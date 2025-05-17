@@ -3,20 +3,27 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module HTTPHeaders (PDF) where
+module HTTPHeaders (PDF, PDFByteString (..)) where
 
 import Data.ByteString.Lazy (ByteString)
+import Data.OpenApi (NamedSchema (..), ToSchema (..), binarySchema)
 import Network.HTTP.Media.MediaType ((//))
 import Servant.API
 
--- PDF MIME type
+-- | PDF ByteString wrapper
+newtype PDFByteString = PDFByteString ByteString
+
+instance ToSchema PDFByteString where
+    declareNamedSchema _ = pure $ NamedSchema (Just "PDF BinaryString") binarySchema
+
+-- | PDF MIME type
 data PDF
 
 instance Accept PDF where
     contentType _ = "application" // "pdf"
 
-instance MimeRender PDF ByteString where
-    mimeRender _ = id
+instance MimeRender PDF PDFByteString where
+    mimeRender _ = \(PDFByteString bs) -> bs
 
 -- Cache-Control Headers
 type HeaderCacheControl = Header "Cache-Control" String

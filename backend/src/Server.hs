@@ -28,7 +28,7 @@ import Data.UUID (toString)
 import Data.Vector
 import Database (getConnection)
 import GHC.Int
-import HTTPHeaders (PDF)
+import HTTPHeaders (PDF, PDFByteString (..))
 import qualified Hasql.Session as Session
 import Network.Wai
 import Network.Wai.Handler.Warp
@@ -48,6 +48,7 @@ type DebugAPI =
 type PublicAPI =
     "ping" :> Get '[JSON] String
         :<|> "users" :> Get '[JSON] [User.User]
+        :<|> "document" :> Get '[PDF] PDFByteString
         :<|> DebugAPI
         :<|> "login"
             :> ReqBody '[JSON] Auth.UserLoginData
@@ -69,7 +70,6 @@ type AuthMethod = '[Cookie]
 type ProtectedAPI =
     Auth AuthMethod Auth.Token :> "protected" :> Get '[JSON] String
         -- in protected for now because their is no ToSchema for ByteString
-        :<|> "document" :> Get '[PDF] ByteString
         :<|> Auth AuthMethod Auth.Token
             :> "register"
             :> ReqBody '[JSON] Auth.UserRegisterData
@@ -99,8 +99,10 @@ debugAPIHandler
         :<|> (CreateCommit -> Handler ExistingCommit)
 debugAPIHandler = getCommitHandler :<|> postCommitHandler
 
-documentHandler :: Handler ByteString
-documentHandler = liftIO $ readFile "static/dummy.pdf"
+documentHandler :: Handler PDFByteString
+documentHandler = liftIO $ do
+    bs <- readFile "static/dummy.pdf"
+    return $ PDFByteString bs
 
 protectedHandler :: AuthResult Auth.Token -> Handler String
 protectedHandler (Authenticated Auth.Token {..}) =
@@ -208,11 +210,11 @@ server cookieSett jwtSett =
     return swagger
         :<|> ( pingHandler
                 :<|> userHandler
+                :<|> documentHandler
                 :<|> debugAPIHandler
                 :<|> loginHandler cookieSett jwtSett
              )
         :<|> ( protectedHandler
-                :<|> documentHandler
                 :<|> registerHandler
              )
 
