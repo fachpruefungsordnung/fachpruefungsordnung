@@ -5,7 +5,6 @@ module VersionControl.Hash
     , Hashed (..)
     , Hash (..)
     , hashed
-    , hashToBS
     )
 where
 
@@ -19,10 +18,11 @@ import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
 import GHC.Int
 
-newtype Hash = Hash ByteString deriving (Show)
-
-hashToBS :: Hash -> ByteString
-hashToBS (Hash bs) = bs
+-- | represents the hash of a value
+newtype Hash = Hash
+    { unHash :: ByteString
+    }
+    deriving (Show)
 
 instance ToJSON Hash where
     toJSON (Hash bs) = Aeson.String $ TE.decodeUtf8 $ encode bs
@@ -33,6 +33,7 @@ instance FromJSON Hash where
             Right bs -> pure (Hash bs)
             Left err -> fail $ "Invalid base16 encoding in Hash: " ++ err
 
+-- | a hashable value
 class Hashable a where
     updateHash :: SHA1.Ctx -> a -> SHA1.Ctx
 
@@ -63,6 +64,7 @@ instance (Hashable a) => Hashable (Maybe a) where
 instance Hashable Text where
     updateHash ctx text = updateHash ctx $ TE.encodeUtf8 text
 
+-- | represents a value together with its hash
 data Hashed a = Hashed Hash a deriving (Show)
 
 instance (Hashable a, ToJSON a) => ToJSON (Hashed a) where
@@ -75,8 +77,10 @@ instance (Hashable a, FromJSON a) => FromJSON (Hashed a) where
             <$> v .: "hash"
             <*> v .: "content"
 
+-- | returns the input together with its hash
 hashed :: (Hashable a) => a -> Hashed a
 hashed x = Hashed (hash x) x
 
+-- | update a hash by applying the value to 'show'
 updateHashShow :: (Show a) => SHA1.Ctx -> a -> SHA1.Ctx
 updateHashShow ctx = SHA1.update ctx . pack . show

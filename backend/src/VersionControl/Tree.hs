@@ -17,7 +17,6 @@ module VersionControl.Tree
     , dataEdges
     , hashedTree
     , hashTree
-    , nodeIDInt32
     , mkTree
     , mkEdge
     )
@@ -34,19 +33,22 @@ import GHC.Generics
 import GHC.Int
 import VersionControl.Hash (Hash (..), Hashable (..), Hashed (..))
 
-newtype NodeID = NodeID Int32 deriving (Show, Generic)
+-- | represents the id of a `Node`
+newtype NodeID = NodeID
+    { unNodeID :: Int32
+    }
+    deriving (Show, Generic)
 
-instance ToJSON NodeID
+instance ToJSON NodeID where
+    toJSON = toJSON . unNodeID
 
-instance FromJSON NodeID
+instance FromJSON NodeID where
+    parseJSON = fmap NodeID . parseJSON
 
 instance Hashable NodeID where
-    updateHash ctx (NodeID i) = updateHash ctx i
+    updateHash ctx nodeID = updateHash ctx $ unNodeID nodeID
 
-nodeIDInt32 :: NodeID -> Int32
-nodeIDInt32 (NodeID i) = i
-
--- either a reference to an object in the database or the object itself
+-- | represents either a reference to an object in the database or the object itself
 data Ref a b
     = Ref a
     | Value b
@@ -67,7 +69,7 @@ instance (FromJSON a, FromJSON b) => FromJSON (Ref a b) where
 
 instance (ToSchema a, ToSchema b) => ToSchema (Ref a b)
 
--- a tree (TODO: rename Object)
+-- | represents a specific document node version tree
 data Tree a = Tree a [Edge a] deriving (Show, Generic)
 
 instance Functor Tree where
@@ -83,13 +85,15 @@ instance (FromJSON a) => FromJSON (Tree a) where
             <$> v .: "node"
             <*> v .: "edges"
 
+-- | the resulting tree does not require any node to have an id specified
 editableTree :: Tree (Hashed NodeWithRef) -> Tree NodeWithMaybeRef
 editableTree = ((\(Hashed _ t) -> toNodeWithMaybeRef t) <$>)
 
+-- | the resulting tree ref does not require any node to have an id specified
 editableTreeRef :: TreeRef (Hashed NodeWithRef) -> TreeRef NodeWithMaybeRef
 editableTreeRef = (editableTree <$>)
 
--- an edge of a tree
+-- | represents an edge of a tree
 data Edge a = Edge Text (TreeRef a) deriving (Show, Generic)
 
 instance Functor Edge where
@@ -105,22 +109,22 @@ instance (FromJSON a) => FromJSON (Edge a) where
             <$> v .: "title"
             <*> v .: "child"
 
--- a reference to a tree
+-- | a reference to a tree
 type TreeRef a = Ref Hash (Tree a)
 
 treeRefHash :: TreeRef (Hashed a) -> Hash
 treeRefHash (Ref ref) = ref
 treeRefHash (Value (Tree (Hashed ref _) _)) = ref
 
--- convenience constructor for an edge
+-- | convenience constructor for an 'Edge'
 mkEdge :: Text -> Tree NodeWithMaybeRef -> Edge NodeWithMaybeRef
 mkEdge label tree = Edge label $ Value tree
 
--- convenience constructor for a tree
+-- | convenience constructor for a 'Tree'
 mkTree :: Node -> [Edge NodeWithMaybeRef] -> Tree NodeWithMaybeRef
 mkTree node = Tree (NodeWithMaybeRef Nothing node)
 
--- construct a hashed tree from a node and its already hashed edges
+-- | construct a hashed 'Tree' from a node and its already hashed edges
 hashedTree
     :: NodeWithRef
     -> [Edge (Hashed NodeWithRef)]
@@ -137,7 +141,7 @@ hashedTree self children =
         updateHash ctx label
             & flip updateHash (treeRefHash childEdge)
 
--- construct a hashed tree
+-- | construct a hashed 'Tree'
 hashTree :: Tree NodeWithRef -> Tree (Hashed NodeWithRef)
 hashTree (Tree self children) = hashedTree self $ hashEdge <$> children
   where
@@ -145,7 +149,7 @@ hashTree (Tree self children) = hashedTree self $ hashEdge <$> children
         Value tree -> Value (hashTree tree)
         Ref ref -> Ref ref
 
--- a node version for a node which might not yet exist
+-- | a node version for a node which might not yet exist
 data NodeWithMaybeRef
     = NodeWithMaybeRef (Maybe NodeID) Node
     deriving (Show)
@@ -167,7 +171,7 @@ instance FromJSON NodeWithMaybeRef where
                     <*> v .: "content"
                 )
 
--- a node version for a node which is guaranteed to already exist
+-- | a node version for a node which is guaranteed to already exist
 data NodeWithRef
     = NodeWithRef NodeID Node
     deriving (Show, Generic)
@@ -198,7 +202,7 @@ instance Hashable NodeWithRef where
 toNodeWithMaybeRef :: NodeWithRef -> NodeWithMaybeRef
 toNodeWithMaybeRef (NodeWithRef ref node) = NodeWithMaybeRef (Just ref) node
 
--- a node version
+-- | a node version
 data Node = Node
     { nodeKind :: Text
     , nodeContent :: Maybe Text
@@ -209,12 +213,12 @@ instance ToJSON Node
 
 instance FromJSON Node
 
--- a relational-style edge
+-- | a relational-style edge
 data DataEdge = DataEdge
-    { edgeParent :: Hash
-    , edgeChild :: Hash
-    , edgeChildPosition :: Int32
-    , edgeChildTitle :: Text
+    { dataEdgeParent :: Hash
+    , dataEdgeChild :: Hash
+    , dataEdgeChildPosition :: Int32
+    , dataEdgeChildTitle :: Text
     }
 
 dataEdges :: Tree (Hashed NodeWithRef) -> [DataEdge]
@@ -223,8 +227,8 @@ dataEdges (Tree (Hashed parentHash _) children) =
   where
     fromEdge position (Edge label child) =
         DataEdge
-            { edgeParent = parentHash
-            , edgeChild = treeRefHash child
-            , edgeChildPosition = position
-            , edgeChildTitle = label
+            { dataEdgeParent = parentHash
+            , dataEdgeChild = treeRefHash child
+            , dataEdgeChildPosition = position
+            , dataEdgeChildTitle = label
             }

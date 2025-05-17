@@ -10,7 +10,6 @@ module VersionControl.Commit
     , CommitID (..)
     , CommitRef
     , commitRefID
-    , commitIDInt32
     , commitMapRoot
     )
 where
@@ -37,25 +36,30 @@ import GHC.Int
 import VersionControl.Hash
 import VersionControl.Tree
 
--- the id of a commit
-newtype CommitID = CommitID Int32 deriving (Show, Generic)
+-- | represents the id of a commit
+newtype CommitID = CommitID
+    { unCommitID :: Int32
+    }
+    deriving (Show, Generic)
 
-instance ToJSON CommitID
-instance FromJSON CommitID
+instance ToJSON CommitID where
+    toJSON = toJSON . unCommitID
 
-instance ToSchema CommitID
+instance FromJSON CommitID where
+    parseJSON = fmap CommitID . parseJSON
 
-commitIDInt32 :: CommitID -> Int32
-commitIDInt32 (CommitID i) = i
+instance ToSchema CommitID where
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
 
--- a reference to a commit or the commit itself
+-- | represents a reference to a commit or the commit itself
 type CommitRef = Ref CommitID ExistingCommit
 
+-- | extracts the 'CommitID' from a 'CommitRef'
 commitRefID :: CommitRef -> CommitID
 commitRefID (Ref ref) = ref
-commitRefID (Value (ExistingCommit header _)) = commitID header
+commitRefID (Value (ExistingCommit header _)) = commitHeaderID header
 
--- contains all information needed to create a new commit
+-- | contains all information needed to create a new commit
 data CreateCommit
     = CreateCommit
         CommitInfo
@@ -87,7 +91,7 @@ instance ToSchema CreateCommit where
                             ]
                     & required .~ ["info", "root"]
 
--- a commit guaranteed to exist in the database
+-- | represents a commit guaranteed to exist in the database
 data ExistingCommit
     = ExistingCommit
         CommitHeader
@@ -121,6 +125,7 @@ instance ToSchema ExistingCommit where
                     & required
                         .~ ["header", "body"]
 
+-- | maps the root node version of a commit by applying it to a given function
 commitMapRoot
     :: (TreeRef (Hashed NodeWithRef) -> TreeRef (Hashed NodeWithRef))
     -> ExistingCommit
@@ -128,7 +133,7 @@ commitMapRoot
 commitMapRoot f (ExistingCommit header (CommitBody info root)) =
     ExistingCommit header (CommitBody info (f root))
 
--- contains the content of an existing commit
+-- | contains the content of an existing commit
 data CommitBody
     = CommitBody
         CommitInfo
@@ -162,29 +167,74 @@ instance ToSchema CommitBody where
                     & required
                         .~ ["info", "root"]
 
--- additional metadata for existing commits
+-- | additional metadata for existing commits
 data CommitHeader = CommitHeader
-    { commitID :: CommitID
-    , creationTs :: LocalTime
+    { commitHeaderID :: CommitID
+    , commitHeaderTimestamp :: LocalTime
     }
     deriving (Show, Generic)
 
-instance ToJSON CommitHeader
+instance ToJSON CommitHeader where
+    toJSON (CommitHeader commitID creationTs) =
+        Aeson.object ["id" .= commitID, "creationTs" .= creationTs]
 
-instance FromJSON CommitHeader
+instance FromJSON CommitHeader where
+    parseJSON = Aeson.withObject "CommitHeader" $ \v ->
+        CommitHeader
+            <$> v .: "id"
+            <*> v .: "creationTs"
 
-instance ToSchema CommitHeader
+instance ToSchema CommitHeader where
+    declareNamedSchema _ = do
+        idSchema <- declareSchemaRef (Proxy :: Proxy CommitID)
+        tsSchema <- declareSchemaRef (Proxy :: Proxy LocalTime)
+        return $
+            NamedSchema (Just "CommitHeader") $
+                mempty
+                    & type_ ?~ OpenApiObject
+                    & properties
+                        .~ InsOrd.fromList
+                            [ ("id", idSchema)
+                            , ("creationTs", tsSchema)
+                            ]
+                    & required .~ ["id", "creationTs"]
 
--- metadata about a commit
+-- | metadata about a commit
 data CommitInfo = CommitInfo
-    { commitAuthor :: UUID
-    , commitMessage :: Maybe Text
-    , parentCommit :: Maybe CommitRef
+    { commitInfoAuthor :: UUID
+    , commitInfoMessage :: Maybe Text
+    , commitInfoParent :: Maybe CommitRef
     }
     deriving (Show, Generic)
 
-instance ToJSON CommitInfo
+instance ToJSON CommitInfo where
+    toJSON (CommitInfo author message parent) =
+        Aeson.object
+            [ "author" .= author
+            , "message" .= message
+            , "parent" .= parent
+            ]
 
-instance FromJSON CommitInfo
+instance FromJSON CommitInfo where
+    parseJSON = Aeson.withObject "CommitInfo" $ \v ->
+        CommitInfo
+            <$> v .: "author"
+            <*> v .: "message"
+            <*> v .: "parent"
 
-instance ToSchema CommitInfo
+instance ToSchema CommitInfo where
+    declareNamedSchema _ = do
+        authorSchema <- declareSchemaRef (Proxy :: Proxy UUID)
+        messageSchema <- declareSchemaRef (Proxy :: Proxy (Maybe Text))
+        parentSchema <- declareSchemaRef (Proxy :: Proxy (Maybe CommitRef))
+        return $
+            NamedSchema (Just "CommitInfo") $
+                mempty
+                    & type_ ?~ OpenApiObject
+                    & properties
+                        .~ InsOrd.fromList
+                            [ ("author", authorSchema)
+                            , ("message", messageSchema)
+                            , ("parent", parentSchema)
+                            ]
+                    & required .~ ["author"]
