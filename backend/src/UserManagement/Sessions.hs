@@ -37,7 +37,7 @@ getAllUserRoles uid = statement uid Statements.getAllUserRoles
 getUserRoleInGroup :: UUID -> Text -> Session (Maybe Text)
 getUserRoleInGroup uid group = statement (uid, group) Statements.getUserRoleInGroup
 
-putUser :: User.User -> Session Int32
+putUser :: User.User -> Session UUID
 putUser user = statement user Statements.putUser
 
 addGroup :: Text -> Maybe Text -> Session Int32

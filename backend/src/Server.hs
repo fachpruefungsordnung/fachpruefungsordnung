@@ -142,7 +142,7 @@ registerHandler :: AuthResult Auth.Token -> Auth.UserRegisterData -> Handler NoC
 registerHandler (Authenticated Auth.Token{..}) (Auth.UserRegisterData{..}) = do
     eConn <- liftIO getConnection
     case eConn of
-        Left _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
+        Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
         Right conn -> do
             eRole <- liftIO $ Session.run (Sessions.getUserRoleInGroup subject groupName) conn
             case eRole of 

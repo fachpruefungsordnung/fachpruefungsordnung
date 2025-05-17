@@ -92,14 +92,14 @@ getAllUserRoles = rmap toList
   |]
 
 
-putUser :: Statement User.User Int32
+putUser :: Statement User.User UUID
 putUser =
     lmap
         (\(User.User name email pwhash) -> (name, email, pwhash))
         [singletonStatement|
       insert into users (name, email, pwhash)
       values ($1 :: text, $2 :: text, $3 :: text)
-      returning id :: int4
+      returning id :: uuid
     |]
 
 addGroup :: Statement (Text, Maybe Text) Int32

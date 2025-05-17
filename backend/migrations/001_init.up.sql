@@ -6,9 +6,9 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 INSERT INTO
-    users (name, email, pwhash)
+    users (id, name, email, pwhash)
 VALUES
-    ('test', 'test@test.com', '$argon2id$v=19$m=65536,t=2,p=1$07P6YJS1ZkVWh7aA5nBB4A$nhMV4SKqiZp8KqMvKnU1kPwAApPLkrOHcDXUdNA+2eQ');
+    ('7f59659a-9a46-4ba0-a911-09698107a6ea', 'test', 'test@test.com', '$argon2id$v=19$m=65536,t=2,p=1$07P6YJS1ZkVWh7aA5nBB4A$nhMV4SKqiZp8KqMvKnU1kPwAApPLkrOHcDXUdNA+2eQ');
 
 CREATE TYPE ROLE AS ENUM ('admin', 'user');
 
@@ -17,6 +17,11 @@ CREATE TABLE IF NOT EXISTS groups (
     name TEXT NOT NULL UNIQUE,
     description TEXT
 );
+
+INSERT INTO 
+    groups (name, description)
+VALUES
+    ('testgruppe', 'this is a group to test the user system.');
 
 CREATE TABLE IF NOT EXISTS roles (
     user_id UUID NOT NULL,
@@ -27,7 +32,13 @@ CREATE TABLE IF NOT EXISTS roles (
     FOREIGN KEY (group_id) REFERENCES groups (id) ON DELETE CASCADE
 );
 
+INSERT INTO 
+    roles (user_id, group_id, role)
+VALUES
+    ('7f59659a-9a46-4ba0-a911-09698107a6ea', 1, 'admin');
+
 CREATE TABLE IF NOT EXISTS superadmins (
     user_id UUID NOT NULL,
-    PRIMARY KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    PRIMARY KEY (user_id),
+    FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
