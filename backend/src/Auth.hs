@@ -3,15 +3,17 @@
 
 module Auth (Token (..), UserLoginData (..), UserRegisterData (..)) where
 
-import Data.Aeson ( FromJSON, ToJSON )
+import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
-import Data.Text ( Text )
-import Data.UUID ( UUID )
-import GHC.Generics ( Generic )
-import Servant.Auth.Server ( FromJWT, ToJWT )
+import Data.Text (Text)
+import Data.UUID (UUID)
+import GHC.Generics (Generic)
+import Servant.Auth.Server (FromJWT, ToJWT)
 
-data Token = Token { subject :: UUID
-                   , isSuperadmin :: Bool}
+data Token = Token
+    { subject :: UUID
+    , isSuperadmin :: Bool
+    }
     deriving (Generic, ToJSON, ToJWT, FromJSON, FromJWT)
 
 data UserLoginData = UserLoginData
