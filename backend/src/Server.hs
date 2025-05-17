@@ -13,6 +13,7 @@ import qualified Auth
 import Control.Lens
 import Control.Monad.IO.Class
 import Crypto.JOSE.JWK (JWK)
+import Data.ByteString.Lazy (ByteString, readFile)
 import Data.OpenApi
     ( OpenApi
     , description
@@ -27,6 +28,7 @@ import Data.UUID ( toString )
 import Data.Vector
 import Database (getConnection)
 import GHC.Int
+import HTTPHeaders (PDF)
 import qualified Hasql.Session as Session
 import Network.Wai
 import Network.Wai.Handler.Warp
@@ -37,6 +39,7 @@ import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 import qualified VersionControl as VC
 import VersionControl.Commit
+import Prelude hiding (readFile)
 
 type DebugAPI =
     "commits" :> Capture "id" Int32 :> Get '[JSON] ExistingCommit
@@ -59,6 +62,8 @@ type PublicAPI =
 
 type ProtectedAPI auths =
          Auth auths Auth.Token :> "protected" :> Get '[JSON] String
+        -- in protected for now because their is no ToSchema for ByteString
+    :<|> "document" :> Get '[PDF] ByteString
     :<|> Auth auths Auth.Token :> "register"
                                 :> ReqBody '[JSON] Auth.UserRegisterData
                                 :> Post '[JSON] NoContent
@@ -86,6 +91,9 @@ debugAPIHandler
     :: (Int32 -> Handler ExistingCommit)
         :<|> (CreateCommit -> Handler ExistingCommit)
 debugAPIHandler = getCommitHandler :<|> postCommitHandler
+
+documentHandler :: Handler ByteString
+documentHandler = liftIO $ readFile "static/dummy.pdf"
 
 protectedHandler :: AuthResult Auth.Token -> Handler String
 protectedHandler (Authenticated Auth.Token {..}) =
@@ -190,8 +198,10 @@ server cookieSett jwtSett =
                 :<|> loginHandler cookieSett jwtSett
                 
              )
-        :<|> ( protectedHandler 
-                :<|> registerHandler)
+        :<|> ( protectedHandler
+                :<|> documentHandler
+                :<|> registerHandler
+             )
 
 documentedAPI :: Proxy (DocumentedAPI '[JWT, Cookie])
 documentedAPI = Proxy

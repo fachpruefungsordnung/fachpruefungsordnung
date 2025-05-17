@@ -48,6 +48,7 @@ dependencies:
   - wai-app-static
   - warp
   - http-types
+  - http-media
   - aeson
   - template-haskell
   - filepath

@@ -49,8 +49,8 @@ COPY app/ app/
 
 # build project
 RUN --mount=type=cache,target=/root/.stack/ \
-  --mount=type=cache,target=/build/.stack-work/ \
-  stack build --copy-bins --local-bin-path /build/bin\
+--mount=type=cache,target=/build/.stack-work/ \
+stack build --copy-bins --local-bin-path /build/bin\
   --extra-include-dirs=/usr/include/postgresql \
   --extra-lib-dirs=/usr/lib/x86_64-linux-gnu
 
@@ -64,6 +64,7 @@ WORKDIR /home
 
 COPY --from=build /build/bin/backend-exe /home/bin/backend-exe
 COPY migrations/ migrations/
+COPY static/ static/
 
 ENV MIGRATIONS_DIR=/home/migrations/
 
