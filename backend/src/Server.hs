@@ -69,7 +69,6 @@ type AuthMethod = '[Cookie]
 
 type ProtectedAPI =
     Auth AuthMethod Auth.Token :> "protected" :> Get '[JSON] String
-        -- in protected for now because their is no ToSchema for ByteString
         :<|> Auth AuthMethod Auth.Token
             :> "register"
             :> ReqBody '[JSON] Auth.UserRegisterData
