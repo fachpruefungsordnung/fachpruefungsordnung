@@ -1,4 +1,6 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module VersionControl.Hash
     ( Hashable (..)
@@ -8,12 +10,25 @@ module VersionControl.Hash
     )
 where
 
+import Control.Lens ((.~), (?~))
 import qualified Crypto.Hash.SHA1 as SHA1
 import Data.Aeson (FromJSON (..), ToJSON (..), (.:), (.=))
 import qualified Data.Aeson as Aeson
 import Data.ByteString (ByteString)
 import Data.ByteString.Base64 (decode, encode)
 import Data.ByteString.Char8 (pack)
+import Data.Function ((&))
+import qualified Data.HashMap.Strict.InsOrd as InsOrd
+import Data.OpenApi
+    ( NamedSchema (..)
+    , OpenApiType (..)
+    , ToSchema (..)
+    , declareSchemaRef
+    , properties
+    , required
+    , type_
+    )
+import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
 import GHC.Int
@@ -32,6 +47,9 @@ instance FromJSON Hash where
         case decode (TE.encodeUtf8 t) of
             Right bs -> pure (Hash bs)
             Left err -> fail $ "Invalid base16 encoding in Hash: " ++ err
+
+instance ToSchema Hash where
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy String)
 
 -- | a hashable value
 class Hashable a where
@@ -76,6 +94,23 @@ instance (Hashable a, FromJSON a) => FromJSON (Hashed a) where
         Hashed
             <$> v .: "hash"
             <*> v .: "content"
+
+instance (ToSchema a) => ToSchema (Hashed a) where
+    declareNamedSchema _ = do
+        hashSchema <- declareSchemaRef (Proxy :: Proxy Hash)
+        contentSchema <- declareSchemaRef (Proxy :: Proxy a)
+        return $
+            NamedSchema (Just "Hashed") $
+                mempty
+                    & type_
+                        ?~ OpenApiObject
+                    & properties
+                        .~ InsOrd.fromList
+                            [ ("hash", hashSchema)
+                            , ("content", contentSchema)
+                            ]
+                    & required
+                        .~ ["hash", "content"]
 
 -- | returns the input together with its hash
 hashed :: (Hashable a) => a -> Hashed a

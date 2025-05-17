@@ -1,5 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module VersionControl.Tree
     ( Tree (..)
@@ -23,11 +25,22 @@ module VersionControl.Tree
 where
 
 import Control.Applicative ((<|>))
+import Control.Lens ((.~), (?~))
 import qualified Crypto.Hash.SHA1 as SHA1
 import Data.Aeson (FromJSON (..), ToJSON (..), (.:), (.=))
 import qualified Data.Aeson as Aeson
 import Data.Function ((&))
-import Data.OpenApi (ToSchema)
+import qualified Data.HashMap.Strict.InsOrd as InsOrd
+import Data.OpenApi
+    ( NamedSchema (..)
+    , OpenApiType (..)
+    , ToSchema (..)
+    , declareSchemaRef
+    , properties
+    , required
+    , type_
+    )
+import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import GHC.Generics
 import GHC.Int
@@ -44,6 +57,9 @@ instance ToJSON NodeID where
 
 instance FromJSON NodeID where
     parseJSON = fmap NodeID . parseJSON
+
+instance ToSchema NodeID where
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
 
 instance Hashable NodeID where
     updateHash ctx nodeID = updateHash ctx $ unNodeID nodeID
@@ -70,7 +86,7 @@ instance (FromJSON a, FromJSON b) => FromJSON (Ref a b) where
 instance (ToSchema a, ToSchema b) => ToSchema (Ref a b)
 
 -- | represents a specific document node version tree
-data Tree a = Tree a [Edge a] deriving (Show, Generic)
+data Tree a = Tree a [Edge a] deriving (Show)
 
 instance Functor Tree where
     fmap f (Tree a edges) = Tree (f a) $ fmap f <$> edges
@@ -85,6 +101,21 @@ instance (FromJSON a) => FromJSON (Tree a) where
             <$> v .: "node"
             <*> v .: "edges"
 
+instance (ToSchema a) => ToSchema (Tree a) where
+    declareNamedSchema _ = do
+        nodeSchema <- declareSchemaRef (Proxy :: Proxy a)
+        edgesSchema <- declareSchemaRef (Proxy :: Proxy [Edge a])
+        return $
+            NamedSchema (Just "Tree") $
+                mempty
+                    & type_ ?~ OpenApiObject
+                    & properties
+                        .~ InsOrd.fromList
+                            [ ("node", nodeSchema)
+                            , ("edges", edgesSchema)
+                            ]
+                    & required .~ ["node", "edges"]
+
 -- | the resulting tree does not require any node to have an id specified
 editableTree :: Tree (Hashed NodeWithRef) -> Tree NodeWithMaybeRef
 editableTree = ((\(Hashed _ t) -> toNodeWithMaybeRef t) <$>)
@@ -94,7 +125,7 @@ editableTreeRef :: TreeRef (Hashed NodeWithRef) -> TreeRef NodeWithMaybeRef
 editableTreeRef = (editableTree <$>)
 
 -- | represents an edge of a tree
-data Edge a = Edge Text (TreeRef a) deriving (Show, Generic)
+data Edge a = Edge Text (TreeRef a) deriving (Show)
 
 instance Functor Edge where
     fmap f (Edge label treeRef) = Edge label $ fmap f <$> treeRef
@@ -109,9 +140,25 @@ instance (FromJSON a) => FromJSON (Edge a) where
             <$> v .: "title"
             <*> v .: "child"
 
+instance (ToSchema a) => ToSchema (Edge a) where
+    declareNamedSchema _ = do
+        labelSchema <- declareSchemaRef (Proxy :: Proxy Text)
+        refSchema <- declareSchemaRef (Proxy :: Proxy (TreeRef a))
+        return $
+            NamedSchema (Just "Edge") $
+                mempty
+                    & type_ ?~ OpenApiObject
+                    & properties
+                        .~ InsOrd.fromList
+                            [ ("title", labelSchema)
+                            , ("child", refSchema)
+                            ]
+                    & required .~ ["title", "child"]
+
 -- | a reference to a tree
 type TreeRef a = Ref Hash (Tree a)
 
+-- | extract the 'Hash' from a hashed 'TreeRef'
 treeRefHash :: TreeRef (Hashed a) -> Hash
 treeRefHash (Ref ref) = ref
 treeRefHash (Value (Tree (Hashed ref _) _)) = ref
@@ -171,6 +218,25 @@ instance FromJSON NodeWithMaybeRef where
                     <*> v .: "content"
                 )
 
+instance ToSchema NodeWithMaybeRef where
+    declareNamedSchema _ = do
+        idSchema <- declareSchemaRef (Proxy :: Proxy (Maybe NodeID))
+        kindSchema <- declareSchemaRef (Proxy :: Proxy String)
+        contentSchema <- declareSchemaRef (Proxy :: Proxy Node)
+        return
+            $ NamedSchema
+                (Just "NodeWithMaybeRef")
+            $ mempty
+                & type_
+                    ?~ OpenApiObject
+                & properties
+                    .~ InsOrd.fromList
+                        [ ("id", idSchema)
+                        , ("kind", kindSchema)
+                        , ("content", contentSchema)
+                        ]
+                & required .~ ["kind", "content"]
+
 -- | a node version for a node which is guaranteed to already exist
 data NodeWithRef
     = NodeWithRef NodeID Node
@@ -193,6 +259,25 @@ instance FromJSON NodeWithRef where
                     <*> v .: "content"
                 )
 
+instance ToSchema NodeWithRef where
+    declareNamedSchema _ = do
+        idSchema <- declareSchemaRef (Proxy :: Proxy NodeID)
+        kindSchema <- declareSchemaRef (Proxy :: Proxy String)
+        contentSchema <- declareSchemaRef (Proxy :: Proxy Node)
+        return
+            $ NamedSchema
+                (Just "NodeWithRef")
+            $ mempty
+                & type_
+                    ?~ OpenApiObject
+                & properties
+                    .~ InsOrd.fromList
+                        [ ("id", idSchema)
+                        , ("kind", kindSchema)
+                        , ("content", contentSchema)
+                        ]
+                & required .~ ["id", "kind", "content"]
+
 instance Hashable NodeWithRef where
     updateHash ctx (NodeWithRef ref node) =
         updateHash ctx ref
@@ -212,6 +297,8 @@ data Node = Node
 instance ToJSON Node
 
 instance FromJSON Node
+
+instance ToSchema Node
 
 -- | a relational-style edge
 data DataEdge = DataEdge

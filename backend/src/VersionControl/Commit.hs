@@ -79,7 +79,7 @@ instance FromJSON CreateCommit where
 instance ToSchema CreateCommit where
     declareNamedSchema _ = do
         infoSchema <- declareSchemaRef (Proxy :: Proxy CommitInfo)
-        rootSchema <- declareSchemaRef (Proxy :: Proxy Text) -- TODO!
+        rootSchema <- declareSchemaRef (Proxy :: Proxy (TreeRef NodeWithMaybeRef))
         return $
             NamedSchema (Just "CreateCommit") $
                 mempty
@@ -153,7 +153,7 @@ instance FromJSON CommitBody where
 instance ToSchema CommitBody where
     declareNamedSchema _ = do
         infoSchema <- declareSchemaRef (Proxy :: Proxy CommitInfo)
-        rootSchema <- declareSchemaRef (Proxy :: Proxy Text) -- Todo
+        rootSchema <- declareSchemaRef (Proxy :: Proxy (TreeRef (Hashed NodeWithRef)))
         return $
             NamedSchema (Just "CommitBody") $
                 mempty
