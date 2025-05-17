@@ -23,7 +23,7 @@ import Data.OpenApi
     , version
     )
 import Data.Password.Argon2
-import qualified Data.Text as T
+import Data.UUID ( toString )
 import Data.Vector
 import Database (getConnection)
 import GHC.Int
@@ -56,12 +56,12 @@ type PublicAPI =
                      ]
                     NoContent
                 )
-        :<|> "register"
-            :> ReqBody '[JSON] Auth.UserRegisterData
-            :> Post '[JSON] NoContent
 
 type ProtectedAPI auths =
-    Auth auths Auth.Token :> "protected" :> Get '[JSON] String
+         Auth auths Auth.Token :> "protected" :> Get '[JSON] String
+    :<|> Auth auths Auth.Token :> "register"
+                                :> ReqBody '[JSON] Auth.UserRegisterData
+                                :> Post '[JSON] NoContent
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -89,7 +89,7 @@ debugAPIHandler = getCommitHandler :<|> postCommitHandler
 
 protectedHandler :: AuthResult Auth.Token -> Handler String
 protectedHandler (Authenticated Auth.Token {..}) =
-    return $ "This is very private content of " <> T.unpack unToken <> "!"
+    return $ "This is very private content of " <> toString subject <> "!"
 protectedHandler _ =
     throwError
         err403
@@ -116,46 +116,58 @@ loginHandler cookieSett jwtSett Auth.UserLoginData {..} = do
     case eConn of
         Left _ -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
         Right conn -> do
-            eUser <- liftIO $ Session.run (Sessions.getUser loginEmail) conn
+            eUser <- liftIO $ Session.run (Sessions.getLoginRequirements loginEmail) conn
             case eUser of
-                Right (Just User.User {..}) -> do
+                Right (Just (uid, pwhash)) -> do
                     let passwordCheck = checkPassword (mkPassword loginPassword) (PasswordHash pwhash)
                     case passwordCheck of
                         PasswordCheckFail -> throwError $ err401 {errBody = "email or password incorrect\n"}
                         PasswordCheckSuccess -> do
                             mLoginAccepted <-
-                                liftIO $ acceptLogin cookieSett jwtSett (Auth.Token loginEmail)
+                                liftIO $ acceptLogin cookieSett jwtSett (Auth.Token uid False)
                             case mLoginAccepted of
                                 Nothing -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
                                 Just addHeaders -> return $ addHeaders NoContent
                 _ -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
 
-registerHandler :: Auth.UserRegisterData -> Handler NoContent
-registerHandler Auth.UserRegisterData {..} = do
+registerHandler :: AuthResult Auth.Token -> Auth.UserRegisterData -> Handler NoContent
+registerHandler (Authenticated Auth.Token{..}) (Auth.UserRegisterData{..}) = do
     eConn <- liftIO getConnection
     case eConn of
         Left _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
         Right conn -> do
-            eUser <- liftIO $ Session.run (Sessions.getUser registerEmail) conn
-            case eUser of
-                Right Nothing -> do
-                    PasswordHash hashedText <- liftIO $ hashPassword $ mkPassword registerPassword
-                    eAction <-
-                        liftIO $
-                            Session.run
-                                ( Sessions.putUser
-                                    ( User.User
-                                        registerName
-                                        registerEmail
-                                        hashedText
-                                    )
-                                )
-                                conn
-                    case eAction of
-                        Left _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
-                        Right _ -> do
-                            return NoContent
+            eRole <- liftIO $ Session.run (Sessions.getUserRoleInGroup subject groupName) conn
+            case eRole of 
+                Right (Just role) -> 
+                    if role /= "admin" 
+                    then throwError $ err401 {errBody = "unauthorized! you must be admin of the specified group to perform this action!\n"}
+                    else do
+                        eUser <- liftIO $ Session.run (Sessions.getUser registerEmail) conn
+                        case eUser of
+                            Right Nothing -> do
+                                PasswordHash hashedText <- liftIO $ hashPassword $ mkPassword registerPassword
+                                eAction <-
+                                    liftIO $
+                                        Session.run
+                                            ( Sessions.putUser
+                                                ( User.User
+                                                    registerName
+                                                    registerEmail
+                                                    hashedText
+                                                )
+                                            )
+                                            conn
+                                case eAction of
+                                    Left _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
+                                    Right _ -> do
+                                        return NoContent
+                            _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
                 _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
+registerHandler _ _ =
+    throwError
+        err403
+            { errBody = "Not allowed! You need to login to see this content.\n"
+            }
 
 api :: Proxy PublicAPI
 api = Proxy
@@ -176,9 +188,10 @@ server cookieSett jwtSett =
                 :<|> userHandler
                 :<|> debugAPIHandler
                 :<|> loginHandler cookieSett jwtSett
-                :<|> registerHandler
+                
              )
-        :<|> protectedHandler
+        :<|> ( protectedHandler 
+                :<|> registerHandler)
 
 documentedAPI :: Proxy (DocumentedAPI '[JWT, Cookie])
 documentedAPI = Proxy
