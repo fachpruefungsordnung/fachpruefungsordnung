@@ -15,7 +15,11 @@ createCommit (CreateCommit info commitRoot) = do
     root <- putVersionByRef commitRoot
     let body = CommitBody info root
     header <- statement body Statements.createCommit
+    mapM_ putRel $ commitRels $ commitHeaderID header
     return $ ExistingCommit header body
+  where
+    commitRels self = flip CommitRel self <$> commitInfoParents info
+    putRel rel = statement rel Statements.putCommitRel
 
 -- | transaction for putting a document node version by its ref into the database
 putVersionByRef

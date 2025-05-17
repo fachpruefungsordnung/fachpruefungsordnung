@@ -23,7 +23,8 @@ import VersionControl.Tree
 getCommit :: CommitID -> Session ExistingCommit
 getCommit commitID = do
     commit <- statement commitID Statements.getCommit
-    replaceRoot commit
+    commitParentIDs <- statement commitID Statements.getCommitParentIDs
+    replaceRoot $ commit $ toList commitParentIDs
   where
     replaceRoot (ExistingCommit header (CommitBody info (Ref ref))) = do
         valueRoot <- getVersion ref

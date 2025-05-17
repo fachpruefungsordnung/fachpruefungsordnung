@@ -7,6 +7,8 @@ module VersionControl.Statements
     , putVersion
     , putEdge
     , createCommit
+    , putCommitRel
+    , getCommitParentIDs
     , getCommit
     , getChildrenByParentHash
     , getVersion
@@ -123,24 +125,51 @@ createCommit =
                 ( commitInfoAuthor info
                 , commitInfoMessage info
                 , unHash $ treeRefHash root
-                , unCommitID . commitRefID <$> commitInfoParent info
                 )
             )
             [singletonStatement|
-      insert into commits (author, message, root, parent)
-      values ($1 :: uuid, $2 :: text?, $3 :: bytea, $4 :: int4?)
-      returning id :: int4, creation_ts :: timestamp
+            insert into
+                commits (author, message, root)
+            values
+                ($1 :: uuid, $2 :: text?, $3 :: bytea)
+            returning
+                id :: int4, creation_ts :: timestamp
+            |]
+
+putCommitRel :: Statement CommitRel ()
+putCommitRel =
+    lmap
+        (\(CommitRel parent child) -> (unCommitID parent, unCommitID child))
+        [resultlessStatement|
+        insert into
+            commit_trees (parent, child)
+        values
+            ($1 :: int4, $2 :: int4)
     |]
 
+getCommitParentIDs :: Statement CommitID (Vector CommitID)
+getCommitParentIDs =
+    rmap (fmap CommitID) $
+        lmap
+            unCommitID
+            [vectorStatement|
+                select
+                    parent :: int4
+                from
+                    commit_trees
+                where
+                    child = $1 :: int4
+            |]
+
 -- | statement to get a commit by its 'CommitID'
-getCommit :: Statement CommitID ExistingCommit
+getCommit :: Statement CommitID ([CommitID] -> ExistingCommit)
 getCommit =
     rmap
-        ( \(ref, ts, author, message, root, parent) ->
+        ( \(ref, ts, author, message, root) parents ->
             ExistingCommit
                 (CommitHeader (CommitID ref) ts)
                 ( CommitBody
-                    (CommitInfo author message (Ref . CommitID <$> parent))
+                    (CommitInfo author message parents)
                     (Ref (Hash root))
                 )
         )
@@ -152,8 +181,7 @@ getCommit =
           creation_ts :: timestamp,
           author :: uuid,
           message :: text?,
-          root :: bytea,
-          parent :: int4?
+          root :: bytea
         from
           commits
         where

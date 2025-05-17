@@ -9,6 +9,7 @@ module VersionControl.Commit
     , CommitBody (..)
     , CommitID (..)
     , CommitRef
+    , CommitRel (..)
     , commitRefID
     , commitMapRoot
     )
@@ -94,8 +95,9 @@ instance ToSchema CreateCommit where
 -- | represents a commit guaranteed to exist in the database
 data ExistingCommit
     = ExistingCommit
-        CommitHeader
-        CommitBody
+    { existingCommitHeader :: CommitHeader
+    , existingCommitBody :: CommitBody
+    }
     deriving (Show)
 
 instance ToJSON ExistingCommit where
@@ -203,7 +205,7 @@ instance ToSchema CommitHeader where
 data CommitInfo = CommitInfo
     { commitInfoAuthor :: UUID
     , commitInfoMessage :: Maybe Text
-    , commitInfoParent :: Maybe CommitRef
+    , commitInfoParents :: [CommitID]
     }
     deriving (Show, Generic)
 
@@ -238,3 +240,9 @@ instance ToSchema CommitInfo where
                             , ("parent", parentSchema)
                             ]
                     & required .~ ["author"]
+
+-- | describes a parent-child relation between two commits
+data CommitRel = CommitRel
+    { commitRelParent :: CommitID
+    , commitRelChild :: CommitID
+    }
