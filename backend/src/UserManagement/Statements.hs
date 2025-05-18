@@ -116,3 +116,15 @@ addRole =
       insert into roles (user_id, group_id, role)
       values ($1 :: uuid, $2 :: int4, $3 :: text)
     |]
+
+
+-- | get all Users that have any role in the given group
+getUsersOfGroup :: Statement Int32 [User.UserInfo]
+getUsersOfGroup = rmap (fmap (\(id, name, email, role) -> User.UserInfo id name email (read $ unpack role)) . toList)
+  [vectorStatement|
+    select u.id :: uuid, u.name :: text, u.email :: text, r.role :: text
+    from users u
+    join roles r on u.id = r.user_id
+    join groups g on g.id = r.group_id
+    where g.id = $1 :: int4
+  |]
