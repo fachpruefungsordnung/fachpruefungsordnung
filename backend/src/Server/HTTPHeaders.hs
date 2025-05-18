@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module HTTPHeaders (PDF, PDFByteString (..)) where
+module Server.HTTPHeaders (PDF, PDFByteString (..)) where
 
 import Data.ByteString.Lazy (ByteString)
 import Data.OpenApi (NamedSchema (..), ToSchema (..), binarySchema)

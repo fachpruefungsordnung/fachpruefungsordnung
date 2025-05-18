@@ -59,7 +59,7 @@ getUser =
      where email = $1 :: text
    |]
 
-getUserRoleInGroup :: Statement (UUID, Text) (Maybe Text)
+getUserRoleInGroup :: Statement (UUID, Int32) (Maybe Text)
 getUserRoleInGroup = 
   rmap
       (listToMaybe . toList) 
@@ -69,7 +69,7 @@ getUserRoleInGroup =
         from users u
         join roles r on u.id = r.user_id
         join groups g on g.id = r.group_id
-        where u.id = $1 :: uuid and g.name = $2 :: text
+        where u.id = $1 :: uuid and g.id = $2 :: int4
       |]
 
 getUsers :: Statement () (Vector User.User)
@@ -81,10 +81,10 @@ getUsers =
       from users
     |]
 
-getAllUserRoles :: Statement UUID [(Text, Text)]
+getAllUserRoles :: Statement UUID [(Int32, Text)]
 getAllUserRoles = rmap toList
   [vectorStatement|
-    select g.name :: text, r.role :: text
+    select g.id :: int4, r.role :: text
     from users u
     join roles r on u.id = r.user_id
     join groups g on g.id = r.group_id
@@ -112,7 +112,7 @@ addGroup =
 
 addRole :: Statement (UUID, Int32, Text) ()
 addRole = 
-        [singletonStatement|
+        [resultlessStatement|
       insert into roles (user_id, group_id, role)
       values ($1 :: uuid, $2 :: int4, $3 :: text)
     |]

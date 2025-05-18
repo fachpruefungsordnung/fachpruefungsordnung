@@ -1,8 +1,13 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module UserManagement.User
     ( User (..),
-      FullUser(..)
+      FullUser(..),
+      Role (..),
+      roleToText,
+      textToRole
     )
 where
 
@@ -39,3 +44,19 @@ instance ToJSON FullUser
 instance FromJSON FullUser
 
 instance ToSchema FullUser
+
+
+data Role = Member | Admin
+  deriving (Eq, Show, Generic)
+
+-- Convert to/from Text
+roleToText :: Role -> Text
+roleToText = \case
+  Member  -> "user"
+  Admin -> "admin"
+
+textToRole :: Text -> Maybe Role
+textToRole = \case
+  "user"  -> Just Member
+  "admin" -> Just Admin
+  _       -> Nothing

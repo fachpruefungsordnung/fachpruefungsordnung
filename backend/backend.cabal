@@ -19,11 +19,9 @@ extra-source-files:
 
 library
   exposed-modules:
-      Auth
       Control.Applicative.Utils
       Data.Text.FromWhitespace
       Database
-      HTTPHeaders
       Language.Ltml.AST.Block
       Language.Ltml.AST.Document
       Language.Ltml.AST.Format
@@ -36,6 +34,8 @@ library
       Language.Ltml.Parser.MiTree
       Lib
       Server
+      Server.Auth
+      Server.HTTPHeaders
       UserManagement.Sessions
       UserManagement.Statements
       UserManagement.User

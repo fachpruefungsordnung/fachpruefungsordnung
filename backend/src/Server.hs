@@ -9,7 +9,7 @@
 
 module Server (runServer, DocumentedAPI, PublicAPI, jwtSettings, cookieSettings, app, server) where
 
-import qualified Auth
+import qualified Server.Auth as Auth
 import Control.Lens
 import Control.Monad.IO.Class
 import Crypto.JOSE.JWK (JWK)
@@ -24,11 +24,11 @@ import Data.OpenApi
     , version
     )
 import Data.Password.Argon2
-import Data.UUID (toString)
+import Data.UUID (UUID, toString)
 import Data.Vector
 import Database (getConnection)
 import GHC.Int
-import HTTPHeaders (PDF, PDFByteString (..))
+import Server.HTTPHeaders (PDF, PDFByteString (..))
 import qualified Hasql.Session as Session
 import Network.Wai
 import Network.Wai.Handler.Warp
@@ -68,11 +68,25 @@ type PublicAPI =
 type AuthMethod = '[Cookie]
 
 type ProtectedAPI =
-    Auth AuthMethod Auth.Token :> "protected" :> Get '[JSON] String
-        :<|> Auth AuthMethod Auth.Token
-            :> "register"
-            :> ReqBody '[JSON] Auth.UserRegisterData
-            :> Post '[JSON] NoContent
+         Auth AuthMethod Auth.Token 
+        :> "protected" 
+        :> Get '[JSON] String
+    :<|> Auth AuthMethod Auth.Token
+        :> "register"
+        :> ReqBody '[JSON] Auth.UserRegisterData
+        :> Post '[JSON] NoContent
+    :<|> Auth AuthMethod Auth.Token
+        :> "user"
+        :> Capture "userId" UUID
+        :> Get '[JSON] User.FullUser
+    :<|> Auth AuthMethod Auth.Token
+        :> "user"
+        :> Capture "userId" UUID
+        :> Delete '[JSON] NoContent
+    :<|> Auth AuthMethod Auth.Token
+        :> "user"
+        :> ReqBody '[JSON] Auth.UserUpdate
+        :> Patch '[JSON] NoContent
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -154,10 +168,10 @@ registerHandler (Authenticated Auth.Token {..}) (Auth.UserRegisterData {..}) = d
         Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
         Right conn -> do
             eRole <-
-                liftIO $ Session.run (Sessions.getUserRoleInGroup subject groupName) conn
+                liftIO $ Session.run (Sessions.getUserRoleInGroup subject groupID) conn
             case eRole of
                 Right (Just role) ->
-                    if role /= "admin"
+                    if role /= User.Admin
                         then
                             throwError $
                                 err401
@@ -181,15 +195,60 @@ registerHandler (Authenticated Auth.Token {..}) (Auth.UserRegisterData {..}) = d
                                                 )
                                                 conn
                                     case eAction of
-                                        Left _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
-                                        Right _ -> do
-                                            return NoContent
+                                        Left _ -> throwError $ err401 {errBody = "user creation failed!\n"}
+                                        Right userID -> do
+                                            eAction' <- liftIO $ Session.run (Sessions.addRole userID groupID User.Member) conn
+                                            case eAction' of
+                                                Left _ -> throwError $ err401 {errBody = "failed to assign role!\n"} -- need to delete user here!
+                                                Right _ -> return NoContent
+                                            
                                 _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
                 _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
 registerHandler _ _ =
     throwError
         err403
-            { errBody = "Not allowed! You need to login to see this content.\n"
+            { errBody = "Not allowed! You need to login to perform this action.\n"
+            }
+
+getUserHandler 
+    :: AuthResult Auth.Token -> UUID -> Handler User.FullUser
+getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
+    eConn <- liftIO getConnection
+    case eConn of
+        Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
+        Right conn -> do undefined
+getUserHandler _ _ =
+    throwError
+        err403
+            { errBody = "Not allowed! You need to login to perform this action.\n"
+            }
+
+deleteUserHandler
+    :: AuthResult Auth.Token -> UUID -> Handler NoContent
+deleteUserHandler (Authenticated Auth.Token {..}) requestedUserID = 
+    if isSuperadmin then do
+        eConn <- liftIO getConnection
+        case eConn of
+            Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
+            Right conn -> do undefined
+    else throwError $ err401 {errBody = "permission denied! must be superadmin to perform this action.\n"}
+deleteUserHandler _ _ =
+    throwError
+        err403
+            { errBody = "Not allowed! You need to login to perform this action.\n"
+            }
+
+patchUserHandler
+    :: AuthResult Auth.Token -> Auth.UserUpdate -> Handler NoContent
+patchUserHandler (Authenticated Auth.Token {..}) (Auth.UserUpdate{..}) = do
+    eConn <- liftIO getConnection
+    case eConn of
+        Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
+        Right conn -> do undefined
+patchUserHandler _ _ =
+    throwError
+        err403
+            { errBody = "Not allowed! You need to login to perform this action.\n"
             }
 
 api :: Proxy PublicAPI
@@ -215,6 +274,9 @@ server cookieSett jwtSett =
              )
         :<|> ( protectedHandler
                 :<|> registerHandler
+                :<|> getUserHandler
+                :<|> deleteUserHandler
+                :<|> patchUserHandler
              )
 
 documentedAPI :: Proxy DocumentedAPI
