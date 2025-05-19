@@ -17,6 +17,7 @@ import Data.OpenApi (ToSchema)
 import Data.Text
 import Data.UUID (UUID)
 import GHC.Generics
+import Text.Read (readMaybe)
 
 data User = User
     { userName :: Text
@@ -59,7 +60,7 @@ data Role = Member | Admin
 
 instance Show Role where
     show = \case
-        Member -> "user"
+        Member -> "member"
         Admin -> "admin"
 
 instance Read Role where
@@ -71,12 +72,8 @@ instance Read Role where
 
 -- Convert to/from Text
 roleToText :: Role -> Text
-roleToText = \case
-    Member -> "user"
-    Admin -> "admin"
+roleToText = pack . show
+
 
 textToRole :: Text -> Maybe Role
-textToRole = \case
-    "user" -> Just Member
-    "admin" -> Just Admin
-    _ -> Nothing
+textToRole = readMaybe . unpack
