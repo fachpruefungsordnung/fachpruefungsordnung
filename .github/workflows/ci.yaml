@@ -166,10 +166,9 @@ jobs:
 
           # Only check test jobs if they were supposed to run
           if [[ "${{ needs.job-spec.outputs.backend }}" == "true" ]]; then
-            [[ "${{ needs.check-backend.result }}"       != 'success' ]] && { RET_CODE=1; echo "Backend checks failed"; }
+            [[ "${{ needs.check-backend.result }}"      != 'success' ]] && { RET_CODE=1; echo "Backend checks failed"; }
+            [[ "${{ needs.test-backend.result }}"       != 'success' ]] && { RET_CODE=1; echo "Backend tests failed"; }
           fi
-
-          [[ "${{ needs.test-backend.result }}"       != 'success' ]] && { RET_CODE=1; echo "Backend tests failed"; }
 
           if [[ "${{ needs.job-spec.outputs.frontend }}" == "true" ]]; then
             [[ "${{ needs.check-frontend.result }}"      != 'success' ]] && { RET_CODE=1; echo "Frontend tests failed"; }
