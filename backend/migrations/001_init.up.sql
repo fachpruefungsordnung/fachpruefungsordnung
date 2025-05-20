@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
 INSERT INTO
     users (name, email, pwhash)
 VALUES
-    ('test', 'test@test.com', '1234');
+    ('tester', 'test@test.com', '1234');
 
 CREATE TYPE ROLE AS ENUM ('admin', 'user');
 
