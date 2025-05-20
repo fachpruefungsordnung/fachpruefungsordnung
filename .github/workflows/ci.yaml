@@ -21,9 +21,9 @@ jobs:
     permissions: write-all
     runs-on: self-hosted
     outputs:
-      backend: ${{ steps.filter.outputs.backend }}
-      frontend: ${{ steps.filter.outputs.frontend }}
-      migrations: ${{ steps.filter.outputs.migrations }}
+      backend: ${{ github.ref == 'refs/heads/main' || steps.filter.outputs.backend }}
+      frontend: ${{ github.ref == 'refs/heads/main' || steps.filter.outputs.frontend }}
+      migrations: ${{ github.ref == 'refs/heads/main' || steps.filter.outputs.migrations }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -133,7 +133,8 @@ jobs:
 
       - name: Find modified migrations
         run: |
-          MODIFIED_MIGRATIONS=$(git diff --name-only origin/$GITHUB_BASE_REF...origin/$GITHUB_HEAD_REF 'backend/migrations/*.sql')
+          BASE_REF=$GITHUB_BASE_REF || HEAD~2
+          MODIFIED_MIGRATIONS=$(git diff --name-only origin/$BASE_REF...origin/$GITHUB_REF 'backend/migrations/*.sql')
           SPACE_SEP_FILE_NAMES=$(echo $MODIFIED_MIGRATIONS| tr '\n' ' ')
           echo "FILES=$SPACE_SEP_FILE_NAMES" >> $GITHUB_OUTPUT
         id: modified-migrations
@@ -185,7 +186,7 @@ jobs:
     name: Deploy to Server
     runs-on: self-hosted
     needs: [tests-pass]
-    if: ${{ github.ref_name == 'main' }}
+    if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 60
     steps:
       - name: Deploy via SSH
