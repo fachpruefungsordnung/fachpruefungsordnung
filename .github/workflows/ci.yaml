@@ -126,7 +126,7 @@ jobs:
     permissions: write-all
     runs-on: self-hosted
     needs: job-spec
-    if: ${{ needs.job-spec.outputs.migrations == 'true' }}
+    if: ${{ github.event_name == 'pull_request' && needs.job-spec.outputs.migrations == 'true' }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
