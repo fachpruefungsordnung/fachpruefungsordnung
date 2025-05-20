@@ -10,8 +10,6 @@ on:
     branches:
       - "**"
 
-# https://forgejo.org/docs/latest/user/actions/#auto-cancellation-of-workflows
-# https://i.kym-cdn.com/entries/icons/mobile/000/027/528/519.jpg
 concurrency:
   # Allow only one workflow per any non-`main` branch.
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.ref_name == 'main' && github.sha || 'anysha' }}
@@ -182,3 +180,25 @@ jobs:
             echo "All tests passed successfully!"
           fi
           exit $RET_CODE
+
+  deploy:
+    name: Deploy to Server
+    runs-on: self-hosted
+    needs: [tests-pass]
+    if: ${{ github.ref_name == 'main' }}
+    timeout-minutes: 60
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          port: ${{ secrets.SSH_PORT }}
+          command_timeout: 200m
+          script: |
+            cd ${{ vars.REPO_PATH }}
+            git pull
+            docker compose -f docker-compose.yaml -f docker-compose.ssl.yaml build
+            docker compose down
+            docker compose -f docker-compose.yaml -f docker-compose.ssl.yaml up -d
