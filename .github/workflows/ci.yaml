@@ -138,7 +138,7 @@ jobs:
       - name: Find modified migrations for the current PR
         if: ${{ github.ref != 'refs/heads/main' }}
         run: |
-          MODIFIED_MIGRATIONS=$(git diff --name-only origin/$GITHUB_BASE_REF ...origin/$GITHUB_HEAD_REF 'backend/migrations/*.sql')
+          MODIFIED_MIGRATIONS=$(git diff --name-only origin/$GITHUB_BASE_REF...origin/$GITHUB_HEAD_REF 'backend/migrations/*.sql')
           SPACE_SEP_FILE_NAMES=$(echo $MODIFIED_MIGRATIONS| tr '\n' ' ')
           echo "FILES=$SPACE_SEP_FILE_NAMES" >> $GITHUB_OUTPUT
         id: modified-migrations
@@ -147,7 +147,7 @@ jobs:
         uses: sbdchd/squawk-action@v2
         with:
           fail-on-violations: true
-          files: ${{ steps.modified-migrations.outputs.FILES || "" }}
+          files: ${{ steps.modified-migrations.outputs.FILES }}
           pg-version: "17.0"
           version: "latest"
 
