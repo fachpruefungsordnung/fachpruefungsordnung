@@ -133,7 +133,8 @@ jobs:
 
       - name: Install jq
         run: |
-          sudo apt-get install jq
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get -y install jq
 
       - name: Find modified migrations for the current PR
         if: ${{ github.ref != 'refs/heads/main' }}
