@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   run-tests:
-    uses: ./.forgejo/workflows/ci.yml
+    uses: ./.github/workflows/ci.yml
     secrets: inherit
 
   deploy:
