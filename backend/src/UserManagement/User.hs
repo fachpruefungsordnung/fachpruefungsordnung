@@ -27,9 +27,7 @@ data User = User
     deriving (Eq, Show, Generic)
 
 instance ToJSON User
-
 instance FromJSON User
-
 instance ToSchema User
 
 data FullUser = FullUser
@@ -42,9 +40,7 @@ data FullUser = FullUser
     deriving (Eq, Show, Generic)
 
 instance ToJSON FullUser
-
 instance FromJSON FullUser
-
 instance ToSchema FullUser
 
 -- | used for necessary user info inside a group
@@ -54,9 +50,16 @@ data UserInfo = UserInfo
     , userInfoEmail :: Text
     , userInfoRole :: Role
     }
+    deriving (Eq, Show, Generic)
+
+instance ToJSON UserInfo
+instance ToSchema UserInfo
 
 data Role = Member | Admin
     deriving (Eq, Generic)
+
+instance ToJSON Role
+instance ToSchema Role
 
 instance Show Role where
     show = \case
@@ -66,14 +69,12 @@ instance Show Role where
 instance Read Role where
     readsPrec _ s = case lex s of
         [("member", rs)] -> [(Member, rs)]
-        [("admin", rs)]  -> [(Admin, rs)]
-        _                -> [] 
-
+        [("admin", rs)] -> [(Admin, rs)]
+        _ -> []
 
 -- Convert to/from Text
 roleToText :: Role -> Text
 roleToText = pack . show
-
 
 textToRole :: Text -> Maybe Role
 textToRole = readMaybe . unpack

@@ -9,11 +9,10 @@
 
 module Server (runServer, DocumentedAPI, PublicAPI, jwtSettings, cookieSettings, app, server) where
 
-import qualified Server.Auth as Auth
 import Control.Lens
 import Control.Monad.IO.Class
 import Crypto.JOSE.JWK (JWK)
-import Data.ByteString.Lazy (ByteString, readFile)
+import Data.ByteString.Lazy (readFile)
 import Data.OpenApi
     ( OpenApi
     , description
@@ -28,13 +27,15 @@ import Data.UUID (UUID, toString)
 import Data.Vector
 import Database (getConnection)
 import GHC.Int
-import Server.HTTPHeaders (PDF, PDFByteString (..))
+import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Network.Wai
 import Network.Wai.Handler.Warp
 import Servant
 import Servant.Auth.Server
 import Servant.OpenApi
+import qualified Server.Auth as Auth
+import Server.HTTPHeaders (PDF, PDFByteString (..))
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 import qualified VersionControl as VC
@@ -68,25 +69,29 @@ type PublicAPI =
 type AuthMethod = '[Cookie]
 
 type ProtectedAPI =
-         Auth AuthMethod Auth.Token 
-        :> "protected" 
+    Auth AuthMethod Auth.Token
+        :> "protected"
         :> Get '[JSON] String
-    :<|> Auth AuthMethod Auth.Token
-        :> "register"
-        :> ReqBody '[JSON] Auth.UserRegisterData
-        :> Post '[JSON] NoContent
-    :<|> Auth AuthMethod Auth.Token
-        :> "user"
-        :> Capture "userId" UUID
-        :> Get '[JSON] User.FullUser
-    :<|> Auth AuthMethod Auth.Token
-        :> "user"
-        :> Capture "userId" UUID
-        :> Delete '[JSON] NoContent
-    :<|> Auth AuthMethod Auth.Token
-        :> "user"
-        :> ReqBody '[JSON] Auth.UserUpdate
-        :> Patch '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "register"
+            :> ReqBody '[JSON] Auth.UserRegisterData
+            :> Post '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "user"
+            :> Capture "userId" UUID
+            :> Get '[JSON] User.FullUser
+        :<|> Auth AuthMethod Auth.Token
+            :> "user"
+            :> Capture "userId" UUID
+            :> Delete '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "user"
+            :> ReqBody '[JSON] Auth.UserUpdate
+            :> Patch '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "group"
+            :> Capture "groupID" Int32
+            :> Get '[JSON] [User.UserInfo]
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -197,11 +202,11 @@ registerHandler (Authenticated Auth.Token {..}) (Auth.UserRegisterData {..}) = d
                                     case eAction of
                                         Left _ -> throwError $ err401 {errBody = "user creation failed!\n"}
                                         Right userID -> do
-                                            eAction' <- liftIO $ Session.run (Sessions.addRole userID groupID User.Member) conn
+                                            eAction' <-
+                                                liftIO $ Session.run (Sessions.addRole userID groupID User.Member) conn
                                             case eAction' of
                                                 Left _ -> throwError $ err401 {errBody = "failed to assign role!\n"} -- need to delete user here!
                                                 Right _ -> return NoContent
-                                            
                                 _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
                 _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
 registerHandler _ _ =
@@ -210,7 +215,7 @@ registerHandler _ _ =
             { errBody = "Not allowed! You need to login to perform this action.\n"
             }
 
-getUserHandler 
+getUserHandler
     :: AuthResult Auth.Token -> UUID -> Handler User.FullUser
 getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
     eConn <- liftIO getConnection
@@ -225,13 +230,18 @@ getUserHandler _ _ =
 
 deleteUserHandler
     :: AuthResult Auth.Token -> UUID -> Handler NoContent
-deleteUserHandler (Authenticated Auth.Token {..}) requestedUserID = 
-    if isSuperadmin then do
-        eConn <- liftIO getConnection
-        case eConn of
-            Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
-            Right conn -> do undefined
-    else throwError $ err401 {errBody = "permission denied! must be superadmin to perform this action.\n"}
+deleteUserHandler (Authenticated Auth.Token {..}) requestedUserID =
+    if isSuperadmin
+        then do
+            eConn <- liftIO getConnection
+            case eConn of
+                Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
+                Right conn -> do undefined
+        else
+            throwError $
+                err401
+                    { errBody = "permission denied! must be superadmin to perform this action.\n"
+                    }
 deleteUserHandler _ _ =
     throwError
         err403
@@ -240,7 +250,7 @@ deleteUserHandler _ _ =
 
 patchUserHandler
     :: AuthResult Auth.Token -> Auth.UserUpdate -> Handler NoContent
-patchUserHandler (Authenticated Auth.Token {..}) (Auth.UserUpdate{..}) = do
+patchUserHandler (Authenticated Auth.Token {..}) (Auth.UserUpdate {..}) = do
     eConn <- liftIO getConnection
     case eConn of
         Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
@@ -250,6 +260,37 @@ patchUserHandler _ _ =
         err403
             { errBody = "Not allowed! You need to login to perform this action.\n"
             }
+
+groupMembersHandler :: AuthResult Auth.Token -> Int32 -> Handler [User.UserInfo]
+groupMembersHandler (Authenticated Auth.Token {..}) group_id = do
+    eConn <- liftIO getConnection
+    case eConn of
+        Left _ -> throwError $ err500 {errBody = "connection to db failed\n"}
+        Right conn ->
+            if isSuperadmin
+                then getMembers conn
+                else do
+                    eRole <-
+                        liftIO $ Session.run (Sessions.getUserRoleInGroup subject group_id) conn
+                    case eRole of
+                        Left _ -> throwError $ err500 {errBody = "database access failed\n"}
+                        Right Nothing -> throwError $ err500 {errBody = "invalid role in db\n"}
+                        Right (Just role) ->
+                            if role == User.Admin
+                                then getMembers conn
+                                else
+                                    throwError $
+                                        err403 {errBody = "You need to be Admin of the group to perform this action!\n"}
+  where
+    getMembers :: Connection -> Handler [User.UserInfo]
+    getMembers conn = do
+        eMembers <- liftIO $ Session.run (Sessions.getMembersOfGroup group_id) conn
+        case eMembers of
+            Left _ -> throwError $ err500 {errBody = "database access failed\n"}
+            Right members -> return members
+groupMembersHandler _ _ =
+    throwError $
+        err403 {errBody = "Not allowed! You need to login to perform this action.\n"}
 
 api :: Proxy PublicAPI
 api = Proxy
@@ -277,6 +318,7 @@ server cookieSett jwtSett =
                 :<|> getUserHandler
                 :<|> deleteUserHandler
                 :<|> patchUserHandler
+                :<|> groupMembersHandler
              )
 
 documentedAPI :: Proxy DocumentedAPI

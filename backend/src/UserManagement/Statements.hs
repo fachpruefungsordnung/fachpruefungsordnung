@@ -11,9 +11,11 @@ module UserManagement.Statements
     , getAllUserRoles
     , addGroup
     , addRole
+    , getMembersOfGroup
     )
 where
 
+import Data.Maybe (listToMaybe)
 import Data.Profunctor (lmap, rmap)
 import Data.Text
 import Data.Tuple.Curry (uncurryN)
@@ -23,7 +25,7 @@ import GHC.Int
 import Hasql.Statement
 import Hasql.TH
 import qualified UserManagement.User as User
-import Data.Maybe (listToMaybe)
+import Prelude hiding (id)
 
 getUserID :: Statement Text UUID
 getUserID =
@@ -37,10 +39,11 @@ getUserID =
   |]
 
 getLoginRequirements :: Statement Text (Maybe (UUID, Text))
-getLoginRequirements = 
+getLoginRequirements =
     rmap
-      (listToMaybe . toList) 
-      [vectorStatement|
+        (listToMaybe . toList)
+        [vectorStatement|
+
         select
           id :: uuid, pwhash :: text
         from
@@ -60,10 +63,11 @@ getUser =
    |]
 
 getUserRoleInGroup :: Statement (UUID, Int32) (Maybe Text)
-getUserRoleInGroup = 
-  rmap
-      (listToMaybe . toList) 
-      [vectorStatement|
+getUserRoleInGroup =
+    rmap
+        (listToMaybe . toList)
+        [vectorStatement|
+
         select
           r.role :: text
         from users u
@@ -82,15 +86,17 @@ getUsers =
     |]
 
 getAllUserRoles :: Statement UUID [(Int32, Text)]
-getAllUserRoles = rmap toList
-  [vectorStatement|
+getAllUserRoles =
+    rmap
+        toList
+        [vectorStatement|
+
     select g.id :: int4, r.role :: text
     from users u
     join roles r on u.id = r.user_id
     join groups g on g.id = r.group_id
     where u.id = $1 :: uuid
   |]
-
 
 putUser :: Statement User.User UUID
 putUser =
@@ -104,24 +110,32 @@ putUser =
 
 addGroup :: Statement (Text, Maybe Text) Int32
 addGroup =
-        [singletonStatement|
+    [singletonStatement|
+
       insert into groups (name, description)
       values ($1 :: text, $2 :: text?)
       returning id :: int4
     |]
 
 addRole :: Statement (UUID, Int32, Text) ()
-addRole = 
-        [resultlessStatement|
+addRole =
+    [resultlessStatement|
+
       insert into roles (user_id, group_id, role)
       values ($1 :: uuid, $2 :: int4, $3 :: text)
     |]
 
-
 -- | get all Users that have any role in the given group
-getUsersOfGroup :: Statement Int32 [User.UserInfo]
-getUsersOfGroup = rmap (fmap (\(id, name, email, role) -> User.UserInfo id name email (read $ unpack role)) . toList)
-  [vectorStatement|
+getMembersOfGroup :: Statement Int32 [User.UserInfo]
+getMembersOfGroup =
+    rmap
+        ( fmap
+            ( \(id, name, email, role) ->
+                User.UserInfo id name email (read $ unpack role)
+            )
+            . toList
+        )
+        [vectorStatement|
     select u.id :: uuid, u.name :: text, u.email :: text, r.role :: text
     from users u
     join roles r on u.id = r.user_id
