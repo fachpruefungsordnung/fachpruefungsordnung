@@ -134,7 +134,8 @@ jobs:
       - name: Find modified migrations
         run: |
           BASE_REF=$GITHUB_BASE_REF || HEAD~2
-          MODIFIED_MIGRATIONS=$(git diff --name-only origin/$BASE_REF...origin/$GITHUB_REF 'backend/migrations/*.sql')
+          HEAD_REF=$GITHUB_HEAD_REF || $GITHUB_REF
+          MODIFIED_MIGRATIONS=$(git diff --name-only origin/$BASE_REF...origin/$HEAD_REF 'backend/migrations/*.sql')
           SPACE_SEP_FILE_NAMES=$(echo $MODIFIED_MIGRATIONS| tr '\n' ' ')
           echo "FILES=$SPACE_SEP_FILE_NAMES" >> $GITHUB_OUTPUT
         id: modified-migrations
