@@ -38,9 +38,9 @@ import Type.Proxy (Proxy(..))
 
 type State = { route :: Maybe Route }
 
-data Query a = NavigateQ Route a
+data Query a = NavigateQ Route a -- ^ Query to navigate to a new route.
 
-data Action = Initialize
+data Action = Initialize -- ^ Action to initialize the main component.
 
 _navbar = Proxy :: Proxy "navbar"
 _home = Proxy :: Proxy "home"
@@ -103,9 +103,8 @@ main = HA.runHalogenAff do
   rootComponent <- runAppM initialStore component
   halogenIO <- runUI rootComponent unit body
 
-  -- Here, we detect changes in the URL hash ...
+  -- Set up a listener for hash changes and update the route accordingly.
   void $ liftEffect $ matchesWith (RD.parse routeCodec) \old new ->
     when (old /= Just new) $ launchAff_ do
-      -- ... and update the app state accordingly.
       _response <- halogenIO.query $ H.mkTell $ NavigateQ new
       pure unit

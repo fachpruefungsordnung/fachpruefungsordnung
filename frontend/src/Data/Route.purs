@@ -25,6 +25,8 @@ routeCodec = root $ sum
   , "Login": "login" / noArgs
   }
 
+-- | Converts a route to a string representation.
+-- | This is useful for displaying the route in the UI or for debugging purposes.
 routeToString :: Route -> String
 routeToString = case _ of
   Home -> "Home"

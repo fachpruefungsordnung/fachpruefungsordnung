@@ -1,6 +1,6 @@
 # Text
 
-Some nodes contain *text*, which may be [formatted](#formatting), and contain
+Some nodes contain *text*, which may be [styled](#styling), and contain
 [references](#references) and [child nodes](#child-nodes).
 
 Text may be spread over several lines; linebreaks are translated to single
@@ -15,12 +15,12 @@ indentation.
 context.
 
 
-## Formatting
+## Styling
 
-* Nodes may permit formatted text.
+* Nodes may permit styled text.
 * Specifically, text may be `<*bold*>`, `</in italics/>`, and/or
   `<_undelined_>`.
-* Different formatting may be nested (e.g., `<*bold </and italics/>*>`), but
+* Different style tags may be nested (e.g., `<*bold </and italics/>*>`), but
   not the same (e.g., `<*bold <*again*>*>` is illegal).
 
 

@@ -20,7 +20,6 @@ import Halogen.Themes.Bootstrap5
   ( bgBodyTertiary
   , btn
   , btnLink
-  , collapse
   , containerFluid
   , meAuto
   , navItem

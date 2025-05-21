@@ -5,42 +5,36 @@ module FPO.Page.Home (component) where
 
 import Prelude
 
-import Control.Monad.Rec.Class (forever)
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
-import Effect.Aff (Milliseconds(..))
-import Effect.Aff as Aff
+import Components.Preview (Output)
+import Data.Maybe (Maybe(..))
+import Data.Unit (unit)
 import Effect.Aff.Class (class MonadAff)
+import Type.Proxy (Proxy(..))
+import Web.DOM.Document (Document)
+import Effect.Aff as Aff
 import FPO.Components.Button as Button
 import FPO.Components.Editor as Editor
-import FPO.Data.Request (getString)
 import Halogen as H
+import Halogen.Themes.Bootstrap5 as HB
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Halogen.Subscription as HS
-import Halogen.Themes.Bootstrap5 as HB
-import Type.Proxy (Proxy(..))
+import Components.Preview (Output, Query(TellClickedHttpRequest, TellLoadPdf, TellShowOrHideWarning), preview) as Preview
 
 data Action
-  = Increment
-  | Initialize
-  | HandleButton Button.Output
-  | HandleEditor Editor.Output
+  = HandleEditor Editor.Output
+  | HandlePreview Preview.Output
 
 type State =
-  { count :: Int
-  , dummyUser :: Maybe String
-  , editorContent :: Maybe (Array String)
-  }
+  { editorContent :: Maybe (Array String) }
 
 type Slots =
-  ( button :: forall query. H.Slot query Button.Output Int
-  , navbar :: forall query output. H.Slot query output Unit
-  , editor :: H.Slot Editor.Query Editor.Output Unit
+  ( editor :: H.Slot Editor.Query Editor.Output Unit
+  , preview :: H.Slot Preview.Query Preview.Output Unit
   )
 
-_button = Proxy :: Proxy "button"
 _editor = Proxy :: Proxy "editor"
+_preview = Proxy :: Proxy "preview"
 
 component
   :: forall query input output m
@@ -50,17 +44,14 @@ component =
   H.mkComponent
     { initialState
     , render
-    , eval: H.mkEval H.defaultEval
-        { handleAction = handleAction
-        , initialize = Just Initialize
-        }
+    , eval: H.mkEval H.defaultEval { handleAction = handleAction }
     }
   where
   initialState :: input -> State
-  initialState _ = { count: 0, dummyUser: Nothing, editorContent: Nothing }
+  initialState _ = { editorContent: Nothing }
 
   render :: State -> H.ComponentHTML Action Slots m
-  render { count, dummyUser, editorContent } =
+  render { editorContent } =
     HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.p0, HB.overflowHidden ] ]
       [
         -- the _button is for the Proxy to be able to identify it via a term
@@ -71,63 +62,19 @@ component =
           [ HH.div [ HP.classes [ HB.dFlex, HB.flexGrow1, HB.flexRow, HB.g0, HB.overflowHidden ] ]
               [ HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.col6 ] ]
                   [ HH.slot _editor unit Editor.editor unit HandleEditor ]
-              , HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.col6, HB.textCenter, HB.bgInfoSubtle, HB.overflowHidden ] ]
-                  [ HH.div_ [ HH.text "Hier sollte die Vorschau sein." ]
-                  , HH.div_ [ HH.text $ if dummyUser == Nothing then "Hier kommt nach dem Knopfdruck ein Text" else "Wow, nun haben wir einen dummy User geladen mit dem Namen: " <> fromMaybe "err" dummyUser ]
-                  , HH.slot _button 0 Button.button { label: show count } HandleButton
-                  , HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.overflowHidden ] ]
-                      [ case editorContent of
-                          Nothing ->
-                            HH.text "Der Editor ist leer!"
-                          Just content ->
-                            HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.overflowHidden ] ]
-                              [ HH.text "Editorinhalt:"
-                              , HH.div
-                                  [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HH.ClassName "mt-1", HB.overflowAuto ] ]
-                                  [ HH.pre
-                                      [ HP.classes [ HB.flexGrow1, HH.ClassName "border rounded p-1 bg-light", HB.h100 ] ]
-                                      ( content <#> \line ->
-                                          HH.div_ [ HH.text $ preserveEmptyLine line ]
-                                      )
-                                  ]
-                              ]
-                      ]
-                  ]
+              , HH.slot _preview unit Preview.preview { editorContent } HandlePreview
               ]
           ]
       ]
-
-  -- Forces the string to be at least one character long.
-  preserveEmptyLine :: String -> String
-  preserveEmptyLine str = if str == "" then " " else str
 
   -- output is when our component communicates with a parent
   -- m is relevant when the component performs effects
   handleAction :: MonadAff m => Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
-    HandleButton output -> case output of
-      Button.Clicked -> H.modify_ \state -> state { count = 0 }
-
     HandleEditor output -> case output of
-      Editor.ClickedHTTPRequest -> do
-        response <- H.liftAff $ getString "/users"
-        case response of
-          Right { body } ->
-            H.modify_ _ { dummyUser = Just body }
-          Left _ -> do
-            H.modify_ _ { dummyUser = Nothing }
+      Editor.ClickedHTTPRequest -> H.tell _preview unit Preview.TellClickedHttpRequest
+      Editor.ClickedQuery response -> H.modify_ \st -> st { editorContent = response }
+      Editor.ClickedShowWarning -> H.tell _preview unit Preview.TellShowOrHideWarning
+      Editor.LoadPdf -> H.tell _preview unit Preview.TellLoadPdf
 
-      Editor.ClickedQuery response -> do
-        H.modify_ \st -> st { editorContent = response }
-
-    Increment -> H.modify_ \state -> state { count = state.count + 1 }
-
-    Initialize -> do
-      { emitter, listener } <- H.liftEffect HS.create
-      void $ H.subscribe emitter
-      void
-        $ H.liftAff
-        $ Aff.forkAff
-        $ forever do
-            Aff.delay $ Milliseconds 1000.0
-            H.liftEffect $ HS.notify listener Increment
+    HandlePreview _ -> pure unit

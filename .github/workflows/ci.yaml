@@ -1,0 +1,210 @@
+name: Run Tests
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "*"
+  pull_request:
+    branches:
+      - "**"
+
+concurrency:
+  # Allow only one workflow per any non-`main` branch.
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.ref_name == 'main' && github.sha || 'anysha' }}
+  cancel-in-progress: true
+
+jobs:
+  job-spec:
+    name: Decide which jobs to run
+    permissions: write-all
+    runs-on: self-hosted
+    outputs:
+      backend: ${{ github.ref == 'refs/heads/main' || steps.filter.outputs.backend }}
+      frontend: ${{ github.ref == 'refs/heads/main' || steps.filter.outputs.frontend }}
+      migrations: ${{ github.ref == 'refs/heads/main' || steps.filter.outputs.migrations }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for Changes
+        id: filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+            migrations:
+              - 'backend/migrations/**'
+
+  check-backend:
+    name: Check Backend
+    runs-on: self-hosted
+    needs: job-spec
+    if: ${{ needs.job-spec.outputs.backend == 'true' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Formatting
+        uses: haskell-actions/run-fourmolu@v9
+        with:
+          version: "0.15.0.0"
+
+      - name: Setup HLint
+        uses: haskell-actions/hlint-setup@v2
+        with:
+          version: "3.10"
+
+      - name: HLint
+        uses: haskell-actions/hlint-run@v2
+        with:
+          path: backend/
+          fail-on: suggestion
+
+      - name: Build Stack Project
+        uses: freckle/stack-action@v5
+        with:
+          working-directory: backend
+          stack-build-arguments: --fast --no-test
+          test: false
+
+  check-frontend:
+    name: Check Frontend
+    runs-on: self-hosted
+    needs: job-spec
+    if: ${{ needs.job-spec.outputs.frontend == 'true' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install PureScript tools
+        working-directory: frontend
+        run: |
+          npm install -g purescript spago@next purs-tidy
+          npm install
+
+      - name: Check Formatting
+        working-directory: frontend
+        run: purs-tidy check .
+
+      - name: Run Tests
+        working-directory: frontend
+        run: spago test
+
+  test-backend:
+    name: Run backend tests
+    runs-on: postgres
+    needs:
+      - job-spec
+      - check-backend
+    if: ${{ needs.job-spec.outputs.backend == 'true' && needs.check-backend.result =='success' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # - name: Test Stack Project
+      #   uses: freckle/stack-action@v5
+      #   with:
+      #     working-directory: backend
+      #     stack-build-arguments: --fast
+
+  lint-migrations:
+    name: Check Postgres migrations
+    permissions: write-all
+    runs-on: self-hosted
+    needs: job-spec
+    if: ${{ needs.job-spec.outputs.migrations == 'true' }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install jq
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          sudo apt-get -y install jq
+
+      - name: Find modified migrations for the current PR
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          MODIFIED_MIGRATIONS=$(git diff --name-only origin/$GITHUB_BASE_REF...origin/$GITHUB_HEAD_REF 'backend/migrations/*.sql')
+          SPACE_SEP_FILE_NAMES=$(echo $MODIFIED_MIGRATIONS| tr '\n' ' ')
+          echo "FILES=$SPACE_SEP_FILE_NAMES" >> $GITHUB_OUTPUT
+        id: modified-migrations
+
+      - name: Check Postgres migrations
+        uses: sbdchd/squawk-action@v2
+        with:
+          fail-on-violations: true
+          files: ${{ steps.modified-migrations.outputs.FILES }}
+          pg-version: "17.0"
+          version: "latest"
+
+  tests-pass:
+    name: Tests Pass
+    runs-on: self-hosted
+    needs:
+      - job-spec
+      - check-backend
+      - check-frontend
+      - test-backend
+      - lint-migrations
+    if: always()
+    steps:
+      - name: Check all tests pass
+        run: |
+          # Check dependent jobs...
+          RET_CODE=0
+
+          # Only check test jobs if they were supposed to run
+          if [[ "${{ needs.job-spec.outputs.backend }}" == "true" ]]; then
+            [[ "${{ needs.check-backend.result }}"      != 'success' ]] && { RET_CODE=1; echo "Backend checks failed"; }
+            [[ "${{ needs.test-backend.result }}"       != 'success' ]] && { RET_CODE=1; echo "Backend tests failed"; }
+          fi
+
+          if [[ "${{ needs.job-spec.outputs.frontend }}" == "true" ]]; then
+            [[ "${{ needs.check-frontend.result }}"      != 'success' ]] && { RET_CODE=1; echo "Frontend tests failed"; }
+          fi
+
+          if [[ "${{ needs.job-spec.outputs.migrations }}" == "true" ]]; then
+            [[ "${{ needs.lint-migrations.result }}"      != 'success' ]] && { RET_CODE=1; echo "Migration tests failed"; }
+          fi
+
+          if [[ "$RET_CODE" -eq 0 ]]; then
+            echo "All tests passed successfully!"
+          fi
+          exit $RET_CODE
+
+  deploy:
+    name: Deploy to Server
+    runs-on: self-hosted
+    needs: [tests-pass]
+    if: ${{ github.ref == 'refs/heads/main' }}
+    timeout-minutes: 60
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          port: ${{ secrets.SSH_PORT }}
+          command_timeout: 200m
+          script: |
+            cd ${{ vars.REPO_PATH }}
+            git pull
+            docker compose -f docker-compose.yaml -f docker-compose.ssl.yaml build
+            docker compose down
+            docker compose -f docker-compose.yaml -f docker-compose.ssl.yaml up -d
