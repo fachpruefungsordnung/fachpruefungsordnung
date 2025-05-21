@@ -24,7 +24,7 @@ import Data.OpenApi
     )
 import Data.Password.Argon2
 import Data.UUID (UUID, toString)
-import Data.Vector
+import Data.Vector (toList)
 import Database (getConnection)
 import GHC.Int
 import Hasql.Connection (Connection)
@@ -36,6 +36,7 @@ import Servant.Auth.Server
 import Servant.OpenApi
 import qualified Server.Auth as Auth
 import Server.HTTPHeaders (PDF, PDFByteString (..))
+import UserManagement.Group (Group (..))
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 import qualified VersionControl as VC
@@ -92,6 +93,11 @@ type ProtectedAPI =
             :> "group"
             :> Capture "groupID" Int32
             :> Get '[JSON] [User.UserInfo]
+        :<|> Auth AuthMethod Auth.Token
+            :> "group"
+            :> "create"
+            :> ReqBody '[JSON] Group
+            :> Post '[JSON] Int32
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -274,7 +280,9 @@ groupMembersHandler (Authenticated Auth.Token {..}) group_id = do
                         liftIO $ Session.run (Sessions.getUserRoleInGroup subject group_id) conn
                     case eRole of
                         Left _ -> throwError $ err500 {errBody = "database access failed\n"}
-                        Right Nothing -> throwError $ err500 {errBody = "invalid role in db\n"}
+                        Right Nothing ->
+                            throwError $
+                                err403 {errBody = "You need to be Admin of the group to perform this action!\n"}
                         Right (Just role) ->
                             if role == User.Admin
                                 then getMembers conn
@@ -289,6 +297,32 @@ groupMembersHandler (Authenticated Auth.Token {..}) group_id = do
             Left _ -> throwError $ err500 {errBody = "database access failed\n"}
             Right members -> return members
 groupMembersHandler _ _ =
+    throwError $
+        err403 {errBody = "Not allowed! You need to login to perform this action.\n"}
+
+createGroupHandler :: AuthResult Auth.Token -> Group -> Handler Int32
+createGroupHandler (Authenticated Auth.Token {..}) (Group {..}) = do
+    eConn <- liftIO getConnection
+    case eConn of
+        Left _ -> throwError $ err500 {errBody = "connection to db failed\n"}
+        Right conn -> do
+            -- Check if User is Admin in any group
+            eRoles <- liftIO $ Session.run (Sessions.getAllUserRoles subject) conn
+            case eRoles of
+                Left _ -> throwError $ err500 {errBody = "database access failed\n"}
+                Right roles ->
+                    if any (\(_, mr) -> mr == Just User.Admin) roles
+                        then do
+                            -- create new group
+                            eGroupID <-
+                                liftIO $ Session.run (Sessions.addGroup groupName groupDescription) conn
+                            case eGroupID of
+                                Left _ -> throwError $ err500 {errBody = "database access failed\n"}
+                                Right groupID -> return groupID
+                        else
+                            throwError $
+                                err403 {errBody = "You need to be Admin of any group to perform this action!\n"}
+createGroupHandler _ _ =
     throwError $
         err403 {errBody = "Not allowed! You need to login to perform this action.\n"}
 
@@ -319,6 +353,7 @@ server cookieSett jwtSett =
                 :<|> deleteUserHandler
                 :<|> patchUserHandler
                 :<|> groupMembersHandler
+                :<|> createGroupHandler
              )
 
 documentedAPI :: Proxy DocumentedAPI

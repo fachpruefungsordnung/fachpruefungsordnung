@@ -36,6 +36,7 @@ library
       Server
       Server.Auth
       Server.HTTPHeaders
+      UserManagement.Group
       UserManagement.Sessions
       UserManagement.Statements
       UserManagement.User
