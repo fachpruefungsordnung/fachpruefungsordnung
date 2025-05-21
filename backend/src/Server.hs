@@ -26,7 +26,7 @@ import Data.Password.Argon2
 import Data.UUID (UUID, toString)
 import Data.Vector (toList)
 import Database (getConnection)
-import GHC.Int
+import GHC.Int (Int32)
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Network.Wai
@@ -36,6 +36,7 @@ import Servant.Auth.Server
 import Servant.OpenApi
 import qualified Server.Auth as Auth
 import Server.HTTPHeaders (PDF, PDFByteString (..))
+import Server.HandlerUtil
 import UserManagement.Group (Group (..))
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
@@ -268,63 +269,43 @@ patchUserHandler _ _ =
             }
 
 groupMembersHandler :: AuthResult Auth.Token -> Int32 -> Handler [User.UserInfo]
-groupMembersHandler (Authenticated Auth.Token {..}) group_id = do
-    eConn <- liftIO getConnection
-    case eConn of
-        Left _ -> throwError $ err500 {errBody = "connection to db failed\n"}
-        Right conn ->
-            if isSuperadmin
-                then getMembers conn
-                else do
-                    eRole <-
-                        liftIO $ Session.run (Sessions.getUserRoleInGroup subject group_id) conn
-                    case eRole of
-                        Left _ -> throwError $ err500 {errBody = "database access failed\n"}
-                        Right Nothing ->
-                            throwError $
-                                err403 {errBody = "You need to be Admin of the group to perform this action!\n"}
-                        Right (Just role) ->
-                            if role == User.Admin
-                                then getMembers conn
-                                else
-                                    throwError $
-                                        err403 {errBody = "You need to be Admin of the group to perform this action!\n"}
+groupMembersHandler (Authenticated token) groupID = do
+    conn <- tryGetDBConnection
+    ifSuperOrAdminDo conn token groupID (getMembers conn)
   where
     getMembers :: Connection -> Handler [User.UserInfo]
     getMembers conn = do
-        eMembers <- liftIO $ Session.run (Sessions.getMembersOfGroup group_id) conn
+        eMembers <- liftIO $ Session.run (Sessions.getMembersOfGroup groupID) conn
         case eMembers of
-            Left _ -> throwError $ err500 {errBody = "database access failed\n"}
+            Left _ -> throwError errDatabaseAccessFailed
             Right members -> return members
-groupMembersHandler _ _ =
-    throwError $
-        err403 {errBody = "Not allowed! You need to login to perform this action.\n"}
+groupMembersHandler _ _ = throwError errNotLoggedIn
 
 createGroupHandler :: AuthResult Auth.Token -> Group -> Handler Int32
 createGroupHandler (Authenticated Auth.Token {..}) (Group {..}) = do
-    eConn <- liftIO getConnection
-    case eConn of
-        Left _ -> throwError $ err500 {errBody = "connection to db failed\n"}
-        Right conn -> do
+    conn <- tryGetDBConnection
+    if isSuperadmin
+        then createGroup conn
+        else do
             -- Check if User is Admin in any group
             eRoles <- liftIO $ Session.run (Sessions.getAllUserRoles subject) conn
             case eRoles of
-                Left _ -> throwError $ err500 {errBody = "database access failed\n"}
+                Left _ -> throwError errDatabaseAccessFailed
                 Right roles ->
                     if any (\(_, mr) -> mr == Just User.Admin) roles
-                        then do
-                            -- create new group
-                            eGroupID <-
-                                liftIO $ Session.run (Sessions.addGroup groupName groupDescription) conn
-                            case eGroupID of
-                                Left _ -> throwError $ err500 {errBody = "database access failed\n"}
-                                Right groupID -> return groupID
+                        then createGroup conn
                         else
                             throwError $
                                 err403 {errBody = "You need to be Admin of any group to perform this action!\n"}
-createGroupHandler _ _ =
-    throwError $
-        err403 {errBody = "Not allowed! You need to login to perform this action.\n"}
+  where
+    createGroup :: Connection -> Handler Int32
+    createGroup conn = do
+        eGroupID <-
+            liftIO $ Session.run (Sessions.addGroup groupName groupDescription) conn
+        case eGroupID of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right groupID -> return groupID
+createGroupHandler _ _ = throwError errNotLoggedIn
 
 api :: Proxy PublicAPI
 api = Proxy
