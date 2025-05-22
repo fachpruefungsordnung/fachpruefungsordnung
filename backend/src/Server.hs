@@ -29,11 +29,11 @@ import Database (getConnection)
 import GHC.Int (Int32)
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
-import Network.Wai
-import Network.Wai.Handler.Warp
+import Network.Wai (Application)
+import Network.Wai.Handler.Warp (run)
 import Servant
 import Servant.Auth.Server
-import Servant.OpenApi
+import Servant.OpenApi (HasOpenApi (toOpenApi))
 import qualified Server.Auth as Auth
 import Server.HTTPHeaders (PDF, PDFByteString (..))
 import Server.HandlerUtil
@@ -287,7 +287,7 @@ createGroupHandler (Authenticated Auth.Token {..}) (Group {..}) = do
     if isSuperadmin
         then createGroup conn
         else do
-            -- Check if User is Admin in any group
+            -- Check if User is Admin in ANY group
             eRoles <- liftIO $ Session.run (Sessions.getAllUserRoles subject) conn
             case eRoles of
                 Left _ -> throwError errDatabaseAccessFailed
@@ -307,7 +307,7 @@ createGroupHandler (Authenticated Auth.Token {..}) (Group {..}) = do
             Right groupID -> return groupID
 createGroupHandler _ _ = throwError errNotLoggedIn
 
-api :: Proxy PublicAPI
+api :: Proxy (PublicAPI :<|> ProtectedAPI)
 api = Proxy
 
 swagger :: OpenApi
