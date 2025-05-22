@@ -1,4 +1,5 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -12,11 +13,12 @@ module UserManagement.User
     )
 where
 
-import Data.Aeson
+import Data.Aeson ( FromJSON, ToJSON )
 import Data.OpenApi (ToSchema)
-import Data.Text
+import Data.Text ( pack, unpack, Text )
 import Data.UUID (UUID)
-import GHC.Generics
+import GHC.Generics ( Generic )
+import GHC.Int ( Int32 )
 import Text.Read (readMaybe)
 
 data User = User
@@ -35,9 +37,9 @@ data FullUser = FullUser
     , fullUserName :: Text
     , fullUserEmail :: Text
     , fullUserPwhash :: Text
-    , fullUserRoles :: [(Text, Text)]
+    , fullUserRoles :: [(Int32, Role)]
     }
-    deriving (Eq, Show, Generic)
+    deriving (Show, Generic)
 
 instance ToJSON FullUser
 instance FromJSON FullUser
@@ -56,7 +58,7 @@ instance ToJSON UserInfo
 instance ToSchema UserInfo
 
 data Role = Member | Admin
-    deriving (Eq, Generic)
+    deriving (Eq, Generic, FromJSON)
 
 instance ToJSON Role
 instance ToSchema Role
