@@ -35,6 +35,7 @@ library
       Lib
       Server
       Server.Auth
+      Server.HandlerUtil
       Server.HTTPHeaders
       UserManagement.Group
       UserManagement.Sessions
