@@ -154,119 +154,83 @@ loginHandler
             NoContent
         )
 loginHandler cookieSett jwtSett Auth.UserLoginData {..} = do
-    eConn <- liftIO getConnection
-    case eConn of
-        Left _ -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
-        Right conn -> do
-            eUser <- liftIO $ Session.run (Sessions.getLoginRequirements loginEmail) conn
-            case eUser of
-                Right (Just (uid, pwhash)) -> do
-                    let passwordCheck = checkPassword (mkPassword loginPassword) (PasswordHash pwhash)
-                    case passwordCheck of
-                        PasswordCheckFail -> throwError $ err401 {errBody = "email or password incorrect\n"}
-                        PasswordCheckSuccess -> do
-                            mLoginAccepted <-
-                                liftIO $ acceptLogin cookieSett jwtSett (Auth.Token uid False)
-                            case mLoginAccepted of
-                                Nothing -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
-                                Just addHeaders -> return $ addHeaders NoContent
-                _ -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
+    conn <- tryGetDBConnection
+    eUser <- liftIO $ Session.run (Sessions.getLoginRequirements loginEmail) conn
+    case eUser of
+        Right (Just (uid, pwhash)) -> do
+            let passwordCheck = checkPassword (mkPassword loginPassword) (PasswordHash pwhash)
+            case passwordCheck of
+                PasswordCheckFail -> throwError $ err401 {errBody = "email or password incorrect\n"}
+                PasswordCheckSuccess -> do
+                    mLoginAccepted <-
+                        liftIO $ acceptLogin cookieSett jwtSett (Auth.Token uid False)
+                    case mLoginAccepted of
+                        Nothing -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
+                        Just addHeaders -> return $ addHeaders NoContent
+        _ -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
 
 registerHandler
     :: AuthResult Auth.Token -> Auth.UserRegisterData -> Handler NoContent
-registerHandler (Authenticated Auth.Token {..}) (Auth.UserRegisterData {..}) = do
-    eConn <- liftIO getConnection
-    case eConn of
-        Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
-        Right conn -> do
-            eRole <-
-                liftIO $ Session.run (Sessions.getUserRoleInGroup subject groupID) conn
-            case eRole of
-                Right (Just role) ->
-                    if role /= User.Admin
-                        then
-                            throwError $
-                                err401
-                                    { errBody =
-                                        "unauthorized! you must be admin of the specified group to perform this action!\n"
-                                    }
-                        else do
-                            eUser <- liftIO $ Session.run (Sessions.getUser registerEmail) conn
-                            case eUser of
-                                Right Nothing -> do
-                                    PasswordHash hashedText <- liftIO $ hashPassword $ mkPassword registerPassword
-                                    eAction <-
-                                        liftIO $
-                                            Session.run
-                                                ( Sessions.putUser
-                                                    ( User.User
-                                                        registerName
-                                                        registerEmail
-                                                        hashedText
-                                                    )
-                                                )
-                                                conn
-                                    case eAction of
-                                        Left _ -> throwError $ err401 {errBody = "user creation failed!\n"}
-                                        Right userID -> do
-                                            eAction' <-
-                                                liftIO $ Session.run (Sessions.addRole userID groupID User.Member) conn
-                                            case eAction' of
-                                                Left _ -> throwError $ err401 {errBody = "failed to assign role!\n"} -- need to delete user here!
-                                                Right _ -> return NoContent
-                                _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
-                _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
-registerHandler _ _ =
-    throwError
-        err403
-            { errBody = "Not allowed! You need to login to perform this action.\n"
-            }
+registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) = do
+    conn <- tryGetDBConnection
+    ifSuperOrAdminDo conn token gID (addNewMember regData conn)
+  where
+    addNewMember :: Auth.UserRegisterData -> Connection -> Handler NoContent
+    addNewMember (Auth.UserRegisterData{..}) conn = do
+        eUser <- liftIO $ Session.run (Sessions.getUser registerEmail) conn
+        case eUser of
+            Right Nothing -> do
+                PasswordHash hashedText <- liftIO $ hashPassword $ mkPassword registerPassword
+                eAction <-
+                    liftIO $
+                        Session.run
+                            ( Sessions.putUser
+                                ( User.User
+                                    registerName
+                                    registerEmail
+                                    hashedText
+                                )
+                            )
+                            conn
+                case eAction of
+                    Left _ -> throwError $ err500 {errBody = "user creation failed!\n"}
+                    Right userID -> do
+                        eAction' <-
+                            liftIO $ Session.run (Sessions.addRole userID groupID User.Member) conn
+                        case eAction' of
+                            Left _ -> throwError $ err500 {errBody = "failed to assign role!\n"}
+                            Right _ -> return NoContent
+            Right (Just _) -> throwError $ err409 {errBody = "a user with that email exists already."}
+            _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
+registerHandler _ _ = throwError errNotLoggedIn
 
 getUserHandler
     :: AuthResult Auth.Token -> UUID -> Handler User.FullUser
 getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
-    eConn <- liftIO getConnection
-    case eConn of
-        Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
-        Right conn -> do undefined
-getUserHandler _ _ =
-    throwError
-        err403
-            { errBody = "Not allowed! You need to login to perform this action.\n"
-            }
+    conn <- tryGetDBConnection
+    undefined    
+getUserHandler _ _ = throwError errNotLoggedIn
 
 deleteUserHandler
     :: AuthResult Auth.Token -> UUID -> Handler NoContent
 deleteUserHandler (Authenticated Auth.Token {..}) requestedUserID =
     if isSuperadmin
         then do
-            eConn <- liftIO getConnection
-            case eConn of
-                Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
-                Right conn -> do undefined
+            conn <- tryGetDBConnection
+            eAction <- liftIO $ Session.run (Sessions.deleteUser requestedUserID) conn
+            case eAction of
+                Left _ -> throwError $ err500 {errBody = "deletion failed"}
+                Right _ -> return NoContent
         else
-            throwError $
-                err401
-                    { errBody = "permission denied! must be superadmin to perform this action.\n"
-                    }
-deleteUserHandler _ _ =
-    throwError
-        err403
-            { errBody = "Not allowed! You need to login to perform this action.\n"
-            }
+            throwError errSuperAdminOnly
+deleteUserHandler _ _ = throwError errNotLoggedIn
 
 patchUserHandler
     :: AuthResult Auth.Token -> Auth.UserUpdate -> Handler NoContent
 patchUserHandler (Authenticated Auth.Token {..}) (Auth.UserUpdate {..}) = do
-    eConn <- liftIO getConnection
-    case eConn of
-        Left _ -> throwError $ err401 {errBody = "connection to db failed\n"}
-        Right conn -> do undefined
-patchUserHandler _ _ =
-    throwError
-        err403
-            { errBody = "Not allowed! You need to login to perform this action.\n"
-            }
+    conn <- tryGetDBConnection
+    undefined
+patchUserHandler _ _ = throwError errNotLoggedIn
 
 groupMembersHandler :: AuthResult Auth.Token -> Int32 -> Handler [User.UserInfo]
 groupMembersHandler (Authenticated token) groupID = do

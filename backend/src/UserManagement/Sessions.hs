@@ -3,11 +3,17 @@ module UserManagement.Sessions
     , getUser
     , getUserID
     , putUser
+    , deleteUser
+    , updateUserName
+    , updateUserEmail
+    , updateUserPWHash
     , getUserRoleInGroup
     , getLoginRequirements
     , getAllUserRoles
     , addGroup
     , addRole
+    , updateUserRoleInGroup
+    , removeUserFromGroup
     , getMembersOfGroup
     )
 where
@@ -46,6 +52,18 @@ getUserRoleInGroup uid group =
 putUser :: User.User -> Session UUID
 putUser user = statement user Statements.putUser
 
+deleteUser :: UUID -> Session ()
+deleteUser uid = statement uid Statements.deleteUser
+
+updateUserName :: Text -> UUID -> Session ()
+updateUserName name uid = statement (name, uid) Statements.updateUserName
+
+updateUserEmail :: Text -> UUID -> Session ()
+updateUserEmail email uid = statement (email, uid) Statements.updateUserName
+
+updateUserPWHash :: Text -> UUID -> Session ()
+updateUserPWHash pwhash uid = statement (pwhash, uid) Statements.updateUserName
+
 addGroup :: Text -> Maybe Text -> Session Int32
 addGroup group description = statement (group, description) Statements.addGroup
 
@@ -53,6 +71,13 @@ addRole :: UUID -> Int32 -> User.Role -> Session ()
 addRole uid gid role =
     let sqlrole = User.roleToText role
      in statement (uid, gid, sqlrole) Statements.addRole
+
+updateUserRoleInGroup :: UUID -> Int32 -> User.Role -> Session ()
+updateUserRoleInGroup uid gid role = let roletext = User.roleToText role
+                                      in statement (uid, gid, roletext) Statements.updateUserRoleInGroup
+
+removeUserFromGroup :: UUID -> Int32  -> Session ()
+removeUserFromGroup uid gid = statement (uid, gid) Statements.removeUserFromGroup
 
 getMembersOfGroup :: Int32 -> Session [User.UserInfo]
 getMembersOfGroup group_id = statement group_id Statements.getMembersOfGroup

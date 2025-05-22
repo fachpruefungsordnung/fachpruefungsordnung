@@ -7,6 +7,7 @@ module Server.HandlerUtil
     , errDatabaseConnectionFailed
     , errDatabaseAccessFailed
     , errNoAdminInThisGroup
+    , errSuperAdminOnly
     , errNotLoggedIn
     ) where
 
@@ -58,6 +59,10 @@ errDatabaseAccessFailed = err500 {errBody = "Database access failed!\n"}
 errNoAdminInThisGroup :: ServerError
 errNoAdminInThisGroup =
     err403 {errBody = "You have to be Admin of the group to perform this action!\n"}
+
+errSuperAdminOnly :: ServerError
+errSuperAdminOnly =
+    err403 {errBody = "You have to be Superadmin to perform this action!\n"}
 
 errNotLoggedIn :: ServerError
 errNotLoggedIn =

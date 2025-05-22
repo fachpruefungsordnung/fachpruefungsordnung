@@ -5,12 +5,18 @@ module UserManagement.Statements
     ( getUsers
     , getUser
     , putUser
+    , deleteUser
     , getUserID
     , getLoginRequirements
     , getUserRoleInGroup
     , getAllUserRoles
+    , updateUserName
+    , updateUserEmail
+    , updateUserPWHash
     , addGroup
     , addRole
+    , updateUserRoleInGroup
+    , removeUserFromGroup
     , getMembersOfGroup
     )
 where
@@ -108,6 +114,36 @@ putUser =
       returning id :: uuid
     |]
 
+deleteUser :: Statement UUID ()
+deleteUser =
+  [resultlessStatement|
+    delete from users where id = $1 :: uuid
+  |]
+
+updateUserName :: Statement (Text, UUID) ()
+updateUserName =
+  [resultlessStatement|
+    update users
+    set name = $1 :: text
+    where id = $2 :: uuid
+  |]
+
+updateUserEmail :: Statement (Text, UUID) ()
+updateUserEmail =
+  [resultlessStatement|
+    update users
+    set email = $1 :: text
+    where id = $2 :: uuid
+  |]
+
+updateUserPWHash :: Statement (Text, UUID) ()
+updateUserPWHash =
+  [resultlessStatement|
+    update users
+    set pwhash = $1 :: text
+    where id = $2 :: uuid
+  |]
+
 addGroup :: Statement (Text, Maybe Text) Int32
 addGroup =
     [singletonStatement|
@@ -123,6 +159,21 @@ addRole =
 
       insert into roles (user_id, group_id, role)
       values ($1 :: uuid, $2 :: int4, $3 :: text)
+    |]
+
+updateUserRoleInGroup :: Statement (UUID, Int32, Text) ()
+updateUserRoleInGroup = 
+    [resultlessStatement|
+      update roles
+      set role = $3 :: text
+      where user_id = $1 :: uuid and group_id = $2 :: int4
+    |]
+
+removeUserFromGroup :: Statement (UUID, Int32) ()
+removeUserFromGroup = 
+    [resultlessStatement|
+      delete from roles 
+      where user_id = $1 :: uuid and group_id = $2 :: int4
     |]
 
 -- | get all Users that have any role in the given group

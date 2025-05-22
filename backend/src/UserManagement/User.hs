@@ -36,7 +36,6 @@ data FullUser = FullUser
     { fullUserID :: UUID
     , fullUserName :: Text
     , fullUserEmail :: Text
-    , fullUserPwhash :: Text
     , fullUserRoles :: [(Int32, Role)]
     }
     deriving (Show, Generic)
