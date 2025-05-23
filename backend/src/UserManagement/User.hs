@@ -8,6 +8,7 @@ module UserManagement.User
     , FullUser (..)
     , UserInfo (..)
     , Role (..)
+    , UserID
     , roleToText
     , textToRole
     )
@@ -21,6 +22,8 @@ import GHC.Generics ( Generic )
 import GHC.Int ( Int32 )
 import Text.Read (readMaybe)
 
+type UserID = UUID
+
 data User = User
     { userName :: Text
     , userEmail :: Text
@@ -33,7 +36,7 @@ instance FromJSON User
 instance ToSchema User
 
 data FullUser = FullUser
-    { fullUserID :: UUID
+    { fullUserID :: UserID
     , fullUserName :: Text
     , fullUserEmail :: Text
     , fullUserRoles :: [(Int32, Role)]
@@ -46,7 +49,7 @@ instance ToSchema FullUser
 
 -- | used for necessary user info inside a group
 data UserInfo = UserInfo
-    { userInfoID :: UUID
+    { userInfoID :: UserID
     , userInfoName :: Text
     , userInfoEmail :: Text
     , userInfoRole :: Role

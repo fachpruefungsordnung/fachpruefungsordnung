@@ -23,13 +23,12 @@ import Data.OpenApi
     , version
     )
 import Data.Password.Argon2
-import Data.UUID (UUID, toString)
+import Data.UUID (toString)
 import Data.Vector (toList)
 import Database (getConnection)
 import GHC.Int (Int32)
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
-import Network.Wai (Application)
 import Network.Wai.Handler.Warp (run)
 import Servant
 import Servant.Auth.Server
@@ -40,6 +39,7 @@ import Server.HandlerUtil
 import UserManagement.Group (Group (..))
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
+import qualified UserManagement.Group as Group
 import qualified VersionControl as VC
 import VersionControl.Commit
 import Prelude hiding (readFile)
@@ -80,11 +80,11 @@ type ProtectedAPI =
             :> Post '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
             :> "user"
-            :> Capture "userId" UUID
+            :> Capture "userId" User.UserID
             :> Get '[JSON] User.FullUser
         :<|> Auth AuthMethod Auth.Token
             :> "user"
-            :> Capture "userId" UUID
+            :> Capture "userId" User.UserID
             :> Delete '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
             :> "user"
@@ -92,13 +92,13 @@ type ProtectedAPI =
             :> Patch '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
             :> "group"
-            :> Capture "groupID" Int32
+            :> Capture "groupID" Group.GroupID
             :> Get '[JSON] [User.UserInfo]
         :<|> Auth AuthMethod Auth.Token
             :> "group"
             :> "create"
             :> ReqBody '[JSON] Group
-            :> Post '[JSON] Int32
+            :> Post '[JSON] Group.GroupID
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -205,14 +205,14 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
 registerHandler _ _ = throwError errNotLoggedIn
 
 getUserHandler
-    :: AuthResult Auth.Token -> UUID -> Handler User.FullUser
+    :: AuthResult Auth.Token -> User.UserID -> Handler User.FullUser
 getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
     conn <- tryGetDBConnection
     undefined    
 getUserHandler _ _ = throwError errNotLoggedIn
 
 deleteUserHandler
-    :: AuthResult Auth.Token -> UUID -> Handler NoContent
+    :: AuthResult Auth.Token -> User.UserID -> Handler NoContent
 deleteUserHandler (Authenticated Auth.Token {..}) requestedUserID =
     if isSuperadmin
         then do
@@ -232,7 +232,7 @@ patchUserHandler (Authenticated Auth.Token {..}) (Auth.UserUpdate {..}) = do
     undefined
 patchUserHandler _ _ = throwError errNotLoggedIn
 
-groupMembersHandler :: AuthResult Auth.Token -> Int32 -> Handler [User.UserInfo]
+groupMembersHandler :: AuthResult Auth.Token -> Group.GroupID -> Handler [User.UserInfo]
 groupMembersHandler (Authenticated token) groupID = do
     conn <- tryGetDBConnection
     ifSuperOrAdminDo conn token groupID (getMembers conn)
@@ -245,7 +245,7 @@ groupMembersHandler (Authenticated token) groupID = do
             Right members -> return members
 groupMembersHandler _ _ = throwError errNotLoggedIn
 
-createGroupHandler :: AuthResult Auth.Token -> Group -> Handler Int32
+createGroupHandler :: AuthResult Auth.Token -> Group -> Handler Group.GroupID
 createGroupHandler (Authenticated Auth.Token {..}) (Group {..}) = do
     conn <- tryGetDBConnection
     if isSuperadmin
@@ -262,7 +262,7 @@ createGroupHandler (Authenticated Auth.Token {..}) (Group {..}) = do
                             throwError $
                                 err403 {errBody = "You need to be Admin of any group to perform this action!\n"}
   where
-    createGroup :: Connection -> Handler Int32
+    createGroup :: Connection -> Handler Group.GroupID
     createGroup conn = do
         eGroupID <-
             liftIO $ Session.run (Sessions.addGroup groupName groupDescription) conn

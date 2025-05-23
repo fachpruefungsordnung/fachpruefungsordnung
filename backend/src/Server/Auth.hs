@@ -22,15 +22,15 @@ import qualified Data.HashMap.Strict.InsOrd as HM
 import Data.OpenApi
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
-import Data.UUID (UUID)
 import GHC.Generics (Generic)
-import GHC.Int (Int32)
 import Servant.API
 import Servant.Auth.Server
 import Servant.OpenApi
+import qualified UserManagement.User as User
+import qualified UserManagement.Group as Group
 
 data Token = Token
-    { subject :: UUID
+    { subject :: User.UserID
     , isSuperadmin :: Bool
     }
     deriving (Generic, ToJSON, ToJWT, FromJSON, FromJWT)
@@ -45,7 +45,7 @@ data UserRegisterData = UserRegisterData
     { registerName :: Text
     , registerEmail :: Text
     , registerPassword :: Text
-    , groupID :: Int32
+    , groupID :: Group.GroupID
     }
     deriving (Generic, FromJSON, ToSchema)
 
@@ -53,7 +53,7 @@ data UserUpdate = UserUpdate
     { newName :: Maybe Text
     , newEmail :: Maybe Text
     , newPassword :: Maybe Text
-    , newRole :: Maybe (Int32, Text)
+    , newRole :: Maybe (Group.GroupID, Text)
     }
     deriving (Generic, ToJSON, FromJSON, ToSchema)
 
