@@ -14,6 +14,7 @@ module UserManagement.Statements
     , updateUserEmail
     , updateUserPWHash
     , addGroup
+    , deleteGroup
     , addRole
     , updateUserRoleInGroup
     , removeUserFromGroup
@@ -151,6 +152,13 @@ addGroup =
       insert into groups (name, description)
       values ($1 :: text, $2 :: text?)
       returning id :: int4
+    |]
+
+deleteGroup :: Statement Group.GroupID ()
+deleteGroup = 
+    [resultlessStatement|
+      delete from groups 
+      where id = $1 :: int4 
     |]
 
 addRole :: Statement (User.UserID, Group.GroupID, Text) ()
