@@ -1,6 +1,6 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.37.0.
+-- This file has been generated from package.yaml by hpack version 0.36.0.
 --
 -- see: https://github.com/sol/hpack
 
@@ -43,6 +43,7 @@ library
       VersionControl.Commit
       VersionControl.Error
       VersionControl.Hash
+      VersionControl.Merge
       VersionControl.Sessions
       VersionControl.Statements
       VersionControl.Transactions
@@ -58,6 +59,7 @@ library
     , base >=4.7 && <5
     , base64-bytestring
     , bytestring
+    , containers
     , cryptohash-sha1
     , filepath
     , hasql
@@ -107,6 +109,7 @@ executable backend-exe
     , base >=4.7 && <5
     , base64-bytestring
     , bytestring
+    , containers
     , cryptohash-sha1
     , filepath
     , hasql
@@ -159,6 +162,7 @@ test-suite backend-test
     , base >=4.7 && <5
     , base64-bytestring
     , bytestring
+    , containers
     , cryptohash-sha1
     , filepath
     , hasql

@@ -10,6 +10,7 @@ module VersionControl.Commit
     , CommitID (..)
     , CommitRef
     , CommitRel (..)
+    , CommitNode (..)
     , commitRefID
     , commitMapRoot
     )
@@ -41,7 +42,7 @@ import VersionControl.Tree
 newtype CommitID = CommitID
     { unCommitID :: Int32
     }
-    deriving (Show, Generic)
+    deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON CommitID where
     toJSON = toJSON . unCommitID
@@ -132,25 +133,27 @@ commitMapRoot
     :: (TreeRef (Hashed NodeWithRef) -> TreeRef (Hashed NodeWithRef))
     -> ExistingCommit
     -> ExistingCommit
-commitMapRoot f (ExistingCommit header (CommitBody info root)) =
-    ExistingCommit header (CommitBody info (f root))
+commitMapRoot f (ExistingCommit header (CommitBody info root base)) =
+    ExistingCommit header (CommitBody info (f root) base)
 
 -- | contains the content of an existing commit
 data CommitBody
     = CommitBody
         CommitInfo
         (TreeRef (Hashed NodeWithRef))
+        (Maybe CommitID)
     deriving (Show)
 
 instance ToJSON CommitBody where
-    toJSON (CommitBody info root) =
-        Aeson.object ["info" .= info, "root" .= root]
+    toJSON (CommitBody info root base) =
+        Aeson.object ["info" .= info, "root" .= root, "base" .= base]
 
 instance FromJSON CommitBody where
     parseJSON = Aeson.withObject "CommitBody" $ \v ->
         CommitBody
             <$> v .: "info"
             <*> v .: "root"
+            <*> v .: "base"
 
 instance ToSchema CommitBody where
     declareNamedSchema _ = do
@@ -210,11 +213,11 @@ data CommitInfo = CommitInfo
     deriving (Show, Generic)
 
 instance ToJSON CommitInfo where
-    toJSON (CommitInfo author message parent) =
+    toJSON (CommitInfo author message parents) =
         Aeson.object
             [ "author" .= author
             , "message" .= message
-            , "parent" .= parent
+            , "parents" .= parents
             ]
 
 instance FromJSON CommitInfo where
@@ -222,7 +225,7 @@ instance FromJSON CommitInfo where
         CommitInfo
             <$> v .: "author"
             <*> v .: "message"
-            <*> v .: "parent"
+            <*> v .: "parents"
 
 instance ToSchema CommitInfo where
     declareNamedSchema _ = do
@@ -245,4 +248,11 @@ instance ToSchema CommitInfo where
 data CommitRel = CommitRel
     { commitRelParent :: CommitID
     , commitRelChild :: CommitID
+    }
+
+-- | information about a commits position in the commit graph.
+data CommitNode = CommitNode
+    { commitNodeID :: CommitID
+    , commitNodeBase :: Maybe CommitID
+    , commitNodeHeight :: Int32
     }

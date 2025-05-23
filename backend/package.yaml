@@ -26,6 +26,7 @@ dependencies:
   - tuple
   - lens
   - profunctors
+  - containers
   - hasql
   - hasql-th
   - hasql-pool

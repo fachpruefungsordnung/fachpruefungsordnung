@@ -9,17 +9,43 @@ import VersionControl.Hash
 import qualified VersionControl.Statements as Statements
 import VersionControl.Tree
 
--- | transaction for creating a commit in the database in the database
+-- | transaction for creating a commit in the database
 createCommit :: CreateCommit -> Transaction ExistingCommit
 createCommit (CreateCommit info commitRoot) = do
     root <- putVersionByRef commitRoot
-    let body = CommitBody info root
+    base <- getLCACommitID $ commitInfoParents info
+    let body = CommitBody info root base
     header <- statement body Statements.createCommit
     mapM_ putRel $ commitRels $ commitHeaderID header
     return $ ExistingCommit header body
   where
     commitRels self = flip CommitRel self <$> commitInfoParents info
     putRel rel = statement rel Statements.putCommitRel
+
+{- | finds the lowest common anchestor of given commits if it exists.
+TODO: maybe not the best implementation, but it will work for now.
+-}
+getLCACommitID :: [CommitID] -> Transaction (Maybe CommitID)
+getLCACommitID ids = do
+    commitNodes <- mapM (flip statement Statements.getCommitNode) ids
+    maybeBase <- commonBase commitNodes
+    return $ commitNodeID <$> maybeBase
+  where
+    commonBase :: [CommitNode] -> Transaction (Maybe CommitNode)
+    commonBase [] = return Nothing
+    commonBase [x] = return $ Just x
+    commonBase (x : y : xs) = do
+        base <- commonBase2 x y
+        maybe (return Nothing) id (commonBase . (: xs) <$> base)
+    commonBase2 :: CommitNode -> CommitNode -> Transaction (Maybe CommitNode)
+    commonBase2 x y
+        | commitNodeID x == commitNodeID y = return $ Just x
+        | commitNodeHeight x < commitNodeHeight y = commonBase2 y x
+        | otherwise = case (commitNodeBase x) of
+            Just baseID -> do
+                base <- statement baseID Statements.getCommitNode
+                commonBase2 y base
+            Nothing -> return Nothing
 
 -- | transaction for putting a document node version by its ref into the database
 putVersionByRef

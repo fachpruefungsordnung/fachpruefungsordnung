@@ -26,9 +26,9 @@ getCommit commitID = do
     commitParentIDs <- statement commitID Statements.getCommitParentIDs
     replaceRoot $ commit $ toList commitParentIDs
   where
-    replaceRoot (ExistingCommit header (CommitBody info (Ref ref))) = do
+    replaceRoot (ExistingCommit header (CommitBody info (Ref ref) base)) = do
         valueRoot <- getVersion ref
-        return $ ExistingCommit header $ CommitBody info $ Value valueRoot
+        return $ ExistingCommit header $ CommitBody info (Value valueRoot) base
     replaceRoot commit = return commit
 
 -- | session to create a new commit in the database

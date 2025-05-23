@@ -23,13 +23,20 @@ CREATE TABLE IF NOT EXISTS commits (
     creation_ts TIMESTAMP NOT NULL DEFAULT NOW (),
     author UUID NOT NULL REFERENCES users (id),
     message TEXT NOT NULL,
-    root BYTEA NOT NULL REFERENCES node_versions (hash)
+    root BYTEA NOT NULL REFERENCES node_versions (hash),
+    base INTEGER REFERENCES commits (id),
+    height INTEGER NOT NULL -- distance to the root node (via base!)
 );
 
 CREATE TABLE IF NOT EXISTS commit_trees (
     parent INTEGER NOT NULL REFERENCES commits (id),
     child INTEGER NOT NULL REFERENCES commits (id),
     PRIMARY KEY (parent, child)
+);
+
+CREATE TABLE IF NOT EXISTS commit_base (
+    commit INTEGER PRIMARY KEY NOT NULL REFERENCES commits (id),
+    base INTEGER NOT NULL REFERENCES commits (id) -- parent, if only one exists, lca of parents otherwise
 );
 
 CREATE TABLE IF NOT EXISTS documents (
