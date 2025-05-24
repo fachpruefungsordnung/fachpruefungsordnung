@@ -27,7 +27,7 @@ TODO: maybe not the best implementation, but it will work for now.
 -}
 getLCACommitID :: [CommitID] -> Transaction (Maybe CommitID)
 getLCACommitID ids = do
-    commitNodes <- mapM (flip statement Statements.getCommitNode) ids
+    commitNodes <- mapM (`statement` Statements.getCommitNode) ids
     maybeBase <- commonBase commitNodes
     return $ commitNodeID <$> maybeBase
   where
@@ -36,12 +36,12 @@ getLCACommitID ids = do
     commonBase [x] = return $ Just x
     commonBase (x : y : xs) = do
         base <- commonBase2 x y
-        maybe (return Nothing) id (commonBase . (: xs) <$> base)
+        maybe (return Nothing) (commonBase . (: xs)) base
     commonBase2 :: CommitNode -> CommitNode -> Transaction (Maybe CommitNode)
     commonBase2 x y
         | commitNodeID x == commitNodeID y = return $ Just x
         | commitNodeHeight x < commitNodeHeight y = commonBase2 y x
-        | otherwise = case (commitNodeBase x) of
+        | otherwise = case commitNodeBase x of
             Just baseID -> do
                 base <- statement baseID Statements.getCommitNode
                 commonBase2 y base
