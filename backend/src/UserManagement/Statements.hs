@@ -30,8 +30,8 @@ import Data.Vector
 import GHC.Int
 import Hasql.Statement
 import Hasql.TH
-import qualified UserManagement.User as User
 import qualified UserManagement.Group as Group
+import qualified UserManagement.User as User
 import Prelude hiding (id)
 
 getUserID :: Statement Text User.UserID
@@ -117,13 +117,15 @@ putUser =
 
 deleteUser :: Statement User.UserID ()
 deleteUser =
-  [resultlessStatement|
+    [resultlessStatement|
+
     delete from users where id = $1 :: uuid
   |]
 
 updateUserName :: Statement (Text, User.UserID) ()
 updateUserName =
-  [resultlessStatement|
+    [resultlessStatement|
+
     update users
     set name = $1 :: text
     where id = $2 :: uuid
@@ -131,7 +133,8 @@ updateUserName =
 
 updateUserEmail :: Statement (Text, User.UserID) ()
 updateUserEmail =
-  [resultlessStatement|
+    [resultlessStatement|
+
     update users
     set email = $1 :: text
     where id = $2 :: uuid
@@ -139,14 +142,15 @@ updateUserEmail =
 
 updateUserPWHash :: Statement (Text, User.UserID) ()
 updateUserPWHash =
-  [resultlessStatement|
+    [resultlessStatement|
+
     update users
     set pwhash = $1 :: text
     where id = $2 :: uuid
   |]
 
 addGroup :: Statement (Text, Maybe Text) Group.GroupID
-addGroup = 
+addGroup =
     [singletonStatement|
 
       insert into groups (name, description)
@@ -155,7 +159,7 @@ addGroup =
     |]
 
 deleteGroup :: Statement Group.GroupID ()
-deleteGroup = 
+deleteGroup =
     [resultlessStatement|
       delete from groups 
       where id = $1 :: int4 
@@ -170,7 +174,7 @@ addRole =
     |]
 
 updateUserRoleInGroup :: Statement (User.UserID, Group.GroupID, Text) ()
-updateUserRoleInGroup = 
+updateUserRoleInGroup =
     [resultlessStatement|
       update roles
       set role = $3 :: text
@@ -178,7 +182,7 @@ updateUserRoleInGroup =
     |]
 
 removeUserFromGroup :: Statement (User.UserID, Group.GroupID) ()
-removeUserFromGroup = 
+removeUserFromGroup =
     [resultlessStatement|
       delete from roles 
       where user_id = $1 :: uuid and group_id = $2 :: int4

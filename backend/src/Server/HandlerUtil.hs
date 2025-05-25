@@ -16,7 +16,7 @@ import Database (getConnection)
 import Hasql.Connection (Connection)
 import Hasql.Session (run)
 import Servant
-import Server.Auth (Token(..))
+import Server.Auth (Token (..))
 import UserManagement.Group (GroupID)
 import qualified UserManagement.Sessions as Sessions
 import UserManagement.User (Role (..))
