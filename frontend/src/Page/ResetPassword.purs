@@ -8,7 +8,7 @@ module FPO.Page.ResetPassword (component) where
 import Prelude
 
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.String (null)
 import Data.String.Regex (regex, test)
 import Data.String.Regex.Flags (noFlags)
@@ -84,13 +84,13 @@ component =
   handleAction :: MonadAff m => Action -> H.HalogenM State Action () output m Unit
   handleAction = case _ of
     Initialize -> do
-      mail <- fromMaybe "" <<< _.userMail <$> getStore
+      mail <- _.inputMail <$> getStore
       H.modify_ \state -> state { email = mail }
     UpdateCode code -> do
       H.modify_ \state -> state { code = code, error = Nothing }
     UpdateEmail email -> do
       H.modify_ \state -> state { email = email, error = Nothing }
-      updateStore $ Store.SetUserMail email
+      updateStore $ Store.SetMail email
     UpdatePasswordPrimary password -> do
       H.modify_ \state -> state { passwordPrimary = password, error = Nothing }
     UpdatePasswordSecondary password -> do
@@ -113,7 +113,7 @@ component =
       H.modify_ \state -> state { error = Just error }
 
       when (not $ null mail) do
-        updateStore $ Store.SetUserMail mail
+        updateStore $ Store.SetMail mail
 
 renderResetForm :: forall w. State -> HH.HTML w Action
 renderResetForm state =

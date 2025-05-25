@@ -10,7 +10,7 @@ module FPO.Page.Login (component) where
 
 import Prelude
 
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
@@ -80,17 +80,18 @@ component =
       -- When opening the login tab, we simply take the user's email 
       -- address from the store, provided that it exists (was 
       -- previously set).
-      mail <- fromMaybe "" <<< _.userMail <$> getStore
+      mail <- _.inputMail <$> getStore
       H.modify_ \state -> state { email = mail }
     UpdateEmail email -> do
       H.modify_ \state -> state { email = email, error = Nothing }
       -- In this example, we are simply storing the user's email in our
       -- store, every time the user clicks on the button (either login or
       -- register).
-      updateStore $ Store.SetUserMail email
+      updateStore $ Store.SetMail email
     UpdatePassword password -> do
       H.modify_ \state -> state { password = password, error = Nothing }
     EmitError error -> do
+      updateStore $ Store.SetUser $ Just { userName: "local invalid User" }
       H.modify_ \state -> state { error = Just error }
     NavigateToPasswordReset -> do
       navigate PasswordReset

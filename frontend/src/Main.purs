@@ -102,7 +102,7 @@ component =
 main :: Effect Unit
 main = HA.runHalogenAff do
   body <- HA.awaitBody
-  let initialStore = { userMail: Nothing } :: Store.Store
+  let initialStore = { inputMail: "", user: Nothing } :: Store.Store
   rootComponent <- runAppM initialStore component
   halogenIO <- runUI rootComponent unit body
 
