@@ -40,10 +40,7 @@ type State =
   , code :: String
   }
 
--- | Login component.
--- |
--- | Notice how we are using MonadStore to update the store with the user's
--- | email when the user clicks on the button. 
+-- | Passwort reset component.
 component
   :: forall query input output m
    . MonadAff m

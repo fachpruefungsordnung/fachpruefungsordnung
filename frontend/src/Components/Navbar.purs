@@ -15,23 +15,22 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (User)
 import FPO.Data.Store as Store
-import Halogen (ClassName(..))
+import Halogen (AttrName(..), ClassName(..))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties (classes) as HP
-import Halogen.HTML.Properties (style)
+import Halogen.HTML.Properties (attr, classes, style) as HP
+import Halogen.HTML.Properties.ARIA (role)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Store.Select (selectEq)
-import Halogen.Themes.Bootstrap5 (bgBodyTertiary, btn, btnLink, containerFluid, dropdown, dropdownItem, dropdownMenu, dropdownToggle, meAuto, msAuto, navItem, navLink, navbar, navbarBrand, navbarCollapse, navbarExpandSm, navbarNav) as HB
+import Halogen.Themes.Bootstrap5 as HB
 
-type State = { user :: Maybe User, dropdownOpen :: Boolean }
+type State = { user :: Maybe User }
 
 data Action
   = Navigate Route
   | Receive (Connected Store.Store Unit) -- Receive store updates
-  | ToggleDropdown
   | Logout
 
 -- | The navbar component that renders the navigation bar.
@@ -44,7 +43,7 @@ navbar
   => Navigate m
   => H.Component query Unit output m
 navbar = connect (selectEq identity) $ H.mkComponent
-  { initialState: \{ context: store } -> { user: store.user, dropdownOpen: false }
+  { initialState: \{ context: store } -> { user: store.user }
   , render
   , eval: H.mkEval H.defaultEval
       { handleAction = handleAction
@@ -55,7 +54,12 @@ navbar = connect (selectEq identity) $ H.mkComponent
   render :: State -> H.ComponentHTML Action () m
   render state = HH.nav [ HP.classes [ HB.navbar, HB.navbarExpandSm, HB.bgBodyTertiary ] ]
     [ HH.div [ HP.classes [ HB.containerFluid ] ]
-        [ HH.a [ HP.classes [ HB.navbarBrand ], HE.onClick (const $ Navigate Home), style "cursor: pointer" ] [ HH.text "FPO-Editor" ]
+        [ HH.a
+            [ HP.classes [ HB.navbarBrand ]
+            , HE.onClick (const $ Navigate Home)
+            , HP.style "cursor: pointer"
+            ]
+            [ HH.text "FPO-Editor" ]
         , HH.div [ HP.classes [ HB.navbarCollapse ] ]
             [ HH.ul [ HP.classes [ HB.navbarNav, HB.meAuto ] ]
                 [ HH.li [ HP.classes [ HB.navItem ] ]
@@ -66,7 +70,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                 [ HH.li [ HP.classes [ HB.navItem ] ]
                     [ case state.user of
                         Nothing -> navButton "Login" Login
-                        Just user -> userDropdown user.userName state.dropdownOpen
+                        Just user -> userDropdown user.userName
                     ]
                 ]
             ]
@@ -81,10 +85,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
     navigate route
   handleAction (Receive { context: store }) = do
     H.modify_ _ { user = store.user }
-  handleAction ToggleDropdown = do
-    H.modify_ \s -> s { dropdownOpen = not s.dropdownOpen }
   handleAction Logout = do
-    H.modify_ _ { dropdownOpen = false }
     -- TODO: Perform logout logic, e.g., clear user session, redirect to login.
     -- Notice how we do not have to change this component's user state here, because
     -- updating the store will trigger a re-evaluation of the navbar component.
@@ -100,24 +101,27 @@ navbar = connect (selectEq identity) $ H.mkComponent
       [ HH.text label ]
 
   -- Creates a user dropdown with user icon and logout option
-  userDropdown :: String -> Boolean -> H.ComponentHTML Action () m
-  userDropdown username dropdownOpen =
-    HH.div [ HP.classes [ HB.dropdown ] ]
-      [ HH.button
-          [ HP.classes [ HB.btn, HB.btnLink, HB.navLink, HB.dropdownToggle ]
-          , HE.onClick (const ToggleDropdown)
+  userDropdown :: String -> H.ComponentHTML Action () m
+  userDropdown username =
+    HH.li
+      [ HP.classes [ HB.navItem, HB.dropdown ] ]
+      [ HH.a
+          [ HP.classes [ HB.navLink, HB.dropdownToggle ]
+          , role "button"
+          , HP.attr (AttrName "data-bs-toggle") "dropdown"
+          , HP.attr (AttrName "aria-expanded") "false"
           ]
-          [ HH.i [ HP.classes [ ClassName "bi", ClassName "bi-person" ] ] []
+          [ HH.i [ HP.classes [ ClassName "bi-person", HB.me1 ] ] []
           , HH.text username
           ]
       , HH.ul
           [ HP.classes [ HB.dropdownMenu ]
-          , style $ if dropdownOpen then "display: block;" else "display: none;"
+          , HP.attr (AttrName "aria-labelledby") "navbarDarkDropdownMenuLink"
           ]
           [ HH.li_
               [ HH.span
                   [ HP.classes [ HB.dropdownItem ]
-                  , style "cursor: default;"
+                  , HP.style "cursor: default;"
                   , HE.onClick (const Logout)
                   ]
                   [ HH.text "Logout" ]

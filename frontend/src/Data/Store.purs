@@ -10,8 +10,7 @@ type User = { userName :: String }
 
 -- | The Store type represents the global state of the application.
 type Store =
-  { inputMail :: String -- ^ The email that was input in the login form
-  --   (example state variable)
+  { inputMail :: String -- ^ The email that was input in the login form (example state variable)
   , user :: Maybe User -- ^ The user's name
   }
 

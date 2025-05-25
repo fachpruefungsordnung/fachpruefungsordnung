@@ -47,11 +47,13 @@ data Action = Initialize -- ^ Action to initialize the main component.
 _navbar = Proxy :: Proxy "navbar"
 _home = Proxy :: Proxy "home"
 _login = Proxy :: Proxy "login"
+_resetPassword = Proxy :: Proxy "resetPassword"
 
 type Slots =
   ( home :: forall q. H.Slot q Void Unit
   , login :: forall q. H.Slot q Void Unit
   , navbar :: forall q. H.Slot q Void Unit
+  , resetPassword :: forall q. H.Slot q Void Unit
   )
 
 component
@@ -62,7 +64,7 @@ component
   => H.Component Query Unit Void m
 component =
   H.mkComponent
-    { initialState: const { route: Just Login }
+    { initialState: const { route: Nothing }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -79,7 +81,7 @@ component =
         Just p -> case p of
           Home -> HH.slot_ _home unit Home.component unit
           Login -> HH.slot_ _login unit Login.component unit
-          PasswordReset -> HH.slot_ _home unit PasswordReset.component unit
+          PasswordReset -> HH.slot_ _resetPassword unit PasswordReset.component unit
     ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
