@@ -11,6 +11,7 @@ module FPO.Page.Login (component) where
 import Prelude
 
 import Data.Maybe (Maybe(..))
+import Data.String.CodeUnits (takeWhile)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
@@ -91,7 +92,14 @@ component =
     UpdatePassword password -> do
       H.modify_ \state -> state { password = password, error = Nothing }
     EmitError error -> do
-      updateStore $ Store.SetUser $ Just { userName: "local invalid User" }
+      -- TODO: For testing purposes, we "log in" a user where the name
+      --       is simply the local part of the email address.
+      --       Iff the user is "admin", we set the isAdmin flag to true.
+
+      email <- _.inputMail <$> getStore
+      let name = takeWhile (_ /= '@') email
+      updateStore $ Store.SetUser $ Just { userName: name, isAdmin: name == "admin" }
+
       H.modify_ \state -> state { error = Just error }
     NavigateToPasswordReset -> do
       navigate PasswordReset

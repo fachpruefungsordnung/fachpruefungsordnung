@@ -37,3 +37,11 @@ addColumn val str placeholder bi for act =
             ]
         ]
     ]
+
+-- | Wraps the given HTML in a div with the specified class.
+addClass
+  :: forall w i
+   . H.HTML w i
+  -> H.ClassName
+  -> H.HTML w i
+addClass html c = HH.div [ HP.classes [ c ] ] [ html ]

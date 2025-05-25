@@ -15,6 +15,7 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (User)
 import FPO.Data.Store as Store
+import FPO.Page.HTML (addClass)
 import Halogen (AttrName(..), ClassName(..))
 import Halogen as H
 import Halogen.HTML as HH
@@ -70,7 +71,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                 [ HH.li [ HP.classes [ HB.navItem ] ]
                     [ case state.user of
                         Nothing -> navButton "Login" Login
-                        Just user -> userDropdown user.userName
+                        Just user -> userDropdown user
                     ]
                 ]
             ]
@@ -86,10 +87,12 @@ navbar = connect (selectEq identity) $ H.mkComponent
   handleAction (Receive { context: store }) = do
     H.modify_ _ { user = store.user }
   handleAction Logout = do
-    -- TODO: Perform logout logic, e.g., clear user session, redirect to login.
+    -- TODO: Perform logout logic, e.g., clear user session, etc.
     -- Notice how we do not have to change this component's user state here, because
     -- updating the store will trigger a re-evaluation of the navbar component.
     updateStore (Store.SetUser Nothing)
+    -- We simply navigate to the Login page indiscriminately
+    navigate Login
 
   -- Creates a navigation button
   navButton :: String -> Route -> H.ComponentHTML Action () m
@@ -101,8 +104,8 @@ navbar = connect (selectEq identity) $ H.mkComponent
       [ HH.text label ]
 
   -- Creates a user dropdown with user icon and logout option
-  userDropdown :: String -> H.ComponentHTML Action () m
-  userDropdown username =
+  userDropdown :: User -> H.ComponentHTML Action () m
+  userDropdown user =
     HH.li
       [ HP.classes [ HB.navItem, HB.dropdown ] ]
       [ HH.a
@@ -112,19 +115,32 @@ navbar = connect (selectEq identity) $ H.mkComponent
           , HP.attr (AttrName "aria-expanded") "false"
           ]
           [ HH.i [ HP.classes [ ClassName "bi-person", HB.me1 ] ] []
-          , HH.text username
+          , HH.text user.userName
           ]
       , HH.ul
-          [ HP.classes [ HB.dropdownMenu ]
+          [ HP.classes [ HB.dropdownMenu, HB.dropdownMenuEnd ]
           , HP.attr (AttrName "aria-labelledby") "navbarDarkDropdownMenuLink"
           ]
-          [ HH.li_
-              [ HH.span
-                  [ HP.classes [ HB.dropdownItem ]
-                  , HP.style "cursor: default;"
-                  , HE.onClick (const Logout)
-                  ]
-                  [ HH.text "Logout" ]
-              ]
+          ( [ dropdownEntry "Profil" "person" (Navigate Login) ] -- TODO: navigate to profile page
+
+              <> -- TODO: navigate to admin panel 
+                ( if user.isAdmin then [ dropdownEntry "Adminpanel" "exclamation-octagon" (Navigate Login) `addClass` HB.bgWarningSubtle ]
+                  else []
+                )
+              <> [ dropdownEntry "Logout" "box-arrow-right" Logout ]
+          )
+      ]
+
+  -- Creates a dropdown entry with a label, bootstrap icon, and action. 
+  dropdownEntry :: String -> String -> Action -> H.ComponentHTML Action () m
+  dropdownEntry label icon action =
+    HH.li_
+      [ HH.span
+          [ HP.classes [ HB.dropdownItem, HB.dFlex, HB.alignItemsCenter ]
+          , HP.style "cursor: default;"
+          , HE.onClick (const action)
+          ]
+          [ HH.i [ HP.classes [ ClassName $ "bi-" <> icon, HB.flexShrink0, HB.me2 ] ] []
+          , HH.text label
           ]
       ]

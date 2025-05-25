@@ -6,7 +6,7 @@ module FPO.Data.Store where
 
 import Data.Maybe (Maybe)
 
-type User = { userName :: String }
+type User = { userName :: String, isAdmin :: Boolean }
 
 -- | The Store type represents the global state of the application.
 type Store =
