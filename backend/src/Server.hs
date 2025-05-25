@@ -286,7 +286,7 @@ deleteGroupHandler (Authenticated token) groupID = do
     deleteGroup conn = do
         eResult <- liftIO $ Session.run (Sessions.deleteGroup groupID) conn
         case eResult of
-            Left _ -> throwError $ errDatabaseAccessFailed
+            Left _ -> throwError errDatabaseAccessFailed
             Right () -> return NoContent
 deleteGroupHandler _ _ = throwError errNotLoggedIn
 

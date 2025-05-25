@@ -23,7 +23,7 @@ instance Accept PDF where
     contentType _ = "application" // "pdf"
 
 instance MimeRender PDF PDFByteString where
-    mimeRender _ = \(PDFByteString bs) -> bs
+    mimeRender _ (PDFByteString bs) = bs
 
 -- Cache-Control Headers
 type HeaderCacheControl = Header "Cache-Control" String
