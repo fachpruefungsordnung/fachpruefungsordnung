@@ -14,6 +14,7 @@ data Route
   = Home
   | Login
   | PasswordReset
+  | AdminPanel
 
 derive instance genericRoute :: Generic Route _
 derive instance eqRoute :: Eq Route
@@ -25,6 +26,7 @@ routeCodec = root $ sum
   { "Home": noArgs
   , "Login": "login" / noArgs
   , "PasswordReset": "password-reset" / noArgs
+  , "AdminPanel": "admin-panel" / noArgs
   }
 
 -- | Converts a route to a string representation.
@@ -34,3 +36,4 @@ routeToString = case _ of
   Home -> "Home"
   Login -> "Login"
   PasswordReset -> "PasswordReset"
+  AdminPanel -> "AdminPanel"

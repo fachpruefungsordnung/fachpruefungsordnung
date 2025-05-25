@@ -123,8 +123,8 @@ navbar = connect (selectEq identity) $ H.mkComponent
           ]
           ( [ dropdownEntry "Profil" "person" (Navigate Login) ] -- TODO: navigate to profile page
 
-              <> -- TODO: navigate to admin panel 
-                ( if user.isAdmin then [ dropdownEntry "Adminpanel" "exclamation-octagon" (Navigate Login) `addClass` HB.bgWarningSubtle ]
+              <>
+                ( if user.isAdmin then [ dropdownEntry "Adminpanel" "exclamation-octagon" (Navigate AdminPanel) `addClass` HB.bgWarningSubtle ]
                   else []
                 )
               <> [ dropdownEntry "Logout" "box-arrow-right" Logout ]
