@@ -13,6 +13,7 @@ import Routing.Duplex.Generic.Syntax ((/))
 data Route
   = Home
   | Login
+  | PasswordReset
 
 derive instance genericRoute :: Generic Route _
 derive instance eqRoute :: Eq Route
@@ -23,6 +24,7 @@ routeCodec :: RouteDuplex' Route
 routeCodec = root $ sum
   { "Home": noArgs
   , "Login": "login" / noArgs
+  , "PasswordReset": "password-reset" / noArgs
   }
 
 -- | Converts a route to a string representation.
@@ -31,3 +33,4 @@ routeToString :: Route -> String
 routeToString = case _ of
   Home -> "Home"
   Login -> "Login"
+  PasswordReset -> "PasswordReset"

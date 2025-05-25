@@ -5,21 +5,15 @@ module FPO.Page.Home (component) where
 
 import Prelude
 
-import Components.Preview (Output)
+import Components.Preview (Output, Query(TellClickedHttpRequest, TellLoadPdf, TellShowOrHideWarning), preview) as Preview
 import Data.Maybe (Maybe(..))
-import Data.Unit (unit)
 import Effect.Aff.Class (class MonadAff)
-import Type.Proxy (Proxy(..))
-import Web.DOM.Document (Document)
-import Effect.Aff as Aff
-import FPO.Components.Button as Button
 import FPO.Components.Editor as Editor
 import Halogen as H
-import Halogen.Themes.Bootstrap5 as HB
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Halogen.Subscription as HS
-import Components.Preview (Output, Query(TellClickedHttpRequest, TellLoadPdf, TellShowOrHideWarning), preview) as Preview
+import Halogen.Themes.Bootstrap5 as HB
+import Type.Proxy (Proxy(..))
 
 data Action
   = HandleEditor Editor.Output

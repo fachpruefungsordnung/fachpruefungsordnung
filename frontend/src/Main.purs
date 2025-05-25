@@ -13,22 +13,24 @@ import Data.Either (hush)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class.Console (log)
 import FPO.AppM (runAppM)
 import FPO.Components.Navbar as Navbar
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Route (Route(..), routeCodec)
+import FPO.Data.Route (Route(..), routeCodec, routeToString)
 import FPO.Data.Store as Store
 import FPO.Page.Home as Home
 import FPO.Page.Login as Login
+import FPO.Page.ResetPassword as PasswordReset
 import Halogen (liftEffect)
 import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Halogen.Themes.Bootstrap5 as HB
 import Halogen.Store.Monad (class MonadStore)
+import Halogen.Themes.Bootstrap5 as HB
 import Halogen.VDom.Driver (runUI)
-import Prelude (Unit, Void, bind, const, discard, pure, unit, void, when, ($), (/=), (<$>), (<<<))
+import Prelude (Unit, Void, bind, const, discard, pure, unit, void, when, ($), (/=), (<$>), (<<<), (<>))
 import Routing.Duplex as RD
 import Routing.Hash (getHash, matchesWith)
 import Type.Proxy (Proxy(..))
@@ -45,11 +47,13 @@ data Action = Initialize -- ^ Action to initialize the main component.
 _navbar = Proxy :: Proxy "navbar"
 _home = Proxy :: Proxy "home"
 _login = Proxy :: Proxy "login"
+_resetPassword = Proxy :: Proxy "resetPassword"
 
 type Slots =
   ( home :: forall q. H.Slot q Void Unit
   , login :: forall q. H.Slot q Void Unit
   , navbar :: forall q. H.Slot q Void Unit
+  , resetPassword :: forall q. H.Slot q Void Unit
   )
 
 component
@@ -60,7 +64,7 @@ component
   => H.Component Query Unit Void m
 component =
   H.mkComponent
-    { initialState: const { route: Just Login }
+    { initialState: const { route: Nothing }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
@@ -77,6 +81,7 @@ component =
         Just p -> case p of
           Home -> HH.slot_ _home unit Home.component unit
           Login -> HH.slot_ _login unit Login.component unit
+          PasswordReset -> HH.slot_ _resetPassword unit PasswordReset.component unit
     ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
@@ -99,7 +104,7 @@ component =
 main :: Effect Unit
 main = HA.runHalogenAff do
   body <- HA.awaitBody
-  let initialStore = { userMail: Nothing } :: Store.Store
+  let initialStore = { inputMail: "", user: Nothing } :: Store.Store
   rootComponent <- runAppM initialStore component
   halogenIO <- runUI rootComponent unit body
 
@@ -107,4 +112,5 @@ main = HA.runHalogenAff do
   void $ liftEffect $ matchesWith (RD.parse routeCodec) \old new ->
     when (old /= Just new) $ launchAff_ do
       _response <- halogenIO.query $ H.mkTell $ NavigateQ new
+      log $ "Navigated to: " <> routeToString new
       pure unit

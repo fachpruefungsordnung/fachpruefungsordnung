@@ -1,4 +1,4 @@
--- | Simple test page for login/register.
+-- | Simple test page for login.
 -- |
 -- | This page is currently not connected to any backend and does not perform any
 -- | authentication. 
@@ -10,29 +10,27 @@ module FPO.Page.Login (component) where
 
 import Prelude
 
-import Data.Maybe (Maybe(..), fromMaybe)
-import Data.String (null)
-import Effect.Aff.Class (class MonadAff)
+import Data.Maybe (Maybe(..))
+import FPO.Data.Navigate (class Navigate, navigate)
+import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
+import FPO.Page.HTML (addColumn)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events (onClick, onValueInput) as HE
+import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 
 data Action
   = Initialize
-  | ToggleRegister
-  | UpdateName String
+  | NavigateToPasswordReset
   | UpdateEmail String
   | UpdatePassword String
   | EmitError String
 
 type State =
-  { isRegistering :: Boolean
-  , name :: String
-  , email :: String
+  { email :: String
   , password :: String
   , error :: Maybe String
   }
@@ -43,7 +41,7 @@ type State =
 -- | email when the user clicks on the button. 
 component
   :: forall query input output m
-   . MonadAff m
+   . Navigate m
   => MonadStore Store.Action Store.Store m
   => H.Component query input output m
 component =
@@ -58,9 +56,7 @@ component =
   where
   initialState :: input -> State
   initialState _ =
-    { isRegistering: false
-    , name: ""
-    , email: ""
+    { email: ""
     , password: ""
     , error: Nothing
     }
@@ -69,8 +65,7 @@ component =
   render state =
     HH.div
       [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
-      [ if state.isRegistering then renderRegisterForm state
-        else renderLoginForm state
+      [ renderLoginForm state
       , HH.div [ HP.classes [ HB.textCenter ] ]
           [ case state.error of
               Just err -> HH.div [ HP.classes [ HB.alert, HB.alertDanger ] ]
@@ -79,71 +74,50 @@ component =
           ]
       ]
 
-  handleAction :: MonadAff m => Action -> H.HalogenM State Action () output m Unit
+  handleAction :: Action -> H.HalogenM State Action () output m Unit
   handleAction = case _ of
     Initialize -> do
       -- When opening the login tab, we simply take the user's email 
       -- address from the store, provided that it exists (was 
       -- previously set).
-      mail <- fromMaybe "" <<< _.userMail <$> getStore
+      mail <- _.inputMail <$> getStore
       H.modify_ \state -> state { email = mail }
-      pure unit
-    ToggleRegister -> do
-      H.modify_ \state -> state { isRegistering = not state.isRegistering, error = Nothing }
-      pure unit
-    UpdateName name -> do
-      H.modify_ \state -> state { name = name, error = Nothing }
-      pure unit
     UpdateEmail email -> do
       H.modify_ \state -> state { email = email, error = Nothing }
-      pure unit
-    UpdatePassword password -> do
-      H.modify_ \state -> state { password = password, error = Nothing }
-      pure unit
-    EmitError error -> do
-      mail <- H.gets _.email
-      H.modify_ \state -> state { error = Just error }
-
       -- In this example, we are simply storing the user's email in our
       -- store, every time the user clicks on the button (either login or
       -- register).
-      when (not $ null mail) do
-        updateStore $ Store.SetUserMail mail
-
-      pure unit
+      updateStore $ Store.SetMail email
+    UpdatePassword password -> do
+      H.modify_ \state -> state { password = password, error = Nothing }
+    EmitError error -> do
+      updateStore $ Store.SetUser $ Just { userName: "local invalid User" }
+      H.modify_ \state -> state { error = Just error }
+    NavigateToPasswordReset -> do
+      navigate PasswordReset
 
 renderLoginForm :: forall w. State -> HH.HTML w Action
 renderLoginForm state =
   HH.div [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my3 ] ]
     [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
-        [ HH.form
+        [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+            [ HH.text "Login" ]
+        , HH.form
             []
-            [ HH.label [ HP.classes [ HB.formLabel ], HP.for "email" ]
-                [ HH.text "Email address:" ]
-            , HH.div [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
-                [ HH.span [ HP.classes [ HB.inputGroupText ] ]
-                    [ HH.i [ HP.class_ (H.ClassName "bi-person-fill") ] [] ]
-                , HH.input
-                    [ HP.type_ HP.InputEmail
-                    , HP.classes [ HB.formControl ]
-                    , HP.placeholder "yo@example.com"
-                    , HP.value state.email
-                    , HE.onValueInput UpdateEmail
-                    ]
-                ]
-            , HH.label [ HP.classes [ HB.formLabel ], HP.for "password" ]
-                [ HH.text "Password:" ]
-            , HH.div [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
-                [ HH.span [ HP.classes [ HB.inputGroupText ] ]
-                    [ HH.i [ HP.class_ (H.ClassName "bi-lock-fill") ] [] ]
-                , HH.input
-                    [ HP.type_ HP.InputPassword
-                    , HP.classes [ HB.formControl ]
-                    , HP.placeholder "Password"
-                    , HP.value state.password
-                    , HE.onValueInput UpdatePassword
-                    ]
-                ]
+            [ addColumn
+                state.email
+                "E-Mail-Addresse:"
+                "E-Mail"
+                "bi-envelope-fill"
+                HP.InputEmail
+                UpdateEmail
+            , addColumn
+                state.password
+                "Passwort:"
+                "Passwort"
+                "bi-lock-fill"
+                HP.InputPassword
+                UpdatePassword
             , HH.div [ HP.classes [ HB.mb4, HB.textCenter ] ]
                 [ HH.button
                     [ HP.classes [ HB.btn, HB.btnPrimary ]
@@ -156,74 +130,9 @@ renderLoginForm state =
                 [ HH.button
                     [ HP.classes [ HB.btn, HB.btnLink ]
                     , HP.type_ HP.ButtonButton
-                    , HE.onClick $ const ToggleRegister
+                    , HE.onClick $ const NavigateToPasswordReset
                     ]
-                    [ HH.text "Need an account? Register here" ]
-                ]
-            ]
-        ]
-    ]
-
-renderRegisterForm :: forall w. State -> HH.HTML w Action
-renderRegisterForm state =
-  HH.div [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my3 ] ]
-    [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
-        [ HH.form
-            []
-            [ HH.label [ HP.classes [ HB.formLabel ], HP.for "name" ]
-                [ HH.text "Full Name:" ]
-            , HH.div [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
-                [ HH.span [ HP.classes [ HB.inputGroupText ] ]
-                    [ HH.i [ HP.class_ (H.ClassName "bi-person-badge") ] [] ]
-                , HH.input
-                    [ HP.type_ HP.InputText
-                    , HP.classes [ HB.formControl ]
-                    , HP.placeholder "John Doe"
-                    , HP.value state.name
-                    , HE.onValueInput UpdateName
-                    ]
-                ]
-            , HH.label [ HP.classes [ HB.formLabel ], HP.for "email" ]
-                [ HH.text "Email address:" ]
-            , HH.div [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
-                [ HH.span [ HP.classes [ HB.inputGroupText ] ]
-                    [ HH.i [ HP.class_ (H.ClassName "bi-person-fill") ] [] ]
-                , HH.input
-                    [ HP.type_ HP.InputEmail
-                    , HP.classes [ HB.formControl ]
-                    , HP.placeholder "yo@example.com"
-                    , HP.value state.email
-                    , HE.onValueInput UpdateEmail
-                    ]
-                ]
-            , HH.label [ HP.classes [ HB.formLabel ], HP.for "password" ]
-                [ HH.text "Password:" ]
-            , HH.div [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
-                [ HH.span [ HP.classes [ HB.inputGroupText ] ]
-                    [ HH.i [ HP.class_ (H.ClassName "bi-lock-fill") ] [] ]
-                , HH.input
-                    [ HP.type_ HP.InputPassword
-                    , HP.classes [ HB.formControl ]
-                    , HP.placeholder "Password"
-                    , HP.value state.password
-                    , HE.onValueInput UpdatePassword
-                    ]
-                ]
-            , HH.div [ HP.classes [ HB.mb4, HB.textCenter ] ]
-                [ HH.button
-                    [ HP.classes [ HB.btn, HB.btnPrimary ]
-                    , HP.type_ HP.ButtonSubmit
-                    , HE.onClick $ const (EmitError "Registering not implemented!")
-                    ]
-                    [ HH.text "Register" ]
-                ]
-            , HH.div [ HP.classes [ HB.textCenter ] ]
-                [ HH.button
-                    [ HP.classes [ HB.btn, HB.btnLink ]
-                    , HP.type_ HP.ButtonButton
-                    , HE.onClick $ const ToggleRegister
-                    ]
-                    [ HH.text "Already have an account? Login here" ]
+                    [ HH.text "Passwort vergessen?" ]
                 ]
             ]
         ]
