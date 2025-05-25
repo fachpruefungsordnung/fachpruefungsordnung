@@ -36,9 +36,9 @@ import Servant.OpenApi (HasOpenApi (toOpenApi))
 import qualified Server.Auth as Auth
 import Server.HTTPHeaders (PDF, PDFByteString (..))
 import Server.HandlerUtil
+import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
-import qualified UserManagement.Group as Group
 import qualified VersionControl as VC
 import VersionControl.Commit
 import Prelude hiding (readFile)
@@ -101,7 +101,7 @@ type ProtectedAPI =
         :<|> Auth AuthMethod Auth.Token
             :> "group"
             :> Capture "groupID" Group.GroupID
-            :> Delete '[JSON] NoContent 
+            :> Delete '[JSON] NoContent
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -179,7 +179,7 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
     ifSuperOrAdminDo conn token gID (addNewMember regData conn)
   where
     addNewMember :: Auth.UserRegisterData -> Connection -> Handler NoContent
-    addNewMember (Auth.UserRegisterData{..}) conn = do
+    addNewMember (Auth.UserRegisterData {..}) conn = do
         eUser <- liftIO $ Session.run (Sessions.getUser registerEmail) conn
         case eUser of
             Right Nothing -> do
@@ -211,7 +211,7 @@ getUserHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler User.FullUser
 getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
     conn <- tryGetDBConnection
-    undefined    
+    undefined
 getUserHandler _ _ = throwError errNotLoggedIn
 
 deleteUserHandler
@@ -235,7 +235,8 @@ patchUserHandler (Authenticated Auth.Token {..}) (Auth.UserUpdate {..}) = do
     undefined
 patchUserHandler _ _ = throwError errNotLoggedIn
 
-groupMembersHandler :: AuthResult Auth.Token -> Group.GroupID -> Handler [User.UserInfo]
+groupMembersHandler
+    :: AuthResult Auth.Token -> Group.GroupID -> Handler [User.UserInfo]
 groupMembersHandler (Authenticated token) groupID = do
     conn <- tryGetDBConnection
     ifSuperOrAdminDo conn token groupID (getMembers conn)
@@ -248,7 +249,8 @@ groupMembersHandler (Authenticated token) groupID = do
             Right members -> return members
 groupMembersHandler _ _ = throwError errNotLoggedIn
 
-createGroupHandler :: AuthResult Auth.Token -> Group.Group -> Handler Group.GroupID
+createGroupHandler
+    :: AuthResult Auth.Token -> Group.Group -> Handler Group.GroupID
 createGroupHandler (Authenticated Auth.Token {..}) (Group.Group {..}) = do
     conn <- tryGetDBConnection
     if isSuperadmin
@@ -274,19 +276,19 @@ createGroupHandler (Authenticated Auth.Token {..}) (Group.Group {..}) = do
             Right groupID -> return groupID
 createGroupHandler _ _ = throwError errNotLoggedIn
 
-deleteGroupHandler :: AuthResult Auth.Token -> Group.GroupID -> Handler NoContent
+deleteGroupHandler
+    :: AuthResult Auth.Token -> Group.GroupID -> Handler NoContent
 deleteGroupHandler (Authenticated token) groupID = do
     conn <- tryGetDBConnection
     ifSuperOrAdminDo conn token groupID (deleteGroup conn)
-    where
-        deleteGroup :: Connection -> Handler NoContent
-        deleteGroup conn = do
-            eResult <- liftIO $ Session.run (Sessions.deleteGroup groupID) conn
-            case eResult of
-                Left _ -> throwError $ errDatabaseAccessFailed
-                Right () -> return NoContent
+  where
+    deleteGroup :: Connection -> Handler NoContent
+    deleteGroup conn = do
+        eResult <- liftIO $ Session.run (Sessions.deleteGroup groupID) conn
+        case eResult of
+            Left _ -> throwError $ errDatabaseAccessFailed
+            Right () -> return NoContent
 deleteGroupHandler _ _ = throwError errNotLoggedIn
-
 
 api :: Proxy (PublicAPI :<|> ProtectedAPI)
 api = Proxy

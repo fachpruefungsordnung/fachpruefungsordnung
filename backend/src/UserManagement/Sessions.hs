@@ -23,9 +23,9 @@ import qualified Data.Bifunctor (second)
 import Data.Text (Text)
 import Data.Vector (Vector)
 import Hasql.Session (Session, statement)
+import qualified UserManagement.Group as Group
 import qualified UserManagement.Statements as Statements
 import qualified UserManagement.User as User
-import qualified UserManagement.Group as Group
 
 getUsers :: Session (Vector User.User)
 getUsers = statement () Statements.getUsers
@@ -76,10 +76,11 @@ addRole uid gid role =
      in statement (uid, gid, sqlrole) Statements.addRole
 
 updateUserRoleInGroup :: User.UserID -> Group.GroupID -> User.Role -> Session ()
-updateUserRoleInGroup uid gid role = let roletext = User.roleToText role
-                                      in statement (uid, gid, roletext) Statements.updateUserRoleInGroup
+updateUserRoleInGroup uid gid role =
+    let roletext = User.roleToText role
+     in statement (uid, gid, roletext) Statements.updateUserRoleInGroup
 
-removeUserFromGroup :: User.UserID -> Group.GroupID  -> Session ()
+removeUserFromGroup :: User.UserID -> Group.GroupID -> Session ()
 removeUserFromGroup uid gid = statement (uid, gid) Statements.removeUserFromGroup
 
 getMembersOfGroup :: Group.GroupID -> Session [User.UserInfo]

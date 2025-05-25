@@ -26,8 +26,8 @@ import GHC.Generics (Generic)
 import Servant.API
 import Servant.Auth.Server
 import Servant.OpenApi
-import qualified UserManagement.User as User
 import qualified UserManagement.Group as Group
+import qualified UserManagement.User as User
 
 data Token = Token
     { subject :: User.UserID

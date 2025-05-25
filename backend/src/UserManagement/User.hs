@@ -1,5 +1,5 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -14,12 +14,12 @@ module UserManagement.User
     )
 where
 
-import Data.Aeson ( FromJSON, ToJSON )
+import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
-import Data.Text ( pack, unpack, Text )
+import Data.Text (Text, pack, unpack)
 import Data.UUID (UUID)
-import GHC.Generics ( Generic )
-import GHC.Int ( Int32 )
+import GHC.Generics (Generic)
+import GHC.Int (Int32)
 import Text.Read (readMaybe)
 
 type UserID = UUID
