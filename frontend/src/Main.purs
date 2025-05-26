@@ -46,7 +46,9 @@ type State = { route :: Maybe Route }
 
 data Query a = NavigateQ Route a -- ^ Query to navigate to a new route.
 
-data Action = Initialize -- ^ Action to initialize the main component.
+data Action 
+  = Initialize -- ^ Action to initialize the main component.
+  | HandleOverview Overview.Output
 
 _navbar = Proxy :: Proxy "navbar"
 _home = Proxy :: Proxy "home"
@@ -65,7 +67,7 @@ type Slots =
   , adminPanel :: forall q. H.Slot q Void Unit
   , page404 :: forall q. H.Slot q Void Unit
   , profile :: forall q. H.Slot q Void Unit
-  , overview :: forall q. H.Slot q Void Unit
+  , overview :: forall q. H.Slot q Overview.Output Unit
   )
 
 component
@@ -104,6 +106,8 @@ component =
     Initialize -> do
       initialRoute <- hush <<< (RD.parse routeCodec) <$> liftEffect getHash
       navigate $ fromMaybe Home initialRoute
+{-     HandleOverview output -> case output of    <- todo
+      Overview.OpenProject projId ->  -}
 
   handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Void m (Maybe a)
   handleQuery = case _ of
