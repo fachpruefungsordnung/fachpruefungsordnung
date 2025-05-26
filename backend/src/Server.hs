@@ -169,7 +169,8 @@ loginHandler cookieSett jwtSett Auth.UserLoginData {..} = do
                     case mLoginAccepted of
                         Nothing -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
                         Just addHeaders -> return $ addHeaders NoContent
-        _ -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
+        Right Nothing -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
+        Left _ -> throwError errDatabaseAccessFailed
 
 registerHandler
     :: AuthResult Auth.Token -> Auth.UserRegisterData -> Handler NoContent
@@ -203,7 +204,7 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
                             Left _ -> throwError $ err500 {errBody = "failed to assign role!\n"}
                             Right _ -> return NoContent
             Right (Just _) -> throwError $ err409 {errBody = "a user with that email exists already."}
-            _ -> throwError $ err401 {errBody = "registration failed! Please try again!\n"}
+            Left _ -> throwError errDatabaseAccessFailed
 registerHandler _ _ = throwError errNotLoggedIn
 
 getUserHandler
@@ -221,7 +222,7 @@ deleteUserHandler (Authenticated Auth.Token {..}) requestedUserID =
             conn <- tryGetDBConnection
             eAction <- liftIO $ Session.run (Sessions.deleteUser requestedUserID) conn
             case eAction of
-                Left _ -> throwError $ err500 {errBody = "deletion failed"}
+                Left _ -> throwError errDatabaseAccessFailed
                 Right _ -> return NoContent
         else
             throwError errSuperAdminOnly
