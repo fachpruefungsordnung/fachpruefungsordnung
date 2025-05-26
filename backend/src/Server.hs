@@ -198,11 +198,8 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
                 case eAction of
                     Left _ -> throwError $ err500 {errBody = "user creation failed!\n"}
                     Right userID -> do
-                        eAction' <-
-                            liftIO $ Session.run (Sessions.addRole userID groupID User.Member) conn
-                        case eAction' of
-                            Left _ -> throwError $ err500 {errBody = "failed to assign role!\n"}
-                            Right _ -> return NoContent
+                        addRoleInGroup conn userID groupID User.Member
+                        return NoContent
             Right (Just _) -> throwError $ err409 {errBody = "a user with that email exists already."}
             Left _ -> throwError errDatabaseAccessFailed
 registerHandler _ _ = throwError errNotLoggedIn
@@ -262,7 +259,10 @@ createGroupHandler (Authenticated Auth.Token {..}) (Group.Group {..}) = do
                 Left _ -> throwError errDatabaseAccessFailed
                 Right roles ->
                     if any (\(_, mr) -> mr == Just User.Admin) roles
-                        then createGroup conn
+                        then do
+                            groupID <- createGroup conn
+                            addRoleInGroup conn subject groupID User.Admin
+                            return groupID
                         else
                             throwError $
                                 err403 {errBody = "You need to be Admin of any group to perform this action!\n"}

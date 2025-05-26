@@ -4,6 +4,7 @@
 module Server.HandlerUtil
     ( ifSuperOrAdminDo
     , tryGetDBConnection
+    , addRoleInGroup
     , errDatabaseConnectionFailed
     , errDatabaseAccessFailed
     , errNoAdminInThisGroup
@@ -17,9 +18,9 @@ import Hasql.Connection (Connection)
 import Hasql.Session (run)
 import Servant
 import Server.Auth (Token (..))
-import UserManagement.Group (GroupID)
+import UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
-import UserManagement.User (Role (..))
+import qualified UserManagement.User as User
 
 {- | Checks if User is SuperAdmin or Admin in the given group.
   If so, it calls the given callback Handler;
@@ -36,7 +37,7 @@ ifSuperOrAdminDo conn (Token {..}) groupID callback =
                 Right Nothing ->
                     throwError errNoAdminInThisGroup
                 Right (Just role) ->
-                    if role == Admin
+                    if role == User.Admin
                         then callback
                         else
                             throwError errNoAdminInThisGroup
@@ -49,12 +50,24 @@ tryGetDBConnection = do
         Left _ -> throwError errDatabaseConnectionFailed
         Right conn -> return conn
 
+-- | Adds given role in group to User
+addRoleInGroup
+    :: Connection -> User.UserID -> Group.GroupID -> User.Role -> Handler ()
+addRoleInGroup conn userID groupID role = do
+    eResult <- liftIO $ run (Sessions.addRole userID groupID role) conn
+    case eResult of
+        Right () -> return ()
+        Left _ -> throwError errFailedToSetRole
+
 -- Specific errors
 errDatabaseConnectionFailed :: ServerError
 errDatabaseConnectionFailed = err500 {errBody = "Connection to database failed!\n"}
 
 errDatabaseAccessFailed :: ServerError
 errDatabaseAccessFailed = err500 {errBody = "Database access failed!\n"}
+
+errFailedToSetRole :: ServerError
+errFailedToSetRole = err500 {errBody = "Failed to set role in Database!"}
 
 errNoAdminInThisGroup :: ServerError
 errNoAdminInThisGroup =
