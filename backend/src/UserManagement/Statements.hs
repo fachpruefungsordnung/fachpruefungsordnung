@@ -170,7 +170,7 @@ addRole =
     [resultlessStatement|
 
       insert into roles (user_id, group_id, role)
-      values ($1 :: uuid, $2 :: int4, $3 :: text)
+      values ($1 :: uuid, $2 :: int4, $3 :: text :: role)
     |]
 
 updateUserRoleInGroup :: Statement (User.UserID, Group.GroupID, Text) ()
