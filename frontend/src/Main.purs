@@ -22,6 +22,7 @@ import FPO.Data.Store as Store
 import FPO.Page.AdminPanel as AdminPanel
 import FPO.Page.Home as Home
 import FPO.Page.Login as Login
+import FPO.Page.Overview as Overview
 import FPO.Page.Page404 as Page404
 import FPO.Page.Profile as Profile
 import FPO.Page.ResetPassword as PasswordReset
@@ -54,6 +55,7 @@ _resetPassword = Proxy :: Proxy "resetPassword"
 _adminPanel = Proxy :: Proxy "adminPanel"
 _page404 = Proxy :: Proxy "page404"
 _profile = Proxy :: Proxy "profile"
+_overview = Proxy :: Proxy "overview"
 
 type Slots =
   ( home :: forall q. H.Slot q Void Unit
@@ -63,6 +65,7 @@ type Slots =
   , adminPanel :: forall q. H.Slot q Void Unit
   , page404 :: forall q. H.Slot q Void Unit
   , profile :: forall q. H.Slot q Void Unit
+  , overview :: forall q. H.Slot q Void Unit
   )
 
 component
@@ -93,6 +96,7 @@ component =
           PasswordReset -> HH.slot_ _resetPassword unit PasswordReset.component unit
           AdminPanel -> HH.slot_ _adminPanel unit AdminPanel.component unit
           Profile -> HH.slot_ _profile unit Profile.component unit
+          Overview -> HH.slot_ _overview unit Overview.component unit
     ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
@@ -108,7 +112,7 @@ component =
       -- If the user is not an admin, restrict access to the AdminPanel.
       -- This might not be a scalable solution for larger applications, and we might
       -- want to implement a more robust permission system in the future.
-      -- 
+      --
       -- We could also allow the user to access any page they want, but each page would
       -- check if the user is allowed to access it and display an error message if not.
       admin <- maybe false _.isAdmin <$> _.user <$> getStore

@@ -1,4 +1,4 @@
--- | This module defines the routing for the application. 
+-- | This module defines the routing for the application.
 
 module FPO.Data.Route where
 
@@ -16,6 +16,7 @@ data Route
   | PasswordReset
   | AdminPanel
   | Profile
+  | Overview
 
 derive instance genericRoute :: Generic Route _
 derive instance eqRoute :: Eq Route
@@ -29,6 +30,7 @@ routeCodec = root $ sum
   , "PasswordReset": "password-reset" / noArgs
   , "AdminPanel": "admin-panel" / noArgs
   , "Profile": "profile" / noArgs
+  , "Overview": "overview" / noArgs
   }
 
 -- | Converts a route to a string representation.
@@ -40,3 +42,4 @@ routeToString = case _ of
   PasswordReset -> "PasswordReset"
   AdminPanel -> "AdminPanel"
   Profile -> "Profile"
+  Overview -> "Overview"
