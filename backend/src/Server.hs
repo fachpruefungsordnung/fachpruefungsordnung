@@ -90,16 +90,15 @@ type ProtectedAPI =
             :> ReqBody '[JSON] Auth.UserUpdate
             :> Patch '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
-            :> "group"
-            :> "create"
+            :> "groups"
             :> ReqBody '[JSON] Group.Group
             :> Post '[JSON] Group.GroupID
         :<|> Auth AuthMethod Auth.Token
-            :> "group"
+            :> "groups"
             :> Capture "groupID" Group.GroupID
             :> Get '[JSON] [User.UserInfo]
         :<|> Auth AuthMethod Auth.Token
-            :> "group"
+            :> "groups"
             :> Capture "groupID" Group.GroupID
             :> Delete '[JSON] NoContent
 
