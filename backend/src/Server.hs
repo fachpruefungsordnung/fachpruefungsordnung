@@ -78,15 +78,15 @@ type ProtectedAPI =
             :> ReqBody '[JSON] Auth.UserRegisterData
             :> Post '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
-            :> "user"
+            :> "users"
             :> Capture "userId" User.UserID
             :> Get '[JSON] User.FullUser
         :<|> Auth AuthMethod Auth.Token
-            :> "user"
+            :> "users"
             :> Capture "userId" User.UserID
             :> Delete '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
-            :> "user"
+            :> "users"
             :> ReqBody '[JSON] Auth.UserUpdate
             :> Patch '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
