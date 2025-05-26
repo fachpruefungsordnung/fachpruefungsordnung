@@ -77,18 +77,18 @@ type ProtectedAPI =
             :> "register"
             :> ReqBody '[JSON] Auth.UserRegisterData
             :> Post '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "users"
-            :> Capture "userId" User.UserID
-            :> Get '[JSON] User.FullUser
+        -- :<|> Auth AuthMethod Auth.Token
+        --     :> "users"
+        --     :> Capture "userId" User.UserID
+        --     :> Get '[JSON] User.FullUser
         :<|> Auth AuthMethod Auth.Token
             :> "users"
             :> Capture "userId" User.UserID
             :> Delete '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "users"
-            :> ReqBody '[JSON] Auth.UserUpdate
-            :> Patch '[JSON] NoContent
+        -- :<|> Auth AuthMethod Auth.Token
+        --     :> "users"
+        --     :> ReqBody '[JSON] Auth.UserUpdate
+        --     :> Patch '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
             :> "groups"
             :> ReqBody '[JSON] Group.Group
@@ -204,12 +204,12 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
             Left _ -> throwError errDatabaseAccessFailed
 registerHandler _ _ = throwError errNotLoggedIn
 
-getUserHandler
-    :: AuthResult Auth.Token -> User.UserID -> Handler User.FullUser
-getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
-    conn <- tryGetDBConnection
-    undefined
-getUserHandler _ _ = throwError errNotLoggedIn
+-- getUserHandler
+--     :: AuthResult Auth.Token -> User.UserID -> Handler User.FullUser
+-- getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
+--     conn <- tryGetDBConnection
+--     undefined
+-- getUserHandler _ _ = throwError errNotLoggedIn
 
 deleteUserHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler NoContent
@@ -225,12 +225,12 @@ deleteUserHandler (Authenticated Auth.Token {..}) requestedUserID =
             throwError errSuperAdminOnly
 deleteUserHandler _ _ = throwError errNotLoggedIn
 
-patchUserHandler
-    :: AuthResult Auth.Token -> Auth.UserUpdate -> Handler NoContent
-patchUserHandler (Authenticated Auth.Token {..}) (Auth.UserUpdate {..}) = do
-    conn <- tryGetDBConnection
-    undefined
-patchUserHandler _ _ = throwError errNotLoggedIn
+-- patchUserHandler
+--     :: AuthResult Auth.Token -> Auth.UserUpdate -> Handler NoContent
+-- patchUserHandler (Authenticated Auth.Token {..}) (Auth.UserUpdate {..}) = do
+--     conn <- tryGetDBConnection
+--     undefined
+-- patchUserHandler _ _ = throwError errNotLoggedIn
 
 groupMembersHandler
     :: AuthResult Auth.Token -> Group.GroupID -> Handler [User.UserInfo]
@@ -313,9 +313,9 @@ server cookieSett jwtSett =
              )
         :<|> ( protectedHandler
                 :<|> registerHandler
-                :<|> getUserHandler
+                -- :<|> getUserHandler
                 :<|> deleteUserHandler
-                :<|> patchUserHandler
+                -- :<|> patchUserHandler
                 :<|> createGroupHandler
                 :<|> groupMembersHandler
                 :<|> deleteGroupHandler
