@@ -5,12 +5,10 @@ module FPO.Data.Route where
 import Prelude hiding ((/))
 
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe, Maybe(Nothing), fromMaybe)
-import Routing.Duplex (RouteDuplex', boolean, optional, root, string)
+import Data.Maybe (Maybe(Nothing), fromMaybe)
+import Routing.Duplex (RouteDuplex', boolean, optional, root)
 import Routing.Duplex.Generic (noArgs, sum)
 import Routing.Duplex.Generic.Syntax ((/), (?))
-import Data.Show (show)
-import Routing.Match (bool)
 
 -- | Represents all available routes in the application.
 data Route

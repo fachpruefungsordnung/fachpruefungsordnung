@@ -8,12 +8,12 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (User)
-import Halogen.Store.Monad (class MonadStore, getStore)
+import FPO.Data.Store as Store
 import Halogen as H
-import Halogen.Themes.Bootstrap5 as HB
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import FPO.Data.Store as Store
+import Halogen.Store.Monad (class MonadStore, getStore)
+import Halogen.Themes.Bootstrap5 as HB
 
 data Action = Initialize
 

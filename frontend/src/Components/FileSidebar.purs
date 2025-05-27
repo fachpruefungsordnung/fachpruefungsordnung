@@ -2,20 +2,19 @@ module FPO.Components.FileSidebar where
 
 import Prelude
 
-import Data.Maybe (Maybe(..))
 import Data.Array (head, tail, reverse, delete)
+import Data.Maybe (Maybe(..))
 import Data.String (length, take, toCodePointArray, singleton)
 import Data.String.CodePoints (CodePoint)
+import Effect.Class (class MonadEffect, liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Web.File.File as F
-import Web.File.File (File)
-import Web.File.Url (createObjectURL)
 import Unsafe.Coerce (unsafeCoerce)
-import Effect.Class (liftEffect)
-import Effect.Class (class MonadEffect)
+import Web.File.File (File)
+import Web.File.File as F
+import Web.File.Url (createObjectURL)
 
 data Output = SendPDF (Maybe String)
 

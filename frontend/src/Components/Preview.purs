@@ -8,18 +8,18 @@ import Control.Monad.Rec.Class (forever)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import Data.Time.Duration (Milliseconds(Milliseconds))
+import Effect.Aff (delay, forkAff) as Aff
 import Effect.Aff.Class (class MonadAff)
 import Effect.Console (log)
-import FPO.Data.Request (getIgnore, getString)
-import Type.Proxy (Proxy(Proxy))
-import Effect.Aff (delay, forkAff) as Aff
 import FPO.Components.Button (Output(Clicked), button) as Button
+import FPO.Data.Request (getIgnore, getString)
 import Halogen as H
-import Halogen.Themes.Bootstrap5 (bgInfoSubtle, col6, dFlex, flexColumn, flexGrow1, h100, overflowAuto, overflowHidden, textCenter, w100) as HB
 import Halogen.HTML (div, div_, pre, slot, text) as HH
 import Halogen.HTML.Elements (embed)
 import Halogen.HTML.Properties (classes, src) as HP
 import Halogen.Subscription (create, notify) as HS
+import Halogen.Themes.Bootstrap5 (bgInfoSubtle, col6, dFlex, flexColumn, flexGrow1, h100, overflowAuto, overflowHidden, textCenter, w100) as HB
+import Type.Proxy (Proxy(Proxy))
 
 type Output = Unit
 

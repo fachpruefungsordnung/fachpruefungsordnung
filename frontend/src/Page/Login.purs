@@ -116,7 +116,7 @@ component =
       loginResponse <- H.liftAff $ Request.postString "/login" (encodeJson loginDto)
       case loginResponse of
         Left err -> handleAction (EmitError (printError err))
-        Right { status, statusText, headers, body } ->
+        Right { status, body } ->
           case status of
             -- only accepting 200s responses since those are the only ones that encode success in our case
             -- at the same time updating the store of the application
