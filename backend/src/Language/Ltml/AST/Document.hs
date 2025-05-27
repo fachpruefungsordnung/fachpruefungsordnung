@@ -1,5 +1,6 @@
 module Language.Ltml.AST.Document (Document) where
 
+import Language.Lsd.AST.Document (DocumentFormat)
 import Language.Ltml.AST.Node (Node)
 import Language.Ltml.AST.Section (Section)
 
@@ -8,8 +9,6 @@ data Document
         DocumentFormat
         DocumentHeader
         DocumentBody
-
-data DocumentFormat = DocumentFormat
 
 data DocumentHeader = DocumentHeader
 

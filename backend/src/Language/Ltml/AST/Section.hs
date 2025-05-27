@@ -1,8 +1,8 @@
 module Language.Ltml.AST.Section (Section) where
 
 import Data.Text (Text)
+import Language.Lsd.AST.Section (SectionFormat)
 import Language.Ltml.AST.Block (Block)
-import Language.Ltml.AST.Format (HeadingFormat, IdentifierFormat)
 import Language.Ltml.AST.Node (Node)
 
 -- sectionKind = Section
@@ -12,11 +12,6 @@ data Section
         SectionFormat
         Heading
         [Node SectionChild]
-
-data SectionFormat
-    = SectionFormat
-        IdentifierFormat
-        HeadingFormat
 
 -- TODO: Use PlainText (yet to be defined).
 newtype Heading = Heading Text

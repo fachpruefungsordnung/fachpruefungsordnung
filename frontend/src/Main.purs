@@ -20,9 +20,10 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..), routeCodec, routeToString)
 import FPO.Data.Store as Store
 import FPO.Page.AdminPanel as AdminPanel
-import FPO.Page.Page404 as Page404
 import FPO.Page.Home as Home
 import FPO.Page.Login as Login
+import FPO.Page.Page404 as Page404
+import FPO.Page.Profile as Profile
 import FPO.Page.ResetPassword as PasswordReset
 import Halogen (liftEffect)
 import Halogen as H
@@ -52,6 +53,7 @@ _login = Proxy :: Proxy "login"
 _resetPassword = Proxy :: Proxy "resetPassword"
 _adminPanel = Proxy :: Proxy "adminPanel"
 _page404 = Proxy :: Proxy "page404"
+_profile = Proxy :: Proxy "profile"
 
 type Slots =
   ( home :: forall q. H.Slot q Void Unit
@@ -60,6 +62,7 @@ type Slots =
   , resetPassword :: forall q. H.Slot q Void Unit
   , adminPanel :: forall q. H.Slot q Void Unit
   , page404 :: forall q. H.Slot q Void Unit
+  , profile :: forall q. H.Slot q Void Unit
   )
 
 component
@@ -89,6 +92,7 @@ component =
           Login -> HH.slot_ _login unit Login.component unit
           PasswordReset -> HH.slot_ _resetPassword unit PasswordReset.component unit
           AdminPanel -> HH.slot_ _adminPanel unit AdminPanel.component unit
+          Profile { loginSuccessful } -> HH.slot_ _profile unit Profile.component { loginSuccessfulBanner: loginSuccessful }
     ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Void m Unit

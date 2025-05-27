@@ -6,7 +6,7 @@ import Control.Applicative ((<|>))
 import qualified Data.Char as Char (isAlpha)
 import Data.Text (Text)
 import Data.Text.FromWhitespace (FromWhitespace, fromWhitespace)
-import Language.Ltml.AST.Format (IdentifierFormat)
+import Language.Lsd.AST.Paragraph (ParagraphFormat)
 import Language.Ltml.AST.Label (Label)
 import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.MiTree (hangingBlock', miForest)
@@ -17,10 +17,6 @@ data Paragraph
     = Paragraph
         ParagraphFormat
         [RichTextTree]
-
-newtype ParagraphFormat
-    = ParagraphFormat
-        IdentifierFormat
 
 data RichTextTree
     = TextLeaf Text

@@ -3,6 +3,9 @@ package:
   dependencies:
     - ace
     - affjax-web
+    - argonaut
+    - codec
+    - codec-argonaut
     - console
     - effect
     - halogen

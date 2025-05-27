@@ -60,7 +60,7 @@ component =
 
 renderAdminPanel :: forall w. State -> HH.HTML w Action
 renderAdminPanel _ =
-  HH.div [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my3 ] ]
+  HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
     [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
         [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
             [ HH.text "Adminpanel" ]

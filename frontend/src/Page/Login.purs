@@ -10,18 +10,25 @@ module FPO.Page.Login (component) where
 
 import Prelude
 
+import Affjax (printError)
+import Affjax.StatusCode (StatusCode(StatusCode))
+import Data.Argonaut.Encode.Class (encodeJson)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (takeWhile)
+import Dto.Login (LoginDto)
+import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..))
-import FPO.Data.Store as Store
 import FPO.Page.HTML (addColumn)
-import Halogen as H
-import Halogen.HTML as HH
-import Halogen.HTML.Events (onClick) as HE
-import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
+import Halogen as H
 import Halogen.Themes.Bootstrap5 as HB
+import Halogen.HTML.Events (onClick) as HE
+import Halogen.HTML as HH
+import Halogen.HTML.Properties as HP
+import FPO.Data.Request (postString) as Request
+import FPO.Data.Store as Store
 
 data Action
   = Initialize
@@ -29,6 +36,10 @@ data Action
   | UpdateEmail String
   | UpdatePassword String
   | EmitError String
+  | DoLogin LoginDto
+
+toLoginDto :: State -> LoginDto
+toLoginDto state = { loginEmail: state.email, loginPassword: state.password }
 
 type State =
   { email :: String
@@ -44,6 +55,7 @@ component
   :: forall query input output m
    . Navigate m
   => MonadStore Store.Action Store.Store m
+  => MonadAff m
   => H.Component query input output m
 component =
   H.mkComponent
@@ -75,7 +87,7 @@ component =
           ]
       ]
 
-  handleAction :: Action -> H.HalogenM State Action () output m Unit
+  handleAction :: MonadAff m => Action -> H.HalogenM State Action () output m Unit
   handleAction = case _ of
     Initialize -> do
       -- When opening the login tab, we simply take the user's email
@@ -92,21 +104,33 @@ component =
     UpdatePassword password -> do
       H.modify_ \state -> state { password = password, error = Nothing }
     EmitError error -> do
-      -- TODO: For testing purposes, we "log in" a user where the name
-      --       is simply the local part of the email address.
-      --       Iff the user is "admin", we set the isAdmin flag to true.
-
-      email <- _.inputMail <$> getStore
-      let name = takeWhile (_ /= '@') email
-      updateStore $ Store.SetUser $ Just { userName: name, isAdmin: name == "admin" }
-
       H.modify_ \state -> state { error = Just error }
     NavigateToPasswordReset -> do
       navigate PasswordReset
+    DoLogin loginDto -> do
+      -- trying to do a login by calling the api at /api/login
+      -- we show the error response that comes back from the backend
+      -- TODO when the backend implmented their new login api with jwt and stuff, we
+      -- TODO need to update that logic as well (as well as extracting the logic into
+      -- TODO a seperate, tested function)
+      loginResponse <- H.liftAff $ Request.postString "/login" (encodeJson loginDto)
+      case loginResponse of
+        Left err -> handleAction (EmitError (printError err))
+        Right { status, statusText, headers, body } ->
+          case status of
+            -- only accepting 200s responses since those are the only ones that encode success in our case
+            -- at the same time updating the store of the application
+            -- TODO persisting the credentials in the browser storage
+            StatusCode 200 -> do
+              let name = takeWhile (_ /= '@') loginDto.loginEmail
+              updateStore $ Store.SetUser $ Just { userName: name, isAdmin: false }
+              navigate (Profile { loginSuccessful: Just true })
+            StatusCode _ -> handleAction (EmitError body)
+      pure unit
 
 renderLoginForm :: forall w. State -> HH.HTML w Action
 renderLoginForm state =
-  HH.div [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my3 ] ]
+  HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
     [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
         [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
             [ HH.text "Login" ]
@@ -130,7 +154,7 @@ renderLoginForm state =
                 [ HH.button
                     [ HP.classes [ HB.btn, HB.btnPrimary ]
                     , HP.type_ HP.ButtonSubmit
-                    , HE.onClick $ const (EmitError "Login not implemented!")
+                    , HE.onClick $ const (DoLogin (toLoginDto state))
                     ]
                     [ HH.text "Login" ]
                 ]

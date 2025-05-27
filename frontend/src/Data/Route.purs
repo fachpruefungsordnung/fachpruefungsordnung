@@ -5,9 +5,12 @@ module FPO.Data.Route where
 import Prelude hiding ((/))
 
 import Data.Generic.Rep (class Generic)
-import Routing.Duplex (RouteDuplex', root)
+import Data.Maybe (Maybe, Maybe(Nothing), fromMaybe)
+import Routing.Duplex (RouteDuplex', boolean, optional, root, string)
 import Routing.Duplex.Generic (noArgs, sum)
-import Routing.Duplex.Generic.Syntax ((/))
+import Routing.Duplex.Generic.Syntax ((/), (?))
+import Data.Show (show)
+import Routing.Match (bool)
 
 -- | Represents all available routes in the application.
 data Route
@@ -15,6 +18,7 @@ data Route
   | Login
   | PasswordReset
   | AdminPanel
+  | Profile { loginSuccessful :: Maybe Boolean }
 
 derive instance genericRoute :: Generic Route _
 derive instance eqRoute :: Eq Route
@@ -27,6 +31,7 @@ routeCodec = root $ sum
   , "Login": "login" / noArgs
   , "PasswordReset": "password-reset" / noArgs
   , "AdminPanel": "admin-panel" / noArgs
+  , "Profile": "profile" ? { loginSuccessful: optional <<< boolean }
   }
 
 -- | Converts a route to a string representation.
@@ -37,3 +42,4 @@ routeToString = case _ of
   Login -> "Login"
   PasswordReset -> "PasswordReset"
   AdminPanel -> "AdminPanel"
+  Profile { loginSuccessful } -> "Profile" <> (if loginSuccessful == Nothing then "" else " (loginSuccessful: " <> (show $ fromMaybe false loginSuccessful) <> ")")

@@ -5,7 +5,7 @@ module FPO.Page.Home (component) where
 
 import Prelude
 
-import Components.Preview (Output, Query(TellClickedHttpRequest, TellLoadPdf, TellShowOrHideWarning), preview) as Preview
+import Components.Preview (Output, Query(TellClickedHttpRequest, TellLoadPdf, TellLoadUploadedPdf, TellShowOrHideWarning), preview) as Preview
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Editor as Editor
@@ -70,5 +70,6 @@ component =
       Editor.ClickedQuery response -> H.modify_ \st -> st { editorContent = response }
       Editor.ClickedShowWarning -> H.tell _preview unit Preview.TellShowOrHideWarning
       Editor.LoadPdf -> H.tell _preview unit Preview.TellLoadPdf
+      Editor.SendPDF mURL -> H.tell _preview unit (Preview.TellLoadUploadedPdf mURL)
 
     HandlePreview _ -> pure unit
