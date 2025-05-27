@@ -5,7 +5,16 @@ module FPO.Page.Home (component) where
 
 import Prelude
 
-import Components.Preview (Output, Query(TellClickedHttpRequest, TellLoadPdf, TellLoadUploadedPdf, TellShowOrHideWarning), preview) as Preview
+import Components.Preview
+  ( Output
+  , Query
+      ( TellClickedHttpRequest
+      , TellLoadPdf
+      , TellLoadUploadedPdf
+      , TellShowOrHideWarning
+      )
+  , preview
+  ) as Preview
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Editor as Editor
@@ -46,15 +55,31 @@ component =
 
   render :: State -> H.ComponentHTML Action Slots m
   render { editorContent } =
-    HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.p0, HB.overflowHidden ] ]
+    HH.div
+      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.p0, HB.overflowHidden ]
+      ]
       [
         -- the _button is for the Proxy to be able to identify it via a term
         -- the 0 is the unique identifier
         -- and button { label: "Click Me" } is the component with its input (communication from parent to child)
         -- in the HH.slot function there is a way to handle messages from the child to the parent (now the HandleButton parameter)
-        HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.containerFluid, HB.p0, HB.flexFill, HB.overflowHidden ] ]
-          [ HH.div [ HP.classes [ HB.dFlex, HB.flexGrow1, HB.flexRow, HB.g0, HB.overflowHidden ] ]
-              [ HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.col6 ] ]
+        HH.div
+          [ HP.classes
+              [ HB.dFlex
+              , HB.flexColumn
+              , HB.flexGrow1
+              , HB.containerFluid
+              , HB.p0
+              , HB.flexFill
+              , HB.overflowHidden
+              ]
+          ]
+          [ HH.div
+              [ HP.classes
+                  [ HB.dFlex, HB.flexGrow1, HB.flexRow, HB.g0, HB.overflowHidden ]
+              ]
+              [ HH.div
+                  [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.col6 ] ]
                   [ HH.slot _editor unit Editor.editor unit HandleEditor ]
               , HH.slot _preview unit Preview.preview { editorContent } HandlePreview
               ]

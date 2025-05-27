@@ -2,9 +2,9 @@ module FPO.Components.FileSidebar where
 
 import Prelude
 
-import Data.Array (head, tail, reverse, delete)
+import Data.Array (delete, head, reverse, tail)
 import Data.Maybe (Maybe(..))
-import Data.String (length, take, toCodePointArray, singleton)
+import Data.String (length, singleton, take, toCodePointArray)
 import Data.String.CodePoints (CodePoint)
 import Effect.Class (class MonadEffect, liftEffect)
 import Halogen as H

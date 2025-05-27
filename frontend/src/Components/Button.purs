@@ -33,8 +33,12 @@ button =
 
   render :: State -> H.ComponentHTML Action () m
   render { label } = HH.div []
-    [ HH.small_ [ HH.text "Dies ist ein Button, der dessen Code demonstrieren soll, wie input und output in Halogen funktioniert: " ]
-    , HH.button [ HE.onClick \_ -> Click, HP.classes [ HB.btn, HB.btnPrimary ] ] [ HH.text label ]
+    [ HH.small_
+        [ HH.text
+            "Dies ist ein Button, der dessen Code demonstrieren soll, wie input und output in Halogen funktioniert: "
+        ]
+    , HH.button [ HE.onClick \_ -> Click, HP.classes [ HB.btn, HB.btnPrimary ] ]
+        [ HH.text label ]
     ]
 
   handleAction :: Action -> H.HalogenM State Action () Output m Unit

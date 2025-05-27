@@ -38,7 +38,8 @@ component =
     }
   where
   initialState :: Input -> State
-  initialState { loginSuccessfulBanner } = { user: Nothing, loginSuccessfulBanner: fromMaybe false loginSuccessfulBanner }
+  initialState { loginSuccessfulBanner } =
+    { user: Nothing, loginSuccessfulBanner: fromMaybe false loginSuccessfulBanner }
 
   render :: State -> H.ComponentHTML Action () m
   render state =
@@ -47,11 +48,13 @@ component =
       [ HH.div [ HP.classes [ HB.col, HB.textCenter ] ]
           [ HH.h1 [] [ HH.text "Profil" ]
           , case state.user of
-              Just user -> HH.div [ HP.classes [ HB.dFlex, HB.justifyContentCenter, HB.my5 ] ]
+              Just user -> HH.div
+                [ HP.classes [ HB.dFlex, HB.justifyContentCenter, HB.my5 ] ]
                 [ HH.div [ HP.classes [ HB.colMd3 ] ]
                     [ HH.div [ HP.classes [ HB.textCenter, HB.mt3 ] ]
                         [ case state.loginSuccessfulBanner of
-                            true -> HH.div [ HP.classes [ HB.alert, HB.alertSuccess ] ]
+                            true -> HH.div
+                              [ HP.classes [ HB.alert, HB.alertSuccess ] ]
                               [ HH.text "Login successful" ]
                             false -> HH.text ""
                         ]
@@ -65,8 +68,17 @@ component =
                                 ]
                             , HH.li [ HP.classes [ HB.listGroupItem ] ]
                                 [ HH.strong_ [ HH.text "Rolle: " ]
-                                , HH.span [ HP.classes [ HB.badge, if user.isAdmin then HB.bgPrimary else HB.bgSecondary ] ]
-                                    [ HH.text $ if user.isAdmin then "Administrator" else "Member" ]
+                                , HH.span
+                                    [ HP.classes
+                                        [ HB.badge
+                                        , if user.isAdmin then HB.bgPrimary
+                                          else HB.bgSecondary
+                                        ]
+                                    ]
+                                    [ HH.text $
+                                        if user.isAdmin then "Administrator"
+                                        else "Member"
+                                    ]
                                 ]
                             ]
                         ]

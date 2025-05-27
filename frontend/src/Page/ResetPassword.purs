@@ -97,14 +97,17 @@ component =
       --       We could also, instead of handling a code here, simply send an email with a link
       --       to reset the password.
       --       For now, we are just emitting an error.
-      H.modify_ \state -> state { error = Just "TODO; Es wurde Ihnen (k)ein Code per E-Mail geschickt!" }
+      H.modify_ \state -> state
+        { error = Just "TODO; Es wurde Ihnen (k)ein Code per E-Mail geschickt!" }
       pure unit
     SendPasswordReset -> do
       { passwordPrimary, passwordSecondary } <- H.get
       if (passwordPrimary /= passwordSecondary) then do
-        H.modify_ \state -> state { error = Just "Die Passwörter stimmen nicht überein!" }
+        H.modify_ \state -> state
+          { error = Just "Die Passwörter stimmen nicht überein!" }
       else do
-        H.modify_ \state -> state { error = Just "Passwortreset wird noch nicht unterstützt!" }
+        H.modify_ \state -> state
+          { error = Just "Passwortreset wird noch nicht unterstützt!" }
     EmitError error -> do
       mail <- H.gets _.email
       H.modify_ \state -> state { error = Just error }
@@ -149,7 +152,10 @@ renderResetForm state =
                         ( [ HP.classes [ HB.btn, HB.btnOutlineSecondary ]
                           , HP.type_ HP.ButtonButton
                           , HE.onClick \_ -> RequestCode
-                          ] <> if not (isValidEmail state.email) then [ HP.disabled true ] else []
+                          ] <>
+                            if not (isValidEmail state.email) then
+                              [ HP.disabled true ]
+                            else []
                         )
                         [ HH.text "Code anfordern" ]
                     , HH.input
@@ -168,7 +174,9 @@ renderResetForm state =
                     ( [ HP.classes [ HB.btn, HB.btnPrimary ]
                       , HP.type_ HP.ButtonSubmit
                       , HE.onClick $ const SendPasswordReset
-                      ] <> if not (isValidEmail state.email) then [ HP.disabled true ] else []
+                      ] <>
+                        if not (isValidEmail state.email) then [ HP.disabled true ]
+                        else []
                     )
                     [ HH.text "Abschicken" ]
                 ]

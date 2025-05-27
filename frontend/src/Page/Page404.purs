@@ -36,7 +36,10 @@ component =
       [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
       [ HH.div [ HP.classes [ HB.col, HB.textCenter ] ]
           [ HH.h1 [] [ HH.text "404" ]
-          , HH.p [] [ HH.text "Diese Seite existiert nicht, wurde verschoben, oder erfordert Privilegien, die Sie nicht besitzen." ]
+          , HH.p []
+              [ HH.text
+                  "Diese Seite existiert nicht, wurde verschoben, oder erfordert Privilegien, die Sie nicht besitzen."
+              ]
           , HH.button
               [ HP.classes [ HB.btn, HB.btnPrimary ]
               , HE.onClick (const GoHome)

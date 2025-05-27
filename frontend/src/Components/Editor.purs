@@ -71,7 +71,8 @@ editor = H.mkComponent
   }
   where
   initialState :: State
-  initialState = { editor: Nothing, pdfWarningAvailable: false, pdfWarningIsShown: false }
+  initialState =
+    { editor: Nothing, pdfWarningAvailable: false, pdfWarningIsShown: false }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
@@ -81,12 +82,29 @@ editor = H.mkComponent
 
           [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
           [ HH.span [ HP.classes [ HB.textWhite ] ] [ HH.text "Toolbar" ]
-          , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const MakeRequest ] [ HH.text "Click Me for HTTP request" ]
-          , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const QueryEditor ] [ HH.text "Query Editor" ]
-          , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ClickLoadPdf ] [ HH.text "Load PDF" ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+              , HE.onClick $ const MakeRequest
+              ]
+              [ HH.text "Click Me for HTTP request" ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+              , HE.onClick $ const QueryEditor
+              ]
+              [ HH.text "Query Editor" ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+              , HE.onClick $ const ClickLoadPdf
+              ]
+              [ HH.text "Load PDF" ]
           , if not state.pdfWarningAvailable then HH.div_ []
-            else HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ShowWarning ]
-              [ HH.text ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning") ]
+            else HH.button
+              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+              , HE.onClick $ const ShowWarning
+              ]
+              [ HH.text
+                  ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning")
+              ]
           ]
       , HH.div -- Second toolbar
 
