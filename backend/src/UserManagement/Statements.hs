@@ -3,7 +3,8 @@
 
 module UserManagement.Statements
     ( getUsers
-    , getUser
+    , getUserByEmail
+    , getUserByID
     , putUser
     , deleteUser
     , getUserID
@@ -59,14 +60,24 @@ getLoginRequirements =
           email = $1 :: text
       |]
 
-getUser :: Statement Text (Maybe User.User)
-getUser =
+getUserByEmail :: Statement Text (Maybe User.User)
+getUserByEmail =
     rmap
         (fmap (uncurryN User.User))
         [maybeStatement|
      select name :: text, email :: text, pwhash :: text
      from users
      where email = $1 :: text
+   |]
+
+getUserByID :: Statement User.UserID (Maybe User.User)
+getUserByID =
+    rmap
+        (fmap (uncurryN User.User))
+        [maybeStatement|
+     select name :: text, email :: text, pwhash :: text
+     from users
+     where id = $1 :: uuid
    |]
 
 getUserRoleInGroup :: Statement (User.UserID, Group.GroupID) (Maybe Text)

@@ -19,8 +19,8 @@ import Data.OpenApi (ToSchema)
 import Data.Text (Text, pack, unpack)
 import Data.UUID (UUID)
 import GHC.Generics (Generic)
-import GHC.Int (Int32)
 import Text.Read (readMaybe)
+import qualified UserManagement.Group as Group
 
 type UserID = UUID
 
@@ -39,7 +39,7 @@ data FullUser = FullUser
     { fullUserID :: UserID
     , fullUserName :: Text
     , fullUserEmail :: Text
-    , fullUserRoles :: [(Int32, Role)]
+    , fullUserRoles :: [(Group.GroupID, Role)]
     }
     deriving (Show, Generic)
 

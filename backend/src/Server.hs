@@ -23,6 +23,7 @@ import Data.OpenApi
     , version
     )
 import Data.Password.Argon2
+import Data.Text (Text)
 import Data.UUID (toString)
 import Data.Vector (toList)
 import Database (getConnection)
@@ -82,6 +83,13 @@ type ProtectedAPI =
         --     :> Get '[JSON] User.FullUser
         :<|> Auth AuthMethod Auth.Token
             :> "users"
+<<<<<<< HEAD
+=======
+            :> Capture "userId" User.UserID
+            :> Get '[JSON] User.FullUser
+        :<|> Auth AuthMethod Auth.Token
+            :> "user"
+>>>>>>> 01650f5 (added role endpoints and logic)
             :> Capture "userId" User.UserID
             :> Delete '[JSON] NoContent
         -- :<|> Auth AuthMethod Auth.Token
@@ -89,7 +97,17 @@ type ProtectedAPI =
         --     :> ReqBody '[JSON] Auth.UserUpdate
         --     :> Patch '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
+<<<<<<< HEAD
             :> "groups"
+=======
+            :> "users"
+            :> Capture "userId" User.UserID
+            :> ReqBody '[JSON] Auth.UserUpdate
+            :> Patch '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "group"
+            :> "create"
+>>>>>>> 01650f5 (added role endpoints and logic)
             :> ReqBody '[JSON] Group.Group
             :> Post '[JSON] Group.GroupID
         :<|> Auth AuthMethod Auth.Token
@@ -100,6 +118,26 @@ type ProtectedAPI =
             :> "groups"
             :> Capture "groupID" Group.GroupID
             :> Delete '[JSON] NoContent
+<<<<<<< HEAD
+=======
+        :<|> Auth AuthMethod Auth.Token
+            :> "roles"
+            :> Capture "groupID" Group.GroupID
+            :> Capture "userId" User.UserID
+            :> Get '[JSON] User.Role
+        :<|> Auth AuthMethod Auth.Token
+            :> "roles"
+            :> Capture "groupID" Group.GroupID
+            :> Capture "userId" User.UserID
+            :> ReqBody '[JSON] User.Role
+            :> Post '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "roles"
+            :> Capture "groupID" Group.GroupID
+            :> Capture "userId" User.UserID
+            :> Delete '[JSON] NoContent
+        
+>>>>>>> 01650f5 (added role endpoints and logic)
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -179,7 +217,11 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
   where
     addNewMember :: Auth.UserRegisterData -> Connection -> Handler NoContent
     addNewMember (Auth.UserRegisterData {..}) conn = do
+<<<<<<< HEAD
         eUser <- liftIO $ Session.run (Sessions.getUser registerEmail) conn
+=======
+        eUser <- liftIO $ Session.run (Sessions.getUserByEmail registerEmail) conn
+>>>>>>> 01650f5 (added role endpoints and logic)
         case eUser of
             Right Nothing -> do
                 PasswordHash hashedText <- liftIO $ hashPassword $ mkPassword registerPassword
@@ -203,12 +245,35 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
             Left _ -> throwError errDatabaseAccessFailed
 registerHandler _ _ = throwError errNotLoggedIn
 
+<<<<<<< HEAD
 -- getUserHandler
 --     :: AuthResult Auth.Token -> User.UserID -> Handler User.FullUser
 -- getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
 --     conn <- tryGetDBConnection
 --     undefined
 -- getUserHandler _ _ = throwError errNotLoggedIn
+=======
+getUserHandler
+    :: AuthResult Auth.Token -> User.UserID -> Handler User.FullUser
+getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
+    if isSuperadmin || subject == requestedUserID
+        then do
+            conn <- tryGetDBConnection
+            eAction <- liftIO $ Session.run (Sessions.getUserByID requestedUserID) conn
+            case eAction of
+                Left _ -> throwError errDatabaseAccessFailed
+                Right Nothing -> throwError $ err404 {errBody = "user not found."}
+                Right (Just User.User{..}) -> do
+                    eAction' <- liftIO $ Session.run (Sessions.getAllUserRoles requestedUserID) conn
+                    case eAction' of
+                        Left _ -> throwError errDatabaseAccessFailed
+                        Right roles ->
+                            let roles' = [(group, role) | (group, Just role) <- roles] in
+                            return $ User.FullUser requestedUserID userName userEmail roles'
+        else
+            throwError errSuperAdminOnly
+getUserHandler _ _ = throwError errNotLoggedIn
+>>>>>>> 01650f5 (added role endpoints and logic)
 
 deleteUserHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler NoContent
@@ -224,12 +289,39 @@ deleteUserHandler (Authenticated Auth.Token {..}) requestedUserID =
             throwError errSuperAdminOnly
 deleteUserHandler _ _ = throwError errNotLoggedIn
 
+<<<<<<< HEAD
 -- patchUserHandler
 --     :: AuthResult Auth.Token -> Auth.UserUpdate -> Handler NoContent
 -- patchUserHandler (Authenticated Auth.Token {..}) (Auth.UserUpdate {..}) = do
 --     conn <- tryGetDBConnection
 --     undefined
 -- patchUserHandler _ _ = throwError errNotLoggedIn
+=======
+patchUserHandler
+    :: AuthResult Auth.Token -> User.UserID -> Auth.UserUpdate -> Handler NoContent
+patchUserHandler (Authenticated Auth.Token{..}) userID (Auth.UserUpdate {..}) = do
+    conn <- tryGetDBConnection
+    if isSuperadmin || subject == userID then
+        patchUser conn
+    else
+        throwError errSuperAdminOnly
+  where
+    patchUser :: Connection -> Handler NoContent
+    patchUser conn = do
+        updateEntry conn newName $ Sessions.updateUserName userID
+        updateEntry conn newEmail $ Sessions.updateUserEmail userID
+        return NoContent
+
+    updateEntry :: Connection -> Maybe a -> (a -> Session.Session ()) -> Handler ()
+    updateEntry _    Nothing    _   = return ()
+    updateEntry conn (Just val) upd = do
+        eAction <- liftIO $ Session.run (upd val) conn
+        case eAction of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right _ -> return ()
+
+patchUserHandler _ _ _ = throwError errNotLoggedIn
+>>>>>>> 01650f5 (added role endpoints and logic)
 
 groupMembersHandler
     :: AuthResult Auth.Token -> Group.GroupID -> Handler [User.UserInfo]
@@ -289,6 +381,64 @@ deleteGroupHandler (Authenticated token) groupID = do
             Right () -> return NoContent
 deleteGroupHandler _ _ = throwError errNotLoggedIn
 
+<<<<<<< HEAD
+=======
+getRoleHandler 
+    :: AuthResult Auth.Token -> Group.GroupID -> User.UserID -> Handler User.Role
+getRoleHandler (Authenticated token) groupID userID = do
+    conn <- tryGetDBConnection
+    ifSuperOrAdminDo conn token groupID (getRole conn)
+  where
+    getRole :: Connection -> Handler User.Role
+    getRole conn = do
+        eResult <- liftIO $ Session.run (Sessions.getUserRoleInGroup userID groupID) conn
+        case eResult of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right (Just role) -> return role
+            Right Nothing -> throwError $ err404 {errBody = "User not member of this group."}
+getRoleHandler _ _ _ = throwError errNotLoggedIn
+
+postRoleHandler 
+    :: AuthResult Auth.Token -> Group.GroupID -> User.UserID -> User.Role -> Handler NoContent
+postRoleHandler (Authenticated token) groupID userID userRole = do
+    conn <- tryGetDBConnection
+    ifSuperOrAdminDo conn token groupID (postRole conn)
+  where
+    postRole :: Connection -> Handler NoContent
+    postRole conn = do
+        eResult <- liftIO $ Session.run (Sessions.getUserRoleInGroup userID groupID) conn
+        case eResult of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right (Just role) -> if role == userRole 
+                                 then return NoContent
+                                 else do
+                                    eAction <- liftIO $ Session.run (Sessions.updateUserRoleInGroup userID groupID userRole) conn
+                                    case eAction of
+                                        Left _ -> throwError errDatabaseAccessFailed
+                                        Right _ -> return NoContent
+
+            Right Nothing -> do
+                eAction <- liftIO $ Session.run (Sessions.addRole userID groupID userRole) conn
+                case eAction of
+                    Left _ -> throwError errDatabaseAccessFailed
+                    Right _ -> return NoContent
+postRoleHandler _ _ _ _ = throwError errNotLoggedIn
+
+deleteRoleHandler 
+    :: AuthResult Auth.Token -> Group.GroupID -> User.UserID -> Handler NoContent
+deleteRoleHandler (Authenticated token) groupID userID = do
+    conn <- tryGetDBConnection
+    ifSuperOrAdminDo conn token groupID (deleteRole conn)
+  where
+    deleteRole :: Connection -> Handler NoContent
+    deleteRole conn = do
+        eResult <- liftIO $ Session.run (Sessions.removeUserFromGroup userID groupID) conn
+        case eResult of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right _ -> return NoContent
+deleteRoleHandler _ _ _ = throwError errNotLoggedIn
+
+>>>>>>> 01650f5 (added role endpoints and logic)
 api :: Proxy (PublicAPI :<|> ProtectedAPI)
 api = Proxy
 
@@ -318,6 +468,9 @@ server cookieSett jwtSett =
                 :<|> createGroupHandler
                 :<|> groupMembersHandler
                 :<|> deleteGroupHandler
+                :<|> getRoleHandler
+                :<|> postRoleHandler
+                :<|> deleteRoleHandler
              )
 
 documentedAPI :: Proxy DocumentedAPI

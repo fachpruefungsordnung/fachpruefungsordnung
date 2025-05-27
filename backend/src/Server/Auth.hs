@@ -52,8 +52,6 @@ data UserRegisterData = UserRegisterData
 data UserUpdate = UserUpdate
     { newName :: Maybe Text
     , newEmail :: Maybe Text
-    , newPassword :: Maybe Text
-    , newRole :: Maybe (Group.GroupID, Text)
     }
     deriving (Generic, ToJSON, FromJSON, ToSchema)
 
