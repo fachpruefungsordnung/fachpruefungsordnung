@@ -22,9 +22,9 @@ library
       Control.Applicative.Utils
       Data.Text.FromWhitespace
       Database
+      Language.Lsd.AST.Format
       Language.Ltml.AST.Block
       Language.Ltml.AST.Document
-      Language.Ltml.AST.Format
       Language.Ltml.AST.Label
       Language.Ltml.AST.Node
       Language.Ltml.AST.Paragraph
