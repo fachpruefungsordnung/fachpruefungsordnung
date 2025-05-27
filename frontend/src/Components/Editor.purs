@@ -198,8 +198,8 @@ editor = H.mkComponent
 -- | Change listener for the editor.
 --
 --   This function should implement stuff like parsing and syntax analysis,
---   linting, code completion, etc., but for now it just places markers 
---   for occurrences of the word "error" in order to demonstrate how to use 
+--   linting, code completion, etc., but for now it just places markers
+--   for occurrences of the word "error" in order to demonstrate how to use
 --   the Ace editor API with markers.
 addChangeListener :: Types.Editor -> Effect Unit
 addChangeListener editor_ = do
