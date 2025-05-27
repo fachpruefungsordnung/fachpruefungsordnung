@@ -1,7 +1,7 @@
 -- | Simple test page for password reset.
 -- |
 -- | This page is currently not connected to any backend and
--- | does not perform any meaningful password reset. 
+-- | does not perform any meaningful password reset.
 
 module FPO.Page.ResetPassword (component) where
 

@@ -142,4 +142,3 @@ editor = H.mkComponent
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
       H.raise ClickedShowWarning
-

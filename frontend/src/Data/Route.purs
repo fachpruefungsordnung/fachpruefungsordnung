@@ -1,4 +1,4 @@
--- | This module defines the routing for the application. 
+-- | This module defines the routing for the application.
 
 module FPO.Data.Route where
 

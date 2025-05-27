@@ -1,7 +1,7 @@
 -- | Simple test page for login.
 -- |
 -- | This page is currently not connected to any backend and does not perform any
--- | authentication. 
+-- | authentication.
 -- |
 -- | Additionally, this page shows how to use `MonadStore` to update and read data
 -- | from the store.
@@ -39,7 +39,7 @@ type State =
 -- | Login component.
 -- |
 -- | Notice how we are using MonadStore to update the store with the user's
--- | email when the user clicks on the button. 
+-- | email when the user clicks on the button.
 component
   :: forall query input output m
    . Navigate m
@@ -78,8 +78,8 @@ component =
   handleAction :: Action -> H.HalogenM State Action () output m Unit
   handleAction = case _ of
     Initialize -> do
-      -- When opening the login tab, we simply take the user's email 
-      -- address from the store, provided that it exists (was 
+      -- When opening the login tab, we simply take the user's email
+      -- address from the store, provided that it exists (was
       -- previously set).
       mail <- _.inputMail <$> getStore
       H.modify_ \state -> state { email = mail }

@@ -4,5 +4,5 @@ export const driver = {
   },
   fixupUrl: function (url) {
     return url || "/";
-  }
+  },
 };

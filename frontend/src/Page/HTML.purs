@@ -13,7 +13,7 @@ import Halogen.Themes.Bootstrap5 as HB
 -- Creates a new column with a label and an input field.
 addColumn
   :: forall w a
-   . String -- ^ value 
+   . String -- ^ value
   -> String -- ^ label
   -> String -- ^ placeholder
   -> String -- ^ icon

@@ -104,7 +104,7 @@ component =
       -- If the user is not an admin, restrict access to the AdminPanel.
       -- This might not be a scalable solution for larger applications, and we might
       -- want to implement a more robust permission system in the future.
-      -- 
+      --
       -- We could also allow the user to access any page they want, but each page would
       -- check if the user is allowed to access it and display an error message if not.
       admin <- maybe false _.isAdmin <$> _.user <$> getStore

@@ -61,4 +61,3 @@ getBlob path = AX.get AXRF.blob ("/api" <> path)
 -- | Makes a POST request to the given path with a JSON body and expects a Blob response.
 postBlob :: String -> Json -> Aff (Either Error (Response Blob))
 postBlob path body = AX.post AXRF.blob ("/api" <> path) (Just $ RequestBody.json body)
-
