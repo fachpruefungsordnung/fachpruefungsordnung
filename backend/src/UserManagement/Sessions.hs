@@ -17,6 +17,9 @@ module UserManagement.Sessions
     , updateUserRoleInGroup
     , removeUserFromGroup
     , getMembersOfGroup
+    , addSuperadmin
+    , removeSuperadmin
+    , checkSuperadmin
     )
 where
 
@@ -89,3 +92,12 @@ removeUserFromGroup uid gid = statement (uid, gid) Statements.removeUserFromGrou
 
 getMembersOfGroup :: Group.GroupID -> Session [User.UserInfo]
 getMembersOfGroup group_id = statement group_id Statements.getMembersOfGroup
+
+addSuperadmin :: User.UserID -> Session ()
+addSuperadmin uid = statement uid Statements.addSuperadmin
+
+removeSuperadmin :: User.UserID -> Session ()
+removeSuperadmin uid = statement uid Statements.removeSuperadmin
+
+checkSuperadmin :: User.UserID -> Session Bool
+checkSuperadmin uid = statement uid Statements.checkSuperadmin

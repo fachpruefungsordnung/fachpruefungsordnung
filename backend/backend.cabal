@@ -24,7 +24,7 @@ library
       Database
       Language.Ltml.AST.Block
       Language.Ltml.AST.Document
-      Language.Lsd.AST.Format
+      Language.Ltml.AST.Format
       Language.Ltml.AST.Label
       Language.Ltml.AST.Node
       Language.Ltml.AST.Paragraph

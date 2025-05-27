@@ -10,6 +10,7 @@ module Server.HandlerUtil
     , errNoAdminInThisGroup
     , errSuperAdminOnly
     , errNotLoggedIn
+    , errUserNotFound
     ) where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -78,4 +79,11 @@ errSuperAdminOnly =
 
 errNotLoggedIn :: ServerError
 errNotLoggedIn =
+<<<<<<< HEAD
     err401 {errBody = "Not allowed! You need to login to perform this action.\n"}
+=======
+    err401 {errBody = "Not allowed! You need to be logged in to perform this action.\n"}
+
+errUserNotFound :: ServerError
+errUserNotFound = err404 {errBody = "User not member of this group."}
+>>>>>>> 7211d5c (added superadmin demote/promote and modified login to account for superadmin)

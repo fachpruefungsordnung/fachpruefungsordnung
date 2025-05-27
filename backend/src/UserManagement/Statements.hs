@@ -20,6 +20,9 @@ module UserManagement.Statements
     , updateUserRoleInGroup
     , removeUserFromGroup
     , getMembersOfGroup
+    , addSuperadmin
+    , removeSuperadmin
+    , checkSuperadmin
     )
 where
 
@@ -216,3 +219,30 @@ getMembersOfGroup =
     join groups g on g.id = r.group_id
     where g.id = $1 :: int4
   |]
+
+addSuperadmin :: Statement User.UserID ()
+addSuperadmin =
+    [resultlessStatement|
+
+      insert into superadmins (user_id)
+      values ($1 :: uuid)
+    |]
+
+removeSuperadmin :: Statement User.UserID ()
+removeSuperadmin =
+    [resultlessStatement|
+
+      delete from superadmins
+      where user_id = $1 :: uuid
+    |]
+
+checkSuperadmin :: Statement User.UserID Bool
+checkSuperadmin =
+    [singletonStatement|
+
+      select exists (
+        select 1
+        from superadmins
+        where user_id = $1 :: uuid
+      ) :: bool
+    |]
