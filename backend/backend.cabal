@@ -6,7 +6,7 @@ cabal-version: 1.12
 
 name:           backend
 version:        0.1.0.0
-description:    Please see the README on Codeberg at <https://codeberg.org/fachpruefungsordnung/fachpruefungsordnung>
+description:    Please see the README on GitHub at <https://github.com/fachpruefungsordnung/fachpruefungsordnung>
 author:         Author name here
 maintainer:     example@example.com
 copyright:      2025 Author name here
@@ -22,9 +22,17 @@ library
       Control.Applicative.Utils
       Data.Text.FromWhitespace
       Database
+      Language.Lsd.AST
+      Language.Lsd.AST.Common
+      Language.Lsd.AST.Format
+      Language.Lsd.AST.SimpleRegex
+      Language.Lsd.AST.Type.Document
+      Language.Lsd.AST.Type.Enum
+      Language.Lsd.AST.Type.Header
+      Language.Lsd.AST.Type.Paragraph
+      Language.Lsd.AST.Type.Section
       Language.Ltml.AST.Block
       Language.Ltml.AST.Document
-      Language.Ltml.AST.Format
       Language.Ltml.AST.Label
       Language.Ltml.AST.Node
       Language.Ltml.AST.Paragraph
@@ -60,6 +68,7 @@ library
     , base >=4.7 && <5
     , base64-bytestring
     , bytestring
+    , containers
     , cryptohash-sha1
     , filepath
     , hasql
@@ -74,7 +83,6 @@ library
     , lens
     , lucid2
     , megaparsec
-    , mtl
     , openapi3
     , password
     , profunctors
@@ -109,6 +117,7 @@ executable backend-exe
     , base >=4.7 && <5
     , base64-bytestring
     , bytestring
+    , containers
     , cryptohash-sha1
     , filepath
     , hasql
@@ -123,7 +132,6 @@ executable backend-exe
     , lens
     , lucid2
     , megaparsec
-    , mtl
     , openapi3
     , password
     , profunctors
@@ -161,6 +169,7 @@ test-suite backend-test
     , base >=4.7 && <5
     , base64-bytestring
     , bytestring
+    , containers
     , cryptohash-sha1
     , filepath
     , hasql
@@ -177,7 +186,6 @@ test-suite backend-test
     , lens
     , lucid2
     , megaparsec
-    , mtl
     , openapi3
     , password
     , profunctors

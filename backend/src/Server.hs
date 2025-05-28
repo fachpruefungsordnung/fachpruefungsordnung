@@ -76,37 +76,21 @@ type ProtectedAPI =
             :> "register"
             :> ReqBody '[JSON] Auth.UserRegisterData
             :> Post '[JSON] NoContent
-        -- :<|> Auth AuthMethod Auth.Token
-        --     :> "users"
-        --     :> Capture "userId" User.UserID
-        --     :> Get '[JSON] User.FullUser
         :<|> Auth AuthMethod Auth.Token
             :> "users"
-<<<<<<< HEAD
-=======
             :> Capture "userId" User.UserID
             :> Get '[JSON] User.FullUser
         :<|> Auth AuthMethod Auth.Token
-            :> "user"
->>>>>>> 01650f5 (added role endpoints and logic)
+            :> "users"
             :> Capture "userId" User.UserID
             :> Delete '[JSON] NoContent
-        -- :<|> Auth AuthMethod Auth.Token
-        --     :> "users"
-        --     :> ReqBody '[JSON] Auth.UserUpdate
-        --     :> Patch '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
-<<<<<<< HEAD
-            :> "groups"
-=======
             :> "users"
             :> Capture "userId" User.UserID
             :> ReqBody '[JSON] Auth.UserUpdate
             :> Patch '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
-            :> "group"
-            :> "create"
->>>>>>> 01650f5 (added role endpoints and logic)
+            :> "groups"
             :> ReqBody '[JSON] Group.Group
             :> Post '[JSON] Group.GroupID
         :<|> Auth AuthMethod Auth.Token
@@ -117,8 +101,6 @@ type ProtectedAPI =
             :> "groups"
             :> Capture "groupID" Group.GroupID
             :> Delete '[JSON] NoContent
-<<<<<<< HEAD
-=======
         :<|> Auth AuthMethod Auth.Token
             :> "roles"
             :> Capture "groupID" Group.GroupID
@@ -145,9 +127,8 @@ type ProtectedAPI =
             :> "superadmin"
             :> Capture "userId" User.UserID
             :> Delete '[JSON] NoContent
-        
-        
->>>>>>> 01650f5 (added role endpoints and logic)
+
+
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -211,17 +192,8 @@ loginHandler cookieSett jwtSett Auth.UserLoginData {..} = do
             case passwordCheck of
                 PasswordCheckFail -> throwError $ err401 {errBody = "email or password incorrect\n"}
                 PasswordCheckSuccess -> do
-<<<<<<< HEAD
-                    mLoginAccepted <-
-                        liftIO $ acceptLogin cookieSett jwtSett (Auth.Token uid False)
-                    case mLoginAccepted of
-                        Nothing -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
-                        Just addHeaders -> return $ addHeaders NoContent
-        Right Nothing -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
-        Left _ -> throwError errDatabaseAccessFailed
-=======
                     eSuperadmin <- liftIO $ Session.run (Sessions.checkSuperadmin uid) conn
-                    case eSuperadmin of 
+                    case eSuperadmin of
                         Left _ -> throwError errDatabaseAccessFailed
                         Right isSuperadmin -> do
                             mLoginAccepted <-
@@ -229,8 +201,8 @@ loginHandler cookieSett jwtSett Auth.UserLoginData {..} = do
                             case mLoginAccepted of
                                 Nothing -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
                                 Just addHeaders -> return $ addHeaders NoContent
-        _ -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
->>>>>>> 7211d5c (added superadmin demote/promote and modified login to account for superadmin)
+        Right Nothing -> throwError errUserNotFound
+        Left _ -> throwError errDatabaseAccessFailed
 
 registerHandler
     :: AuthResult Auth.Token -> Auth.UserRegisterData -> Handler NoContent
@@ -240,11 +212,7 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
   where
     addNewMember :: Auth.UserRegisterData -> Connection -> Handler NoContent
     addNewMember (Auth.UserRegisterData {..}) conn = do
-<<<<<<< HEAD
-        eUser <- liftIO $ Session.run (Sessions.getUser registerEmail) conn
-=======
         eUser <- liftIO $ Session.run (Sessions.getUserByEmail registerEmail) conn
->>>>>>> 01650f5 (added role endpoints and logic)
         case eUser of
             Right Nothing -> do
                 PasswordHash hashedText <- liftIO $ hashPassword $ mkPassword registerPassword
@@ -268,14 +236,6 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
             Left _ -> throwError errDatabaseAccessFailed
 registerHandler _ _ = throwError errNotLoggedIn
 
-<<<<<<< HEAD
--- getUserHandler
---     :: AuthResult Auth.Token -> User.UserID -> Handler User.FullUser
--- getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
---     conn <- tryGetDBConnection
---     undefined
--- getUserHandler _ _ = throwError errNotLoggedIn
-=======
 getUserHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler User.FullUser
 getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
@@ -296,7 +256,6 @@ getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
         else
             throwError errSuperAdminOnly
 getUserHandler _ _ = throwError errNotLoggedIn
->>>>>>> 01650f5 (added role endpoints and logic)
 
 deleteUserHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler NoContent
@@ -312,14 +271,6 @@ deleteUserHandler (Authenticated Auth.Token {..}) requestedUserID =
             throwError errSuperAdminOnly
 deleteUserHandler _ _ = throwError errNotLoggedIn
 
-<<<<<<< HEAD
--- patchUserHandler
---     :: AuthResult Auth.Token -> Auth.UserUpdate -> Handler NoContent
--- patchUserHandler (Authenticated Auth.Token {..}) (Auth.UserUpdate {..}) = do
---     conn <- tryGetDBConnection
---     undefined
--- patchUserHandler _ _ = throwError errNotLoggedIn
-=======
 patchUserHandler
     :: AuthResult Auth.Token -> User.UserID -> Auth.UserUpdate -> Handler NoContent
 patchUserHandler (Authenticated Auth.Token{..}) userID (Auth.UserUpdate {..}) = do
@@ -344,7 +295,6 @@ patchUserHandler (Authenticated Auth.Token{..}) userID (Auth.UserUpdate {..}) = 
             Right _ -> return ()
 
 patchUserHandler _ _ _ = throwError errNotLoggedIn
->>>>>>> 01650f5 (added role endpoints and logic)
 
 groupMembersHandler
     :: AuthResult Auth.Token -> Group.GroupID -> Handler [User.UserInfo]
@@ -395,15 +345,6 @@ deleteGroupHandler
 deleteGroupHandler (Authenticated token) groupID = do
     conn <- tryGetDBConnection
     ifSuperOrAdminDo conn token groupID (deleteGroup conn)
-<<<<<<< HEAD
-  where
-    deleteGroup :: Connection -> Handler NoContent
-    deleteGroup conn = do
-        eResult <- liftIO $ Session.run (Sessions.deleteGroup groupID) conn
-        case eResult of
-            Left _ -> throwError errDatabaseAccessFailed
-            Right () -> return NoContent
-=======
     where
         deleteGroup :: Connection -> Handler NoContent
         deleteGroup conn = do
@@ -411,12 +352,9 @@ deleteGroupHandler (Authenticated token) groupID = do
             case eResult of
                 Left _ -> throwError errDatabaseAccessFailed
                 Right () -> return NoContent
->>>>>>> 7211d5c (added superadmin demote/promote and modified login to account for superadmin)
 deleteGroupHandler _ _ = throwError errNotLoggedIn
 
-<<<<<<< HEAD
-=======
-getRoleHandler 
+getRoleHandler
     :: AuthResult Auth.Token -> Group.GroupID -> User.UserID -> Handler User.Role
 getRoleHandler (Authenticated token) groupID userID = do
     conn <- tryGetDBConnection
@@ -431,7 +369,7 @@ getRoleHandler (Authenticated token) groupID userID = do
             Right Nothing -> throwError errUserNotFound
 getRoleHandler _ _ _ = throwError errNotLoggedIn
 
-postRoleHandler 
+postRoleHandler
     :: AuthResult Auth.Token -> Group.GroupID -> User.UserID -> User.Role -> Handler NoContent
 postRoleHandler (Authenticated token) groupID userID userRole = do
     conn <- tryGetDBConnection
@@ -442,7 +380,7 @@ postRoleHandler (Authenticated token) groupID userID userRole = do
         eResult <- liftIO $ Session.run (Sessions.getUserRoleInGroup userID groupID) conn
         case eResult of
             Left _ -> throwError errDatabaseAccessFailed
-            Right (Just role) -> if role == userRole 
+            Right (Just role) -> if role == userRole
                                  then return NoContent
                                  else do
                                     eAction <- liftIO $ Session.run (Sessions.updateUserRoleInGroup userID groupID userRole) conn
@@ -457,7 +395,7 @@ postRoleHandler (Authenticated token) groupID userID userRole = do
                     Right _ -> return NoContent
 postRoleHandler _ _ _ _ = throwError errNotLoggedIn
 
-deleteRoleHandler 
+deleteRoleHandler
     :: AuthResult Auth.Token -> Group.GroupID -> User.UserID -> Handler NoContent
 deleteRoleHandler (Authenticated token) groupID userID = do
     conn <- tryGetDBConnection
@@ -471,12 +409,9 @@ deleteRoleHandler (Authenticated token) groupID userID = do
             Right _ -> return NoContent
 deleteRoleHandler _ _ _ = throwError errNotLoggedIn
 
-<<<<<<< HEAD
->>>>>>> 01650f5 (added role endpoints and logic)
-=======
 postSuperadminHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler NoContent
-postSuperadminHandler (Authenticated Auth.Token{..}) userID = 
+postSuperadminHandler (Authenticated Auth.Token{..}) userID =
     if isSuperadmin then do
         conn <- tryGetDBConnection
         eAction <- liftIO $ Session.run (Sessions.addSuperadmin userID) conn
@@ -489,7 +424,7 @@ postSuperadminHandler _ _ = throwError errNotLoggedIn
 
 deleteSuperadminHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler NoContent
-deleteSuperadminHandler (Authenticated Auth.Token{..}) userID = 
+deleteSuperadminHandler (Authenticated Auth.Token{..}) userID =
     if isSuperadmin then do
         conn <- tryGetDBConnection
         eAction <- liftIO $ Session.run (Sessions.removeSuperadmin userID) conn
@@ -499,8 +434,6 @@ deleteSuperadminHandler (Authenticated Auth.Token{..}) userID =
     else throwError errSuperAdminOnly
 deleteSuperadminHandler _ _ = throwError errNotLoggedIn
 
-
->>>>>>> 7211d5c (added superadmin demote/promote and modified login to account for superadmin)
 api :: Proxy (PublicAPI :<|> ProtectedAPI)
 api = Proxy
 
@@ -524,9 +457,9 @@ server cookieSett jwtSett =
              )
         :<|> ( protectedHandler
                 :<|> registerHandler
-                -- :<|> getUserHandler
+                :<|> getUserHandler
                 :<|> deleteUserHandler
-                -- :<|> patchUserHandler
+                :<|> patchUserHandler
                 :<|> createGroupHandler
                 :<|> groupMembersHandler
                 :<|> deleteGroupHandler
