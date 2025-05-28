@@ -128,8 +128,6 @@ type ProtectedAPI =
             :> Capture "userId" User.UserID
             :> Delete '[JSON] NoContent
 
-
-
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
 type DocumentedAPI = SwaggerAPI :<|> PublicAPI :<|> ProtectedAPI
@@ -246,13 +244,13 @@ getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
             case eAction of
                 Left _ -> throwError errDatabaseAccessFailed
                 Right Nothing -> throwError $ err404 {errBody = "user not found."}
-                Right (Just User.User{..}) -> do
+                Right (Just User.User {..}) -> do
                     eAction' <- liftIO $ Session.run (Sessions.getAllUserRoles requestedUserID) conn
                     case eAction' of
                         Left _ -> throwError errDatabaseAccessFailed
                         Right roles ->
-                            let roles' = [(group, role) | (group, Just role) <- roles] in
-                            return $ User.FullUser requestedUserID userName userEmail roles'
+                            let roles' = [(group, role) | (group, Just role) <- roles]
+                             in return $ User.FullUser requestedUserID userName userEmail roles'
         else
             throwError errSuperAdminOnly
 getUserHandler _ _ = throwError errNotLoggedIn
@@ -273,12 +271,13 @@ deleteUserHandler _ _ = throwError errNotLoggedIn
 
 patchUserHandler
     :: AuthResult Auth.Token -> User.UserID -> Auth.UserUpdate -> Handler NoContent
-patchUserHandler (Authenticated Auth.Token{..}) userID (Auth.UserUpdate {..}) = do
+patchUserHandler (Authenticated Auth.Token {..}) userID (Auth.UserUpdate {..}) = do
     conn <- tryGetDBConnection
-    if isSuperadmin || subject == userID then
-        patchUser conn
-    else
-        throwError errSuperAdminOnly
+    if isSuperadmin || subject == userID
+        then
+            patchUser conn
+        else
+            throwError errSuperAdminOnly
   where
     patchUser :: Connection -> Handler NoContent
     patchUser conn = do
@@ -287,13 +286,12 @@ patchUserHandler (Authenticated Auth.Token{..}) userID (Auth.UserUpdate {..}) = 
         return NoContent
 
     updateEntry :: Connection -> Maybe a -> (a -> Session.Session ()) -> Handler ()
-    updateEntry _    Nothing    _   = return ()
+    updateEntry _ Nothing _ = return ()
     updateEntry conn (Just val) upd = do
         eAction <- liftIO $ Session.run (upd val) conn
         case eAction of
             Left _ -> throwError errDatabaseAccessFailed
             Right _ -> return ()
-
 patchUserHandler _ _ _ = throwError errNotLoggedIn
 
 groupMembersHandler
@@ -345,13 +343,13 @@ deleteGroupHandler
 deleteGroupHandler (Authenticated token) groupID = do
     conn <- tryGetDBConnection
     ifSuperOrAdminDo conn token groupID (deleteGroup conn)
-    where
-        deleteGroup :: Connection -> Handler NoContent
-        deleteGroup conn = do
-            eResult <- liftIO $ Session.run (Sessions.deleteGroup groupID) conn
-            case eResult of
-                Left _ -> throwError errDatabaseAccessFailed
-                Right () -> return NoContent
+  where
+    deleteGroup :: Connection -> Handler NoContent
+    deleteGroup conn = do
+        eResult <- liftIO $ Session.run (Sessions.deleteGroup groupID) conn
+        case eResult of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right () -> return NoContent
 deleteGroupHandler _ _ = throwError errNotLoggedIn
 
 getRoleHandler
@@ -362,7 +360,8 @@ getRoleHandler (Authenticated token) groupID userID = do
   where
     getRole :: Connection -> Handler User.Role
     getRole conn = do
-        eResult <- liftIO $ Session.run (Sessions.getUserRoleInGroup userID groupID) conn
+        eResult <-
+            liftIO $ Session.run (Sessions.getUserRoleInGroup userID groupID) conn
         case eResult of
             Left _ -> throwError errDatabaseAccessFailed
             Right (Just role) -> return role
@@ -370,24 +369,31 @@ getRoleHandler (Authenticated token) groupID userID = do
 getRoleHandler _ _ _ = throwError errNotLoggedIn
 
 postRoleHandler
-    :: AuthResult Auth.Token -> Group.GroupID -> User.UserID -> User.Role -> Handler NoContent
+    :: AuthResult Auth.Token
+    -> Group.GroupID
+    -> User.UserID
+    -> User.Role
+    -> Handler NoContent
 postRoleHandler (Authenticated token) groupID userID userRole = do
     conn <- tryGetDBConnection
     ifSuperOrAdminDo conn token groupID (postRole conn)
   where
     postRole :: Connection -> Handler NoContent
     postRole conn = do
-        eResult <- liftIO $ Session.run (Sessions.getUserRoleInGroup userID groupID) conn
+        eResult <-
+            liftIO $ Session.run (Sessions.getUserRoleInGroup userID groupID) conn
         case eResult of
             Left _ -> throwError errDatabaseAccessFailed
-            Right (Just role) -> if role == userRole
-                                 then return NoContent
-                                 else do
-                                    eAction <- liftIO $ Session.run (Sessions.updateUserRoleInGroup userID groupID userRole) conn
-                                    case eAction of
-                                        Left _ -> throwError errDatabaseAccessFailed
-                                        Right _ -> return NoContent
-
+            Right (Just role) ->
+                if role == userRole
+                    then return NoContent
+                    else do
+                        eAction <-
+                            liftIO $
+                                Session.run (Sessions.updateUserRoleInGroup userID groupID userRole) conn
+                        case eAction of
+                            Left _ -> throwError errDatabaseAccessFailed
+                            Right _ -> return NoContent
             Right Nothing -> do
                 eAction <- liftIO $ Session.run (Sessions.addRole userID groupID userRole) conn
                 case eAction of
@@ -403,7 +409,8 @@ deleteRoleHandler (Authenticated token) groupID userID = do
   where
     deleteRole :: Connection -> Handler NoContent
     deleteRole conn = do
-        eResult <- liftIO $ Session.run (Sessions.removeUserFromGroup userID groupID) conn
+        eResult <-
+            liftIO $ Session.run (Sessions.removeUserFromGroup userID groupID) conn
         case eResult of
             Left _ -> throwError errDatabaseAccessFailed
             Right _ -> return NoContent
@@ -411,27 +418,28 @@ deleteRoleHandler _ _ _ = throwError errNotLoggedIn
 
 postSuperadminHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler NoContent
-postSuperadminHandler (Authenticated Auth.Token{..}) userID =
-    if isSuperadmin then do
-        conn <- tryGetDBConnection
-        eAction <- liftIO $ Session.run (Sessions.addSuperadmin userID) conn
-        case eAction of
-            Left _ -> throwError errDatabaseAccessFailed
-            Right _ -> return NoContent
-    else throwError errSuperAdminOnly
-
+postSuperadminHandler (Authenticated Auth.Token {..}) userID =
+    if isSuperadmin
+        then do
+            conn <- tryGetDBConnection
+            eAction <- liftIO $ Session.run (Sessions.addSuperadmin userID) conn
+            case eAction of
+                Left _ -> throwError errDatabaseAccessFailed
+                Right _ -> return NoContent
+        else throwError errSuperAdminOnly
 postSuperadminHandler _ _ = throwError errNotLoggedIn
 
 deleteSuperadminHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler NoContent
-deleteSuperadminHandler (Authenticated Auth.Token{..}) userID =
-    if isSuperadmin then do
-        conn <- tryGetDBConnection
-        eAction <- liftIO $ Session.run (Sessions.removeSuperadmin userID) conn
-        case eAction of
-            Left _ -> throwError errDatabaseAccessFailed
-            Right _ -> return NoContent
-    else throwError errSuperAdminOnly
+deleteSuperadminHandler (Authenticated Auth.Token {..}) userID =
+    if isSuperadmin
+        then do
+            conn <- tryGetDBConnection
+            eAction <- liftIO $ Session.run (Sessions.removeSuperadmin userID) conn
+            case eAction of
+                Left _ -> throwError errDatabaseAccessFailed
+                Right _ -> return NoContent
+        else throwError errSuperAdminOnly
 deleteSuperadminHandler _ _ = throwError errNotLoggedIn
 
 api :: Proxy (PublicAPI :<|> ProtectedAPI)

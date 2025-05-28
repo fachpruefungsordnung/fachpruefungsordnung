@@ -175,8 +175,8 @@ addGroup =
 deleteGroup :: Statement Group.GroupID ()
 deleteGroup =
     [resultlessStatement|
-      delete from groups 
-      where id = $1 :: int4 
+      delete from groups
+      where id = $1 :: int4
     |]
 
 addRole :: Statement (User.UserID, Group.GroupID, Text) ()
@@ -198,7 +198,7 @@ updateUserRoleInGroup =
 removeUserFromGroup :: Statement (User.UserID, Group.GroupID) ()
 removeUserFromGroup =
     [resultlessStatement|
-      delete from roles 
+      delete from roles
       where user_id = $1 :: uuid and group_id = $2 :: int4
     |]
 

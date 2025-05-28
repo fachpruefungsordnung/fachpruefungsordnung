@@ -79,7 +79,9 @@ errSuperAdminOnly =
 
 errNotLoggedIn :: ServerError
 errNotLoggedIn =
-    err401 {errBody = "Not allowed! You need to be logged in to perform this action.\n"}
+    err401
+        { errBody = "Not allowed! You need to be logged in to perform this action.\n"
+        }
 
 errUserNotFound :: ServerError
 errUserNotFound = err404 {errBody = "User not member of this group."}
