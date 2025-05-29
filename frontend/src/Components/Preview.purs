@@ -20,7 +20,6 @@ import Halogen.HTML.Properties (classes, src) as HP
 import Halogen.Subscription (create, notify) as HS
 import Halogen.Themes.Bootstrap5
   ( bgInfoSubtle
-  , col6
   , dFlex
   , flexColumn
   , flexGrow1
@@ -150,11 +149,27 @@ preview = H.mkComponent
             ]
         ]
       AskedButError reason -> HH.div
-        [ HP.classes [ HB.col6, HB.textCenter, HB.bgInfoSubtle ] ]
+        [ HP.classes
+            [ HB.dFlex
+            , HB.flexColumn
+            , HB.flexGrow1
+            , HB.textCenter
+            , HB.bgInfoSubtle
+            , HB.overflowHidden
+            ]
+        ]
         if showWarning then [ HH.text reason ]
         else [ embed [ HP.src "/api/document", HP.classes [ HB.w100, HB.h100 ] ] [] ]
       PdfAvailable -> HH.div
-        [ HP.classes [ HB.col6, HB.textCenter, HB.bgInfoSubtle ] ]
+        [ HP.classes
+            [ HB.dFlex
+            , HB.flexColumn
+            , HB.flexGrow1
+            , HB.textCenter
+            , HB.bgInfoSubtle
+            , HB.overflowHidden
+            ]
+        ]
         [ case pdfURL of
             Nothing -> embed
               [ HP.src "/api/document", HP.classes [ HB.w100, HB.h100 ] ]
