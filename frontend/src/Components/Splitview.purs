@@ -171,7 +171,7 @@ splitview = H.mkComponent
           , HP.style $
               "flex: 0 0 " <> show (state.middleRatio * 100.0) <> "%; box-sizing: border-box; min-height: 0; overflow: hidden;"
           ]
-          [ HH.slot _editor unit Editor.editor { editorText: state.editorText } HandleEditor ]
+          [ HH.slot _editor unit Editor.editor unit HandleEditor ]
 
       -- Resizer
       , HH.div
@@ -196,13 +196,15 @@ splitview = H.mkComponent
 
     Init -> do
       let entries = map (\n -> {id: n, name: "§" <> show n <> " This is Paragraph " <> show n, content: "This is the content of §" <> show n} ) (range 1 11)
+          firstEntry = case head entries of
+            Nothing    -> "Nothing"
+            Just entry -> entry.content
       H.modify_ \st -> do
         st  { tocEntries = entries
-            , editorText = case head entries of
-                Just entry -> entry.content
-                Nothing -> "Nothing"
+            , editorText = firstEntry
             , editorContent = Just ["This is the initial content of the editor."]
             }
+      H.tell _editor unit (Editor.ChangeSection firstEntry)
 
     ToggleSidebar -> do
       win <- H.liftEffect Web.HTML.window

@@ -38,9 +38,6 @@ type Slots =
 
 _pdfSlideBar = Proxy :: Proxy "pdfSlideBar"
 
-type Input = 
-  { editorText :: String }
-
 data Output
   = ClickedQuery (Maybe (Array String))
   | SendPDF (Maybe String)
@@ -51,7 +48,6 @@ data Action
   | Delete
   | ShowWarning
   | HandleFileSidebar FileSidebar.Output
-  | Receive Input
 
 -- We use a query to get the content of the editor
 data Query a 
@@ -60,7 +56,7 @@ data Query a
   | LoadPdf a
   | ChangeSection String a
 
-editor :: forall m. MonadEffect m => H.Component Query Input Output m
+editor :: forall input m. MonadEffect m => H.Component Query input Output m
 editor = H.mkComponent
   { initialState: const initialState
   , render
@@ -68,7 +64,6 @@ editor = H.mkComponent
       { initialize = Just Init
       , handleAction = handleAction
       , handleQuery = handleQuery
-      , receive = Just <<< Receive
       }
   }
   where
@@ -167,12 +162,6 @@ editor = H.mkComponent
       FileSidebar.SendPDF mURL -> do
         H.raise (SendPDF mURL)
         H.modify_ _ { pdfWarningAvailable = true }
-    
-    Receive { editorText } -> do
-      H.gets _.editor >>= traverse_ \ed -> do
-        H.liftEffect $ do
-          document <- Editor.getSession ed >>= Session.getDocument
-          Document.setValue editorText document
       
 
   handleQuery
