@@ -3,8 +3,6 @@
 
 module FPO.Page.Home (component) where
 
-import Prelude
-
 import Effect.Aff.Class (class MonadAff)
 import Halogen as H
 import Halogen.HTML as HH

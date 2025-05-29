@@ -85,7 +85,7 @@ editor = H.mkComponent
     }
 
   render :: State -> H.ComponentHTML Action Slots m
-  render state =
+  render _ =
     HH.div
       [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
       [ HH.div -- Second toolbar
