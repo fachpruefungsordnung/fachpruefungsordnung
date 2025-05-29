@@ -291,7 +291,9 @@ splitview = H.mkComponent
 
         _ -> pure unit
 
-    JumpToSection section -> H.tell _editor unit (Editor.ChangeSection section)
+    JumpToSection section -> do
+      H.tell _editor unit Editor.SaveSection
+      H.tell _editor unit (Editor.ChangeSection section)
 
     -- Toolbar button actions
 
@@ -299,7 +301,9 @@ splitview = H.mkComponent
 
     SaveSection -> H.tell _editor unit Editor.SaveSection
 
-    QueryEditor -> H.tell _editor unit Editor.QueryEditor
+    QueryEditor -> do
+      H.tell _editor unit Editor.SaveSection
+      H.tell _editor unit Editor.QueryEditor
 
     ShowWarning -> do
       H.modify_ \st -> st { pdfWarningIsShown = not st.pdfWarningIsShown }
