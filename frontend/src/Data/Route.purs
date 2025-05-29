@@ -13,6 +13,7 @@ import Routing.Duplex.Generic.Syntax ((/), (?))
 -- | Represents all available routes in the application.
 data Route
   = Home
+  | Editor
   | Login
   | PasswordReset
   | AdminPanel
@@ -26,6 +27,7 @@ derive instance ordRoute :: Ord Route
 routeCodec :: RouteDuplex' Route
 routeCodec = root $ sum
   { "Home": noArgs
+  , "Editor": "editor" / noArgs
   , "Login": "login" / noArgs
   , "PasswordReset": "password-reset" / noArgs
   , "AdminPanel": "admin-panel" / noArgs
@@ -37,6 +39,7 @@ routeCodec = root $ sum
 routeToString :: Route -> String
 routeToString = case _ of
   Home -> "Home"
+  Editor -> "Editor"
   Login -> "Login"
   PasswordReset -> "PasswordReset"
   AdminPanel -> "AdminPanel"

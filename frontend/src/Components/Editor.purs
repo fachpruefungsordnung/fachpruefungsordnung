@@ -38,27 +38,27 @@ type Slots =
 
 _pdfSlideBar = Proxy :: Proxy "pdfSlideBar"
 
+type Input = 
+  { editorText :: String }
+
 data Output
-  = ClickedHTTPRequest
-  | ClickedQuery (Maybe (Array String))
-  | LoadPdf
-  | ClickedShowWarning
+  = ClickedQuery (Maybe (Array String))
   | SendPDF (Maybe String)
 
 data Action
   = Init
   | Paragraph
   | Delete
-  | MakeRequest
-  | QueryEditor
-  | ClickLoadPdf
   | ShowWarning
   | HandleFileSidebar FileSidebar.Output
+  | Receive Input
 
 -- We use a query to get the content of the editor
-data Query a = RequestContent (Array String -> a)
-
-type Input = Unit
+data Query a 
+ -- = RequestContent (Array String -> a)
+  = QueryEditor a
+  | LoadPdf a
+  | ChangeSection String a
 
 editor :: forall m. MonadEffect m => H.Component Query Input Output m
 editor = H.mkComponent
@@ -67,6 +67,8 @@ editor = H.mkComponent
   , eval: H.mkEval H.defaultEval
       { initialize = Just Init
       , handleAction = handleAction
+      , handleQuery = handleQuery
+      , receive = Just <<< Receive
       }
   }
   where
@@ -77,18 +79,7 @@ editor = H.mkComponent
   render state =
     HH.div
       [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
-      [ HH.div -- First toolbar
-
-          [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
-          [ HH.span [ HP.classes [ HB.textWhite ] ] [ HH.text "Toolbar" ]
-          , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const MakeRequest ] [ HH.text "Click Me for HTTP request" ]
-          , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const QueryEditor ] [ HH.text "Query Editor" ]
-          , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ClickLoadPdf ] [ HH.text "Load PDF" ]
-          , if not state.pdfWarningAvailable then HH.div_ []
-            else HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ShowWarning ]
-              [ HH.text ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning") ]
-          ]
-      , HH.div -- Second toolbar
+      [ HH.div -- Second toolbar
 
           [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap2 ] ]
           [ HH.button
@@ -168,32 +159,49 @@ editor = H.mkComponent
           document <- Editor.getSession ed >>= Session.getDocument
           Document.insertLines row [ "Paragraph", "=========" ] document
 
-    MakeRequest -> do
-      H.raise ClickedHTTPRequest
-
-    ClickLoadPdf -> do
-      H.raise LoadPdf
-      H.modify_ _ { pdfWarningAvailable = true }
-
-    -- Because Session does not provide a way to get all lines directly,
-    -- we need to take another indirect route to get the lines.
-    -- Notice that this extra step is not needed for all js calls.
-    -- For example, `Session.getLine` can be called directly.
-    QueryEditor -> do
-      allLines <- H.gets _.editor >>= traverse \ed -> do
-        H.liftEffect $ Editor.getSession ed
-          >>= Session.getDocument
-          >>= Document.getAllLines
-      H.raise (ClickedQuery allLines)
-
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
-      H.raise ClickedShowWarning
 
     HandleFileSidebar output -> case output of
       FileSidebar.SendPDF mURL -> do
         H.raise (SendPDF mURL)
         H.modify_ _ { pdfWarningAvailable = true }
+    
+    Receive { editorText } -> do
+      H.gets _.editor >>= traverse_ \ed -> do
+        H.liftEffect $ do
+          document <- Editor.getSession ed >>= Session.getDocument
+          Document.setValue editorText document
+      
+
+  handleQuery
+    :: forall a
+     . Query a
+    -> H.HalogenM State Action Slots Output m (Maybe a)
+  handleQuery = case _ of
+
+    ChangeSection editorText a -> do
+      H.gets _.editor >>= traverse_ \ed -> do
+        H.liftEffect $ do
+          document <- Editor.getSession ed >>= Session.getDocument
+          Document.setValue editorText document
+      pure (Just a)
+
+    LoadPdf a -> do
+      H.modify_ _ { pdfWarningAvailable = true }
+      pure (Just a)
+
+    -- Because Session does not provide a way to get all lines directly,
+    -- we need to take another indirect route to get the lines.
+    -- Notice that this extra step is not needed for all js calls.
+    -- For example, `Session.getLine` can be called directly.
+    QueryEditor a -> do
+      allLines <- H.gets _.editor >>= traverse \ed -> do
+        H.liftEffect $ Editor.getSession ed
+          >>= Session.getDocument
+          >>= Document.getAllLines
+      H.raise (ClickedQuery allLines)
+      pure (Just a)
 
 -- | Change listener for the editor.
 --

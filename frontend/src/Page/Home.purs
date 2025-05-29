@@ -55,7 +55,7 @@ component =
         HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.containerFluid, HB.p0, HB.flexFill, HB.overflowHidden ] ]
           [ HH.div [ HP.classes [ HB.dFlex, HB.flexGrow1, HB.flexRow, HB.g0, HB.overflowHidden ] ]
               [ HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.col6 ] ]
-                  [ HH.slot _editor unit Editor.editor unit HandleEditor ]
+                  [ HH.slot _editor unit Editor.editor { editorText: "" } HandleEditor ]
               , HH.slot _preview unit Preview.preview { editorContent } HandlePreview
               ]
           ]
@@ -66,10 +66,10 @@ component =
   handleAction :: MonadAff m => Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     HandleEditor output -> case output of
-      Editor.ClickedHTTPRequest -> H.tell _preview unit Preview.TellClickedHttpRequest
+      --Editor.ClickedHTTPRequest -> H.tell _preview unit Preview.TellClickedHttpRequest
       Editor.ClickedQuery response -> H.modify_ \st -> st { editorContent = response }
-      Editor.ClickedShowWarning -> H.tell _preview unit Preview.TellShowOrHideWarning
-      Editor.LoadPdf -> H.tell _preview unit Preview.TellLoadPdf
+      --Editor.ClickedShowWarning -> H.tell _preview unit Preview.TellShowOrHideWarning
+      --Editor.LoadPdf -> H.tell _preview unit Preview.TellLoadPdf
       Editor.SendPDF mURL -> H.tell _preview unit (Preview.TellLoadUploadedPdf mURL)
 
     HandlePreview _ -> pure unit

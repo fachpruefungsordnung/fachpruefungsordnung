@@ -20,6 +20,7 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..), routeCodec, routeToString)
 import FPO.Data.Store as Store
 import FPO.Page.AdminPanel as AdminPanel
+import FPO.Page.EditorPage as EditorPage
 import FPO.Page.Home as Home
 import FPO.Page.Login as Login
 import FPO.Page.Page404 as Page404
@@ -49,6 +50,7 @@ data Action = Initialize -- ^ Action to initialize the main component.
 
 _navbar = Proxy :: Proxy "navbar"
 _home = Proxy :: Proxy "home"
+_editor = Proxy :: Proxy "editor"
 _login = Proxy :: Proxy "login"
 _resetPassword = Proxy :: Proxy "resetPassword"
 _adminPanel = Proxy :: Proxy "adminPanel"
@@ -57,6 +59,7 @@ _profile = Proxy :: Proxy "profile"
 
 type Slots =
   ( home :: forall q. H.Slot q Void Unit
+  , editor :: forall q. H.Slot q Unit Unit
   , login :: forall q. H.Slot q Void Unit
   , navbar :: forall q. H.Slot q Void Unit
   , resetPassword :: forall q. H.Slot q Void Unit
@@ -89,6 +92,7 @@ component =
         Nothing -> HH.slot_ _page404 unit Page404.component unit
         Just p -> case p of
           Home -> HH.slot_ _home unit Home.component unit
+          Editor -> HH.slot_ _editor unit EditorPage.component unit
           Login -> HH.slot_ _login unit Login.component unit
           PasswordReset -> HH.slot_ _resetPassword unit PasswordReset.component unit
           AdminPanel -> HH.slot_ _adminPanel unit AdminPanel.component unit

@@ -49,6 +49,7 @@ type Input =
 
 data Query a
   = TellLoadPdf a
+  | GotEditorQuery (Maybe (Array String)) a
   | TellLoadUploadedPdf (Maybe String) a
   | TellShowOrHideWarning a
   | TellClickedHttpRequest a
@@ -76,7 +77,7 @@ preview = H.mkComponent
   render :: State -> H.ComponentHTML Action Slots m
   render { count, dummyUser, editorContent, pdf, showWarning, pdfURL } =
     case pdf of
-      Empty -> HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.col6, HB.textCenter, HB.bgInfoSubtle, HB.overflowHidden ] ]
+      Empty -> HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.textCenter, HB.bgInfoSubtle, HB.overflowHidden ] ]
         [ HH.div_ [ HH.text "Hier sollte die Vorschau sein." ]
         , HH.div_
             [ HH.text $
@@ -153,6 +154,11 @@ preview = H.mkComponent
         Left err -> do
           H.liftEffect $ log $ printError err
           H.modify_ _ { pdf = AskedButError "Error loading PDF." }
+      pure (Just a)
+
+    GotEditorQuery mEditorContent a -> do
+      H.modify_ \state ->
+        state { editorContent = mEditorContent }
       pure (Just a)
 
     TellLoadUploadedPdf mURL a -> do
