@@ -34,7 +34,23 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore, getStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Halogen.VDom.Driver (runUI)
-import Prelude (Unit, Void, bind, const, discard, pure, unit, void, when, ($), (/=), (<$>), (<<<), (<>), (||))
+import Prelude
+  ( Unit
+  , Void
+  , bind
+  , const
+  , discard
+  , pure
+  , unit
+  , void
+  , when
+  , ($)
+  , (/=)
+  , (<$>)
+  , (<<<)
+  , (<>)
+  , (||)
+  )
 import Routing.Duplex as RD
 import Routing.Hash (getHash, matchesWith)
 import Type.Proxy (Proxy(..))
@@ -86,7 +102,8 @@ component =
     }
   where
   render :: State -> H.ComponentHTML Action Slots m
-  render state = HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.vh100, HB.p0, HB.overflowHidden ] ]
+  render state = HH.div
+    [ HP.classes [ HB.dFlex, HB.flexColumn, HB.vh100, HB.p0, HB.overflowHidden ] ]
     [ HH.slot_ _navbar unit Navbar.navbar unit
     , case state.route of
         Nothing -> HH.slot_ _page404 unit Page404.component unit
@@ -96,7 +113,8 @@ component =
           Login -> HH.slot_ _login unit Login.component unit
           PasswordReset -> HH.slot_ _resetPassword unit PasswordReset.component unit
           AdminPanel -> HH.slot_ _adminPanel unit AdminPanel.component unit
-          Profile { loginSuccessful } -> HH.slot_ _profile unit Profile.component { loginSuccessfulBanner: loginSuccessful }
+          Profile { loginSuccessful } -> HH.slot_ _profile unit Profile.component
+            { loginSuccessfulBanner: loginSuccessful }
     ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Void m Unit

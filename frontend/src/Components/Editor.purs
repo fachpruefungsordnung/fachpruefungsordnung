@@ -144,12 +144,12 @@ editor = H.mkComponent
           -- Add some example text
           Document.setValue
             ( intercalate "\n" $
-                [ "Hier wird später der Code geschrieben!"
+                [ "The code will be written here later!"
                 , ""
-                , "Fehler können schon als solche markiert werden, siehe error!"
+                , "Errors can already be marked as such, see error!"
                 , ""
-                , "% Dieser Editor verwendet testweise den TeX-Mode (und GitHub-Theme),"
-                , "% also können wir TeX-Highlighting verwenden."
+                , "% This editor is currently using TeX mode (and GitHub theme) for testing,"
+                , "% so we can use TeX highlighting."
                 , "   $\\dotsc$"
                 ]
             )

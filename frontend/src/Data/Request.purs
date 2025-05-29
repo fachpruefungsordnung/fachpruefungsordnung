@@ -28,11 +28,18 @@ getString path = AX.get AXRF.string ("/api" <> path)
 -- | As long as this is not needed, we can use the other ones, but maybe should migrate the other
 -- | functions to behave in the correct style
 getWithRequest :: Aff (Either Error (Response String))
-getWithRequest = request driver (defaultRequest { url = "https://random-data-api.com/api/v2/users", method = Left GET, responseFormat = AXRF.string })
+getWithRequest = request driver
+  ( defaultRequest
+      { url = "https://random-data-api.com/api/v2/users"
+      , method = Left GET
+      , responseFormat = AXRF.string
+      }
+  )
 
 -- | Makes a POST request to the given path with a JSON body and expects a String response.
 postString :: String -> Json -> Aff (Either Error (Response String))
-postString path body = AX.post AXRF.string ("/api" <> path) (Just $ RequestBody.json body)
+postString path body = AX.post AXRF.string ("/api" <> path)
+  (Just $ RequestBody.json body)
 
 -- | Makes a GET request to the given path and expects a JSON response.
 getJson :: String -> Aff (Either Error (Response Json))
@@ -52,7 +59,8 @@ getIgnore path = AX.get AXRF.ignore ("/api" <> path)
 
 -- | Makes a POST request to the given path with a JSON body and expects a Document response.
 postDocument :: String -> Json -> Aff (Either Error (Response Document))
-postDocument path body = AX.post AXRF.document ("/api" <> path) (Just $ RequestBody.json body)
+postDocument path body = AX.post AXRF.document ("/api" <> path)
+  (Just $ RequestBody.json body)
 
 -- | Makes a GET request to the given path and expects a Blob response.
 getBlob :: String -> Aff (Either Error (Response Blob))

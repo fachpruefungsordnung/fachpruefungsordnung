@@ -43,4 +43,7 @@ routeToString = case _ of
   Login -> "Login"
   PasswordReset -> "PasswordReset"
   AdminPanel -> "AdminPanel"
-  Profile { loginSuccessful } -> "Profile" <> (if loginSuccessful == Nothing then "" else " (loginSuccessful: " <> (show $ fromMaybe false loginSuccessful) <> ")")
+  Profile { loginSuccessful } -> "Profile" <>
+    ( if loginSuccessful == Nothing then ""
+      else " (loginSuccessful: " <> (show $ fromMaybe false loginSuccessful) <> ")"
+    )

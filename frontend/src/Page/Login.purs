@@ -19,16 +19,16 @@ import Data.String.CodeUnits (takeWhile)
 import Dto.Login (LoginDto)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Route (Route(..))
-import FPO.Page.HTML (addColumn)
-import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
-import Halogen as H
-import Halogen.Themes.Bootstrap5 as HB
-import Halogen.HTML.Events (onClick) as HE
-import Halogen.HTML as HH
-import Halogen.HTML.Properties as HP
 import FPO.Data.Request (postString) as Request
+import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
+import FPO.Page.HTML (addColumn)
+import Halogen as H
+import Halogen.HTML as HH
+import Halogen.HTML.Events (onClick) as HE
+import Halogen.HTML.Properties as HP
+import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
+import Halogen.Themes.Bootstrap5 as HB
 
 data Action
   = Initialize
@@ -138,15 +138,15 @@ renderLoginForm state =
             []
             [ addColumn
                 state.email
-                "E-Mail-Addresse:"
-                "E-Mail"
+                "Email Address:"
+                "Email"
                 "bi-envelope-fill"
                 HP.InputEmail
                 UpdateEmail
             , addColumn
                 state.password
-                "Passwort:"
-                "Passwort"
+                "Password:"
+                "Password"
                 "bi-lock-fill"
                 HP.InputPassword
                 UpdatePassword
@@ -164,7 +164,7 @@ renderLoginForm state =
                     , HP.type_ HP.ButtonButton
                     , HE.onClick $ const NavigateToPasswordReset
                     ]
-                    [ HH.text "Passwort vergessen?" ]
+                    [ HH.text "Forgot password?" ]
                 ]
             ]
         ]

@@ -53,7 +53,8 @@ navbar = connect (selectEq identity) $ H.mkComponent
   }
   where
   render :: State -> H.ComponentHTML Action () m
-  render state = HH.nav [ HP.classes [ HB.navbar, HB.navbarExpandSm, HB.bgBodyTertiary ] ]
+  render state = HH.nav
+    [ HP.classes [ HB.navbar, HB.navbarExpandSm, HB.bgBodyTertiary ] ]
     [ HH.div [ HP.classes [ HB.containerFluid ] ]
         [ HH.a
             [ HP.classes [ HB.navbarBrand ]
@@ -125,9 +126,14 @@ navbar = connect (selectEq identity) $ H.mkComponent
           [ HP.classes [ HB.dropdownMenu, HB.dropdownMenuEnd ]
           , HP.attr (AttrName "aria-labelledby") "navbarDarkDropdownMenuLink"
           ]
-          ( [ dropdownEntry "Profil" "person" (Navigate (Profile { loginSuccessful: Nothing })) ]
+          ( [ dropdownEntry "Profile" "person"
+                (Navigate (Profile { loginSuccessful: Nothing }))
+            ]
               <>
-                ( if user.isAdmin then [ dropdownEntry "Adminpanel" "exclamation-octagon" (Navigate AdminPanel) `addClass` HB.bgWarningSubtle ]
+                ( if user.isAdmin then
+                    [ dropdownEntry "Admin Panel" "exclamation-octagon"
+                        (Navigate AdminPanel) `addClass` HB.bgWarningSubtle
+                    ]
                   else []
                 )
               <> [ dropdownEntry "Logout" "box-arrow-right" Logout ]
@@ -143,7 +149,8 @@ navbar = connect (selectEq identity) $ H.mkComponent
           , HP.style "cursor: default;"
           , HE.onClick (const action)
           ]
-          [ HH.i [ HP.classes [ ClassName $ "bi-" <> icon, HB.flexShrink0, HB.me2 ] ] []
+          [ HH.i [ HP.classes [ ClassName $ "bi-" <> icon, HB.flexShrink0, HB.me2 ] ]
+              []
           , HH.text label
           ]
       ]

@@ -18,7 +18,18 @@ import Halogen.HTML (div, div_, pre, slot, text) as HH
 import Halogen.HTML.Elements (embed)
 import Halogen.HTML.Properties (classes, src) as HP
 import Halogen.Subscription (create, notify) as HS
-import Halogen.Themes.Bootstrap5 (bgInfoSubtle, col6, dFlex, flexColumn, flexGrow1, h100, overflowAuto, overflowHidden, textCenter, w100) as HB
+import Halogen.Themes.Bootstrap5
+  ( bgInfoSubtle
+  , col6
+  , dFlex
+  , flexColumn
+  , flexGrow1
+  , h100
+  , overflowAuto
+  , overflowHidden
+  , textCenter
+  , w100
+  ) as HB
 import Type.Proxy (Proxy(Proxy))
 
 type Output = Unit
@@ -72,7 +83,14 @@ preview = H.mkComponent
   }
   where
   initialState :: State
-  initialState = { count: 0, dummyUser: Nothing, editorContent: Nothing, pdf: Empty, showWarning: false, pdfURL: Nothing }
+  initialState =
+    { count: 0
+    , dummyUser: Nothing
+    , editorContent: Nothing
+    , pdf: Empty
+    , showWarning: false
+    , pdfURL: Nothing
+    }
 
   render :: State -> H.ComponentHTML Action Slots m
   render { count, dummyUser, editorContent, pdf, showWarning, pdfURL } =
@@ -81,21 +99,40 @@ preview = H.mkComponent
         [ HH.div_ [ HH.text "Hier sollte die Vorschau sein." ]
         , HH.div_
             [ HH.text $
-                if dummyUser == Nothing then "Hier kommt nach dem Knopfdruck ein Text"
-                else "Wow, nun haben wir einen dummy User geladen mit dem Namen: " <> fromMaybe "err" dummyUser
+                if dummyUser == Nothing then
+                  "Press the HTTP request button to load a dummy user"
+                else "Wow, we have successfully loaded a dummy user with name: " <>
+                  fromMaybe "err" dummyUser
             ]
         , HH.slot _button 0 Button.button { label: show count } HandleButton
-        , HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.overflowHidden ] ]
+        , HH.div
+            [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.overflowHidden ]
+            ]
             [ case editorContent of
                 Nothing ->
-                  HH.text "Der Editor ist leer!"
+                  HH.text "The editor has no content!"
                 Just content ->
-                  HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.overflowHidden ] ]
-                    [ HH.text "Editorinhalt:"
+                  HH.div
+                    [ HP.classes
+                        [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.overflowHidden ]
+                    ]
+                    [ HH.text "Editor Content:"
                     , HH.div
-                        [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, H.ClassName "mt-1", HB.overflowAuto ] ]
+                        [ HP.classes
+                            [ HB.dFlex
+                            , HB.flexColumn
+                            , HB.flexGrow1
+                            , H.ClassName "mt-1"
+                            , HB.overflowAuto
+                            ]
+                        ]
                         [ HH.pre
-                            [ HP.classes [ HB.flexGrow1, H.ClassName "border rounded p-1 bg-light", HB.h100 ] ]
+                            [ HP.classes
+                                [ HB.flexGrow1
+                                , H.ClassName "border rounded p-1 bg-light"
+                                , HB.h100
+                                ]
+                            ]
                             ( content <#> \line ->
                                 HH.div_ [ HH.text $ preserveEmptyLine line ]
                             )
@@ -103,12 +140,16 @@ preview = H.mkComponent
                     ]
             ]
         ]
-      AskedButError reason -> HH.div [ HP.classes [ HB.col6, HB.textCenter, HB.bgInfoSubtle ] ]
+      AskedButError reason -> HH.div
+        [ HP.classes [ HB.col6, HB.textCenter, HB.bgInfoSubtle ] ]
         if showWarning then [ HH.text reason ]
         else [ embed [ HP.src "/api/document", HP.classes [ HB.w100, HB.h100 ] ] [] ]
-      PdfAvailable -> HH.div [ HP.classes [ HB.col6, HB.textCenter, HB.bgInfoSubtle ] ]
+      PdfAvailable -> HH.div
+        [ HP.classes [ HB.col6, HB.textCenter, HB.bgInfoSubtle ] ]
         [ case pdfURL of
-            Nothing -> embed [ HP.src "/api/document", HP.classes [ HB.w100, HB.h100 ] ] []
+            Nothing -> embed
+              [ HP.src "/api/document", HP.classes [ HB.w100, HB.h100 ] ]
+              []
             Just url -> embed [ HP.src url, HP.classes [ HB.w100, HB.h100 ] ] []
         ]
 
@@ -131,9 +172,11 @@ preview = H.mkComponent
 
     LoadPdf pdfState -> H.modify_ \state -> state { pdf = pdfState }
 
-    ShowOrHideWarning -> H.modify_ \state -> state { showWarning = not state.showWarning }
+    ShowOrHideWarning -> H.modify_ \state -> state
+      { showWarning = not state.showWarning }
 
-    Receive { editorContent } -> H.modify_ \state -> state { editorContent = editorContent }
+    Receive { editorContent } -> H.modify_ \state -> state
+      { editorContent = editorContent }
 
   handleQuery
     :: forall a
@@ -148,7 +191,8 @@ preview = H.mkComponent
           else H.modify_ _
             { pdf = AskedButError
                 ( "Could not load pdf properly. Here should be a detailed warning message"
-                    <> "in the future that returned from the compiled pdf. This is just a dummy pdf for now"
+                    <>
+                      "in the future that returned from the compiled pdf. This is just a dummy pdf for now"
                 )
             }
         Left err -> do
