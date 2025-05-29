@@ -46,7 +46,7 @@ component =
     HH.div
       [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
       [ HH.div [ HP.classes [ HB.col, HB.textCenter ] ]
-          [ HH.h1 [] [ HH.text "Profil" ]
+          [ HH.h1 [] [ HH.text "Profile" ]
           , case state.user of
               Just user -> HH.div
                 [ HP.classes [ HB.dFlex, HB.justifyContentCenter, HB.my5 ] ]
@@ -60,14 +60,14 @@ component =
                         ]
                     , HH.div [ HP.classes [ HB.card ] ]
                         [ HH.div [ HP.classes [ HB.cardHeader ] ]
-                            [ HH.text "Nutzerdaten" ]
+                            [ HH.text "User data" ]
                         , HH.ul [ HP.classes [ HB.listGroup, HB.listGroupFlush ] ]
                             [ HH.li [ HP.classes [ HB.listGroupItem ] ]
-                                [ HH.strong_ [ HH.text "Nutzername: " ]
+                                [ HH.strong_ [ HH.text "User name: " ]
                                 , HH.text user.userName
                                 ]
                             , HH.li [ HP.classes [ HB.listGroupItem ] ]
-                                [ HH.strong_ [ HH.text "Rolle: " ]
+                                [ HH.strong_ [ HH.text "Role: " ]
                                 , HH.span
                                     [ HP.classes
                                         [ HB.badge
@@ -92,7 +92,7 @@ component =
               --
               --       For now, we just handle this case gracefully.
               Nothing -> HH.div [ HP.classes [ HB.my3 ] ]
-                [ HH.i [] [ HH.text "unbekannter Nutzer" ]
+                [ HH.i [] [ HH.text "unknown user" ]
                 ]
           ]
       ]

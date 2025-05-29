@@ -38,13 +38,13 @@ component =
           [ HH.h1 [] [ HH.text "404" ]
           , HH.p []
               [ HH.text
-                  "Diese Seite existiert nicht, wurde verschoben, oder erfordert Privilegien, die Sie nicht besitzen."
+                  "This page does not exist, has been moved, or requires privileges you do not have."
               ]
           , HH.button
               [ HP.classes [ HB.btn, HB.btnPrimary ]
               , HE.onClick (const GoHome)
               ]
-              [ HH.text "Startseite" ]
+              [ HH.text "Home" ]
           ]
       ]
 

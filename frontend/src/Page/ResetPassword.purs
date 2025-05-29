@@ -40,7 +40,7 @@ type State =
   , code :: String
   }
 
--- | Passwort reset component.
+-- | Password reset component.
 component
   :: forall query input output m
    . MonadAff m
@@ -98,16 +98,16 @@ component =
       --       to reset the password.
       --       For now, we are just emitting an error.
       H.modify_ \state -> state
-        { error = Just "TODO; Es wurde Ihnen (k)ein Code per E-Mail geschickt!" }
+        { error = Just "TODO; A code has (not) been sent to you by email!" }
       pure unit
     SendPasswordReset -> do
       { passwordPrimary, passwordSecondary } <- H.get
       if (passwordPrimary /= passwordSecondary) then do
         H.modify_ \state -> state
-          { error = Just "Die Passwörter stimmen nicht überein!" }
+          { error = Just "The passwords do not match." }
       else do
         H.modify_ \state -> state
-          { error = Just "Passwortreset wird noch nicht unterstützt!" }
+          { error = Just "Password reset is not supported yet!" }
     EmitError error -> do
       mail <- H.gets _.email
       H.modify_ \state -> state { error = Just error }
@@ -120,33 +120,33 @@ renderResetForm state =
   HH.div [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my3 ] ]
     [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
         [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-            [ HH.text "Passwort zurücksetzen" ]
+            [ HH.text "Reset Password" ]
         , HH.form
             []
             [ addColumn
                 state.email
-                "E-Mail-Addresse:"
-                "E-Mail"
+                "Email Address:"
+                "Email"
                 "bi-envelope-fill"
                 HP.InputEmail
                 UpdateEmail
             , addColumn
                 state.passwordPrimary
-                "Neues Passwort:"
-                "Passwort"
+                "New Password:"
+                "Password"
                 "bi-lock-fill"
                 HP.InputPassword
                 UpdatePasswordPrimary
             , addColumn
                 state.passwordSecondary
-                "Neues Passwort wiederholen:"
-                "Passwort"
+                "Repeat new Password:"
+                "Password"
                 "bi-lock-fill"
                 HP.InputPassword
                 UpdatePasswordSecondary
             , HH.div []
                 [ HH.label [ HP.classes [ HB.formLabel ], HP.for "code" ]
-                    [ HH.text "Bestätigungscode:" ]
+                    [ HH.text "Confirmation Code:" ]
                 , HH.div [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
                     [ HH.button
                         ( [ HP.classes [ HB.btn, HB.btnOutlineSecondary ]
@@ -157,11 +157,11 @@ renderResetForm state =
                               [ HP.disabled true ]
                             else []
                         )
-                        [ HH.text "Code anfordern" ]
+                        [ HH.text "Request Code" ]
                     , HH.input
                         [ HP.type_ HP.InputText
                         , HP.classes [ HB.formControl ]
-                        , HP.placeholder "Code eingeben"
+                        , HP.placeholder "input Code here"
                         , HP.value state.code
                         , HE.onValueInput UpdateCode
                         , HP.id "code"
@@ -178,7 +178,7 @@ renderResetForm state =
                         if not (isValidEmail state.email) then [ HP.disabled true ]
                         else []
                     )
-                    [ HH.text "Abschicken" ]
+                    [ HH.text "Submit" ]
                 ]
             ]
         ]

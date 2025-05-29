@@ -105,11 +105,12 @@ preview = H.mkComponent
             , HB.overflowHidden
             ]
         ]
-        [ HH.div_ [ HH.text "Hier sollte die Vorschau sein." ]
+        [ HH.div_ [ HH.text "Preview:" ]
         , HH.div_
             [ HH.text $
-                if dummyUser == Nothing then "Hier kommt nach dem Knopfdruck ein Text"
-                else "Wow, nun haben wir einen dummy User geladen mit dem Namen: " <>
+                if dummyUser == Nothing then
+                  "Press the HTTP request button to load a dummy user"
+                else "Wow, we have successfully loaded a dummy user with name: " <>
                   fromMaybe "err" dummyUser
             ]
         , HH.slot _button 0 Button.button { label: show count } HandleButton
@@ -118,13 +119,13 @@ preview = H.mkComponent
             ]
             [ case editorContent of
                 Nothing ->
-                  HH.text "Der Editor ist leer!"
+                  HH.text "The editor has no content!"
                 Just content ->
                   HH.div
                     [ HP.classes
                         [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.overflowHidden ]
                     ]
-                    [ HH.text "Editorinhalt:"
+                    [ HH.text "Editor Content:"
                     , HH.div
                         [ HP.classes
                             [ HB.dFlex

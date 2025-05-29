@@ -63,8 +63,8 @@ renderAdminPanel _ =
   HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
     [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
         [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-            [ HH.text "Adminpanel" ]
+            [ HH.text "Admin Panel" ]
         , HH.text
-            "Hier müsste jetzt ein Adminpanel sein, aber das ist noch nicht implementiert."
+            "You should see an admin panel now, but it hasn't been implemented yet."
         ]
     ]

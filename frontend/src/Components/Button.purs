@@ -35,7 +35,7 @@ button =
   render { label } = HH.div []
     [ HH.small_
         [ HH.text
-            "Dies ist ein Button, der dessen Code demonstrieren soll, wie input und output in Halogen funktioniert: "
+            "This is a simple button that demonstrates how input and ouput works in Halogen:"
         ]
     , HH.button [ HE.onClick \_ -> Click, HP.classes [ HB.btn, HB.btnPrimary ] ]
         [ HH.text label ]

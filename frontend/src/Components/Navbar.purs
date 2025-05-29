@@ -122,12 +122,12 @@ navbar = connect (selectEq identity) $ H.mkComponent
           [ HP.classes [ HB.dropdownMenu, HB.dropdownMenuEnd ]
           , HP.attr (AttrName "aria-labelledby") "navbarDarkDropdownMenuLink"
           ]
-          ( [ dropdownEntry "Profil" "person"
+          ( [ dropdownEntry "Profile" "person"
                 (Navigate (Profile { loginSuccessful: Nothing }))
             ]
               <>
                 ( if user.isAdmin then
-                    [ dropdownEntry "Adminpanel" "exclamation-octagon"
+                    [ dropdownEntry "Admin Panel" "exclamation-octagon"
                         (Navigate AdminPanel) `addClass` HB.bgWarningSubtle
                     ]
                   else []

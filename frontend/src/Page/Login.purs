@@ -138,15 +138,15 @@ renderLoginForm state =
             []
             [ addColumn
                 state.email
-                "E-Mail-Addresse:"
-                "E-Mail"
+                "Email Address:"
+                "Email"
                 "bi-envelope-fill"
                 HP.InputEmail
                 UpdateEmail
             , addColumn
                 state.password
-                "Passwort:"
-                "Passwort"
+                "Password:"
+                "Password"
                 "bi-lock-fill"
                 HP.InputPassword
                 UpdatePassword
@@ -164,7 +164,7 @@ renderLoginForm state =
                     , HP.type_ HP.ButtonButton
                     , HE.onClick $ const NavigateToPasswordReset
                     ]
-                    [ HH.text "Passwort vergessen?" ]
+                    [ HH.text "Forgot password?" ]
                 ]
             ]
         ]

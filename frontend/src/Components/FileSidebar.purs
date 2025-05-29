@@ -51,7 +51,7 @@ fileSidebar =
     HH.div_
       [ HH.button
           [ HE.onClick \_ -> ToggleSidebar ]
-          [ HH.text (if state.sidebarOpen then "⬅️ Schließen" else "📂 Dateien") ]
+          [ HH.text (if state.sidebarOpen then "⬅️ Close" else "📂 Files") ]
       -- , HH.input
       --     [ HP.type_ HP.InputFile
       --     , HE.onFileUpload FileUploaded
@@ -70,7 +70,7 @@ fileSidebar =
                 \padding: 1rem; \
                 \z-index: 1000;"
             ]
-            [ HH.h3_ [ HH.text "Hochgeladene Dateien" ]
+            [ HH.h3_ [ HH.text "Uploaded Files" ]
             , HH.input
                 [ HP.type_ HP.InputFile
                 , HE.onFileUpload FileUploaded
@@ -83,7 +83,7 @@ fileSidebar =
                       -- Show button
                       , HH.button
                           [ HE.onClick \_ -> RaisePDF (Just entry.url)
-                          , HP.title "Anzeigen"
+                          , HP.title "Show"
                           , HP.style "margin-left: 0.5rem;"
                           ]
                           [ HH.text "👁️" ]
@@ -91,14 +91,14 @@ fileSidebar =
                       , HH.a
                           [ HP.href entry.url
                           , HP.download (F.name entry.file)
-                          , HP.title "Herunterladen"
+                          , HP.title "Download"
                           , HP.style "margin-left: 0.5rem;"
                           ]
                           [ HH.text "⬇️" ]
                       -- Delete button
                       , HH.button
                           [ HE.onClick \_ -> DeleteFile (PDFFile entry)
-                          , HP.title "Löschen"
+                          , HP.title "Delete"
                           , HP.style "margin-left: 0.5rem;"
                           ]
                           [ HH.text "🗑️" ]
