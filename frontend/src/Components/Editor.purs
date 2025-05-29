@@ -97,13 +97,14 @@ editor = H.mkComponent
               , HH.text " Delete"
               ]
           ]
-      , HH.div -- FileSidebar
+      -- take out the file sidebar
+      -- , HH.div -- FileSidebar
 
-          [ HP.classes [ HB.bgLight, HB.dFlex, HB.flexRow, HB.g0, HB.overflowHidden ]
-          , HP.style "min-height: 0"
-          ]
-          -- TODO: add input of dummy pdf file
-          [ HH.slot _pdfSlideBar unit FileSidebar.fileSidebar unit HandleFileSidebar ]
+      --     [ HP.classes [ HB.bgLight, HB.dFlex, HB.flexRow, HB.g0, HB.overflowHidden ]
+      --     , HP.style "min-height: 0"
+      --     ]
+      --     -- TODO: add input of dummy pdf file
+      --     [ HH.slot _pdfSlideBar unit FileSidebar.fileSidebar unit HandleFileSidebar ]
       , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
