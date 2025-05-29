@@ -2,7 +2,7 @@ module FPO.Component.Splitview where
 
 import Prelude
 
-import Data.Array (head, range)
+import Data.Array (head, range, findIndex, updateAt)
 import Data.Maybe (Maybe(..))
 import Data.Int (toNumber)
 import Effect.Aff.Class (class MonadAff)
@@ -24,8 +24,9 @@ derive instance eqDragTarget :: Eq DragTarget
 type TOCEntry = 
   { id :: Int
   , name :: String
-  , content :: String
+  , content :: Maybe (Array String)
   }
+
 
 type Output = Unit
 type Input = Unit
@@ -38,9 +39,10 @@ data Action
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
   | ToggleSidebar
-  | JumpToSection String
+  | JumpToSection TOCEntry
   -- Toolbar buttons
   | ClickedHTTPRequest
+  | SaveSection
   | QueryEditor
   | ClickLoadPdf
   | ShowWarning
@@ -70,7 +72,6 @@ type State =
   -- The last expanded sidebar width, used to restore the sidebar when toggling
   , lastExpandedSidebarRatio :: Number
 
-  , editorText :: String
   , editorContent :: Maybe (Array String)
   , hasResizedSidebar :: Boolean
   , pdfWarningAvailable :: Boolean
@@ -96,7 +97,6 @@ splitview = H.mkComponent
       , sidebarRatio: 0.2
       , middleRatio: 0.4
       , lastExpandedSidebarRatio: 0.2
-      , editorText: "Nothing."
       , editorContent: Nothing
       , hasResizedSidebar: false
       , pdfWarningAvailable: false
@@ -116,6 +116,7 @@ splitview = H.mkComponent
           [ HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ToggleSidebar ] [ HH.text "[≡]" ]
           , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
           , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ClickedHTTPRequest ] [ HH.text "Click Me for HTTP request" ]
+          , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const SaveSection ] [ HH.text "Save" ]
           , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const QueryEditor ] [ HH.text "Query Editor" ]
           , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ClickLoadPdf ] [ HH.text "Load PDF" ]
           , if not state.pdfWarningAvailable then HH.div_ []
@@ -147,7 +148,7 @@ splitview = H.mkComponent
                       , HP.style "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0;"
                       ]
                       [ HH.span
-                          [ HE.onClick \_ -> JumpToSection content
+                          [ HE.onClick \_ -> JumpToSection { id, name, content }
                           , HP.classes [ HB.textTruncate ]
                           , HP.style "cursor: pointer; display: inline-block; min-width: 6ch;"
                           ]
@@ -195,13 +196,18 @@ splitview = H.mkComponent
   handleAction = case _ of
 
     Init -> do
-      let entries = map (\n -> {id: n, name: "§" <> show n <> " This is Paragraph " <> show n, content: "This is the content of §" <> show n} ) (range 1 11)
-          firstEntry = case head entries of
-            Nothing    -> "Nothing"
-            Just entry -> entry.content
+      let 
+        entries = map (\n -> 
+            { id: n
+            , name: "§" <> show n <> " This is Paragraph " <> show n
+            , content: Just ["This is the content of §" <> show n]
+            }
+          ) (range 1 11)
+        firstEntry = case head entries of
+            Nothing    -> { id: -1, name: "No Entry", content: Just [""] }
+            Just entry -> entry
       H.modify_ \st -> do
         st  { tocEntries = entries
-            , editorText = firstEntry
             , editorContent = Just ["This is the initial content of the editor."]
             }
       H.tell _editor unit (Editor.ChangeSection firstEntry)
@@ -291,6 +297,8 @@ splitview = H.mkComponent
 
     ClickedHTTPRequest -> H.tell _preview unit Preview.TellClickedHttpRequest
 
+    SaveSection -> H.tell _editor unit Editor.SaveSection
+
     QueryEditor -> H.tell _editor unit Editor.QueryEditor
 
     ShowWarning -> do
@@ -306,6 +314,16 @@ splitview = H.mkComponent
 
     HandleEditor output -> case output of
       Editor.ClickedQuery response -> H.tell _preview unit (Preview.GotEditorQuery response)
+      Editor.SavedSection section -> do
+        state <- H.get
+        case findIndex (\e -> e.id == section.id) state.tocEntries of
+          Nothing -> pure unit
+          Just idx -> 
+            case updateAt idx section state.tocEntries of
+              Nothing -> pure unit
+              Just updatedEntries -> 
+                H.modify_ \st -> st { tocEntries = updatedEntries }
+        
       Editor.SendPDF mURL -> H.tell _preview unit (Preview.TellLoadUploadedPdf mURL)
 
     HandlePreview _ -> pure unit

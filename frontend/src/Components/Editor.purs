@@ -26,8 +26,15 @@ import Halogen.HTML.Properties (classes, ref, style) as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
 
+type TOCEntry = 
+  { id :: Int
+  , name :: String
+  , content :: Maybe (Array String)
+  }
+
 type State =
   { editor :: Maybe Types.Editor
+  , tocEntry :: Maybe TOCEntry
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
   }
@@ -40,6 +47,7 @@ _pdfSlideBar = Proxy :: Proxy "pdfSlideBar"
 
 data Output
   = ClickedQuery (Maybe (Array String))
+  | SavedSection TOCEntry
   | SendPDF (Maybe String)
 
 data Action
@@ -53,8 +61,9 @@ data Action
 data Query a 
  -- = RequestContent (Array String -> a)
   = QueryEditor a
+  | SaveSection a
   | LoadPdf a
-  | ChangeSection String a
+  | ChangeSection TOCEntry a
 
 editor :: forall input m. MonadEffect m => H.Component Query input Output m
 editor = H.mkComponent
@@ -68,7 +77,11 @@ editor = H.mkComponent
   }
   where
   initialState :: State
-  initialState = { editor: Nothing, pdfWarningAvailable: false, pdfWarningIsShown: false }
+  initialState = 
+    { editor: Nothing
+    , tocEntry: Nothing
+    , pdfWarningAvailable: false
+    , pdfWarningIsShown: false }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
@@ -170,15 +183,37 @@ editor = H.mkComponent
     -> H.HalogenM State Action Slots Output m (Maybe a)
   handleQuery = case _ of
 
-    ChangeSection editorText a -> do
+    ChangeSection entry a -> do
+      H.modify_ \state -> state { tocEntry = Just entry }
+      let content = case entry.content of
+            Just lines -> lines
+            Nothing -> []
       H.gets _.editor >>= traverse_ \ed -> do
         H.liftEffect $ do
           document <- Editor.getSession ed >>= Session.getDocument
-          Document.setValue editorText document
+          Document.setValue (intercalate "\n" content) document
       pure (Just a)
 
     LoadPdf a -> do
       H.modify_ _ { pdfWarningAvailable = true }
+      pure (Just a)
+
+    SaveSection a -> do
+      state <- H.get
+      allLines <- H.gets _.editor >>= traverse \ed -> do
+        H.liftEffect $ Editor.getSession ed
+          >>= Session.getDocument
+          >>= Document.getAllLines
+
+      let entry =
+            case state.tocEntry of
+              Nothing -> { id: -1, name: "Section not found", content: allLines }
+              Just e -> e
+
+          newEntry = { id: entry.id, name: entry.name, content: allLines }
+
+      H.modify_ \st -> st { tocEntry = Just newEntry }
+      H.raise (SavedSection newEntry)
       pure (Just a)
 
     -- Because Session does not provide a way to get all lines directly,
