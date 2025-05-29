@@ -8,31 +8,41 @@ module FPO.Component.Splitview where
 
 import Prelude
 
-import Data.Array (head, range, findIndex, updateAt)
-import Data.Maybe (Maybe(..))
+import Components.Preview
+  ( Output
+  , Query
+      ( TellClickedHttpRequest
+      , GotEditorQuery
+      , TellLoadPdf
+      , TellLoadUploadedPdf
+      , TellShowOrHideWarning
+      )
+  , preview
+  ) as Preview
+import Data.Array (findIndex, head, range, updateAt)
 import Data.Int (toNumber)
+import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Editor as Editor
-import Components.Preview (Output, Query(TellClickedHttpRequest, GotEditorQuery, TellLoadPdf, TellLoadUploadedPdf, TellShowOrHideWarning), preview) as Preview
-import Web.UIEvent.MouseEvent (MouseEvent, clientX)
-import Web.HTML as Web.HTML
-import Web.HTML.Window as Web.HTML.Window
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
+import Web.HTML as Web.HTML
+import Web.HTML.Window as Web.HTML.Window
+import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 
 data DragTarget = ResizeLeft | ResizeRight
+
 derive instance eqDragTarget :: Eq DragTarget
 
-type TOCEntry = 
+type TOCEntry =
   { id :: Int
   , name :: String
   , content :: Maybe (Array String)
   }
-
 
 type Output = Unit
 type Input = Unit
@@ -109,7 +119,8 @@ splitview = H.mkComponent
       , pdfWarningIsShown: false
       }
   , render
-  , eval: H.mkEval $ H.defaultEval { initialize = Just Init, handleAction = handleAction }
+  , eval: H.mkEval $ H.defaultEval
+      { initialize = Just Init, handleAction = handleAction }
   }
   where
 
@@ -117,19 +128,44 @@ splitview = H.mkComponent
   render state =
     HH.div_
       [ -- First Toolbar
-        HH.div 
+        HH.div
           [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
-          [ HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ToggleSidebar ] [ HH.text "[≡]" ]
+          [ HH.button
+              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+              , HE.onClick $ const ToggleSidebar
+              ]
+              [ HH.text "[≡]" ]
           , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
-          , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ClickedHTTPRequest ] [ HH.text "Click Me for HTTP request" ]
-          , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const SaveSection ] [ HH.text "Save" ]
-          , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const QueryEditor ] [ HH.text "Query Editor" ]
-          , HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ClickLoadPdf ] [ HH.text "Load PDF" ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+              , HE.onClick $ const ClickedHTTPRequest
+              ]
+              [ HH.text "Click Me for HTTP request" ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+              , HE.onClick $ const SaveSection
+              ]
+              [ HH.text "Save" ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+              , HE.onClick $ const QueryEditor
+              ]
+              [ HH.text "Query Editor" ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+              , HE.onClick $ const ClickLoadPdf
+              ]
+              [ HH.text "Load PDF" ]
           , if not state.pdfWarningAvailable then HH.div_ []
-            else HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ShowWarning ]
-              [ HH.text ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning") ]
+            else HH.button
+              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+              , HE.onClick $ const ShowWarning
+              ]
+              [ HH.text
+                  ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning")
+              ]
           ]
-      ,renderSplit state
+      , renderSplit state
       ]
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
@@ -145,22 +181,25 @@ splitview = H.mkComponent
         HH.div
           [ HP.classes [ HB.overflowAuto, HB.p1 ]
           , HP.style $
-              "flex: 0 0 " <> show (state.sidebarRatio * 100.0) <> "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"
+              "flex: 0 0 " <> show (state.sidebarRatio * 100.0) <>
+                "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"
           ]
           [ HH.div_
               ( map
-                  (\{ id, name, content } ->
-                    HH.div
-                      [ HP.title ("Jump to section " <> name)
-                      , HP.style "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0;"
-                      ]
-                      [ HH.span
-                          [ HE.onClick \_ -> JumpToSection { id, name, content }
-                          , HP.classes [ HB.textTruncate ]
-                          , HP.style "cursor: pointer; display: inline-block; min-width: 6ch;"
-                          ]
-                          [ HH.text name ]
-                      ]
+                  ( \{ id, name, content } ->
+                      HH.div
+                        [ HP.title ("Jump to section " <> name)
+                        , HP.style
+                            "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0;"
+                        ]
+                        [ HH.span
+                            [ HE.onClick \_ -> JumpToSection { id, name, content }
+                            , HP.classes [ HB.textTruncate ]
+                            , HP.style
+                                "cursor: pointer; display: inline-block; min-width: 6ch;"
+                            ]
+                            [ HH.text name ]
+                        ]
                   )
                   state.tocEntries
               )
@@ -177,7 +216,8 @@ splitview = H.mkComponent
       , HH.div
           [ HP.classes [ HB.dFlex, HB.flexColumn ]
           , HP.style $
-              "flex: 0 0 " <> show (state.middleRatio * 100.0) <> "%; box-sizing: border-box; min-height: 0; overflow: hidden;"
+              "flex: 0 0 " <> show (state.middleRatio * 100.0) <>
+                "%; box-sizing: border-box; min-height: 0; overflow: hidden;"
           ]
           [ HH.slot _editor unit Editor.editor unit HandleEditor ]
 
@@ -192,33 +232,39 @@ splitview = H.mkComponent
       , HH.div
           [ HP.classes [ HB.dFlex, HB.flexColumn ]
           , HP.style $
-              "flex: 1 1 " <> show ((1.0 - state.sidebarRatio - state.middleRatio) * 100.0) <> "%; box-sizing: border-box; min-height: 0; overflow: hidden;" 
+              "flex: 1 1 "
+                <> show ((1.0 - state.sidebarRatio - state.middleRatio) * 100.0)
+                <> "%; box-sizing: border-box; min-height: 0; overflow: hidden;"
           ]
-          [ HH.slot _preview unit Preview.preview { editorContent: state.editorContent } HandlePreview ]
+          [ HH.slot _preview unit Preview.preview
+              { editorContent: state.editorContent }
+              HandlePreview
+          ]
       ]
-
-
 
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
 
     Init -> do
-      let 
-      -- Create initial TOC entries
-        entries = map (\n -> 
-            { id: n
-            , name: "§" <> show n <> " This is Paragraph " <> show n
-            , content: Just ["This is the content of §" <> show n]
-            }
-          ) (range 1 11)
+      let
+        -- Create initial TOC entries
+        entries = map
+          ( \n ->
+              { id: n
+              , name: "§" <> show n <> " This is Paragraph " <> show n
+              , content: Just [ "This is the content of §" <> show n ]
+              }
+          )
+          (range 1 11)
         -- Put first entry in editor
         firstEntry = case head entries of
-            Nothing    -> { id: -1, name: "No Entry", content: Just [""] }
-            Just entry -> entry
+          Nothing -> { id: -1, name: "No Entry", content: Just [ "" ] }
+          Just entry -> entry
       H.modify_ \st -> do
-        st  { tocEntries = entries
-            , editorContent = Just ["This is the initial content of the editor."]
-            }
+        st
+          { tocEntries = entries
+          , editorContent = Just [ "This is the initial content of the editor." ]
+          }
       H.tell _editor unit (Editor.ChangeSection firstEntry)
 
     -- Set the left resizer to a set position on the left side
@@ -246,9 +292,8 @@ splitview = H.mkComponent
         H.modify_ \st -> st
           { sidebarRatio = newSidebar
           , middleRatio = max 0.1 (st.middleRatio + delta)
-          , lastExpandedSidebarRatio = 
-              if st.hasResizedSidebar 
-              then st.lastExpandedSidebarRatio 
+          , lastExpandedSidebarRatio =
+              if st.hasResizedSidebar then st.lastExpandedSidebarRatio
               else st.sidebarRatio
           , hasResizedSidebar = false
           }
@@ -294,14 +339,17 @@ splitview = H.mkComponent
             rawSidebarRatio = s + (ratioX - mx)
             maxSidebarRatio = s + m - (85.0 / width)
             -- enforce minimum width to show at least ~6 characters
-            clampedSidebarRatio = max (70.0 / width) (min maxSidebarRatio rawSidebarRatio)
+            clampedSidebarRatio = max (70.0 / width)
+              (min maxSidebarRatio rawSidebarRatio)
             newSidebar = clampedSidebarRatio
             newMiddle = s + m - clampedSidebarRatio
           when (newMiddle * width >= 85.0) do
             H.modify_ \st -> st
               { sidebarRatio = newSidebar
               , middleRatio = newMiddle
-              , lastExpandedSidebarRatio = if newSidebar * width > 85.0 then newSidebar else st.lastExpandedSidebarRatio
+              , lastExpandedSidebarRatio =
+                  if newSidebar * width > 85.0 then newSidebar
+                  else st.lastExpandedSidebarRatio
               , hasResizedSidebar = true
               }
 
@@ -340,20 +388,20 @@ splitview = H.mkComponent
     -- Query handler
 
     HandleEditor output -> case output of
-      Editor.ClickedQuery response -> H.tell _preview unit (Preview.GotEditorQuery response)
+      Editor.ClickedQuery response -> H.tell _preview unit
+        (Preview.GotEditorQuery response)
       Editor.SavedSection section -> do
         state <- H.get
         -- update the TOC entry received from the editor in state
         case findIndex (\e -> e.id == section.id) state.tocEntries of
           Nothing -> pure unit
-          Just idx -> 
+          Just idx ->
             case updateAt idx section state.tocEntries of
               Nothing -> pure unit
-              Just updatedEntries -> 
+              Just updatedEntries ->
                 H.modify_ \st -> st { tocEntries = updatedEntries }
-        
+
       Editor.SendPDF mURL -> H.tell _preview unit (Preview.TellLoadUploadedPdf mURL)
 
     HandlePreview _ -> pure unit
-
 
