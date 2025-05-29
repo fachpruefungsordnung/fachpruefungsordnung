@@ -29,17 +29,17 @@ component =
   render :: State -> H.ComponentHTML Action () m
   render _ =
     HH.div
-    [ HP.classes
-        [ HB.dFlex
-        , HB.flexColumn
-        , HB.justifyContentCenter
-        , HB.alignItemsCenter
-        , HB.h100
-        , HB.bgLight
-        ]
-    ]
-    [ HH.h1 [ HP.classes [ HB.textPrimary, HB.mb3 ] ]
-        [ HH.text "Hinweis" ]
-    , HH.p [ HP.classes [ HB.textCenter, HB.fs5 ] ]
-        [ HH.text "Der Editor wurde zum Page Editor verlegt." ]
-    ]
+      [ HP.classes
+          [ HB.dFlex
+          , HB.flexColumn
+          , HB.justifyContentCenter
+          , HB.alignItemsCenter
+          , HB.h100
+          , HB.bgLight
+          ]
+      ]
+      [ HH.h1 [ HP.classes [ HB.textPrimary, HB.mb3 ] ]
+          [ HH.text "Hinweis" ]
+      , HH.p [ HP.classes [ HB.textCenter, HB.fs5 ] ]
+          [ HH.text "Der Editor wurde zum Page Editor verlegt." ]
+      ]

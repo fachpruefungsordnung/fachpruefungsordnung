@@ -26,7 +26,7 @@ import Halogen.HTML.Properties (classes, ref, style) as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
 
-type TOCEntry = 
+type TOCEntry =
   { id :: Int
   , name :: String
   , content :: Maybe (Array String)
@@ -58,8 +58,8 @@ data Action
   | HandleFileSidebar FileSidebar.Output
 
 -- We use a query to get the content of the editor
-data Query a 
- -- = RequestContent (Array String -> a)
+data Query a
+  -- = RequestContent (Array String -> a)
   = QueryEditor a
   | SaveSection a
   | LoadPdf a
@@ -77,11 +77,12 @@ editor = H.mkComponent
   }
   where
   initialState :: State
-  initialState = 
+  initialState =
     { editor: Nothing
     , tocEntry: Nothing
     , pdfWarningAvailable: false
-    , pdfWarningIsShown: false }
+    , pdfWarningIsShown: false
+    }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
@@ -175,7 +176,6 @@ editor = H.mkComponent
       FileSidebar.SendPDF mURL -> do
         H.raise (SendPDF mURL)
         H.modify_ _ { pdfWarningAvailable = true }
-      
 
   handleQuery
     :: forall a
@@ -185,9 +185,10 @@ editor = H.mkComponent
 
     ChangeSection entry a -> do
       H.modify_ \state -> state { tocEntry = Just entry }
-      let content = case entry.content of
-            Just lines -> lines
-            Nothing -> []
+      let
+        content = case entry.content of
+          Just lines -> lines
+          Nothing -> []
       H.gets _.editor >>= traverse_ \ed -> do
         H.liftEffect $ do
           document <- Editor.getSession ed >>= Session.getDocument
@@ -205,12 +206,13 @@ editor = H.mkComponent
           >>= Session.getDocument
           >>= Document.getAllLines
 
-      let entry =
-            case state.tocEntry of
-              Nothing -> { id: -1, name: "Section not found", content: allLines }
-              Just e -> e
+      let
+        entry =
+          case state.tocEntry of
+            Nothing -> { id: -1, name: "Section not found", content: allLines }
+            Just e -> e
 
-          newEntry = { id: entry.id, name: entry.name, content: allLines }
+        newEntry = { id: entry.id, name: entry.name, content: allLines }
 
       H.modify_ \st -> st { tocEntry = Just newEntry }
       H.raise (SavedSection newEntry)

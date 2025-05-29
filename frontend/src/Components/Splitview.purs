@@ -1,3 +1,9 @@
+-- It has 3 split views: a sidebar, an editor, and a preview area. 
+-- Between each of the views, there are resizers that allow the user to adjust the width 
+-- of each section. The sidebar contains a table of contents (TOC) with clickable entries 
+-- that jump to specific sections in the editor. The editor allows users to edit content, 
+-- and the preview area displays the output based on the editor's content.
+
 module FPO.Component.Splitview where
 
 import Prelude
@@ -110,7 +116,7 @@ splitview = H.mkComponent
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div_
-      [ 
+      [ -- First Toolbar
         HH.div 
           [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
           [ HH.button [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ], HE.onClick $ const ToggleSidebar ] [ HH.text "[≡]" ]
@@ -129,6 +135,7 @@ splitview = H.mkComponent
   renderSplit :: State -> H.ComponentHTML Action Slots m
   renderSplit state =
     HH.div
+      -- Set mouse event
       [ HE.onMouseMove HandleMouseMove
       , HE.onMouseUp StopResize
       , HP.classes [ HB.dFlex ]
@@ -197,12 +204,14 @@ splitview = H.mkComponent
 
     Init -> do
       let 
+      -- Create initial TOC entries
         entries = map (\n -> 
             { id: n
             , name: "§" <> show n <> " This is Paragraph " <> show n
             , content: Just ["This is the content of §" <> show n]
             }
           ) (range 1 11)
+        -- Put first entry in editor
         firstEntry = case head entries of
             Nothing    -> { id: -1, name: "No Entry", content: Just [""] }
             Just entry -> entry
@@ -212,11 +221,14 @@ splitview = H.mkComponent
             }
       H.tell _editor unit (Editor.ChangeSection firstEntry)
 
+    -- Set the left resizer to a set position on the left side
+    -- Toggle the sidebar again, wihtout resizing this resizer put it back in last position
     ToggleSidebar -> do
       win <- H.liftEffect Web.HTML.window
       width <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let w = toNumber width
       state <- H.get
+      -- The sidebar is "closed"
       if state.sidebarRatio * w <= 85.0 then do
         let
           target = state.lastExpandedSidebarRatio
@@ -224,7 +236,9 @@ splitview = H.mkComponent
         H.modify_ \st -> st
           { sidebarRatio = target
           , middleRatio = max 0.1 (st.middleRatio - delta)
+          , hasResizedSidebar = true
           }
+      -- "close" sidebar
       else do
         let
           newSidebar = 85.0 / w
@@ -232,9 +246,14 @@ splitview = H.mkComponent
         H.modify_ \st -> st
           { sidebarRatio = newSidebar
           , middleRatio = max 0.1 (st.middleRatio + delta)
-          , lastExpandedSidebarRatio = if st.hasResizedSidebar then st.lastExpandedSidebarRatio else st.sidebarRatio
+          , lastExpandedSidebarRatio = 
+              if st.hasResizedSidebar 
+              then st.lastExpandedSidebarRatio 
+              else st.sidebarRatio
+          , hasResizedSidebar = false
           }
 
+    -- Resizing as long as mouse is hold down on window
     StartResize which mouse -> do
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
@@ -249,12 +268,15 @@ splitview = H.mkComponent
         , startMiddleRatio = st.middleRatio
         }
 
+    -- Stop resizing, when mouse is released
     StopResize _ ->
       H.modify_ \st -> st
         { dragTarget = Nothing
         , hasResizedSidebar = true
         }
 
+    -- While mouse is hold down, resizer move to position of mouse
+    -- (with certain rules)
     HandleMouseMove mouse -> do
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
@@ -291,6 +313,7 @@ splitview = H.mkComponent
 
         _ -> pure unit
 
+    -- Change the content of current § section in the editor
     JumpToSection section -> do
       H.tell _editor unit Editor.SaveSection
       H.tell _editor unit (Editor.ChangeSection section)
@@ -320,6 +343,7 @@ splitview = H.mkComponent
       Editor.ClickedQuery response -> H.tell _preview unit (Preview.GotEditorQuery response)
       Editor.SavedSection section -> do
         state <- H.get
+        -- update the TOC entry received from the editor in state
         case findIndex (\e -> e.id == section.id) state.tocEntries of
           Nothing -> pure unit
           Just idx -> 

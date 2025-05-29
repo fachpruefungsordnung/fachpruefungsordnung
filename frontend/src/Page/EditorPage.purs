@@ -13,8 +13,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(..))
 
-data Action
-  = HandleSplitview Splitview.Output
+data Action = HandleSplitview Splitview.Output
 
 type State = {}
 
@@ -38,10 +37,9 @@ component =
   render :: State -> H.ComponentHTML Action Slots m
   render _ =
     HH.div [ HP.classes [ HB.flexGrow1, HB.p0, HB.overflowHidden ] ]
-      [ 
-        HH.slot _splitview unit Splitview.splitview unit HandleSplitview
+      [ HH.slot _splitview unit Splitview.splitview unit HandleSplitview
       ]
 
-  handleAction  :: MonadAff m => Action -> H.HalogenM State Action Slots output m Unit
+  handleAction :: MonadAff m => Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     HandleSplitview _ -> pure unit
