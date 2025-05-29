@@ -19,6 +19,7 @@ package:
     - halogen-store
     - halogen-subscriptions
     - http-methods
+    - integers
     - maybe
     - prelude
     - routing
@@ -29,6 +30,8 @@ package:
     - unsafe-coerce
     - web-dom
     - web-file
+    - web-html
+    - web-uievents
   test:
     main: Test.Main
     dependencies: []
