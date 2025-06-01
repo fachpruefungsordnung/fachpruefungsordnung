@@ -62,6 +62,15 @@ type PublicAPI =
                      ]
                     NoContent
                 )
+        :<|> "logout"
+            :> Get
+                '[JSON]
+                ( Headers
+                    '[ Header "Set-Cookie" SetCookie
+                     , Header "Set-Cookie" SetCookie
+                     ]
+                    NoContent
+                )
 
 -- | Cookie means that Auth is implemented via two Cookies.
 --   One HTTP-only JWT Cookie, which is managed by the browser
@@ -201,6 +210,15 @@ loginHandler cookieSett jwtSett Auth.UserLoginData {..} = do
                                 Just addHeaders -> return $ addHeaders NoContent
         Right Nothing -> throwError errUserNotFound
         Left _ -> throwError errDatabaseAccessFailed
+
+logoutHandler
+    :: CookieSettings
+    -> Handler
+        ( Headers
+            '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie]
+            NoContent
+        )
+logoutHandler cookieSett = return $ clearSession cookieSett NoContent
 
 registerHandler
     :: AuthResult Auth.Token -> Auth.UserRegisterData -> Handler NoContent
@@ -462,6 +480,7 @@ server cookieSett jwtSett =
                 :<|> documentHandler
                 :<|> debugAPIHandler
                 :<|> loginHandler cookieSett jwtSett
+                :<|> logoutHandler cookieSett
              )
         :<|> ( protectedHandler
                 :<|> registerHandler

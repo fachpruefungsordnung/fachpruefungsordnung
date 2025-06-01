@@ -191,7 +191,7 @@ updateUserRoleInGroup :: Statement (User.UserID, Group.GroupID, Text) ()
 updateUserRoleInGroup =
     [resultlessStatement|
       update roles
-      set role = $3 :: text
+      set role = $3 :: text :: role
       where user_id = $1 :: uuid and group_id = $2 :: int4
     |]
 

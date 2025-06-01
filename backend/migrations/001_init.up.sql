@@ -42,3 +42,8 @@ CREATE TABLE IF NOT EXISTS superadmins (
     PRIMARY KEY (user_id),
     FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 );
+
+INSERT INTO 
+    superadmins (user_id)
+VALUES
+    ('7f59659a-9a46-4ba0-a911-09698107a6ea');
