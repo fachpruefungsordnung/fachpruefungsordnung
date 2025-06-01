@@ -39,6 +39,7 @@ data FullUser = FullUser
     { fullUserID :: UserID
     , fullUserName :: Text
     , fullUserEmail :: Text
+    , fullUserIsSuperadmin :: Bool
     , fullUserRoles :: [(Group.GroupID, Role)]
     }
     deriving (Show, Generic)

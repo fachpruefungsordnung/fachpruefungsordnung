@@ -263,12 +263,16 @@ getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
                 Left _ -> throwError errDatabaseAccessFailed
                 Right Nothing -> throwError $ err404 {errBody = "user not found."}
                 Right (Just User.User {..}) -> do
-                    eAction' <- liftIO $ Session.run (Sessions.getAllUserRoles requestedUserID) conn
-                    case eAction' of
+                    eIsSuper <- liftIO $ Session.run (Sessions.checkSuperadmin requestedUserID) conn
+                    case eIsSuper of
                         Left _ -> throwError errDatabaseAccessFailed
-                        Right roles ->
-                            let roles' = [(group, role) | (group, Just role) <- roles]
-                             in return $ User.FullUser requestedUserID userName userEmail roles'
+                        Right isSuper -> do
+                            eAction' <- liftIO $ Session.run (Sessions.getAllUserRoles requestedUserID) conn
+                            case eAction' of
+                                Left _ -> throwError errDatabaseAccessFailed
+                                Right roles ->
+                                    let roles' = [(group, role) | (group, Just role) <- roles]
+                                     in return $ User.FullUser requestedUserID userName userEmail isSuper roles'
         else
             throwError errSuperAdminOnly
 getUserHandler _ _ = throwError errNotLoggedIn
@@ -440,10 +444,15 @@ postSuperadminHandler (Authenticated Auth.Token {..}) userID =
     if isSuperadmin
         then do
             conn <- tryGetDBConnection
-            eAction <- liftIO $ Session.run (Sessions.addSuperadmin userID) conn
-            case eAction of
+            eIsSuper <- liftIO $ Session.run (Sessions.checkSuperadmin userID) conn
+            case eIsSuper of
                 Left _ -> throwError errDatabaseAccessFailed
-                Right _ -> return NoContent
+                Right True -> throwError errIsAlreadySuperadmin
+                Right False -> do
+                    eAction <- liftIO $ Session.run (Sessions.addSuperadmin userID) conn
+                    case eAction of
+                        Left _ -> throwError errDatabaseAccessFailed
+                        Right _ -> return NoContent
         else throwError errSuperAdminOnly
 postSuperadminHandler _ _ = throwError errNotLoggedIn
 
