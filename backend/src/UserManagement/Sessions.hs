@@ -66,7 +66,7 @@ updateUserName :: User.UserID -> Text -> Session ()
 updateUserName uid name = statement (name, uid) Statements.updateUserName
 
 updateUserEmail :: User.UserID -> Text -> Session ()
-updateUserEmail uid email = statement (email, uid) Statements.updateUserName
+updateUserEmail uid email = statement (email, uid) Statements.updateUserEmail
 
 updateUserPWHash :: User.UserID -> Text -> Session ()
 updateUserPWHash uid pwhash = statement (pwhash, uid) Statements.updateUserName

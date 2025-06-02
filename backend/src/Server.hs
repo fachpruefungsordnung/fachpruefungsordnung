@@ -120,7 +120,7 @@ type ProtectedAPI =
             :> Capture "groupID" Group.GroupID
             :> Capture "userId" User.UserID
             :> ReqBody '[JSON] User.Role
-            :> Post '[JSON] NoContent
+            :> Put '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
             :> "roles"
             :> Capture "groupID" Group.GroupID
@@ -296,8 +296,15 @@ patchUserHandler
 patchUserHandler (Authenticated Auth.Token {..}) userID (Auth.UserUpdate {..}) = do
     conn <- tryGetDBConnection
     if isSuperadmin || subject == userID
-        then
-            patchUser conn
+        then case newEmail of
+            Nothing -> patchUser conn
+            Just newEmail' -> do
+                -- check if email is already used for some account
+                eUser <- liftIO $ Session.run (Sessions.getUserByEmail newEmail') conn
+                case eUser of
+                    Left _ -> throwError errDatabaseAccessFailed
+                    Right Nothing -> patchUser conn
+                    Right _ -> throwError errEmailAlreadyUsed
         else
             throwError errSuperAdminOnly
   where
