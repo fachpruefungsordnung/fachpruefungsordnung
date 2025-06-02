@@ -65,7 +65,10 @@ data Query a
   | LoadPdf a
   | ChangeSection TOCEntry a
 
-editor :: forall input m. MonadEffect m => H.Component Query input Output m
+editor
+  :: forall input m
+   . MonadEffect m
+  => H.Component Query input Output m
 editor = H.mkComponent
   { initialState: const initialState
   , render
@@ -137,6 +140,7 @@ editor = H.mkComponent
           -- Set the editor's theme and mode
           Editor.setTheme "ace/theme/github" editor_
           EditSession.setMode "ace/mode/tex" session
+          Editor.setEnableLiveAutocompletion true editor_
 
           -- Add a change listener to the editor
           addChangeListener editor_
@@ -243,11 +247,13 @@ addChangeListener editor_ = do
   Session.onChange session \_ -> do
     lines <- Session.getDocument session >>= Document.getAllLines
 
-    -- Remove all existing markers
+    -- Remove all existing markers ...
     markers <- Session.getMarkers session
     for_ markers \marker -> do
       id <- Marker.getId marker
       Session.removeMarker id session
+    -- ... and annotations
+    Session.clearAnnotations session
 
     -- traverse all lines and insert a marker for each occurrence of "error"
     for_ (0 .. (Array.length lines - 1)) \row -> do
@@ -256,7 +262,13 @@ addChangeListener editor_ = do
           for_ (findAllIndicesOf "error" line) \col -> do
             r <- Range.create row col row (col + 5)
             _ <- Session.addMarker r "ace_error-marker" "text" false session
-            pure unit
+            addAnnotation
+              { row: row
+              , column: col
+              , text: "Error found!"
+              , type: "error"
+              }
+              session
         Nothing -> pure unit
 
 -- | Helper function to find all indices of a substring in a string
@@ -275,3 +287,12 @@ findAllIndicesOf needle haystack = go 0 []
         in
           go (absoluteIndex + 1) (absoluteIndex : acc)
       Nothing -> acc
+
+-- | Adds an annotation to the editor session.
+addAnnotation
+  :: Types.Annotation
+  -> Types.EditSession
+  -> Effect Unit
+addAnnotation annotation session = do
+  anns <- Session.getAnnotations session
+  Session.setAnnotations (annotation : anns) session
