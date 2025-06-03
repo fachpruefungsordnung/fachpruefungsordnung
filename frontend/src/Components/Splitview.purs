@@ -391,7 +391,5 @@ splitview = H.mkComponent
               Just updatedEntries ->
                 H.modify_ \st -> st { tocEntries = updatedEntries }
 
-      Editor.SendPDF mURL -> H.tell _preview unit (Preview.TellLoadUploadedPdf mURL)
-
     HandlePreview _ -> pure unit
 
