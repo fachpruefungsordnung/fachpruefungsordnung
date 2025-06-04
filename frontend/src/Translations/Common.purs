@@ -6,29 +6,20 @@ import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)
 
 type CommonLabels =
-  ( "email"
-      ::: "emailAddress"
-      ::: "home"
-      ::: "password"
+  ( "home"
       ::: "submit"
       ::: SNil
   )
 
 enCommon :: Translation CommonLabels
 enCommon = fromRecord
-  { email: "Email"
-  , emailAddress: "Email address"
-  , home: "Home"
-  , password: "Password"
+  { home: "Home"
   , submit: "Submit"
   }
 
 deCommon :: Translation CommonLabels
 deCommon = fromRecord
-  { email: "E-Mail"
-  , emailAddress: "E-Mail-Adresse"
-  , home: "Start"
-  , password: "Passwort"
+  { home: "Start"
   , submit: "Absenden"
   }
 

@@ -131,22 +131,22 @@ renderResetForm state =
             []
             [ addColumn
                 state.email
-                (translate (label :: _ "emailAddress") state.translator <> ":")
-                (translate (label :: _ "email") state.translator)
+                (translate (label :: _ "login_emailAddress") state.translator <> ":")
+                (translate (label :: _ "login_email") state.translator)
                 "bi-envelope-fill"
                 HP.InputEmail
                 UpdateEmail
             , addColumn
                 state.passwordPrimary
                 (translate (label :: _ "rp_PasswordNew") state.translator <> ":")
-                (translate (label :: _ "password") state.translator)
+                (translate (label :: _ "login_password") state.translator)
                 "bi-lock-fill"
                 HP.InputPassword
                 UpdatePasswordPrimary
             , addColumn
                 state.passwordSecondary
                 (translate (label :: _ "rp_PasswordConfirm") state.translator <> ":")
-                (translate (label :: _ "password") state.translator)
+                (translate (label :: _ "login_password") state.translator)
                 "bi-lock-fill"
                 HP.InputPassword
                 UpdatePasswordSecondary

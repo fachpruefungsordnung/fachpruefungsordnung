@@ -165,15 +165,17 @@ component =
               [ HE.onSubmit \e -> DoLogin (toLoginDto state) e ]
               [ addColumn
                   state.email
-                  ((translate (label :: _ "emailAddress") state.translator) <> ":")
-                  (translate (label :: _ "email") state.translator)
+                  ( (translate (label :: _ "login_emailAddress") state.translator) <>
+                      ":"
+                  )
+                  (translate (label :: _ "login_email") state.translator)
                   "bi-envelope-fill"
                   HP.InputEmail
                   UpdateEmail
               , addColumn
                   state.password
-                  ((translate (label :: _ "password") state.translator) <> ":")
-                  (translate (label :: _ "password") state.translator)
+                  ((translate (label :: _ "login_password") state.translator) <> ":")
+                  (translate (label :: _ "login_password") state.translator)
                   "bi-lock-fill"
                   HP.InputPassword
                   UpdatePassword
@@ -189,7 +191,7 @@ component =
                       , HE.onClick $ const NavigateToPasswordReset
                       ]
                       [ HH.text
-                          ( translate (label :: _ "passwordForgotten")
+                          ( translate (label :: _ "login_passwordForgotten")
                               state.translator
                           )
                       ]

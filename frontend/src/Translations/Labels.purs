@@ -7,8 +7,8 @@ import Prim.RowList as RL
 import Record (merge)
 import Record.Extra (type (:::), SCons, SNil)
 import Simple.I18n.Translation (Translation, fromRecord, toRecord)
-import Translations.Auth (deAuth, enAuth)
 import Translations.Common (deCommon, enCommon)
+import Translations.Login (deLogin, enLogin)
 import Translations.Profile (deProfile, enProfile)
 import Translations.ResetPassword (dePasswordReset, enPasswordReset)
 import Type.Data.Ordering (class Append) as RL
@@ -20,11 +20,12 @@ import Type.Data.Ordering (class Append) as RL
 -- | Because of this constraint, it's sensible to use
 -- | appropriate prefixes for strongly related labels.
 type Labels =
-  ( "email"
-      ::: "emailAddress"
-      ::: "home"
-      ::: "password"
-      ::: "passwordForgotten"
+  ( "home"
+      -- | Login Page
+      ::: "login_email"
+      ::: "login_emailAddress"
+      ::: "login_password"
+      ::: "login_passwordForgotten"
 
       -- | Profile Page
       ::: "prof_loginSuccessful"
@@ -50,11 +51,11 @@ type Labels =
 en :: Translation Labels
 en = fromRecord $
   merge
-    (merge (toRecord enCommon) (toRecord enAuth))
+    (merge (toRecord enCommon) (toRecord enLogin))
     (merge (toRecord enPasswordReset) (toRecord enProfile))
 
 de :: Translation Labels
 de = fromRecord $
   merge
-    (merge (toRecord deCommon) (toRecord deAuth))
+    (merge (toRecord deCommon) (toRecord deLogin))
     (merge (toRecord dePasswordReset) (toRecord deProfile))
