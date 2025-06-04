@@ -8,7 +8,6 @@
             "ace",
             "aff",
             "affjax",
-            "affjax-web",
             "argonaut-codecs",
             "argonaut-core",
             "arrays",
@@ -22,6 +21,7 @@
             "halogen-bootstrap5",
             "halogen-store",
             "halogen-subscriptions",
+            "http-methods",
             "integers",
             "maybe",
             "prelude",
@@ -44,7 +44,6 @@
             "ace",
             "aff",
             "affjax",
-            "affjax-web",
             "argonaut-codecs",
             "argonaut-core",
             "arraybuffer-types",
@@ -739,18 +738,6 @@
         "refs",
         "unsafe-coerce",
         "web-xhr"
-      ]
-    },
-    "affjax-web": {
-      "type": "registry",
-      "version": "1.0.0",
-      "integrity": "sha256-n/yJUk1wMxMN7fJ2TJ+fELgieomy29N617yOshAnrc0=",
-      "dependencies": [
-        "aff",
-        "affjax",
-        "either",
-        "maybe",
-        "prelude"
       ]
     },
     "argonaut-codecs": {

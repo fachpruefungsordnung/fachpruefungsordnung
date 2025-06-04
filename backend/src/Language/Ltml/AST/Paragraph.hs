@@ -10,3 +10,4 @@ data Paragraph
     = Paragraph
         ParagraphFormat
         [RichTextTree]
+    deriving (Show)

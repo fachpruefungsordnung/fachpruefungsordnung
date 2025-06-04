@@ -4,7 +4,6 @@ package:
     - ace
     - aff
     - affjax
-    - affjax-web
     - argonaut-codecs
     - argonaut-core
     - arrays
@@ -18,6 +17,7 @@ package:
     - halogen-bootstrap5
     - halogen-store
     - halogen-subscriptions
+    - http-methods
     - integers
     - maybe
     - prelude

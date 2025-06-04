@@ -30,10 +30,9 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
-import Simple.I18n.Translator (translate)
+import Simple.I18n.Translator (label, translate)
 import Translations.Translator (EqTranslator, fromEqTranslator)
 import Translations.Util (FPOState, selectTranslator)
-import Type.Proxy (Proxy(Proxy))
 import Web.Event.Event (preventDefault)
 import Web.Event.Internal.Types (Event)
 
@@ -166,15 +165,15 @@ component =
               [ HE.onSubmit \e -> DoLogin (toLoginDto state) e ]
               [ addColumn
                   state.email
-                  "Email Address:"
-                  "Email"
+                  ((translate (label :: _ "emailAddress") state.translator) <> ":")
+                  (translate (label :: _ "email") state.translator)
                   "bi-envelope-fill"
                   HP.InputEmail
                   UpdateEmail
               , addColumn
                   state.password
-                  ((translate (Proxy :: _ "password") state.translator) <> ":")
-                  (translate (Proxy :: _ "password") state.translator)
+                  ((translate (label :: _ "password") state.translator) <> ":")
+                  (translate (label :: _ "password") state.translator)
                   "bi-lock-fill"
                   HP.InputPassword
                   UpdatePassword
@@ -189,7 +188,11 @@ component =
                       , HP.type_ HP.ButtonButton
                       , HE.onClick $ const NavigateToPasswordReset
                       ]
-                      [ HH.text "Forgot password?" ]
+                      [ HH.text
+                          ( translate (label :: _ "passwordForgotten")
+                              state.translator
+                          )
+                      ]
                   ]
               ]
           ]

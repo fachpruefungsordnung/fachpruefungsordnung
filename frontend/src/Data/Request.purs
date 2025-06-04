@@ -6,53 +6,101 @@ module FPO.Data.Request where
 
 import Prelude
 
-import Affjax (AffjaxDriver, Error, Response)
+import Affjax (AffjaxDriver, Error, Request, Response, request)
 import Affjax.RequestBody (json) as RequestBody
+import Affjax.RequestHeader (RequestHeader(RequestHeader))
+import Affjax.ResponseFormat (ResponseFormat)
 import Affjax.ResponseFormat (blob, document, ignore, json, string) as AXRF
-import Affjax.Web (get, post) as AX
 import Data.Argonaut.Core (Json)
-import Data.Either (Either)
+import Data.Either (Either(Left))
+import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
+import Effect (Effect)
 import Effect.Aff (Aff)
+import Effect.Aff.Class (liftAff)
+import Effect.Class (liftEffect)
 import Web.DOM.Document (Document)
 import Web.File.Blob (Blob)
 
+-- | Foreign imports
 foreign import driver :: AffjaxDriver
+foreign import getCookieEff :: String -> Effect String
 
--- | Makes a GET request to the given path and expects a String response.
+-- | Helper-Funktion zum Erstellen einer FPO-Request mit XSRF-Token
+defaultFpoRequest
+  :: forall a. ResponseFormat a -> String -> Method -> Effect (Request a)
+defaultFpoRequest responseFormat url method = do
+  xsrfToken <- getCookieEff "XSRF-TOKEN"
+  pure
+    { method: Left method
+    , url
+    , headers: [ RequestHeader "X-XSRF-TOKEN" xsrfToken ]
+    , content: Nothing
+    , username: Nothing
+    , password: Nothing
+    , withCredentials: false
+    , responseFormat
+    , timeout: Nothing
+    }
+
+-- | GET-Anfragen ----------------------------------------------------------
+
+-- | Makes a GET request and expects a String response.
 getString :: String -> Aff (Either Error (Response String))
-getString path = AX.get AXRF.string ("/api" <> path)
+getString url = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.string ("/api" <> url) GET
+  liftAff $ request driver fpoRequest
 
--- | Makes a POST request to the given path with a JSON body and expects a String response.
-postString :: String -> Json -> Aff (Either Error (Response String))
-postString path body = AX.post AXRF.string ("/api" <> path)
-  (Just $ RequestBody.json body)
-
--- | Makes a GET request to the given path and expects a JSON response.
+-- | Makes a GET request and expects a JSON response.
 getJson :: String -> Aff (Either Error (Response Json))
-getJson path = AX.get AXRF.json ("/api" <> path)
+getJson url = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.json ("/api" <> url) GET
+  liftAff $ request driver fpoRequest
 
--- | Makes a POST request to the given path with a JSON body and expects a JSON response.
-postJson :: String -> Json -> Aff (Either Error (Response Json))
-postJson path body = AX.post AXRF.json ("/api" <> path) (Just $ RequestBody.json body)
-
--- | Makes a GET request to the given path and expects a Document response.
+-- | Makes a GET request and expects a Document response.
 getDocument :: String -> Aff (Either Error (Response Document))
-getDocument path = AX.get AXRF.document ("/api" <> path)
+getDocument url = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.document ("/api" <> url) GET
+  liftAff $ request driver fpoRequest
 
--- | Makes a GET request to the given path and expects a Null response.
-getIgnore :: String -> Aff (Either Error (Response Unit))
-getIgnore path = AX.get AXRF.ignore ("/api" <> path)
-
--- | Makes a POST request to the given path with a JSON body and expects a Document response.
-postDocument :: String -> Json -> Aff (Either Error (Response Document))
-postDocument path body = AX.post AXRF.document ("/api" <> path)
-  (Just $ RequestBody.json body)
-
--- | Makes a GET request to the given path and expects a Blob response.
+-- | Makes a GET request and expects a Blob response.
 getBlob :: String -> Aff (Either Error (Response Blob))
-getBlob path = AX.get AXRF.blob ("/api" <> path)
+getBlob url = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.blob ("/api" <> url) GET
+  liftAff $ request driver fpoRequest
 
--- | Makes a POST request to the given path with a JSON body and expects a Blob response.
+-- | Makes a GET request and expects a Null response.
+getIgnore :: String -> Aff (Either Error (Response Unit))
+getIgnore url = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.ignore ("/api" <> url) GET
+  liftAff $ request driver fpoRequest
+
+-- | POST-Anfragen ---------------------------------------------------------
+
+-- | Makes a POST request with a JSON body and expects a String response.
+postString :: String -> Json -> Aff (Either Error (Response String))
+postString url body = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.string ("/api" <> url) POST
+  let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
+
+-- | Makes a POST request with a JSON body and expects a JSON response.
+postJson :: String -> Json -> Aff (Either Error (Response Json))
+postJson url body = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.json ("/api" <> url) POST
+  let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
+
+-- | Makes a POST request with a JSON body and expects a Document response.
+postDocument :: String -> Json -> Aff (Either Error (Response Document))
+postDocument url body = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.document ("/api" <> url) POST
+  let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
+
+-- | Makes a POST request with a JSON body and expects a Blob response.
 postBlob :: String -> Json -> Aff (Either Error (Response Blob))
-postBlob path body = AX.post AXRF.blob ("/api" <> path) (Just $ RequestBody.json body)
+postBlob url body = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.blob ("/api" <> url) POST
+  let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'

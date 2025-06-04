@@ -16,6 +16,7 @@ import Language.Lsd.AST.Type.Text
 newtype ParagraphFormat
     = ParagraphFormat
         IdentifierFormat
+    deriving (Show)
 
 data ParagraphType
     = ParagraphType

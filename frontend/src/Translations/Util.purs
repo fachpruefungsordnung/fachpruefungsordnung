@@ -9,4 +9,4 @@ import Translations.Translator (EqTranslator)
 type FPOState r = { translator :: Translator Labels | r }
 
 selectTranslator :: Selector Store.Store EqTranslator
-selectTranslator = selectEq \store -> store.translator
+selectTranslator = selectEq _.translator

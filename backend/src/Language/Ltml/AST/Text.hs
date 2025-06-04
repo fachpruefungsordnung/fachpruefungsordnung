@@ -23,7 +23,7 @@ data TextTree style enumItem special
     | Reference Label
     | Styled style [TextTree style enumItem special]
     | EnumChild enumItem
-    | Footnote [TextTree style Void Void]
+    | Footnote [FootnoteTextTree]
     deriving (Show)
 
 instance FromWhitespace (TextTree a b c) where
@@ -44,7 +44,7 @@ data FontStyle
     | Underlined
     deriving (Show)
 
-newtype EnumItem = EnumItem [TextTree FontStyle EnumItem Void]
+newtype EnumItem = EnumItem [RichTextTree]
     deriving (Show)
 
 newtype SentenceStart = SentenceStart (Maybe Label)

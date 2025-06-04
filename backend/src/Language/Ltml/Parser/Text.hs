@@ -1,14 +1,16 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Language.Ltml.Parser.Text
     ( textForestP
+    , hangingTextP
     )
 where
 
 import Control.Applicative (empty, (<|>))
 import Control.Applicative.Combinators (choice)
-import qualified Data.Char as Char (isAlpha)
+import qualified Data.Char as Char (isControl)
+import Data.Text (Text)
+import qualified Data.Text as Text (singleton)
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword (..))
 import Language.Lsd.AST.Type.Enum (EnumType (..))
@@ -19,13 +21,14 @@ import Language.Lsd.AST.Type.Text
 import Language.Ltml.AST.Text
     ( EnumItem (..)
     , FontStyle (..)
+    , FootnoteTextTree
     , SentenceStart (..)
     , TextTree (..)
     )
 import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Label (labelP)
 import Language.Ltml.Parser.MiTree (hangingBlock', miForest)
-import Text.Megaparsec (takeWhile1P)
+import Text.Megaparsec (satisfy, some, takeWhile1P)
 import Text.Megaparsec.Char (char)
 
 textForestP
@@ -45,20 +48,22 @@ elementPF p =
         <|> Styled <$ char '<' <*> styleP <*> p <* char '>'
 
 childPF
-    :: (StyleP style, EnumP enumType enumItem)
+    :: (EnumP enumType enumItem)
     => TextType enumType
     -> Parser (TextTree style enumItem special)
 childPF (TextType enumTypes footnoteTypes) =
     EnumChild <$> choice (fmap enumItemP enumTypes)
-        <|> Footnote <$> choice (fmap footnoteP footnoteTypes)
+        <|> Footnote <$> choice (fmap footnoteTextP footnoteTypes)
 
--- TODO: Configurable keyword.
-footnoteP
-    :: (StyleP style)
-    => FootnoteType
-    -> Parser [TextTree style Void Void]
-footnoteP (FootnoteType (Keyword kw) tt) =
-    hangingBlock' kw elementPF (childPF tt)
+footnoteTextP :: FootnoteType -> Parser [FootnoteTextTree]
+footnoteTextP (FootnoteType kw tt) = hangingTextP kw tt
+
+hangingTextP
+    :: (StyleP style, EnumP enumType enumItem, SpecialP special)
+    => Keyword
+    -> TextType enumType
+    -> Parser [TextTree style enumItem special]
+hangingTextP (Keyword kw) t = hangingBlock' kw elementPF (childPF t)
 
 class StyleP style where
     styleP :: Parser style
@@ -79,8 +84,7 @@ instance EnumP Void Void where
     enumItemP = const empty
 
 instance EnumP EnumType EnumItem where
-    enumItemP (EnumType (Keyword kw) tt) =
-        EnumItem <$> hangingBlock' kw elementPF (childPF tt)
+    enumItemP (EnumType kw tt) = EnumItem <$> hangingTextP kw tt
 
 class SpecialP special where
     specialP :: Parser special
@@ -88,8 +92,32 @@ class SpecialP special where
 
 instance SpecialP Void where
     specialP = empty
-    textLeafP = TextLeaf <$> takeWhile1P (Just "word") Char.isAlpha -- TODO
+    textLeafP = TextLeaf <$> simpleWordP
 
 instance SpecialP SentenceStart where
     specialP = pure $ SentenceStart Nothing -- TODO
-    textLeafP = TextLeaf <$> takeWhile1P (Just "word") Char.isAlpha -- TODO
+    textLeafP = TextLeaf <$> simpleWordP -- TODO
+
+simpleWordP :: Parser Text
+simpleWordP =
+    mconcat
+        <$> some
+            ( takeWhile1P Nothing isWordRegularChar
+                <|> Text.singleton <$ char '\\' <*> satisfy isWordChar
+            )
+
+-- NOTE: isControl '\n' == True
+isWordChar :: Char -> Bool
+isWordChar ' ' = False
+isWordChar c = not $ Char.isControl c
+
+isWordSpecialChar :: Char -> Bool
+isWordSpecialChar '\\' = True
+isWordSpecialChar '{' = True
+isWordSpecialChar '}' = True
+isWordSpecialChar '<' = True
+isWordSpecialChar '>' = True
+isWordSpecialChar _ = False
+
+isWordRegularChar :: Char -> Bool
+isWordRegularChar c = isWordChar c && not (isWordSpecialChar c)
