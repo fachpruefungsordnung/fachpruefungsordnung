@@ -109,7 +109,7 @@ component =
       st <- H.get
       if (st.passwordPrimary /= st.passwordSecondary) then do
         H.modify_ \state -> state
-          { error = Just $ translate (label :: _ "rpNoMatch") st.translator }
+          { error = Just $ translate (label :: _ "rp_NoMatch") st.translator }
       else do
         H.modify_ \state -> state
           { error = Just "[TODO] Password reset is not supported yet!" }

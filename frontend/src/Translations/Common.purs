@@ -2,14 +2,15 @@ module Translations.Common where
 
 import Prelude
 
-import Record.Extra (SNil)
+import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)
 
 type CommonLabels =
-  ( "email" ::: "emailAddress" ::: "home" ::: "password" ::: "profile" ::: "role"
+  ( "email"
+      ::: "emailAddress"
+      ::: "home"
+      ::: "password"
       ::: "submit"
-      ::: "userData"
-      ::: "userName"
       ::: SNil
   )
 
@@ -20,10 +21,6 @@ enCommon = fromRecord
   , home: "Home"
   , password: "Password"
   , submit: "Submit"
-  , userName: "User name"
-  , userData: "User data"
-  , profile: "Profile"
-  , role: "Role"
   }
 
 deCommon :: Translation CommonLabels
@@ -33,9 +30,5 @@ deCommon = fromRecord
   , home: "Start"
   , password: "Passwort"
   , submit: "Absenden"
-  , userName: "Benutzername"
-  , userData: "Nutzerdaten"
-  , profile: "Profil"
-  , role: "Rolle"
   }
 

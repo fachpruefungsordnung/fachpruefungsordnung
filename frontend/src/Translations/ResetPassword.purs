@@ -2,7 +2,7 @@ module Translations.ResetPassword where
 
 import Prelude
 
-import Record.Extra (SNil)
+import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)
 
 type PasswordResetLabels =

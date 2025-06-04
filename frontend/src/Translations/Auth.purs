@@ -2,20 +2,20 @@ module Translations.Auth where
 
 import Prelude
 
-import Record.Extra (SNil)
+import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)
 
 type AuthLabels =
-  ("loginSuccessful" ::: "passwordForgotten" ::: SNil)
+  ( "passwordForgotten"
+      ::: SNil
+  )
 
 enAuth :: Translation AuthLabels
 enAuth = fromRecord
-  { loginSuccessful: "Login successful"
-  , passwordForgotten: "Forgot password?"
+  { passwordForgotten: "Forgot password?"
   }
 
 deAuth :: Translation AuthLabels
 deAuth = fromRecord
-  { loginSuccessful: "Login erfolgreich"
-  , passwordForgotten: "Passwort vergessen?"
+  { passwordForgotten: "Passwort vergessen?"
   }

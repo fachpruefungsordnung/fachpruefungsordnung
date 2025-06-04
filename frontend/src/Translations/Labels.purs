@@ -1,15 +1,15 @@
 module Translations.Labels where
 
-import Data.Array (foldr)
 import Data.Function (($))
-import Data.Functor (map)
 import Prim.Row (class Union)
 import Prim.RowList (class RowToList)
 import Prim.RowList as RL
 import Record (merge)
-import Record.Extra (type (:::), SCons, SList, SNil)
+import Record.Extra (type (:::), SCons, SNil)
 import Simple.I18n.Translation (Translation, fromRecord, toRecord)
+import Translations.Auth (deAuth, enAuth)
 import Translations.Common (deCommon, enCommon)
+import Translations.Profile (deProfile, enProfile)
 import Translations.ResetPassword (dePasswordReset, enPasswordReset)
 import Type.Data.Ordering (class Append) as RL
 
@@ -23,11 +23,15 @@ type Labels =
   ( "email"
       ::: "emailAddress"
       ::: "home"
-      ::: "loginSuccessful"
       ::: "password"
       ::: "passwordForgotten"
-      ::: "profile"
-      ::: "role"
+
+      -- | Profile Page
+      ::: "prof_loginSuccessful"
+      ::: "prof_profile"
+      ::: "prof_role"
+      ::: "prof_userData"
+      ::: "prof_userName"
 
       -- | Reset Password Page
       ::: "rp_ConfirmationCode"
@@ -39,16 +43,18 @@ type Labels =
       ::: "rp_RequestCode"
 
       ::: "submit"
-      ::: "userData"
-      ::: "userName"
       ::: SNil
   )
 
 -- | Übersetzungen zusammenführen
 en :: Translation Labels
-en = fromRecord $ merge (merge (toRecord enCommon) (toRecord enAuth))
-  (toRecord enPasswordReset)
+en = fromRecord $
+  merge
+    (merge (toRecord enCommon) (toRecord enAuth))
+    (merge (toRecord enPasswordReset) (toRecord enProfile))
 
 de :: Translation Labels
-de = fromRecord
-  (merge (merge (toRecord deCommon) (toRecord deAuth)) (toRecord dePasswordReset))
+de = fromRecord $
+  merge
+    (merge (toRecord deCommon) (toRecord deAuth))
+    (merge (toRecord dePasswordReset) (toRecord deProfile))
