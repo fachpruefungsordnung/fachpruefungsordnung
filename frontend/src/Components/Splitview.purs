@@ -44,7 +44,6 @@ data Action
   | StartResize DragTarget MouseEvent
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
-  | ToggleSidebar
   | JumpToSection TOCEntry
   -- Toolbar buttons
   | ClickedHTTPRequest
@@ -52,6 +51,9 @@ data Action
   | QueryEditor
   | ClickLoadPdf
   | ShowWarning
+  -- Toggle buttons
+  | ToggleSidebar
+  | TogglePreview
   -- Query Output
   | HandleEditor Editor.Output
   | HandlePreview Preview.Output
@@ -77,9 +79,11 @@ type State =
 
   -- The last expanded sidebar width, used to restore the sidebar when toggling
   , lastExpandedSidebarRatio :: Number
+  , lastExpandedMiddleRatio :: Number
 
   , editorContent :: Maybe (Array String)
   , tocEntriesShown :: Boolean
+  , previewShown :: Boolean
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
   }
@@ -103,8 +107,10 @@ splitview = H.mkComponent
       , sidebarRatio: 0.2
       , middleRatio: 0.4
       , lastExpandedSidebarRatio: 0.2
+      , lastExpandedMiddleRatio: 0.4
       , editorContent: Nothing
-      , tocEntriesShown: false
+      , tocEntriesShown: true
+      , previewShown: true
       , pdfWarningAvailable: false
       , pdfWarningIsShown: false
       }
@@ -117,45 +123,47 @@ splitview = H.mkComponent
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div_
-      [ -- First Toolbar
-        HH.div
-          [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
-          [ HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const ToggleSidebar
-              ]
-              [ HH.text "[≡]" ]
-          , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const ClickedHTTPRequest
-              ]
-              [ HH.text "Click Me for HTTP request" ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const SaveSection
-              ]
-              [ HH.text "Save" ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const QueryEditor
-              ]
-              [ HH.text "Query Editor" ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const ClickLoadPdf
-              ]
-              [ HH.text "Load PDF" ]
-          , if not state.pdfWarningAvailable then HH.div_ []
-            else HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const ShowWarning
-              ]
-              [ HH.text
-                  ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning")
-              ]
+      [ renderToolbar state, renderSplit state ]
+
+  renderToolbar :: State -> H.ComponentHTML Action Slots m
+  renderToolbar state =
+    -- First Toolbar
+    HH.div
+      [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
+      [ HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const ToggleSidebar
           ]
-      , renderSplit state
+          [ HH.text "[≡]" ]
+      , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const ClickedHTTPRequest
+          ]
+          [ HH.text "Click Me for HTTP request" ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const SaveSection
+          ]
+          [ HH.text "Save" ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const QueryEditor
+          ]
+          [ HH.text "Query Editor" ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const ClickLoadPdf
+          ]
+          [ HH.text "Load PDF" ]
+      , if not state.pdfWarningAvailable then HH.div_ []
+        else HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const ShowWarning
+          ]
+          [ HH.text
+              ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning")
+          ]
       ]
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
@@ -171,33 +179,29 @@ splitview = H.mkComponent
         else []) <>
         [ -- Editor
             HH.div
-              [ HP.classes [ HB.dFlex, HB.flexColumn ]
-              , HP.style $
-                  "flex: 0 0 " <> show (state.middleRatio * 100.0) <>
-                    "%; box-sizing: border-box; min-height: 0; overflow: hidden;"
-              ]
-              [ HH.slot _editor unit Editor.editor unit HandleEditor ]
+            [ HP.style $ "position: relative; flex: 0 0 " <> show (state.middleRatio * 100.0) <> "%;" ]
+            [ -- Floating Button outside to the right of editor container
+              HH.div
+                [ HP.style
+                    "position: absolute; top: 50%; right: 0px; margin = outside transform: translateY(-50%); z-index: 10;" ]
+                [ HH.button
+                    [ HP.classes [ HB.btn, HB.btnLight, HB.btnSm ]
+                    , HE.onClick \_ -> TogglePreview
+                    ]
+                    [ HH.text if state.previewShown then ">" else "<" ]
+                ]
 
-            -- Resizer
-          , HH.div
-              [ HE.onMouseDown (StartResize ResizeRight)
-              , HP.style "width: 5px; cursor: col-resize; background: #ccc;"
-              ]
-              []
-
-            -- Preview
-          , HH.div
-              [ HP.classes [ HB.dFlex, HB.flexColumn ]
-              , HP.style $
-                  "flex: 1 1 "
-                    <> show ((1.0 - state.sidebarRatio - state.middleRatio) * 100.0)
-                    <> "%; box-sizing: border-box; min-height: 0; overflow: hidden;"
-              ]
-              [ HH.slot _preview unit Preview.preview
-                  { editorContent: state.editorContent }
-                  HandlePreview
-              ]
-          ]
+              -- The actual editor area
+            , HH.div
+                [ HP.classes [ HB.dFlex, HB.flexColumn ]
+                , HP.style
+                    "height: 100%; box-sizing: border-box; min-height: 0; overflow: hidden;" ]
+                [ HH.slot _editor unit Editor.editor unit HandleEditor ]
+            ]
+          ] <>
+        (if state.previewShown
+          then renderPreview state
+          else [])
       )
   
   renderSidebar :: State -> Array (H.ComponentHTML Action Slots m)
@@ -229,13 +233,36 @@ splitview = H.mkComponent
                 state.tocEntries
             )
         ]
-
-    -- Resizer
+    -- Left Resizer
     , HH.div
         [ HE.onMouseDown (StartResize ResizeLeft)
         , HP.style "width: 5px; cursor: col-resize; background: #ccc;"
         ]
         []
+    ]
+
+  
+  renderPreview :: State -> Array (H.ComponentHTML Action Slots m)
+  renderPreview state =
+    [-- Right Resizer
+      HH.div
+        [ HE.onMouseDown (StartResize ResizeRight)
+        , HP.style "width: 5px; cursor: col-resize; background: #ccc;"
+        ]
+        []
+
+      -- Preview
+      , HH.div
+        [ HP.classes [ HB.dFlex, HB.flexColumn ]
+        , HP.style $
+            "flex: 1 1 "
+              <> show ((1.0 - state.sidebarRatio - state.middleRatio) * 100.0)
+              <> "%; box-sizing: border-box; min-height: 0; overflow: hidden;"
+        ]
+        [ HH.slot _preview unit Preview.preview
+            { editorContent: state.editorContent }
+            HandlePreview
+        ]
     ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
@@ -262,27 +289,6 @@ splitview = H.mkComponent
           , editorContent = Just [ "This is the initial content of the editor." ]
           }
       H.tell _editor unit (Editor.ChangeSection firstEntry)
-
-    -- Set the left resizer to a set position on the left side
-    -- Toggle the sidebar again, wihtout resizing this resizer put it back in last position
-    ToggleSidebar -> do
-      win <- H.liftEffect Web.HTML.window
-      width <- H.liftEffect $ Web.HTML.Window.innerWidth win
-      let w = toNumber width
-      state <- H.get
-      -- close sidebar
-      if state.tocEntriesShown then 
-        H.modify_ \st -> st
-          { sidebarRatio = 0.0
-          , lastExpandedSidebarRatio = st.sidebarRatio
-          , tocEntriesShown = false
-          }
-      -- open sidebar
-      else do
-        H.modify_ \st -> st
-          { sidebarRatio = st.lastExpandedSidebarRatio
-          , tocEntriesShown = true
-          }
 
     -- Resizing as long as mouse is hold down on window
     StartResize which mouse -> do
@@ -366,6 +372,40 @@ splitview = H.mkComponent
       H.modify_ \st -> st { pdfWarningAvailable = true }
       H.tell _editor unit Editor.LoadPdf
       H.tell _preview unit Preview.TellLoadPdf
+
+    -- Toggle actions
+
+    -- Set the left resizer to a set position on the left side
+    -- Toggle the sidebar again, wihtout resizing this resizer put it back in last position
+    ToggleSidebar -> do
+      state <- H.get
+      -- close sidebar
+      if state.tocEntriesShown then 
+        H.modify_ \st -> st
+          { sidebarRatio = 0.0
+          , lastExpandedSidebarRatio = st.sidebarRatio
+          , tocEntriesShown = false
+          }
+      -- open sidebar
+      else do
+        H.modify_ \st -> st
+          { sidebarRatio = st.lastExpandedSidebarRatio
+          , tocEntriesShown = true
+          }
+
+    TogglePreview -> do
+      state <- H.get 
+      if state.previewShown then
+        H.modify_ \st -> st
+          { middleRatio = 1.0 - st.sidebarRatio
+          , previewShown = false
+          }
+      else do
+        -- restore the last expanded middle ratio, when toggling preview back on
+        H.modify_ \st -> st
+          { middleRatio = st.lastExpandedMiddleRatio
+          , previewShown = true
+          }
 
     -- Query handler
 
