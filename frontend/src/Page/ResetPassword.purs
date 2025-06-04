@@ -126,7 +126,7 @@ renderResetForm state =
   HH.div [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my3 ] ]
     [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
         [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-            [ HH.text $ translate (label :: _ "rpHeader") state.translator ]
+            [ HH.text $ translate (label :: _ "rp_Header") state.translator ]
         , HH.form
             []
             [ addColumn
@@ -138,14 +138,14 @@ renderResetForm state =
                 UpdateEmail
             , addColumn
                 state.passwordPrimary
-                (translate (label :: _ "rpPasswordNew") state.translator <> ":")
+                (translate (label :: _ "rp_PasswordNew") state.translator <> ":")
                 (translate (label :: _ "password") state.translator)
                 "bi-lock-fill"
                 HP.InputPassword
                 UpdatePasswordPrimary
             , addColumn
                 state.passwordSecondary
-                (translate (label :: _ "rpPasswordConfirm") state.translator <> ":")
+                (translate (label :: _ "rp_PasswordConfirm") state.translator <> ":")
                 (translate (label :: _ "password") state.translator)
                 "bi-lock-fill"
                 HP.InputPassword
@@ -153,7 +153,7 @@ renderResetForm state =
             , HH.div []
                 [ HH.label [ HP.classes [ HB.formLabel ], HP.for "code" ]
                     [ HH.text $
-                        translate (label :: _ "rpConfirmationCode") state.translator
+                        translate (label :: _ "rp_ConfirmationCode") state.translator
                           <> ":"
                     ]
                 , HH.div [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
@@ -166,13 +166,13 @@ renderResetForm state =
                               [ HP.disabled true ]
                             else []
                         )
-                        [ HH.text $ translate (label :: _ "rpRequestCode")
+                        [ HH.text $ translate (label :: _ "rp_RequestCode")
                             state.translator
                         ]
                     , HH.input
                         [ HP.type_ HP.InputText
                         , HP.classes [ HB.formControl ]
-                        , HP.placeholder $ translate (label :: _ "rpInputCode")
+                        , HP.placeholder $ translate (label :: _ "rp_InputCode")
                             state.translator
                         , HP.value state.code
                         , HE.onValueInput UpdateCode

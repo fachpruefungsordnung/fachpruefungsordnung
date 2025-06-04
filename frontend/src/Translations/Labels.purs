@@ -1,7 +1,17 @@
 module Translations.Labels where
 
-import Record.Extra (type (:::), SNil)
-import Simple.I18n.Translation (Translation, fromRecord)
+import Data.Array (foldr)
+import Data.Function (($))
+import Data.Functor (map)
+import Prim.Row (class Union)
+import Prim.RowList (class RowToList)
+import Prim.RowList as RL
+import Record (merge)
+import Record.Extra (type (:::), SCons, SList, SNil)
+import Simple.I18n.Translation (Translation, fromRecord, toRecord)
+import Translations.Common (deCommon, enCommon)
+import Translations.ResetPassword (dePasswordReset, enPasswordReset)
+import Type.Data.Ordering (class Append) as RL
 
 -- | All kinds of abstract labels representing UI texts,
 -- | detached from the actual language selection.
@@ -20,13 +30,13 @@ type Labels =
       ::: "role"
 
       -- | Reset Password Page
-      ::: "rpConfirmationCode"
-      ::: "rpHeader"
-      ::: "rpInputCode"
-      ::: "rpNoMatch"
-      ::: "rpPasswordConfirm"
-      ::: "rpPasswordNew"
-      ::: "rpRequestCode"
+      ::: "rp_ConfirmationCode"
+      ::: "rp_Header"
+      ::: "rp_InputCode"
+      ::: "rp_NoMatch"
+      ::: "rp_PasswordConfirm"
+      ::: "rp_PasswordNew"
+      ::: "rp_RequestCode"
 
       ::: "submit"
       ::: "userData"
@@ -34,50 +44,11 @@ type Labels =
       ::: SNil
   )
 
+-- | Übersetzungen zusammenführen
 en :: Translation Labels
-en = fromRecord
-  { email: "Email"
-  , emailAddress: "Email address"
-  , home: "Home"
-  , loginSuccessful: "Login successful"
-  , password: "Password"
-  , passwordForgotten: "Forgot password?"
-  , profile: "Profile"
-  , role: "Role"
-
-  , rpConfirmationCode: "Confirmation Code"
-  , rpHeader: "Reset Password"
-  , rpInputCode: "Input Code here"
-  , rpNoMatch: "The passwords do not match."
-  , rpPasswordConfirm: "Repeat new password"
-  , rpPasswordNew: "New password"
-  , rpRequestCode: "Request Code"
-
-  , submit: "Submit"
-  , userData: "User data"
-  , userName: "User name"
-  }
+en = fromRecord $ merge (merge (toRecord enCommon) (toRecord enAuth))
+  (toRecord enPasswordReset)
 
 de :: Translation Labels
 de = fromRecord
-  { email: "E-Mail"
-  , emailAddress: "E-Mail-Adresse"
-  , home: "Start"
-  , loginSuccessful: "Login erfolgreich"
-  , password: "Passwort"
-  , passwordForgotten: "Passwort vergessen?"
-  , profile: "Profil"
-  , role: "Rolle"
-
-  , rpConfirmationCode: "Bestätigungscode"
-  , rpHeader: "Passwort zurücksetzen"
-  , rpInputCode: "Code hier eingeben"
-  , rpNoMatch: "Die Passwörter stimmen nicht überein."
-  , rpPasswordConfirm: "Neues Passwort wiederholen"
-  , rpPasswordNew: "Neues Passwort"
-  , rpRequestCode: "Code anfordern"
-
-  , submit: "Absenden"
-  , userData: "Benutzerdaten"
-  , userName: "Benutzername"
-  }
+  (merge (merge (toRecord deCommon) (toRecord deAuth)) (toRecord dePasswordReset))
