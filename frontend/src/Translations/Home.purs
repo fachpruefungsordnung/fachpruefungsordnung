@@ -6,8 +6,7 @@ import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)
 
 type HomeLabels =
-  ( "home_home"
-      ::: "home_pleaseLogIn"
+  ( "home_pleaseLogIn"
       ::: "home_toLogin"
       ::: "home_yourProjects"
       ::: SNil
@@ -15,16 +14,14 @@ type HomeLabels =
 
 enHome :: Translation HomeLabels
 enHome = fromRecord
-  { home_home: "Home"
-  , home_pleaseLogIn: "Please log in to view your projects."
+  { home_pleaseLogIn: "Please log in to view your projects."
   , home_toLogin: "To login"
   , home_yourProjects: "Your Projects"
   }
 
 deHome :: Translation HomeLabels
 deHome = fromRecord
-  { home_home: "Start"
-  , home_pleaseLogIn: "Bitte logge Dich ein, damit Du deine Projekte sehen kannst."
+  { home_pleaseLogIn: "Bitte logge Dich ein, damit Du deine Projekte sehen kannst."
   , home_toLogin: "Zum Login"
   , home_yourProjects: "Deine Projekte"
   }

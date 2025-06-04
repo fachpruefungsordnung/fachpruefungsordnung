@@ -27,12 +27,15 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
+import Simple.I18n.Translator (label, translate)
 import Translations.Translator
   ( FPOTranslator(FPOTranslator)
+  , fromFpoTranslator
   , getTranslatorForLanguage
   )
+import Translations.Util (FPOState)
 
-type State = { user :: Maybe User, language :: String }
+type State = FPOState (user :: Maybe User, language :: String)
 
 data Action
   = Navigate Route
@@ -51,7 +54,10 @@ navbar
   => H.Component query Unit output m
 navbar = connect (selectEq identity) $ H.mkComponent
   { initialState: \{ context: store } ->
-      { user: store.user, language: store.language }
+      { user: store.user
+      , language: store.language
+      , translator: fromFpoTranslator store.translator
+      }
   , render
   , eval: H.mkEval H.defaultEval
       { handleAction = handleAction
@@ -72,7 +78,10 @@ navbar = connect (selectEq identity) $ H.mkComponent
         , HH.div [ HP.classes [ HB.navbarCollapse ] ]
             [ HH.ul [ HP.classes [ HB.navbarNav, HB.meAuto ] ]
                 [ HH.li [ HP.classes [ HB.navItem ] ]
-                    [ navButton "Home" Home ]
+                    [ navButton
+                        (translate (label :: _ "common_home") state.translator)
+                        Home
+                    ]
                 , HH.li [ HP.classes [ HB.navItem ] ]
                     [ navButton "Editor" Editor ]
                 ]
@@ -99,6 +108,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
     H.modify_ _
       { user = store.user
       , language = store.language
+      , translator = fromFpoTranslator store.translator
       }
   handleAction Logout = do
     -- TODO: Perform logout logic, e.g., clear user session, etc.

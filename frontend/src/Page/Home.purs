@@ -87,7 +87,7 @@ component =
               ]
           ]
           [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-              [ HH.text $ translate (label :: _ "home_home") state.translator ]
+              [ HH.text $ translate (label :: _ "common_home") state.translator ]
           , HH.div [ HP.classes [ HB.dropdownDivider, HB.mb4 ] ] []
           , renderProjectsOverview state
           ]

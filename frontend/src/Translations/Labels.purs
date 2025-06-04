@@ -24,11 +24,11 @@ type Labels =
   ( -- | Common Phrases
     "common_email"
       ::: "common_emailAddress"
+      ::: "common_home"
       ::: "common_password"
       ::: "common_submit"
 
       -- | Home Page
-      ::: "home_home"
       ::: "home_pleaseLogIn"
       ::: "home_toLogin"
       ::: "home_yourProjects"
