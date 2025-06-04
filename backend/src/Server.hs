@@ -86,6 +86,9 @@ type ProtectedAPI =
             :> ReqBody '[JSON] Auth.UserRegisterData
             :> Post '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
+            :> "me"
+            :> Get '[JSON] User.FullUser
+        :<|> Auth AuthMethod Auth.Token
             :> "users"
             :> Capture "userId" User.UserID
             :> Get '[JSON] User.FullUser
@@ -251,6 +254,10 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
             Right (Just _) -> throwError $ err409 {errBody = "a user with that email exists already."}
             Left _ -> throwError errDatabaseAccessFailed
 registerHandler _ _ = throwError errNotLoggedIn
+
+meHandler :: AuthResult Auth.Token -> Handler User.FullUser
+meHandler auth@(Authenticated Auth.Token {..}) = getUserHandler auth subject
+meHandler _ = throwError errNotLoggedIn
 
 getUserHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler User.FullUser
@@ -500,6 +507,7 @@ server cookieSett jwtSett =
              )
         :<|> ( protectedHandler
                 :<|> registerHandler
+                :<|> meHandler
                 :<|> getUserHandler
                 :<|> deleteUserHandler
                 :<|> patchUserHandler
