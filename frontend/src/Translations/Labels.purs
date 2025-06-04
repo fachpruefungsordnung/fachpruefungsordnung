@@ -1,18 +1,14 @@
 module Translations.Labels where
 
 import Data.Function (($))
-import Prim.Row (class Union)
-import Prim.RowList (class RowToList)
-import Prim.RowList as RL
 import Record (merge)
-import Record.Extra (type (:::), SCons, SNil)
+import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord, toRecord)
 import Translations.Common (deCommon, enCommon)
 import Translations.Home (deHome, enHome)
 import Translations.Login (deLogin, enLogin)
 import Translations.Profile (deProfile, enProfile)
 import Translations.ResetPassword (dePasswordReset, enPasswordReset)
-import Type.Data.Ordering (class Append) as RL
 
 -- | All kinds of abstract labels representing UI texts,
 -- | detached from the actual language selection.

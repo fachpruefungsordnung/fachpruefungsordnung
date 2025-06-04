@@ -1,9 +1,7 @@
 module Translations.Login where
 
-import Prelude
-
 import Record.Extra (type (:::), SNil)
-import Simple.I18n.Translation (Translation, fromRecord, toRecord)
+import Simple.I18n.Translation (Translation, fromRecord)
 
 type LoginLabels =
   ( "login_passwordForgotten"
