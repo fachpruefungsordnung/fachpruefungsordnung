@@ -25,6 +25,7 @@
             "integers",
             "maybe",
             "prelude",
+            "record",
             "record-extra",
             "routing",
             "routing-duplex",
