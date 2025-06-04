@@ -257,7 +257,7 @@ splitview = H.mkComponent
         , HP.style $
             "flex: 1 1 "
               <> show ((1.0 - state.sidebarRatio - state.middleRatio) * 100.0)
-              <> "%; box-sizing: border-box; min-height: 0; overflow: hidden;"
+              <> "%; box-sizing: border-box; min-height: 0; overflow: hidden; min-width: 6ch;"
         ]
         [ HH.slot _preview unit Preview.preview
             { editorContent: state.editorContent }
@@ -318,34 +318,44 @@ splitview = H.mkComponent
         x = toNumber $ clientX mouse
         width = toNumber intWidth
         ratioX = x / width
+
+        minRatio = 0.05  -- 5%
+        maxRatio = 0.7   -- 70%
+
+        clamp :: Number -> Number -> Number -> Number
+        clamp minVal maxVal x = max minVal (min maxVal x)
+
       mt <- H.gets _.dragTarget
       mx <- H.gets _.startMouseRatio
+
       case mt of
         Just ResizeLeft -> do
           s <- H.gets _.startSidebarRatio
           m <- H.gets _.startMiddleRatio
           let
+            total = s + m
             rawSidebarRatio = s + (ratioX - mx)
-            maxSidebarRatio = s + m - (85.0 / width)
-            -- enforce minimum width to show at least ~6 characters
-            clampedSidebarRatio = max (70.0 / width)
-              (min maxSidebarRatio rawSidebarRatio)
-            newSidebar = clampedSidebarRatio
-            newMiddle = s + m - clampedSidebarRatio
-          when (newMiddle * width >= 85.0) do
+            newSidebar = clamp minRatio 0.2 rawSidebarRatio
+            newMiddle  = total - newSidebar
+          when (newSidebar >= minRatio && newMiddle >= minRatio && newSidebar <= maxRatio) do
             H.modify_ \st -> st
               { sidebarRatio = newSidebar
               , middleRatio = newMiddle
               , lastExpandedSidebarRatio =
-                  if newSidebar * width > 85.0 then newSidebar
+                  if newSidebar > minRatio then newSidebar
                   else st.lastExpandedSidebarRatio
               }
 
         Just ResizeRight -> do
+          s <- H.gets _.startSidebarRatio
           m <- H.gets _.startMiddleRatio
           let
-            newMiddleRatio = max 0.1 (m + (ratioX - mx))
-          H.modify_ \st -> st { middleRatio = newMiddleRatio }
+            total = 1.0 - s
+            rawMiddleRatio = m + (ratioX - mx)
+            newMiddle = clamp minRatio 0.7 rawMiddleRatio
+            newPreview = total - newMiddle
+          when (newMiddle >= minRatio && newMiddle <= maxRatio && newPreview >= minRatio) do
+            H.modify_ \st -> st { middleRatio = newMiddle }
 
         _ -> pure unit
 
@@ -375,14 +385,16 @@ splitview = H.mkComponent
 
     -- Toggle actions
 
-    -- Set the left resizer to a set position on the left side
-    -- Toggle the sidebar again, wihtout resizing this resizer put it back in last position
+    -- Toggle the sidebar
+    -- Add logic in calculating the middle ratio
+    -- to restore the last expanded middle ratio, when toggling preview back on
     ToggleSidebar -> do
       state <- H.get
       -- close sidebar
       if state.tocEntriesShown then 
         H.modify_ \st -> st
           { sidebarRatio = 0.0
+          , middleRatio = st.middleRatio + st.sidebarRatio
           , lastExpandedSidebarRatio = st.sidebarRatio
           , tocEntriesShown = false
           }
@@ -390,14 +402,22 @@ splitview = H.mkComponent
       else do
         H.modify_ \st -> st
           { sidebarRatio = st.lastExpandedSidebarRatio
+          , middleRatio = st.middleRatio - st.lastExpandedSidebarRatio
           , tocEntriesShown = true
           }
 
+    -- Toggle the preview area
     TogglePreview -> do
       state <- H.get 
+      win <- H.liftEffect Web.HTML.window
+      totalWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
+      let
+        w = toNumber totalWidth
+        resizerWidth = 5.0
+        resizerRatio = resizerWidth / w
       if state.previewShown then
         H.modify_ \st -> st
-          { middleRatio = 1.0 - st.sidebarRatio
+          { middleRatio = 1.0 - st.sidebarRatio - resizerRatio
           , previewShown = false
           }
       else do
