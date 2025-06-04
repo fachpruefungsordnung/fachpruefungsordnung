@@ -8,7 +8,6 @@ import Simple.I18n.Translation (Translation, fromRecord)
 type CommonLabels =
   ( "common_email"
       ::: "common_emailAddress"
-      ::: "common_home"
       ::: "common_password"
       ::: "common_submit"
       ::: SNil
@@ -16,8 +15,7 @@ type CommonLabels =
 
 enCommon :: Translation CommonLabels
 enCommon = fromRecord
-  { common_home: "Home"
-  , common_email: "Email"
+  { common_email: "Email"
   , common_emailAddress: "Email address"
   , common_password: "Password"
   , common_submit: "Submit"
@@ -25,8 +23,7 @@ enCommon = fromRecord
 
 deCommon :: Translation CommonLabels
 deCommon = fromRecord
-  { common_home: "Start"
-  , common_email: "E-Mail"
+  { common_email: "E-Mail"
   , common_emailAddress: "E-Mail Addresse"
   , common_password: "Passwort"
   , common_submit: "Absenden"

@@ -8,6 +8,7 @@ import Record (merge)
 import Record.Extra (type (:::), SCons, SNil)
 import Simple.I18n.Translation (Translation, fromRecord, toRecord)
 import Translations.Common (deCommon, enCommon)
+import Translations.Home (deHome, enHome)
 import Translations.Login (deLogin, enLogin)
 import Translations.Profile (deProfile, enProfile)
 import Translations.ResetPassword (dePasswordReset, enPasswordReset)
@@ -23,9 +24,14 @@ type Labels =
   ( -- | Common Phrases
     "common_email"
       ::: "common_emailAddress"
-      ::: "common_home"
       ::: "common_password"
       ::: "common_submit"
+
+      -- | Home Page
+      ::: "home_home"
+      ::: "home_pleaseLogIn"
+      ::: "home_toLogin"
+      ::: "home_yourProjects"
 
       -- | Login Page
       ::: "login_passwordForgotten"
@@ -54,10 +60,16 @@ en :: Translation Labels
 en = fromRecord $
   merge
     (merge (toRecord enCommon) (toRecord enLogin))
-    (merge (toRecord enPasswordReset) (toRecord enProfile))
+    ( merge
+        (toRecord enPasswordReset)
+        (merge (toRecord enProfile) (toRecord enHome))
+    )
 
 de :: Translation Labels
 de = fromRecord $
   merge
     (merge (toRecord deCommon) (toRecord deLogin))
-    (merge (toRecord dePasswordReset) (toRecord deProfile))
+    ( merge
+        (toRecord dePasswordReset)
+        (merge (toRecord deProfile) (toRecord deHome))
+    )
