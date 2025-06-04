@@ -28,7 +28,6 @@ package:
     - simple-i18n
     - strings
     - tailrec
-    - unsafe-coerce
     - web-dom
     - web-events
     - web-file
