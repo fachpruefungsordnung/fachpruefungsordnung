@@ -165,17 +165,17 @@ component =
               [ HE.onSubmit \e -> DoLogin (toLoginDto state) e ]
               [ addColumn
                   state.email
-                  ( (translate (label :: _ "login_emailAddress") state.translator) <>
+                  ( (translate (label :: _ "common_emailAddress") state.translator) <>
                       ":"
                   )
-                  (translate (label :: _ "login_email") state.translator)
+                  (translate (label :: _ "common_email") state.translator)
                   "bi-envelope-fill"
                   HP.InputEmail
                   UpdateEmail
               , addColumn
                   state.password
-                  ((translate (label :: _ "login_password") state.translator) <> ":")
-                  (translate (label :: _ "login_password") state.translator)
+                  ((translate (label :: _ "common_password") state.translator) <> ":")
+                  (translate (label :: _ "common_password") state.translator)
                   "bi-lock-fill"
                   HP.InputPassword
                   UpdatePassword

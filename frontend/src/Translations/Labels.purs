@@ -20,11 +20,14 @@ import Type.Data.Ordering (class Append) as RL
 -- | Because of this constraint, it's sensible to use
 -- | appropriate prefixes for strongly related labels.
 type Labels =
-  ( "home"
+  ( -- | Common Phrases
+    "common_email"
+      ::: "common_emailAddress"
+      ::: "common_home"
+      ::: "common_password"
+      ::: "common_submit"
+
       -- | Login Page
-      ::: "login_email"
-      ::: "login_emailAddress"
-      ::: "login_password"
       ::: "login_passwordForgotten"
 
       -- | Profile Page
@@ -43,7 +46,6 @@ type Labels =
       ::: "rp_PasswordNew"
       ::: "rp_RequestCode"
 
-      ::: "submit"
       ::: SNil
   )
 

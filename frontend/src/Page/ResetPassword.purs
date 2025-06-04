@@ -131,22 +131,22 @@ renderResetForm state =
             []
             [ addColumn
                 state.email
-                (translate (label :: _ "login_emailAddress") state.translator <> ":")
-                (translate (label :: _ "login_email") state.translator)
+                (translate (label :: _ "common_emailAddress") state.translator <> ":")
+                (translate (label :: _ "common_email") state.translator)
                 "bi-envelope-fill"
                 HP.InputEmail
                 UpdateEmail
             , addColumn
                 state.passwordPrimary
                 (translate (label :: _ "rp_PasswordNew") state.translator <> ":")
-                (translate (label :: _ "login_password") state.translator)
+                (translate (label :: _ "common_password") state.translator)
                 "bi-lock-fill"
                 HP.InputPassword
                 UpdatePasswordPrimary
             , addColumn
                 state.passwordSecondary
                 (translate (label :: _ "rp_PasswordConfirm") state.translator <> ":")
-                (translate (label :: _ "login_password") state.translator)
+                (translate (label :: _ "common_password") state.translator)
                 "bi-lock-fill"
                 HP.InputPassword
                 UpdatePasswordSecondary
@@ -190,7 +190,9 @@ renderResetForm state =
                         if not (isValidEmail state.email) then [ HP.disabled true ]
                         else []
                     )
-                    [ HH.text $ translate (label :: _ "submit") state.translator ]
+                    [ HH.text $ translate (label :: _ "common_submit")
+                        state.translator
+                    ]
                 ]
             ]
         ]
