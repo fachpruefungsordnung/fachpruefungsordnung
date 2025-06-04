@@ -27,7 +27,10 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
-import Translations.Translator (EqTranslator(EqTranslator), getTranslatorForLanguage)
+import Translations.Translator
+  ( FPOTranslator(FPOTranslator)
+  , getTranslatorForLanguage
+  )
 
 type State = { user :: Maybe User, language :: String }
 
@@ -109,7 +112,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
     H.liftEffect $ saveLanguage lang
     updateStore $ Store.SetLanguage lang
     -- Build and update the translator for the new language
-    let translator = EqTranslator $ getTranslatorForLanguage lang
+    let translator = FPOTranslator $ getTranslatorForLanguage lang
     updateStore $ Store.SetTranslator translator
 
   -- Creates a navigation button.

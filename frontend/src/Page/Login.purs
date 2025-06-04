@@ -31,7 +31,7 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
-import Translations.Translator (EqTranslator, fromEqTranslator)
+import Translations.Translator (FPOTranslator, fromFpoTranslator)
 import Translations.Util (FPOState, selectTranslator)
 import Web.Event.Event (preventDefault)
 import Web.Event.Internal.Types (Event)
@@ -45,7 +45,7 @@ data Action
   | UpdatePassword String
   | EmitError String
   | DoLogin LoginDto Event
-  | Receive (Connected EqTranslator Input)
+  | Receive (Connected FPOTranslator Input)
 
 toLoginDto :: State -> LoginDto
 toLoginDto state = { loginEmail: state.email, loginPassword: state.password }
@@ -72,7 +72,7 @@ component =
         { email: ""
         , password: ""
         , error: Nothing
-        , translator: fromEqTranslator context
+        , translator: fromFpoTranslator context
         }
     , render
     , eval: H.mkEval H.defaultEval
@@ -107,7 +107,7 @@ component =
           { email: store.inputMail
           , password: ""
           , error: Nothing
-          , translator: fromEqTranslator store.translator
+          , translator: fromFpoTranslator store.translator
           }
       H.put initialState
     UpdateEmail email -> do
@@ -141,7 +141,7 @@ component =
               handleLoginRedirect
             StatusCode _ -> handleAction (EmitError body)
       pure unit
-    Receive { context } -> H.modify_ _ { translator = fromEqTranslator context }
+    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
 
   -- After successful login, redirect to either a previously set redirect route
   -- or to the profile page with a login success banner.

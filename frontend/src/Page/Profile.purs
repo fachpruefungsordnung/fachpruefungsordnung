@@ -16,13 +16,13 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, getStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (translate)
-import Translations.Translator (EqTranslator, fromEqTranslator)
+import Translations.Translator (FPOTranslator, fromFpoTranslator)
 import Translations.Util (FPOState, selectTranslator)
 import Type.Proxy (Proxy(Proxy))
 
 data Action
   = Initialize
-  | Receive (Connected EqTranslator Input)
+  | Receive (Connected FPOTranslator Input)
 
 type State = FPOState (user :: Maybe User, loginSuccessfulBanner :: Boolean)
 
@@ -45,11 +45,11 @@ component =
         }
     }
   where
-  initialState :: Connected EqTranslator Input -> State
+  initialState :: Connected FPOTranslator Input -> State
   initialState { context, input: { loginSuccessfulBanner } } =
     { user: Nothing
     , loginSuccessfulBanner: fromMaybe false loginSuccessfulBanner
-    , translator: fromEqTranslator context
+    , translator: fromFpoTranslator context
     }
 
   render :: State -> H.ComponentHTML Action () m
@@ -134,4 +134,4 @@ component =
         Nothing -> do
           navigate Login
           pure unit
-    Receive { context } -> H.modify_ _ { translator = fromEqTranslator context }
+    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }

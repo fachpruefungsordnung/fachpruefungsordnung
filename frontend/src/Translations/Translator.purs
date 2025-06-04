@@ -10,19 +10,19 @@ import Web.HTML (window)
 import Web.HTML.Navigator (language)
 import Web.HTML.Window (navigator)
 
-translator :: EqTranslator
+translator :: FPOTranslator
 translator =
-  EqTranslator $ createTranslator
+  FPOTranslator $ createTranslator
     (Proxy :: _ "en") -- Fallback language (and default language)
     { en, de } -- Translations
 
-newtype EqTranslator = EqTranslator (Translator Labels)
+newtype FPOTranslator = FPOTranslator (Translator Labels)
 
-instance eqEqTranslator :: Eq EqTranslator where
+instance eqFpoTranslator :: Eq FPOTranslator where
   eq _ _ = false
 
-fromEqTranslator :: EqTranslator -> Translator Labels
-fromEqTranslator (EqTranslator trans) = trans
+fromFpoTranslator :: FPOTranslator -> Translator Labels
+fromFpoTranslator (FPOTranslator trans) = trans
 
 detectBrowserLanguage :: Effect String
 detectBrowserLanguage = do

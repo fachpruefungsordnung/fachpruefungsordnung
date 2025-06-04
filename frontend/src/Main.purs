@@ -58,7 +58,7 @@ import Prelude
 import Routing.Duplex as RD
 import Routing.Hash (getHash, matchesWith)
 import Translations.Translator
-  ( EqTranslator(EqTranslator)
+  ( FPOTranslator(FPOTranslator)
   , detectBrowserLanguage
   , getTranslatorForLanguage
   )
@@ -171,7 +171,7 @@ main = HA.runHalogenAff do
       { inputMail: ""
       , user: user
       , loginRedirect: Nothing
-      , translator: EqTranslator translator
+      , translator: FPOTranslator translator
       , language: defaultLang
       } :: Store.Store
   rootComponent <- runAppM initialStore component

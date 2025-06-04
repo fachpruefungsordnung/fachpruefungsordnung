@@ -23,7 +23,7 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
-import Translations.Translator (EqTranslator, fromEqTranslator)
+import Translations.Translator (FPOTranslator, fromFpoTranslator)
 import Translations.Util (FPOState, selectTranslator)
 
 data Action
@@ -35,7 +35,7 @@ data Action
   | UpdatePasswordSecondary String
   | UpdateCode String
   | EmitError String
-  | Receive (Connected EqTranslator Unit)
+  | Receive (Connected FPOTranslator Unit)
 
 type State = FPOState
   ( email :: String
@@ -59,7 +59,7 @@ component =
         , passwordSecondary: ""
         , code: ""
         , error: Nothing
-        , translator: fromEqTranslator context
+        , translator: fromFpoTranslator context
         }
     , render
     , eval: H.mkEval H.defaultEval
@@ -119,7 +119,7 @@ component =
 
       when (not $ null mail) do
         updateStore $ Store.SetMail mail
-    Receive { context } -> H.modify_ _ { translator = fromEqTranslator context }
+    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
 
 renderResetForm :: forall w. State -> HH.HTML w Action
 renderResetForm state =
