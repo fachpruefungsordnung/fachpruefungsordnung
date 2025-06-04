@@ -10,6 +10,25 @@ import Translations.Login (deLogin, enLogin)
 import Translations.Profile (deProfile, enProfile)
 import Translations.ResetPassword (dePasswordReset, enPasswordReset)
 
+-- | Übersetzungen zusammenführen
+en :: Translation Labels
+en = fromRecord $
+  merge
+    (merge (toRecord enCommon) (toRecord enLogin))
+    ( merge
+        (toRecord enPasswordReset)
+        (merge (toRecord enProfile) (toRecord enHome))
+    )
+
+de :: Translation Labels
+de = fromRecord $
+  merge
+    (merge (toRecord deCommon) (toRecord deLogin))
+    ( merge
+        (toRecord dePasswordReset)
+        (merge (toRecord deProfile) (toRecord deHome))
+    )
+
 -- | All kinds of abstract labels representing UI texts,
 -- | detached from the actual language selection.
 -- |
@@ -50,22 +69,3 @@ type Labels =
 
       ::: SNil
   )
-
--- | Übersetzungen zusammenführen
-en :: Translation Labels
-en = fromRecord $
-  merge
-    (merge (toRecord enCommon) (toRecord enLogin))
-    ( merge
-        (toRecord enPasswordReset)
-        (merge (toRecord enProfile) (toRecord enHome))
-    )
-
-de :: Translation Labels
-de = fromRecord $
-  merge
-    (merge (toRecord deCommon) (toRecord deLogin))
-    ( merge
-        (toRecord dePasswordReset)
-        (merge (toRecord deProfile) (toRecord deHome))
-    )
