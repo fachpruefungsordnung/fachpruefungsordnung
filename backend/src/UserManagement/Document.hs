@@ -1,12 +1,15 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module UserManagement.Document (DocPermission (..), permissionToText, textToPermission) where
+module UserManagement.Document (DocumentID, DocPermission (..), permissionToText, textToPermission) where
 
 import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
 import Data.Text (Text, pack, unpack)
 import GHC.Generics (Generic)
 import Text.Read (readMaybe)
+import GHC.Int (Int32)
+
+type DocumentID = Int32 
 
 data DocPermission = Read | Review | Edit
     deriving (Eq, Generic)
