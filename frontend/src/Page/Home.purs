@@ -123,13 +123,14 @@ component =
       ]
     Nothing -> HH.p
       [ HP.classes [ HB.textCenter, HB.mt5 ] ]
-      [ HH.text $ translate (label :: _ "home_pleaseLogIn") state.translator
+      [ HH.text $ translate (label :: _ "home_pleaseLogInA") state.translator
       , HH.a
           [ HE.onClick $ const $ NavLogin
-          , HP.classes [ HB.textDecorationUnderline, HB.textDark, HB.ms2 ]
+          , HP.classes [ HB.textDecorationUnderline, HB.textDark ]
           , HP.style "cursor: pointer;"
           ]
           [ HH.text $ translate (label :: _ "home_toLogin") state.translator ]
+      , HH.text $ translate (label :: _ "home_pleaseLogInB") state.translator
       ]
 
   -- | Renders a single project card.

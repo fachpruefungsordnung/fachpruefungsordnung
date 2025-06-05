@@ -20,7 +20,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
-import Simple.I18n.Translator (translate)
+import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
 
 data Action
@@ -62,7 +62,7 @@ component =
       [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
       [ HH.div [ HP.classes [ HB.col, HB.textCenter ] ]
           [ HH.h1 []
-              [ HH.text $ translate (Proxy :: _ "prof_profile") state.translator ]
+              [ HH.text $ translate (label :: _ "prof_profile") state.translator ]
           , case state.user of
               Just user -> HH.div
                 [ HP.classes [ HB.dFlex, HB.justifyContentCenter, HB.my5 ] ]
@@ -79,14 +79,14 @@ component =
                         ]
                     , HH.div [ HP.classes [ HB.card ] ]
                         [ HH.div [ HP.classes [ HB.cardHeader ] ]
-                            [ HH.text $ translate (Proxy :: _ "prof_userData")
+                            [ HH.text $ translate (label :: _ "prof_userData")
                                 state.translator
                             ]
                         , HH.ul [ HP.classes [ HB.listGroup, HB.listGroupFlush ] ]
                             [ HH.li [ HP.classes [ HB.listGroupItem ] ]
                                 [ HH.strong_
                                     [ HH.text $
-                                        ( translate (Proxy :: _ "prof_userName")
+                                        ( translate (label :: _ "prof_userName")
                                             state.translator
                                         ) <> ": "
                                     ]
@@ -95,7 +95,7 @@ component =
                             , HH.li [ HP.classes [ HB.listGroupItem ] ]
                                 [ HH.strong_
                                     [ HH.text $
-                                        ( translate (Proxy :: _ "prof_role")
+                                        ( translate (label :: _ "prof_role")
                                             state.translator
                                         ) <> ": "
                                     ]

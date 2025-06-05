@@ -44,7 +44,8 @@ type Labels =
       ::: "common_submit"
 
       -- | Home Page
-      ::: "home_pleaseLogIn"
+      ::: "home_pleaseLogInA"
+      ::: "home_pleaseLogInB"
       ::: "home_toLogin"
       ::: "home_yourProjects"
 
