@@ -17,6 +17,12 @@ import FPO.Data.Route (Route(..))
 import FPO.Data.Store (User, saveLanguage)
 import FPO.Data.Store as Store
 import FPO.Page.HTML (addClass)
+import FPO.Translations.Translator
+  ( FPOTranslator(..)
+  , fromFpoTranslator
+  , getTranslatorForLanguage
+  )
+import FPO.Translations.Util (FPOState)
 import Halogen (AttrName(..), ClassName(..))
 import Halogen as H
 import Halogen.HTML as HH
@@ -27,9 +33,9 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
-import Translations.Translator (EqTranslator(EqTranslator), getTranslatorForLanguage)
+import Simple.I18n.Translator (label, translate)
 
-type State = { user :: Maybe User, language :: String }
+type State = FPOState (user :: Maybe User, language :: String)
 
 data Action
   = Navigate Route
@@ -44,8 +50,6 @@ data Query a
   = RequestReloadUser a
 
 -- | The navbar component that renders the navigation bar.
--- |
--- | It subscribes to store changes to update the user information.
 navbar
   :: forall output m
    . MonadAff m
@@ -54,7 +58,10 @@ navbar
   => H.Component Query Unit output m
 navbar = connect (selectEq identity) $ H.mkComponent
   { initialState: \{ context: store } ->
-      { user: Nothing, language: store.language }
+      { user: Nothing
+      , language: store.language
+      , translator: fromFpoTranslator store.translator
+      }
   , render
   , eval: H.mkEval H.defaultEval
       { handleAction = handleAction
@@ -77,7 +84,10 @@ navbar = connect (selectEq identity) $ H.mkComponent
         , HH.div [ HP.classes [ HB.navbarCollapse ] ]
             [ HH.ul [ HP.classes [ HB.navbarNav, HB.meAuto ] ]
                 [ HH.li [ HP.classes [ HB.navItem ] ]
-                    [ navButton "Home" Home ]
+                    [ navButton
+                        (translate (label :: _ "common_home") state.translator)
+                        Home
+                    ]
                 , HH.li [ HP.classes [ HB.navItem ] ]
                     [ navButton "Editor" Editor ]
                 ]
@@ -101,7 +111,10 @@ navbar = connect (selectEq identity) $ H.mkComponent
   handleAction (Navigate route) = do
     navigate route
   handleAction (Receive { context: store }) = do
-    H.modify_ _ { language = store.language }
+    H.modify_ _
+      { language = store.language
+      , translator = fromFpoTranslator store.translator
+      }
   handleAction Logout = do
     -- Reset the cookies and reset the user state
     _ <- H.liftAff $ getIgnore "/logout"
@@ -112,7 +125,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
     H.liftEffect $ saveLanguage lang
     updateStore $ Store.SetLanguage lang
     -- Build and update the translator for the new language
-    let translator = EqTranslator $ getTranslatorForLanguage lang
+    let translator = FPOTranslator $ getTranslatorForLanguage lang
     updateStore $ Store.SetTranslator translator
   handleAction ReloadUser = do
     u <- liftAff getUser

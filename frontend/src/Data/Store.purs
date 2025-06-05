@@ -9,7 +9,7 @@ import Prelude
 import Data.Maybe (Maybe)
 import Effect (Effect)
 import FPO.Data.Route (Route)
-import Translations.Translator (EqTranslator)
+import FPO.Translations.Translator (FPOTranslator)
 import Web.HTML (window)
 import Web.HTML.Window (localStorage)
 import Web.Storage.Storage (getItem, setItem) as LocalStorage
@@ -20,7 +20,7 @@ type User = { userName :: String, isAdmin :: Boolean }
 type Store =
   { inputMail :: String -- ^ The email that was input in the login form (example state variable)
   , loginRedirect :: Maybe Route -- ^ The route to redirect to after login
-  , translator :: EqTranslator
+  , translator :: FPOTranslator
   , language :: String
   }
 
@@ -28,7 +28,7 @@ data Action
   = SetMail String -- ^ Action to set the user's email.
   | SetLoginRedirect (Maybe Route) -- ^ Action to set the redirect route after login.
   | SetLanguage String
-  | SetTranslator EqTranslator
+  | SetTranslator FPOTranslator
 
 -- | Update the store based on the action.
 reduce :: Store -> Action -> Store

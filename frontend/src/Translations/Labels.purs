@@ -1,7 +1,33 @@
-module Translations.Labels where
+module FPO.Translations.Labels where
 
+import Data.Function (($))
+import FPO.Translations.Common (deCommon, enCommon)
+import FPO.Translations.Home (deHome, enHome)
+import FPO.Translations.Login (deLogin, enLogin)
+import FPO.Translations.Profile (deProfile, enProfile)
+import FPO.Translations.ResetPassword (dePasswordReset, enPasswordReset)
+import Record (merge)
 import Record.Extra (type (:::), SNil)
-import Simple.I18n.Translation (Translation, fromRecord)
+import Simple.I18n.Translation (Translation, fromRecord, toRecord)
+
+-- | Übersetzungen zusammenführen
+en :: Translation Labels
+en = fromRecord $
+  merge
+    (merge (toRecord enCommon) (toRecord enLogin))
+    ( merge
+        (toRecord enPasswordReset)
+        (merge (toRecord enProfile) (toRecord enHome))
+    )
+
+de :: Translation Labels
+de = fromRecord $
+  merge
+    (merge (toRecord deCommon) (toRecord deLogin))
+    ( merge
+        (toRecord dePasswordReset)
+        (merge (toRecord deProfile) (toRecord deHome))
+    )
 
 -- | All kinds of abstract labels representing UI texts,
 -- | detached from the actual language selection.
@@ -10,74 +36,36 @@ import Simple.I18n.Translation (Translation, fromRecord)
 -- | Because of this constraint, it's sensible to use
 -- | appropriate prefixes for strongly related labels.
 type Labels =
-  ( "email"
-      ::: "emailAddress"
-      ::: "home"
-      ::: "loginSuccessful"
-      ::: "password"
-      ::: "passwordForgotten"
-      ::: "profile"
-      ::: "role"
+  ( -- | Common Phrases
+    "common_email"
+      ::: "common_emailAddress"
+      ::: "common_home"
+      ::: "common_password"
+      ::: "common_submit"
+
+      -- | Home Page
+      ::: "home_pleaseLogIn"
+      ::: "home_toLogin"
+      ::: "home_yourProjects"
+
+      -- | Login Page
+      ::: "login_passwordForgotten"
+
+      -- | Profile Page
+      ::: "prof_loginSuccessful"
+      ::: "prof_profile"
+      ::: "prof_role"
+      ::: "prof_userData"
+      ::: "prof_userName"
 
       -- | Reset Password Page
-      ::: "rpConfirmationCode"
-      ::: "rpHeader"
-      ::: "rpInputCode"
-      ::: "rpNoMatch"
-      ::: "rpPasswordConfirm"
-      ::: "rpPasswordNew"
-      ::: "rpRequestCode"
+      ::: "rp_ConfirmationCode"
+      ::: "rp_Header"
+      ::: "rp_InputCode"
+      ::: "rp_NoMatch"
+      ::: "rp_PasswordConfirm"
+      ::: "rp_PasswordNew"
+      ::: "rp_RequestCode"
 
-      ::: "submit"
-      ::: "userData"
-      ::: "userName"
       ::: SNil
   )
-
-en :: Translation Labels
-en = fromRecord
-  { email: "Email"
-  , emailAddress: "Email address"
-  , home: "Home"
-  , loginSuccessful: "Login successful"
-  , password: "Password"
-  , passwordForgotten: "Forgot password?"
-  , profile: "Profile"
-  , role: "Role"
-
-  , rpConfirmationCode: "Confirmation Code"
-  , rpHeader: "Reset Password"
-  , rpInputCode: "Input Code here"
-  , rpNoMatch: "The passwords do not match."
-  , rpPasswordConfirm: "Repeat new password"
-  , rpPasswordNew: "New password"
-  , rpRequestCode: "Request Code"
-
-  , submit: "Submit"
-  , userData: "User data"
-  , userName: "User name"
-  }
-
-de :: Translation Labels
-de = fromRecord
-  { email: "E-Mail"
-  , emailAddress: "E-Mail-Adresse"
-  , home: "Start"
-  , loginSuccessful: "Login erfolgreich"
-  , password: "Passwort"
-  , passwordForgotten: "Passwort vergessen?"
-  , profile: "Profil"
-  , role: "Rolle"
-
-  , rpConfirmationCode: "Bestätigungscode"
-  , rpHeader: "Passwort zurücksetzen"
-  , rpInputCode: "Code hier eingeben"
-  , rpNoMatch: "Die Passwörter stimmen nicht überein."
-  , rpPasswordConfirm: "Neues Passwort wiederholen"
-  , rpPasswordNew: "Neues Passwort"
-  , rpRequestCode: "Code anfordern"
-
-  , submit: "Absenden"
-  , userData: "Benutzerdaten"
-  , userName: "Benutzername"
-  }

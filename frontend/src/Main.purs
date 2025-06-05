@@ -7,11 +7,10 @@
 
 module Main where
 
-import Data.Maybe
-
 import Affjax (Error, Response)
 import Affjax.StatusCode (StatusCode(StatusCode))
 import Data.Either (Either(Left, Right), hush)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Aff.Class (class MonadAff)
@@ -29,6 +28,11 @@ import FPO.Page.Login as Login
 import FPO.Page.Page404 as Page404
 import FPO.Page.Profile as Profile
 import FPO.Page.ResetPassword as PasswordReset
+import FPO.Translations.Translator
+  ( FPOTranslator(..)
+  , detectBrowserLanguage
+  , getTranslatorForLanguage
+  )
 import Halogen (liftEffect)
 import Halogen as H
 import Halogen.Aff as HA
@@ -56,11 +60,6 @@ import Prelude
   )
 import Routing.Duplex as RD
 import Routing.Hash (getHash, matchesWith)
-import Translations.Translator
-  ( EqTranslator(EqTranslator)
-  , detectBrowserLanguage
-  , getTranslatorForLanguage
-  )
 import Type.Proxy (Proxy(..))
 
 --------------------------------------------------------------------------------
@@ -174,7 +173,7 @@ main = HA.runHalogenAff do
     initialStore =
       { inputMail: ""
       , loginRedirect: Nothing
-      , translator: EqTranslator translator
+      , translator: FPOTranslator translator
       , language: defaultLang
       } :: Store.Store
   rootComponent <- runAppM initialStore component

@@ -17,20 +17,27 @@ import FPO.Data.Request (getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (User)
 import FPO.Data.Store as Store
+import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Store.Monad (class MonadStore, updateStore)
+import Halogen.Store.Connect (Connected, connect)
+import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
+import Simple.I18n.Translator (label, translate)
+
+type Input = Unit
 
 data Action
   = Initialize
   | NavLogin
   | ViewProject String
+  | Receive (Connected FPOTranslator Input)
 
-type State =
-  { user :: Maybe User }
+type State = FPOState
+  (user :: Maybe User)
 
 -- Model for Projects
 type Project =
@@ -42,23 +49,24 @@ type Project =
   }
 
 component
-  :: forall query input output m
+  :: forall query output m
    . MonadAff m
   => Navigate m
   => MonadStore Store.Action Store.Store m
-  => H.Component query input output m
+  => H.Component query Input output m
 component =
-  H.mkComponent
+  connect selectTranslator $ H.mkComponent
     { initialState
     , render
     , eval: H.mkEval H.defaultEval
         { initialize = Just Initialize
         , handleAction = handleAction
+        , receive = Just <<< Receive
         }
     }
   where
-  initialState :: input -> State
-  initialState _ = { user: Nothing }
+  initialState :: Connected FPOTranslator Input -> State
+  initialState { context } = { user: Nothing, translator: fromFpoTranslator context }
 
   render
     :: forall slots
@@ -79,7 +87,8 @@ component =
               , HB.mb4
               ]
           ]
-          [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ] [ HH.text "Home" ]
+          [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+              [ HH.text $ translate (label :: _ "common_home") state.translator ]
           , HH.div [ HP.classes [ HB.dropdownDivider, HB.mb4 ] ] []
           , renderProjectsOverview state
           ]
@@ -92,8 +101,11 @@ component =
     -> H.HalogenM State Action slots output m Unit
   handleAction = case _ of
     Initialize -> do
+      store <- getStore
       u <- liftAff getUser
-      H.modify_ _ { user = u }
+      H.modify_ _
+        { user = u, translator = fromFpoTranslator store.translator }
+    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject projectName -> do
       log $ "Routing to editor for project " <> projectName
       navigate Editor
@@ -105,19 +117,19 @@ component =
   renderProjectsOverview :: forall w. State -> HH.HTML w Action
   renderProjectsOverview state = case state.user of
     Just _ -> HH.div []
-      [ HH.h3 [ HP.classes [ HB.mb4 ] ] [ HH.text "Your Projects" ]
+      [ HH.h3 [ HP.classes [ HB.mb4 ] ]
+          [ HH.text $ translate (label :: _ "home_yourProjects") state.translator ]
       , HH.div [] (map (renderProjectCard state) mockProjects)
       ]
     Nothing -> HH.p
       [ HP.classes [ HB.textCenter, HB.mt5 ] ]
-      [ HH.text "Please "
+      [ HH.text $ translate (label :: _ "home_pleaseLogIn") state.translator
       , HH.a
           [ HE.onClick $ const $ NavLogin
-          , HP.classes [ HB.textDecorationUnderline, HB.textDark ]
+          , HP.classes [ HB.textDecorationUnderline, HB.textDark, HB.ms2 ]
           , HP.style "cursor: pointer;"
           ]
-          [ HH.text "log in" ]
-      , HH.text " to view your projects."
+          [ HH.text $ translate (label :: _ "home_toLogin") state.translator ]
       ]
 
   -- | Renders a single project card.

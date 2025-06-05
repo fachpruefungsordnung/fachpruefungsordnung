@@ -11,6 +11,8 @@ import FPO.Data.Request (getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (User)
 import FPO.Data.Store as Store
+import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen (liftAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -19,13 +21,11 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (translate)
-import Translations.Translator (EqTranslator, fromEqTranslator)
-import Translations.Util (FPOState, selectTranslator)
 import Type.Proxy (Proxy(Proxy))
 
 data Action
   = Initialize
-  | Receive (Connected EqTranslator Input)
+  | Receive (Connected FPOTranslator Input)
 
 type State = FPOState (user :: Maybe User, loginSuccessfulBanner :: Boolean)
 
@@ -49,11 +49,11 @@ component =
         }
     }
   where
-  initialState :: Connected EqTranslator Input -> State
+  initialState :: Connected FPOTranslator Input -> State
   initialState { context, input: { loginSuccessfulBanner } } =
     { user: Nothing
     , loginSuccessfulBanner: fromMaybe false loginSuccessfulBanner
-    , translator: fromEqTranslator context
+    , translator: fromFpoTranslator context
     }
 
   render :: State -> H.ComponentHTML Action () m
@@ -61,7 +61,8 @@ component =
     HH.div
       [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
       [ HH.div [ HP.classes [ HB.col, HB.textCenter ] ]
-          [ HH.h1 [] [ HH.text $ translate (Proxy :: _ "profile") state.translator ]
+          [ HH.h1 []
+              [ HH.text $ translate (Proxy :: _ "prof_profile") state.translator ]
           , case state.user of
               Just user -> HH.div
                 [ HP.classes [ HB.dFlex, HB.justifyContentCenter, HB.my5 ] ]
@@ -70,21 +71,22 @@ component =
                         [ case state.loginSuccessfulBanner of
                             true -> HH.div
                               [ HP.classes [ HB.alert, HB.alertSuccess ] ]
-                              [ HH.text $ translate (Proxy :: _ "loginSuccessful")
+                              [ HH.text $ translate
+                                  (Proxy :: _ "prof_loginSuccessful")
                                   state.translator
                               ]
                             false -> HH.text ""
                         ]
                     , HH.div [ HP.classes [ HB.card ] ]
                         [ HH.div [ HP.classes [ HB.cardHeader ] ]
-                            [ HH.text $ translate (Proxy :: _ "userData")
+                            [ HH.text $ translate (Proxy :: _ "prof_userData")
                                 state.translator
                             ]
                         , HH.ul [ HP.classes [ HB.listGroup, HB.listGroupFlush ] ]
                             [ HH.li [ HP.classes [ HB.listGroupItem ] ]
                                 [ HH.strong_
                                     [ HH.text $
-                                        ( translate (Proxy :: _ "userName")
+                                        ( translate (Proxy :: _ "prof_userName")
                                             state.translator
                                         ) <> ": "
                                     ]
@@ -93,7 +95,7 @@ component =
                             , HH.li [ HP.classes [ HB.listGroupItem ] ]
                                 [ HH.strong_
                                     [ HH.text $
-                                        ( translate (Proxy :: _ "role")
+                                        ( translate (Proxy :: _ "prof_role")
                                             state.translator
                                         ) <> ": "
                                     ]
@@ -137,4 +139,4 @@ component =
         Nothing -> do
           navigate Login
           pure unit
-    Receive { context } -> H.modify_ _ { translator = fromEqTranslator context }
+    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }

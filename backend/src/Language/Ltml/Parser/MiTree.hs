@@ -2,7 +2,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 -- | Parsing Mixed Indentation Trees---trees that may both be represented by
---   indentation, or by paranthesis tokens, where the latter nodes may span
+--   indentation, or by bracketing tokens, where the latter nodes may span
 --   multiple lines of matching indentation.
 module Language.Ltml.Parser.MiTree
     ( miForest
@@ -13,7 +13,7 @@ module Language.Ltml.Parser.MiTree
     )
 where
 
-import Control.Applicative ((<|>))
+import Control.Applicative (empty, (<|>))
 import Control.Applicative.Utils ((<:>))
 import Control.Monad (void)
 import Data.Text (Text)
@@ -42,17 +42,27 @@ nli' :: (MonadParser m, FromWhitespace a) => m a
 nli' = fromWhitespace <$> nli
 
 -- | Parse a list of mixed indentation trees (a forest).
+--
 --   In-line nodes are parsed by @'elementPF' p@, where @p@ is supplied as the
 --   parser for the children nodes.
+--
 --   Indented nodes are parsed by 'childP'.
+--
 --   'elementPF' is expected to be a simple wrapper around its argument @p@,
 --   and not to consume (ASCII) spaces or newlines, unlike @p@.
+--   @p@ only succeeds on an in-line ending; that is, it fails on a final
+--   newline or EOF.
+--   Typically, @p@ is enclosed in some kind of bracketing parsers.
 --   For leaf nodes, 'elementPF' may simply ignore @p@.
---   'elementPF p' is further expected to not accept the empty input.
+--   @'elementPF' p@ is further expected to not accept the empty input.
+--
 --   Unlike 'elementPF', 'childP' is expected to take care of indentation
---   itself--past its first line--and to consume any trailing (ASCII) spaces
---   or (single) newline plus indentation.
---   Typically, 'childP' uses 'hangingBlock'.
+--   itself--except at the very beginning, where it may expect that any
+--   indentation has been parsed and the indentation is correct.
+--   Further, 'childP' must only succeed after a final newline (plus
+--   indentation) or EOF (see also 'eoi').
+--   Typically, 'childP' uses 'hangingBlock', which satisfies these
+--   requirements.
 miForest
     :: forall m a
      . (MonadParser m, FromWhitespace a)
@@ -68,39 +78,44 @@ miForestFrom
     -> m a
     -> Pos
     -> m [a]
-miForestFrom elementPF childP lvl = goE
+miForestFrom elementPF childP lvl = go True
   where
-    -- Each of the below parsers must generally consume any trailing ASCII
-    -- spaces, or newline plus subsequent indentation.
-
-    -- Parse forest, headed by element.
-    goE :: m [a]
-    goE =
-        elementPF goE
-            <:> ( (nli' >>= goEorCorEnd')
-                    <|> sp' <:> goE
-                    <|> pure []
-                )
-
-    -- Parse forest, headed by child; at start of an input line.
-    -- Enforces that a child ends after newline ('eoi').
-    goC :: m [a]
-    goC = (checkIndent lvl' *> childP <* eoi lvl') <:> goEorCorEnd
+    go :: Bool -> m [a]
+    go permitEndAfterNewline = goE
       where
-        lvl' = nextIndentLevel lvl
+        -- `goX` vs. `goX'`:
+        --  - The `goX` parsers must generally be used in-line; that is, not
+        --    at the start of a line.
+        --    - Exception: `goE`, initially.
+        --  - The `goX'` parsers must only be used at the start of a line
+        --    (after indentation; i.e., after `nli'`).
 
-    -- Parse forest, headed by element or child, or end (of forest); at
-    -- start of an input line.
-    goEorCorEnd :: m [a]
-    goEorCorEnd = checkIndent lvl *> goE <|> goC <|> pure []
+        -- Parse forest, headed by element.
+        goE :: m [a]
+        goE =
+            elementPF (go False)
+                <:> ( (nli' >>= \s -> (s :) <$> goE' <|> goC' <|> goEnd')
+                        <|> sp' <:> goE
+                        <|> goEnd
+                    )
 
-    -- Parse forest, headed by element or child, or end (of forest); at
-    -- start of an input line.
-    -- In case of element, prepends preceding whitespace encoding
-    -- (separator).
-    goEorCorEnd' :: a -> m [a]
-    goEorCorEnd' sep =
-        ((sep :) <$> (checkIndent lvl *> goE)) <|> goC <|> pure []
+        goE' :: m [a]
+        goE' = checkIndent lvl *> goE
+
+        -- Parse forest, headed by child; at start of an input line.
+        goC' :: m [a]
+        goC' = checkIndent lvl' *> childP <:> (goE' <|> goC' <|> goEnd')
+          where
+            lvl' = nextIndentLevel lvl
+
+        goEnd :: m [a]
+        goEnd = pure []
+
+        goEnd' :: m [a]
+        goEnd' =
+            if permitEndAfterNewline
+                then goEnd
+                else empty
 
 hangingBlock
     :: (MonadParser m, FromWhitespace a)
