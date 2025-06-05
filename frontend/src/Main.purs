@@ -19,7 +19,6 @@ import Effect.Class.Console (log)
 import FPO.AppM (runAppM)
 import FPO.Components.Navbar as Navbar
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (getString)
 import FPO.Data.Route (Route(..), routeCodec, routeToString)
 import FPO.Data.Store (User, loadLanguage)
 import FPO.Data.Store as Store
@@ -35,7 +34,7 @@ import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Halogen.VDom.Driver (runUI)
 import Prelude
@@ -53,7 +52,7 @@ import Prelude
   , (<$>)
   , (<<<)
   , (<>)
-  , (||)
+  , (==)
   )
 import Routing.Duplex as RD
 import Routing.Hash (getHash, matchesWith)
@@ -86,7 +85,7 @@ type Slots =
   ( home :: forall q. H.Slot q Void Unit
   , editor :: forall q. H.Slot q Unit Unit
   , login :: forall q. H.Slot q Void Unit
-  , navbar :: forall q. H.Slot q Void Unit
+  , navbar :: H.Slot Navbar.Query Void Unit
   , resetPassword :: forall q. H.Slot q Void Unit
   , adminPanel :: forall q. H.Slot q Void Unit
   , page404 :: forall q. H.Slot q Void Unit
@@ -135,17 +134,22 @@ component =
   handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Void m (Maybe a)
   handleQuery = case _ of
     NavigateQ dest a -> do
-      -- Before navigating, check if the user is allowed to access the destination.
-      -- If the user is not an admin, restrict access to the AdminPanel.
-      -- This might not be a scalable solution for larger applications, and we might
-      -- want to implement a more robust permission system in the future.
-      --
-      -- We could also allow the user to access any page they want, but each page would
-      -- check if the user is allowed to access it and display an error message if not.
-      admin <- maybe false _.isAdmin <$> _.user <$> getStore
-      let allowed = admin || dest /= AdminPanel
+      -- Here, we do not check for user credentials before navigating.
+      -- Each page (e.g., profile or admin panel) should handle its own access control.
+      -- If the user is not logged in, they will be redirected to the login page or
+      -- some other sensible page (e.g., home or 404 page).
+      -- This is reasonable because each specific backend API call will check
+      -- whether the user is logged in or not (and has sufficient access rights), and
+      -- the frontend should then handle the response accordingly - for each possible
+      -- page and action.
 
-      H.modify_ _ { route = if allowed then Just dest else Nothing }
+      route <- H.gets _.route
+      -- If the user came from the login page, we want to reload the user data
+      -- to ensure that the navbar displays the correct user information.
+      when (route == Just Login) $ do
+        H.tell _navbar unit Navbar.RequestReloadUser
+
+      H.modify_ _ { route = Just dest }
 
       -- Drop the redirect route if the user is navigating to a different page.
       when (dest /= Login) $ do
@@ -160,8 +164,8 @@ main :: Effect Unit
 main = HA.runHalogenAff do
   body <- HA.awaitBody
   -- Load logged in user from the localstorage
-  response <- getString "/get-user" -- TODO wait for backend to support this
-  let user = handleInitialResponse response
+  -- response <- getString "/get-user" -- TODO wait for backend to support this
+  -- let user = handleInitialResponse response
   savedLang <- H.liftEffect loadLanguage
   browserLang <- H.liftEffect detectBrowserLanguage
   let defaultLang = fromMaybe browserLang savedLang :: String
@@ -169,7 +173,6 @@ main = HA.runHalogenAff do
   let
     initialStore =
       { inputMail: ""
-      , user: user
       , loginRedirect: Nothing
       , translator: EqTranslator translator
       , language: defaultLang
@@ -190,4 +193,3 @@ handleInitialResponse = case _ of
   Right { status, body } -> case status of
     StatusCode 200 -> Just { userName: body, isAdmin: false }
     _ -> Nothing
-

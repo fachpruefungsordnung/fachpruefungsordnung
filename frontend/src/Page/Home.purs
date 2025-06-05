@@ -10,9 +10,10 @@ module FPO.Page.Home (component) where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Effect.Aff.Class (class MonadAff)
+import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class.Console (log)
 import FPO.Data.Navigate (class Navigate, navigate)
+import FPO.Data.Request (getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (User)
 import FPO.Data.Store as Store
@@ -20,7 +21,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 
 data Action
@@ -91,7 +92,7 @@ component =
     -> H.HalogenM State Action slots output m Unit
   handleAction = case _ of
     Initialize -> do
-      u <- _.user <$> getStore
+      u <- liftAff getUser
       H.modify_ _ { user = u }
     ViewProject projectName -> do
       log $ "Routing to editor for project " <> projectName

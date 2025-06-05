@@ -1,6 +1,11 @@
 -- | Simple admin panel page. Right now, this is just a placeholder.
 -- |
 -- | This page is only accessible to users with admin privileges.
+-- |
+-- | TODO: Implement the actual admin panel functionality, see mockups.
+-- |       For a start, it should be enough to connect with the backend
+-- |       and check if we're even allowed to access this page, then
+-- |       handle the response accordingly.
 
 module FPO.Page.AdminPanel (component) where
 
@@ -8,6 +13,7 @@ import Prelude
 
 import Data.Maybe (Maybe(..))
 import FPO.Data.Store as Store
+import Halogen (ClassName(..))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -64,7 +70,13 @@ renderAdminPanel _ =
     [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
         [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
             [ HH.text "Admin Panel" ]
-        , HH.text
-            "You should see an admin panel now, but it hasn't been implemented yet."
+        , HH.div [ HP.style "text-align: justify;" ]
+            [ HH.text $
+                "You should see an admin panel now, but it hasn't been implemented yet. "
+                  <>
+                    "Also, notice that this page will only be accessible to users with admin privileges. "
+                  <>
+                    "If you are not an admin, you will be redirected to some other page (404 or home, for example)."
+            ]
         ]
     ]

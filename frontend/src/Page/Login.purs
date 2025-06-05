@@ -15,7 +15,6 @@ import Affjax.StatusCode (StatusCode(StatusCode))
 import Data.Argonaut.Encode.Class (encodeJson)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Data.String.CodeUnits (takeWhile)
 import Dto.Login (LoginDto)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate, navigate)
@@ -135,8 +134,8 @@ component =
             -- at the same time updating the store of the application
             -- TODO persisting the credentials in the browser storage
             StatusCode 200 -> do
-              let name = takeWhile (_ /= '@') loginDto.loginEmail
-              updateStore $ Store.SetUser $ Just { userName: name, isAdmin: false }
+              -- let name = takeWhile (_ /= '@') loginDto.loginEmail
+              -- updateStore $ Store.SetUser $ Just { userName: name, isAdmin: false }
 
               handleLoginRedirect
             StatusCode _ -> handleAction (EmitError body)

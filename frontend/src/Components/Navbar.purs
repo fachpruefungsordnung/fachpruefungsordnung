@@ -10,9 +10,9 @@ module FPO.Components.Navbar where
 import Prelude
 
 import Data.Maybe (Maybe(..))
-import Effect.Aff.Class (class MonadAff)
+import Effect.Aff.Class (class MonadAff, liftAff)
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (getIgnore)
+import FPO.Data.Request (getIgnore, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (User, saveLanguage)
 import FPO.Data.Store as Store
@@ -36,23 +36,31 @@ data Action
   | Receive (Connected Store.Store Unit) -- Receive store updates
   | Logout
   | SetLanguage String
+  | ReloadUser
+
+data Query a
+  -- | Request a reload from outside - usually, the main routing component
+  -- | will call this to ensure the user data is up-to-date (e.g., after login).
+  = RequestReloadUser a
 
 -- | The navbar component that renders the navigation bar.
 -- |
 -- | It subscribes to store changes to update the user information.
 navbar
-  :: forall query output m
+  :: forall output m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
   => Navigate m
-  => H.Component query Unit output m
+  => H.Component Query Unit output m
 navbar = connect (selectEq identity) $ H.mkComponent
   { initialState: \{ context: store } ->
-      { user: store.user, language: store.language }
+      { user: Nothing, language: store.language }
   , render
   , eval: H.mkEval H.defaultEval
       { handleAction = handleAction
       , receive = Just <<< Receive
+      , initialize = Just ReloadUser
+      , handleQuery = handleQuery
       }
   }
   where
@@ -93,17 +101,12 @@ navbar = connect (selectEq identity) $ H.mkComponent
   handleAction (Navigate route) = do
     navigate route
   handleAction (Receive { context: store }) = do
-    H.modify_ _
-      { user = store.user
-      , language = store.language
-      }
+    H.modify_ _ { language = store.language }
   handleAction Logout = do
-    -- TODO: Perform logout logic, e.g., clear user session, etc.
-    -- Notice how we do not have to change this component's user state here, because
-    -- updating the store will trigger a re-evaluation of the navbar component.
-    updateStore (Store.SetUser Nothing)
-    _ <- H.liftAff $ getIgnore "/logout" -- this should reset the cookies
-    -- We simply navigate to the Login page indiscriminately
+    -- Reset the cookies and reset the user state
+    _ <- H.liftAff $ getIgnore "/logout"
+    H.modify_ _ { user = Nothing }
+    -- Simply navigate to the Login page indiscriminately
     navigate Login
   handleAction (SetLanguage lang) = do
     H.liftEffect $ saveLanguage lang
@@ -111,6 +114,14 @@ navbar = connect (selectEq identity) $ H.mkComponent
     -- Build and update the translator for the new language
     let translator = EqTranslator $ getTranslatorForLanguage lang
     updateStore $ Store.SetTranslator translator
+  handleAction ReloadUser = do
+    u <- liftAff getUser
+    H.modify_ _ { user = u }
+
+  handleQuery :: forall a. Query a -> H.HalogenM State Action () output m (Maybe a)
+  handleQuery (RequestReloadUser a) = do
+    handleAction ReloadUser
+    pure $ Just a
 
   -- Creates a navigation button.
   navButton :: String -> Route -> H.ComponentHTML Action () m

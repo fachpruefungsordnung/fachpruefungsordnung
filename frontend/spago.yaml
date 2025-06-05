@@ -4,6 +4,7 @@ package:
     - ace
     - aff
     - affjax
+    - argonaut
     - argonaut-codecs
     - argonaut-core
     - arrays
