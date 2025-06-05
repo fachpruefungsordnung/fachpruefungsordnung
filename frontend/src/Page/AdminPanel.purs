@@ -11,8 +11,13 @@ module FPO.Page.AdminPanel (component) where
 
 import Prelude
 
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
+import Effect.Aff.Class (class MonadAff)
+import FPO.Data.Navigate (class Navigate, navigate)
+import FPO.Data.Request (getUser)
+import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
+import Halogen (liftAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -29,6 +34,8 @@ type State =
 component
   :: forall query input output m
    . MonadStore Store.Action Store.Store m
+  => MonadAff m
+  => Navigate m
   => H.Component query input output m
 component =
   H.mkComponent
@@ -61,6 +68,14 @@ component =
   handleAction :: Action -> H.HalogenM State Action () output m Unit
   handleAction = case _ of
     Initialize -> do
+      -- TODO: Usually, we would fetch some data here (and handle
+      --       the error of missing credentials), but for now,
+      --       we just check if the user is an admin and redirect
+      --       to a 404 page if not.
+      u <- liftAff $ getUser
+      when (fromMaybe true (not <$> _.isAdmin <$> u)) $
+        navigate Page404
+
       pure unit
 
 renderAdminPanel :: forall w. State -> HH.HTML w Action
@@ -75,7 +90,7 @@ renderAdminPanel _ =
                   <>
                     "Also, notice that this page will only be accessible to users with admin privileges. "
                   <>
-                    "If you are not an admin, you will be redirected to some other page (404 or home, for example)."
+                    "If you are not an admin, should have been redirected to some other page (404 or home, for example)."
             ]
         ]
     ]

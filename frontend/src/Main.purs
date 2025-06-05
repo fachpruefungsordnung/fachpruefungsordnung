@@ -120,6 +120,7 @@ component =
           Login -> HH.slot_ _login unit Login.component unit
           PasswordReset -> HH.slot_ _resetPassword unit PasswordReset.component unit
           AdminPanel -> HH.slot_ _adminPanel unit AdminPanel.component unit
+          Page404 -> HH.slot_ _page404 unit Page404.component unit
           Profile { loginSuccessful } -> HH.slot_ _profile unit Profile.component
             { loginSuccessfulBanner: loginSuccessful }
     ]

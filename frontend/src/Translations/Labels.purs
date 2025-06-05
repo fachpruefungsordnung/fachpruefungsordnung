@@ -9,24 +9,25 @@ import FPO.Translations.ResetPassword (dePasswordReset, enPasswordReset)
 import Record (merge)
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord, toRecord)
+import Translations.Page.Page404 (dePage404, enPage404)
 
 -- | Übersetzungen zusammenführen
 en :: Translation Labels
 en = fromRecord $
   merge
-    (merge (toRecord enCommon) (toRecord enLogin))
+    (merge (toRecord enCommon) (toRecord enHome))
     ( merge
-        (toRecord enPasswordReset)
-        (merge (toRecord enProfile) (toRecord enHome))
+        (merge (toRecord enLogin) (toRecord enPage404))
+        (merge (toRecord enPasswordReset) (toRecord enProfile))
     )
 
 de :: Translation Labels
 de = fromRecord $
   merge
-    (merge (toRecord deCommon) (toRecord deLogin))
+    (merge (toRecord deCommon) (toRecord deHome))
     ( merge
-        (toRecord dePasswordReset)
-        (merge (toRecord deProfile) (toRecord deHome))
+        (merge (toRecord deLogin) (toRecord dePage404))
+        (merge (toRecord dePasswordReset) (toRecord deProfile))
     )
 
 -- | All kinds of abstract labels representing UI texts,
@@ -51,6 +52,9 @@ type Labels =
 
       -- | Login Page
       ::: "login_passwordForgotten"
+
+      -- | 404 Page
+      ::: "p404_notFound"
 
       -- | Profile Page
       ::: "prof_loginSuccessful"
