@@ -13,7 +13,6 @@ import Prelude
 
 import Data.Maybe (Maybe(..))
 import FPO.Data.Store as Store
-import Halogen (ClassName(..))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
