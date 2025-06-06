@@ -163,7 +163,9 @@ navbar = connect (selectEq identity) $ H.mkComponent
           [ HP.classes [ HB.dropdownMenu, HB.dropdownMenuEnd ]
           , HP.attr (AttrName "aria-labelledby") "navbarDarkDropdownMenuLink"
           ]
-          ( [ dropdownEntry "Profile" "person"
+          ( [ dropdownEntry
+                (translate (label :: _ "prof_profile") state.translator)
+                "person"
                 (Navigate (Profile { loginSuccessful: Nothing }))
             ]
               <>
