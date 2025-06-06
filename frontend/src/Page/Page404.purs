@@ -68,4 +68,5 @@ component =
     GoHome -> do
       navigate Home
       pure unit
-    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }

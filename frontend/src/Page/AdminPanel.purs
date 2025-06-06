@@ -17,40 +17,43 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
+import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen (liftAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
+import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
+import Simple.I18n.Translator (label, translate)
 
-data Action = Initialize
+data Action
+  = Initialize
+  | Receive (Connected FPOTranslator Unit)
 
-type State =
-  { error :: Maybe String
-  }
+type State = FPOState (error :: Maybe String)
 
 -- | Admin panel page component.
 component
-  :: forall query input output m
+  :: forall query output m
    . MonadStore Store.Action Store.Store m
   => MonadAff m
   => Navigate m
-  => H.Component query input output m
+  => H.Component query Unit output m
 component =
-  H.mkComponent
+  connect selectTranslator $ H.mkComponent
     { initialState
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
         , initialize = Just Initialize
+        , receive = Just <<< Receive
         }
     }
   where
-  initialState :: input -> State
-  initialState _ =
-    { error: Nothing
-    }
+  initialState :: Connected FPOTranslator Unit -> State
+  initialState { context } = { translator: fromFpoTranslator context, error: Nothing }
 
   render :: State -> H.ComponentHTML Action () m
   render state =
@@ -75,15 +78,15 @@ component =
       u <- liftAff $ getUser
       when (fromMaybe true (not <$> _.isAdmin <$> u)) $
         navigate Page404
-
-      pure unit
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
 
 renderAdminPanel :: forall w. State -> HH.HTML w Action
-renderAdminPanel _ =
+renderAdminPanel state =
   HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
     [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
         [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-            [ HH.text "Admin Panel" ]
+            [ HH.text $ translate (label :: _ "ap_adminPanel") state.translator ]
         , HH.div [ HP.style "text-align: justify;" ]
             [ HH.text $
                 "You should see an admin panel now, but it hasn't been implemented yet. "
