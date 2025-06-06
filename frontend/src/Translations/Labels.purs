@@ -1,6 +1,7 @@
 module FPO.Translations.Labels where
 
 import Data.Function (($))
+import FPO.Translations.AdminPanel (deAdminPanel, enAdminPanel)
 import FPO.Translations.Common (deCommon, enCommon)
 import FPO.Translations.Home (deHome, enHome)
 import FPO.Translations.Login (deLogin, enLogin)
@@ -14,20 +15,24 @@ import Translations.Page.Page404 (dePage404, enPage404)
 -- | Übersetzungen zusammenführen
 en :: Translation Labels
 en = fromRecord $
-  merge
-    (merge (toRecord enCommon) (toRecord enHome))
+  merge (toRecord enAdminPanel)
     ( merge
-        (merge (toRecord enLogin) (toRecord enPage404))
-        (merge (toRecord enPasswordReset) (toRecord enProfile))
+        (merge (toRecord enCommon) (toRecord enHome))
+        ( merge
+            (merge (toRecord enLogin) (toRecord enPage404))
+            (merge (toRecord enPasswordReset) (toRecord enProfile))
+        )
     )
 
 de :: Translation Labels
 de = fromRecord $
-  merge
-    (merge (toRecord deCommon) (toRecord deHome))
+  merge (toRecord deAdminPanel)
     ( merge
-        (merge (toRecord deLogin) (toRecord dePage404))
-        (merge (toRecord dePasswordReset) (toRecord deProfile))
+        (merge (toRecord deCommon) (toRecord deHome))
+        ( merge
+            (merge (toRecord deLogin) (toRecord dePage404))
+            (merge (toRecord dePasswordReset) (toRecord deProfile))
+        )
     )
 
 -- | All kinds of abstract labels representing UI texts,
@@ -37,8 +42,10 @@ de = fromRecord $
 -- | Because of this constraint, it's sensible to use
 -- | appropriate prefixes for strongly related labels.
 type Labels =
-  ( -- | Common Phrases
-    "common_email"
+  ( -- | Admin Panel
+    "ap_adminPanel"
+      -- | Common Phrases
+      ::: "common_email"
       ::: "common_emailAddress"
       ::: "common_home"
       ::: "common_password"
