@@ -19,17 +19,19 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events (onClick, onValueInput) as HE
+import Halogen.HTML.Events (onClick, onSubmit, onValueInput) as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
+import Web.Event.Event (preventDefault)
+import Web.Event.Internal.Types (Event)
 
 data Action
   = Initialize
   | RequestCode
-  | SendPasswordReset
+  | DoSubmit Event
   | UpdateEmail String
   | UpdatePasswordPrimary String
   | UpdatePasswordSecondary String
@@ -105,7 +107,9 @@ component =
       H.modify_ \state -> state
         { error = Just "[TODO] A code has (not) been sent to you by email!" }
       pure unit
-    SendPasswordReset -> do
+    DoSubmit event -> do
+      H.liftEffect $ preventDefault event
+
       st <- H.get
       if (st.passwordPrimary /= st.passwordSecondary) then do
         H.modify_ \state -> state
@@ -119,7 +123,8 @@ component =
 
       when (not $ null mail) do
         updateStore $ Store.SetMail mail
-    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
 
 renderResetForm :: forall w. State -> HH.HTML w Action
 renderResetForm state =
@@ -128,7 +133,7 @@ renderResetForm state =
         [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
             [ HH.text $ translate (label :: _ "rp_Header") state.translator ]
         , HH.form
-            []
+            [ HE.onSubmit DoSubmit ]
             [ addColumn
                 state.email
                 (translate (label :: _ "common_emailAddress") state.translator <> ":")
@@ -162,9 +167,7 @@ renderResetForm state =
                           , HP.type_ HP.ButtonButton
                           , HE.onClick \_ -> RequestCode
                           ] <>
-                            if not (isValidEmail state.email) then
-                              [ HP.disabled true ]
-                            else []
+                            disable
                         )
                         [ HH.text $ translate (label :: _ "rp_RequestCode")
                             state.translator
@@ -185,10 +188,8 @@ renderResetForm state =
                 [ HH.button
                     ( [ HP.classes [ HB.btn, HB.btnPrimary ]
                       , HP.type_ HP.ButtonSubmit
-                      , HE.onClick $ const SendPasswordReset
                       ] <>
-                        if not (isValidEmail state.email) then [ HP.disabled true ]
-                        else []
+                        disable
                     )
                     [ HH.text $ translate (label :: _ "common_submit")
                         state.translator
@@ -198,6 +199,11 @@ renderResetForm state =
         ]
     ]
   where
+  disable =
+    if not (isValidEmail state.email) then
+      [ HP.disabled true ]
+    else []
+
   isValidEmail :: String -> Boolean
   isValidEmail email =
     let
