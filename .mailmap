@@ -1,0 +1,26 @@
+# Canonical author names and emails.
+#
+# Use this to provide a canonical name and email for an author when their
+# name is not always written the same way and/or they have commits authored
+# under different email addresses.
+#
+# Reference: https://git-scm.com/docs/gitmailmap
+
+# Keep these entries sorted alphabetically.
+
+Fabian Krull <60816643+Fab1000@users.noreply.github.com>
+Fabian Krull <60816643+Fab1000@users.noreply.github.com> <fabian3krull+codeberg@gmail.com>
+lassezuengel <lassezuengel@gmail.com>
+lassezuengel <lassezuengel@gmail.com> Lasse Zuengel <lassezuengel@gmail.com>
+lassezuengel <lassezuengel@gmail.com> Lasse Züngel <lassezuengel@gmail.com>
+Malin Glienke <malin.glienke@mailbox.org>
+Merlin <info@bahn.sh>
+Merlin <info@bahn.sh> <merliin3007@gmail.com>
+Merlin <info@bahn.sh> merliin3007 <info@bahn.sh>
+Merlin <info@bahn.sh> merliin3007 <merliin3007@gmail.com>
+nschmahl <schmahlnick@gmail.com>
+nschmahl <schmahlnick@gmail.com> NickSchmahl <nickschmahl@noreply.codeberg.org>
+Nummersechs <eddy.wu@gmx.de>
+Nummersechs <eddy.wu@gmx.de> <stu204034@mail.uni-kiel.de>
+# Lennart1543 <lennart1543@noreply.codeberg.org>
+# stu236751 <stu236751@mail.uni-kiel.de>

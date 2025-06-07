@@ -27,7 +27,8 @@ counter =
   render { count } =
     HH.div_ [ HH.text $ show count ]
 
-  handleQuery :: forall action a. Query a -> H.HalogenM State action () output m (Maybe a)
+  handleQuery
+    :: forall action a. Query a -> H.HalogenM State action () output m (Maybe a)
   handleQuery = case _ of
     Increment a -> do
       H.modify_ \state -> state { count = state.count + 1 }

@@ -2,16 +2,40 @@ package:
   name: fpo-frontend
   dependencies:
     - ace
-    - affjax-web
+    - aff
+    - affjax
+    - argonaut
+    - argonaut-codecs
+    - argonaut-core
+    - arrays
     - console
+    - datetime
+    - dom-indexed
     - effect
+    - either
+    - foldable-traversable
     - halogen
     - halogen-bootstrap5
     - halogen-store
-    - json
+    - halogen-subscriptions
+    - http-methods
+    - integers
+    - maybe
     - prelude
+    - record
+    - record-extra
     - routing
     - routing-duplex
+    - safe-coerce
+    - simple-i18n
+    - strings
+    - tailrec
+    - web-dom
+    - web-events
+    - web-file
+    - web-html
+    - web-storage
+    - web-uievents
   test:
     main: Test.Main
     dependencies: []

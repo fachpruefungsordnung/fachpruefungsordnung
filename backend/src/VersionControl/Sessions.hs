@@ -39,12 +39,11 @@ createCommit commit =
         Write
         $ Transactions.createCommit commit
 
-{- | session to get a document tree by its hash.
-The whole tree is obtained from the database.
-TODO: implement a variation of this session to filter on a path through the tree.
-This is useful, when the frontend just needs to display part of the document
-e.g., a single paragraph.
--}
+-- | session to get a document tree by its hash.
+--   The whole tree is obtained from the database.
+--   TODO: implement a variation of this session to filter on a path through the tree.
+--   This is useful, when the frontend just needs to display part of the document
+--   e.g., a single paragraph.
 getVersion :: Hash -> Session (Tree (Hashed NodeWithRef))
 getVersion hs = do
     root <- statement hs Statements.getVersion

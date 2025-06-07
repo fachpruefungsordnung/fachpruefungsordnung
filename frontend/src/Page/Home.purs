@@ -1,133 +1,190 @@
 -- | Home page of the application. As of now, this is simply our
 -- | "sandbox" for testing components.
+-- |
+-- | Right now, it displays a list of mock projects and allows
+-- | the user to navigate to the editor by clicking on the title.
+-- | The user must be logged in to see the projects.
 
 module FPO.Page.Home (component) where
 
 import Prelude
 
-import Control.Monad.Rec.Class (forever)
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
-import Effect.Aff (Milliseconds(..))
-import Effect.Aff as Aff
-import Effect.Aff.Class (class MonadAff)
-import FPO.Components.Button as Button
-import FPO.Components.Editor as Editor
-import FPO.Data.Request (getString)
+import Data.Maybe (Maybe(..))
+import Effect.Aff.Class (class MonadAff, liftAff)
+import Effect.Class.Console (log)
+import FPO.Data.Navigate (class Navigate, navigate)
+import FPO.Data.Request (getUser)
+import FPO.Data.Route (Route(..))
+import FPO.Data.Store (User)
+import FPO.Data.Store as Store
+import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen as H
 import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Subscription as HS
+import Halogen.Store.Connect (Connected, connect)
+import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
-import Type.Proxy (Proxy(..))
+import Simple.I18n.Translator (label, translate)
+
+type Input = Unit
 
 data Action
-  = Increment
-  | Initialize
-  | HandleButton Button.Output
-  | HandleEditor Editor.Output
+  = Initialize
+  | NavLogin
+  | ViewProject String
+  | Receive (Connected FPOTranslator Input)
 
-type State =
-  { count :: Int
-  , dummyUser :: Maybe String
-  , editorContent :: Maybe (Array String)
+type State = FPOState
+  (user :: Maybe User)
+
+-- Model for Projects
+type Project =
+  { name :: String
+  , description :: String
+  , version :: String
+  , collaborators :: Int
+  , updated :: String
   }
 
-type Slots =
-  ( button :: forall query. H.Slot query Button.Output Int
-  , navbar :: forall query output. H.Slot query output Unit
-  , editor :: H.Slot Editor.Query Editor.Output Unit
-  )
-
-_button = Proxy :: Proxy "button"
-_editor = Proxy :: Proxy "editor"
-
 component
-  :: forall query input output m
+  :: forall query output m
    . MonadAff m
-  => H.Component query input output m
+  => Navigate m
+  => MonadStore Store.Action Store.Store m
+  => H.Component query Input output m
 component =
-  H.mkComponent
+  connect selectTranslator $ H.mkComponent
     { initialState
     , render
     , eval: H.mkEval H.defaultEval
-        { handleAction = handleAction
-        , initialize = Just Initialize
+        { initialize = Just Initialize
+        , handleAction = handleAction
+        , receive = Just <<< Receive
         }
     }
   where
-  initialState :: input -> State
-  initialState _ = { count: 0, dummyUser: Nothing, editorContent: Nothing }
+  initialState :: Connected FPOTranslator Input -> State
+  initialState { context } = { user: Nothing, translator: fromFpoTranslator context }
 
-  render :: State -> H.ComponentHTML Action Slots m
-  render { count, dummyUser, editorContent } =
-    HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.p0, HB.overflowHidden ] ]
-      [
-        -- the _button is for the Proxy to be able to identify it via a term
-        -- the 0 is the unique identifier
-        -- and button { label: "Click Me" } is the component with its input (communication from parent to child)
-        -- in the HH.slot function there is a way to handle messages from the child to the parent (now the HandleButton parameter)
-        HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.containerFluid, HB.p0, HB.flexFill, HB.overflowHidden ] ]
-          [ HH.div [ HP.classes [ HB.dFlex, HB.flexGrow1, HB.flexRow, HB.g0, HB.overflowHidden ] ]
-              [ HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.col6 ] ]
-                  [ HH.slot _editor unit Editor.editor unit HandleEditor ]
-              , HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.col6, HB.textCenter, HB.bgInfoSubtle, HB.overflowHidden ] ]
-                  [ HH.div_ [ HH.text "Hier sollte die Vorschau sein." ]
-                  , HH.div_ [ HH.text $ if dummyUser == Nothing then "Hier kommt nach dem Knopfdruck ein Text" else "Wow, nun haben wir einen dummy User geladen mit dem Namen: " <> fromMaybe "err" dummyUser ]
-                  , HH.slot _button 0 Button.button { label: show count } HandleButton
-                  , HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.overflowHidden ] ]
-                      [ case editorContent of
-                          Nothing ->
-                            HH.text "Der Editor ist leer!"
-                          Just content ->
-                            HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.overflowHidden ] ]
-                              [ HH.text "Editorinhalt:"
-                              , HH.div
-                                  [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HH.ClassName "mt-1", HB.overflowAuto ] ]
-                                  [ HH.pre
-                                      [ HP.classes [ HB.flexGrow1, HH.ClassName "border rounded p-1 bg-light", HB.h100 ] ]
-                                      ( content <#> \line ->
-                                          HH.div_ [ HH.text $ preserveEmptyLine line ]
-                                      )
-                                  ]
-                              ]
-                      ]
+  render
+    :: forall slots
+     . State
+    -> H.ComponentHTML Action slots m
+  render state =
+    HH.div
+      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.p0, HB.overflowHidden ]
+      ]
+      [ HH.div
+          [ HP.classes
+              [ HB.container
+              , HB.mt5
+              , HB.dFlex
+              , HB.flexColumn
+              , HB.justifyContentStart
+              , HB.alignItemsCenter
+              , HB.mb4
+              ]
+          ]
+          [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+              [ HH.text $ translate (label :: _ "common_home") state.translator ]
+          , HH.div [ HP.classes [ HB.dropdownDivider, HB.mb4 ] ] []
+          , renderProjectsOverview state
+          ]
+      ]
+
+  handleAction
+    :: forall slots
+     . MonadAff m
+    => Action
+    -> H.HalogenM State Action slots output m Unit
+  handleAction = case _ of
+    Initialize -> do
+      store <- getStore
+      u <- liftAff getUser
+      H.modify_ _
+        { user = u, translator = fromFpoTranslator store.translator }
+    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
+    ViewProject projectName -> do
+      log $ "Routing to editor for project " <> projectName
+      navigate Editor
+    NavLogin -> do
+      updateStore $ Store.SetLoginRedirect (Just Home)
+      navigate Login
+
+  -- | Renders the overview of projects for the user.
+  renderProjectsOverview :: forall w. State -> HH.HTML w Action
+  renderProjectsOverview state = case state.user of
+    Just _ -> HH.div []
+      [ HH.h3 [ HP.classes [ HB.mb4 ] ]
+          [ HH.text $ translate (label :: _ "home_yourProjects") state.translator ]
+      , HH.div [] (map (renderProjectCard state) mockProjects)
+      ]
+    Nothing -> HH.p
+      [ HP.classes [ HB.textCenter, HB.mt5 ] ]
+      [ HH.text $ translate (label :: _ "home_pleaseLogInA") state.translator
+      , HH.a
+          [ HE.onClick $ const $ NavLogin
+          , HP.classes [ HB.textDecorationUnderline, HB.textDark ]
+          , HP.style "cursor: pointer;"
+          ]
+          [ HH.text $ translate (label :: _ "home_toLogin") state.translator ]
+      , HH.text $ translate (label :: _ "home_pleaseLogInB") state.translator
+      ]
+
+  -- | Renders a single project card.
+  renderProjectCard :: forall w. State -> Project -> HH.HTML w Action
+  renderProjectCard _ project =
+    HH.div [ HP.classes [ HB.card, HB.shadowSm, HB.mb3, HB.bgSecondarySubtle ] ]
+      [ HH.div [ HP.classes [ HB.cardBody ] ]
+          [ HH.h5
+              [ HP.classes [ HB.cardTitle, HB.mb1, HB.textPrimary ]
+              , HP.style "cursor: pointer;"
+              , HE.onClick $ const $ ViewProject project.name
+              ]
+              [ HH.text project.name ]
+          , HH.p
+              [ HP.classes [ HB.cardText, HB.mb2 ] ]
+              [ HH.text project.description ]
+          , HH.div
+              [ HP.classes
+                  [ HB.dFlex
+                  , HB.justifyContentBetween
+                  , HB.alignItemsCenter
+                  ]
+              ]
+              [ HH.small []
+                  [ HH.i [ HP.classes [ H.ClassName "bi-tag", HB.me1 ] ] []
+                  , HH.text ("v" <> project.version)
+                  ]
+              , HH.small []
+                  [ HH.i [ HP.classes [ H.ClassName "bi-people", HB.me1 ] ] []
+                  , HH.text (show project.collaborators)
+                  ]
+              , HH.small []
+                  [ HH.i [ HP.classes [ H.ClassName "bi-clock", HB.me1 ] ] []
+                  , HH.text project.updated
                   ]
               ]
           ]
       ]
 
-  -- Forces the string to be at least one character long.
-  preserveEmptyLine :: String -> String
-  preserveEmptyLine str = if str == "" then " " else str
-
-  -- output is when our component communicates with a parent
-  -- m is relevant when the component performs effects
-  handleAction :: MonadAff m => Action -> H.HalogenM State Action Slots output m Unit
-  handleAction = case _ of
-    HandleButton output -> case output of
-      Button.Clicked -> H.modify_ \state -> state { count = 0 }
-
-    HandleEditor output -> case output of
-      Editor.ClickedHTTPRequest -> do
-        response <- H.liftAff $ getString "/users"
-        case response of
-          Right { body } ->
-            H.modify_ _ { dummyUser = Just body }
-          Left _ -> do
-            H.modify_ _ { dummyUser = Nothing }
-
-      Editor.ClickedQuery response -> do
-        H.modify_ \st -> st { editorContent = response }
-
-    Increment -> H.modify_ \state -> state { count = state.count + 1 }
-
-    Initialize -> do
-      { emitter, listener } <- H.liftEffect HS.create
-      void $ H.subscribe emitter
-      void
-        $ H.liftAff
-        $ Aff.forkAff
-        $ forever do
-            Aff.delay $ Milliseconds 1000.0
-            H.liftEffect $ HS.notify listener Increment
+  mockProjects :: Array Project
+  mockProjects =
+    [ { name: "FPO Informatik 1-Fach M.Sc. 2025"
+      , description: "Hier gibt es Zusatzinformationen!"
+      , version: "1.2"
+      , collaborators: 3
+      , updated: "6 hours ago"
+      }
+    , { name: "FPO Elektrotechnik und Informationstechnik B.Sc. 2022"
+      , description:
+          (<>)
+            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor"
+            "incidunt Hello! ut labore et dolore magna aliqua. Ut enim ad minim veniam"
+      , version: "4.8"
+      , collaborators: 4
+      , updated: "3 days ago"
+      }
+    ]

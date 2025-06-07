@@ -22,9 +22,8 @@ createCommit (CreateCommit info commitRoot) = do
     commitRels self = flip CommitRel self <$> commitInfoParents info
     putRel rel = statement rel Statements.putCommitRel
 
-{- | finds the lowest common anchestor of given commits if it exists.
-TODO: maybe not the best implementation, but it will work for now.
--}
+-- | finds the lowest common anchestor of given commits if it exists.
+--   TODO: maybe not the best implementation, but it will work for now.
 getLCACommitID :: [CommitID] -> Transaction (Maybe CommitID)
 getLCACommitID ids = do
     commitNodes <- mapM (`statement` Statements.getCommitNode) ids
@@ -73,11 +72,10 @@ putVersion (Tree self children) = do
     putEdge :: DataEdge -> Transaction ()
     putEdge edge = statement edge Statements.putEdge
 
-{- | transaction which ensures the existance of a node version in the database.
-If the handed node has no 'NodeID', a new node is created.
-TODO: if a node with id is handed, check if it exists. If not, just ignore the
-specified 'NodeID' and treat it just like a node with no id specified.
--}
+-- | transaction which ensures the existance of a node version in the database.
+--   If the handed node has no 'NodeID', a new node is created.
+--   TODO: if a node with id is handed, check if it exists. If not, just ignore the
+--   specified 'NodeID' and treat it just like a node with no id specified.
 ensureNodeExists :: NodeWithMaybeRef -> Transaction NodeWithRef
 ensureNodeExists (NodeWithMaybeRef (Just ref) node) = return $ NodeWithRef ref node
 ensureNodeExists (NodeWithMaybeRef Nothing node) = do

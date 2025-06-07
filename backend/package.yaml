@@ -16,8 +16,8 @@ extra-source-files:
 # To avoid duplicated efforts in documentation and dealing with the
 # complications of embedding Haddock markup inside cabal files, it is
 # common to point users to the README.md file.
-description: Please see the README on Codeberg at
-  <https://codeberg.org/fachpruefungsordnung/fachpruefungsordnung>
+description: Please see the README on GitHub at
+  <https://github.com/fachpruefungsordnung/fachpruefungsordnung>
 
 dependencies:
   - Cabal
@@ -37,6 +37,7 @@ dependencies:
   - text
   - zlib
   - cryptohash-sha1
+  - containers
   - base64-bytestring
   - time
   - servant
@@ -59,7 +60,8 @@ dependencies:
   - jose
   - uuid
   - megaparsec
-  - mtl
+  - parser-combinators
+  - pretty-simple
 
 ghc-options:
   - -Wall

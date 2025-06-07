@@ -6,23 +6,49 @@
         "core": {
           "dependencies": [
             "ace",
-            "affjax-web",
+            "aff",
+            "affjax",
+            "argonaut",
+            "argonaut-codecs",
+            "argonaut-core",
+            "arrays",
             "console",
+            "datetime",
+            "dom-indexed",
             "effect",
+            "either",
+            "foldable-traversable",
             "halogen",
             "halogen-bootstrap5",
             "halogen-store",
-            "json",
+            "halogen-subscriptions",
+            "http-methods",
+            "integers",
+            "maybe",
             "prelude",
+            "record",
+            "record-extra",
             "routing",
-            "routing-duplex"
+            "routing-duplex",
+            "safe-coerce",
+            "simple-i18n",
+            "strings",
+            "tailrec",
+            "web-dom",
+            "web-events",
+            "web-file",
+            "web-html",
+            "web-storage",
+            "web-uievents"
           ],
           "build_plan": [
             "ace",
             "aff",
             "affjax",
-            "affjax-web",
+            "argonaut",
+            "argonaut-codecs",
             "argonaut-core",
+            "argonaut-traversals",
             "arraybuffer-types",
             "arrays",
             "assert",
@@ -64,7 +90,6 @@
             "js-date",
             "js-promise",
             "js-uri",
-            "json",
             "lazy",
             "lcg",
             "lists",
@@ -81,14 +106,17 @@
             "partial",
             "prelude",
             "profunctor",
+            "profunctor-lenses",
             "quickcheck",
             "random",
             "record",
+            "record-extra",
             "refs",
             "routing",
             "routing-duplex",
             "safe-coerce",
             "semirings",
+            "simple-i18n",
             "st",
             "strings",
             "tailrec",
@@ -716,16 +744,32 @@
         "web-xhr"
       ]
     },
-    "affjax-web": {
+    "argonaut": {
       "type": "registry",
-      "version": "1.0.0",
-      "integrity": "sha256-n/yJUk1wMxMN7fJ2TJ+fELgieomy29N617yOshAnrc0=",
+      "version": "9.0.0",
+      "integrity": "sha256-9sHzkzcFkaMUa9+3FjIybJDYnHtY4Jp4zHOJ84qPTXo=",
       "dependencies": [
-        "aff",
-        "affjax",
-        "either",
+        "argonaut-codecs",
+        "argonaut-core",
+        "argonaut-traversals"
+      ]
+    },
+    "argonaut-codecs": {
+      "type": "registry",
+      "version": "9.1.0",
+      "integrity": "sha256-N6efXByUeg848ompEqJfVvZuZPfdRYDGlTDFn0G0Oh8=",
+      "dependencies": [
+        "argonaut-core",
+        "arrays",
+        "effect",
+        "foreign-object",
+        "identity",
+        "integers",
         "maybe",
-        "prelude"
+        "nonempty",
+        "ordered-collections",
+        "prelude",
+        "record"
       ]
     },
     "argonaut-core": {
@@ -744,6 +788,16 @@
         "prelude",
         "strings",
         "tailrec"
+      ]
+    },
+    "argonaut-traversals": {
+      "type": "registry",
+      "version": "10.0.0",
+      "integrity": "sha256-9nSfqR70rjiNWVVsCoK+jrm9dmyZTx89IKNYO6uNUIk=",
+      "dependencies": [
+        "argonaut-codecs",
+        "argonaut-core",
+        "profunctor-lenses"
       ]
     },
     "arraybuffer-types": {
@@ -1312,23 +1366,6 @@
         "maybe"
       ]
     },
-    "json": {
-      "type": "registry",
-      "version": "1.1.0",
-      "integrity": "sha256-LuN8PyX/gvRR4/7X7M9P+zL7BKbv34NcUE/7MILXQSA=",
-      "dependencies": [
-        "either",
-        "foldable-traversable",
-        "functions",
-        "gen",
-        "integers",
-        "maybe",
-        "prelude",
-        "strings",
-        "tuples",
-        "unfoldable"
-      ]
-    },
     "lazy": {
       "type": "registry",
       "version": "6.0.0",
@@ -1514,6 +1551,33 @@
         "tuples"
       ]
     },
+    "profunctor-lenses": {
+      "type": "registry",
+      "version": "8.0.0",
+      "integrity": "sha256-K7f29rHRHgVSb2Y/PaSKtfYPriP6n87BJNO7EhsZHas=",
+      "dependencies": [
+        "arrays",
+        "bifunctors",
+        "const",
+        "control",
+        "distributive",
+        "either",
+        "foldable-traversable",
+        "foreign-object",
+        "functors",
+        "identity",
+        "lists",
+        "maybe",
+        "newtype",
+        "ordered-collections",
+        "partial",
+        "prelude",
+        "profunctor",
+        "record",
+        "transformers",
+        "tuples"
+      ]
+    },
     "quickcheck": {
       "type": "registry",
       "version": "8.0.1",
@@ -1565,6 +1629,20 @@
         "functions",
         "prelude",
         "unsafe-coerce"
+      ]
+    },
+    "record-extra": {
+      "type": "registry",
+      "version": "5.0.1",
+      "integrity": "sha256-7vnREK2fpGJ7exswSeA9UpZFuU+UXRt3SA7AFUldT/Y=",
+      "dependencies": [
+        "arrays",
+        "functions",
+        "lists",
+        "prelude",
+        "record",
+        "tuples",
+        "typelevel-prelude"
       ]
     },
     "refs": {
@@ -1641,6 +1719,20 @@
         "lists",
         "newtype",
         "prelude"
+      ]
+    },
+    "simple-i18n": {
+      "type": "registry",
+      "version": "2.0.1",
+      "integrity": "sha256-UKhN4RzNA4VxqtGHohyIGaFryaAsHFbfzokSbBs+mqI=",
+      "dependencies": [
+        "foreign-object",
+        "maybe",
+        "prelude",
+        "record",
+        "record-extra",
+        "typelevel-prelude",
+        "unsafe-coerce"
       ]
     },
     "st": {

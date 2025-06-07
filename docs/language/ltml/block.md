@@ -1,17 +1,16 @@
 # Blocks
 
-There are several kinds of blocks, which are described in the following.
+A block is either a [paragraph](#paragraphs), a [table](#tables),
+or an [appendix](#appendices).
 
 
 ## Paragraphs
 
-Paragraphs are composed of [sentences](#sentences).
+Paragraphs are composed of [styled text](./text.md).
+Unlike general text, paragraph text is made up of sentences.
 
-
-### Sentences
-
-Sentences are text that is generally terminated by a single period (`.`).
-Exceptions apply in the context of [text](./text.md#child-nodes) (TODO).
+Sentences are generally terminated by a single period (`.`), each.
+Exceptions apply in the context of [text children](./text.md#child-nodes) (TODO).
 
 
 ## Tables
