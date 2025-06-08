@@ -36,6 +36,7 @@ import Servant.OpenApi (HasOpenApi (toOpenApi))
 import qualified Server.Auth as Auth
 import Server.HTTPHeaders (PDF, PDFByteString (..))
 import Server.HandlerUtil
+import qualified UserManagement.Document as Document
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
@@ -136,6 +137,10 @@ type ProtectedAPI =
             :> "superadmin"
             :> Capture "userId" User.UserID
             :> Delete '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "documents"
+            :> Capture "documentID" Document.DocumentID
+            :> Get '[JSON] ExistingCommit
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -476,6 +481,11 @@ deleteSuperadminHandler (Authenticated Auth.Token {..}) userID =
         else throwError errSuperAdminOnly
 deleteSuperadminHandler _ _ = throwError errNotLoggedIn
 
+getDocumentHandler
+    :: AuthResult Auth.Token -> Document.DocumentID -> Handler ExistingCommit
+getDocumentHandler (Authenticated Auth.Token {..}) docID = undefined
+getDocumentHandler _ _ = undefined
+
 api :: Proxy (PublicAPI :<|> ProtectedAPI)
 api = Proxy
 
@@ -511,6 +521,7 @@ server cookieSett jwtSett =
                 :<|> deleteRoleHandler
                 :<|> postSuperadminHandler
                 :<|> deleteSuperadminHandler
+                :<|> getDocumentHandler
              )
 
 documentedAPI :: Proxy DocumentedAPI

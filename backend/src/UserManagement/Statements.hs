@@ -34,6 +34,7 @@ import Data.Vector
 import GHC.Int
 import Hasql.Statement
 import Hasql.TH
+import qualified UserManagement.Document as Document
 import qualified UserManagement.Group as Group
 import qualified UserManagement.User as User
 import Prelude hiding (id)
@@ -246,3 +247,6 @@ checkSuperadmin =
         where user_id = $1 :: uuid
       ) :: bool
     |]
+
+checkDocumentPermission :: Statement User.UserID Document.DocPermission
+checkDocumentPermission = undefined
