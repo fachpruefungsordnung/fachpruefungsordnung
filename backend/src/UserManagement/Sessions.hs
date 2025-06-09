@@ -20,6 +20,8 @@ module UserManagement.Sessions
     , addSuperadmin
     , removeSuperadmin
     , checkSuperadmin
+    , checkGroupDocPermission
+    , getExternalDocPermission
     )
 where
 
@@ -27,6 +29,7 @@ import qualified Data.Bifunctor (second)
 import Data.Text (Text)
 import Data.Vector (Vector)
 import Hasql.Session (Session, statement)
+import qualified UserManagement.Document as Document
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Statements as Statements
 import qualified UserManagement.User as User
@@ -101,3 +104,10 @@ removeSuperadmin uid = statement uid Statements.removeSuperadmin
 
 checkSuperadmin :: User.UserID -> Session Bool
 checkSuperadmin uid = statement uid Statements.checkSuperadmin
+
+checkGroupDocPermission :: User.UserID -> Document.DocumentID -> Session Bool
+checkGroupDocPermission uid did = statement (uid, did) Statements.checkGroupDocPermission
+
+getExternalDocPermission
+    :: User.UserID -> Document.DocumentID -> Session (Maybe Document.DocPermission)
+getExternalDocPermission uid did = statement (uid, did) Statements.getExternalDocPermission

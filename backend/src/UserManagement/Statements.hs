@@ -23,6 +23,8 @@ module UserManagement.Statements
     , addSuperadmin
     , removeSuperadmin
     , checkSuperadmin
+    , checkGroupDocPermission
+    , getExternalDocPermission
     )
 where
 
@@ -34,6 +36,7 @@ import Data.Vector
 import GHC.Int
 import Hasql.Statement
 import Hasql.TH
+import UserManagement.Document (textToPermission)
 import qualified UserManagement.Document as Document
 import qualified UserManagement.Group as Group
 import qualified UserManagement.User as User
@@ -248,5 +251,27 @@ checkSuperadmin =
       ) :: bool
     |]
 
-checkDocumentPermission :: Statement User.UserID Document.DocPermission
-checkDocumentPermission = undefined
+-- | check if User is Member (or Admin) of the group that owns the specified document
+checkGroupDocPermission :: Statement (User.UserID, Document.DocumentID) Bool
+checkGroupDocPermission =
+    [singletonStatement|
+      
+      select exists (
+        select 1
+        from roles r
+        join documents d on d.group_id = r.group_id
+        where r.user_id = $1 :: uuid and d.id = $2 :: int4
+      ) :: bool
+    |]
+
+-- | extract the DocPermission for external document editors if they exist
+getExternalDocPermission
+    :: Statement (User.UserID, Document.DocumentID) (Maybe Document.DocPermission)
+getExternalDocPermission =
+    rmap
+        (>>= textToPermission)
+        [maybeStatement|
+    select permission :: text 
+    from external_document_rights
+    where user_id = $1 :: uuid and document_id = $2 :: int4
+  |]

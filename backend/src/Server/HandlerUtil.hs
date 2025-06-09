@@ -13,6 +13,7 @@ module Server.HandlerUtil
     , errNotLoggedIn
     , errUserNotFound
     , errEmailAlreadyUsed
+    , checkDocPermission
     ) where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -21,14 +22,16 @@ import Hasql.Connection (Connection)
 import Hasql.Session (run)
 import Servant
 import Server.Auth (Token (..))
-import UserManagement.Group as Group
+import qualified UserManagement.Document as Document
+import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 
 -- | Checks if User is SuperAdmin or Admin in the given group.
 --   If so, it calls the given callback Handler;
 --   Otherwise, it throws a 403 error.
-ifSuperOrAdminDo :: Connection -> Token -> GroupID -> Handler a -> Handler a
+ifSuperOrAdminDo
+    :: Connection -> Token -> Group.GroupID -> Handler a -> Handler a
 ifSuperOrAdminDo conn (Token {..}) groupID callback =
     if isSuperadmin
         then callback
@@ -60,6 +63,28 @@ addRoleInGroup conn userID groupID role = do
     case eResult of
         Right () -> return ()
         Left _ -> throwError errFailedToSetRole
+
+-- | Check if User is Member (or Admin) of the group that owns the specified document
+--   or return external DocPermission
+-- Nothing                     -> both paths failed (no permission)
+-- Maybe (Left ())             -> User is Member of the right group
+-- Maybe (Right DocPermission) -> User has external access
+checkDocPermission
+    :: User.UserID
+    -> Document.DocumentID
+    -> Handler (Maybe (Either () Document.DocPermission))
+checkDocPermission userID docID = do
+    conn <- tryGetDBConnection
+    eIsMember <- liftIO $ run (Sessions.checkGroupDocPermission userID docID) conn
+    case eIsMember of
+        Left _ -> throwError errDatabaseAccessFailed
+        Right True -> return $ Just $ Left () -- user is member of right group
+        Right False -> do
+            ePerm <- liftIO $ run (Sessions.getExternalDocPermission userID docID) conn
+            case ePerm of
+                Left _ -> throwError errDatabaseAccessFailed
+                Right Nothing -> return Nothing
+                Right (Just perm) -> return $ Just $ Right perm
 
 -- Specific errors
 errDatabaseConnectionFailed :: ServerError
