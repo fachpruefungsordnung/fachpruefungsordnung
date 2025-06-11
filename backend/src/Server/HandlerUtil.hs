@@ -5,6 +5,8 @@ module Server.HandlerUtil
     ( ifSuperOrAdminDo
     , tryGetDBConnection
     , addRoleInGroup
+    , checkDocPermission
+    , getGroupOfDocument
     , errDatabaseConnectionFailed
     , errDatabaseAccessFailed
     , errNoAdminInThisGroup
@@ -14,8 +16,7 @@ module Server.HandlerUtil
     , errUserNotFound
     , errEmailAlreadyUsed
     , errDocumentDoesNotExist
-    , checkDocPermission
-    , getGroupOfDocument
+    , errNoPermission
     ) where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -67,27 +68,27 @@ addRoleInGroup conn userID groupID role = do
         Left _ -> throwError errFailedToSetRole
 
 -- | Check if User is Member (or Admin) of the group that owns the specified document
---   or return external DocPermission
--- Nothing                     -> both paths failed (no permission)
--- Maybe (Left ())             -> User is Member of the right group
--- Maybe (Right DocPermission) -> User has external access
+--   or return external DocPermission. Members will always get `Edit` permission.
+-- Nothing            -> both paths failed (no permission)
+-- Just DocPermission -> User has given access rights
 checkDocPermission
-    :: User.UserID
+    :: Connection
+    -> User.UserID
     -> Document.DocumentID
-    -> Handler (Maybe (Either () Document.DocPermission))
-checkDocPermission userID docID = do
-    conn <- tryGetDBConnection
+    -> Handler (Maybe Document.DocPermission)
+checkDocPermission conn userID docID = do
     eIsMember <- liftIO $ run (Sessions.checkGroupDocPermission userID docID) conn
     case eIsMember of
         Left _ -> throwError errDatabaseAccessFailed
-        Right True -> return $ Just $ Left () -- user is member of right group
+        Right True -> return $ Just Document.Edit -- user is member of right group
         Right False -> do
             ePerm <- liftIO $ run (Sessions.getExternalDocPermission userID docID) conn
             case ePerm of
                 Left _ -> throwError errDatabaseAccessFailed
                 Right Nothing -> return Nothing
-                Right (Just perm) -> return $ Just $ Right perm
+                Right (Just perm) -> return $ Just perm
 
+-- | Get the groupID of the group that owns the specified document
 getGroupOfDocument :: Document.DocumentID -> Handler Group.GroupID
 getGroupOfDocument docID = do
     conn <- tryGetDBConnection
@@ -132,3 +133,6 @@ errEmailAlreadyUsed = err409 {errBody = "Email is already in use."}
 
 errDocumentDoesNotExist :: ServerError
 errDocumentDoesNotExist = err404 {errBody = "Document not found."}
+
+errNoPermission :: ServerError
+errNoPermission = err403 {errBody = "Insufficient permission to perform this action."}

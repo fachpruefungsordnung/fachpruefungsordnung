@@ -145,7 +145,6 @@ type ProtectedAPI =
             :> "documents"
             :> Capture "documentID" Document.DocumentID
             :> "external"
-            :> "all"
             :> Get '[JSON] [(User.UserID, Document.DocPermission)]
         :<|> Auth AuthMethod Auth.Token
             :> "documents"
@@ -508,12 +507,20 @@ deleteSuperadminHandler _ _ = throwError errNotLoggedIn
 
 getDocumentHandler
     :: AuthResult Auth.Token -> Document.DocumentID -> Handler ExistingCommit
-getDocumentHandler (Authenticated Auth.Token {..}) docID = undefined
-getDocumentHandler _ _ = undefined
+getDocumentHandler (Authenticated Auth.Token {..}) docID = do
+    conn <- tryGetDBConnection
+    mPerm <- checkDocPermission conn subject docID
+    case mPerm of
+        Nothing -> throwError errNoPermission
+        Just perm ->
+            if perm >= Document.Read
+                then undefined -- TODO: function for returning doc
+                else throwError errNoPermission
+getDocumentHandler _ _ = throwError errNotLoggedIn
 
 getDocumentAllExternalUsersHandler
-    :: AuthResult Auth.Token 
-    -> Document.DocumentID 
+    :: AuthResult Auth.Token
+    -> Document.DocumentID
     -> Handler [(User.UserID, Document.DocPermission)]
 getDocumentAllExternalUsersHandler (Authenticated token) docID = do
     conn <- tryGetDBConnection
@@ -522,17 +529,17 @@ getDocumentAllExternalUsersHandler (Authenticated token) docID = do
   where
     getUsers :: Connection -> Handler [(User.UserID, Document.DocPermission)]
     getUsers conn = do
-        eUserlist <- liftIO $ Session.run (Sessions.getAllExternalUsersOfDocument docID) conn
+        eUserlist <-
+            liftIO $ Session.run (Sessions.getAllExternalUsersOfDocument docID) conn
         case eUserlist of
             Left _ -> throwError errDatabaseAccessFailed
             Right userList -> return userList
-
 getDocumentAllExternalUsersHandler _ _ = throwError errNotLoggedIn
 
 getDocumentExternalUserHandler
-    :: AuthResult Auth.Token 
-    -> Document.DocumentID 
-    -> User.UserID 
+    :: AuthResult Auth.Token
+    -> Document.DocumentID
+    -> User.UserID
     -> Handler (Maybe Document.DocPermission)
 getDocumentExternalUserHandler (Authenticated token) docID userID = do
     conn <- tryGetDBConnection
@@ -541,17 +548,18 @@ getDocumentExternalUserHandler (Authenticated token) docID userID = do
   where
     getUser :: Connection -> Handler (Maybe Document.DocPermission)
     getUser conn = do
-        emPermission <- liftIO $ Session.run (Sessions.getExternalDocPermission userID docID) conn
+        emPermission <-
+            liftIO $ Session.run (Sessions.getExternalDocPermission userID docID) conn
         case emPermission of
             Left _ -> throwError errDatabaseAccessFailed
             Right mPermission -> return mPermission
 getDocumentExternalUserHandler _ _ _ = throwError errNotLoggedIn
 
 postDocumentExternalUserHandler
-    :: AuthResult Auth.Token 
-    -> Document.DocumentID 
-    -> User.UserID 
-    -> Document.DocPermission 
+    :: AuthResult Auth.Token
+    -> Document.DocumentID
+    -> User.UserID
+    -> Document.DocPermission
     -> Handler NoContent
 postDocumentExternalUserHandler (Authenticated token) docID userID perm = do
     conn <- tryGetDBConnection
@@ -560,25 +568,28 @@ postDocumentExternalUserHandler (Authenticated token) docID userID perm = do
   where
     postUser :: Connection -> Handler NoContent
     postUser conn = do
-        emPermission <- liftIO $ Session.run (Sessions.getExternalDocPermission userID docID) conn
+        emPermission <-
+            liftIO $ Session.run (Sessions.getExternalDocPermission userID docID) conn
         case emPermission of
             Left _ -> throwError errDatabaseAccessFailed
-            Right Nothing -> do 
-                eAction <- liftIO $ Session.run (Sessions.addExternalDocPermission userID docID perm) conn
+            Right Nothing -> do
+                eAction <-
+                    liftIO $ Session.run (Sessions.addExternalDocPermission userID docID perm) conn
                 case eAction of
                     Left _ -> throwError errDatabaseAccessFailed
                     Right _ -> return NoContent
             Right (Just _) -> do
-                eAction <- liftIO $ Session.run (Sessions.updateExternalDocPermission userID docID perm) conn
+                eAction <-
+                    liftIO $
+                        Session.run (Sessions.updateExternalDocPermission userID docID perm) conn
                 case eAction of
                     Left _ -> throwError errDatabaseAccessFailed
                     Right _ -> return NoContent
-
 postDocumentExternalUserHandler _ _ _ _ = throwError errNotLoggedIn
 
 deleteDocumentExternalUsersHandler
-    :: AuthResult Auth.Token 
-    -> Document.DocumentID 
+    :: AuthResult Auth.Token
+    -> Document.DocumentID
     -> User.UserID
     -> Handler NoContent
 deleteDocumentExternalUsersHandler (Authenticated token) docID userID = do
@@ -588,7 +599,8 @@ deleteDocumentExternalUsersHandler (Authenticated token) docID userID = do
   where
     postUser :: Connection -> Handler NoContent
     postUser conn = do
-        eAction <- liftIO $ Session.run (Sessions.deleteExternalDocPermission userID docID) conn
+        eAction <-
+            liftIO $ Session.run (Sessions.deleteExternalDocPermission userID docID) conn
         case eAction of
             Left _ -> throwError errDatabaseAccessFailed
             Right _ -> return NoContent
