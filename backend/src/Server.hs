@@ -144,6 +144,10 @@ type ProtectedAPI =
         :<|> Auth AuthMethod Auth.Token
             :> "documents"
             :> Capture "documentID" Document.DocumentID
+            :> Delete '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "documents"
+            :> Capture "documentID" Document.DocumentID
             :> "external"
             :> Get '[JSON] [(User.UserID, Document.DocPermission)]
         :<|> Auth AuthMethod Auth.Token
@@ -518,6 +522,17 @@ getDocumentHandler (Authenticated Auth.Token {..}) docID = do
                 else throwError errNoPermission
 getDocumentHandler _ _ = throwError errNotLoggedIn
 
+deleteDocumentHandler
+    :: AuthResult Auth.Token -> Document.DocumentID -> Handler NoContent
+deleteDocumentHandler (Authenticated token) docID = do
+    conn <- tryGetDBConnection
+    groupID <- getGroupOfDocument conn docID
+    ifSuperOrAdminDo conn token groupID (deleteDoc docID)
+  where
+    deleteDoc :: Document.DocumentID -> Handler NoContent
+    deleteDoc = undefined -- TODO: function call to delete document
+deleteDocumentHandler _ _ = throwError errNotLoggedIn
+
 getDocumentAllExternalUsersHandler
     :: AuthResult Auth.Token
     -> Document.DocumentID
@@ -642,6 +657,7 @@ server cookieSett jwtSett =
                 :<|> postSuperadminHandler
                 :<|> deleteSuperadminHandler
                 :<|> getDocumentHandler
+                :<|> deleteDocumentHandler
                 :<|> getDocumentAllExternalUsersHandler
                 :<|> getDocumentExternalUserHandler
                 :<|> postDocumentExternalUserHandler
