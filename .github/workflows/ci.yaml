@@ -66,6 +66,9 @@ jobs:
         with:
           path: backend/
           fail-on: suggestion
+      - name: Debug
+        working-directory: frontend
+        run: ls .
 
       - name: Build Stack Project
         uses: freckle/stack-action@v5
