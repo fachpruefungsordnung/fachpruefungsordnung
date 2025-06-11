@@ -9,6 +9,7 @@
 
 module Server.Handlers.DocumentHandlers (
       getDocumentHandler
+    , deleteDocumentHandler
     , getAllExternalUsersDocumentHandler
     , getExternalUserDocumentHandler
     , postExternalUserDocumentHandler
@@ -40,6 +41,17 @@ getDocumentHandler (Authenticated Auth.Token {..}) docID = do
                 then undefined -- TODO: function for returning doc
                 else throwError errNoPermission
 getDocumentHandler _ _ = throwError errNotLoggedIn
+
+deleteDocumentHandler
+    :: AuthResult Auth.Token -> Document.DocumentID -> Handler NoContent
+deleteDocumentHandler (Authenticated token) docID = do
+    conn <- tryGetDBConnection
+    groupID <- getGroupOfDocument conn docID
+    ifSuperOrAdminDo conn token groupID (deleteDoc docID)
+  where
+    deleteDoc :: Document.DocumentID -> Handler NoContent
+    deleteDoc = undefined -- TODO: function call to delete document
+deleteDocumentHandler _ _ = throwError errNotLoggedIn
 
 getAllExternalUsersDocumentHandler
     :: AuthResult Auth.Token

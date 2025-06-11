@@ -142,6 +142,10 @@ type ProtectedAPI =
         :<|> Auth AuthMethod Auth.Token
             :> "documents"
             :> Capture "documentID" Document.DocumentID
+            :> Delete '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "documents"
+            :> Capture "documentID" Document.DocumentID
             :> "external"
             :> Get '[JSON] [(User.UserID, Document.DocPermission)]
         :<|> Auth AuthMethod Auth.Token
@@ -238,6 +242,7 @@ server cookieSett jwtSett =
                 :<|> postSuperadminHandler
                 :<|> deleteSuperadminHandler
                 :<|> getDocumentHandler
+                :<|> deleteDocumentHandler
                 :<|> getAllExternalUsersDocumentHandler
                 :<|> getExternalUserDocumentHandler
                 :<|> postExternalUserDocumentHandler
