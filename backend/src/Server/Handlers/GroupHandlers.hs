@@ -7,23 +7,43 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Server.Handlers.GroupHandlers (
-      groupMembersHandler
-    , createGroupHandler
-    , deleteGroupHandler
-) where
+module Server.Handlers.GroupHandlers
+    ( GroupAPI
+    , groupServer
+    ) where
 
 import Control.Monad.IO.Class
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
 import Servant.Auth.Server
+import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
 import Server.HandlerUtil
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 import Prelude hiding (readFile)
+
+type GroupAPI =
+    Auth AuthMethod Auth.Token
+        :> "groups"
+        :> ReqBody '[JSON] Group.Group
+        :> Post '[JSON] Group.GroupID
+        :<|> Auth AuthMethod Auth.Token
+            :> "groups"
+            :> Capture "groupID" Group.GroupID
+            :> Get '[JSON] [User.UserInfo]
+        :<|> Auth AuthMethod Auth.Token
+            :> "groups"
+            :> Capture "groupID" Group.GroupID
+            :> Delete '[JSON] NoContent
+
+groupServer :: Server GroupAPI
+groupServer =
+    createGroupHandler
+        :<|> groupMembersHandler
+        :<|> deleteGroupHandler
 
 groupMembersHandler
     :: AuthResult Auth.Token -> Group.GroupID -> Handler [User.UserInfo]

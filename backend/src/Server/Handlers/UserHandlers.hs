@@ -7,74 +7,49 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Server.Handlers.UserHandlers 
-    ( userHandler
-    , loginHandler
-    , logoutHandler
-    , registerHandler
-    , getUserHandler
-    , deleteUserHandler
-    , patchUserHandler) where
+module Server.Handlers.UserHandlers
+    ( UserAPI
+    , userServer
+    ) where
 
 import Control.Monad.IO.Class
 import Data.Password.Argon2
-import Data.Vector (toList)
-import Database (getConnection)
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
 import Servant.Auth.Server
+import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
 import Server.HandlerUtil
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 import Prelude hiding (readFile)
 
+type UserAPI =
+    Auth AuthMethod Auth.Token
+        :> "register"
+        :> ReqBody '[JSON] Auth.UserRegisterData
+        :> Post '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "users"
+            :> Capture "userId" User.UserID
+            :> Get '[JSON] User.FullUser
+        :<|> Auth AuthMethod Auth.Token
+            :> "users"
+            :> Capture "userId" User.UserID
+            :> Delete '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "users"
+            :> Capture "userId" User.UserID
+            :> ReqBody '[JSON] Auth.UserUpdate
+            :> Patch '[JSON] NoContent
 
-userHandler :: Handler [User.User]
-userHandler = liftIO $ do
-    Right connection <- getConnection
-    Right vector <- Session.run Sessions.getUsers connection
-    return $ toList vector
-
-loginHandler
-    :: CookieSettings
-    -> JWTSettings
-    -> Auth.UserLoginData
-    -> Handler
-        ( Headers
-            '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie]
-            NoContent
-        )
-loginHandler cookieSett jwtSett Auth.UserLoginData {..} = do
-    conn <- tryGetDBConnection
-    eUser <- liftIO $ Session.run (Sessions.getLoginRequirements loginEmail) conn
-    case eUser of
-        Right (Just (uid, pwhash)) -> do
-            let passwordCheck = checkPassword (mkPassword loginPassword) (PasswordHash pwhash)
-            case passwordCheck of
-                PasswordCheckFail -> throwError $ err401 {errBody = "email or password incorrect\n"}
-                PasswordCheckSuccess -> do
-                    eSuperadmin <- liftIO $ Session.run (Sessions.checkSuperadmin uid) conn
-                    case eSuperadmin of
-                        Left _ -> throwError errDatabaseAccessFailed
-                        Right isSuperadmin -> do
-                            mLoginAccepted <-
-                                liftIO $ acceptLogin cookieSett jwtSett (Auth.Token uid isSuperadmin)
-                            case mLoginAccepted of
-                                Nothing -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
-                                Just addHeaders -> return $ addHeaders NoContent
-        Right Nothing -> throwError errUserNotFound
-        Left _ -> throwError errDatabaseAccessFailed
-
-logoutHandler
-    :: CookieSettings
-    -> Handler
-        ( Headers
-            '[Header "Set-Cookie" SetCookie, Header "Set-Cookie" SetCookie]
-            NoContent
-        )
-logoutHandler cookieSett = return $ clearSession cookieSett NoContent
+userServer :: Server UserAPI
+userServer =
+    registerHandler
+        :<|> getUserHandler
+        :<|> deleteUserHandler
+        :<|> patchUserHandler
 
 registerHandler
     :: AuthResult Auth.Token -> Auth.UserRegisterData -> Handler NoContent

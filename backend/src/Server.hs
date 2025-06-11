@@ -23,22 +23,25 @@ import Data.OpenApi
     , version
     )
 import Data.UUID (toString)
+import Data.Vector (toList)
 import Database (getConnection)
 import GHC.Int (Int32)
+import qualified Hasql.Session as Session
 import Network.Wai.Handler.Warp (run)
 import Servant
 import Servant.Auth.Server
 import Servant.OpenApi (HasOpenApi (toOpenApi))
+import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
 import Server.HTTPHeaders (PDF, PDFByteString (..))
-import qualified UserManagement.Document as Document
-import qualified UserManagement.Group as Group
-import qualified UserManagement.User as User
-import qualified VersionControl as VC
-import Server.Handlers.UserHandlers
+import Server.Handlers.AuthHandlers
+import Server.Handlers.DocumentHandlers
 import Server.Handlers.GroupHandlers
 import Server.Handlers.RoleHandlers
-import Server.Handlers.DocumentHandlers
+import Server.Handlers.UserHandlers
+import qualified UserManagement.Sessions as Sessions
+import qualified UserManagement.User as User
+import qualified VersionControl as VC
 import VersionControl.Commit
 import Prelude hiding (readFile)
 
@@ -51,122 +54,16 @@ type PublicAPI =
         :<|> "users" :> Get '[JSON] [User.User]
         :<|> "document" :> Get '[PDF] PDFByteString
         :<|> DebugAPI
-        :<|> "login"
-            :> ReqBody '[JSON] Auth.UserLoginData
-            :> Post
-                '[JSON]
-                ( Headers
-                    '[ Header "Set-Cookie" SetCookie
-                     , Header "Set-Cookie" SetCookie
-                     ]
-                    NoContent
-                )
-        :<|> "logout"
-            :> Get
-                '[JSON]
-                ( Headers
-                    '[ Header "Set-Cookie" SetCookie
-                     , Header "Set-Cookie" SetCookie
-                     ]
-                    NoContent
-                )
-
--- | Cookie means that Auth is implemented via two Cookies.
---   One HTTP-only JWT Cookie, which is managed by the browser
---   and a XSRF Cookie, which has to be mirrored in a "X-XSRF-TOKEN" Header
-type AuthMethod = '[Cookie]
+        :<|> AuthAPI
 
 type ProtectedAPI =
-             Auth AuthMethod Auth.Token
-            :> "protected"
-            :> Get '[JSON] String
-        :<|> Auth AuthMethod Auth.Token
-            :> "register"
-            :> ReqBody '[JSON] Auth.UserRegisterData
-            :> Post '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "users"
-            :> Capture "userId" User.UserID
-            :> Get '[JSON] User.FullUser
-        :<|> Auth AuthMethod Auth.Token
-            :> "users"
-            :> Capture "userId" User.UserID
-            :> Delete '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "users"
-            :> Capture "userId" User.UserID
-            :> ReqBody '[JSON] Auth.UserUpdate
-            :> Patch '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "groups"
-            :> ReqBody '[JSON] Group.Group
-            :> Post '[JSON] Group.GroupID
-        :<|> Auth AuthMethod Auth.Token
-            :> "groups"
-            :> Capture "groupID" Group.GroupID
-            :> Get '[JSON] [User.UserInfo]
-        :<|> Auth AuthMethod Auth.Token
-            :> "groups"
-            :> Capture "groupID" Group.GroupID
-            :> Delete '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "roles"
-            :> Capture "groupID" Group.GroupID
-            :> Capture "userId" User.UserID
-            :> Get '[JSON] User.Role
-        :<|> Auth AuthMethod Auth.Token
-            :> "roles"
-            :> Capture "groupID" Group.GroupID
-            :> Capture "userId" User.UserID
-            :> ReqBody '[JSON] User.Role
-            :> Put '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "roles"
-            :> Capture "groupID" Group.GroupID
-            :> Capture "userId" User.UserID
-            :> Delete '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "roles"
-            :> "superadmin"
-            :> Capture "userId" User.UserID
-            :> Post '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "roles"
-            :> "superadmin"
-            :> Capture "userId" User.UserID
-            :> Delete '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" Document.DocumentID
-            :> Get '[JSON] ExistingCommit
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" Document.DocumentID
-            :> Delete '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" Document.DocumentID
-            :> "external"
-            :> Get '[JSON] [(User.UserID, Document.DocPermission)]
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" Document.DocumentID
-            :> "external"
-            :> Capture "userID" User.UserID
-            :> Get '[JSON] (Maybe Document.DocPermission)
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" Document.DocumentID
-            :> "external"
-            :> Capture "userID" User.UserID
-            :> ReqBody '[JSON] Document.DocPermission
-            :> Post '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" Document.DocumentID
-            :> "external"
-            :> Capture "userID" User.UserID
-            :> Delete '[JSON] NoContent
+    Auth AuthMethod Auth.Token
+        :> "protected"
+        :> Get '[JSON] String
+        :<|> UserAPI
+        :<|> GroupAPI
+        :<|> RoleAPI
+        :<|> DocumentAPI
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -174,6 +71,12 @@ type DocumentedAPI = SwaggerAPI :<|> PublicAPI :<|> ProtectedAPI
 
 pingHandler :: Handler String
 pingHandler = return "pong"
+
+userHandler :: Handler [User.User]
+userHandler = liftIO $ do
+    Right connection <- getConnection
+    Right vector <- Session.run Sessions.getUsers connection
+    return $ toList vector
 
 getCommitHandler :: Int32 -> Handler ExistingCommit
 getCommitHandler id' = liftIO $ do
@@ -225,28 +128,13 @@ server cookieSett jwtSett =
                 :<|> userHandler
                 :<|> documentHandler
                 :<|> debugAPIHandler
-                :<|> loginHandler cookieSett jwtSett
-                :<|> logoutHandler cookieSett
+                :<|> authServer cookieSett jwtSett
              )
         :<|> ( protectedHandler
-                :<|> registerHandler
-                :<|> getUserHandler
-                :<|> deleteUserHandler
-                :<|> patchUserHandler
-                :<|> createGroupHandler
-                :<|> groupMembersHandler
-                :<|> deleteGroupHandler
-                :<|> getRoleHandler
-                :<|> postRoleHandler
-                :<|> deleteRoleHandler
-                :<|> postSuperadminHandler
-                :<|> deleteSuperadminHandler
-                :<|> getDocumentHandler
-                :<|> deleteDocumentHandler
-                :<|> getAllExternalUsersDocumentHandler
-                :<|> getExternalUserDocumentHandler
-                :<|> postExternalUserDocumentHandler
-                :<|> deleteExternalUserDocumentHandler
+                :<|> userServer
+                :<|> groupServer
+                :<|> roleServer
+                :<|> documentServer
              )
 
 documentedAPI :: Proxy DocumentedAPI
