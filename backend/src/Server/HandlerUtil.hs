@@ -89,9 +89,8 @@ checkDocPermission conn userID docID = do
                 Right (Just perm) -> return $ Just perm
 
 -- | Get the groupID of the group that owns the specified document
-getGroupOfDocument :: Document.DocumentID -> Handler Group.GroupID
-getGroupOfDocument docID = do
-    conn <- tryGetDBConnection
+getGroupOfDocument :: Connection -> Document.DocumentID -> Handler Group.GroupID
+getGroupOfDocument conn docID = do
     emgroupID <- liftIO $ run (Sessions.getDocumentGroupID docID) conn
     case emgroupID of
         Left _ -> throwError errDatabaseAccessFailed

@@ -524,7 +524,7 @@ getDocumentAllExternalUsersHandler
     -> Handler [(User.UserID, Document.DocPermission)]
 getDocumentAllExternalUsersHandler (Authenticated token) docID = do
     conn <- tryGetDBConnection
-    groupID <- getGroupOfDocument docID
+    groupID <- getGroupOfDocument conn docID
     ifSuperOrAdminDo conn token groupID (getUsers conn)
   where
     getUsers :: Connection -> Handler [(User.UserID, Document.DocPermission)]
@@ -543,7 +543,7 @@ getDocumentExternalUserHandler
     -> Handler (Maybe Document.DocPermission)
 getDocumentExternalUserHandler (Authenticated token) docID userID = do
     conn <- tryGetDBConnection
-    groupID <- getGroupOfDocument docID
+    groupID <- getGroupOfDocument conn docID
     ifSuperOrAdminDo conn token groupID (getUser conn)
   where
     getUser :: Connection -> Handler (Maybe Document.DocPermission)
@@ -563,7 +563,7 @@ postDocumentExternalUserHandler
     -> Handler NoContent
 postDocumentExternalUserHandler (Authenticated token) docID userID perm = do
     conn <- tryGetDBConnection
-    groupID <- getGroupOfDocument docID
+    groupID <- getGroupOfDocument conn docID
     ifSuperOrAdminDo conn token groupID (postUser conn)
   where
     postUser :: Connection -> Handler NoContent
@@ -594,7 +594,7 @@ deleteDocumentExternalUsersHandler
     -> Handler NoContent
 deleteDocumentExternalUsersHandler (Authenticated token) docID userID = do
     conn <- tryGetDBConnection
-    groupID <- getGroupOfDocument docID
+    groupID <- getGroupOfDocument conn docID
     ifSuperOrAdminDo conn token groupID (postUser conn)
   where
     postUser :: Connection -> Handler NoContent
