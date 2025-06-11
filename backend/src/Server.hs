@@ -141,6 +141,31 @@ type ProtectedAPI =
             :> "documents"
             :> Capture "documentID" Document.DocumentID
             :> Get '[JSON] ExistingCommit
+        :<|> Auth AuthMethod Auth.Token
+            :> "documents"
+            :> Capture "documentID" Document.DocumentID
+            :> "external"
+            :> "all"
+            :> Get '[JSON] [(User.UserID, Document.DocPermission)]
+        :<|> Auth AuthMethod Auth.Token
+            :> "documents"
+            :> Capture "documentID" Document.DocumentID
+            :> "external"
+            :> Capture "userID" User.UserID
+            :> Get '[JSON] (Maybe Document.DocPermission)
+        :<|> Auth AuthMethod Auth.Token
+            :> "documents"
+            :> Capture "documentID" Document.DocumentID
+            :> "external"
+            :> Capture "userID" User.UserID
+            :> ReqBody '[JSON] Document.DocPermission
+            :> Post '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "documents"
+            :> Capture "documentID" Document.DocumentID
+            :> "external"
+            :> Capture "userID" User.UserID
+            :> Delete '[JSON] NoContent
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -486,6 +511,89 @@ getDocumentHandler
 getDocumentHandler (Authenticated Auth.Token {..}) docID = undefined
 getDocumentHandler _ _ = undefined
 
+getDocumentAllExternalUsersHandler
+    :: AuthResult Auth.Token 
+    -> Document.DocumentID 
+    -> Handler [(User.UserID, Document.DocPermission)]
+getDocumentAllExternalUsersHandler (Authenticated token) docID = do
+    conn <- tryGetDBConnection
+    groupID <- getGroupOfDocument docID
+    ifSuperOrAdminDo conn token groupID (getUsers conn)
+  where
+    getUsers :: Connection -> Handler [(User.UserID, Document.DocPermission)]
+    getUsers conn = do
+        eUserlist <- liftIO $ Session.run (Sessions.getAllExternalUsersOfDocument docID) conn
+        case eUserlist of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right userList -> return userList
+
+getDocumentAllExternalUsersHandler _ _ = throwError errNotLoggedIn
+
+getDocumentExternalUserHandler
+    :: AuthResult Auth.Token 
+    -> Document.DocumentID 
+    -> User.UserID 
+    -> Handler (Maybe Document.DocPermission)
+getDocumentExternalUserHandler (Authenticated token) docID userID = do
+    conn <- tryGetDBConnection
+    groupID <- getGroupOfDocument docID
+    ifSuperOrAdminDo conn token groupID (getUser conn)
+  where
+    getUser :: Connection -> Handler (Maybe Document.DocPermission)
+    getUser conn = do
+        emPermission <- liftIO $ Session.run (Sessions.getExternalDocPermission userID docID) conn
+        case emPermission of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right mPermission -> return mPermission
+getDocumentExternalUserHandler _ _ _ = throwError errNotLoggedIn
+
+postDocumentExternalUserHandler
+    :: AuthResult Auth.Token 
+    -> Document.DocumentID 
+    -> User.UserID 
+    -> Document.DocPermission 
+    -> Handler NoContent
+postDocumentExternalUserHandler (Authenticated token) docID userID perm = do
+    conn <- tryGetDBConnection
+    groupID <- getGroupOfDocument docID
+    ifSuperOrAdminDo conn token groupID (postUser conn)
+  where
+    postUser :: Connection -> Handler NoContent
+    postUser conn = do
+        emPermission <- liftIO $ Session.run (Sessions.getExternalDocPermission userID docID) conn
+        case emPermission of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right Nothing -> do 
+                eAction <- liftIO $ Session.run (Sessions.addExternalDocPermission userID docID perm) conn
+                case eAction of
+                    Left _ -> throwError errDatabaseAccessFailed
+                    Right _ -> return NoContent
+            Right (Just _) -> do
+                eAction <- liftIO $ Session.run (Sessions.updateExternalDocPermission userID docID perm) conn
+                case eAction of
+                    Left _ -> throwError errDatabaseAccessFailed
+                    Right _ -> return NoContent
+
+postDocumentExternalUserHandler _ _ _ _ = throwError errNotLoggedIn
+
+deleteDocumentExternalUsersHandler
+    :: AuthResult Auth.Token 
+    -> Document.DocumentID 
+    -> User.UserID
+    -> Handler NoContent
+deleteDocumentExternalUsersHandler (Authenticated token) docID userID = do
+    conn <- tryGetDBConnection
+    groupID <- getGroupOfDocument docID
+    ifSuperOrAdminDo conn token groupID (postUser conn)
+  where
+    postUser :: Connection -> Handler NoContent
+    postUser conn = do
+        eAction <- liftIO $ Session.run (Sessions.deleteExternalDocPermission userID docID) conn
+        case eAction of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right _ -> return NoContent
+deleteDocumentExternalUsersHandler _ _ _ = throwError errNotLoggedIn
+
 api :: Proxy (PublicAPI :<|> ProtectedAPI)
 api = Proxy
 
@@ -522,6 +630,10 @@ server cookieSett jwtSett =
                 :<|> postSuperadminHandler
                 :<|> deleteSuperadminHandler
                 :<|> getDocumentHandler
+                :<|> getDocumentAllExternalUsersHandler
+                :<|> getDocumentExternalUserHandler
+                :<|> postDocumentExternalUserHandler
+                :<|> deleteDocumentExternalUsersHandler
              )
 
 documentedAPI :: Proxy DocumentedAPI

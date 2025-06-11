@@ -13,7 +13,9 @@ module Server.HandlerUtil
     , errNotLoggedIn
     , errUserNotFound
     , errEmailAlreadyUsed
+    , errDocumentDoesNotExist
     , checkDocPermission
+    , getGroupOfDocument
     ) where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -86,6 +88,15 @@ checkDocPermission userID docID = do
                 Right Nothing -> return Nothing
                 Right (Just perm) -> return $ Just $ Right perm
 
+getGroupOfDocument :: Document.DocumentID -> Handler Group.GroupID
+getGroupOfDocument docID = do
+    conn <- tryGetDBConnection
+    emgroupID <- liftIO $ run (Sessions.getDocumentGroupID docID) conn
+    case emgroupID of
+        Left _ -> throwError errDatabaseAccessFailed
+        Right Nothing -> throwError errDocumentDoesNotExist
+        Right (Just groupID) -> return groupID
+
 -- Specific errors
 errDatabaseConnectionFailed :: ServerError
 errDatabaseConnectionFailed = err500 {errBody = "Connection to database failed!\n"}
@@ -118,3 +129,6 @@ errIsAlreadySuperadmin = err409 {errBody = "User already has Superadmin privileg
 
 errEmailAlreadyUsed :: ServerError
 errEmailAlreadyUsed = err409 {errBody = "Email is already in use."}
+
+errDocumentDoesNotExist :: ServerError
+errDocumentDoesNotExist = err404 {errBody = "Document not found."}

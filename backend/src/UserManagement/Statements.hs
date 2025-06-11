@@ -25,6 +25,11 @@ module UserManagement.Statements
     , checkSuperadmin
     , checkGroupDocPermission
     , getExternalDocPermission
+    , getDocumentGroupID
+    , getAllExternalUsersOfDocument
+    , addExternalDocPermission
+    , updateExternalDocPermission
+    , deleteExternalDocPermission
     )
 where
 
@@ -41,6 +46,7 @@ import qualified UserManagement.Document as Document
 import qualified UserManagement.Group as Group
 import qualified UserManagement.User as User
 import Prelude hiding (id)
+import qualified Control.Arrow as Data.Bifunctor
 
 getUserID :: Statement Text User.UserID
 getUserID =
@@ -275,3 +281,48 @@ getExternalDocPermission =
     from external_document_rights
     where user_id = $1 :: uuid and document_id = $2 :: int4
   |]
+
+-- | get the group id of a given document. the maybe is only technical and should never be Nothing in practice.
+getDocumentGroupID :: Statement Document.DocumentID (Maybe Group.GroupID)
+getDocumentGroupID =
+    [maybeStatement|
+     select group_id :: int4
+     from documents
+     where id = $1 :: int4
+   |]
+  
+addExternalDocPermission :: Statement (User.UserID, Document.DocumentID, Text) ()
+addExternalDocPermission = 
+    [resultlessStatement|
+
+      insert into external_document_rights (user_id, document_id, permission)
+      values ($1 :: uuid, $2 :: int4, $3 :: text :: docpermission)
+    |]
+  
+updateExternalDocPermission :: Statement (User.UserID, Document.DocumentID, Text) ()
+updateExternalDocPermission = 
+    [resultlessStatement|
+
+      update external_document_rights
+      set permission = $3 :: text :: docpermission
+      where user_id = $1 :: uuid and document_id = $2 :: int4
+    |]
+
+deleteExternalDocPermission :: Statement (User.UserID, Document.DocumentID) ()
+deleteExternalDocPermission =
+    [resultlessStatement|
+
+        delete from external_document_rights
+        where user_id = $1 :: uuid and document_id = $2 :: int4
+      |]
+
+getAllExternalUsersOfDocument :: Statement Document.DocumentID [(User.UserID, Maybe Document.DocPermission)]
+getAllExternalUsersOfDocument =
+    rmap
+        (fmap (Data.Bifunctor.second textToPermission) . toList)
+        [vectorStatement|
+          select user_id :: uuid, permission :: text
+          from external_document_rights
+          where document_id = $1 :: int4
+        |]
+
