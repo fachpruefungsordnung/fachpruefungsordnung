@@ -8,7 +8,7 @@ module FPO.Component.Splitview where
 
 import Prelude
 
-import Data.Array (findIndex, head, range, updateAt)
+import Data.Array (findIndex, range, updateAt)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
@@ -44,7 +44,6 @@ data Action
   | StartResize DragTarget MouseEvent
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
-  | ToggleSidebar
   | JumpToSection TOCEntry
   -- Toolbar buttons
   | ClickedHTTPRequest
@@ -52,6 +51,9 @@ data Action
   | QueryEditor
   | ClickLoadPdf
   | ShowWarning
+  -- Toggle buttons
+  | ToggleSidebar
+  | TogglePreview
   -- Query Output
   | HandleEditor Editor.Output
   | HandlePreview Preview.Output
@@ -61,9 +63,11 @@ type State =
 
   -- TOC: Table of Contents
   , tocEntries :: Array TOCEntry
+  , slectedTocEntry :: Maybe Int
 
   -- Store the width values as ratios of the total width
   -- TODO: Using the ratios to keep the ratio, when resizing the window
+  --      But how do we get the event of window resize?
 
   -- Instead of setting the width directly to mouse position, calculate a delta
   -- for a smoother and correct resize experience with the start positions
@@ -77,9 +81,18 @@ type State =
 
   -- The last expanded sidebar width, used to restore the sidebar when toggling
   , lastExpandedSidebarRatio :: Number
+  , lastExpandedMiddleRatio :: Number
 
+  -- There are 2 ways to send content to preview:
+  -- 1. This editorContent is sent through the slot in renderPreview
+  -- 2. Throuth QueryEditor, where the editor collects its content and sends it
+  --   to the preview component.
+  -- TODO: Which one to use?
   , editorContent :: Maybe (Array String)
-  , hasResizedSidebar :: Boolean
+
+  -- Boolean flags for UI state
+  , tocEntriesShown :: Boolean
+  , previewShown :: Boolean
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
   }
@@ -97,14 +110,17 @@ splitview = H.mkComponent
   { initialState: \_ ->
       { dragTarget: Nothing
       , tocEntries: []
+      , slectedTocEntry: Nothing
       , startMouseRatio: 0.0
       , startSidebarRatio: 0.0
       , startMiddleRatio: 0.0
       , sidebarRatio: 0.2
       , middleRatio: 0.4
       , lastExpandedSidebarRatio: 0.2
+      , lastExpandedMiddleRatio: 0.4
       , editorContent: Nothing
-      , hasResizedSidebar: false
+      , tocEntriesShown: true
+      , previewShown: true
       , pdfWarningAvailable: false
       , pdfWarningIsShown: false
       }
@@ -117,120 +133,162 @@ splitview = H.mkComponent
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div_
-      [ -- First Toolbar
-        HH.div
-          [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
-          [ HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const ToggleSidebar
-              ]
-              [ HH.text "[≡]" ]
-          , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const ClickedHTTPRequest
-              ]
-              [ HH.text "Click Me for HTTP request" ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const SaveSection
-              ]
-              [ HH.text "Save" ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const QueryEditor
-              ]
-              [ HH.text "Query Editor" ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const ClickLoadPdf
-              ]
-              [ HH.text "Load PDF" ]
-          , if not state.pdfWarningAvailable then HH.div_ []
-            else HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-              , HE.onClick $ const ShowWarning
-              ]
-              [ HH.text
-                  ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning")
-              ]
+      [ renderToolbar state, renderSplit state ]
+
+  renderToolbar :: State -> H.ComponentHTML Action Slots m
+  renderToolbar state =
+    -- First Toolbar
+    HH.div
+      [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
+      [ HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const ToggleSidebar
           ]
-      , renderSplit state
+          [ HH.text "[≡]" ]
+      , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const ClickedHTTPRequest
+          ]
+          [ HH.text "Click Me for HTTP request" ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const SaveSection
+          ]
+          [ HH.text "Save" ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const QueryEditor
+          ]
+          [ HH.text "Query Editor" ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const ClickLoadPdf
+          ]
+          [ HH.text "Load PDF" ]
+      , if not state.pdfWarningAvailable then HH.div_ []
+        else HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const ShowWarning
+          ]
+          [ HH.text
+              ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning")
+          ]
       ]
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
   renderSplit state =
     HH.div
-      -- Set mouse event
       [ HE.onMouseMove HandleMouseMove
       , HE.onMouseUp StopResize
       , HP.classes [ HB.dFlex ]
       , HP.style "height: 100vh; position: relative; user-select: none;"
       ]
-      [ -- Sidebar
-        HH.div
-          [ HP.classes [ HB.overflowAuto, HB.p1 ]
-          , HP.style $
-              "flex: 0 0 " <> show (state.sidebarRatio * 100.0) <>
-                "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"
-          ]
-          [ HH.div_
-              ( map
-                  ( \{ id, name, content } ->
-                      HH.div
-                        [ HP.title ("Jump to section " <> name)
-                        , HP.style
-                            "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0;"
+      ( -- TOC Sidebar
+        ( if state.tocEntriesShown then renderSidebar state
+          else []
+        )
+          <>
+            [ -- Editor
+              HH.div
+                [ HP.style $ "position: relative; flex: 0 0 "
+                    <> show (state.middleRatio * 100.0)
+                    <> "%;"
+                ]
+                [ -- Floating Button outside to the right of editor container to toggle preview
+                  HH.div
+                    [ HP.style
+                        "position: absolute; top: 50%; right: 0px; margin = outside transform: translateY(-50%); z-index: 10;"
+                    ]
+                    [ HH.button
+                        [ HP.classes [ HB.btn, HB.btnLight, HB.btnSm ]
+                        , HE.onClick \_ -> TogglePreview
                         ]
-                        [ HH.span
-                            [ HE.onClick \_ -> JumpToSection { id, name, content }
-                            , HP.classes [ HB.textTruncate ]
-                            , HP.style
-                                "cursor: pointer; display: inline-block; min-width: 6ch;"
-                            ]
-                            [ HH.text name ]
-                        ]
-                  )
-                  state.tocEntries
-              )
-          ]
+                        [ HH.text if state.previewShown then ">" else "<" ]
+                    ]
 
-      -- Resizer
-      , HH.div
-          [ HE.onMouseDown (StartResize ResizeLeft)
-          , HP.style "width: 5px; cursor: col-resize; background: #ccc;"
-          ]
-          []
+                -- The actual editor area
+                , HH.div
+                    [ HP.classes [ HB.dFlex, HB.flexColumn ]
+                    , HP.style
+                        "height: 100%; box-sizing: border-box; min-height: 0; overflow: hidden;"
+                    ]
+                    [ HH.slot _editor unit Editor.editor unit HandleEditor ]
+                ]
+            ]
+          <>
+            -- Preview Sectioin
+            ( if state.previewShown then renderPreview state
+              else []
+            )
+      )
 
-      -- Editor
-      , HH.div
-          [ HP.classes [ HB.dFlex, HB.flexColumn ]
-          , HP.style $
-              "flex: 0 0 " <> show (state.middleRatio * 100.0) <>
-                "%; box-sizing: border-box; min-height: 0; overflow: hidden;"
-          ]
-          [ HH.slot _editor unit Editor.editor unit HandleEditor ]
+  renderSidebar :: State -> Array (H.ComponentHTML Action Slots m)
+  renderSidebar state =
+    [ -- Sidebar
+      HH.div
+        [ HP.classes [ HB.overflowAuto, HB.p1 ]
+        , HP.style $
+            "flex: 0 0 " <> show (state.sidebarRatio * 100.0) <>
+              "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"
+        ]
+        [ HH.div_
+            ( map
+                ( \{ id, name, content } ->
+                    HH.div
+                      [ HP.title ("Jump to section " <> name)
+                      , HP.style
+                          "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0;"
+                      ]
+                      [ HH.span
+                          [ HE.onClick \_ -> JumpToSection { id, name, content }
+                          , HP.classes
+                              ( [ HB.textTruncate ]
+                                  <>
+                                    if Just id == state.slectedTocEntry then
+                                      [ HB.fwBold ]
+                                    else []
+                              )
+                          , HP.style
+                              "cursor: pointer; display: inline-block; min-width: 6ch;"
+                          ]
+                          [ HH.text name ]
+                      ]
+                )
+                state.tocEntries
+            )
+        ]
+    -- Left Resizer
+    , HH.div
+        [ HE.onMouseDown (StartResize ResizeLeft)
+        , HP.style "width: 5px; cursor: col-resize; background: #ccc;"
+        ]
+        []
+    ]
 
-      -- Resizer
-      , HH.div
-          [ HE.onMouseDown (StartResize ResizeRight)
-          , HP.style "width: 5px; cursor: col-resize; background: #ccc;"
-          ]
-          []
+  renderPreview :: State -> Array (H.ComponentHTML Action Slots m)
+  renderPreview state =
+    [ -- Right Resizer
+      HH.div
+        [ HE.onMouseDown (StartResize ResizeRight)
+        , HP.style "width: 5px; cursor: col-resize; background: #ccc;"
+        ]
+        []
 
-      -- Preview
-      , HH.div
-          [ HP.classes [ HB.dFlex, HB.flexColumn ]
-          , HP.style $
-              "flex: 1 1 "
-                <> show ((1.0 - state.sidebarRatio - state.middleRatio) * 100.0)
-                <> "%; box-sizing: border-box; min-height: 0; overflow: hidden;"
-          ]
-          [ HH.slot _preview unit Preview.preview
-              { editorContent: state.editorContent }
-              HandlePreview
-          ]
-      ]
+    -- Preview
+    , HH.div
+        [ HP.classes [ HB.dFlex, HB.flexColumn ]
+        , HP.style $
+            "flex: 1 1 "
+              <> show ((1.0 - state.sidebarRatio - state.middleRatio) * 100.0)
+              <>
+                "%; box-sizing: border-box; min-height: 0; overflow: hidden; min-width: 6ch;"
+        ]
+        [ HH.slot _preview unit Preview.preview
+            { editorContent: state.editorContent }
+            HandlePreview
+        ]
+    ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
@@ -246,49 +304,23 @@ splitview = H.mkComponent
               }
           )
           (range 1 11)
-        -- Put first entry in editor
-        firstEntry = case head entries of
-          Nothing -> { id: -1, name: "No Entry", content: Just [ "" ] }
-          Just entry -> entry
+      -- Comment it out for now, to let the other text show up first in editor
+      -- head has to be imported from Data.Array
+      -- Put first entry in editor
+      --   firstEntry = case head entries of
+      --     Nothing -> { id: -1, name: "No Entry", content: Just [ "" ] }
+      --     Just entry -> entry
+      -- H.tell _editor unit (Editor.ChangeSection firstEntry)
       H.modify_ \st -> do
         st
           { tocEntries = entries
+          -- Have not sent the first entry to editor yet. See comment above
+          -- , slectedTocEntry = Just firstEntry.id
           , editorContent = Just [ "This is the initial content of the editor." ]
-          }
-      H.tell _editor unit (Editor.ChangeSection firstEntry)
-
-    -- Set the left resizer to a set position on the left side
-    -- Toggle the sidebar again, wihtout resizing this resizer put it back in last position
-    ToggleSidebar -> do
-      win <- H.liftEffect Web.HTML.window
-      width <- H.liftEffect $ Web.HTML.Window.innerWidth win
-      let w = toNumber width
-      state <- H.get
-      -- The sidebar is "closed"
-      if state.sidebarRatio * w <= 85.0 then do
-        let
-          target = state.lastExpandedSidebarRatio
-          delta = target - (85.0 / w)
-        H.modify_ \st -> st
-          { sidebarRatio = target
-          , middleRatio = max 0.1 (st.middleRatio - delta)
-          , hasResizedSidebar = true
-          }
-      -- "close" sidebar
-      else do
-        let
-          newSidebar = 85.0 / w
-          delta = state.sidebarRatio - newSidebar
-        H.modify_ \st -> st
-          { sidebarRatio = newSidebar
-          , middleRatio = max 0.1 (st.middleRatio + delta)
-          , lastExpandedSidebarRatio =
-              if st.hasResizedSidebar then st.lastExpandedSidebarRatio
-              else st.sidebarRatio
-          , hasResizedSidebar = false
           }
 
     -- Resizing as long as mouse is hold down on window
+    -- (Or until the browser detects the mouse is released)
     StartResize which mouse -> do
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
@@ -303,12 +335,9 @@ splitview = H.mkComponent
         , startMiddleRatio = st.middleRatio
         }
 
-    -- Stop resizing, when mouse is released
+    -- Stop resizing, when mouse is released (is detected by browser)
     StopResize _ ->
-      H.modify_ \st -> st
-        { dragTarget = Nothing
-        , hasResizedSidebar = true
-        }
+      H.modify_ \st -> st { dragTarget = Nothing }
 
     -- While mouse is hold down, resizer move to position of mouse
     -- (with certain rules)
@@ -319,35 +348,50 @@ splitview = H.mkComponent
         x = toNumber $ clientX mouse
         width = toNumber intWidth
         ratioX = x / width
+
+        minRatio = 0.05 -- 5%
+        maxRatio = 0.7 -- 70%
+
+        clamp :: Number -> Number -> Number -> Number
+        clamp minVal maxVal xval = max minVal (min maxVal xval)
+
       mt <- H.gets _.dragTarget
       mx <- H.gets _.startMouseRatio
+
       case mt of
         Just ResizeLeft -> do
           s <- H.gets _.startSidebarRatio
           m <- H.gets _.startMiddleRatio
           let
+            total = s + m
             rawSidebarRatio = s + (ratioX - mx)
-            maxSidebarRatio = s + m - (85.0 / width)
-            -- enforce minimum width to show at least ~6 characters
-            clampedSidebarRatio = max (70.0 / width)
-              (min maxSidebarRatio rawSidebarRatio)
-            newSidebar = clampedSidebarRatio
-            newMiddle = s + m - clampedSidebarRatio
-          when (newMiddle * width >= 85.0) do
-            H.modify_ \st -> st
-              { sidebarRatio = newSidebar
-              , middleRatio = newMiddle
-              , lastExpandedSidebarRatio =
-                  if newSidebar * width > 85.0 then newSidebar
-                  else st.lastExpandedSidebarRatio
-              , hasResizedSidebar = true
-              }
+            newSidebar = clamp minRatio 0.2 rawSidebarRatio
+            newMiddle = total - newSidebar
+          when
+            ( newSidebar >= minRatio && newMiddle >= minRatio && newSidebar <=
+                maxRatio
+            )
+            do
+              H.modify_ \st -> st
+                { sidebarRatio = newSidebar
+                , middleRatio = newMiddle
+                , lastExpandedSidebarRatio =
+                    if newSidebar > minRatio then newSidebar
+                    else st.lastExpandedSidebarRatio
+                }
 
         Just ResizeRight -> do
+          s <- H.gets _.startSidebarRatio
           m <- H.gets _.startMiddleRatio
           let
-            newMiddleRatio = max 0.1 (m + (ratioX - mx))
-          H.modify_ \st -> st { middleRatio = newMiddleRatio }
+            total = 1.0 - s
+            rawMiddleRatio = m + (ratioX - mx)
+            newMiddle = clamp minRatio 0.7 rawMiddleRatio
+            newPreview = total - newMiddle
+          when
+            (newMiddle >= minRatio && newMiddle <= maxRatio && newPreview >= minRatio)
+            do
+              H.modify_ \st -> st { middleRatio = newMiddle }
 
         _ -> pure unit
 
@@ -355,6 +399,11 @@ splitview = H.mkComponent
     JumpToSection section -> do
       H.tell _editor unit Editor.SaveSection
       H.tell _editor unit (Editor.ChangeSection section)
+      H.modify_ \st -> st
+        { slectedTocEntry = Just section.id
+        -- maybe add in later, to automatically update preview, when selecting section
+        -- , editorContent = section.content
+        }
 
     -- Toolbar button actions
 
@@ -375,6 +424,53 @@ splitview = H.mkComponent
       H.tell _editor unit Editor.LoadPdf
       H.tell _preview unit Preview.TellLoadPdf
 
+    -- Toggle actions
+
+    -- Toggle the sidebar
+    -- Add logic in calculating the middle ratio
+    -- to restore the last expanded middle ratio, when toggling preview back on
+    ToggleSidebar -> do
+      state <- H.get
+      -- close sidebar
+      if state.tocEntriesShown then
+        H.modify_ \st -> st
+          { sidebarRatio = 0.0
+          , middleRatio = st.middleRatio + st.sidebarRatio
+          , lastExpandedSidebarRatio = st.sidebarRatio
+          , tocEntriesShown = false
+          }
+      -- open sidebar
+      else do
+        H.modify_ \st -> st
+          { sidebarRatio = st.lastExpandedSidebarRatio
+          , middleRatio = st.middleRatio - st.lastExpandedSidebarRatio
+          , tocEntriesShown = true
+          }
+
+    -- Toggle the preview area
+    TogglePreview -> do
+      state <- H.get
+      -- all this, in order for not overlapping the left resizer (to not make it disappear)
+      win <- H.liftEffect Web.HTML.window
+      totalWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
+      let
+        w = toNumber totalWidth
+        resizerWidth = 5.0
+        resizerRatio = resizerWidth / w
+      -- close preview
+      if state.previewShown then
+        H.modify_ \st -> st
+          { middleRatio = 1.0 - st.sidebarRatio - resizerRatio
+          , previewShown = false
+          }
+      -- open preview
+      else do
+        -- restore the last expanded middle ratio, when toggling preview back on
+        H.modify_ \st -> st
+          { middleRatio = st.lastExpandedMiddleRatio
+          , previewShown = true
+          }
+
     -- Query handler
 
     HandleEditor output -> case output of
@@ -390,8 +486,6 @@ splitview = H.mkComponent
               Nothing -> pure unit
               Just updatedEntries ->
                 H.modify_ \st -> st { tocEntries = updatedEntries }
-
-      Editor.SendPDF mURL -> H.tell _preview unit (Preview.TellLoadUploadedPdf mURL)
 
     HandlePreview _ -> pure unit
 

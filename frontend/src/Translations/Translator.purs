@@ -1,28 +1,28 @@
-module Translations.Translator where
+module FPO.Translations.Translator where
 
 import Prelude
 
 import Effect (Effect)
+import FPO.Translations.Labels (Labels, de, en)
 import Simple.I18n.Translator (Translator, createTranslator)
-import Translations.Labels (Labels, de, en)
 import Type.Proxy (Proxy(Proxy))
 import Web.HTML (window)
 import Web.HTML.Navigator (language)
 import Web.HTML.Window (navigator)
 
-translator :: EqTranslator
+translator :: FPOTranslator
 translator =
-  EqTranslator $ createTranslator
+  FPOTranslator $ createTranslator
     (Proxy :: _ "en") -- Fallback language (and default language)
     { en, de } -- Translations
 
-newtype EqTranslator = EqTranslator (Translator Labels)
+newtype FPOTranslator = FPOTranslator (Translator Labels)
 
-instance eqEqTranslator :: Eq EqTranslator where
+instance eqFpoTranslator :: Eq FPOTranslator where
   eq _ _ = false
 
-fromEqTranslator :: EqTranslator -> Translator Labels
-fromEqTranslator (EqTranslator trans) = trans
+fromFpoTranslator :: FPOTranslator -> Translator Labels
+fromFpoTranslator (FPOTranslator trans) = trans
 
 detectBrowserLanguage :: Effect String
 detectBrowserLanguage = do

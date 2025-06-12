@@ -18,7 +18,6 @@ import Data.String as String
 import Data.Traversable (traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
-import FPO.Components.FileSidebar as FileSidebar
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -39,23 +38,17 @@ type State =
   , pdfWarningIsShown :: Boolean
   }
 
-type Slots =
-  ( pdfSlideBar :: H.Slot FileSidebar.Query FileSidebar.Output Unit
-  )
-
 _pdfSlideBar = Proxy :: Proxy "pdfSlideBar"
 
 data Output
   = ClickedQuery (Maybe (Array String))
   | SavedSection TOCEntry
-  | SendPDF (Maybe String)
 
 data Action
   = Init
   | Paragraph
   | Delete
   | ShowWarning
-  | HandleFileSidebar FileSidebar.Output
 
 -- We use a query to get the content of the editor
 data Query a
@@ -87,7 +80,7 @@ editor = H.mkComponent
     , pdfWarningIsShown: false
     }
 
-  render :: State -> H.ComponentHTML Action Slots m
+  render :: State -> forall slots. H.ComponentHTML Action slots m
   render _ =
     HH.div
       [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
@@ -109,14 +102,6 @@ editor = H.mkComponent
               , HH.text " Delete"
               ]
           ]
-      -- take out the file sidebar
-      -- , HH.div -- FileSidebar
-
-      --     [ HP.classes [ HB.bgLight, HB.dFlex, HB.flexRow, HB.g0, HB.overflowHidden ]
-      --     , HP.style "min-height: 0"
-      --     ]
-      --     -- TODO: add input of dummy pdf file
-      --     [ HH.slot _pdfSlideBar unit FileSidebar.fileSidebar unit HandleFileSidebar ]
       , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
@@ -126,7 +111,7 @@ editor = H.mkComponent
           []
       ]
 
-  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
+  handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
     Init -> do
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
@@ -176,15 +161,10 @@ editor = H.mkComponent
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
 
-    HandleFileSidebar output -> case output of
-      FileSidebar.SendPDF mURL -> do
-        H.raise (SendPDF mURL)
-        H.modify_ _ { pdfWarningAvailable = true }
-
   handleQuery
-    :: forall a
+    :: forall slots a
      . Query a
-    -> H.HalogenM State Action Slots Output m (Maybe a)
+    -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
 
     ChangeSection entry a -> do

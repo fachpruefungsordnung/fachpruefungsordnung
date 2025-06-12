@@ -2,7 +2,7 @@
 
 module Language.Ltml.Parser.Text
     ( textForestP
-    , hangingTextP
+    , hangingTextP'
     )
 where
 
@@ -12,22 +12,24 @@ import qualified Data.Char as Char (isControl)
 import Data.Text (Text)
 import qualified Data.Text as Text (singleton)
 import Data.Void (Void)
-import Language.Lsd.AST.Common (Keyword (..))
-import Language.Lsd.AST.Type.Enum (EnumType (..))
+import Language.Lsd.AST.Common (Keyword)
+import Language.Lsd.AST.Type.Enum (EnumType (EnumType))
 import Language.Lsd.AST.Type.Text
-    ( FootnoteType (..)
-    , TextType (..)
+    ( FootnoteType (FootnoteType)
+    , TextType (TextType)
     )
+import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Text
-    ( EnumItem (..)
+    ( EnumItem (EnumItem)
     , FontStyle (..)
     , FootnoteTextTree
-    , SentenceStart (..)
+    , SentenceStart (SentenceStart)
     , TextTree (..)
     )
 import Language.Ltml.Parser (Parser)
+import Language.Ltml.Parser.Keyword (keywordP, mlKeywordP)
 import Language.Ltml.Parser.Label (labelP)
-import Language.Ltml.Parser.MiTree (hangingBlock', miForest)
+import Language.Ltml.Parser.MiTree (hangingBlock', hangingBlock_, miForest)
 import Text.Megaparsec (satisfy, some, takeWhile1P)
 import Text.Megaparsec.Char (char)
 
@@ -63,7 +65,14 @@ hangingTextP
     => Keyword
     -> TextType enumType
     -> Parser [TextTree style enumItem special]
-hangingTextP (Keyword kw) t = hangingBlock' kw elementPF (childPF t)
+hangingTextP kw t = hangingBlock_ (keywordP kw) elementPF (childPF t)
+
+hangingTextP'
+    :: (StyleP style, EnumP enumType enumItem, SpecialP special)
+    => Keyword
+    -> TextType enumType
+    -> Parser (Maybe Label, [TextTree style enumItem special])
+hangingTextP' kw t = hangingBlock' (mlKeywordP kw) elementPF (childPF t)
 
 class StyleP style where
     styleP :: Parser style

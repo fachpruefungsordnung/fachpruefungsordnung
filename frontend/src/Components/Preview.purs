@@ -50,7 +50,6 @@ type Input =
 data Query a
   = TellLoadPdf a
   | GotEditorQuery (Maybe (Array String)) a
-  | TellLoadUploadedPdf (Maybe String) a
   | TellShowOrHideWarning a
   | TellClickedHttpRequest a
 
@@ -217,10 +216,6 @@ preview = H.mkComponent
     GotEditorQuery mEditorContent a -> do
       H.modify_ \state ->
         state { editorContent = mEditorContent }
-      pure (Just a)
-
-    TellLoadUploadedPdf mURL a -> do
-      H.modify_ _ { pdf = PdfAvailable, pdfURL = mURL }
       pure (Just a)
 
     TellShowOrHideWarning a -> do

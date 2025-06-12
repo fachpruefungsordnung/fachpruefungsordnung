@@ -17,6 +17,7 @@ data Route
   | Login
   | PasswordReset
   | AdminPanel
+  | Page404
   | Profile { loginSuccessful :: Maybe Boolean }
 
 derive instance genericRoute :: Generic Route _
@@ -31,6 +32,7 @@ routeCodec = root $ sum
   , "Login": "login" / noArgs
   , "PasswordReset": "password-reset" / noArgs
   , "AdminPanel": "admin-panel" / noArgs
+  , "Page404": "404" / noArgs
   , "Profile": "profile" ? { loginSuccessful: optional <<< boolean }
   }
 
@@ -43,6 +45,7 @@ routeToString = case _ of
   Login -> "Login"
   PasswordReset -> "PasswordReset"
   AdminPanel -> "AdminPanel"
+  Page404 -> "Page404"
   Profile { loginSuccessful } -> "Profile" <>
     ( if loginSuccessful == Nothing then ""
       else " (loginSuccessful: " <> (show $ fromMaybe false loginSuccessful) <> ")"

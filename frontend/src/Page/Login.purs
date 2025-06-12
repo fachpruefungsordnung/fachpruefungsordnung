@@ -15,7 +15,6 @@ import Affjax.StatusCode (StatusCode(StatusCode))
 import Data.Argonaut.Encode.Class (encodeJson)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Data.String.CodeUnits (takeWhile)
 import Dto.Login (LoginDto)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate, navigate)
@@ -23,6 +22,8 @@ import FPO.Data.Request (postString) as Request
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Page.HTML (addColumn)
+import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick, onSubmit) as HE
@@ -31,8 +32,6 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
-import Translations.Translator (EqTranslator, fromEqTranslator)
-import Translations.Util (FPOState, selectTranslator)
 import Web.Event.Event (preventDefault)
 import Web.Event.Internal.Types (Event)
 
@@ -45,7 +44,7 @@ data Action
   | UpdatePassword String
   | EmitError String
   | DoLogin LoginDto Event
-  | Receive (Connected EqTranslator Input)
+  | Receive (Connected FPOTranslator Input)
 
 toLoginDto :: State -> LoginDto
 toLoginDto state = { loginEmail: state.email, loginPassword: state.password }
@@ -72,7 +71,7 @@ component =
         { email: ""
         , password: ""
         , error: Nothing
-        , translator: fromEqTranslator context
+        , translator: fromFpoTranslator context
         }
     , render
     , eval: H.mkEval H.defaultEval
@@ -107,7 +106,7 @@ component =
           { email: store.inputMail
           , password: ""
           , error: Nothing
-          , translator: fromEqTranslator store.translator
+          , translator: fromFpoTranslator store.translator
           }
       H.put initialState
     UpdateEmail email -> do
@@ -135,13 +134,13 @@ component =
             -- at the same time updating the store of the application
             -- TODO persisting the credentials in the browser storage
             StatusCode 200 -> do
-              let name = takeWhile (_ /= '@') loginDto.loginEmail
-              updateStore $ Store.SetUser $ Just { userName: name, isAdmin: false }
+              -- let name = takeWhile (_ /= '@') loginDto.loginEmail
+              -- updateStore $ Store.SetUser $ Just { userName: name, isAdmin: false }
 
               handleLoginRedirect
             StatusCode _ -> handleAction (EmitError body)
       pure unit
-    Receive { context } -> H.modify_ _ { translator = fromEqTranslator context }
+    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
 
   -- After successful login, redirect to either a previously set redirect route
   -- or to the profile page with a login success banner.
@@ -165,15 +164,17 @@ component =
               [ HE.onSubmit \e -> DoLogin (toLoginDto state) e ]
               [ addColumn
                   state.email
-                  ((translate (label :: _ "emailAddress") state.translator) <> ":")
-                  (translate (label :: _ "email") state.translator)
+                  ( (translate (label :: _ "common_emailAddress") state.translator) <>
+                      ":"
+                  )
+                  (translate (label :: _ "common_email") state.translator)
                   "bi-envelope-fill"
                   HP.InputEmail
                   UpdateEmail
               , addColumn
                   state.password
-                  ((translate (label :: _ "password") state.translator) <> ":")
-                  (translate (label :: _ "password") state.translator)
+                  ((translate (label :: _ "common_password") state.translator) <> ":")
+                  (translate (label :: _ "common_password") state.translator)
                   "bi-lock-fill"
                   HP.InputPassword
                   UpdatePassword
@@ -189,7 +190,7 @@ component =
                       , HE.onClick $ const NavigateToPasswordReset
                       ]
                       [ HH.text
-                          ( translate (label :: _ "passwordForgotten")
+                          ( translate (label :: _ "login_passwordForgotten")
                               state.translator
                           )
                       ]

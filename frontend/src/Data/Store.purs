@@ -9,7 +9,7 @@ import Prelude
 import Data.Maybe (Maybe)
 import Effect (Effect)
 import FPO.Data.Route (Route)
-import Translations.Translator (EqTranslator)
+import FPO.Translations.Translator (FPOTranslator)
 import Web.HTML (window)
 import Web.HTML.Window (localStorage)
 import Web.Storage.Storage (getItem, setItem) as LocalStorage
@@ -19,24 +19,21 @@ type User = { userName :: String, isAdmin :: Boolean }
 -- | The Store type represents the global state of the application.
 type Store =
   { inputMail :: String -- ^ The email that was input in the login form (example state variable)
-  , user :: Maybe User -- ^ The user's name
   , loginRedirect :: Maybe Route -- ^ The route to redirect to after login
-  , translator :: EqTranslator
+  , translator :: FPOTranslator
   , language :: String
   }
 
 data Action
   = SetMail String -- ^ Action to set the user's email.
-  | SetUser (Maybe User) -- ^ Action to set the user's name.
   | SetLoginRedirect (Maybe Route) -- ^ Action to set the redirect route after login.
   | SetLanguage String
-  | SetTranslator EqTranslator
+  | SetTranslator FPOTranslator
 
 -- | Update the store based on the action.
 reduce :: Store -> Action -> Store
 reduce store = case _ of
   SetMail m -> store { inputMail = m }
-  SetUser u -> store { user = u }
   -- TODO: Using `Store.loginRedirect`, we can specify the route to redirect to after login.
   --       While sufficent for the case of logins and login redirect handling, this is not
   --       flexible (i.e., usable for pages and actions other than login).

@@ -9,6 +9,7 @@ import Language.Lsd.AST.Type.Section
     , SectionChildType (SectionChildParagraphType, SectionChildSectionType)
     , SectionType (SectionType)
     )
+import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Node (Node (Node))
 import Language.Ltml.AST.Section
     ( Heading (Heading)
@@ -19,19 +20,19 @@ import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
 import Language.Ltml.Parser.Common.SimpleRegex (simpleRegexP)
 import Language.Ltml.Parser.Paragraph (paragraphP)
-import Language.Ltml.Parser.Text (hangingTextP)
+import Language.Ltml.Parser.Text (hangingTextP')
 
--- TODO: Parse node label.
 sectionP :: SectionType -> Parser (Node Section)
-sectionP (SectionType kw headingT fmt childrenTR) =
-    Node Nothing <$> (Section fmt <$> headingP kw headingT <*> childrenP)
+sectionP (SectionType kw headingT fmt childrenTR) = do
+    (mLabel, heading) <- headingP kw headingT
+    Node mLabel . Section fmt heading <$> childrenP
   where
     childrenP :: Parser [SectionChild]
     childrenP = simpleRegexP sectionChildP childrenTR
 
-headingP :: Keyword -> HeadingType -> Parser Heading
+headingP :: Keyword -> HeadingType -> Parser (Maybe Label, Heading)
 headingP kw (HeadingType fmt tt) =
-    nLexeme $ Heading fmt <$> hangingTextP kw tt
+    nLexeme $ fmap (Heading fmt) <$> hangingTextP' kw tt
 
 sectionChildP :: SectionChildType -> Parser SectionChild
 sectionChildP (SectionChildSectionType t) =

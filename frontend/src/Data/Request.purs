@@ -12,13 +12,16 @@ import Affjax.RequestHeader (RequestHeader(RequestHeader))
 import Affjax.ResponseFormat (ResponseFormat)
 import Affjax.ResponseFormat (blob, document, ignore, json, string) as AXRF
 import Data.Argonaut.Core (Json)
-import Data.Either (Either(Left))
+import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
+import Data.JSON (decodeUser)
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
+import Effect.Console (log)
+import FPO.Data.Store (User)
 import Web.DOM.Document (Document)
 import Web.File.Blob (Blob)
 
@@ -43,7 +46,25 @@ defaultFpoRequest responseFormat url method = do
     , timeout: Nothing
     }
 
--- | GET-Anfragen ----------------------------------------------------------
+-- | High-level requests ---------------------------------------------------
+
+-- | Fetches the current user from the server, based on the `/me` endpoint.
+getUser :: Aff (Maybe User)
+getUser = do
+  userResponse <- getJson "/me"
+  case userResponse of
+    Left _ ->
+      pure Nothing
+    Right res -> do
+      case decodeUser (res.body) of
+        Left err -> do
+          liftEffect $ log $ "Error decoding user: " <> show err
+          pure Nothing
+        Right user -> do
+          liftEffect $ log $ "User decoded successfully: " <> show user
+          pure $ Just user
+
+-- | GET-Requests ----------------------------------------------------------
 
 -- | Makes a GET request and expects a String response.
 getString :: String -> Aff (Either Error (Response String))
@@ -75,7 +96,7 @@ getIgnore url = do
   fpoRequest <- liftEffect $ defaultFpoRequest AXRF.ignore ("/api" <> url) GET
   liftAff $ request driver fpoRequest
 
--- | POST-Anfragen ---------------------------------------------------------
+-- | POST-Requests ---------------------------------------------------------
 
 -- | Makes a POST request with a JSON body and expects a String response.
 postString :: String -> Json -> Aff (Either Error (Response String))

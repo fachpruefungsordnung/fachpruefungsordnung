@@ -4,6 +4,7 @@ package:
     - ace
     - aff
     - affjax
+    - argonaut
     - argonaut-codecs
     - argonaut-core
     - arrays
@@ -21,6 +22,7 @@ package:
     - integers
     - maybe
     - prelude
+    - record
     - record-extra
     - routing
     - routing-duplex
@@ -28,7 +30,6 @@ package:
     - simple-i18n
     - strings
     - tailrec
-    - unsafe-coerce
     - web-dom
     - web-events
     - web-file
