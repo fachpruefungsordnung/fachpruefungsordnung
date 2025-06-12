@@ -76,7 +76,7 @@ getDocumentHandler (Authenticated Auth.Token {..}) docID = do
     case mPerm of
         Nothing -> throwError errNoPermission
         Just perm ->
-            if perm >= Document.Read
+            if Document.hasPermission perm Document.Read
                 then undefined -- TODO: function for returning doc
                 else throwError errNoPermission
 getDocumentHandler _ _ = throwError errNotLoggedIn

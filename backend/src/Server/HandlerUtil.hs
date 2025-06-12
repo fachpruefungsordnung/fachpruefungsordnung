@@ -80,7 +80,7 @@ checkDocPermission conn userID docID = do
     eIsMember <- liftIO $ run (Sessions.checkGroupDocPermission userID docID) conn
     case eIsMember of
         Left _ -> throwError errDatabaseAccessFailed
-        Right True -> return $ Just Document.Edit -- user is member of right group
+        Right True -> return $ Just Document.Editer -- user is member of right group
         Right False -> do
             ePerm <- liftIO $ run (Sessions.getExternalDocPermission userID docID) conn
             case ePerm of
