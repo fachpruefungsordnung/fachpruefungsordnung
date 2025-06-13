@@ -45,7 +45,7 @@ type RoleAPI =
             :> "roles"
             :> "superadmin"
             :> Capture "userId" User.UserID
-            :> Post '[JSON] NoContent
+            :> Put '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
             :> "roles"
             :> "superadmin"
@@ -57,7 +57,7 @@ roleServer =
     getRoleHandler
         :<|> postRoleHandler
         :<|> deleteRoleHandler
-        :<|> postSuperadminHandler
+        :<|> putSuperadminHandler
         :<|> deleteSuperadminHandler
 
 getRoleHandler
@@ -124,23 +124,23 @@ deleteRoleHandler (Authenticated token) groupID userID = do
             Right _ -> return NoContent
 deleteRoleHandler _ _ _ = throwError errNotLoggedIn
 
-postSuperadminHandler
+putSuperadminHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler NoContent
-postSuperadminHandler (Authenticated Auth.Token {..}) userID =
+putSuperadminHandler (Authenticated Auth.Token {..}) userID =
     if isSuperadmin
         then do
             conn <- tryGetDBConnection
             eIsSuper <- liftIO $ Session.run (Sessions.checkSuperadmin userID) conn
             case eIsSuper of
                 Left _ -> throwError errDatabaseAccessFailed
-                Right True -> throwError errIsAlreadySuperadmin
+                Right True -> return NoContent -- user already is SuperAdmin
                 Right False -> do
                     eAction <- liftIO $ Session.run (Sessions.addSuperadmin userID) conn
                     case eAction of
                         Left _ -> throwError errDatabaseAccessFailed
                         Right _ -> return NoContent
         else throwError errSuperAdminOnly
-postSuperadminHandler _ _ = throwError errNotLoggedIn
+putSuperadminHandler _ _ = throwError errNotLoggedIn
 
 deleteSuperadminHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler NoContent

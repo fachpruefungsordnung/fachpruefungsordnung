@@ -11,7 +11,6 @@ module Server.HandlerUtil
     , errDatabaseAccessFailed
     , errNoAdminInThisGroup
     , errSuperAdminOnly
-    , errIsAlreadySuperadmin
     , errNotLoggedIn
     , errUserNotFound
     , errEmailAlreadyUsed
@@ -123,9 +122,6 @@ errNotLoggedIn =
 
 errUserNotFound :: ServerError
 errUserNotFound = err404 {errBody = "User not member of this group."}
-
-errIsAlreadySuperadmin :: ServerError
-errIsAlreadySuperadmin = err409 {errBody = "User already has Superadmin privileges."}
 
 errEmailAlreadyUsed :: ServerError
 errEmailAlreadyUsed = err409 {errBody = "Email is already in use."}

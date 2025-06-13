@@ -51,7 +51,7 @@ type DocumentAPI =
             :> "external"
             :> Capture "userID" User.UserID
             :> ReqBody '[JSON] Document.DocPermission
-            :> Post '[JSON] NoContent
+            :> Put '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
             :> "documents"
             :> Capture "documentID" Document.DocumentID
@@ -65,7 +65,7 @@ documentServer =
         :<|> deleteDocumentHandler
         :<|> getAllExternalUsersDocumentHandler
         :<|> getExternalUserDocumentHandler
-        :<|> postExternalUserDocumentHandler
+        :<|> putExternalUserDocumentHandler
         :<|> deleteExternalUserDocumentHandler
 
 getDocumentHandler
@@ -129,13 +129,13 @@ getExternalUserDocumentHandler (Authenticated token) docID userID = do
             Right mPermission -> return mPermission
 getExternalUserDocumentHandler _ _ _ = throwError errNotLoggedIn
 
-postExternalUserDocumentHandler
+putExternalUserDocumentHandler
     :: AuthResult Auth.Token
     -> Document.DocumentID
     -> User.UserID
     -> Document.DocPermission
     -> Handler NoContent
-postExternalUserDocumentHandler (Authenticated token) docID userID perm = do
+putExternalUserDocumentHandler (Authenticated token) docID userID perm = do
     conn <- tryGetDBConnection
     groupID <- getGroupOfDocument conn docID
     ifSuperOrAdminDo conn token groupID (postUser conn)
@@ -159,7 +159,7 @@ postExternalUserDocumentHandler (Authenticated token) docID userID perm = do
                 case eAction of
                     Left _ -> throwError errDatabaseAccessFailed
                     Right _ -> return NoContent
-postExternalUserDocumentHandler _ _ _ _ = throwError errNotLoggedIn
+putExternalUserDocumentHandler _ _ _ _ = throwError errNotLoggedIn
 
 deleteExternalUserDocumentHandler
     :: AuthResult Auth.Token
