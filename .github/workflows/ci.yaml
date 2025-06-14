@@ -71,9 +71,8 @@ jobs:
         uses: freckle/stack-action@v5
         with:
           working-directory: backend
-          stack-build-arguments: --no-test -v --fast --allow-newer --prefetch
+          stack-build-arguments: --no-test -v --allow-newer
           test: false
-          cache-prefix: v2
 
   check-frontend:
     name: Check Frontend
