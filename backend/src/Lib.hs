@@ -45,6 +45,9 @@ testTree =
                 , mkEdge
                     "Anlage 3"
                     (mkTree (Node "anlage" (Just "Guck mal! Noch eine Anlage!")) [])
+                , mkEdge
+                    "Anlage 4"
+                    (mkTree (Node "anlage" (Just "Guck mal! Ne vierte Anlage!")) [])
                 ]
             )
         ]
