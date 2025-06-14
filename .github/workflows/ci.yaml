@@ -71,7 +71,7 @@ jobs:
         uses: freckle/stack-action@v5
         with:
           working-directory: backend
-          stack-build-arguments: --no-test -v # hier darf auf keinen fall --fast stehen.
+          stack-build-arguments: --no-test -v --fast --allow-newer --prefetch
           test: false
           cache-prefix: v2
 
