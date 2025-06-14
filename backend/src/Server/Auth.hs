@@ -10,7 +10,8 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Server.Auth
-    ( Token (..)
+    ( AuthMethod
+    , Token (..)
     , UserLoginData (..)
     , UserRegisterData (..)
     , UserUpdate (..)
@@ -28,6 +29,11 @@ import Servant.Auth.Server
 import Servant.OpenApi
 import qualified UserManagement.Group as Group
 import qualified UserManagement.User as User
+
+-- | Cookie means that Auth is implemented via two Cookies.
+--   One HTTP-only JWT Cookie, which is managed by the browser
+--   and a XSRF Cookie, which has to be mirrored in a "X-XSRF-TOKEN" Header
+type AuthMethod = '[Cookie]
 
 data Token = Token
     { subject :: User.UserID
