@@ -52,7 +52,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Clean
-        run: rm -f backend/backend.cabal
+        run: rm -f backend/backend.cabal; rm -rf backend/.stack-work
 
       - name: Check Formatting
         uses: haskell-actions/run-fourmolu@v9
