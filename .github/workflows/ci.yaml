@@ -73,6 +73,7 @@ jobs:
           working-directory: backend
           stack-build-arguments: --fast --no-test
           test: false
+          cache-version: v2
 
   check-frontend:
     name: Check Frontend
