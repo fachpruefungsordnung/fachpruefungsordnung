@@ -60,7 +60,6 @@ dependencies:
   - uuid
   - megaparsec
   - parser-combinators
-  - pretty-simple
 
 ghc-options:
   - -Wall
