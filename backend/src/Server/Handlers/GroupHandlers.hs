@@ -24,6 +24,7 @@ import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 import Prelude hiding (readFile)
+import VersionControl.Commit (ExistingCommit)
 
 type GroupAPI =
     Auth AuthMethod Auth.Token
@@ -38,12 +39,18 @@ type GroupAPI =
             :> "groups"
             :> Capture "groupID" Group.GroupID
             :> Delete '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> "groups"
+            :> Capture "groupID" Group.GroupID
+            :> "documents"
+            :> Get '[JSON] [ExistingCommit]
 
 groupServer :: Server GroupAPI
 groupServer =
     createGroupHandler
         :<|> groupMembersHandler
         :<|> deleteGroupHandler
+        :<|> getAllGroupDocumentsHandler
 
 groupMembersHandler
     :: AuthResult Auth.Token -> Group.GroupID -> Handler [User.UserInfo]
@@ -102,3 +109,12 @@ deleteGroupHandler (Authenticated token) groupID = do
             Left _ -> throwError errDatabaseAccessFailed
             Right () -> return NoContent
 deleteGroupHandler _ _ = throwError errNotLoggedIn
+
+getAllGroupDocumentsHandler :: AuthResult Auth.Token -> Group.GroupID -> Handler [ExistingCommit]
+getAllGroupDocumentsHandler (Authenticated token) groupID = do
+    conn <- tryGetDBConnection
+    ifGroupMemberDo conn token groupID (getAllDocs groupID)
+        where
+            getAllDocs :: Group.GroupID -> Handler [ExistingCommit]
+            getAllDocs groupID = undefined -- TODO: function call for collecting all docs of given group
+getAllGroupDocumentsHandler _ _ = throwError errNotLoggedIn

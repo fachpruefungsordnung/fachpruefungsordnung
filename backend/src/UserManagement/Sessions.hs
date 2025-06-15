@@ -8,6 +8,7 @@ module UserManagement.Sessions
     , updateUserName
     , updateUserEmail
     , updateUserPWHash
+    , checkGroupMembership
     , getUserRoleInGroup
     , getLoginRequirements
     , getAllUserRoles
@@ -58,6 +59,9 @@ getAllUserRoles :: User.UserID -> Session [(Group.GroupID, Maybe User.Role)]
 getAllUserRoles uid =
     fmap (Data.Bifunctor.second User.textToRole)
         <$> statement uid Statements.getAllUserRoles
+
+checkGroupMembership :: User.UserID -> Group.GroupID -> Session Bool
+checkGroupMembership userID groupID = statement (userID, groupID) Statements.checkGroupMembership
 
 getUserRoleInGroup :: User.UserID -> Group.GroupID -> Session (Maybe User.Role)
 getUserRoleInGroup uid group =

@@ -9,6 +9,7 @@ module UserManagement.Statements
     , deleteUser
     , getUserID
     , getLoginRequirements
+    , checkGroupMembership
     , getUserRoleInGroup
     , getAllUserRoles
     , updateUserName
@@ -92,6 +93,18 @@ getUserByID =
      from users
      where id = $1 :: uuid
    |]
+
+-- | Checks if User has any role in Group and returns True or False
+checkGroupMembership :: Statement (User.UserID, Group.GroupID) Bool
+checkGroupMembership =
+    [singletonStatement|
+
+      select exists (
+        select 1
+        from roles
+        where user_id = $1 :: uuid and group_id = $2 :: int4
+      ) :: bool
+    |]
 
 getUserRoleInGroup :: Statement (User.UserID, Group.GroupID) (Maybe Text)
 getUserRoleInGroup =

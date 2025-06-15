@@ -3,13 +3,15 @@
 
 module Server.HandlerUtil
     ( ifSuperOrAdminDo
+    , ifGroupMemberDo
     , tryGetDBConnection
     , addRoleInGroup
     , checkDocPermission
     , getGroupOfDocument
     , errDatabaseConnectionFailed
     , errDatabaseAccessFailed
-    , errNoAdminInThisGroup
+    , errNoMemberOfThisGroup
+    , errNoAdminOfThisGroup
     , errSuperAdminOnly
     , errNotLoggedIn
     , errUserNotFound
@@ -23,7 +25,7 @@ import Database (getConnection)
 import Hasql.Connection (Connection)
 import Hasql.Session (run)
 import Servant
-import Server.Auth (Token (..))
+import qualified Server.Auth as Auth
 import qualified UserManagement.Document as Document
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
@@ -33,8 +35,8 @@ import qualified UserManagement.User as User
 --   If so, it calls the given callback Handler;
 --   Otherwise, it throws a 403 error.
 ifSuperOrAdminDo
-    :: Connection -> Token -> Group.GroupID -> Handler a -> Handler a
-ifSuperOrAdminDo conn (Token {..}) groupID callback =
+    :: Connection -> Auth.Token -> Group.GroupID -> Handler a -> Handler a
+ifSuperOrAdminDo conn (Auth.Token {..}) groupID callback =
     if isSuperadmin
         then callback
         else do
@@ -42,12 +44,23 @@ ifSuperOrAdminDo conn (Token {..}) groupID callback =
             case emRole of
                 Left _ -> throwError errDatabaseAccessFailed
                 Right Nothing ->
-                    throwError errNoAdminInThisGroup
+                    throwError errNoAdminOfThisGroup
                 Right (Just role) ->
                     if role == User.Admin
                         then callback
                         else
-                            throwError errNoAdminInThisGroup
+                            throwError errNoAdminOfThisGroup
+
+-- | Checks if user is Member (or Admin) in specified group.
+--   If so, it calls the given callback Handler;
+-- Otherwise, it throws a 403 error.
+ifGroupMemberDo :: Connection -> Auth.Token -> Group.GroupID -> Handler a -> Handler a
+ifGroupMemberDo conn (Auth.Token {..}) groupID callback = do
+    eMembership <- liftIO $ run (Sessions.checkGroupMembership subject groupID) conn
+    case eMembership of
+        Left _  -> throwError errDatabaseAccessFailed
+        Right False -> throwError errNoMemberOfThisGroup
+        Right True -> callback
 
 -- | Gets DB Connection and throws 500 error if it fails
 tryGetDBConnection :: Handler Connection
@@ -106,8 +119,12 @@ errDatabaseAccessFailed = err500 {errBody = "Database access failed!\n"}
 errFailedToSetRole :: ServerError
 errFailedToSetRole = err500 {errBody = "Failed to set role in Database!"}
 
-errNoAdminInThisGroup :: ServerError
-errNoAdminInThisGroup =
+errNoMemberOfThisGroup :: ServerError
+errNoMemberOfThisGroup =
+    err403 {errBody = "You have to be Member of the group to perform this action!\n"}
+
+errNoAdminOfThisGroup :: ServerError
+errNoAdminOfThisGroup =
     err403 {errBody = "You have to be Admin of the group to perform this action!\n"}
 
 errSuperAdminOnly :: ServerError
