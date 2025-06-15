@@ -8,6 +8,7 @@ module UserManagement.Sessions
     , updateUserName
     , updateUserEmail
     , updateUserPWHash
+    , checkGroupMembership
     , getUserRoleInGroup
     , getLoginRequirements
     , getAllUserRoles
@@ -20,6 +21,13 @@ module UserManagement.Sessions
     , addSuperadmin
     , removeSuperadmin
     , checkSuperadmin
+    , checkGroupDocPermission
+    , getExternalDocPermission
+    , getDocumentGroupID
+    , getAllExternalUsersOfDocument
+    , addExternalDocPermission
+    , updateExternalDocPermission
+    , deleteExternalDocPermission
     )
 where
 
@@ -27,6 +35,7 @@ import qualified Data.Bifunctor (second)
 import Data.Text (Text)
 import Data.Vector (Vector)
 import Hasql.Session (Session, statement)
+import qualified UserManagement.Document as Document
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Statements as Statements
 import qualified UserManagement.User as User
@@ -50,6 +59,9 @@ getAllUserRoles :: User.UserID -> Session [(Group.GroupID, Maybe User.Role)]
 getAllUserRoles uid =
     fmap (Data.Bifunctor.second User.textToRole)
         <$> statement uid Statements.getAllUserRoles
+
+checkGroupMembership :: User.UserID -> Group.GroupID -> Session Bool
+checkGroupMembership userID groupID = statement (userID, groupID) Statements.checkGroupMembership
 
 getUserRoleInGroup :: User.UserID -> Group.GroupID -> Session (Maybe User.Role)
 getUserRoleInGroup uid group =
@@ -101,3 +113,34 @@ removeSuperadmin uid = statement uid Statements.removeSuperadmin
 
 checkSuperadmin :: User.UserID -> Session Bool
 checkSuperadmin uid = statement uid Statements.checkSuperadmin
+
+checkGroupDocPermission :: User.UserID -> Document.DocumentID -> Session Bool
+checkGroupDocPermission uid did = statement (uid, did) Statements.checkGroupDocPermission
+
+getExternalDocPermission
+    :: User.UserID -> Document.DocumentID -> Session (Maybe Document.DocPermission)
+getExternalDocPermission uid did = statement (uid, did) Statements.getExternalDocPermission
+
+getDocumentGroupID :: Document.DocumentID -> Session (Maybe Group.GroupID)
+getDocumentGroupID did = statement did Statements.getDocumentGroupID
+
+getAllExternalUsersOfDocument
+    :: Document.DocumentID -> Session [(User.UserID, Document.DocPermission)]
+getAllExternalUsersOfDocument did = do
+    users <- statement did Statements.getAllExternalUsersOfDocument
+    return [(user, perm) | (user, Just perm) <- users]
+
+addExternalDocPermission
+    :: User.UserID -> Document.DocumentID -> Document.DocPermission -> Session ()
+addExternalDocPermission uid did perm =
+    let perm' = Document.permissionToText perm
+     in statement (uid, did, perm') Statements.addExternalDocPermission
+
+updateExternalDocPermission
+    :: User.UserID -> Document.DocumentID -> Document.DocPermission -> Session ()
+updateExternalDocPermission uid did perm =
+    let perm' = Document.permissionToText perm
+     in statement (uid, did, perm') Statements.updateExternalDocPermission
+
+deleteExternalDocPermission :: User.UserID -> Document.DocumentID -> Session ()
+deleteExternalDocPermission uid did = statement (uid, did) Statements.deleteExternalDocPermission

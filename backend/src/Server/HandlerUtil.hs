@@ -3,16 +3,21 @@
 
 module Server.HandlerUtil
     ( ifSuperOrAdminDo
+    , ifGroupMemberDo
     , tryGetDBConnection
     , addRoleInGroup
+    , checkDocPermission
+    , getGroupOfDocument
     , errDatabaseConnectionFailed
     , errDatabaseAccessFailed
-    , errNoAdminInThisGroup
+    , errNoMemberOfThisGroup
+    , errNoAdminOfThisGroup
     , errSuperAdminOnly
-    , errIsAlreadySuperadmin
     , errNotLoggedIn
     , errUserNotFound
     , errEmailAlreadyUsed
+    , errDocumentDoesNotExist
+    , errNoPermission
     ) where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -20,16 +25,18 @@ import Database (getConnection)
 import Hasql.Connection (Connection)
 import Hasql.Session (run)
 import Servant
-import Server.Auth (Token (..))
-import UserManagement.Group as Group
+import qualified Server.Auth as Auth
+import qualified UserManagement.Document as Document
+import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 
 -- | Checks if User is SuperAdmin or Admin in the given group.
 --   If so, it calls the given callback Handler;
 --   Otherwise, it throws a 403 error.
-ifSuperOrAdminDo :: Connection -> Token -> GroupID -> Handler a -> Handler a
-ifSuperOrAdminDo conn (Token {..}) groupID callback =
+ifSuperOrAdminDo
+    :: Connection -> Auth.Token -> Group.GroupID -> Handler a -> Handler a
+ifSuperOrAdminDo conn (Auth.Token {..}) groupID callback =
     if isSuperadmin
         then callback
         else do
@@ -37,12 +44,24 @@ ifSuperOrAdminDo conn (Token {..}) groupID callback =
             case emRole of
                 Left _ -> throwError errDatabaseAccessFailed
                 Right Nothing ->
-                    throwError errNoAdminInThisGroup
+                    throwError errNoAdminOfThisGroup
                 Right (Just role) ->
                     if role == User.Admin
                         then callback
                         else
-                            throwError errNoAdminInThisGroup
+                            throwError errNoAdminOfThisGroup
+
+-- | Checks if user is Member (or Admin) in specified group.
+--   If so, it calls the given callback Handler;
+-- Otherwise, it throws a 403 error.
+ifGroupMemberDo
+    :: Connection -> Auth.Token -> Group.GroupID -> Handler a -> Handler a
+ifGroupMemberDo conn (Auth.Token {..}) groupID callback = do
+    eMembership <- liftIO $ run (Sessions.checkGroupMembership subject groupID) conn
+    case eMembership of
+        Left _ -> throwError errDatabaseAccessFailed
+        Right False -> throwError errNoMemberOfThisGroup
+        Right True -> callback
 
 -- | Gets DB Connection and throws 500 error if it fails
 tryGetDBConnection :: Handler Connection
@@ -61,6 +80,36 @@ addRoleInGroup conn userID groupID role = do
         Right () -> return ()
         Left _ -> throwError errFailedToSetRole
 
+-- | Check if User is Member (or Admin) of the group that owns the specified document
+--   or return external DocPermission. Members will always get `Edit` permission.
+-- Nothing            -> both paths failed (no permission)
+-- Just DocPermission -> User has given access rights
+checkDocPermission
+    :: Connection
+    -> User.UserID
+    -> Document.DocumentID
+    -> Handler (Maybe Document.DocPermission)
+checkDocPermission conn userID docID = do
+    eIsMember <- liftIO $ run (Sessions.checkGroupDocPermission userID docID) conn
+    case eIsMember of
+        Left _ -> throwError errDatabaseAccessFailed
+        Right True -> return $ Just Document.Editer -- user is member of right group
+        Right False -> do
+            ePerm <- liftIO $ run (Sessions.getExternalDocPermission userID docID) conn
+            case ePerm of
+                Left _ -> throwError errDatabaseAccessFailed
+                Right Nothing -> return Nothing
+                Right (Just perm) -> return $ Just perm
+
+-- | Get the groupID of the group that owns the specified document
+getGroupOfDocument :: Connection -> Document.DocumentID -> Handler Group.GroupID
+getGroupOfDocument conn docID = do
+    emgroupID <- liftIO $ run (Sessions.getDocumentGroupID docID) conn
+    case emgroupID of
+        Left _ -> throwError errDatabaseAccessFailed
+        Right Nothing -> throwError errDocumentDoesNotExist
+        Right (Just groupID) -> return groupID
+
 -- Specific errors
 errDatabaseConnectionFailed :: ServerError
 errDatabaseConnectionFailed = err500 {errBody = "Connection to database failed!\n"}
@@ -71,8 +120,14 @@ errDatabaseAccessFailed = err500 {errBody = "Database access failed!\n"}
 errFailedToSetRole :: ServerError
 errFailedToSetRole = err500 {errBody = "Failed to set role in Database!"}
 
-errNoAdminInThisGroup :: ServerError
-errNoAdminInThisGroup =
+errNoMemberOfThisGroup :: ServerError
+errNoMemberOfThisGroup =
+    err403
+        { errBody = "You have to be Member of the group to perform this action!\n"
+        }
+
+errNoAdminOfThisGroup :: ServerError
+errNoAdminOfThisGroup =
     err403 {errBody = "You have to be Admin of the group to perform this action!\n"}
 
 errSuperAdminOnly :: ServerError
@@ -88,8 +143,11 @@ errNotLoggedIn =
 errUserNotFound :: ServerError
 errUserNotFound = err404 {errBody = "User not member of this group."}
 
-errIsAlreadySuperadmin :: ServerError
-errIsAlreadySuperadmin = err409 {errBody = "User already has Superadmin privileges."}
-
 errEmailAlreadyUsed :: ServerError
 errEmailAlreadyUsed = err409 {errBody = "Email is already in use."}
+
+errDocumentDoesNotExist :: ServerError
+errDocumentDoesNotExist = err404 {errBody = "Document not found."}
+
+errNoPermission :: ServerError
+errNoPermission = err403 {errBody = "Insufficient permission to perform this action."}
