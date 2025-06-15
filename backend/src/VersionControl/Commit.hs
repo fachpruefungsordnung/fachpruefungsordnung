@@ -64,8 +64,9 @@ commitRefID (Value (ExistingCommit header _)) = commitHeaderID header
 -- | contains all information needed to create a new commit
 data CreateCommit
     = CreateCommit
-        CommitInfo
-        (TreeRef NodeWithMaybeRef)
+    { createCommitInfo :: CommitInfo
+    , createCommitRoot :: TreeRef NodeWithMaybeRef
+    }
     deriving (Show)
 
 instance ToJSON CreateCommit where
@@ -255,4 +256,5 @@ data CommitNode = CommitNode
     { commitNodeID :: CommitID
     , commitNodeBase :: Maybe CommitID
     , commitNodeHeight :: Int32
+    , commitNodeRootCommit :: Maybe CommitID
     }

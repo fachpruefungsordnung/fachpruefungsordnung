@@ -1,4 +1,8 @@
-module VersionControl.Document (Document (..), DocumentID (..)) where
+module VersionControl.Document
+    ( Document (..)
+    , DocumentID (..)
+    , withNewDocumentHead
+    ) where
 
 import Data.Text (Text)
 import GHC.Int (Int32)
@@ -14,3 +18,7 @@ data Document = Document
     , groupId :: GroupID
     , documentHead :: Maybe CommitID
     }
+
+-- | Update the document head for the given document
+withNewDocumentHead :: Document -> CommitID -> Document
+withNewDocumentHead doc c = doc {documentHead = Just c}

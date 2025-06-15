@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS commits (
     message TEXT NOT NULL,
     root BYTEA NOT NULL REFERENCES node_versions (hash),
     base INTEGER REFERENCES commits (id),
-    height INTEGER NOT NULL -- distance to the root node (via base!)
+    height INTEGER NOT NULL, -- distance to the root commit (directly via base!)
+    root_commit INTEGER REFERENCES commits (id)
 );
 
 CREATE TABLE IF NOT EXISTS commit_trees (

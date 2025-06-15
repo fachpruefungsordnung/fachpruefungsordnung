@@ -15,6 +15,7 @@ module VersionControl.Statements
     , getVersion
     , createDocument
     , getDocument
+    , setDocumentHead
     )
 where
 
@@ -158,7 +159,12 @@ createCommit =
                         select height + 1
                         from commits
                         where id = $4 :: int4?
-                    ), 0)
+                    ), 0),
+                    coalesce((
+                        select root_commit
+                        from commits
+                        where id = $4 :: int4?
+                    ), $4 :: int4?)
                 )
                 returning
                     id :: int4, creation_ts :: timestamp
@@ -225,11 +231,12 @@ getCommit =
 getCommitNode :: Statement CommitID CommitNode
 getCommitNode =
     rmap
-        ( \(commit, base, height) ->
+        ( \(commit, base, height, root) ->
             CommitNode
                 (CommitID commit)
                 (CommitID <$> base)
                 height
+                (CommitID <$> root)
         )
         $ lmap
             unCommitID
@@ -237,7 +244,8 @@ getCommitNode =
                 select
                     id :: int4,
                     base :: int4?,
-                    height :: int4
+                    height :: int4,
+                    root_commit :: int4?
                 from
                     commits
                 where
@@ -279,6 +287,21 @@ getDocument =
                 head :: int4?
             from
                 documents
+            where
+                id = $1 :: int4
+        |]
+
+-- | statement to put a specific version of a document tree into the database
+setDocumentHead :: Statement (DocumentID, CommitID) ()
+setDocumentHead =
+    lmap
+        ( \(DocumentID documentId, CommitID commitId) ->
+            (documentId, commitId)
+        )
+        [resultlessStatement|
+            update documents
+            set
+                head = $2 :: int4
             where
                 id = $1 :: int4
         |]

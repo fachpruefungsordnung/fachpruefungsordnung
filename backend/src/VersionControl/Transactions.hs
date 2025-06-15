@@ -3,11 +3,46 @@ module VersionControl.Transactions
     )
 where
 
+import Data.Maybe (fromMaybe)
 import Hasql.Transaction (Transaction, statement)
 import VersionControl.Commit
+import VersionControl.Document (Document (..), DocumentID, withNewDocumentHead)
 import VersionControl.Hash
+import VersionControl.Merge (MergeResult)
 import qualified VersionControl.Statements as Statements
 import VersionControl.Tree
+
+createDocumentCommit
+    :: DocumentID -> CreateCommit -> Transaction (Either HeadUpdateError Document)
+createDocumentCommit documentId commamit = do
+    commit <- createCommit commamit
+    let commitId = commitHeaderID $ existingCommitHeader commit
+    setDocumentHead documentId commitId
+
+data HeadUpdateError = HierWerdenNurKinderMitGleichenElternVerheiratetError
+
+setDocumentHead
+    :: DocumentID -> CommitID -> Transaction (Either HeadUpdateError Document)
+setDocumentHead documentId commitId = do
+    document <- statement documentId Statements.getDocument
+    oldHead <-
+        mapM (`statement` Statements.getCommitNode) (documentHead document)
+    case oldHead of
+        Just x -> do
+            newHead <- statement commitId Statements.getCommitNode
+            let equalRoots =
+                    fromMaybe False $
+                        (==)
+                            <$> commitNodeRootCommit x
+                            <*> commitNodeRootCommit newHead
+            if equalRoots
+                then updateHead document
+                else return $ Left HierWerdenNurKinderMitGleichenElternVerheiratetError
+        Nothing -> updateHead document
+  where
+    updateHead doc = do
+        statement (documentId, commitId) Statements.setDocumentHead
+        return $ Right (withNewDocumentHead doc commitId)
 
 -- | transaction for creating a commit in the database
 createCommit :: CreateCommit -> Transaction ExistingCommit
