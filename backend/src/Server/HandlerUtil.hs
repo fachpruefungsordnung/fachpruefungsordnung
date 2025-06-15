@@ -54,11 +54,12 @@ ifSuperOrAdminDo conn (Auth.Token {..}) groupID callback =
 -- | Checks if user is Member (or Admin) in specified group.
 --   If so, it calls the given callback Handler;
 -- Otherwise, it throws a 403 error.
-ifGroupMemberDo :: Connection -> Auth.Token -> Group.GroupID -> Handler a -> Handler a
+ifGroupMemberDo
+    :: Connection -> Auth.Token -> Group.GroupID -> Handler a -> Handler a
 ifGroupMemberDo conn (Auth.Token {..}) groupID callback = do
     eMembership <- liftIO $ run (Sessions.checkGroupMembership subject groupID) conn
     case eMembership of
-        Left _  -> throwError errDatabaseAccessFailed
+        Left _ -> throwError errDatabaseAccessFailed
         Right False -> throwError errNoMemberOfThisGroup
         Right True -> callback
 
@@ -121,7 +122,9 @@ errFailedToSetRole = err500 {errBody = "Failed to set role in Database!"}
 
 errNoMemberOfThisGroup :: ServerError
 errNoMemberOfThisGroup =
-    err403 {errBody = "You have to be Member of the group to perform this action!\n"}
+    err403
+        { errBody = "You have to be Member of the group to perform this action!\n"
+        }
 
 errNoAdminOfThisGroup :: ServerError
 errNoAdminOfThisGroup =
