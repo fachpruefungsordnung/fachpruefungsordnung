@@ -13,6 +13,8 @@ module VersionControl.Statements
     , getCommitNode
     , getChildrenByParentHash
     , getVersion
+    , createDocument
+    , getDocument
     )
 where
 
@@ -21,7 +23,9 @@ import Data.Text
 import Data.Vector
 import Hasql.Statement
 import Hasql.TH
+import UserManagement.Group (GroupID)
 import VersionControl.Commit
+import VersionControl.Document (Document (..), DocumentID (..))
 import VersionControl.Hash (Hash (..), Hashed (..))
 import VersionControl.Tree
 
@@ -216,9 +220,8 @@ getCommit =
                 id = $1 :: int4
             |]
 
-{- | get commit node by commit id.
-contains metadata about a commits position in the commit graph.
--}
+-- | get commit node by commit id.
+-- contains metadata about a commits position in the commit graph.
 getCommitNode :: Statement CommitID CommitNode
 getCommitNode =
     rmap
@@ -240,3 +243,42 @@ getCommitNode =
                 where
                     id = $1 :: int4
             |]
+
+-- | statement to create a node of a certain kind
+createDocument :: Statement (Text, GroupID) DocumentID
+createDocument =
+    rmap
+        DocumentID
+        [singletonStatement|
+            insert into documents
+                (name, group_id)
+            values
+                ($1 :: text),
+                ($2 :: int4)
+            returning id :: int4
+        |]
+
+-- | statement to get a document by its corresponding 'DocumentID'
+getDocument :: Statement DocumentID Document
+getDocument =
+    rmap
+        ( \(document, name, groupID, headCommit) ->
+            Document
+                (DocumentID document)
+                name
+                groupID
+                (CommitID <$> headCommit)
+        )
+        $ lmap
+            unDocumentID
+            [singletonStatement|
+            select
+                id :: int4,
+                name :: text,
+                group_id :: int4,
+                head :: int4?
+            from
+                documents
+            where
+                id = $1 :: int4
+        |]

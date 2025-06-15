@@ -2,6 +2,8 @@ module VersionControl.Sessions
     ( createCommit
     , getCommit
     , getVersion
+    , createDocument
+    , getDocument
     )
 where
 
@@ -13,7 +15,9 @@ import Hasql.Transaction.Sessions
     , Mode (..)
     , transaction
     )
+import UserManagement.Group (GroupID)
 import VersionControl.Commit
+import VersionControl.Document (Document, DocumentID)
 import VersionControl.Hash
 import qualified VersionControl.Statements as Statements
 import qualified VersionControl.Transactions as Transactions
@@ -38,6 +42,14 @@ createCommit commit =
         Serializable
         Write
         $ Transactions.createCommit commit
+
+-- | session to create a new document
+createDocument :: Text -> GroupID -> Session DocumentID
+createDocument = curry $ flip statement Statements.createDocument
+
+-- | session to get an existing document
+getDocument :: DocumentID -> Session Document
+getDocument = flip statement Statements.getDocument
 
 -- | session to get a document tree by its hash.
 --   The whole tree is obtained from the database.
