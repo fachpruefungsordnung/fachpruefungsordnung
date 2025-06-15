@@ -23,11 +23,21 @@ import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
 
+-- | State of an asynchronous load operation.
+-- | It can either be in a loading state or have successfully loaded data.
+-- |
+-- | TODO: Because `handleAction` handles the case of failing to load the user
+-- |       explicitly (by navigating to the login page), we do not care about
+-- |       the error case here. We should look for a more general approach to
+-- |       handle loading entities in the future. Right now, this is at least
+-- |       more descriptive than using `Maybe`.
+data LoadState a = Loading | Loaded a
+
 data Action
   = Initialize
   | Receive (Connected FPOTranslator Input)
 
-type State = FPOState (user :: Maybe User, loginSuccessfulBanner :: Boolean)
+type State = FPOState (user :: LoadState User, loginSuccessfulBanner :: Boolean)
 
 type Input = { loginSuccessfulBanner :: Maybe Boolean }
 
@@ -51,7 +61,7 @@ component =
   where
   initialState :: Connected FPOTranslator Input -> State
   initialState { context, input: { loginSuccessfulBanner } } =
-    { user: Nothing
+    { user: Loading
     , loginSuccessfulBanner: fromMaybe false loginSuccessfulBanner
     , translator: fromFpoTranslator context
     }
@@ -64,7 +74,7 @@ component =
           [ HH.h1 []
               [ HH.text $ translate (label :: _ "prof_profile") state.translator ]
           , case state.user of
-              Just user -> HH.div
+              Loaded user -> HH.div
                 [ HP.classes [ HB.dFlex, HB.justifyContentCenter, HB.my5 ] ]
                 [ HH.div [ HP.classes [ HB.colMd3 ] ]
                     [ HH.div [ HP.classes [ HB.textCenter, HB.mt3 ] ]
@@ -116,15 +126,8 @@ component =
 
                     ]
                 ]
-              -- TODO: This case should not happen because on initialization, we leave this component
-              --       if the user is not logged in. We should somehow parametrize the component
-              --       over the user, so that it can only be used when a user is actually logged in,
-              --       or look for another approach to handle this.
-              --
-              --       For now, we just handle this case gracefully.
-              Nothing -> HH.div [ HP.classes [ HB.my3 ] ]
-                [ HH.i [] [ HH.text "unknown user" ]
-                ]
+              Loading -> HH.div [ HP.classes [ HB.my3 ] ]
+                [ HH.div [ HP.classes [ HB.spinnerBorder ] ] [] ]
           ]
       ]
 
@@ -134,7 +137,7 @@ component =
       u <- liftAff getUser
       case u of
         Just us -> do
-          H.modify_ \currState -> currState { user = Just us }
+          H.modify_ \currState -> currState { user = Loaded us }
           pure unit
         Nothing -> do
           navigate Login

@@ -23,7 +23,7 @@ import Language.Ltml.AST.Text
     ( EnumItem (EnumItem)
     , FontStyle (..)
     , FootnoteTextTree
-    , SentenceStart (SentenceStart)
+    , SentenceStart
     , TextTree (..)
     )
 import Language.Ltml.Parser (Parser)
@@ -104,7 +104,7 @@ instance SpecialP Void where
     textLeafP = TextLeaf <$> simpleWordP
 
 instance SpecialP SentenceStart where
-    specialP = pure $ SentenceStart Nothing -- TODO
+    specialP = empty -- pure $ SentenceStart Nothing -- TODO
     textLeafP = TextLeaf <$> simpleWordP -- TODO
 
 simpleWordP :: Parser Text

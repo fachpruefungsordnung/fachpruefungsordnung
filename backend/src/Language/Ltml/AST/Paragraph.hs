@@ -4,10 +4,10 @@ module Language.Ltml.AST.Paragraph
 where
 
 import Language.Lsd.AST.Type.Paragraph (ParagraphFormat)
-import Language.Ltml.AST.Text (RichTextTree)
+import Language.Ltml.AST.Text (ParagraphTextTree)
 
 data Paragraph
     = Paragraph
         ParagraphFormat
-        [RichTextTree]
+        [ParagraphTextTree]
     deriving (Show)
