@@ -1,7 +1,16 @@
 -- | Generic table head component.
 --   Allows for sorting by clicking on the header.
 
-module FPO.Components.Table.Head where
+module FPO.Components.Table.Head
+  ( Order(..)
+  , Output(..)
+  , SortingStyle(..)
+  , Title
+  , component
+  , createTableColumns
+  , sortByF
+  , toggleSorting
+  ) where
 
 import Prelude
 
@@ -48,6 +57,12 @@ sortByF sorting f arr =
   case sorting of
     Asc -> sortBy f arr
     Desc -> sortBy (flip f) arr
+
+-- | Switches the sorting direction.
+toggleSorting :: Order -> Order
+toggleSorting sorting = case sorting of
+  Asc -> Desc
+  Desc -> Asc
 
 component :: forall query m. H.Component query Input Output m
 component =
@@ -144,12 +159,6 @@ component =
   getColumnStyle state column =
     if state.active == column.title then HB.bgSecondarySubtle
     else HB.bgBodySecondary
-
-  -- Switches the sorting direction.
-  toggleSorting :: Order -> Order
-  toggleSorting sorting = case sorting of
-    Asc -> Desc
-    Desc -> Asc
 
   -- Toggles the sorting state of a column.
   toggleColumnSorting :: Column -> Column

@@ -9,7 +9,7 @@ module FPO.Page.Home (component) where
 
 import Prelude
 
-import Data.Array (filter)
+import Data.Array (filter, null)
 import Data.DateTime (DateTime, adjust, date, day, diff, month, year)
 import Data.Enum (fromEnum)
 import Data.Int (floor)
@@ -148,11 +148,19 @@ component =
       pure unit
     ChangeSorting (TH.Clicked title order) -> do
       state <- H.get
+
+      -- Sorting logic based on the clicked column title:
       projects <- pure $ case title of
         "Title" ->
-          TH.sortByF order (\a b -> compare a.name b.name) state.projects
+          TH.sortByF
+            order
+            (\a b -> compare a.name b.name)
+            state.projects
         "Last Updated" ->
-          TH.sortByF order (\a b -> compare a.updated b.updated) state.projects
+          TH.sortByF
+            (TH.toggleSorting order) -- The newest project should be first.
+            (\a b -> compare a.updated b.updated)
+            state.projects
         _ -> state.projects -- Ignore other columns.
 
       H.modify_ _ { projects = projects }
@@ -166,7 +174,7 @@ component =
     Just _ -> HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
       [ addCard
           (translate (label :: _ "home_yourProjects") state.translator)
-          [ HP.classes [ HB.col8 ] ]
+          [ HP.classes [ HB.colSm11, HB.colMd9, HB.colLg7 ] ]
           (renderProjectOverview state)
       ]
     Nothing -> HH.p
@@ -203,16 +211,27 @@ component =
   -- Renders the list of projects.
   renderProjectTable :: State -> H.ComponentHTML Action Slots m
   renderProjectTable state =
-    -- TODO: The table should have a fixed width and each column should
-    --       have a fixed width as well, allowing for smoother filtering
-    --       without (automatic) resizing.
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
-      [ HH.slot _tablehead unit TH.component tableCols ChangeSorting
-      , HH.tbody
-          []
-          ( map (renderProjectRow state) $ filterProjects state.searchQuery
-              state.projects
+      [ HH.colgroup_
+          [ HH.col [ HP.style "width: 70%;" ] -- 'Title' column
+          , HH.col [ HP.style "width: 30%;" ] -- 'Last Updated' column
+          ]
+      , HH.slot _tablehead unit TH.component tableCols ChangeSorting
+      , HH.tbody_
+          ( let
+              ps = filterProjects state.searchQuery state.projects
+            in
+              if null ps then
+                [ HH.tr []
+                    [ HH.td
+                        [ HP.colSpan 2
+                        , HP.classes [ HB.textCenter ]
+                        ]
+                        [ HH.i_ [ HH.text "No projects found" ] ]
+                    ]
+                ]
+              else map (renderProjectRow state) ps
           )
       ]
     where
