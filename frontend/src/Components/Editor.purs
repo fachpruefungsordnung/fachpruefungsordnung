@@ -9,6 +9,7 @@ import Ace.EditSession as Session
 import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
+import Ace.Selection as Selection
 import Ace.Types as Types
 import Data.Array (intercalate, (..), (:))
 import Data.Array as Array
@@ -21,7 +22,7 @@ import Effect.Class (class MonadEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
-import Halogen.HTML.Properties (classes, ref, style) as HP
+import Halogen.HTML.Properties (classes, ref, style, title) as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
 
@@ -49,6 +50,9 @@ data Action
   | Paragraph
   | Delete
   | ShowWarning
+  | Bold
+  | Italic
+  | Underline
 
 -- We use a query to get the content of the editor
 data Query a
@@ -84,23 +88,26 @@ editor = H.mkComponent
   render _ =
     HH.div
       [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
-      [ HH.div -- Second toolbar
-
-          [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap2 ] ]
+      [ HH.div
+          [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
           [ HH.button
-              [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
-              , HE.onClick \_ -> Paragraph
+              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+              , HP.title "Text fett formatieren"
+              , HE.onClick \_ -> Bold
               ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-paragraph" ] ] []
-              , HH.text " Paragraph"
-              ]
+              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-bold" ] ] [] ]
           , HH.button
-              [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
-              , HE.onClick \_ -> Delete
+              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+              , HP.title "Text kursiv formatieren"
+              , HE.onClick \_ -> Italic
               ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ] ] []
-              , HH.text " Delete"
+              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-italic" ] ] [] ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+              , HP.title "Text unterstreichen"
+              , HE.onClick \_ -> Underline
               ]
+              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-underline" ] ] [] ]
           ]
       , HH.div -- Editor container
 
@@ -157,6 +164,18 @@ editor = H.mkComponent
           row <- Types.getRow <$> Editor.getCursorPosition ed
           document <- Editor.getSession ed >>= Session.getDocument
           Document.insertLines row [ "Paragraph", "=========" ] document
+
+    Bold -> do
+      H.gets _.editor >>= traverse_ \ed ->
+        H.liftEffect $ surroundSelection "<*" ">" ed
+
+    Italic -> do
+      H.gets _.editor >>= traverse_ \ed ->
+        H.liftEffect $ surroundSelection "</" ">" ed
+
+    Underline -> do
+      H.gets _.editor >>= traverse_ \ed ->
+        H.liftEffect $ surroundSelection "<_" ">" ed
 
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
@@ -276,3 +295,23 @@ addAnnotation
 addAnnotation annotation session = do
   anns <- Session.getAnnotations session
   Session.setAnnotations (annotation : anns) session
+
+surroundSelection :: String -> String -> Types.Editor -> Effect Unit
+surroundSelection left right ed = do
+  session <- Editor.getSession ed
+  selection <- Editor.getSelection ed
+  range <- Selection.getRange selection
+  selectedText <- Session.getTextRange range session
+
+  -- Get the start position
+  startPos <- Range.getStart range
+
+  -- Insert the surrounded text
+  let newText = left <> selectedText <> right
+  Session.replace range newText session
+
+  -- Calculate new cursor position (after the left part)
+  let newColumn = (Types.getColumn startPos) + (String.length left)
+
+  -- Move cursor to new position
+  Editor.moveCursorTo (Types.getRow startPos) (Just newColumn) Nothing ed
