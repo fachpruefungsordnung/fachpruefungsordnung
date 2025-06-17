@@ -178,50 +178,62 @@ splitview = H.mkComponent
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
   renderSplit state =
-    HH.div
-      [ HE.onMouseMove HandleMouseMove
-      , HE.onMouseUp StopResize
-      , HP.classes [ HB.dFlex ]
-      , HP.style "height: 100vh; position: relative; user-select: none;"
-      ]
-      ( -- TOC Sidebar
-        ( if state.tocEntriesShown then renderSidebar state
-          else []
-        )
-          <>
-            [ -- Editor
-              HH.div
-                [ HP.style $ "position: relative; flex: 0 0 "
-                    <> show (state.middleRatio * 100.0)
-                    <> "%;"
-                ]
-                [ -- Floating Button outside to the right of editor container to toggle preview
-                  HH.div
-                    [ HP.style
-                        "position: absolute; top: 50%; right: 0px; margin = outside transform: translateY(-50%); z-index: 10;"
-                    ]
-                    [ HH.button
-                        [ HP.classes [ HB.btn, HB.btnLight, HB.btnSm ]
-                        , HE.onClick \_ -> TogglePreview
-                        ]
-                        [ HH.text if state.previewShown then ">" else "<" ]
-                    ]
+    -- We have to manually shrink the size of those elements, otherwise if they overflow the bottom 
+    -- of the elements wont be visible anymore
+    let
+      navbarHeight :: Int
+      navbarHeight = 56 -- px, height of the navbar
 
-                -- The actual editor area
-                , HH.div
-                    [ HP.classes [ HB.dFlex, HB.flexColumn ]
-                    , HP.style
-                        "height: 100%; box-sizing: border-box; min-height: 0; overflow: hidden;"
-                    ]
-                    [ HH.slot _editor unit Editor.editor unit HandleEditor ]
-                ]
-            ]
-          <>
-            -- Preview Sectioin
-            ( if state.previewShown then renderPreview state
-              else []
+      toolbarHeight :: Int
+      toolbarHeight = 31 -- px, height of the toolbar
+    in
+      HH.div
+        [ HE.onMouseMove HandleMouseMove
+        , HE.onMouseUp StopResize
+        , HP.classes [ HB.dFlex, HB.overflowHidden ]
+        , HP.style
+            ( "height: calc(100vh - " <> show (navbarHeight + toolbarHeight) <>
+                "px); max-height: 100%; user-select: none"
             )
-      )
+        ]
+        ( -- TOC Sidebar
+          ( if state.tocEntriesShown then renderSidebar state
+            else []
+          )
+            <>
+              [ -- Editor
+                HH.div
+                  [ HP.style $ "position: relative; flex: 0 0 "
+                      <> show (state.middleRatio * 100.0)
+                      <> "%;"
+                  ]
+                  [ -- Floating Button outside to the right of editor container to toggle preview
+                    HH.div
+                      [ HP.style
+                          "position: absolute; top: 50%; right: 0px; margin = outside transform: translateY(-50%); z-index: 10;"
+                      ]
+                      [ HH.button
+                          [ HP.classes [ HB.btn, HB.btnLight, HB.btnSm ]
+                          , HE.onClick \_ -> TogglePreview
+                          ]
+                          [ HH.text if state.previewShown then ">" else "<" ]
+                      ]
+
+                  -- The actual editor area
+                  , HH.div
+                      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow0 ]
+                      , HP.style
+                          "height: 100%; box-sizing: border-box; min-height: 0; overflow: hidden;"
+                      ]
+                      [ HH.slot _editor unit Editor.editor unit HandleEditor ]
+                  ]
+              ]
+            <>
+              -- Preview Sectioin
+              ( if state.previewShown then renderPreview state
+                else []
+              )
+        )
 
   renderSidebar :: State -> Array (H.ComponentHTML Action Slots m)
   renderSidebar state =
