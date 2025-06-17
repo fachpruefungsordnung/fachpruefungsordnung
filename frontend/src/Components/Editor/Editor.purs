@@ -3,13 +3,25 @@ module FPO.Components.Editor
   , Output(..)
   , Query(..)
   , State
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
   , TOCEntry
   , _pdfSlideBar
+=======
+>>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
   , addAnnotation
   , addChangeListener
   , editor
   , findAllIndicesOf
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
   , removeMarkerByPosition
+=======
+  , removeMarkerByID
+  , removeMarkerByIDs
+  , removeMarkerByPosition
+  , removeMarkerByRange
+  , removeMarkerByRowCol
+  , surroundSelection
+>>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
   )
   where
 
@@ -21,6 +33,7 @@ import Ace.EditSession as Session
 import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
+import Ace.Selection as Selection
 import Ace.Types as Types
 <<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 import Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
@@ -51,6 +64,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, ref, style, title) as HP
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
@@ -60,6 +74,9 @@ import Web.DOM.Element (toEventTarget)
 import Web.Event.EventTarget (addEventListener, eventListener)
 import Web.HTML.HTMLElement (toElement)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
+=======
+import Halogen.Themes.Bootstrap5 as HB
+>>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
 
 <<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 type AnnotatedMarker =
@@ -93,8 +110,6 @@ type State =
   , pdfWarningIsShown :: Boolean
   )
 
-_pdfSlideBar = Proxy :: Proxy "pdfSlideBar"
-
 data Output
   = ClickedQuery (Maybe (Array String))
   | SavedSection TOCEntry
@@ -107,7 +122,10 @@ data Action
   | Bold
   | Italic
   | Underline
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
   | Receive (Connected FPOTranslator Unit)
+=======
+>>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
 
 -- We use a query to get the content of the editor
 data Query a
@@ -152,23 +170,38 @@ editor = connect selectTranslator $ H.mkComponent
           [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
           [ HH.button
               [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
               , HP.title (translate (label :: _ "editor_textBold") state.translator)
+=======
+              , HP.title "Text fett formatieren"
+>>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
               , HE.onClick \_ -> Bold
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-bold" ] ] [] ]
           , HH.button
               [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
               , HP.title (translate (label :: _ "editor_textItalic") state.translator)
+=======
+              , HP.title "Text kursiv formatieren"
+>>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
               , HE.onClick \_ -> Italic
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-italic" ] ] [] ]
           , HH.button
               [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
               , HP.title
                   (translate (label :: _ "editor_textUnderline") state.translator)
               , HE.onClick \_ -> Underline
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-underline" ] ] [] ]
+=======
+              , HP.title "Text unterstreichen"
+              , HE.onClick \_ -> Underline
+              ]
+              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-italic" ] ] [] ]
+>>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
           , HH.button
               [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
               , HE.onClick \_ -> Comment
@@ -314,6 +347,18 @@ editor = connect selectTranslator $ H.mkComponent
             { tocEntry = st.tocEntry <#> \entry ->
                 entry { markers = Just newMarkers }
             }
+
+    Bold -> do
+      H.gets _.editor >>= traverse_ \ed ->
+        H.liftEffect $ surroundSelection "<*" ">" ed
+
+    Italic -> do
+      H.gets _.editor >>= traverse_ \ed ->
+        H.liftEffect $ surroundSelection "</" ">" ed
+
+    Underline -> do
+      H.gets _.editor >>= traverse_ \ed ->
+        H.liftEffect $ surroundSelection "<_" ">" ed
 
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
@@ -466,6 +511,26 @@ addAnnotation
 addAnnotation annotation session = do
   anns <- Session.getAnnotations session
   Session.setAnnotations (annotation : anns) session
+
+surroundSelection :: String -> String -> Types.Editor -> Effect Unit
+surroundSelection left right ed = do
+  session <- Editor.getSession ed
+  selection <- Editor.getSelection ed
+  range <- Selection.getRange selection
+  selectedText <- Session.getTextRange range session
+
+  -- Get the start position
+  startPos <- Range.getStart range
+
+  -- Insert the surrounded text
+  let newText = left <> selectedText <> right
+  Session.replace range newText session
+
+  -- Calculate new cursor position (after the left part)
+  let newColumn = (Types.getColumn startPos) + (String.length left)
+
+  -- Move cursor to new position
+  Editor.moveCursorTo (Types.getRow startPos) (Just newColumn) Nothing ed
 
 -- Multiple marker removal functions
 -- These functions remove markers by IDs, range, position, or row/column.
