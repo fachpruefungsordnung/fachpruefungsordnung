@@ -350,15 +350,21 @@ editor = connect selectTranslator $ H.mkComponent
 
     Bold -> do
       H.gets _.editor >>= traverse_ \ed ->
-        H.liftEffect $ surroundSelection "<*" ">" ed
+        H.liftEffect $ do
+          surroundSelection "<*" ">" ed
+          Editor.focus ed
 
     Italic -> do
       H.gets _.editor >>= traverse_ \ed ->
-        H.liftEffect $ surroundSelection "</" ">" ed
+        H.liftEffect $ do
+          surroundSelection "</" ">" ed
+          Editor.focus ed
 
     Underline -> do
       H.gets _.editor >>= traverse_ \ed ->
-        H.liftEffect $ surroundSelection "<_" ">" ed
+        H.liftEffect $ do
+          surroundSelection "<_" ">" ed
+          Editor.focus ed
 
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
@@ -512,6 +518,8 @@ addAnnotation annotation session = do
   anns <- Session.getAnnotations session
   Session.setAnnotations (annotation : anns) session
 
+-- | Surrounds the selected text with the given left and right strings
+-- | and positions the cursor after the inserted left text.
 surroundSelection :: String -> String -> Types.Editor -> Effect Unit
 surroundSelection left right ed = do
   session <- Editor.getSession ed
@@ -531,6 +539,15 @@ surroundSelection left right ed = do
 
   -- Move cursor to new position
   Editor.moveCursorTo (Types.getRow startPos) (Just newColumn) Nothing ed
+  -- Create a new range that encompasses the entire surrounded text
+  newRange <- Range.create
+    (Types.getRow startPos)
+    ((Types.getColumn startPos) + (String.length left))
+    (Types.getRow startPos)
+    ((Types.getColumn startPos) + (String.length newText) - (String.length right))
+
+  -- Set the selection to this new range
+  Selection.setSelectionRange newRange selection
 
 -- Multiple marker removal functions
 -- These functions remove markers by IDs, range, position, or row/column.
