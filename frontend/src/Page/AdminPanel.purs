@@ -20,6 +20,7 @@ import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Pagination as P
+import FPO.Components.Pagination as P
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Route (Route(..))
@@ -121,7 +122,7 @@ component =
       when (fromMaybe true (not <$> _.isAdmin <$> u)) $
         navigate Page404
 
-      let users = map (\i -> if i == 23 then "test" else "User " <> show i) (1 .. 55)
+      let users = map (\i -> if i == 23 then "test" else "User " <> show i) (1 .. 60)
       H.modify_ _ { users = users, filteredUsers = users }
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -202,21 +203,15 @@ component =
   renderUserList state =
     addCard "List of Users" [ HP.classes [ HB.col5 ] ] $ HH.div_
       [ HH.ul [ HP.classes [ HB.listGroup ] ]
-          $ map createUserEntry usrs
-              <> replicate (10 - length usrs)
-                emptyEntry
-      -- TODO: ^ Artificially inflating the list to 10 entries
-      --         allows for a fixed overall height of the list,
-      --         but it's not a clean solution at all.
+          $ map createUserEntry
+              (slice (state.page * 10) ((state.page + 1) * 10) state.filteredUsers)
       , HH.slot _pagination unit P.component ps SetPage
       ]
     where
-    usrs = slice (state.page * 10) ((state.page + 1) * 10) state.filteredUsers
     ps =
       { pages:
-          max 1 $
-            length state.filteredUsers `div` 10 +
-              if length state.filteredUsers `mod` 10 > 0 then 1 else 0
+          length state.filteredUsers `div` 10 +
+            if length state.filteredUsers `mod` 10 > 0 then 1 else 0
       , style: P.Compact 1
       , reaction: P.PreservePage
       }
