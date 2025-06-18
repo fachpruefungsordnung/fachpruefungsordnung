@@ -47,8 +47,6 @@ data Output
 
 data Action
   = Init
-  | Paragraph
-  | Delete
   | ShowWarning
   | Bold
   | Italic
@@ -151,19 +149,6 @@ editor = H.mkComponent
             )
             document
 
-    Delete -> do
-      H.gets _.editor >>= traverse_ \ed -> do
-        H.liftEffect $ do
-          row <- Types.getRow <$> Editor.getCursorPosition ed
-          document <- Editor.getSession ed >>= Session.getDocument
-          Document.removeLines row row document
-
-    Paragraph -> do
-      H.gets _.editor >>= traverse_ \ed -> do
-        H.liftEffect $ do
-          row <- Types.getRow <$> Editor.getCursorPosition ed
-          document <- Editor.getSession ed >>= Session.getDocument
-          Document.insertLines row [ "Paragraph", "=========" ] document
     Bold -> do
       H.gets _.editor >>= traverse_ \ed ->
         H.liftEffect $ do
