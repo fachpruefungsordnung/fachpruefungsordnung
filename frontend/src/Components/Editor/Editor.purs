@@ -281,6 +281,7 @@ editor = connect selectTranslator $ H.mkComponent
             )
             document
 
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
     Bold -> do
       H.gets _.editor >>= traverse_ \ed ->
         H.liftEffect $ do
@@ -298,6 +299,8 @@ editor = connect selectTranslator $ H.mkComponent
         H.liftEffect $ do
           underscore ed
           Editor.focus ed
+=======
+>>>>>>> 09e577d (Remove "Delete" and "Paragraph from Actions):frontend/src/Components/Editor.purs
 
     Comment -> do
       H.gets _.editor >>= traverse_ \ed -> do
