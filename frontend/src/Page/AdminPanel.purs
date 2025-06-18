@@ -19,6 +19,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
+import FPO.Components.Pagination as P
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Route (Route(..))
@@ -29,20 +30,24 @@ import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen (liftAff)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
+import Type.Proxy (Proxy(..))
+
+_pagination = Proxy :: Proxy "pagination"
+
+type Slots =
+  ( pagination :: forall q. H.Slot q P.Output Unit
+  )
 
 data Action
   = Initialize
   | Receive (Connected FPOTranslator Unit)
   | DoNothing -- Placeholder for future actions
-  -- TODO: If we want/have to use pagination,
-  --       we should move this to a separate module (component).
-  | SetPage Int
+  | SetPage P.Output
   -- TODO: Of course, we should add dedicated components for the filtering
   --        and creation of users, but for now, we just use these actions to
   --        demonstrate the functionality (mockup!). Or, might be even better,
@@ -92,7 +97,7 @@ component =
     , createUsername: ""
     }
 
-  render :: State -> H.ComponentHTML Action () m
+  render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
       [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
@@ -105,7 +110,7 @@ component =
           ]
       ]
 
-  handleAction :: Action -> H.HalogenM State Action () output m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
       -- TODO: Usually, we would fetch some data here (and handle
@@ -116,13 +121,13 @@ component =
       when (fromMaybe true (not <$> _.isAdmin <$> u)) $
         navigate Page404
 
-      let users = map (\i -> if i == 23 then "test" else "User " <> show i) (1 .. 30)
+      let users = map (\i -> if i == 23 then "test" else "User " <> show i) (1 .. 60)
       H.modify_ _ { users = users, filteredUsers = users }
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
     DoNothing -> do
       pure unit
-    SetPage p -> do
+    SetPage (P.Clicked p) -> do
       H.modify_ _ { page = p }
     ChangeFilterUsername username -> do
       H.modify_ _ { filterUsername = username }
@@ -132,7 +137,7 @@ component =
       s <- H.get
       let
         filteredUsers = filter (\u -> contains (Pattern s.filterUsername) u) s.users
-      H.modify_ _ { filteredUsers = filteredUsers, page = 0 }
+      H.modify_ _ { filteredUsers = filteredUsers }
     CreateUser -> do
       newUser <- H.gets _.createUsername
       if newUser == "" then H.modify_ _ { error = Just "Username cannot be empty." }
@@ -144,7 +149,7 @@ component =
           , createUsername = ""
           }
 
-  renderAdminPanel :: forall w. State -> HH.HTML w Action
+  renderAdminPanel :: State -> H.ComponentHTML Action Slots m
   renderAdminPanel state =
     HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
       [ HH.div [ HP.classes [ HB.colSm12, HB.colMd10, HB.colLg9 ] ]
@@ -154,7 +159,7 @@ component =
           ]
       ]
 
-  renderUserListView :: forall w. State -> HH.HTML w Action
+  renderUserListView :: State -> H.ComponentHTML Action Slots m
   renderUserListView state =
     HH.div [ HP.classes [ HB.row, HB.justifyContentAround ] ]
       [ renderFilterBy state
@@ -162,7 +167,7 @@ component =
       , renderNewUserForm state
       ]
 
-  renderFilterBy :: forall w. State -> HH.HTML w Action
+  renderFilterBy :: State -> H.ComponentHTML Action Slots m
   renderFilterBy state =
     addCard "Filter by" [ HP.classes [ HB.col3 ] ] $ HH.div
       [ HP.classes [ HB.row ] ]
@@ -193,20 +198,22 @@ component =
       ]
 
   -- Creates a list of (dummy) users with pagination.
-  renderUserList :: forall w. State -> HH.HTML w Action
+  renderUserList :: State -> H.ComponentHTML Action Slots m
   renderUserList state =
     addCard "List of Users" [ HP.classes [ HB.col4 ] ] $ HH.div_
       [ HH.ul [ HP.classes [ HB.listGroup ] ]
           $ map createUserEntry
               (slice (state.page * 10) ((state.page + 1) * 10) state.filteredUsers)
-      , HH.ul [ HP.classes [ HB.pagination, HB.mt3, HB.justifyContentCenter ] ]
-          $ map (\i -> createPageItem i (i == state.page + 1))
-              ( range' 1
-                  ( length state.filteredUsers `div` 10 +
-                      if length state.filteredUsers `mod` 10 > 0 then 1 else 0
-                  )
-              )
+      , HH.slot _pagination unit P.component ps SetPage
       ]
+    where
+    ps =
+      { pages:
+          length state.filteredUsers `div` 10 +
+            if length state.filteredUsers `mod` 10 > 0 then 1 else 0
+      , style: P.Compact 1
+      , reaction: P.PreservePage
+      }
 
   -- Creates a form to create a new (dummy) user.
   renderNewUserForm :: forall w. State -> HH.HTML w Action
@@ -243,24 +250,3 @@ component =
   createUserEntry userName =
     HH.li [ HP.classes [ HB.listGroupItem ] ]
       [ HH.text userName ]
-
-  -- Creates a page item for pagination.
-  createPageItem :: forall w. Int -> Boolean -> HH.HTML w Action
-  createPageItem pageNumber enabled =
-    HH.li
-      [ HP.classes $ [ HB.pageItem ] <> if enabled then [ HB.active ] else [] ]
-      [ HH.a
-          [ HP.classes [ HB.pageLink ]
-          , HP.href "#"
-          , HE.onClick $ const (SetPage (pageNumber - 1))
-          ]
-          [ HH.text $ show pageNumber
-          ]
-      ]
-
-  -- A range function that is not completely weird, compared to the one in `Data.Array`.
-  -- Spans from start to end, inclusive. As you would expect, if the end is smaller
-  -- than the start, it returns an **empty** array!
-  range' :: Int -> Int -> Array Int
-  range' 1 0 = []
-  range' start end = start .. end
