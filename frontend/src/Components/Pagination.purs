@@ -167,7 +167,7 @@ component =
             -- Total page count changed, handle this change appropriately.
             case input.reaction of
               FirstPage -> 0
-              PreservePage -> min (input.pages - 1) beforeActive
+              PreservePage -> max 0 $ min (input.pages - 1) beforeActive
           else
             -- Total page count did not change, keep the current active page
             beforeActive

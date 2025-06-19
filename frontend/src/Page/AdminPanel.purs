@@ -14,7 +14,7 @@ module FPO.Page.AdminPanel (component) where
 
 import Prelude
 
-import Data.Array (filter, length, slice, (..), (:))
+import Data.Array (filter, length, replicate, slice, (..), (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
@@ -121,7 +121,7 @@ component =
       when (fromMaybe true (not <$> _.isAdmin <$> u)) $
         navigate Page404
 
-      let users = map (\i -> if i == 23 then "test" else "User " <> show i) (1 .. 60)
+      let users = map (\i -> if i == 23 then "test" else "User " <> show i) (1 .. 55)
       H.modify_ _ { users = users, filteredUsers = users }
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -200,17 +200,23 @@ component =
   -- Creates a list of (dummy) users with pagination.
   renderUserList :: State -> H.ComponentHTML Action Slots m
   renderUserList state =
-    addCard "List of Users" [ HP.classes [ HB.col4 ] ] $ HH.div_
+    addCard "List of Users" [ HP.classes [ HB.col5 ] ] $ HH.div_
       [ HH.ul [ HP.classes [ HB.listGroup ] ]
-          $ map createUserEntry
-              (slice (state.page * 10) ((state.page + 1) * 10) state.filteredUsers)
+          $ map createUserEntry usrs
+              <> replicate (10 - length usrs)
+                emptyEntry
+      -- TODO: ^ Artificially inflating the list to 10 entries
+      --         allows for a fixed overall height of the list,
+      --         but it's not a clean solution at all.
       , HH.slot _pagination unit P.component ps SetPage
       ]
     where
+    usrs = slice (state.page * 10) ((state.page + 1) * 10) state.filteredUsers
     ps =
       { pages:
-          length state.filteredUsers `div` 10 +
-            if length state.filteredUsers `mod` 10 > 0 then 1 else 0
+          max 1 $
+            length state.filteredUsers `div` 10 +
+              if length state.filteredUsers `mod` 10 > 0 then 1 else 0
       , style: P.Compact 1
       , reaction: P.PreservePage
       }
@@ -250,3 +256,12 @@ component =
   createUserEntry userName =
     HH.li [ HP.classes [ HB.listGroupItem ] ]
       [ HH.text userName ]
+
+  -- Creates an empty entry. Used to fill the list
+  -- when there are less than 10 users available.
+  emptyEntry :: forall w. HH.HTML w Action
+  emptyEntry =
+    HH.li [ HP.classes [ HB.listGroupItem ] ]
+      [ HH.div [ HP.classes [ HB.textCenter, HB.invisible ] ]
+          [ HH.text "(no user)" ]
+      ]
