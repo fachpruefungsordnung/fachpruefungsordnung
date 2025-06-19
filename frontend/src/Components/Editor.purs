@@ -13,7 +13,7 @@ import Ace.Types as Types
 import Data.Array (intercalate, (..), (:))
 import Data.Array as Array
 import Data.Foldable (for_, traverse_)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
 import Data.Traversable (traverse)
 import Effect (Effect)
@@ -25,10 +25,21 @@ import Halogen.HTML.Properties (classes, ref, style) as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
 
+type AnnotatedMarker = 
+  { id :: Int
+  , type :: String
+  , range :: Types.Range
+  , startRow :: Int
+  , startCol :: Int
+  , endRow :: Int
+  , endColumn :: Int
+  }
+
 type TOCEntry =
   { id :: Int
   , name :: String
-  , content :: Maybe (Array String)
+  , content :: Maybe String
+  , markers :: Maybe (Array AnnotatedMarker)
   }
 
 type State =
@@ -136,7 +147,7 @@ editor = H.mkComponent
           Editor.setEnableLiveAutocompletion true editor_
 
           -- Add a change listener to the editor
-          addChangeListener editor_
+          -- addChangeListener editor_
 
           -- Add some example text
           Document.setValue
@@ -187,21 +198,44 @@ editor = H.mkComponent
 
     Comment -> do
       H.gets _.editor >>= traverse_ \ed -> do
-        H.liftEffect do
+        newMarker <- H.liftEffect do
           session <- Editor.getSession ed
           range <- Editor.getSelectionRange ed
           -- start is of type Types.Position = {row :: Int, column :: Int}
           -- Range.getStartRow does not work. Return undefined.
           start <- Range.getStart range
-          _ <- Session.addMarker range "my-marker" "text" false session
+          end <- Range.getEnd range
+          let 
+            sRow = Types.getRow start
+            sCol = Types.getColumn start
+            eRow = Types.getRow end
+            eCol = Types.getColumn end
+          newID <- Session.addMarker range "my-marker" "text" false session
           addAnnotation
-            { row: Types.getRow start
-            , column: Types.getColumn start
+            { row: sRow
+            , column: sCol
             , text: "Kommentar hinzugefügt"
             , type: "info" 
             }
             session
-          pure unit
+          let newMarker =
+                { id: newID
+                , type: "info"
+                , range: range
+                , startRow: sRow
+                , startCol: sCol
+                , endRow: eRow
+                , endColumn: eCol
+                }
+          pure newMarker
+        H.modify_ \st ->
+          st 
+            { tocEntry = st.tocEntry <#> \entry ->
+              let updatedMarkers = case entry.markers of
+                    Just ms -> newMarker : ms
+                    Nothing -> [newMarker]
+              in entry { markers = Just updatedMarkers }
+            }
 
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
@@ -214,14 +248,38 @@ editor = H.mkComponent
 
     ChangeSection entry a -> do
       H.modify_ \state -> state { tocEntry = Just entry }
-      let
-        content = case entry.content of
-          Just lines -> lines
-          Nothing -> []
+
+      -- Put the content of the section into the editor and update markers
       H.gets _.editor >>= traverse_ \ed -> do
-        H.liftEffect $ do
-          document <- Editor.getSession ed >>= Session.getDocument
-          Document.setValue (intercalate "\n" content) document
+        H.liftEffect do
+          session <- Editor.getSession ed
+          document <- Session.getDocument session
+
+          -- Set editor content
+          let content = fromMaybe "" entry.content
+          Document.setValue content document
+
+          -- Clear existing markers
+          existingMarkers <- Session.getMarkers session
+          for_ existingMarkers \marker -> do
+            id <- Marker.getId marker
+            Session.removeMarker id session
+
+          -- Clear annotations
+          Session.clearAnnotations session
+
+          -- Add markers + annotations from entry
+          for_ entry.markers \markers ->
+            for_ markers \marker -> do
+              _ <- Session.addMarker marker.range "my-marker" "text" false session
+              addAnnotation
+                { row: marker.startRow
+                , column: marker.startCol
+                , text: "Comment found!"
+                , type: marker.type
+                }
+                session
+
       pure (Just a)
 
     LoadPdf a -> do
@@ -236,12 +294,20 @@ editor = H.mkComponent
           >>= Document.getAllLines
 
       let
-        entry =
-          case state.tocEntry of
-            Nothing -> { id: -1, name: "Section not found", content: allLines }
-            Just e -> e
+        contentText = case allLines of
+          Just ls -> intercalate "\n" ls
+          Nothing -> "<No content>"
 
-        newEntry = { id: entry.id, name: entry.name, content: allLines }
+        entry = case state.tocEntry of
+          Nothing -> { id: -1, name: "Section not found", content: Nothing , markers: Nothing }
+          Just e -> e
+
+        newEntry =
+          { id: entry.id
+          , name: entry.name
+          , content: Just contentText
+          , markers: entry.markers
+          }
 
       H.modify_ \st -> st { tocEntry = Just newEntry }
       H.raise (SavedSection newEntry)
