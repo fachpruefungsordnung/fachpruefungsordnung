@@ -1,7 +1,23 @@
 -- | Generic pagination component.
 -- | This component can be used to display a pagination bar with clickable page numbers.
+-- |
+-- | It supports two `Style`s (`Full` and `Compact`) to control how many
+-- | page numbers are displayed. Furthermore, one can specify how the component reacts
+-- | to changes in the page count (i.e., when the user changes the amount of
+-- | pages and thus the amount of pagination items) using `Reaction`.
+-- |
+-- | The component allows for querying, i.e., the parent component can
+-- | request the component to jump to a specific page number.
 
-module FPO.Components.Pagination where
+module FPO.Components.Pagination
+  ( Input
+  , Output(..)
+  , Query(..)
+  , Reaction(..)
+  , Style(..)
+  , component
+  )
+  where
 
 import Prelude
 
