@@ -16,8 +16,7 @@ module FPO.Components.Pagination
   , Reaction(..)
   , Style(..)
   , component
-  )
-  where
+  ) where
 
 import Prelude
 
@@ -54,8 +53,7 @@ data Reaction
   -- | That is, if the page number increases,
   -- | the shown page does not change. Otherwise, if the current page number
   -- | becomes invalid, the highest valid page number is shown.
-  -- TODO: This hasn't been tested properly yet, so it might not work as expected.
-  --       Also, we should perhaps improve the visuals because changing the amount of
+  -- TODO: We should perhaps improve the visuals because changing the amount of
   --       pagination items shown changes the layout and makes the buttons jump around,
   --       which is not very user-friendly.
   | PreservePage
