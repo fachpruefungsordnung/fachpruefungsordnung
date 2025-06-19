@@ -49,19 +49,22 @@ data Output = Clicked Int
 type State =
   { active :: Int, totalPages :: Int, style :: Style, reaction :: Reaction }
 
+data Query a = SetPageQ Int a
+
 data Action
   = SetPage Int
   | Receive Input
 
 component
-  :: forall query m
-   . H.Component query Input Output m
+  :: forall m
+   . H.Component Query Input Output m
 component =
   H.mkComponent
     { initialState
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
+        , handleQuery = handleQuery
         , receive = Just <<< Receive
         }
     }
@@ -182,6 +185,15 @@ component =
         -- If the active page force-changed, we raise an event with the new active page.
         -- This is useful for the parent component to react to the change.
         H.raise $ Clicked newActive
+
+  handleQuery
+    :: forall a
+     . Query a
+    -> H.HalogenM State Action () Output m (Maybe a)
+  handleQuery = case _ of
+    SetPageQ page x -> do
+      handleAction (SetPage page)
+      pure $ Just x
 
   -- A range function that is not completely weird, compared to the one in `Data.Array`.
   -- Spans from start to end, inclusive. As you would expect, if the end is smaller

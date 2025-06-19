@@ -40,7 +40,7 @@ import Type.Proxy (Proxy(..))
 _pagination = Proxy :: Proxy "pagination"
 
 type Slots =
-  ( pagination :: forall q. H.Slot q P.Output Unit
+  ( pagination :: H.Slot P.Query P.Output Unit
   )
 
 data Action
@@ -257,7 +257,7 @@ component =
     HH.li [ HP.classes [ HB.listGroupItem ] ]
       [ HH.text userName ]
 
-  -- Creates an empty entry. Used to fill the list
+  -- Creates an empty entry. Used for padding
   -- when there are less than 10 users available.
   emptyEntry :: forall w. HH.HTML w Action
   emptyEntry =

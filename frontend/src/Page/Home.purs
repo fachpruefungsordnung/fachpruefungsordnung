@@ -9,10 +9,10 @@ module FPO.Page.Home (component) where
 
 import Prelude
 
-import Data.Array (filter, null)
+import Data.Array (filter, length, null, replicate, slice, (..))
 import Data.DateTime (DateTime, adjust, date, day, diff, month, year)
 import Data.Enum (fromEnum)
-import Data.Int (floor)
+import Data.Int (floor, toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), contains, toLower)
 import Data.Time.Duration
@@ -26,6 +26,7 @@ import Data.Time.Duration
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class.Console (log)
 import Effect.Now (nowDateTime)
+import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getUser)
@@ -47,6 +48,7 @@ import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
 
 _tablehead = Proxy :: Proxy "tablehead"
+_pagination = Proxy :: Proxy "pagination"
 
 type Input = Unit
 
@@ -60,12 +62,14 @@ data Action
   | DoNothing
   | ChangeSorting TH.Output
   | HandleSearchInput String
+  | SetPage P.Output
 
 type State = FPOState
   ( user :: Maybe User
   , projects :: Array Project
   , currentTime :: Maybe DateTime
   , searchQuery :: String
+  , page :: Int
   )
 
 -- | Model for Projects with proper DateTime.
@@ -79,6 +83,7 @@ type Project =
 
 type Slots =
   ( tablehead :: forall q. H.Slot q TH.Output Unit
+  , pagination :: H.Slot P.Query P.Output Unit
   )
 
 component
@@ -105,6 +110,7 @@ component =
     , projects: []
     , currentTime: Nothing
     , searchQuery: ""
+    , page: 0
     }
 
   render
@@ -164,9 +170,14 @@ component =
         _ -> state.projects -- Ignore other columns.
 
       H.modify_ _ { projects = projects }
-      pure unit
+
+      -- After changing the sorting, tell the pagination component
+      -- to reset to the first page:
+      H.tell _pagination unit $ P.SetPageQ 0
     HandleSearchInput query -> do
       H.modify_ _ { searchQuery = query }
+    SetPage (P.Clicked page) -> do
+      H.modify_ _ { page = page }
 
   -- Renders the overview of projects for the user.
   renderProjectsOverview :: State -> H.ComponentHTML Action Slots m
@@ -204,13 +215,25 @@ component =
                   HandleSearchInput
               ]
           , HH.div [ HP.classes [ HB.col12 ] ]
-              [ renderProjectTable state ]
+              [ renderProjectTable ps state ]
+          , HH.slot _pagination unit P.component paginationSettings SetPage
           ]
       ]
+    where
+    -- All projects filtered by the search query:
+    fps = filterProjects state.searchQuery state.projects
+    -- Slice of the projects for the current page:
+    ps = slice (state.page * 5) ((state.page + 1) * 5) $ fps
+    paginationSettings =
+      { pages: length fps `div` 5 +
+          if length fps `mod` 5 > 0 then 1 else 0
+      , style: P.Full
+      , reaction: P.FirstPage -- After changing the search query, reset to first page.
+      }
 
   -- Renders the list of projects.
-  renderProjectTable :: State -> H.ComponentHTML Action Slots m
-  renderProjectTable state =
+  renderProjectTable :: Array Project -> State -> H.ComponentHTML Action Slots m
+  renderProjectTable ps state =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
       [ HH.colgroup_
@@ -218,21 +241,20 @@ component =
           , HH.col [ HP.style "width: 30%;" ] -- 'Last Updated' column
           ]
       , HH.slot _tablehead unit TH.component tableCols ChangeSorting
-      , HH.tbody_
-          ( let
-              ps = filterProjects state.searchQuery state.projects
-            in
-              if null ps then
-                [ HH.tr []
-                    [ HH.td
-                        [ HP.colSpan 2
-                        , HP.classes [ HB.textCenter ]
-                        ]
-                        [ HH.i_ [ HH.text "No projects found" ] ]
+      , HH.tbody_ $
+          if null ps then
+            [ HH.tr []
+                [ HH.td
+                    [ HP.colSpan 2
+                    , HP.classes [ HB.textCenter ]
                     ]
+                    [ HH.i_ [ HH.text "No projects found" ] ]
                 ]
-              else map (renderProjectRow state) ps
-          )
+            ]
+          else
+            ( map (renderProjectRow state) ps
+                <> replicate (5 - length ps) emptyProjectRow
+            ) -- Fill up to 5 rows
       ]
     where
     tableCols = TH.createTableColumns
@@ -255,6 +277,17 @@ component =
           [ HH.text project.name ]
       , HH.td [ HP.classes [ HB.textCenter ] ]
           [ HH.text $ formatRelativeTime state.currentTime project.updated ]
+      ]
+
+  -- Renders an empty project row for padding.
+  emptyProjectRow :: forall w. HH.HTML w Action
+  emptyProjectRow =
+    HH.tr []
+      [ HH.td
+          [ HP.colSpan 2
+          , HP.classes [ HB.textCenter, HB.invisible ]
+          ]
+          [ HH.text $ "Empty Row" ]
       ]
 
   filterProjects :: String -> Array Project -> Array Project
@@ -306,7 +339,7 @@ component =
       , description: "Hier gibt es Zusatzinformationen!"
       , version: "1.2"
       , collaborators: 3
-      , updated: adjustDateTime (Hours 6.0) now -- 6 hours ago
+      , updated: adjustDateTime (Hours 6.0) now
       }
     , { name: "FPO Elektrotechnik und Informationstechnik B.Sc. 2022"
       , description:
@@ -315,7 +348,7 @@ component =
             "incidunt Hello! ut labore et dolore magna aliqua. Ut enim ad minim veniam"
       , version: "4.8"
       , collaborators: 4
-      , updated: adjustDateTime (Days 3.0) now -- 3 days ago
+      , updated: adjustDateTime (Days 3.0) now
       }
     , { name: "FPO Materialwissenschaft B.Sc."
       , description: "An older project for testing absolute date formatting"
@@ -324,6 +357,17 @@ component =
       , updated: adjustDateTime (Days (179.0)) now
       }
     ]
+      <>
+        map
+          ( \i ->
+              { name: "Another FPO Project #" <> show i
+              , description: "This is a mock project for testing purposes."
+              , version: "1.0"
+              , collaborators: 42
+              , updated: adjustDateTime (Hours $ toNumber i) now
+              }
+          )
+          (0 .. 4)
 
   -- Helper function to adjust a DateTime by a duration (subtract from current time)
   adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime
