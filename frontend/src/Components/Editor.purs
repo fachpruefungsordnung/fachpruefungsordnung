@@ -48,6 +48,7 @@ data Action
   = Init
   | Paragraph
   | Delete
+  | Comment
   | ShowWarning
 
 -- We use a query to get the content of the editor
@@ -100,6 +101,13 @@ editor = H.mkComponent
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ] ] []
               , HH.text " Delete"
+              ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
+              , HE.onClick \_ -> Comment
+              ]
+              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ] ] []
+              , HH.text " Comment"
               ]
           ]
       , HH.div -- Editor container
@@ -176,6 +184,24 @@ editor = H.mkComponent
           row <- Types.getRow <$> Editor.getCursorPosition ed
           document <- Editor.getSession ed >>= Session.getDocument
           Document.insertLines row [ "Paragraph", "=========" ] document
+
+    Comment -> do
+      H.gets _.editor >>= traverse_ \ed -> do
+        H.liftEffect do
+          session <- Editor.getSession ed
+          range <- Editor.getSelectionRange ed
+          -- start is of type Types.Position = {row :: Int, column :: Int}
+          -- Range.getStartRow does not work. Return undefined.
+          start <- Range.getStart range
+          _ <- Session.addMarker range "my-marker" "text" false session
+          addAnnotation
+            { row: Types.getRow start
+            , column: Types.getColumn start
+            , text: "Kommentar hinzugefügt"
+            , type: "info" 
+            }
+            session
+          pure unit
 
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
