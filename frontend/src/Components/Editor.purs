@@ -124,7 +124,7 @@ editor = H.mkComponent
 
           -- Set the editor's theme and mode
           Editor.setTheme "ace/theme/github" editor_
-          EditSession.setMode "ace/mode/tex" session
+          EditSession.setMode "ace/mode/custom_mode" session
           Editor.setEnableLiveAutocompletion true editor_
 
           -- Add a change listener to the editor
@@ -133,13 +133,32 @@ editor = H.mkComponent
           -- Add some example text
           Document.setValue
             ( intercalate "\n" $
-                [ "The code will be written here later!"
+                [ "# Project Overview"
+                , ""
+                , "-- This is a developer comment."
+                , ""
+                , "## To-Do List"
+                , ""
+                , "1. Document initial setup."
+                , "2. <*Define the API*>                        % LTML: bold"
+                , "3. <_Underline important interface items_>   % LTML: underline"
+                , "4. </Emphasize optional features/>           % LTML: italic"
+                , ""
+                , "/* Note: Nested styles are allowed,"
+                , "   but not transitively within the same tag type!"
+                , "   Written in a code block."
+                , "*/"
+                , ""
+                , "<*This is </allowed/>*>                      % valid nesting"
+                , "<*This is <*not allowed*>*>                  % invalid, but still highlighted"
+                , ""
+                , "## Status"
                 , ""
                 , "Errors can already be marked as such, see error!"
                 , ""
-                , "% This editor is currently using TeX mode (and GitHub theme) for testing,"
-                , "% so we can use TeX highlighting."
-                , "   $\\dotsc$"
+                , "TODO: Write the README file."
+                , "FIXME: The parser fails on nested blocks."
+                , "NOTE: We're using this style as a placeholder."
                 ]
             )
             document
