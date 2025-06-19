@@ -16,7 +16,8 @@ module FPO.Components.Pagination
   , Reaction(..)
   , Style(..)
   , component
-  ) where
+  )
+  where
 
 import Prelude
 
