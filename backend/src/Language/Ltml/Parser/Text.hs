@@ -78,25 +78,14 @@ textForestP
 textForestP t = miForest elementPF (childPF t)
 
 elementPF
-    :: forall m style enumItem special
-     . (MonadParser m, StyleP style, SpecialP m special)
-    => m [TextTree style enumItem special]
-    -> m (MiElementConfig, [TextTree style enumItem special])
-elementPF p = fmap (maybeToList . fmap Special) <$> specialP <|> regularP
-  where
-    regularP :: m (MiElementConfig, [TextTree style enumItem special])
-    regularP =
-        fmap ((regularCfg,) . singleton) $
-            Word <$> wordP (Proxy :: Proxy special)
-                <|> Reference <$ char '{' <* char ':' <*> labelP <* char '}'
-                <|> Styled <$ char '<' <*> styleP <*> p <* char '>'
-      where
-        regularCfg =
-            MiElementConfig
-                { miecPermitEnd = True
-                , miecPermitChild = True
-                , miecRetainTrailingWhitespace = True
-                }
+    :: (StyleP style, SpecialP special)
+    => Parser [TextTree style enumItem special]
+    -> Parser (TextTree style enumItem special)
+elementPF p =
+    Special <$> specialP
+        <|> textLeafP
+        <|> Reference <$ char '{' <* char ':' <*> labelP <* char '}'
+        <|> Styled <$ char '<' <*> styleP <*> p <* char '>'
 
 childPF
     :: forall m style enumType enumItem special
