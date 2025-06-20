@@ -9,7 +9,9 @@ module FPO.Components.Editor
   , addChangeListener
   , editor
   , findAllIndicesOf
-  ) where
+  , removeMarkerByPosition
+  )
+  where
 
 import Prelude
 
@@ -22,11 +24,12 @@ import Ace.Range as Range
 import Ace.Types as Types
 import Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
 import Data.Array (intercalate, (..), (:))
+import Data.Array (filter, filterA, intercalate, sortBy, (..), (:))
 import Data.Array as Array
-import Data.Foldable (for_, traverse_)
-import Data.Maybe (Maybe(..))
+import Data.Foldable (elem, for_, traverse_)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
-import Data.Traversable (traverse)
+import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import FPO.Data.Store as Store
@@ -46,10 +49,24 @@ import Web.Event.EventTarget (addEventListener, eventListener)
 import Web.HTML.HTMLElement (toElement)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
+type AnnotatedMarker =
+  { id :: Int
+  , type :: String
+  , range :: Types.Range
+  , startRow :: Int
+  , startCol :: Int
+  , endRow :: Int
+  , endColumn :: Int
+  }
+
+sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker
+sortMarkers = sortBy (comparing _.startRow <> comparing _.startCol)
+
 type TOCEntry =
   { id :: Int
   , name :: String
-  , content :: Maybe (Array String)
+  , content :: Maybe String
+  , markers :: Maybe (Array AnnotatedMarker)
   }
 
 type State = FPOState
@@ -67,6 +84,8 @@ data Output
 
 data Action
   = Init
+  | Comment
+  | DeleteComment
   | ShowWarning
   | Bold
   | Italic
@@ -131,6 +150,20 @@ editor = connect selectTranslator $ H.mkComponent
               , HE.onClick \_ -> Underline
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-underline" ] ] [] ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
+              , HE.onClick \_ -> Comment
+              ]
+              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ] ] []
+              , HH.text " Comment"
+              ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
+              , HE.onClick \_ -> DeleteComment
+              ]
+              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ] ] []
+              , HH.text "Delete Comment"
+              ]
           ]
       , HH.div -- Editor container
 
@@ -157,22 +190,41 @@ editor = connect selectTranslator $ H.mkComponent
 
           -- Set the editor's theme and mode
           Editor.setTheme "ace/theme/github" editor_
-          Session.setMode "ace/mode/tex" session
+          Session.setMode "ace/mode/custom_mode" session
           Editor.setEnableLiveAutocompletion true editor_
 
           -- Add a change listener to the editor
-          addChangeListener editor_
+          -- addChangeListener editor_
 
           -- Add some example text
           Document.setValue
             ( intercalate "\n" $
-                [ "The code will be written here later!"
+                [ "# Project Overview"
+                , ""
+                , "-- This is a developer comment."
+                , ""
+                , "## To-Do List"
+                , ""
+                , "1. Document initial setup."
+                , "2. <*Define the API*>                        % LTML: bold"
+                , "3. <_Underline important interface items_>   % LTML: underline"
+                , "4. </Emphasize optional features/>           % LTML: italic"
+                , ""
+                , "/* Note: Nested styles are allowed,"
+                , "   but not transitively within the same tag type!"
+                , "   Written in a code block."
+                , "*/"
+                , ""
+                , "<*This is </allowed/>*>                      % valid nesting"
+                , "<*This is <*not allowed*>*>                  % invalid, but still highlighted"
+                , ""
+                , "## Status"
                 , ""
                 , "Errors can already be marked as such, see error!"
                 , ""
-                , "% This editor is currently using TeX mode (and GitHub theme) for testing,"
-                , "% so we can use TeX highlighting."
-                , "   $\\dotsc$"
+                , "TODO: Write the README file."
+                , "FIXME: The parser fails on nested blocks."
+                , "NOTE: We're using this style as a placeholder."
                 ]
             )
             document
@@ -195,6 +247,60 @@ editor = connect selectTranslator $ H.mkComponent
           underscore ed
           Editor.focus ed
 
+    Comment -> do
+      H.gets _.editor >>= traverse_ \ed -> do
+        newMarker <- H.liftEffect do
+          session <- Editor.getSession ed
+          range <- Editor.getSelectionRange ed
+          -- start is of type Types.Position = {row :: Int, column :: Int}
+          -- Range.getStartRow does not work. Return undefined.
+          start <- Range.getStart range
+          end <- Range.getEnd range
+          let
+            sRow = Types.getRow start
+            sCol = Types.getColumn start
+            eRow = Types.getRow end
+            eCol = Types.getColumn end
+          newID <- Session.addMarker range "my-marker" "text" false session
+          let
+            newMarker =
+              { id: newID
+              , type: "info"
+              , range: range
+              , startRow: sRow
+              , startCol: sCol
+              , endRow: eRow
+              , endColumn: eCol
+              }
+          addAnnotation (markerToAnnotation newMarker) session
+          pure newMarker
+        H.modify_ \st ->
+          st
+            { tocEntry = st.tocEntry <#> \entry ->
+                let
+                  updatedMarkers = sortMarkers case entry.markers of
+                    Just ms -> newMarker : ms
+                    Nothing -> [ newMarker ]
+                in
+                  entry { markers = Just updatedMarkers }
+            }
+
+    DeleteComment -> do
+      H.gets _.editor >>= traverse_ \ed -> do
+        session <- H.liftEffect $ Editor.getSession ed
+        cursor <- H.liftEffect $ Editor.getCursorPosition ed
+        state <- H.get
+        -- extract markers from the current TOC entry
+        let markers = fromMaybe [] (state.tocEntry >>= _.markers)
+
+        -- remove the marker at the cursor position and return the remaining markers
+        newMarkers <- H.liftEffect $ removeMarkerByPosition cursor markers session
+        H.modify_ \st ->
+          st
+            { tocEntry = st.tocEntry <#> \entry ->
+                entry { markers = Just newMarkers }
+            }
+
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
 
@@ -208,14 +314,36 @@ editor = connect selectTranslator $ H.mkComponent
 
     ChangeSection entry a -> do
       H.modify_ \state -> state { tocEntry = Just entry }
-      let
-        content = case entry.content of
-          Just lines -> lines
-          Nothing -> []
+
+      -- Put the content of the section into the editor and update markers
       H.gets _.editor >>= traverse_ \ed -> do
-        H.liftEffect $ do
-          document <- Editor.getSession ed >>= Session.getDocument
-          Document.setValue (intercalate "\n" content) document
+        updatedMarkers <- H.liftEffect do
+          session <- Editor.getSession ed
+          document <- Session.getDocument session
+
+          -- Set editor content
+          let content = fromMaybe "" entry.content
+          Document.setValue content document
+
+          -- Remove existing markers
+          existingMarkers <- Session.getMarkers session
+          for_ existingMarkers \marker -> do
+            id <- Marker.getId marker
+            Session.removeMarker id session
+
+          -- Clear annotations
+          Session.clearAnnotations session
+
+          -- Reinsert markers with new IDs and annotations
+          for (fromMaybe [] entry.markers) \marker -> do
+            newID <- Session.addMarker marker.range "my-marker" "text" false session
+            addAnnotation (markerToAnnotation marker) session
+            pure marker { id = newID }
+
+        -- Update state with new marker IDs
+        H.modify_ \st ->
+          st { tocEntry = Just entry { markers = Just updatedMarkers } }
+
       pure (Just a)
 
     LoadPdf a -> do
@@ -230,12 +358,21 @@ editor = connect selectTranslator $ H.mkComponent
           >>= Document.getAllLines
 
       let
-        entry =
-          case state.tocEntry of
-            Nothing -> { id: -1, name: "Section not found", content: allLines }
-            Just e -> e
+        contentText = case allLines of
+          Just ls -> intercalate "\n" ls
+          Nothing -> "<No content>"
 
-        newEntry = { id: entry.id, name: entry.name, content: allLines }
+        entry = case state.tocEntry of
+          Nothing ->
+            { id: -1, name: "Section not found", content: Nothing, markers: Nothing }
+          Just e -> e
+
+        newEntry =
+          { id: entry.id
+          , name: entry.name
+          , content: Just contentText
+          , markers: entry.markers
+          }
 
       H.modify_ \st -> st { tocEntry = Just newEntry }
       H.raise (SavedSection newEntry)
@@ -315,3 +452,71 @@ addAnnotation
 addAnnotation annotation session = do
   anns <- Session.getAnnotations session
   Session.setAnnotations (annotation : anns) session
+
+-- Multiple marker removal functions
+-- These functions remove markers by IDs, range, position, or row/column.
+
+removeMarkerByIDs
+  :: Array Int
+  -> Array AnnotatedMarker
+  -> Types.EditSession
+  -> Effect (Array AnnotatedMarker)
+removeMarkerByIDs targetIDs markers session = do
+  -- Remove all markers with the given IDs
+  for_ targetIDs \targetID -> Session.removeMarker targetID session
+
+  -- Create a new array with the remaining markers
+  let remainingMarkers = filter (\m -> not (m.id `elem` targetIDs)) markers
+
+  -- Set the remaining markers in the session
+  let annotations = map markerToAnnotation remainingMarkers
+  Session.setAnnotations annotations session
+
+  pure remainingMarkers
+
+removeMarkerByID
+  :: Int
+  -> Array AnnotatedMarker
+  -> Types.EditSession
+  -> Effect (Array AnnotatedMarker)
+removeMarkerByID targetID = removeMarkerByIDs [ targetID ]
+
+removeMarkerByRange
+  :: Types.Range
+  -> Array AnnotatedMarker
+  -> Types.EditSession
+  -> Effect (Array AnnotatedMarker)
+removeMarkerByRange targetRange markers session = do
+  matching <- filterA (\m -> Range.containsRange targetRange m.range) markers
+  let ids = map _.id matching
+  removeMarkerByIDs ids markers session
+
+removeMarkerByPosition
+  :: Types.Position
+  -> Array AnnotatedMarker
+  -> Types.EditSession
+  -> Effect (Array AnnotatedMarker)
+removeMarkerByPosition targetPos marker session = do
+  let
+    row = Types.getRow targetPos
+    col = Types.getColumn targetPos
+  targetRange <- Range.create row col row col
+  removeMarkerByRange targetRange marker session
+
+removeMarkerByRowCol
+  :: Int
+  -> Int
+  -> Array AnnotatedMarker
+  -> Types.EditSession
+  -> Effect (Array AnnotatedMarker)
+removeMarkerByRowCol row col marker session = do
+  targetRange <- Range.create row col row col
+  removeMarkerByRange targetRange marker session
+
+markerToAnnotation :: AnnotatedMarker -> Types.Annotation
+markerToAnnotation m =
+  { row: m.startRow
+  , column: m.startCol
+  , text: "Comment found!"
+  , type: m.type
+  }
