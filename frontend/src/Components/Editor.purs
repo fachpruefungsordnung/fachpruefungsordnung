@@ -63,6 +63,7 @@ data Action
   | Paragraph
   | Delete
   | Comment
+  | DeleteComment
   | ShowWarning
 
 -- We use a query to get the content of the editor
@@ -122,6 +123,13 @@ editor = H.mkComponent
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ] ] []
               , HH.text " Comment"
+              ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
+              , HE.onClick \_ -> DeleteComment
+              ]
+              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ] ] []
+              , HH.text "Delete Comment"
               ]
           ]
       , HH.div -- Editor container
@@ -233,6 +241,21 @@ editor = H.mkComponent
                     Nothing -> [newMarker]
               in entry { markers = Just updatedMarkers }
             }
+
+    DeleteComment -> do
+      H.gets _.editor >>= traverse_ \ed -> do
+        session <- H.liftEffect $ Editor.getSession ed
+        cursor  <- H.liftEffect $ Editor.getCursorPosition ed
+        state   <- H.get
+        -- extract markers from the current TOC entry
+        let markers = fromMaybe [] (state.tocEntry >>= _.markers)
+
+        -- remove the marker at the cursor position and return the remaining markers
+        newMarkers <- H.liftEffect $ removeMarkerByPosition cursor markers session
+        H.modify_ \st ->
+          st { tocEntry = st.tocEntry <#> \entry ->
+            entry { markers = Just newMarkers }
+          }
 
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
@@ -383,6 +406,9 @@ addAnnotation annotation session = do
   anns <- Session.getAnnotations session
   Session.setAnnotations (annotation : anns) session
 
+-- Multiple marker removal functions
+-- These functions remove markers by IDs, range, position, or row/column.
+
 removeMarkerByIDs
   :: Array Int
   -> Array AnnotatedMarker
@@ -414,7 +440,7 @@ removeMarkerByRange
   -> Types.EditSession
   -> Effect (Array AnnotatedMarker)
 removeMarkerByRange targetRange markers session = do
-  matching <- filterA (\m -> Range.containsRange m.range targetRange) markers
+  matching <- filterA (\m -> Range.containsRange targetRange m.range) markers
   let ids = map _.id matching
   removeMarkerByIDs ids markers session
 
