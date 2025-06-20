@@ -20,29 +20,24 @@ Heading [text](./text.md) permits neither [styling](./text.md#styling) nor
 [enumerations](./enumeration.md).
 
 Further, heading text is [headed](./text.md#keyword-headed-text) by the
-section keyword (i.e., one level of indentation is implicitly
-added---noticeable with heading text that spans multiple lines).
-
-
-## Labeling
-
-A section may be labeled by appending `{LABEL}` to the keyword (without extra
-whitespace), for a label `LABEL`.
+(possibly [labeled](./general/label.md)) section keyword
+(i.e., one level of indentation is implicitly added---noticeable with heading
+text that spans multiple lines).
 
 
 ## Example
 
 ```
-={main} Main
+={main:} Main
 
-§{sectionA} Some section
+§{sectionA:} Some section
 
 This paragraph is in {:sectionA} in super-section {:main}.
 
 This is another paragraph in {:sectionA}.
 Paragraphs don't have keywords and are just separated by empty lines.
 
-§{sectionB} Another section, with a title
+§{sectionB:} Another section, with a title
   spanning
   several lines
     ^ Also, a footnote.

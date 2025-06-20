@@ -39,7 +39,7 @@ the text within an enumeration may contain an enumeration (as text children).
 ```
 Some sentence with
   # one enumeration item,
-  #{itm} a labeled item ({:itm}),
+  #{itm:} a labeled item ({:itm}),
   # another item,
     which spans
     multiple lines,

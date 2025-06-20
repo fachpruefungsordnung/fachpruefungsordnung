@@ -50,10 +50,11 @@ Exceptions apply in the context of enumerations (TODO).
 Sentences are not full nodes; in particular, [styling](./text.md#styling) may
 overlap with sentences.
 
-However, sentences may be [labeled](./general/label.md)
-(and [referenced](./text.md#references)), by prefixing a sentence with
-`{LABEL:}` (followed by any number of ASCII spaces), where `LABEL` is the
-respective label.
+However, sentences may be [labeled](./general/label.md) at their beginning
+(and [referenced](./text.md#references)).
+[Paragraph labeling](#labeling) takes precedence over sentence labeling; to
+label a sentence at the start of a paragraph (and best always), write the
+labeling on the same line as the start of the sentence.
 
 Further, sentences introduce a context w.r.t.
 [identifiers](./general/identifier.md);
