@@ -22,9 +22,13 @@ import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
 import Ace.Types as Types
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 import Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
 import Data.Array (intercalate, (..), (:))
 import Data.Array (filter, filterA, intercalate, sortBy, (..), (:))
+=======
+import Data.Array (filter, filterA, intercalate, (..), (:))
+>>>>>>> 0a5eade (moved AnnotatedMarker and TOCEntry to Types.purs):frontend/src/Components/Editor.purs
 import Data.Array as Array
 import Data.Foldable (elem, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -32,9 +36,13 @@ import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 import FPO.Data.Store as Store
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+=======
+import FPO.Types (AnnotatedMarker, TOCEntry, sortMarkers)
+>>>>>>> 0a5eade (moved AnnotatedMarker and TOCEntry to Types.purs):frontend/src/Components/Editor.purs
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -49,6 +57,7 @@ import Web.Event.EventTarget (addEventListener, eventListener)
 import Web.HTML.HTMLElement (toElement)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 type AnnotatedMarker =
   { id :: Int
   , type :: String
@@ -71,6 +80,10 @@ type TOCEntry =
 
 type State = FPOState
   ( editor :: Maybe Types.Editor
+=======
+type State =
+  { editor :: Maybe Types.Editor
+>>>>>>> 0a5eade (moved AnnotatedMarker and TOCEntry to Types.purs):frontend/src/Components/Editor.purs
   , tocEntry :: Maybe TOCEntry
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
