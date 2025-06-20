@@ -90,14 +90,14 @@ type State =
   }
 
 type Slots =
-  ( editor  :: H.Slot Editor.Query  Editor.Output  Unit
+  ( editor :: H.Slot Editor.Query Editor.Output Unit
   , preview :: H.Slot Preview.Query Preview.Output Unit
-  , toc     :: H.Slot TOC.Query     TOC.Output     Unit
+  , toc :: H.Slot TOC.Query TOC.Output Unit
   )
 
-_editor =  Proxy :: Proxy "editor"
+_editor = Proxy :: Proxy "editor"
 _preview = Proxy :: Proxy "preview"
-_toc =     Proxy :: Proxy "toc"
+_toc = Proxy :: Proxy "toc"
 
 splitview
   :: forall query m
