@@ -10,9 +10,9 @@ import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
 import Ace.Types as Types
-import Data.Array (intercalate, sortBy, (..), (:))
+import Data.Array (filter, filterA, intercalate, sortBy, (..), (:))
 import Data.Array as Array
-import Data.Foldable (for_, traverse_)
+import Data.Foldable (elem, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
 import Data.Traversable (traverse, for)
@@ -214,13 +214,6 @@ editor = H.mkComponent
             eRow = Types.getRow end
             eCol = Types.getColumn end
           newID <- Session.addMarker range "my-marker" "text" false session
-          addAnnotation
-            { row: sRow
-            , column: sCol
-            , text: "Kommentar hinzugefügt"
-            , type: "info" 
-            }
-            session
           let newMarker =
                 { id: newID
                 , type: "info"
@@ -230,6 +223,7 @@ editor = H.mkComponent
                 , endRow: eRow
                 , endColumn: eCol
                 }
+          addAnnotation (markerToAnnotation newMarker) session
           pure newMarker
         H.modify_ \st ->
           st 
@@ -274,13 +268,7 @@ editor = H.mkComponent
           -- Reinsert markers with new IDs and annotations
           for (fromMaybe [] entry.markers) \marker -> do
             newID <- Session.addMarker marker.range "my-marker" "text" false session
-            addAnnotation
-              { row: marker.startRow
-              , column: marker.startCol
-              , text: "Comment found!"
-              , type: marker.type
-              }
-              session
+            addAnnotation (markerToAnnotation marker) session
             pure marker { id = newID }
 
         -- Update state with new marker IDs
@@ -394,3 +382,68 @@ addAnnotation
 addAnnotation annotation session = do
   anns <- Session.getAnnotations session
   Session.setAnnotations (annotation : anns) session
+
+removeMarkerByIDs
+  :: Array Int
+  -> Array AnnotatedMarker
+  -> Types.EditSession
+  -> Effect (Array AnnotatedMarker)
+removeMarkerByIDs targetIDs markers session = do
+  -- Remove all markers with the given IDs
+  for_ targetIDs \targetID -> Session.removeMarker targetID session
+
+  -- Create a new array with the remaining markers
+  let remainingMarkers = filter (\m -> not (m.id `elem` targetIDs)) markers
+
+  -- Set the remaining markers in the session
+  let annotations = map markerToAnnotation remainingMarkers
+  Session.setAnnotations annotations session
+
+  pure remainingMarkers
+
+removeMarkerByID
+  :: Int
+  -> Array AnnotatedMarker
+  -> Types.EditSession
+  -> Effect (Array AnnotatedMarker)
+removeMarkerByID targetID = removeMarkerByIDs [targetID]
+
+removeMarkerByRange
+  :: Types.Range
+  -> Array AnnotatedMarker
+  -> Types.EditSession
+  -> Effect (Array AnnotatedMarker)
+removeMarkerByRange targetRange markers session = do
+  matching <- filterA (\m -> Range.containsRange m.range targetRange) markers
+  let ids = map _.id matching
+  removeMarkerByIDs ids markers session
+
+removeMarkerByPosition
+  :: Types.Position
+  -> Array AnnotatedMarker
+  -> Types.EditSession
+  -> Effect (Array AnnotatedMarker)
+removeMarkerByPosition targetPos marker session = do
+  let 
+    row = Types.getRow targetPos
+    col = Types.getColumn targetPos
+  targetRange <- Range.create row col row col
+  removeMarkerByRange targetRange marker session
+
+removeMarkerByRowCol
+  :: Int
+  -> Int
+  -> Array AnnotatedMarker
+  -> Types.EditSession
+  -> Effect (Array AnnotatedMarker)
+removeMarkerByRowCol row col marker session = do 
+  targetRange <- Range.create row col row col
+  removeMarkerByRange targetRange marker session
+
+markerToAnnotation :: AnnotatedMarker -> Types.Annotation
+markerToAnnotation m =
+  { row: m.startRow
+  , column: m.startCol
+  , text: "Comment found!"
+  , type: m.type
+  }
