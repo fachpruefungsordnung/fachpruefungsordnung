@@ -18,7 +18,7 @@ import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
-import FPO.Types (AnnotatedMarker, TOCEntry, sortMarkers)
+import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -198,12 +198,9 @@ editor = H.mkComponent
           -- start is of type Types.Position = {row :: Int, column :: Int}
           -- Range.getStartRow does not work. Return undefined.
           start <- Range.getStart range
-          end <- Range.getEnd range
           let
             sRow = Types.getRow start
             sCol = Types.getColumn start
-            eRow = Types.getRow end
-            eCol = Types.getColumn end
           newID <- Session.addMarker range "my-marker" "text" false session
           let
             newMarker =
@@ -212,8 +209,6 @@ editor = H.mkComponent
               , range: range
               , startRow: sRow
               , startCol: sCol
-              , endRow: eRow
-              , endColumn: eCol
               }
           addAnnotation (markerToAnnotation newMarker) session
           pure newMarker
@@ -453,11 +448,3 @@ removeMarkerByRowCol
 removeMarkerByRowCol row col marker session = do
   targetRange <- Range.create row col row col
   removeMarkerByRange targetRange marker session
-
-markerToAnnotation :: AnnotatedMarker -> Types.Annotation
-markerToAnnotation m =
-  { row: m.startRow
-  , column: m.startCol
-  , text: "Comment found!"
-  , type: m.type
-  }
