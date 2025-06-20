@@ -33,19 +33,18 @@ type UserAPI =
         :<|> Auth AuthMethod Auth.Token
             :> "me"
             :> Get '[JSON] User.FullUser
-        :<|> Auth AuthMethod Auth.Token
-            :> "users"
-            :> Capture "userId" User.UserID
-            :> Get '[JSON] User.FullUser
-        :<|> Auth AuthMethod Auth.Token
-            :> "users"
-            :> Capture "userId" User.UserID
-            :> Delete '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "users"
-            :> Capture "userId" User.UserID
-            :> ReqBody '[JSON] Auth.UserUpdate
-            :> Patch '[JSON] NoContent
+        :<|> "users"
+            :> ( Auth AuthMethod Auth.Token
+                    :> Capture "userId" User.UserID
+                    :> Get '[JSON] User.FullUser
+                    :<|> Auth AuthMethod Auth.Token
+                        :> Capture "userId" User.UserID
+                        :> Delete '[JSON] NoContent
+                    :<|> Auth AuthMethod Auth.Token
+                        :> Capture "userId" User.UserID
+                        :> ReqBody '[JSON] Auth.UserUpdate
+                        :> Patch '[JSON] NoContent
+               )
 
 userServer :: Server UserAPI
 userServer =

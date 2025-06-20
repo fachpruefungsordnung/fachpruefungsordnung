@@ -3,7 +3,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Server.HTTPHeaders (PDF, PDFByteString (..)) where
+module Server.HTTPHeaders (PDF, PDFByteString (..), HTML) where
 
 import Data.ByteString.Lazy (ByteString)
 import Data.OpenApi (NamedSchema (..), ToSchema (..), binarySchema)
@@ -24,6 +24,12 @@ instance Accept PDF where
 
 instance MimeRender PDF PDFByteString where
     mimeRender _ (PDFByteString bs) = bs
+
+-- | HTML MIME type
+data HTML
+
+instance Accept HTML where
+    contentType _ = "text" // "html"
 
 -- Cache-Control Headers
 type HeaderCacheControl = Header "Cache-Control" String

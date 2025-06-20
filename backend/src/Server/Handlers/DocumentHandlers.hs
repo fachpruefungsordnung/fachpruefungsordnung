@@ -12,12 +12,15 @@ module Server.Handlers.DocumentHandlers
     ) where
 
 import Control.Monad.IO.Class
+import Data.ByteString (ByteString)
+import Data.Text
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
 import Servant.Auth.Server
 import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
+import Server.HTTPHeaders (HTML, PDF)
 import Server.HandlerUtil
 import qualified UserManagement.Document as Document
 import qualified UserManagement.Sessions as Sessions
@@ -26,38 +29,38 @@ import VersionControl.Commit
 import Prelude hiding (readFile)
 
 type DocumentAPI =
-    Auth AuthMethod Auth.Token
-        :> "documents"
-        :> Capture "documentID" Document.DocumentID
-        :> Get '[JSON] ExistingCommit
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" Document.DocumentID
-            :> Delete '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" Document.DocumentID
-            :> "external"
-            :> Get '[JSON] [(User.UserID, Document.DocPermission)]
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" Document.DocumentID
-            :> "external"
-            :> Capture "userID" User.UserID
-            :> Get '[JSON] (Maybe Document.DocPermission)
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" Document.DocumentID
-            :> "external"
-            :> Capture "userID" User.UserID
-            :> ReqBody '[JSON] Document.DocPermission
-            :> Put '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" Document.DocumentID
-            :> "external"
-            :> Capture "userID" User.UserID
-            :> Delete '[JSON] NoContent
+    "documents"
+        :> ( Auth AuthMethod Auth.Token
+                :> Capture "documentID" Document.DocumentID
+                :> Get '[JSON] ExistingCommit
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "documentID" Document.DocumentID
+                    :> Delete '[JSON] NoContent
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "documentID" Document.DocumentID
+                    :> "external"
+                    :> Get '[JSON] [(User.UserID, Document.DocPermission)]
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "documentID" Document.DocumentID
+                    :> "external"
+                    :> Capture "userID" User.UserID
+                    :> Get '[JSON] (Maybe Document.DocPermission)
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "documentID" Document.DocumentID
+                    :> "external"
+                    :> Capture "userID" User.UserID
+                    :> ReqBody '[JSON] Document.DocPermission
+                    :> Put '[JSON] NoContent
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "documentID" Document.DocumentID
+                    :> "external"
+                    :> Capture "userID" User.UserID
+                    :> Delete '[JSON] NoContent
+                :<|> Auth AuthMethod Auth.Token
+                    :> "render"
+                    :> ReqBody '[JSON] Text
+                    :> Post '[HTML] ByteString
+           )
 
 documentServer :: Server DocumentAPI
 documentServer =
@@ -67,6 +70,7 @@ documentServer =
         :<|> getExternalUserDocumentHandler
         :<|> putExternalUserDocumentHandler
         :<|> deleteExternalUserDocumentHandler
+        :<|> renderHandler
 
 getDocumentHandler
     :: AuthResult Auth.Token -> Document.DocumentID -> Handler ExistingCommit
@@ -179,3 +183,6 @@ deleteExternalUserDocumentHandler (Authenticated token) docID userID = do
             Left _ -> throwError errDatabaseAccessFailed
             Right _ -> return NoContent
 deleteExternalUserDocumentHandler _ _ _ = throwError errNotLoggedIn
+
+renderHandler :: AuthResult Auth.Token -> a -> Handler ByteString
+renderHandler _ _ = throwError errNotLoggedIn
