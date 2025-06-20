@@ -12,16 +12,14 @@ module Server.Handlers.DocumentHandlers
     ) where
 
 import Control.Monad.IO.Class
-import Data.ByteString (ByteString)
-import Data.Text
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
 import Servant.Auth.Server
 import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
-import Server.HTTPHeaders (HTML, PDF)
 import Server.HandlerUtil
+import Server.Handlers.RenderHandlers (RenderAPI, renderServer)
 import qualified UserManagement.Document as Document
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
@@ -56,10 +54,7 @@ type DocumentAPI =
                     :> "external"
                     :> Capture "userID" User.UserID
                     :> Delete '[JSON] NoContent
-                :<|> Auth AuthMethod Auth.Token
-                    :> "render"
-                    :> ReqBody '[JSON] Text
-                    :> Post '[HTML] ByteString
+                :<|> RenderAPI
            )
 
 documentServer :: Server DocumentAPI
@@ -70,7 +65,7 @@ documentServer =
         :<|> getExternalUserDocumentHandler
         :<|> putExternalUserDocumentHandler
         :<|> deleteExternalUserDocumentHandler
-        :<|> renderHandler
+        :<|> renderServer
 
 getDocumentHandler
     :: AuthResult Auth.Token -> Document.DocumentID -> Handler ExistingCommit
@@ -183,6 +178,3 @@ deleteExternalUserDocumentHandler (Authenticated token) docID userID = do
             Left _ -> throwError errDatabaseAccessFailed
             Right _ -> return NoContent
 deleteExternalUserDocumentHandler _ _ _ = throwError errNotLoggedIn
-
-renderHandler :: AuthResult Auth.Token -> a -> Handler ByteString
-renderHandler _ _ = throwError errNotLoggedIn

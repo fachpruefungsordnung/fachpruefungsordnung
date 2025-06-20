@@ -3,12 +3,15 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Server.HTTPHeaders (PDF, PDFByteString (..), HTML) where
+module Server.HTTPHeaders (HeaderContentType, PDF, PDFByteString (..)) where
 
 import Data.ByteString.Lazy (ByteString)
 import Data.OpenApi (NamedSchema (..), ToSchema (..), binarySchema)
 import Network.HTTP.Media.MediaType ((//))
 import Servant.API
+
+-- | HTTP Content-Type Header
+type HeaderContentType = Header "Content-Type" String
 
 -- | PDF ByteString wrapper
 newtype PDFByteString = PDFByteString ByteString
@@ -25,13 +28,7 @@ instance Accept PDF where
 instance MimeRender PDF PDFByteString where
     mimeRender _ (PDFByteString bs) = bs
 
--- | HTML MIME type
-data HTML
-
-instance Accept HTML where
-    contentType _ = "text" // "html"
-
--- Cache-Control Headers
+-- HTTP Cache-Control Headers
 type HeaderCacheControl = Header "Cache-Control" String
 
 data CacheControl = NoCache | MaxAge Int
