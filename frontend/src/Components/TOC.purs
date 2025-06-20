@@ -3,27 +3,46 @@ module FPO.Components.TOC where
 import Prelude
 
 import Ace.Range as Range
+import Ace.Types as Types
 import Data.Array (intercalate, range)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
-import FPO.Types (TOCEntry)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
+import Halogen.HTML.Events as HE
+
+type AnnotatedMarker =
+  { id :: Int
+  , type :: String
+  , range :: Types.Range
+  , startRow :: Int
+  , startCol :: Int
+  , endRow :: Int
+  , endColumn :: Int
+  }
+
+type TOCEntry =
+  { id :: Int
+  , name :: String
+  , content :: Maybe String
+  , markers :: Maybe (Array AnnotatedMarker)
+  }
 
 type Input = Unit
 
-data Output = ChangeSection TOCEntry
+data Output
+  = ChangeSection TOCEntry
 
-data Action
+data Action 
   = Init
   | JumpToSection TOCEntry
 
-data Query a = UpdateTOC TOCEntry a
+data Query a
+  = UpdateTOC TOCEntry a
 
-type State =
+type State = 
   { tocEntries :: Array TOCEntry
   , slectedTocEntry :: Maybe Int
   }
@@ -38,13 +57,13 @@ tocview = H.mkComponent
       , handleQuery = handleQuery
       }
   }
-  where
+  where 
 
   render :: State -> forall slots. H.ComponentHTML Action slots m
-  render state =
+  render state = 
     HH.div_
       ( map
-          ( \{ id, name, content, markers } ->
+          (\{ id, name, content, markers } ->
               HH.div
                 [ HP.title ("Jump to section " <> name)
                 , HP.style
@@ -54,10 +73,9 @@ tocview = H.mkComponent
                     [ HE.onClick \_ -> JumpToSection { id, name, content, markers }
                     , HP.classes
                         ( [ HB.textTruncate ]
-                            <>
-                              if Just id == state.slectedTocEntry then
-                                [ HB.fwBold ]
-                              else []
+                            <> if Just id == state.slectedTocEntry then
+                                  [ HB.fwBold ]
+                                else []
                         )
                     , HP.style
                         "cursor: pointer; display: inline-block; min-width: 6ch;"
@@ -72,7 +90,7 @@ tocview = H.mkComponent
   handleAction = case _ of
 
     Init -> do
-      -- Since all example entries are similar, we create the same markers for all
+    -- Since all example entries are similar, we create the same markers for all
       mark <- H.liftEffect $ Range.create 7 3 7 26
       let
         -- Create initial TOC entries
@@ -103,8 +121,7 @@ tocview = H.mkComponent
                       , ""
                       , "## Status"
                       , ""
-                      , "Errors can no longer be marked as such, see error!"
-                      , "Comment this section out of the code."
+                      , "Errors can already be marked as such, see error!"
                       , ""
                       , "TODO: Write the README file."
                       , "FIXME: The parser fails on nested blocks."
@@ -117,6 +134,8 @@ tocview = H.mkComponent
                     , range: mark
                     , startRow: 7
                     , startCol: 3
+                    , endRow: 7
+                    , endColumn: 26
                     }
                   ]
               }
@@ -143,7 +162,7 @@ tocview = H.mkComponent
      . Query a
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
-
+  
     UpdateTOC entry a -> do
       H.modify_ \state ->
         state
@@ -151,4 +170,6 @@ tocview = H.mkComponent
               map (\e -> if e.id == entry.id then entry else e) state.tocEntries
           }
       pure (Just a)
+
+
 

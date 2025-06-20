@@ -8,16 +8,12 @@ module FPO.Component.Splitview where
 
 import Prelude
 
-import Ace.Range as Range
-import Ace.Types as Types
-import Data.Array (findIndex, intercalate, range, updateAt)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
-import FPO.Data.Store as Store
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -32,23 +28,6 @@ import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 data DragTarget = ResizeLeft | ResizeRight
 
 derive instance eqDragTarget :: Eq DragTarget
-
-type AnnotatedMarker =
-  { id :: Int
-  , type :: String
-  , range :: Types.Range
-  , startRow :: Int
-  , startCol :: Int
-  , endRow :: Int
-  , endColumn :: Int
-  }
-
-type TOCEntry =
-  { id :: Int
-  , name :: String
-  , content :: Maybe String
-  , markers :: Maybe (Array AnnotatedMarker)
-  }
 
 type Output = Unit
 type Input = Unit
@@ -72,6 +51,7 @@ data Action
   -- Query Output
   | HandleEditor Editor.Output
   | HandlePreview Preview.Output
+  | HandleTOC TOC.Output
   | HandleTOC TOC.Output
 
 type State =
@@ -110,14 +90,14 @@ type State =
   }
 
 type Slots =
-  ( editor :: H.Slot Editor.Query Editor.Output Unit
+  ( editor  :: H.Slot Editor.Query  Editor.Output  Unit
   , preview :: H.Slot Preview.Query Preview.Output Unit
-  , toc :: H.Slot TOC.Query TOC.Output Unit
+  , toc     :: H.Slot TOC.Query     TOC.Output     Unit
   )
 
-_editor = Proxy :: Proxy "editor"
+_editor =  Proxy :: Proxy "editor"
 _preview = Proxy :: Proxy "preview"
-_toc = Proxy :: Proxy "toc"
+_toc =     Proxy :: Proxy "toc"
 
 splitview
   :: forall query m
@@ -260,33 +240,7 @@ splitview = H.mkComponent
             "flex: 0 0 " <> show (state.sidebarRatio * 100.0) <>
               "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"
         ]
-        [ HH.div_
-            ( map
-                ( \{ id, name, content, markers } ->
-                    HH.div
-                      [ HP.title ("Jump to section " <> name)
-                      , HP.style
-                          "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0;"
-                      ]
-                      [ HH.span
-                          [ HE.onClick \_ -> JumpToSection
-                              { id, name, content, markers }
-                          , HP.classes
-                              ( [ HB.textTruncate ]
-                                  <>
-                                    if Just id == state.slectedTocEntry then
-                                      [ HB.fwBold ]
-                                    else []
-                              )
-                          , HP.style
-                              "cursor: pointer; display: inline-block; min-width: 6ch;"
-                          ]
-                          [ HH.text name ]
-                      ]
-                )
-                state.tocEntries
-            )
-        ]
+        [ HH.slot _toc unit TOC.tocview unit HandleTOC ]
     -- Left Resizer
     , HH.div
         [ HE.onMouseDown (StartResize ResizeLeft)
@@ -322,72 +276,7 @@ splitview = H.mkComponent
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
 
-    Init -> do
-      -- Since all example entries are similar, we create the same markers for all
-      mark <- H.liftEffect $ Range.create 7 3 7 26
-      let
-        -- Create initial TOC entries
-        entries = map
-          ( \n ->
-              { id: n
-              , name: "§" <> show n <> " This is Paragraph " <> show n
-              , content: Just
-                  ( intercalate "\n" $
-                      [ "# This is content of §" <> show n
-                      , ""
-                      , "-- This is a developer comment."
-                      , ""
-                      , "## To-Do List"
-                      , ""
-                      , "1. Document initial setup."
-                      , "2. <*Define the API*>                        % LTML: bold"
-                      , "3. <_Underline important interface items_>   % LTML: underline"
-                      , "4. </Emphasize optional features/>           % LTML: italic"
-                      , ""
-                      , "/* Note: Nested styles are allowed,"
-                      , "   but not transitively within the same tag type!"
-                      , "   Written in a code block."
-                      , "*/"
-                      , ""
-                      , "<*This is </allowed/>*>                      % valid nesting"
-                      , "<*This is <*not allowed*>*>                  % invalid, but still highlighted"
-                      , ""
-                      , "## Status"
-                      , ""
-                      , "Errors can already be marked as such, see error!"
-                      , ""
-                      , "TODO: Write the README file."
-                      , "FIXME: The parser fails on nested blocks."
-                      , "NOTE: We're using this style as a placeholder."
-                      ]
-                  )
-              , markers: Just
-                  [ { id: 1
-                    , type: "info"
-                    , range: mark
-                    , startRow: 7
-                    , startCol: 3
-                    , endRow: 7
-                    , endColumn: 26
-                    }
-                  ]
-              }
-          )
-          (range 1 11)
-      -- Comment it out for now, to let the other text show up first in editor
-      -- head has to be imported from Data.Array
-      -- Put first entry in editor
-      --   firstEntry = case head entries of
-      --     Nothing -> { id: -1, name: "No Entry", content: Just [ "" ] }
-      --     Just entry -> entry
-      -- H.tell _editor unit (Editor.ChangeSection firstEntry)
-      H.modify_ \st -> do
-        st
-          { tocEntries = entries
-          -- Have not sent the first entry to editor yet. See comment above
-          -- , slectedTocEntry = Just firstEntry.id
-          , editorContent = Just [ "This is the initial content of the editor." ]
-          }
+    Init -> pure unit
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -465,17 +354,6 @@ splitview = H.mkComponent
 
         _ -> pure unit
 
-    -- Change the content of current § section in the editor
-    JumpToSection section -> do
-      H.tell _editor unit Editor.SaveSection
-      H.tell _editor unit (Editor.ChangeSection section)
-      -- TODO add markers
-      H.modify_ \st -> st
-        { slectedTocEntry = Just section.id
-        -- maybe add in later, to automatically update preview, when selecting section
-        -- , editorContent = section.content
-        }
-
     -- Toolbar button actions
 
     ClickedHTTPRequest -> H.tell _preview unit Preview.TellClickedHttpRequest
@@ -546,13 +424,23 @@ splitview = H.mkComponent
 
     HandleEditor output -> case output of
 
+
       Editor.ClickedQuery response -> H.tell _preview unit
         (Preview.GotEditorQuery response)
 
       Editor.SavedSection section -> H.tell _toc unit
         (TOC.UpdateTOC section)
 
+      Editor.SavedSection section -> H.tell _toc unit
+        (TOC.UpdateTOC section)
+
     HandlePreview _ -> pure unit
+
+    HandleTOC output -> case output of
+
+      TOC.ChangeSection entry -> do
+        H.tell _editor unit Editor.SaveSection
+        H.tell _editor unit (Editor.ChangeSection entry)
 
     HandleTOC output -> case output of
 

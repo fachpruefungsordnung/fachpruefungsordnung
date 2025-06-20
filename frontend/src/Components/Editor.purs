@@ -70,8 +70,10 @@ data Action
 data Query a
   -- = RequestContent (Array String -> a)
   = QueryEditor a
+  -- save the current content and send it to splitview
   | SaveSection a
   | LoadPdf a
+  -- receive the selected TOC and put its content into the editor
   | ChangeSection TOCEntry a
 
 editor
