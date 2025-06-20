@@ -30,7 +30,7 @@ data DragTarget = ResizeLeft | ResizeRight
 
 derive instance eqDragTarget :: Eq DragTarget
 
-type AnnotatedMarker = 
+type AnnotatedMarker =
   { id :: Int
   , type :: String
   , range :: Types.Range
@@ -254,7 +254,8 @@ splitview = H.mkComponent
                           "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0;"
                       ]
                       [ HH.span
-                          [ HE.onClick \_ -> JumpToSection { id, name, content, markers }
+                          [ HE.onClick \_ -> JumpToSection
+                              { id, name, content, markers }
                           , HP.classes
                               ( [ HB.textTruncate ]
                                   <>
@@ -316,43 +317,45 @@ splitview = H.mkComponent
               { id: n
               , name: "§" <> show n <> " This is Paragraph " <> show n
               , content: Just
-                ( intercalate "\n" $
-                    [ "# This is content of §" <> show n
-                    , ""
-                    , "-- This is a developer comment."
-                    , ""
-                    , "## To-Do List"
-                    , ""
-                    , "1. Document initial setup."
-                    , "2. <*Define the API*>                        % LTML: bold"
-                    , "3. <_Underline important interface items_>   % LTML: underline"
-                    , "4. </Emphasize optional features/>           % LTML: italic"
-                    , ""
-                    , "/* Note: Nested styles are allowed,"
-                    , "   but not transitively within the same tag type!"
-                    , "   Written in a code block."
-                    , "*/"
-                    , ""
-                    , "<*This is </allowed/>*>                      % valid nesting"
-                    , "<*This is <*not allowed*>*>                  % invalid, but still highlighted"
-                    , ""
-                    , "## Status"
-                    , ""
-                    , "Errors can already be marked as such, see error!"
-                    , ""
-                    , "TODO: Write the README file."
-                    , "FIXME: The parser fails on nested blocks."
-                    , "NOTE: We're using this style as a placeholder."
-                    ]
-                )
-              , markers : Just
-                [ { id: 1
-                , type: "info"
-                , range: mark
-                , startRow: 7
-                , startCol: 3
-                , endRow: 7
-                , endColumn: 26 } ]
+                  ( intercalate "\n" $
+                      [ "# This is content of §" <> show n
+                      , ""
+                      , "-- This is a developer comment."
+                      , ""
+                      , "## To-Do List"
+                      , ""
+                      , "1. Document initial setup."
+                      , "2. <*Define the API*>                        % LTML: bold"
+                      , "3. <_Underline important interface items_>   % LTML: underline"
+                      , "4. </Emphasize optional features/>           % LTML: italic"
+                      , ""
+                      , "/* Note: Nested styles are allowed,"
+                      , "   but not transitively within the same tag type!"
+                      , "   Written in a code block."
+                      , "*/"
+                      , ""
+                      , "<*This is </allowed/>*>                      % valid nesting"
+                      , "<*This is <*not allowed*>*>                  % invalid, but still highlighted"
+                      , ""
+                      , "## Status"
+                      , ""
+                      , "Errors can already be marked as such, see error!"
+                      , ""
+                      , "TODO: Write the README file."
+                      , "FIXME: The parser fails on nested blocks."
+                      , "NOTE: We're using this style as a placeholder."
+                      ]
+                  )
+              , markers: Just
+                  [ { id: 1
+                    , type: "info"
+                    , range: mark
+                    , startRow: 7
+                    , startCol: 3
+                    , endRow: 7
+                    , endColumn: 26
+                    }
+                  ]
               }
           )
           (range 1 11)

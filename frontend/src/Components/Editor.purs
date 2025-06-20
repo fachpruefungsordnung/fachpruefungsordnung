@@ -15,7 +15,7 @@ import Data.Array as Array
 import Data.Foldable (elem, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
-import Data.Traversable (traverse, for)
+import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import Halogen as H
@@ -25,7 +25,7 @@ import Halogen.HTML.Properties (classes, ref, style) as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
 
-type AnnotatedMarker = 
+type AnnotatedMarker =
   { id :: Int
   , type :: String
   , range :: Types.Range
@@ -216,46 +216,50 @@ editor = H.mkComponent
           -- Range.getStartRow does not work. Return undefined.
           start <- Range.getStart range
           end <- Range.getEnd range
-          let 
+          let
             sRow = Types.getRow start
             sCol = Types.getColumn start
             eRow = Types.getRow end
             eCol = Types.getColumn end
           newID <- Session.addMarker range "my-marker" "text" false session
-          let newMarker =
-                { id: newID
-                , type: "info"
-                , range: range
-                , startRow: sRow
-                , startCol: sCol
-                , endRow: eRow
-                , endColumn: eCol
-                }
+          let
+            newMarker =
+              { id: newID
+              , type: "info"
+              , range: range
+              , startRow: sRow
+              , startCol: sCol
+              , endRow: eRow
+              , endColumn: eCol
+              }
           addAnnotation (markerToAnnotation newMarker) session
           pure newMarker
         H.modify_ \st ->
-          st 
+          st
             { tocEntry = st.tocEntry <#> \entry ->
-              let updatedMarkers = sortMarkers case entry.markers of
+                let
+                  updatedMarkers = sortMarkers case entry.markers of
                     Just ms -> newMarker : ms
-                    Nothing -> [newMarker]
-              in entry { markers = Just updatedMarkers }
+                    Nothing -> [ newMarker ]
+                in
+                  entry { markers = Just updatedMarkers }
             }
 
     DeleteComment -> do
       H.gets _.editor >>= traverse_ \ed -> do
         session <- H.liftEffect $ Editor.getSession ed
-        cursor  <- H.liftEffect $ Editor.getCursorPosition ed
-        state   <- H.get
+        cursor <- H.liftEffect $ Editor.getCursorPosition ed
+        state <- H.get
         -- extract markers from the current TOC entry
         let markers = fromMaybe [] (state.tocEntry >>= _.markers)
 
         -- remove the marker at the cursor position and return the remaining markers
         newMarkers <- H.liftEffect $ removeMarkerByPosition cursor markers session
         H.modify_ \st ->
-          st { tocEntry = st.tocEntry <#> \entry ->
-            entry { markers = Just newMarkers }
-          }
+          st
+            { tocEntry = st.tocEntry <#> \entry ->
+                entry { markers = Just newMarkers }
+            }
 
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
@@ -317,7 +321,8 @@ editor = H.mkComponent
           Nothing -> "<No content>"
 
         entry = case state.tocEntry of
-          Nothing -> { id: -1, name: "Section not found", content: Nothing , markers: Nothing }
+          Nothing ->
+            { id: -1, name: "Section not found", content: Nothing, markers: Nothing }
           Just e -> e
 
         newEntry =
@@ -432,7 +437,7 @@ removeMarkerByID
   -> Array AnnotatedMarker
   -> Types.EditSession
   -> Effect (Array AnnotatedMarker)
-removeMarkerByID targetID = removeMarkerByIDs [targetID]
+removeMarkerByID targetID = removeMarkerByIDs [ targetID ]
 
 removeMarkerByRange
   :: Types.Range
@@ -450,7 +455,7 @@ removeMarkerByPosition
   -> Types.EditSession
   -> Effect (Array AnnotatedMarker)
 removeMarkerByPosition targetPos marker session = do
-  let 
+  let
     row = Types.getRow targetPos
     col = Types.getColumn targetPos
   targetRange <- Range.create row col row col
@@ -462,7 +467,7 @@ removeMarkerByRowCol
   -> Array AnnotatedMarker
   -> Types.EditSession
   -> Effect (Array AnnotatedMarker)
-removeMarkerByRowCol row col marker session = do 
+removeMarkerByRowCol row col marker session = do
   targetRange <- Range.create row col row col
   removeMarkerByRange targetRange marker session
 
