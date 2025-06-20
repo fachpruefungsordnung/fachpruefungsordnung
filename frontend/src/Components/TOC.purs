@@ -3,7 +3,6 @@ module FPO.Components.TOC where
 import Prelude
 
 import Ace.Range as Range
-import Ace.Types as Types
 import Data.Array (intercalate, range)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
@@ -105,7 +104,8 @@ tocview = H.mkComponent
                       , ""
                       , "## Status"
                       , ""
-                      , "Errors can already be marked as such, see error!"
+                      , "Errors can no longer be marked as such, see error!"
+                      , "Comment this section out of the code."
                       , ""
                       , "TODO: Write the README file."
                       , "FIXME: The parser fails on nested blocks."
@@ -118,8 +118,6 @@ tocview = H.mkComponent
                     , range: mark
                     , startRow: 7
                     , startCol: 3
-                    , endRow: 7
-                    , endColumn: 26
                     }
                   ]
               }

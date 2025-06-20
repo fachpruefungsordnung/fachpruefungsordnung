@@ -37,12 +37,16 @@ import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 <<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 import FPO.Data.Store as Store
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 =======
 import FPO.Types (AnnotatedMarker, TOCEntry, sortMarkers)
 >>>>>>> 0a5eade (moved AnnotatedMarker and TOCEntry to Types.purs):frontend/src/Components/Editor.purs
+=======
+import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
+>>>>>>> e76fbdb (removed endRow and endCol from AnnotedMarker):frontend/src/Components/Editor.purs
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -270,12 +274,9 @@ editor = connect selectTranslator $ H.mkComponent
           -- start is of type Types.Position = {row :: Int, column :: Int}
           -- Range.getStartRow does not work. Return undefined.
           start <- Range.getStart range
-          end <- Range.getEnd range
           let
             sRow = Types.getRow start
             sCol = Types.getColumn start
-            eRow = Types.getRow end
-            eCol = Types.getColumn end
           newID <- Session.addMarker range "my-marker" "text" false session
           let
             newMarker =
@@ -284,8 +285,6 @@ editor = connect selectTranslator $ H.mkComponent
               , range: range
               , startRow: sRow
               , startCol: sCol
-              , endRow: eRow
-              , endColumn: eCol
               }
           addAnnotation (markerToAnnotation newMarker) session
           pure newMarker
@@ -527,11 +526,3 @@ removeMarkerByRowCol
 removeMarkerByRowCol row col marker session = do
   targetRange <- Range.create row col row col
   removeMarkerByRange targetRange marker session
-
-markerToAnnotation :: AnnotatedMarker -> Types.Annotation
-markerToAnnotation m =
-  { row: m.startRow
-  , column: m.startCol
-  , text: "Comment found!"
-  , type: m.type
-  }
