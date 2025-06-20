@@ -10,12 +10,12 @@ import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
 import Ace.Types as Types
-import Data.Array (intercalate, (..), (:))
+import Data.Array (intercalate, sortBy, (..), (:))
 import Data.Array as Array
 import Data.Foldable (for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
-import Data.Traversable (traverse)
+import Data.Traversable (traverse, for)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import Halogen as H
@@ -34,6 +34,9 @@ type AnnotatedMarker =
   , endRow :: Int
   , endColumn :: Int
   }
+
+sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker
+sortMarkers = sortBy (comparing _.startRow <> comparing _.startCol)
 
 type TOCEntry =
   { id :: Int
@@ -231,7 +234,7 @@ editor = H.mkComponent
         H.modify_ \st ->
           st 
             { tocEntry = st.tocEntry <#> \entry ->
-              let updatedMarkers = case entry.markers of
+              let updatedMarkers = sortMarkers case entry.markers of
                     Just ms -> newMarker : ms
                     Nothing -> [newMarker]
               in entry { markers = Just updatedMarkers }
@@ -251,7 +254,7 @@ editor = H.mkComponent
 
       -- Put the content of the section into the editor and update markers
       H.gets _.editor >>= traverse_ \ed -> do
-        H.liftEffect do
+        updatedMarkers <- H.liftEffect do
           session <- Editor.getSession ed
           document <- Session.getDocument session
 
@@ -259,7 +262,7 @@ editor = H.mkComponent
           let content = fromMaybe "" entry.content
           Document.setValue content document
 
-          -- Clear existing markers
+          -- Remove existing markers
           existingMarkers <- Session.getMarkers session
           for_ existingMarkers \marker -> do
             id <- Marker.getId marker
@@ -268,17 +271,21 @@ editor = H.mkComponent
           -- Clear annotations
           Session.clearAnnotations session
 
-          -- Add markers + annotations from entry
-          for_ entry.markers \markers ->
-            for_ markers \marker -> do
-              _ <- Session.addMarker marker.range "my-marker" "text" false session
-              addAnnotation
-                { row: marker.startRow
-                , column: marker.startCol
-                , text: "Comment found!"
-                , type: marker.type
-                }
-                session
+          -- Reinsert markers with new IDs and annotations
+          for (fromMaybe [] entry.markers) \marker -> do
+            newID <- Session.addMarker marker.range "my-marker" "text" false session
+            addAnnotation
+              { row: marker.startRow
+              , column: marker.startCol
+              , text: "Comment found!"
+              , type: marker.type
+              }
+              session
+            pure marker { id = newID }
+
+        -- Update state with new marker IDs
+        H.modify_ \st ->
+          st { tocEntry = Just entry { markers = Just updatedMarkers } }
 
       pure (Just a)
 
