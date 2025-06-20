@@ -46,7 +46,7 @@ elementPF
 elementPF p =
     Special <$> specialP
         <|> textLeafP
-        <|> Reference <$ char '{' <*> labelP <* char '}'
+        <|> Reference <$ char '{' <* char ':' <*> labelP <* char '}'
         <|> Styled <$ char '<' <*> styleP <*> p <* char '>'
 
 childPF
