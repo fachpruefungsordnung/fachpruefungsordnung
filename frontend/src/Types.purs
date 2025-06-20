@@ -4,7 +4,7 @@ import Prelude
 
 import Ace.Types as Types
 import Data.Array (sortBy)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..))
 
 type AnnotatedMarker =
   { id :: Int
@@ -12,6 +12,8 @@ type AnnotatedMarker =
   , range :: Types.Range
   , startRow :: Int
   , startCol :: Int
+  , endRow :: Int
+  , endColumn :: Int
   }
 
 type TOCEntry =
@@ -23,11 +25,3 @@ type TOCEntry =
 
 sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker
 sortMarkers = sortBy (comparing _.startRow <> comparing _.startCol)
-
-markerToAnnotation :: AnnotatedMarker -> Types.Annotation
-markerToAnnotation m =
-  { row: m.startRow
-  , column: m.startCol
-  , text: "Comment found!"
-  , type: m.type
-  }

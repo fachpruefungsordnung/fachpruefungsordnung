@@ -10,7 +10,7 @@ import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
 import Ace.Types as Types
-import Data.Array (filter, filterA, intercalate, sortBy, (..), (:))
+import Data.Array (filter, filterA, intercalate, (..), (:))
 import Data.Array as Array
 import Data.Foldable (elem, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -18,32 +18,13 @@ import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
+import FPO.Types (AnnotatedMarker, TOCEntry, sortMarkers)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, ref, style) as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
-
-type AnnotatedMarker =
-  { id :: Int
-  , type :: String
-  , range :: Types.Range
-  , startRow :: Int
-  , startCol :: Int
-  , endRow :: Int
-  , endColumn :: Int
-  }
-
-sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker
-sortMarkers = sortBy (comparing _.startRow <> comparing _.startCol)
-
-type TOCEntry =
-  { id :: Int
-  , name :: String
-  , content :: Maybe String
-  , markers :: Maybe (Array AnnotatedMarker)
-  }
 
 type State =
   { editor :: Maybe Types.Editor

@@ -7,28 +7,12 @@ import Ace.Types as Types
 import Data.Array (intercalate, range)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
+import FPO.Types (TOCEntry)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Halogen.HTML.Events as HE
-
-type AnnotatedMarker =
-  { id :: Int
-  , type :: String
-  , range :: Types.Range
-  , startRow :: Int
-  , startCol :: Int
-  , endRow :: Int
-  , endColumn :: Int
-  }
-
-type TOCEntry =
-  { id :: Int
-  , name :: String
-  , content :: Maybe String
-  , markers :: Maybe (Array AnnotatedMarker)
-  }
 
 type Input = Unit
 
