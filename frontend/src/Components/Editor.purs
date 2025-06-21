@@ -10,7 +10,7 @@ import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
 import Ace.Types as Types
-import Data.Array (filter, filterA, intercalate, sortBy, (..), (:))
+import Data.Array (filter, filterA, intercalate, (..), (:))
 import Data.Array as Array
 import Data.Foldable (elem, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -18,32 +18,13 @@ import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
+import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, ref, style) as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
-
-type AnnotatedMarker =
-  { id :: Int
-  , type :: String
-  , range :: Types.Range
-  , startRow :: Int
-  , startCol :: Int
-  , endRow :: Int
-  , endColumn :: Int
-  }
-
-sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker
-sortMarkers = sortBy (comparing _.startRow <> comparing _.startCol)
-
-type TOCEntry =
-  { id :: Int
-  , name :: String
-  , content :: Maybe String
-  , markers :: Maybe (Array AnnotatedMarker)
-  }
 
 type State =
   { editor :: Maybe Types.Editor
@@ -70,8 +51,10 @@ data Action
 data Query a
   -- = RequestContent (Array String -> a)
   = QueryEditor a
+  -- save the current content and send it to splitview
   | SaveSection a
   | LoadPdf a
+  -- receive the selected TOC and put its content into the editor
   | ChangeSection TOCEntry a
 
 editor
@@ -215,12 +198,9 @@ editor = H.mkComponent
           -- start is of type Types.Position = {row :: Int, column :: Int}
           -- Range.getStartRow does not work. Return undefined.
           start <- Range.getStart range
-          end <- Range.getEnd range
           let
             sRow = Types.getRow start
             sCol = Types.getColumn start
-            eRow = Types.getRow end
-            eCol = Types.getColumn end
           newID <- Session.addMarker range "my-marker" "text" false session
           let
             newMarker =
@@ -229,8 +209,6 @@ editor = H.mkComponent
               , range: range
               , startRow: sRow
               , startCol: sCol
-              , endRow: eRow
-              , endColumn: eCol
               }
           addAnnotation (markerToAnnotation newMarker) session
           pure newMarker
@@ -470,11 +448,3 @@ removeMarkerByRowCol
 removeMarkerByRowCol row col marker session = do
   targetRange <- Range.create row col row col
   removeMarkerByRange targetRange marker session
-
-markerToAnnotation :: AnnotatedMarker -> Types.Annotation
-markerToAnnotation m =
-  { row: m.startRow
-  , column: m.startCol
-  , text: "Comment found!"
-  , type: m.type
-  }
