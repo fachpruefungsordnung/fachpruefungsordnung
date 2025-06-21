@@ -35,10 +35,10 @@ sp = takeWhileP (Just "spaces") (== ' ')
 sp1 :: (MonadParser m) => m Text
 sp1 = takeWhile1P (Just "spaces") (== ' ')
 
-sp' :: (MonadParser m, FromWhitespace a) => m a
+sp' :: (MonadParser m, FromWhitespace [a]) => m [a]
 sp' = fromWhitespace <$> sp
 
-nli' :: (MonadParser m, FromWhitespace a) => m a
+nli' :: (MonadParser m, FromWhitespace [a]) => m [a]
 nli' = fromWhitespace <$> nli
 
 -- | Parse a list of mixed indentation trees (a forest).
@@ -67,7 +67,7 @@ nli' = fromWhitespace <$> nli
 --   requirements.
 miForest
     :: forall m a
-     . (MonadParser m, FromWhitespace a)
+     . (MonadParser m, FromWhitespace [a])
     => (m [a] -> m a)
     -> m a
     -> m [a]
@@ -75,7 +75,7 @@ miForest elementPF childP = L.indentLevel >>= miForestFrom elementPF childP
 
 miForestFrom
     :: forall m a
-     . (MonadParser m, FromWhitespace a)
+     . (MonadParser m, FromWhitespace [a])
     => (m [a] -> m a)
     -> m a
     -> Pos
@@ -96,8 +96,8 @@ miForestFrom elementPF childP lvl = go True
         goE :: m [a]
         goE =
             elementPF (go False)
-                <:> ( (nli' >>= \s -> (s :) <$> goE' <|> goC' <|> goEnd')
-                        <|> sp' <:> goE
+                <:> ( (nli' >>= \s -> (s ++) <$> goE' <|> goC' <|> goEnd')
+                        <|> (++) <$> sp' <*> goE
                         <|> goEnd
                     )
 
@@ -131,7 +131,7 @@ miForestFrom elementPF childP lvl = go True
 --
 --   For the other arguments, see 'miForest'.
 hangingBlock
-    :: (MonadParser m, FromWhitespace a)
+    :: (MonadParser m, FromWhitespace [a])
     => m ([a] -> b)
     -> (m [a] -> m a)
     -> m a
@@ -145,7 +145,7 @@ hangingBlock keywordP elementPF childP = do
 -- | Version of 'hangingBlock' where the keyword parser may yield any value,
 --   which is paired with the parsed mi-forest.
 hangingBlock'
-    :: (MonadParser m, FromWhitespace a)
+    :: (MonadParser m, FromWhitespace [a])
     => m b
     -> (m [a] -> m a)
     -> m a
@@ -155,7 +155,7 @@ hangingBlock' = hangingBlock . fmap (,)
 -- | Version of 'hangingBlock' where the keyword parser does not return a
 --   value.
 hangingBlock_
-    :: (MonadParser m, FromWhitespace a)
+    :: (MonadParser m, FromWhitespace [a])
     => m ()
     -> (m [a] -> m a)
     -> m a
