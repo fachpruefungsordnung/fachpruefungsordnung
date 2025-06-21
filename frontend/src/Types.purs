@@ -5,6 +5,7 @@ import Prelude
 import Ace.Types as Types
 import Data.Array (sortBy)
 import Data.Maybe (Maybe)
+import Data.DateTime (DateTime)
 
 type AnnotatedMarker =
   { id :: Int
@@ -12,6 +13,19 @@ type AnnotatedMarker =
   , range :: Types.Range
   , startRow :: Int
   , startCol :: Int
+  , comment :: Maybe Comment
+  }
+
+type Comment =
+  { author :: String
+  , timestamp :: DateTime
+  , content :: String
+  }
+
+type CommentSection =
+  { markerID :: Int
+  , comments :: Array Comment
+  , resolved :: Boolean
   }
 
 type TOCEntry =

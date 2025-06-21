@@ -209,6 +209,7 @@ editor = H.mkComponent
               , range: range
               , startRow: sRow
               , startCol: sCol
+              , comment: Nothing
               }
           addAnnotation (markerToAnnotation newMarker) session
           pure newMarker

@@ -117,6 +117,8 @@ tocview = H.mkComponent
                     , range: mark
                     , startRow: 7
                     , startCol: 3
+                    -- TODO make this a real comment
+                    , comment: Nothing
                     }
                   ]
               }
