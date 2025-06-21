@@ -60,6 +60,8 @@ dependencies:
   - uuid
   - megaparsec
   - parser-combinators
+  - mtl
+  - transformers
   - pretty-simple
 
 ghc-options:
