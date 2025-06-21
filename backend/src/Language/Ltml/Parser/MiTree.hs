@@ -69,12 +69,9 @@ nli' = fromWhitespace <$> nli
 --   newline or EOF.
 --   Typically, @p@ is enclosed in some kind of bracketing parsers.
 --   For leaf nodes, 'elementPF' may simply ignore @p@.
---   @'elementPF' p@ is further generally expected to not accept the empty
---   input.  Exceptions are permitted when
---   (a) sufficiently repeated application eventually halts
---       (i.e. @'Text.Megaparsec.many' ('elementPF' p)@ halts), and
---   (b) @'elementPF' p@ does not succeed on an empty input line (possibly
---       with indentation / (ASCII) spaces).
+--   @'elementPF' p@ is further expected to not accept the empty input, at
+--   least after sufficiently repeated application; i.e.
+--   @'Text.Megaparsec.many' ('elementPF' p)@ is expected to halt.
 --
 --   Unlike 'elementPF', 'childP' is expected to take care of indentation
 --   itself--except at the very beginning, where it may expect that any

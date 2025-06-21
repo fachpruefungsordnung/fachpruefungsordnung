@@ -1,10 +1,12 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Language.Ltml.Parser
     ( Parser
     , MonadParser
+    , ParserWrapper (wrapParser)
     , ParserWrapper (wrapParser)
     , nli
     , nextIndentLevel
@@ -34,7 +36,7 @@ type Parser = Parsec Void Text
 
 type MonadParser m = (MonadParsec Void Text m, MonadFail m)
 
-class (MonadParser m) => ParserWrapper m where
+class ParserWrapper m where
     wrapParser :: Parser a -> m a
 
 instance ParserWrapper Parser where
