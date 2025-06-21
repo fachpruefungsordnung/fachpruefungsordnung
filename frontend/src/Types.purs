@@ -13,13 +13,7 @@ type AnnotatedMarker =
   , range :: Types.Range
   , startRow :: Int
   , startCol :: Int
-  , comment :: Maybe Comment
-  }
-
-type Comment =
-  { author :: String
-  , timestamp :: DateTime
-  , content :: String
+  , commentSection :: Maybe CommentSection
   }
 
 type CommentSection =
@@ -28,11 +22,24 @@ type CommentSection =
   , resolved :: Boolean
   }
 
+type Comment =
+  { author :: String
+  , timestamp :: DateTime
+  , content :: String
+  }
+
 type TOCEntry =
   { id :: Int
   , name :: String
   , content :: Maybe String
   , markers :: Maybe (Array AnnotatedMarker)
+  }
+
+-- shortend version for TOC component to not update its content
+-- since it only uses id and name only
+type ShortendTOCEntry =
+  { id :: Int
+  , name :: String
   }
 
 sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker

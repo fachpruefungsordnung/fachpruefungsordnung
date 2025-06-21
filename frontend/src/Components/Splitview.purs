@@ -8,12 +8,16 @@ module FPO.Component.Splitview where
 
 import Prelude
 
+import Ace.Range as Range
+import Data.Array (find, intercalate, range)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
+import Effect.Now (nowDateTime)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
+import FPO.Types (AnnotatedMarker, Comment, CommentSection, TOCEntry)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -23,6 +27,7 @@ import Type.Proxy (Proxy(Proxy))
 import Web.HTML as Web.HTML
 import Web.HTML.Window as Web.HTML.Window
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
+
 
 data DragTarget = ResizeLeft | ResizeRight
 
@@ -80,6 +85,10 @@ type State =
   -- TODO: Which one to use?
   , editorContent :: Maybe (Array String)
 
+  -- Store tocEntries and send some parts to its children components
+  -- TODO load/upload from/to backend
+  , tocEntries :: Array TOCEntry
+
   -- Boolean flags for UI state
   , tocEntriesShown :: Boolean
   , previewShown :: Boolean
@@ -109,6 +118,7 @@ splitview = H.mkComponent
       , lastExpandedSidebarRatio: 0.2
       , lastExpandedMiddleRatio: 0.4
       , editorContent: Nothing
+      , tocEntries: []
       , tocEntriesShown: true
       , previewShown: true
       , pdfWarningAvailable: false
@@ -258,7 +268,17 @@ splitview = H.mkComponent
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
 
-    Init -> pure unit
+    Init -> do
+      exampleTOCEntries <- createExampleTOCEntries
+      -- -- Comment it out for now, to let the other text show up first in editor
+      -- -- head has to be imported from Data.Array
+      -- -- Put first entry in editor
+      -- --   firstEntry = case head entries of
+      -- --     Nothing -> { id: -1, name: "No Entry", content: Just [ "" ] }
+      -- --     Just entry -> entry
+      -- -- H.tell _editor unit (Editor.ChangeSection firstEntry)
+      H.modify_ \st -> do st { tocEntries = exampleTOCEntries }
+      H.tell _toc unit (TOC.ReceiveTOCs exampleTOCEntries)
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -409,14 +429,113 @@ splitview = H.mkComponent
       Editor.ClickedQuery response -> H.tell _preview unit
         (Preview.GotEditorQuery response)
 
-      Editor.SavedSection section -> H.tell _toc unit
-        (TOC.UpdateTOC section)
+      Editor.SavedSection entry -> 
+        H.modify_ \st -> 
+          st 
+            { tocEntries =
+              map (\e -> if e.id == entry.id then entry else e) st.tocEntries
+            }
 
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
 
-      TOC.ChangeSection entry -> do
+      TOC.ChangeSection selectEntry -> do
         H.tell _editor unit Editor.SaveSection
+        state <- H.get
+        let entry = case (find (\e -> e.id == selectEntry.id) state.tocEntries) of
+              Nothing -> { id: -1, name: "No Entry", content: Nothing, markers: Nothing }
+              Just e  -> e
         H.tell _editor unit (Editor.ChangeSection entry)
+
+-- Create example TOC entries for testing purposes in Init
+
+createExampleTOCEntries :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array TOCEntry)
+createExampleTOCEntries = do
+  -- Since all example entries are similar, we create the same markers for all
+  exampleMarkers <- createExampleMarkers
+  let
+    -- Create initial TOC entries
+    entries = map
+      ( \n ->
+          { id: n
+          , name: "§" <> show n <> " This is Paragraph " <> show n
+          , content: Just $ createExampleTOCText n
+          , markers: Just exampleMarkers
+          }
+      ) (range 1 11)
+  pure entries
+
+createExampleTOCText :: Int -> String
+createExampleTOCText n =
+  intercalate "\n" $
+    [ "# This is content of §" <> show n
+    , ""
+    , "-- This is a developer comment."
+    , ""
+    , "## To-Do List"
+    , ""
+    , "1. Document initial setup."
+    , "2. <*Define the API*>                        % LTML: bold"
+    , "3. <_Underline important interface items_>   % LTML: underline"
+    , "4. </Emphasize optional features/>           % LTML: italic"
+    , ""
+    , "/* Note: Nested styles are allowed,"
+    , "   but not transitively within the same tag type!"
+    , "   Written in a code block."
+    , "*/"
+    , ""
+    , "<*This is </allowed/>*>                      % valid nesting"
+    , "<*This is <*not allowed*>*>                  % invalid, but still highlighted"
+    , ""
+    , "## Status"
+    , ""
+    , "Errors can no longer be marked as such, see error!"
+    , "Comment this section out of the code."
+    , ""
+    , "TODO: Write the README file."
+    , "FIXME: The parser fails on nested blocks."
+    , "NOTE: We're using this style as a placeholder."
+    ]
+
+createExampleMarkers :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array AnnotatedMarker)
+createExampleMarkers = do
+  mark <- H.liftEffect $ Range.create 7 3 7 26
+  commentSection <- createExampleCommentSection
+  let entry = 
+        { id: 1
+        , type: "info"
+        , range: mark
+        , startRow: 7
+        , startCol: 3
+        -- TODO make this a real comment
+        , commentSection: Just commentSection
+        }
+  pure [ entry ]
+
+createExampleCommentSection :: forall m. MonadAff m => H.HalogenM State Action Slots Output m CommentSection
+createExampleCommentSection = do
+  comments <- createExampleComments
+  let
+    commentSection = 
+      { -- Since in init, all markers have the same ID
+        markerID: 1
+      , comments: comments
+      , resolved: false
+      }
+  pure commentSection
+
+createExampleComments :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array Comment)
+createExampleComments = do
+  now <- H.liftEffect nowDateTime
+  let 
+    comments = map
+      ( \n ->
+          { author: "Author " <> show (mod n 2)
+          , timestamp: now
+          , content: "This is comment number " <> show n
+          }
+      )
+      (range 1 6)
+  pure comments
 

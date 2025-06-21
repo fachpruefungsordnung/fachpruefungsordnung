@@ -209,7 +209,7 @@ editor = H.mkComponent
               , range: range
               , startRow: sRow
               , startCol: sCol
-              , comment: Nothing
+              , commentSection: Nothing
               }
           addAnnotation (markerToAnnotation newMarker) session
           pure newMarker
@@ -304,12 +304,7 @@ editor = H.mkComponent
             { id: -1, name: "Section not found", content: Nothing, markers: Nothing }
           Just e -> e
 
-        newEntry =
-          { id: entry.id
-          , name: entry.name
-          , content: Just contentText
-          , markers: entry.markers
-          }
+        newEntry = entry { content = Just contentText }
 
       H.modify_ \st -> st { tocEntry = Just newEntry }
       H.raise (SavedSection newEntry)
