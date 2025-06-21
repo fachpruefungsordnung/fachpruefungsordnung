@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Ltml.AST.Text
@@ -19,7 +20,7 @@ import Data.Void (Void)
 import Language.Ltml.AST.Label (Label)
 
 data TextTree style enumItem special
-    = Word Text
+    = TextLeaf Text
     | Space
     | Special special
     | Reference Label
@@ -28,6 +29,9 @@ data TextTree style enumItem special
     | Footnote [FootnoteTextTree]
     deriving (Show)
 
+instance FromWhitespace [TextTree a b c] where
+    fromWhitespace "" = []
+    fromWhitespace _ = [Space]
 instance FromWhitespace [TextTree a b c] where
     fromWhitespace "" = []
     fromWhitespace _ = [Space]

@@ -51,8 +51,10 @@ sp1 :: (MonadParser m) => m Text
 sp1 = takeWhile1P (Just "spaces") (== ' ')
 
 sp' :: (MonadParser m, FromWhitespace [a]) => m [a]
+sp' :: (MonadParser m, FromWhitespace [a]) => m [a]
 sp' = fromWhitespace <$> sp
 
+nli' :: (MonadParser m, FromWhitespace [a]) => m [a]
 nli' :: (MonadParser m, FromWhitespace [a]) => m [a]
 nli' = fromWhitespace <$> nli
 
@@ -83,7 +85,7 @@ nli' = fromWhitespace <$> nli
 miForest
     :: forall m a
      . (MonadParser m, FromWhitespace [a])
-    => (m [a] -> m (MiElementConfig, [a]))
+    => (m [a] -> m a)
     -> m a
     -> m [a]
 miForest elementPF childP = L.indentLevel >>= miForestFrom elementPF childP
@@ -91,7 +93,7 @@ miForest elementPF childP = L.indentLevel >>= miForestFrom elementPF childP
 miForestFrom
     :: forall m a
      . (MonadParser m, FromWhitespace [a])
-    => (m [a] -> m (MiElementConfig, [a]))
+    => (m [a] -> m a)
     -> m a
     -> Pos
     -> m [a]
@@ -109,18 +111,11 @@ miForestFrom elementPF childP lvl = go True
 
         -- Parse forest, headed by element.
         goE :: m [a]
-        goE = do
-            (cfg, e) <- elementPF (go False)
-            let f =
-                    if miecRetainTrailingWhitespace cfg
-                        then (++)
-                        else const id
-            let wC = when $ miecPermitChild cfg
-            let wEnd = when $ miecPermitEnd cfg
-            (e ++)
-                <$> ( (nli' >>= \s -> f s <$> goE' <|> wC goC' <|> wEnd goEnd')
-                        <|> f <$> sp' <*> goE
-                        <|> wEnd goEnd
+        goE =
+            elementPF (go False)
+                <:> ( (nli' >>= \s -> (s ++) <$> goE' <|> goC' <|> goEnd')
+                        <|> (++) <$> sp' <*> goE
+                        <|> goEnd
                     )
 
         -- Compare `Control.Monad.when`, which is different, but similar.
@@ -156,6 +151,7 @@ miForestFrom elementPF childP lvl = go True
 --   For the other arguments, see 'miForest'.
 hangingBlock
     :: (MonadParser m, FromWhitespace [a])
+    :: (MonadParser m, FromWhitespace [a])
     => m ([a] -> b)
     -> (m [a] -> m (MiElementConfig, [a]))
     -> m a
@@ -170,6 +166,7 @@ hangingBlock keywordP elementPF childP = do
 --   which is paired with the parsed mi-forest.
 hangingBlock'
     :: (MonadParser m, FromWhitespace [a])
+    :: (MonadParser m, FromWhitespace [a])
     => m b
     -> (m [a] -> m (MiElementConfig, [a]))
     -> m a
@@ -179,6 +176,7 @@ hangingBlock' = hangingBlock . fmap (,)
 -- | Version of 'hangingBlock' where the keyword parser does not return a
 --   value.
 hangingBlock_
+    :: (MonadParser m, FromWhitespace [a])
     :: (MonadParser m, FromWhitespace [a])
     => m ()
     -> (m [a] -> m (MiElementConfig, [a]))
