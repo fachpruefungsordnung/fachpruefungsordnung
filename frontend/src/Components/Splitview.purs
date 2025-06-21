@@ -90,7 +90,7 @@ type State =
   , tocEntries :: Array TOCEntry
 
   -- Boolean flags for UI state
-  , tocEntriesShown :: Boolean
+  , sidebarShown :: Boolean
   , previewShown :: Boolean
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
@@ -119,7 +119,7 @@ splitview = H.mkComponent
       , lastExpandedMiddleRatio: 0.4
       , editorContent: Nothing
       , tocEntries: []
-      , tocEntriesShown: true
+      , sidebarShown: true
       , previewShown: true
       , pdfWarningAvailable: false
       , pdfWarningIsShown: false
@@ -185,9 +185,7 @@ splitview = H.mkComponent
       , HP.style "height: 100vh; position: relative; user-select: none;"
       ]
       ( -- TOC Sidebar
-        ( if state.tocEntriesShown then renderSidebar state
-          else []
-        )
+        renderSidebar state
           <>
             [ -- Editor
               HH.div
@@ -230,15 +228,18 @@ splitview = H.mkComponent
         [ HP.classes [ HB.overflowAuto, HB.p1 ]
         , HP.style $
             "flex: 0 0 " <> show (state.sidebarRatio * 100.0) <>
-              "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"
+              "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"<>
+              if not state.sidebarShown then "display: none;" else ""
         ]
         [ HH.slot _toc unit TOC.tocview unit HandleTOC ]
     -- Left Resizer
-    , HH.div
-        [ HE.onMouseDown (StartResize ResizeLeft)
-        , HP.style "width: 5px; cursor: col-resize; background: #ccc;"
-        ]
-        []
+    , if state.sidebarShown then
+        HH.div
+          [ HE.onMouseDown (StartResize ResizeLeft)
+          , HP.style "width: 5px; cursor: col-resize; background: #ccc;"
+          ]
+          []
+      else HH.text ""
     ]
 
   renderPreview :: State -> Array (H.ComponentHTML Action Slots m)
@@ -383,19 +384,19 @@ splitview = H.mkComponent
     ToggleSidebar -> do
       state <- H.get
       -- close sidebar
-      if state.tocEntriesShown then
+      if state.sidebarShown then
         H.modify_ \st -> st
           { sidebarRatio = 0.0
           , middleRatio = st.middleRatio + st.sidebarRatio
           , lastExpandedSidebarRatio = st.sidebarRatio
-          , tocEntriesShown = false
+          , sidebarShown = false
           }
       -- open sidebar
       else do
         H.modify_ \st -> st
           { sidebarRatio = st.lastExpandedSidebarRatio
           , middleRatio = st.middleRatio - st.lastExpandedSidebarRatio
-          , tocEntriesShown = true
+          , sidebarShown = true
           }
 
     -- Toggle the preview area
