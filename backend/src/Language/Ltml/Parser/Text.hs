@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Language.Ltml.Parser.Text
@@ -15,8 +16,6 @@ import Control.Monad (void)
 import Control.Monad.State (StateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import qualified Data.Char as Char (isControl)
-import Data.List (singleton)
-import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy (Proxy))
 import Data.Text (Text)
 import qualified Data.Text as Text (singleton)
@@ -79,12 +78,13 @@ textForestP
 textForestP t = miForest elementPF (childPF t)
 
 elementPF
-    :: (MonadParser m, StyleP style, SpecialP m special)
+    :: forall m style enumItem special
+     . (MonadParser m, StyleP style, SpecialP m special)
     => m [TextTree style enumItem special]
     -> m (TextTree style enumItem special)
 elementPF p =
     Special <$> specialP
-        <|> textLeafP
+        <|> Word <$> wordP (Proxy :: Proxy special)
         <|> Reference <$ char '{' <* char ':' <*> labelP <* char '}'
         <|> Styled <$ char '<' <*> styleP <*> p <* char '>'
 
@@ -149,16 +149,13 @@ instance EnumP EnumType EnumItem where
 
 class (ParserWrapper m) => SpecialP m special | special -> m where
     specialP :: m special
-    textLeafP :: m (TextTree a b special)
+    wordP :: Proxy special -> m Text
 
 instance SpecialP Parser Void where
 instance SpecialP Parser Void where
     specialP = empty
 
-    textLeafP = TextLeaf <$> wordP
-      where
-        wordP :: Parser Text
-        wordP = gWordP isWordChar isWordSpecialChar
+    wordP _ = gWordP isWordChar isWordSpecialChar
 
 instance SpecialP ParagraphParser SentenceStart where
     specialP = do
@@ -197,7 +194,7 @@ instance SpecialP ParagraphParser SentenceStart where
                 isSpecialSuccChar '>' = True
                 isSpecialSuccChar _ = False
 
-    textLeafP = TextLeaf <$> (sentenceWordP <|> sentenceEndP)
+    wordP _ = sentenceWordP <|> sentenceEndP
       where
         sentenceWordP :: ParagraphParser Text
         sentenceWordP = gWordP isWordChar isSentenceSpecialChar

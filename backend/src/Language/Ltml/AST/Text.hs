@@ -20,7 +20,7 @@ import Data.Void (Void)
 import Language.Ltml.AST.Label (Label)
 
 data TextTree style enumItem special
-    = TextLeaf Text
+    = Word Text
     | Space
     | Special special
     | Reference Label
