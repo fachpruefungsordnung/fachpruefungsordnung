@@ -59,7 +59,11 @@ import FPO.Types (AnnotatedMarker, TOCEntry, sortMarkers)
 >>>>>>> 0a5eade (moved AnnotatedMarker and TOCEntry to Types.purs):frontend/src/Components/Editor.purs
 =======
 import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 >>>>>>> e76fbdb (removed endRow and endCol from AnnotedMarker):frontend/src/Components/Editor.purs
+=======
+import Effect.Class.Console (log)
+>>>>>>> 684a8b0 (Some key presses will be logged in the console):frontend/src/Components/Editor.purs
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -68,6 +72,7 @@ import Halogen.HTML.Properties (classes, ref, style, title) as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
 import Web.DOM.Element (toEventTarget)
@@ -77,6 +82,21 @@ import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 =======
 import Halogen.Themes.Bootstrap5 as HB
 >>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
+=======
+import Type.Proxy (Proxy(Proxy))
+import Web.DOM.Element (toEventTarget)
+import Web.Event.Event (Event, EventType(..))
+import Web.Event.EventTarget (addEventListener, eventListener)
+import Web.HTML.HTMLElement (toElement)
+import Web.UIEvent.KeyboardEvent (KeyboardEvent, fromEvent, key)
+import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
+
+type TOCEntry =
+  { id :: Int
+  , name :: String
+  , content :: Maybe (Array String)
+  }
+>>>>>>> 684a8b0 (Some key presses will be logged in the console):frontend/src/Components/Editor.purs
 
 <<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 type AnnotatedMarker =
@@ -229,11 +249,15 @@ editor = connect selectTranslator $ H.mkComponent
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
     Init -> do
+      eventListen <- H.liftEffect $ eventListener keyBinding
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
         H.modify_ _ { editor = Just editor_ }
         H.liftEffect $ do
+<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
           eventListen <- eventListener (keyBinding editor_)
+=======
+>>>>>>> 684a8b0 (Some key presses will be logged in the console):frontend/src/Components/Editor.purs
           container <- Editor.getContainer editor_
           addEventListener keydown eventListen true
             (toEventTarget $ toElement container)
@@ -551,6 +575,32 @@ surroundSelection left right ed = do
 
   -- Set the selection to this new range
   Selection.setSelectionRange newRange selection
+
+keyBinding :: Event -> Effect Unit
+keyBinding event = do
+  let keyboardEvent = fromEvent event :: Maybe KeyboardEvent
+  case keyboardEvent of
+    Nothing -> pure unit
+    Just keyEvent -> do
+      let pressedKey = key keyEvent
+      case pressedKey of
+        "Enter" -> log "Enter" -- Placeholder for Enter key action
+        "Escape" -> log "Escape" -- Placeholder for Escape key action
+        _ -> pure unit
+  pure unit
+
+keyBinding :: Event -> Effect Unit
+keyBinding event = do
+  let keyboardEvent = fromEvent event :: Maybe KeyboardEvent
+  case keyboardEvent of
+    Nothing -> pure unit
+    Just keyEvent -> do
+      let pressedKey = key keyEvent
+      case pressedKey of
+        "Enter" -> log "Enter" -- Placeholder for Enter key action
+        "Escape" -> log "Escape" -- Placeholder for Escape key action
+        _ -> pure unit
+  pure unit
 
 -- Multiple marker removal functions
 -- These functions remove markers by IDs, range, position, or row/column.
