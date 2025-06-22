@@ -17,10 +17,8 @@ import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
 import Data.Text (Text, pack, unpack)
 import GHC.Generics (Generic)
-import GHC.Int (Int32)
 import Text.Read (readMaybe)
-
-type DocumentID = Int32
+import VersionControl.Document (DocumentID)
 
 data DocPermission = Reader | Reviewer | Editer
     deriving (Eq, Generic)

@@ -47,6 +47,7 @@ import UserManagement.Document (textToPermission)
 import qualified UserManagement.Document as Document
 import qualified UserManagement.Group as Group
 import qualified UserManagement.User as User
+import VersionControl.Document (DocumentID (..))
 import Prelude hiding (id)
 
 getUserID :: Statement Text User.UserID
@@ -271,73 +272,83 @@ checkSuperadmin =
     |]
 
 -- | check if User is Member (or Admin) of the group that owns the specified document
-checkGroupDocPermission :: Statement (User.UserID, Document.DocumentID) Bool
+checkGroupDocPermission :: Statement (User.UserID, DocumentID) Bool
 checkGroupDocPermission =
-    [singletonStatement|
-
-      select exists (
-        select 1
-        from roles r
-        join documents d on d.group_id = r.group_id
-        where r.user_id = $1 :: uuid and d.id = $2 :: int4
-      ) :: bool
-    |]
+    lmap
+        (second unDocumentID)
+        [singletonStatement|
+            select exists (
+                select 1
+                from roles r
+                join documents d on d.group_id = r.group_id
+                where r.user_id = $1 :: uuid and d.id = $2 :: int4
+            ) :: bool
+        |]
 
 -- | extract the DocPermission for external document editors if they exist
 getExternalDocPermission
-    :: Statement (User.UserID, Document.DocumentID) (Maybe Document.DocPermission)
+    :: Statement (User.UserID, DocumentID) (Maybe Document.DocPermission)
 getExternalDocPermission =
     rmap
         (>>= textToPermission)
-        [maybeStatement|
-    select permission :: text
-    from external_document_rights
-    where user_id = $1 :: uuid and document_id = $2 :: int4
-  |]
+        $ lmap
+            (second unDocumentID)
+            [maybeStatement|
+                select permission :: text
+                from external_document_rights
+                where user_id = $1 :: uuid and document_id = $2 :: int4
+            |]
 
 -- | get the group id of a given document. the maybe is only technical and should never be Nothing in practice.
-getDocumentGroupID :: Statement Document.DocumentID (Maybe Group.GroupID)
+getDocumentGroupID :: Statement DocumentID (Maybe Group.GroupID)
 getDocumentGroupID =
-    [maybeStatement|
-     select group_id :: int4
-     from documents
-     where id = $1 :: int4
-   |]
+    lmap
+        unDocumentID
+        [maybeStatement|
+            select group_id :: int4
+            from documents
+            where id = $1 :: int4
+        |]
 
 addExternalDocPermission
-    :: Statement (User.UserID, Document.DocumentID, Text) ()
+    :: Statement (User.UserID, DocumentID, Text) ()
 addExternalDocPermission =
-    [resultlessStatement|
-
-      insert into external_document_rights (user_id, document_id, permission)
-      values ($1 :: uuid, $2 :: int4, $3 :: text :: docpermission)
-    |]
+    lmap
+        (\(user, document, permission) -> (user, unDocumentID document, permission))
+        [resultlessStatement|
+            insert into external_document_rights (user_id, document_id, permission)
+            values ($1 :: uuid, $2 :: int4, $3 :: text :: docpermission)
+        |]
 
 updateExternalDocPermission
-    :: Statement (User.UserID, Document.DocumentID, Text) ()
+    :: Statement (User.UserID, DocumentID, Text) ()
 updateExternalDocPermission =
-    [resultlessStatement|
+    lmap
+        (\(user, document, permission) -> (user, unDocumentID document, permission))
+        [resultlessStatement|
+            update external_document_rights
+            set permission = $3 :: text :: docpermission
+            where user_id = $1 :: uuid and document_id = $2 :: int4
+        |]
 
-      update external_document_rights
-      set permission = $3 :: text :: docpermission
-      where user_id = $1 :: uuid and document_id = $2 :: int4
-    |]
-
-deleteExternalDocPermission :: Statement (User.UserID, Document.DocumentID) ()
+deleteExternalDocPermission :: Statement (User.UserID, DocumentID) ()
 deleteExternalDocPermission =
-    [resultlessStatement|
-
-        delete from external_document_rights
-        where user_id = $1 :: uuid and document_id = $2 :: int4
-      |]
+    lmap
+        (second unDocumentID)
+        [resultlessStatement|
+            delete from external_document_rights
+            where user_id = $1 :: uuid and document_id = $2 :: int4
+        |]
 
 getAllExternalUsersOfDocument
-    :: Statement Document.DocumentID [(User.UserID, Maybe Document.DocPermission)]
+    :: Statement DocumentID [(User.UserID, Maybe Document.DocPermission)]
 getAllExternalUsersOfDocument =
     rmap
         (fmap (Data.Bifunctor.second textToPermission) . toList)
-        [vectorStatement|
-          select user_id :: uuid, permission :: text
-          from external_document_rights
-          where document_id = $1 :: int4
-        |]
+        $ lmap
+            unDocumentID
+            [vectorStatement|
+                select user_id :: uuid, permission :: text
+                from external_document_rights
+                where document_id = $1 :: int4
+            |]
