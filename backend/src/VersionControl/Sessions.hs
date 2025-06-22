@@ -2,6 +2,9 @@ module VersionControl.Sessions
     ( createCommit
     , getCommit
     , getVersion
+    , createDocument
+    , getDocument
+    , createDocumentCommit
     )
 where
 
@@ -13,7 +16,10 @@ import Hasql.Transaction.Sessions
     , Mode (..)
     , transaction
     )
+import UserManagement.Group (GroupID)
 import VersionControl.Commit
+import VersionControl.Document (Document, DocumentID)
+import VersionControl.Error (DocumentError)
 import VersionControl.Hash
 import qualified VersionControl.Statements as Statements
 import qualified VersionControl.Transactions as Transactions
@@ -23,11 +29,12 @@ import VersionControl.Tree
 getCommit :: CommitID -> Session ExistingCommit
 getCommit commitID = do
     commit <- statement commitID Statements.getCommit
-    replaceRoot commit
+    commitParentIDs <- statement commitID Statements.getCommitParentIDs
+    replaceRoot $ commit $ toList commitParentIDs
   where
-    replaceRoot (ExistingCommit header (CommitBody info (Ref ref))) = do
+    replaceRoot (ExistingCommit header (CommitBody info (Ref ref) base)) = do
         valueRoot <- getVersion ref
-        return $ ExistingCommit header $ CommitBody info $ Value valueRoot
+        return $ ExistingCommit header $ CommitBody info (Value valueRoot) base
     replaceRoot commit = return commit
 
 -- | session to create a new commit in the database
@@ -37,6 +44,23 @@ createCommit commit =
         Serializable
         Write
         $ Transactions.createCommit commit
+
+-- | session to create a new document
+createDocument :: Text -> GroupID -> Session DocumentID
+createDocument = curry $ flip statement Statements.createDocument
+
+-- | session to create a new commit in a document
+createDocumentCommit
+    :: DocumentID -> CreateCommit -> Session (Either DocumentError Document)
+createDocumentCommit document commit =
+    transaction
+        Serializable
+        Write
+        $ Transactions.createDocumentCommit document commit
+
+-- | session to get an existing document
+getDocument :: DocumentID -> Session Document
+getDocument = flip statement Statements.getDocument
 
 -- | session to get a document tree by its hash.
 --   The whole tree is obtained from the database.

@@ -9,6 +9,8 @@ module VersionControl.Commit
     , CommitBody (..)
     , CommitID (..)
     , CommitRef
+    , CommitRel (..)
+    , CommitNode (..)
     , commitRefID
     , commitMapRoot
     )
@@ -40,7 +42,7 @@ import VersionControl.Tree
 newtype CommitID = CommitID
     { unCommitID :: Int32
     }
-    deriving (Show, Generic)
+    deriving (Show, Generic, Eq, Ord)
 
 instance ToJSON CommitID where
     toJSON = toJSON . unCommitID
@@ -62,8 +64,9 @@ commitRefID (Value (ExistingCommit header _)) = commitHeaderID header
 -- | contains all information needed to create a new commit
 data CreateCommit
     = CreateCommit
-        CommitInfo
-        (TreeRef NodeWithMaybeRef)
+    { createCommitInfo :: CommitInfo
+    , createCommitRoot :: TreeRef NodeWithMaybeRef
+    }
     deriving (Show)
 
 instance ToJSON CreateCommit where
@@ -94,8 +97,9 @@ instance ToSchema CreateCommit where
 -- | represents a commit guaranteed to exist in the database
 data ExistingCommit
     = ExistingCommit
-        CommitHeader
-        CommitBody
+    { existingCommitHeader :: CommitHeader
+    , existingCommitBody :: CommitBody
+    }
     deriving (Show)
 
 instance ToJSON ExistingCommit where
@@ -130,25 +134,27 @@ commitMapRoot
     :: (TreeRef (Hashed NodeWithRef) -> TreeRef (Hashed NodeWithRef))
     -> ExistingCommit
     -> ExistingCommit
-commitMapRoot f (ExistingCommit header (CommitBody info root)) =
-    ExistingCommit header (CommitBody info (f root))
+commitMapRoot f (ExistingCommit header (CommitBody info root base)) =
+    ExistingCommit header (CommitBody info (f root) base)
 
 -- | contains the content of an existing commit
 data CommitBody
     = CommitBody
         CommitInfo
         (TreeRef (Hashed NodeWithRef))
+        (Maybe CommitID)
     deriving (Show)
 
 instance ToJSON CommitBody where
-    toJSON (CommitBody info root) =
-        Aeson.object ["info" .= info, "root" .= root]
+    toJSON (CommitBody info root base) =
+        Aeson.object ["info" .= info, "root" .= root, "base" .= base]
 
 instance FromJSON CommitBody where
     parseJSON = Aeson.withObject "CommitBody" $ \v ->
         CommitBody
             <$> v .: "info"
             <*> v .: "root"
+            <*> v .: "base"
 
 instance ToSchema CommitBody where
     declareNamedSchema _ = do
@@ -203,16 +209,16 @@ instance ToSchema CommitHeader where
 data CommitInfo = CommitInfo
     { commitInfoAuthor :: UUID
     , commitInfoMessage :: Maybe Text
-    , commitInfoParent :: Maybe CommitRef
+    , commitInfoParents :: [CommitID]
     }
     deriving (Show, Generic)
 
 instance ToJSON CommitInfo where
-    toJSON (CommitInfo author message parent) =
+    toJSON (CommitInfo author message parents) =
         Aeson.object
             [ "author" .= author
             , "message" .= message
-            , "parent" .= parent
+            , "parents" .= parents
             ]
 
 instance FromJSON CommitInfo where
@@ -220,7 +226,7 @@ instance FromJSON CommitInfo where
         CommitInfo
             <$> v .: "author"
             <*> v .: "message"
-            <*> v .: "parent"
+            <*> v .: "parents"
 
 instance ToSchema CommitInfo where
     declareNamedSchema _ = do
@@ -238,3 +244,17 @@ instance ToSchema CommitInfo where
                             , ("parent", parentSchema)
                             ]
                     & required .~ ["author"]
+
+-- | describes a parent-child relation between two commits
+data CommitRel = CommitRel
+    { commitRelParent :: CommitID
+    , commitRelChild :: CommitID
+    }
+
+-- | information about a commits position in the commit graph.
+data CommitNode = CommitNode
+    { commitNodeID :: CommitID
+    , commitNodeBase :: Maybe CommitID
+    , commitNodeHeight :: Int32
+    , commitNodeRootCommit :: Maybe CommitID
+    }

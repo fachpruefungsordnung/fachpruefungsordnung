@@ -2,15 +2,24 @@ module VersionControl
     ( Context (..)
     , createCommit
     , getCommit
+    , getDocument
+    , createDocument
+    , createDocumentCommit
     ) where
 
 import Control.Arrow (left)
 import Data.Functor ((<&>))
+import Data.Text (Text)
 import Hasql.Connection (Connection)
 import Hasql.Session (Session, SessionError)
 import qualified Hasql.Session as Session
+import UserManagement.Group (GroupID)
 import VersionControl.Commit (CommitID, CreateCommit, ExistingCommit)
-import VersionControl.Error (VersionControlError (..))
+import VersionControl.Document (Document, DocumentID)
+import VersionControl.Error
+    ( VersionControlError (..)
+    , flattenVersionControlError
+    )
 import qualified VersionControl.Sessions as Sessions
 
 -- | context for the version control (currently just a database connection)
@@ -18,12 +27,40 @@ newtype Context = Context
     { unConnection :: Connection
     }
 
+-- | get a document by id
+getDocument :: DocumentID -> Context -> IO (Either VersionControlError Document)
+getDocument = runSession . Sessions.getDocument
+
+-- | creates a new document in the specified user group
+createDocument
+    :: Text
+    -- ^ The name of the document
+    -> GroupID
+    -- ^ The group which owns the document
+    -> Context
+    -> IO (Either VersionControlError DocumentID)
+createDocument = (runSession .) . Sessions.createDocument
+
 -- | creates a commit in the given version control context
 createCommit
     :: CreateCommit
     -> Context
     -> IO (Either VersionControlError ExistingCommit)
 createCommit = runSession . Sessions.createCommit
+
+-- | creates a commit in the specified document
+--   the newly created commit must be related to the current head commit of the
+--   document (if any).
+createDocumentCommit
+    :: DocumentID
+    -> CreateCommit
+    -> Context
+    -> IO (Either VersionControlError Document)
+createDocumentCommit documentID commit ctx =
+    flattenVersionControlError
+        <$> createDocumentCommit' documentID commit ctx
+  where
+    createDocumentCommit' = (runSession .) . Sessions.createDocumentCommit
 
 -- | gets a commit from the given version control context
 getCommit

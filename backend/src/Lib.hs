@@ -52,12 +52,21 @@ testTree =
 testCommits :: Connection -> IO ExistingCommit
 testCommits conn = do
     Right userId <- getUserID "test@test.com" conn
-    let commit =
+    let commit1 =
             CreateCommit
-                (CommitInfo userId (Just "Test Commit") Nothing)
+                (CommitInfo userId (Just "Test Commit") [])
                 (Value testTree)
-    Right newCommit <- VC.createCommit commit $ VC.Context conn
-    return newCommit
+    Right newCommit <- VC.createCommit commit1 $ VC.Context conn
+    let commit2 =
+            CreateCommit
+                ( CommitInfo
+                    userId
+                    (Just "Another Commit")
+                    [commitHeaderID (existingCommitHeader newCommit)]
+                )
+                (Value testTree)
+    Right newCommit2 <- VC.createCommit commit2 $ VC.Context conn
+    return newCommit2
   where
     getUserID email = Session.run (statement email UStatements.getUserID)
 
