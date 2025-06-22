@@ -67,7 +67,7 @@ createCommit commit =
         $ Transactions.createCommit commit
 
 -- | session to create a new document
-createDocument :: Text -> GroupID -> Session DocumentID
+createDocument :: Text -> GroupID -> Session Document
 createDocument = curry $ flip statement Statements.createDocument
 
 -- | session to create a new commit in a document
