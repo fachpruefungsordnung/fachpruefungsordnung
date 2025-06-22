@@ -46,16 +46,8 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, ref, style, title) as HP
-import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
-import Type.Proxy (Proxy(Proxy))
-import Web.DOM.Element (toEventTarget)
-import Web.Event.EventTarget (addEventListener, eventListener)
-import Web.HTML.HTMLElement (toElement)
-import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
-import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
 import Web.DOM.Element (toEventTarget)
 import Web.Event.EventTarget (addEventListener, eventListener)
@@ -66,26 +58,6 @@ type TOCEntry =
   { id :: Int
   , name :: String
   , content :: Maybe (Array String)
-  }
-
-type AnnotatedMarker =
-  { id :: Int
-  , type :: String
-  , range :: Types.Range
-  , startRow :: Int
-  , startCol :: Int
-  , endRow :: Int
-  , endColumn :: Int
-  }
-
-sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker
-sortMarkers = sortBy (comparing _.startRow <> comparing _.startCol)
-
-type TOCEntry =
-  { id :: Int
-  , name :: String
-  , content :: Maybe String
-  , markers :: Maybe (Array AnnotatedMarker)
   }
 
 type State = FPOState

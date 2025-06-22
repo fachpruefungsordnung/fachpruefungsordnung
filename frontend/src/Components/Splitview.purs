@@ -15,6 +15,7 @@ import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Data.Store as Store
 import FPO.Components.TOC as TOC
+import FPO.Data.Store as Store
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
