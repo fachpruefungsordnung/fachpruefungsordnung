@@ -206,7 +206,7 @@ createCommit =
             )
             [singletonStatement|
                 insert into commits
-                    (author, message, root, base, height)
+                    (author, message, root, base, height, root_commit)
                 values (
                     $1 :: uuid,
                     $2 :: text?,
