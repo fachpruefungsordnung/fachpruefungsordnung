@@ -9,7 +9,6 @@ module FPO.Components.Editor
   , addChangeListener
   , editor
   , findAllIndicesOf
-  , surroundSelection
   ) where
 
 import Prelude
@@ -20,17 +19,16 @@ import Ace.EditSession as Session
 import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
-import Ace.Selection as Selection
 import Ace.Types as Types
+import Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
 import Data.Array (intercalate, (..), (:))
 import Data.Array as Array
-import Data.Foldable (for_, surround, traverse_)
+import Data.Foldable (for_, traverse_)
 import Data.Maybe (Maybe(..))
 import Data.String as String
 import Data.Traversable (traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
-import Effect.Class.Console (log)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -38,10 +36,8 @@ import Halogen.HTML.Properties (classes, ref, style, title) as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
 import Web.DOM.Element (toEventTarget)
-import Web.Event.Event (Event, EventType(..))
 import Web.Event.EventTarget (addEventListener, eventListener)
 import Web.HTML.HTMLElement (toElement)
-import Web.UIEvent.KeyboardEvent (KeyboardEvent, ctrlKey, fromEvent, key)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
 type TOCEntry =
@@ -173,19 +169,19 @@ editor = H.mkComponent
     Bold -> do
       H.gets _.editor >>= traverse_ \ed ->
         H.liftEffect $ do
-          surroundSelection "<*" ">" ed
+          makeBold ed
           Editor.focus ed
 
     Italic -> do
       H.gets _.editor >>= traverse_ \ed ->
         H.liftEffect $ do
-          surroundSelection "</" ">" ed
+          makeItalic ed
           Editor.focus ed
 
     Underline -> do
       H.gets _.editor >>= traverse_ \ed ->
         H.liftEffect $ do
-          surroundSelection "<_" ">" ed
+          underscore ed
           Editor.focus ed
 
     ShowWarning -> do
@@ -306,65 +302,3 @@ addAnnotation
 addAnnotation annotation session = do
   anns <- Session.getAnnotations session
   Session.setAnnotations (annotation : anns) session
-
--- | Surrounds the selected text with the given left and right strings
--- | and positions the cursor after the inserted left text.
-surroundSelection :: String -> String -> Types.Editor -> Effect Unit
-surroundSelection left right ed = do
-  session <- Editor.getSession ed
-  selection <- Editor.getSelection ed
-  range <- Selection.getRange selection
-  selectedText <- Session.getTextRange range session
-
-  -- Get the start position
-  startPos <- Range.getStart range
-
-  -- Insert the surrounded text
-  let newText = left <> selectedText <> right
-  Session.replace range newText session
-
-  -- Calculate new cursor position (after the left part)
-  let newColumn = (Types.getColumn startPos) + (String.length left)
-
-  -- Move cursor to new position
-  Editor.moveCursorTo (Types.getRow startPos) (Just newColumn) Nothing ed
-  -- Create a new range that encompasses the entire surrounded text
-  newRange <- Range.create
-    (Types.getRow startPos)
-    ((Types.getColumn startPos) + (String.length left))
-    (Types.getRow startPos)
-    ((Types.getColumn startPos) + (String.length newText) - (String.length right))
-
-  -- Set the selection to this new range
-  Selection.setSelectionRange newRange selection
-
-keyBinding :: Types.Editor -> Event -> Effect Unit
-keyBinding editor_ event = do
-  let keyboardEvent = fromEvent event :: Maybe KeyboardEvent
-  case keyboardEvent of
-    Nothing -> pure unit
-    Just keyEvent -> do
-      let pressedKey = key keyEvent
-      let ctrlKeyPressed = ctrlKey keyEvent
-      if ctrlKeyPressed then
-        case pressedKey of
-          "b" -> makeBold editor_
-          "i" -> makeItalic editor_
-          "u" -> underscore editor_
-          _ -> pure unit
-      else
-        pure unit
-      case pressedKey of
-        "Enter" -> log "Enter" -- Placeholder for Enter key action
-        "Escape" -> log "Escape" -- Placeholder for Escape key action
-        _ -> pure unit
-  pure unit
-
-makeBold :: Types.Editor -> Effect Unit
-makeBold editor_ = surroundSelection "<*" ">" editor_
-
-makeItalic :: Types.Editor -> Effect Unit
-makeItalic editor_ = surroundSelection "</" ">" editor_
-
-underscore :: Types.Editor -> Effect Unit
-underscore editor_ = surroundSelection "<_" ">" editor_
