@@ -30,6 +30,7 @@ import qualified UserManagement.Document as Document
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
+import VersionControl.Document (DocumentID)
 
 -- | Checks if User is SuperAdmin or Admin in the given group.
 --   If so, it calls the given callback Handler;
@@ -87,7 +88,7 @@ addRoleInGroup conn userID groupID role = do
 checkDocPermission
     :: Connection
     -> User.UserID
-    -> Document.DocumentID
+    -> DocumentID
     -> Handler (Maybe Document.DocPermission)
 checkDocPermission conn userID docID = do
     eIsMember <- liftIO $ run (Sessions.checkGroupDocPermission userID docID) conn
@@ -102,7 +103,7 @@ checkDocPermission conn userID docID = do
                 Right (Just perm) -> return $ Just perm
 
 -- | Get the groupID of the group that owns the specified document
-getGroupOfDocument :: Connection -> Document.DocumentID -> Handler Group.GroupID
+getGroupOfDocument :: Connection -> DocumentID -> Handler Group.GroupID
 getGroupOfDocument conn docID = do
     emgroupID <- liftIO $ run (Sessions.getDocumentGroupID docID) conn
     case emgroupID of

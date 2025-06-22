@@ -23,38 +23,39 @@ import qualified UserManagement.Document as Document
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 import VersionControl.Commit
+import VersionControl.Document (DocumentID)
 import Prelude hiding (readFile)
 
 type DocumentAPI =
     Auth AuthMethod Auth.Token
         :> "documents"
-        :> Capture "documentID" Document.DocumentID
+        :> Capture "documentID" DocumentID
         :> Get '[JSON] ExistingCommit
         :<|> Auth AuthMethod Auth.Token
             :> "documents"
-            :> Capture "documentID" Document.DocumentID
+            :> Capture "documentID" DocumentID
             :> Delete '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
             :> "documents"
-            :> Capture "documentID" Document.DocumentID
+            :> Capture "documentID" DocumentID
             :> "external"
             :> Get '[JSON] [(User.UserID, Document.DocPermission)]
         :<|> Auth AuthMethod Auth.Token
             :> "documents"
-            :> Capture "documentID" Document.DocumentID
+            :> Capture "documentID" DocumentID
             :> "external"
             :> Capture "userID" User.UserID
             :> Get '[JSON] (Maybe Document.DocPermission)
         :<|> Auth AuthMethod Auth.Token
             :> "documents"
-            :> Capture "documentID" Document.DocumentID
+            :> Capture "documentID" DocumentID
             :> "external"
             :> Capture "userID" User.UserID
             :> ReqBody '[JSON] Document.DocPermission
             :> Put '[JSON] NoContent
         :<|> Auth AuthMethod Auth.Token
             :> "documents"
-            :> Capture "documentID" Document.DocumentID
+            :> Capture "documentID" DocumentID
             :> "external"
             :> Capture "userID" User.UserID
             :> Delete '[JSON] NoContent
@@ -69,7 +70,7 @@ documentServer =
         :<|> deleteExternalUserDocumentHandler
 
 getDocumentHandler
-    :: AuthResult Auth.Token -> Document.DocumentID -> Handler ExistingCommit
+    :: AuthResult Auth.Token -> DocumentID -> Handler ExistingCommit
 getDocumentHandler (Authenticated Auth.Token {..}) docID = do
     conn <- tryGetDBConnection
     mPerm <- checkDocPermission conn subject docID
@@ -82,19 +83,19 @@ getDocumentHandler (Authenticated Auth.Token {..}) docID = do
 getDocumentHandler _ _ = throwError errNotLoggedIn
 
 deleteDocumentHandler
-    :: AuthResult Auth.Token -> Document.DocumentID -> Handler NoContent
+    :: AuthResult Auth.Token -> DocumentID -> Handler NoContent
 deleteDocumentHandler (Authenticated token) docID = do
     conn <- tryGetDBConnection
     groupID <- getGroupOfDocument conn docID
     ifSuperOrAdminDo conn token groupID (deleteDoc docID)
   where
-    deleteDoc :: Document.DocumentID -> Handler NoContent
+    deleteDoc :: DocumentID -> Handler NoContent
     deleteDoc = undefined -- TODO: function call to delete document
 deleteDocumentHandler _ _ = throwError errNotLoggedIn
 
 getAllExternalUsersDocumentHandler
     :: AuthResult Auth.Token
-    -> Document.DocumentID
+    -> DocumentID
     -> Handler [(User.UserID, Document.DocPermission)]
 getAllExternalUsersDocumentHandler (Authenticated token) docID = do
     conn <- tryGetDBConnection
@@ -112,7 +113,7 @@ getAllExternalUsersDocumentHandler _ _ = throwError errNotLoggedIn
 
 getExternalUserDocumentHandler
     :: AuthResult Auth.Token
-    -> Document.DocumentID
+    -> DocumentID
     -> User.UserID
     -> Handler (Maybe Document.DocPermission)
 getExternalUserDocumentHandler (Authenticated token) docID userID = do
@@ -131,7 +132,7 @@ getExternalUserDocumentHandler _ _ _ = throwError errNotLoggedIn
 
 putExternalUserDocumentHandler
     :: AuthResult Auth.Token
-    -> Document.DocumentID
+    -> DocumentID
     -> User.UserID
     -> Document.DocPermission
     -> Handler NoContent
@@ -163,7 +164,7 @@ putExternalUserDocumentHandler _ _ _ _ = throwError errNotLoggedIn
 
 deleteExternalUserDocumentHandler
     :: AuthResult Auth.Token
-    -> Document.DocumentID
+    -> DocumentID
     -> User.UserID
     -> Handler NoContent
 deleteExternalUserDocumentHandler (Authenticated token) docID userID = do
