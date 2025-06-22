@@ -22,6 +22,7 @@ import qualified Data.HashMap.Strict.InsOrd as InsOrd
 import Data.OpenApi
     ( NamedSchema (..)
     , OpenApiType (..)
+    , ToParamSchema (..)
     , ToSchema (..)
     , declareSchemaRef
     , properties
@@ -32,6 +33,7 @@ import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import qualified Data.Text.Encoding as TE
 import GHC.Int
+import Web.HttpApiData (FromHttpApiData (..))
 
 -- | represents the hash of a value
 newtype Hash = Hash
@@ -50,6 +52,16 @@ instance FromJSON Hash where
 
 instance ToSchema Hash where
     declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy String)
+
+instance ToParamSchema Hash where
+    toParamSchema _ =
+        mempty
+            & type_ ?~ OpenApiString
+
+instance FromHttpApiData Hash where
+    parseUrlPiece t = case decode (TE.encodeUtf8 t) of
+        Right bs -> Right (Hash bs)
+        Left _ -> Left "Invalid base16 encoding in Hash"
 
 -- | a hashable value
 class Hashable a where
