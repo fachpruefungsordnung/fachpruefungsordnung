@@ -288,17 +288,17 @@ getCommitNode =
             |]
 
 -- | statement to create a node of a certain kind
-createDocument :: Statement (Text, GroupID) DocumentID
+createDocument :: Statement (Text, GroupID) Document
 createDocument =
     rmap
-        DocumentID
+        (\(docID, name, groupID) -> Document (DocumentID docID) name groupID Nothing)
         [singletonStatement|
             insert into documents
                 (name, group_id)
             values
                 ($1 :: text),
                 ($2 :: int4)
-            returning id :: int4
+            returning id :: int4, name :: text, group_id :: int4
         |]
 
 -- | statement to get a document by its corresponding 'DocumentID'

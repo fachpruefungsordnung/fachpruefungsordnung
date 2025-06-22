@@ -56,7 +56,7 @@ createDocument
     -> GroupID
     -- ^ The group which owns the document
     -> Context
-    -> IO (Either VersionControlError DocumentID)
+    -> IO (Either VersionControlError Document)
 createDocument = (runSession .) . Sessions.createDocument
 
 -- | creates a commit in the given version control context
