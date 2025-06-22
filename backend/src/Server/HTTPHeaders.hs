@@ -3,15 +3,12 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Server.HTTPHeaders (HeaderContentType, PDF, PDFByteString (..)) where
+module Server.HTTPHeaders (PDF, PDFByteString (..)) where
 
 import Data.ByteString.Lazy (ByteString)
 import Data.OpenApi (NamedSchema (..), ToSchema (..), binarySchema)
 import Network.HTTP.Media.MediaType ((//))
 import Servant.API
-
--- | HTTP Content-Type Header
-type HeaderContentType = Header "Content-Type" String
 
 -- | PDF ByteString wrapper
 newtype PDFByteString = PDFByteString ByteString
