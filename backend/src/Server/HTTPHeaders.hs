@@ -25,7 +25,7 @@ instance Accept PDF where
 instance MimeRender PDF PDFByteString where
     mimeRender _ (PDFByteString bs) = bs
 
--- Cache-Control Headers
+-- HTTP Cache-Control Headers
 type HeaderCacheControl = Header "Cache-Control" String
 
 data CacheControl = NoCache | MaxAge Int

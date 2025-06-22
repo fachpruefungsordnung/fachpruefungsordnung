@@ -34,8 +34,11 @@ import qualified Data.HashMap.Strict.InsOrd as InsOrd
 import Data.OpenApi
     ( NamedSchema (..)
     , OpenApiType (..)
+    , ToParamSchema (..)
     , ToSchema (..)
     , declareSchemaRef
+    , exclusiveMinimum
+    , minimum_
     , properties
     , required
     , type_
@@ -45,6 +48,7 @@ import Data.Text (Text)
 import GHC.Generics
 import GHC.Int
 import VersionControl.Hash (Hash (..), Hashable (..), Hashed (..))
+import Web.HttpApiData (FromHttpApiData (..))
 
 -- | represents the id of a `Node`
 newtype NodeID = NodeID
@@ -60,6 +64,16 @@ instance FromJSON NodeID where
 
 instance ToSchema NodeID where
     declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
+
+instance ToParamSchema NodeID where
+    toParamSchema _ =
+        mempty
+            & type_ ?~ OpenApiInteger
+            & minimum_ ?~ 0
+            & exclusiveMinimum ?~ False
+
+instance FromHttpApiData NodeID where
+    parseUrlPiece = (NodeID <$>) . parseUrlPiece
 
 instance Hashable NodeID where
     updateHash ctx nodeID = updateHash ctx $ unNodeID nodeID
@@ -308,6 +322,7 @@ data DataEdge = DataEdge
     , dataEdgeChildTitle :: Text
     }
 
+-- | obtains a list of relational-style edges from a tree.
 dataEdges :: Tree (Hashed NodeWithRef) -> [DataEdge]
 dataEdges (Tree (Hashed parentHash _) children) =
     zipWith fromEdge [1, 2 ..] children

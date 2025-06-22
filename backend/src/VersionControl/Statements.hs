@@ -7,9 +7,16 @@ module VersionControl.Statements
     , putVersion
     , putEdge
     , createCommit
+    , putCommitRel
+    , getCommitParentIDs
     , getCommit
+    , getCommitNode
     , getChildrenByParentHash
     , getVersion
+    , createDocument
+    , getDocument
+    , setDocumentHead
+    , getCommitsByRoot
     )
 where
 
@@ -18,7 +25,9 @@ import Data.Text
 import Data.Vector
 import Hasql.Statement
 import Hasql.TH
+import UserManagement.Group (GroupID)
 import VersionControl.Commit
+import VersionControl.Document (Document (..), DocumentID (..))
 import VersionControl.Hash (Hash (..), Hashed (..))
 import VersionControl.Tree
 
@@ -28,8 +37,12 @@ createNode =
     rmap
         NodeID
         [singletonStatement|
-    insert into nodes (kind) values ($1 :: text) returning id :: int4
-  |]
+            insert into nodes
+                (kind)
+            values
+                ($1 :: text)
+            returning id :: int4
+        |]
 
 -- | statement to get a node kind by the corresponding 'NodeID'
 getNodeKind :: Statement NodeID Text
@@ -37,8 +50,13 @@ getNodeKind =
     lmap
         unNodeID
         [singletonStatement|
-    select kind :: text from nodes where id = $1 :: int4
-  |]
+            select
+                kind :: text
+            from
+                nodes
+            where
+                id = $1 :: int4
+        |]
 
 -- | statement to put a specific version of a document tree into the database
 putVersion :: Statement (Hashed NodeWithRef) ()
@@ -48,10 +66,12 @@ putVersion =
             (hash, ref, nodeContent node)
         )
         [resultlessStatement|
-      insert into node_versions (hash, node, content)
-      values ($1 :: bytea, $2 :: int4, $3 :: text?)
-      on conflict (hash) do nothing
-    |]
+            insert into node_versions
+                (hash, node, content)
+            values
+                ($1 :: bytea, $2 :: int4, $3 :: text?)
+            on conflict (hash) do nothing
+        |]
 
 -- | statement to obtain a specific version of a document tree by its hash
 getVersion :: Statement Hash (Hashed NodeWithRef)
@@ -63,17 +83,17 @@ getVersion =
         $ lmap
             (\(Hash bs) -> bs)
             [singletonStatement|
-      select
-        hash :: bytea,
-        node :: int4,
-        kind :: text,
-        content :: text?
-      from
-        node_versions
-        join nodes on node = id
-      where
-        hash = $1 :: bytea
-    |]
+                select
+                    hash :: bytea,
+                    node :: int4,
+                    kind :: text,
+                    content :: text?
+                from
+                    node_versions
+                    join nodes on node = id
+                where
+                    hash = $1 :: bytea
+            |]
 
 -- | statement to put an edge of document node version into the database
 putEdge :: Statement DataEdge ()
@@ -83,9 +103,11 @@ putEdge =
             (unHash parent, unHash child, position, title)
         )
         [resultlessStatement|
-      insert into trees (parent, child, child_position, child_title)
-      values ($1 :: bytea, $2 :: bytea, $3 :: int4, $4 :: text)
-    |]
+            insert into trees
+                (parent, child, child_position, child_title)
+            values
+                ($1 :: bytea, $2 :: bytea, $3 :: int4, $4 :: text)
+        |]
 
 -- | statement to obtain all child document node version by their parent's hash
 getChildrenByParentHash :: Statement Hash (Vector (Text, Hashed NodeWithRef))
@@ -99,63 +121,222 @@ getChildrenByParentHash =
         $ lmap
             (\(Hash bs) -> bs)
             [vectorStatement|
-    select
-      child_title :: text,
-      hash :: bytea,
-      node :: int4,
-      kind :: text,
-      content :: text?
-    from
-      node_versions
-      join trees on hash = child
-      join nodes on node = id
-    where
-      parent = $1 :: bytea
-    order by child_position asc
-  |]
+                select
+                    child_title :: text,
+                    hash :: bytea,
+                    node :: int4,
+                    kind :: text,
+                    content :: text?
+                from
+                    node_versions
+                    join trees on hash = child
+                    join nodes on node = id
+                where
+                    parent = $1 :: bytea
+                order by child_position asc
+            |]
 
 -- | statement to create a commit
 createCommit :: Statement CommitBody CommitHeader
 createCommit =
     rmap (\(newID, ts) -> CommitHeader (CommitID newID) ts) $
         lmap
-            ( \(CommitBody info root) ->
+            ( \(CommitBody info root base) ->
                 ( commitInfoAuthor info
                 , commitInfoMessage info
                 , unHash $ treeRefHash root
-                , unCommitID . commitRefID <$> commitInfoParent info
+                , unCommitID <$> base
                 )
             )
             [singletonStatement|
-      insert into commits (author, message, root, parent)
-      values ($1 :: uuid, $2 :: text?, $3 :: bytea, $4 :: int4?)
-      returning id :: int4, creation_ts :: timestamp
-    |]
+                insert into commits
+                    (author, message, root, base, height, root_commit)
+                values (
+                    $1 :: uuid,
+                    $2 :: text?,
+                    $3 :: bytea,
+                    $4 :: int4?,
+                    coalesce((
+                        select height + 1
+                        from commits
+                        where id = $4 :: int4?
+                    ), 0),
+                    coalesce((
+                        select root_commit
+                        from commits
+                        where id = $4 :: int4?
+                    ), $4 :: int4?)
+                )
+                returning
+                    id :: int4, creation_ts :: timestamp
+            |]
+
+-- | register a parent-child relation between two commits
+putCommitRel :: Statement CommitRel ()
+putCommitRel =
+    lmap
+        (\(CommitRel parent child) -> (unCommitID parent, unCommitID child))
+        [resultlessStatement|
+            insert into
+                commit_trees (parent, child)
+            values
+                ($1 :: int4, $2 :: int4)
+        |]
+
+-- | get the ids of all parents of a commit
+getCommitParentIDs :: Statement CommitID (Vector CommitID)
+getCommitParentIDs =
+    rmap (fmap CommitID) $
+        lmap
+            unCommitID
+            [vectorStatement|
+                select
+                    parent :: int4
+                from
+                    commit_trees
+                where
+                    child = $1 :: int4
+            |]
 
 -- | statement to get a commit by its 'CommitID'
-getCommit :: Statement CommitID ExistingCommit
+getCommit :: Statement CommitID ([CommitID] -> ExistingCommit)
 getCommit =
     rmap
-        ( \(ref, ts, author, message, root, parent) ->
+        ( \(ref, ts, author, message, root, base) parents ->
             ExistingCommit
                 (CommitHeader (CommitID ref) ts)
                 ( CommitBody
-                    (CommitInfo author message (Ref . CommitID <$> parent))
+                    (CommitInfo author message parents)
                     (Ref (Hash root))
+                    (CommitID <$> base)
                 )
         )
         $ lmap
             (\(CommitID i) -> i)
             [singletonStatement|
-        select
-          id :: int4,
-          creation_ts :: timestamp,
-          author :: uuid,
-          message :: text?,
-          root :: bytea,
-          parent :: int4?
-        from
-          commits
-        where
-          id = $1 :: int4
-    |]
+                select
+                    id :: int4,
+                    creation_ts :: timestamp,
+                    author :: uuid,
+                    message :: text?,
+                    root :: bytea,
+                    base :: int4?
+                from
+                    commits
+                where
+                    id = $1 :: int4
+            |]
+
+getCommitsByRoot
+    :: Statement CommitID (Vector (CommitID, [CommitID] -> ExistingCommit))
+getCommitsByRoot =
+    rmap
+        ( fmap
+            ( \(ref, ts, author, message, root, base) ->
+                ( CommitID ref
+                , \parents ->
+                    ExistingCommit
+                        (CommitHeader (CommitID ref) ts)
+                        ( CommitBody
+                            (CommitInfo author message parents)
+                            (Ref (Hash root))
+                            (CommitID <$> base)
+                        )
+                )
+            )
+        )
+        $ lmap
+            unCommitID
+            [vectorStatement|
+                select
+                    id :: int4,
+                    creation_ts :: timestamp,
+                    author :: uuid,
+                    message :: text?,
+                    root :: bytea,
+                    base :: int4?
+                from
+                    commits
+                where
+                    id = $1 :: int4 or root_commit = $1 :: int4
+            |]
+
+-- | get commit node by commit id.
+-- contains metadata about a commits position in the commit graph.
+getCommitNode :: Statement CommitID CommitNode
+getCommitNode =
+    rmap
+        ( \(commit, base, height, root) ->
+            CommitNode
+                (CommitID commit)
+                (CommitID <$> base)
+                height
+                (CommitID <$> root)
+        )
+        $ lmap
+            unCommitID
+            [singletonStatement|
+                select
+                    id :: int4,
+                    base :: int4?,
+                    height :: int4,
+                    root_commit :: int4?
+                from
+                    commits
+                where
+                    id = $1 :: int4
+            |]
+
+-- | statement to create a node of a certain kind
+createDocument :: Statement (Text, GroupID) Document
+createDocument =
+    rmap
+        (\(docID, name, groupID) -> Document (DocumentID docID) name groupID Nothing)
+        [singletonStatement|
+            insert into documents
+                (name, group_id)
+            values
+                ($1 :: text),
+                ($2 :: int4)
+            returning id :: int4, name :: text, group_id :: int4
+        |]
+
+-- | statement to get a document by its corresponding 'DocumentID'
+getDocument :: Statement DocumentID Document
+getDocument =
+    rmap
+        ( \(document, name, groupID, headCommit) ->
+            Document
+                (DocumentID document)
+                name
+                groupID
+                (CommitID <$> headCommit)
+        )
+        $ lmap
+            unDocumentID
+            [singletonStatement|
+            select
+                id :: int4,
+                name :: text,
+                group_id :: int4,
+                head :: int4?
+            from
+                documents
+            where
+                id = $1 :: int4
+        |]
+
+-- | statement to put a specific version of a document tree into the database
+setDocumentHead :: Statement (DocumentID, CommitID) ()
+setDocumentHead =
+    lmap
+        ( \(DocumentID documentId, CommitID commitId) ->
+            (documentId, commitId)
+        )
+        [resultlessStatement|
+            update documents
+            set
+                head = $2 :: int4
+            where
+                id = $1 :: int4
+        |]

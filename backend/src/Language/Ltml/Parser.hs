@@ -1,9 +1,11 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Language.Ltml.Parser
     ( Parser
     , MonadParser
+    , ParserWrapper (wrapParser)
     , nli
     , nextIndentLevel
     , checkIndent
@@ -31,6 +33,12 @@ import qualified Text.Megaparsec.Char.Lexer as L (indentLevel)
 type Parser = Parsec Void Text
 
 type MonadParser m = (MonadParsec Void Text m, MonadFail m)
+
+class (MonadParser m) => ParserWrapper m where
+    wrapParser :: Parser a -> m a
+
+instance ParserWrapper Parser where
+    wrapParser = id
 
 nextIndentLevel :: Pos -> Pos
 nextIndentLevel = (<> mkPos 2)
