@@ -27,6 +27,7 @@ import GHC.Int (Int32)
 import UserManagement.Group (GroupID)
 import VersionControl.Commit (CommitID)
 
+-- | id type for documents
 newtype DocumentID = DocumentID
     { unDocumentID :: Int32
     }
@@ -41,6 +42,7 @@ instance FromJSON DocumentID where
 instance ToSchema DocumentID where
     declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
 
+-- | represents a document
 data Document = Document
     { documentID :: DocumentID
     , documentName :: Text

@@ -31,6 +31,8 @@ class ToVersionControlError a where
 instance ToVersionControlError DocumentError where
     toVersionControlError = DocumentError
 
+-- | flattens a nested either where the outer error is a 'VersionControlError'
+--   and the inner error is mappable to a 'VersionControlError'
 flattenVersionControlError
     :: (ToVersionControlError a)
     => Either VersionControlError (Either a b)
