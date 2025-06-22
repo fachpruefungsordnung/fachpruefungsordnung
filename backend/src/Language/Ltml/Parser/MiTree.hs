@@ -7,6 +7,8 @@
 module Language.Ltml.Parser.MiTree
     ( MiElementConfig (..)
     , miForest
+    ( MiElementConfig (..)
+    , miForest
     , hangingBlock
     , hangingBlock'
     , hangingBlock_
@@ -29,6 +31,20 @@ import Language.Ltml.Parser
     )
 import Text.Megaparsec (Pos, takeWhile1P, takeWhileP)
 import qualified Text.Megaparsec.Char.Lexer as L (indentLevel)
+
+-- | Configuration on how to handle an element (node in a mi-tree).
+data MiElementConfig = MiElementConfig
+    { miecPermitEnd :: Bool
+    -- ^ Whether to permit the parent element to end with this element
+    --   (or else require a succeeding element).
+    , miecPermitChild :: Bool
+    -- ^ Whether to permit a child to succeed this element.
+    , miecRetainTrailingWhitespace :: Bool
+    -- ^ Whether to retain (or else drop) whitespace between this and
+    --   the subsequent element (if any).
+    --   This does not apply if the subsequent element is a child (in which
+    --   case whitespace is always dropped).
+    }
 
 -- | Configuration on how to handle an element (node in a mi-tree).
 data MiElementConfig = MiElementConfig
@@ -71,9 +87,12 @@ nli' = fromWhitespace <$> nli
 --   newline or EOF.
 --   Typically, @p@ is enclosed in some kind of bracketing parsers.
 --   For leaf nodes, 'elementPF' may simply ignore @p@.
---   @'elementPF' p@ is further expected to not accept the empty input, at
---   least after sufficiently repeated application; i.e.
---   @'Text.Megaparsec.many' ('elementPF' p)@ is expected to halt.
+--   @'elementPF' p@ is further generally expected to not accept the empty
+--   input.  Exceptions are permitted when
+--   (a) sufficiently repeated application eventually halts
+--       (i.e. @'Text.Megaparsec.many' ('elementPF' p)@ halts), and
+--   (b) @'elementPF' p@ does not succeed on an empty input line (possibly
+--       with indentation / (ASCII) spaces).
 --
 --   Unlike 'elementPF', 'childP' is expected to take care of indentation
 --   itself--except at the very beginning, where it may expect that any
@@ -85,7 +104,7 @@ nli' = fromWhitespace <$> nli
 miForest
     :: forall m a
      . (MonadParser m, FromWhitespace [a])
-    => (m [a] -> m a)
+    => (m [a] -> m (MiElementConfig, a))
     -> m a
     -> m [a]
 miForest elementPF childP = L.indentLevel >>= miForestFrom elementPF childP
@@ -93,7 +112,7 @@ miForest elementPF childP = L.indentLevel >>= miForestFrom elementPF childP
 miForestFrom
     :: forall m a
      . (MonadParser m, FromWhitespace [a])
-    => (m [a] -> m a)
+    => (m [a] -> m (MiElementConfig, a))
     -> m a
     -> Pos
     -> m [a]
@@ -111,11 +130,18 @@ miForestFrom elementPF childP lvl = go True
 
         -- Parse forest, headed by element.
         goE :: m [a]
-        goE =
-            elementPF (go False)
-                <:> ( (nli' >>= \s -> (s ++) <$> goE' <|> goC' <|> goEnd')
-                        <|> (++) <$> sp' <*> goE
-                        <|> goEnd
+        goE = do
+            (cfg, e) <- elementPF (go False)
+            let f =
+                    if miecRetainTrailingWhitespace cfg
+                        then (++)
+                        else const id
+            let wC = when $ miecPermitChild cfg
+            let wEnd = when $ miecPermitEnd cfg
+            (e :)
+                <$> ( (nli' >>= \s -> f s <$> goE' <|> wC goC' <|> wEnd goEnd')
+                        <|> f <$> sp' <*> goE
+                        <|> wEnd goEnd
                     )
 
         -- Compare `Control.Monad.when`, which is different, but similar.
@@ -137,6 +163,7 @@ miForestFrom elementPF childP lvl = go True
 
         goEnd' :: m [a]
         goEnd' = when permitEndAfterNewline goEnd
+        goEnd' = when permitEndAfterNewline goEnd
 
 -- | Parse a mi-forest headed by a keyword, with all lines but the first
 --   indented one additional level.
@@ -153,7 +180,7 @@ hangingBlock
     :: (MonadParser m, FromWhitespace [a])
     :: (MonadParser m, FromWhitespace [a])
     => m ([a] -> b)
-    -> (m [a] -> m (MiElementConfig, [a]))
+    -> (m [a] -> m (MiElementConfig, a))
     -> m a
     -> m b
 hangingBlock keywordP elementPF childP = do
@@ -168,7 +195,7 @@ hangingBlock'
     :: (MonadParser m, FromWhitespace [a])
     :: (MonadParser m, FromWhitespace [a])
     => m b
-    -> (m [a] -> m (MiElementConfig, [a]))
+    -> (m [a] -> m (MiElementConfig, a))
     -> m a
     -> m (b, [a])
 hangingBlock' = hangingBlock . fmap (,)
@@ -179,7 +206,7 @@ hangingBlock_
     :: (MonadParser m, FromWhitespace [a])
     :: (MonadParser m, FromWhitespace [a])
     => m ()
-    -> (m [a] -> m (MiElementConfig, [a]))
+    -> (m [a] -> m (MiElementConfig, a))
     -> m a
     -> m [a]
 hangingBlock_ = hangingBlock . fmap (const id)
