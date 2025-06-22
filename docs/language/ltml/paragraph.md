@@ -46,7 +46,8 @@ Additionally, paragraph text extends text with [sentences](#sentences).
 Text within a paragraph is split into sentences,
 Sentences are generally terminated by a single period (`.`), exclamation mark
 (`!`), or question mark (`?`), each.
-Exceptions apply in the context of enumerations (TODO).
+Additionally, they are terminated by enumeration items (with the next sentence
+starting after the sequence of enumeration items).
 
 Sentences are not full nodes; in particular, [styling](./text.md#styling) may
 overlap with sentences.
