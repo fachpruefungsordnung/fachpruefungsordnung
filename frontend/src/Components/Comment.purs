@@ -2,6 +2,7 @@ module FPO.Components.Comment where
 
 import Prelude
 
+import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Types (Comment, CommentSection)
@@ -9,7 +10,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Data.DateTime (time)
+import Halogen.Themes.Bootstrap5 as HB
 
 type Input = Unit
 
@@ -20,13 +21,16 @@ data Action
   | UpdateDraft String
   | SendComment
 
-data Query a = SelectedCommentSection Int Int CommentSection a
+data Query a 
+  = ReceiveTimeFormatter (Maybe Formatter) a
+  | SelectedCommentSection Int Int CommentSection a
 
 type State =
   { tocID :: Int
   , markerID :: Int
   , commentsection :: Maybe CommentSection
   , commentDraft :: String
+  , timeFormatter :: Maybe Formatter
   }
 
 commentview :: forall m. MonadAff m => H.Component Query Input Output m
@@ -36,6 +40,7 @@ commentview = H.mkComponent
   , markerID: -1
   , commentsection: Nothing
   , commentDraft: "" 
+  , timeFormatter: Nothing
   }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -51,16 +56,38 @@ commentview = H.mkComponent
     Nothing -> HH.text ""  
     Just commentSection ->
       HH.div [ HP.style "comment-section space-y-3" ]
-        ( map renderComment commentSection.comments
+        ( map (renderComment state.timeFormatter) commentSection.comments 
             <> [ renderInput state.commentDraft ]
         )
   
-  renderComment :: Comment -> forall slots. H.ComponentHTML Action slots m
-  renderComment c =
-    HH.div [ HP.style "rounded-md shadow-md p-3 bg-white border border-gray-300" ]
-      [ HH.div [HP.style "text-sm font-semibold text-gray-700" ] [ HH.text c.author ]
-      , HH.div [ HP.style "mt-1 text-gray-800" ] [ HH.text c.content ]
-      , HH.div [ HP.style "mt-2 text-xs text-gray-500" ] [ HH.text (show (time c.timestamp)) ]
+  renderComment :: Maybe Formatter -> Comment -> forall slots. H.ComponentHTML Action slots m
+  renderComment mFormatter c =
+    HH.div
+      [ HP.classes
+          [ HB.p3
+          , HB.mb3
+          , HB.border
+          , HB.rounded
+          , HB.shadowSm
+          , HB.dFlex
+          , HB.flexColumn
+          ]
+      , HP.style "background-color: #fff9c4;"
+      ]
+      [ -- Inhalt
+        HH.div_
+          [ HH.div_ [ HH.text c.author ]
+          , HH.div [ HP.classes [ HB.mt1 ] ] [ HH.text c.content ]
+          ]
+        -- Zeitstempel klein und unten rechts
+      , HH.div
+          [ HP.classes [ HB.mt2 ]
+          , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;" ]
+          [ HH.text $
+              case mFormatter of
+                Nothing      -> "No timestamp found."
+                Just formatr -> format formatr c.timestamp
+          ]
       ]
 
   renderInput :: String -> forall slots. H.ComponentHTML Action slots m
@@ -97,6 +124,10 @@ commentview = H.mkComponent
      . Query a
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
+
+    ReceiveTimeFormatter timeFormatter a -> do
+      H.modify_ \state -> state  { timeFormatter = timeFormatter }
+      pure (Just a)
 
     SelectedCommentSection tocID markerID section a -> do
       H.modify_ \state -> state 

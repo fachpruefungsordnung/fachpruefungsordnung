@@ -15,6 +15,7 @@ package:
     - either
     - enums
     - foldable-traversable
+    - formatters
     - halogen
     - halogen-bootstrap5
     - halogen-store

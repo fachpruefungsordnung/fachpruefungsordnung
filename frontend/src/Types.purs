@@ -6,6 +6,8 @@ import Ace.Types as Types
 import Data.Array (find, sortBy)
 import Data.Maybe (Maybe)
 import Data.DateTime (DateTime)
+import Data.Formatter.DateTime (FormatterCommand(..),Formatter)
+import Data.List (List(..), (:))
 
 type AnnotatedMarker =
   { id :: Int
@@ -62,3 +64,17 @@ markerToAnnotation m =
   , text: "Comment found!"
   , type: m.type
   }
+
+-- TODO create more timestamps versions and discuss, where to store this
+timeStampsVersions :: Array Formatter
+timeStampsVersions =
+  [ ( DayOfMonthTwoDigits 
+    : Placeholder " "
+    : MonthShort 
+    : Placeholder " "
+    : YearTwoDigits 
+    : Placeholder " "
+    : Hours24 
+    : Placeholder ":"
+    : MinutesTwoDigits 
+    : Nil ) ]

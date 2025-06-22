@@ -9,7 +9,8 @@ module FPO.Component.Splitview where
 import Prelude
 
 import Ace.Range as Range
-import Data.Array (intercalate, range)
+import Data.Array (head, intercalate, range)
+import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Effect.Now (nowDateTime)
@@ -18,7 +19,7 @@ import FPO.Components.Comment as Comment
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
-import FPO.Types (AnnotatedMarker, Comment, CommentSection, TOCEntry, findTOCEntry)
+import FPO.Types (AnnotatedMarker, Comment, CommentSection, TOCEntry, findTOCEntry, timeStampsVersions)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -91,6 +92,9 @@ type State =
   -- TODO load/upload from/to backend
   , tocEntries :: Array TOCEntry
 
+  -- How the timestamp has to be formatted
+  , timeFormatter:: Maybe Formatter
+
   -- Boolean flags for UI state
   , sidebarShown :: Boolean
   , tocShown :: Boolean
@@ -124,6 +128,7 @@ splitview = H.mkComponent
       , lastExpandedMiddleRatio: 0.4
       , editorContent: Nothing
       , tocEntries: []
+      , timeFormatter: Nothing
       , sidebarShown: true
       , tocShown: true
       , previewShown: true
@@ -292,7 +297,9 @@ splitview = H.mkComponent
       -- --     Nothing -> { id: -1, name: "No Entry", content: Just [ "" ] }
       -- --     Just entry -> entry
       -- -- H.tell _editor unit (Editor.ChangeSection firstEntry)
-      H.modify_ \st -> do st { tocEntries = exampleTOCEntries }
+      let timeFormatter = head timeStampsVersions
+      H.modify_ \st -> do st { tocEntries = exampleTOCEntries, timeFormatter = timeFormatter }
+      H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
       H.tell _toc unit (TOC.ReceiveTOCs exampleTOCEntries)
 
     -- Resizing as long as mouse is hold down on window
