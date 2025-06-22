@@ -71,7 +71,7 @@ instance ParserWrapper ParagraphParser where
     wrapParser = lift
 
 textForestP
-    :: ( MonadParser m
+    :: ( ParserWrapper m
        , StyleP style
        , EnumP enumType enumItem
        , SpecialP m special
@@ -104,7 +104,7 @@ elementPF p = fmap Special <$> specialP <|> regularP
 
 childPF
     :: forall m style enumType enumItem special
-     . (MonadParser m, EnumP enumType enumItem, SpecialP m special)
+     . (ParserWrapper m, EnumP enumType enumItem, SpecialP m special)
     => TextType enumType
     -> m (TextTree style enumItem special)
     -> m (TextTree style enumItem special)
@@ -117,7 +117,7 @@ footnoteTextP :: FootnoteType -> Parser [FootnoteTextTree]
 footnoteTextP (FootnoteType kw tt) = hangingTextP kw tt
 
 hangingTextP
-    :: ( MonadParser m
+    :: ( ParserWrapper m
        , StyleP style
        , EnumP enumType enumItem
        , SpecialP m special
@@ -129,7 +129,7 @@ hangingTextP
 hangingTextP kw t = hangingBlock_ (keywordP kw) elementPF (childPF t)
 
 hangingTextP'
-    :: ( MonadParser m
+    :: ( ParserWrapper m
        , StyleP style
        , EnumP enumType enumItem
        , SpecialP m special
@@ -162,7 +162,7 @@ instance EnumP Void Void where
 instance EnumP EnumType EnumItem where
     enumItemP (EnumType kw tt) = EnumItem <$> hangingTextP kw tt
 
-class (ParserWrapper m) => SpecialP m special | special -> m where
+class SpecialP m special | special -> m where
     specialP :: m (MiElementConfig, special)
     wordP :: Proxy special -> m Text
     postEnumChildP :: Proxy special -> m ()
