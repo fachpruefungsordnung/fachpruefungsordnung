@@ -41,12 +41,20 @@ newtype Context = Context
 --      - limit number of commits returned. this could be done with ORDER BY and LIMIT.
 getCommitGraph
     :: DocumentID
+    -- ^ the id of the document of the requested commits graph
     -> Context
+    -- ^ version control context
     -> IO (Either VersionControlError (Vector ExistingCommit))
 getCommitGraph = runSession . Sessions.getCommitGraph
 
 -- | get a document by id
-getDocument :: DocumentID -> Context -> IO (Either VersionControlError Document)
+getDocument
+    :: DocumentID
+    -- ^ the id of the document to get
+    -> Context
+    -- ^ version control context
+    -> IO (Either VersionControlError Document)
+    -- ^ holds the requested document or an error
 getDocument = runSession . Sessions.getDocument
 
 -- | creates a new document in the specified user group
@@ -56,24 +64,39 @@ createDocument
     -> GroupID
     -- ^ The group which owns the document
     -> Context
+    -- ^ version control context
     -> IO (Either VersionControlError Document)
+    -- ^ holds the newly created document or an error
 createDocument = (runSession .) . Sessions.createDocument
 
 -- | creates a commit in the given version control context
 createCommit
     :: CreateCommit
+    -- ^ not-yet existing commit, intendet to be made persistent by this operation
     -> Context
+    -- ^ version control context
     -> IO (Either VersionControlError ExistingCommit)
+    -- ^ holds the newly created commit or an error
 createCommit = runSession . Sessions.createCommit
 
 -- | creates a commit in the specified document
 --   the newly created commit must be related to the current head commit of the
 --   document (if any).
+--
+--   TODO: if the commit is created sucessfully, but can not be set as head of the
+--         document, the commit will persist in the database. I think, this is
+--         reasonable, as it can be used later (e.g., to merge it in).
+--         However, it is currently not returned in this case, which should be
+--         changed imo.
 createDocumentCommit
     :: DocumentID
+    -- ^ the id of the document the commit should belong to
     -> CreateCommit
+    -- ^ not-yet existing commit, intendet to be made persistent by this operation
     -> Context
+    -- ^ version control context
     -> IO (Either VersionControlError Document)
+    -- ^ holds the document with the newly created commit or an error
 createDocumentCommit documentID commit ctx =
     flattenVersionControlError
         <$> createDocumentCommit' documentID commit ctx
@@ -83,8 +106,11 @@ createDocumentCommit documentID commit ctx =
 -- | gets a commit from the given version control context
 getCommit
     :: CommitID
+    -- ^ the id of the commit to obtain from the database
     -> Context
+    -- ^ version control context
     -> IO (Either VersionControlError ExistingCommit)
+    -- ^ holds the requested commit or an error
 getCommit = runSession . Sessions.getCommit
 
 -- | runs a session and maps a potential error to a `VersionControlError`
