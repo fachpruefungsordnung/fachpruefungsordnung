@@ -13,23 +13,30 @@ import Data.DateTime (time)
 
 type Input = Unit
 
-data Output = UpdateComment CommentSection
+data Output = UpdateComment Int Int CommentSection
 
 data Action
   = Init
   | UpdateDraft String
   | SendComment
 
-data Query a = SelectedCommentSection CommentSection a
+data Query a = SelectedCommentSection Int Int CommentSection a
 
 type State =
-  { commentsection :: Maybe CommentSection
+  { tocID :: Int
+  , markerID :: Int
+  , commentsection :: Maybe CommentSection
   , commentDraft :: String
   }
 
-tocview :: forall m. MonadAff m => H.Component Query Input Output m
-tocview = H.mkComponent
-  { initialState: \_ -> { commentsection: Nothing, commentDraft: "" }
+commentview :: forall m. MonadAff m => H.Component Query Input Output m
+commentview = H.mkComponent
+  { initialState: \_ -> 
+  { tocID: -1
+  , markerID: -1
+  , commentsection: Nothing
+  , commentDraft: "" 
+  }
   , render
   , eval: H.mkEval $ H.defaultEval
       { initialize = Just Init
@@ -91,8 +98,10 @@ tocview = H.mkComponent
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
 
-    SelectedCommentSection section a -> do
-      H.modify_ \state ->
-        state { commentsection = Just section }
+    SelectedCommentSection tocID markerID section a -> do
+      H.modify_ \state -> state 
+        { tocID = tocID
+        , markerID = markerID
+        , commentsection = Just section }
       pure (Just a)
 

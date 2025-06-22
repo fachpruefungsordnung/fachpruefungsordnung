@@ -10,7 +10,7 @@ import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
 import Ace.Types as Types
-import Data.Array (filter, filterA, intercalate, (..), (:))
+import Data.Array (filter, filterA, head, intercalate, (..), (:))
 import Data.Array as Array
 import Data.Foldable (elem, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -18,7 +18,7 @@ import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
-import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
+import FPO.Types (AnnotatedMarker, CommentSection, TOCEntry, markerToAnnotation, sortMarkers)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -38,6 +38,7 @@ _pdfSlideBar = Proxy :: Proxy "pdfSlideBar"
 data Output
   = ClickedQuery (Maybe (Array String))
   | SavedSection TOCEntry
+  | SelectedCommentSection Int Int CommentSection
 
 data Action
   = Init
@@ -46,6 +47,7 @@ data Action
   | Comment
   | DeleteComment
   | ShowWarning
+  | SelectComment
 
 -- We use a query to get the content of the editor
 data Query a
@@ -82,7 +84,8 @@ editor = H.mkComponent
   render :: State -> forall slots. H.ComponentHTML Action slots m
   render _ =
     HH.div
-      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
+      [ HE.onClick $ const SelectComment
+      , HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
       [ HH.div -- Second toolbar
 
           [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap2 ] ]
@@ -242,6 +245,28 @@ editor = H.mkComponent
 
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
+    
+    SelectComment -> do
+      H.gets _.editor >>= traverse_ \ed -> do
+        cursor <- H.liftEffect $ Editor.getCursorPosition ed
+        state <- H.get
+        -- extract markers from the current TOC entry
+        let 
+          tocEntry = case state.tocEntry of
+            Nothing -> { id: -1 , name: "No entry" , content: Nothing, markers: Nothing }
+            Just e -> e
+          markers = fromMaybe [] (state.tocEntry >>= _.markers)
+          row = Types.getRow cursor
+          col = Types.getColumn cursor
+
+        -- remove the marker at the cursor position and return the remaining markers
+        targetRange <- H.liftEffect $ Range.create row col row col
+        matching <- H.liftEffect $ filterA (\m -> Range.containsRange targetRange m.range) markers
+        case head matching of
+          Nothing -> pure unit
+          Just marker -> case marker.commentSection of
+            Nothing -> pure unit
+            Just commentSection -> H.raise (SelectedCommentSection tocEntry.id marker.id commentSection)
 
   handleQuery
     :: forall slots a

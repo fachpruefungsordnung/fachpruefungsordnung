@@ -9,15 +9,16 @@ module FPO.Component.Splitview where
 import Prelude
 
 import Ace.Range as Range
-import Data.Array (find, intercalate, range)
+import Data.Array (intercalate, range)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Effect.Now (nowDateTime)
 import Effect.Aff.Class (class MonadAff)
+import FPO.Components.Comment as Comment
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
-import FPO.Types (AnnotatedMarker, Comment, CommentSection, TOCEntry)
+import FPO.Types (AnnotatedMarker, Comment, CommentSection, TOCEntry, findTOCEntry)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -53,6 +54,7 @@ data Action
   | ToggleSidebar
   | TogglePreview
   -- Query Output
+  | HandleComment Comment.Output
   | HandleEditor Editor.Output
   | HandlePreview Preview.Output
   | HandleTOC TOC.Output
@@ -91,17 +93,20 @@ type State =
 
   -- Boolean flags for UI state
   , sidebarShown :: Boolean
+  , tocShown :: Boolean
   , previewShown :: Boolean
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
   }
 
 type Slots =
-  ( editor :: H.Slot Editor.Query Editor.Output Unit
+  ( comment :: H.Slot Comment.Query Comment.Output Unit
+  , editor :: H.Slot Editor.Query Editor.Output Unit
   , preview :: H.Slot Preview.Query Preview.Output Unit
   , toc :: H.Slot TOC.Query TOC.Output Unit
   )
 
+_comment = Proxy :: Proxy "comment"
 _editor = Proxy :: Proxy "editor"
 _preview = Proxy :: Proxy "preview"
 _toc = Proxy :: Proxy "toc"
@@ -120,6 +125,7 @@ splitview = H.mkComponent
       , editorContent: Nothing
       , tocEntries: []
       , sidebarShown: true
+      , tocShown: true
       , previewShown: true
       , pdfWarningAvailable: false
       , pdfWarningIsShown: false
@@ -229,9 +235,17 @@ splitview = H.mkComponent
         , HP.style $
             "flex: 0 0 " <> show (state.sidebarRatio * 100.0) <>
               "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"<>
-              if not state.sidebarShown then "display: none;" else ""
+              if state.sidebarShown && state.tocShown then "" else "display: none;"
         ]
         [ HH.slot _toc unit TOC.tocview unit HandleTOC ]
+    , HH.div
+        [ HP.classes [ HB.overflowAuto, HB.p1 ]
+        , HP.style $
+            "flex: 0 0 " <> show (state.sidebarRatio * 100.0) <>
+              "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"<>
+              if state.sidebarShown && not state.tocShown then "" else "display: none;"
+        ]
+        [ HH.slot _comment unit Comment.commentview unit HandleComment ]
     -- Left Resizer
     , if state.sidebarShown then
         HH.div
@@ -425,6 +439,29 @@ splitview = H.mkComponent
 
     -- Query handler
 
+    HandleComment output ->  case output of
+
+      Comment.UpdateComment tocID markerID newCommentSection -> do
+        state <- H.get
+
+        let
+          updatedTOCEntries =
+            map (\entry ->
+              if entry.id /= tocID then entry
+              else let
+                newMarkers = case entry.markers of
+                  Just markers ->
+                    Just (map (\marker ->
+                      if marker.id /= markerID then marker
+                      else marker { commentSection = Just newCommentSection }
+                    ) markers)
+                  Nothing -> Nothing
+                in
+                  entry { markers = newMarkers }
+            ) state.tocEntries
+
+        H.modify_ \s -> s { tocEntries = updatedTOCEntries }
+        
     HandleEditor output -> case output of
 
       Editor.ClickedQuery response -> H.tell _preview unit
@@ -437,6 +474,10 @@ splitview = H.mkComponent
               map (\e -> if e.id == entry.id then entry else e) st.tocEntries
             }
 
+      Editor.SelectedCommentSection tocID markerID commentSection -> do
+        H.modify_ \st -> st { tocShown = false }
+        H.tell _comment unit (Comment.SelectedCommentSection tocID markerID commentSection)
+
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
@@ -444,7 +485,7 @@ splitview = H.mkComponent
       TOC.ChangeSection selectEntry -> do
         H.tell _editor unit Editor.SaveSection
         state <- H.get
-        let entry = case (find (\e -> e.id == selectEntry.id) state.tocEntries) of
+        let entry = case (findTOCEntry selectEntry.id state.tocEntries) of
               Nothing -> { id: -1, name: "No Entry", content: Nothing, markers: Nothing }
               Just e  -> e
         H.tell _editor unit (Editor.ChangeSection entry)
