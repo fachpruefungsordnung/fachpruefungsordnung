@@ -22,7 +22,7 @@ import Hasql.Transaction.Sessions
 import UserManagement.Group (GroupID)
 import UserManagement.Group (GroupID)
 import VersionControl.Commit
-import VersionControl.Document (Document, DocumentID)
+import VersionControl.Document (Document (..), DocumentID)
 import VersionControl.Error (DocumentError)
 import VersionControl.Hash
 import qualified VersionControl.Statements as Statements
