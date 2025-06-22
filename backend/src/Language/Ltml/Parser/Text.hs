@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -16,6 +17,8 @@ import Control.Applicative.Combinators (choice)
 import Control.Monad.State (StateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import qualified Data.Char as Char (isControl)
+import Data.List (singleton)
+import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy (Proxy))
 import Data.Text (Text)
 import qualified Data.Text as Text (singleton)
@@ -54,7 +57,7 @@ import Text.Megaparsec
     , takeWhile1P
     , try
     )
-import Text.Megaparsec.Char (char)
+import Text.Megaparsec.Char (char, string)
 
 type ParagraphParser =
     StateT
@@ -78,12 +81,12 @@ elementPF
     :: forall m style enumItem special
      . (MonadParser m, StyleP style, SpecialP m special)
     => m [TextTree style enumItem special]
-    -> m (MiElementConfig, TextTree style enumItem special)
-elementPF p = fmap Special <$> specialP <|> regularP
+    -> m (MiElementConfig, [TextTree style enumItem special])
+elementPF p = fmap (maybeToList . fmap Special) <$> specialP <|> regularP
   where
-    regularP :: m (MiElementConfig, TextTree style enumItem special)
+    regularP :: m (MiElementConfig, [TextTree style enumItem special])
     regularP =
-        fmap (regularCfg,) $
+        fmap ((regularCfg,) . singleton) $
             Word <$> wordP (Proxy :: Proxy special)
                 <|> Reference <$ char '{' <* char ':' <*> labelP <* char '}'
                 <|> Styled <$ char '<' <*> styleP <*> p <* char '>'
@@ -152,7 +155,7 @@ instance EnumP EnumType EnumItem where
     enumItemP (EnumType kw tt) = EnumItem <$> hangingTextP kw tt
 
 class SpecialP m special | special -> m where
-    specialP :: m (MiElementConfig, special)
+    specialP :: m (MiElementConfig, Maybe special)
     wordP :: Proxy special -> m Text
     postEnumChildP :: Proxy special -> m ()
 
@@ -165,11 +168,9 @@ instance SpecialP Parser Void where
 
 instance SpecialP ParagraphParser SentenceStart where
     specialP =
-        (specialCfg,) <$> do
-            isSentenceStartExpected <- get
-            if isSentenceStartExpected
-                then (labeledSSP <|> unlabeledSSP) <* put False
-                else empty
+        fmap (specialCfg,) $
+            Nothing <$ continueP
+                <|> Just <$> sentenceStartP
       where
         -- Sentence start tokens (SSTs) must be followed by a regular element;
         -- that is, they must not occur at the end of their parent element
@@ -201,13 +202,30 @@ instance SpecialP ParagraphParser SentenceStart where
                 , miecRetainTrailingWhitespace = False
                 }
 
-        -- TODO: Avoid `try`.
-        labeledSSP :: ParagraphParser SentenceStart
-        labeledSSP = SentenceStart . Just <$> try labelingP
+        sentenceStartP = do
+            isSentenceStartExpected <- get
+            if isSentenceStartExpected
+                then (labeledSSP <|> unlabeledSSP) <* put False
+                else empty
+          where
+            -- TODO: Avoid `try`.
+            labeledSSP :: ParagraphParser SentenceStart
+            labeledSSP = SentenceStart . Just <$> try labelingP
 
-        unlabeledSSP :: ParagraphParser SentenceStart
-        unlabeledSSP =
-            SentenceStart Nothing <$ notFollowedBy (char '\n' <|> char '<')
+            unlabeledSSP :: ParagraphParser SentenceStart
+            unlabeledSSP =
+                SentenceStart Nothing <$ notFollowedBy (char '\n' <|> char '<')
+
+        -- The `{>}` token means to continue the current sentence.
+        --  - It is meant to be used after an enumeration, but can be used
+        --    anywhere where a sentence start is permitted.
+        --  - The same rules as for labeled SSTs apply w.r.t. placement.
+        continueP = do
+            isSentenceStartExpected <- get
+            _ <- string "{>}"
+            if isSentenceStartExpected
+                then put False
+                else fail "Unexpected sentence continuation token."
 
     wordP _ = sentenceWordP <|> sentenceEndP
       where

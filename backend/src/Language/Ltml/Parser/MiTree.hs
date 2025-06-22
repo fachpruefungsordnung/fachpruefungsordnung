@@ -86,7 +86,7 @@ nli' = fromWhitespace <$> nli
 miForest
     :: forall m a
      . (MonadParser m, FromWhitespace [a])
-    => (m [a] -> m (MiElementConfig, a))
+    => (m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> m [a]
 miForest elementPF childP = L.indentLevel >>= miForestFrom elementPF childP
@@ -94,7 +94,7 @@ miForest elementPF childP = L.indentLevel >>= miForestFrom elementPF childP
 miForestFrom
     :: forall m a
      . (MonadParser m, FromWhitespace [a])
-    => (m [a] -> m (MiElementConfig, a))
+    => (m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> Pos
     -> m [a]
@@ -120,7 +120,7 @@ miForestFrom elementPF childP lvl = go True
                         else const id
             let wC = when $ miecPermitChild cfg
             let wEnd = when $ miecPermitEnd cfg
-            (e :)
+            (e ++)
                 <$> ( (nli' >>= \s -> f s <$> goE' <|> wC goC' <|> wEnd goEnd')
                         <|> f <$> sp' <*> goE
                         <|> wEnd goEnd
@@ -160,7 +160,7 @@ miForestFrom elementPF childP lvl = go True
 hangingBlock
     :: (MonadParser m, FromWhitespace [a])
     => m ([a] -> b)
-    -> (m [a] -> m (MiElementConfig, a))
+    -> (m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> m b
 hangingBlock keywordP elementPF childP = do
@@ -174,7 +174,7 @@ hangingBlock keywordP elementPF childP = do
 hangingBlock'
     :: (MonadParser m, FromWhitespace [a])
     => m b
-    -> (m [a] -> m (MiElementConfig, a))
+    -> (m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> m (b, [a])
 hangingBlock' = hangingBlock . fmap (,)
@@ -184,7 +184,7 @@ hangingBlock' = hangingBlock . fmap (,)
 hangingBlock_
     :: (MonadParser m, FromWhitespace [a])
     => m ()
-    -> (m [a] -> m (MiElementConfig, a))
+    -> (m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> m [a]
 hangingBlock_ = hangingBlock . fmap (const id)

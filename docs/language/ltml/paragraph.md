@@ -49,6 +49,13 @@ Sentences are generally terminated by a single period (`.`), exclamation mark
 Additionally, they are terminated by enumeration items (with the next sentence
 starting after the sequence of enumeration items).
 
+Sentence terminatation can be undone by inserting the continuation token `{>}`
+where otherwise a new sentence might start.
+This is meant for continuing a sentence after an enumeration, where it is to
+be inserted at the start of the first line after the enumeration.
+Otherwise, one may also simply escape the line terminator,
+s.t., e.g., `X\. Y.` is equivalent to `X. {>} Y.`).
+
 Sentences are not full nodes; in particular, [styling](./text.md#styling) may
 overlap with sentences.
 
