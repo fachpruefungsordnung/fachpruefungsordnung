@@ -1,4 +1,16 @@
-module FPO.Components.Editor where
+module FPO.Components.Editor
+  ( Action(..)
+  , Output(..)
+  , Query(..)
+  , State
+  , TOCEntry
+  , _pdfSlideBar
+  , addAnnotation
+  , addChangeListener
+  , editor
+  , findAllIndicesOf
+  , surroundSelection
+  ) where
 
 import Prelude
 
@@ -12,7 +24,7 @@ import Ace.Selection as Selection
 import Ace.Types as Types
 import Data.Array (intercalate, (..), (:))
 import Data.Array as Array
-import Data.Foldable (for_, traverse_)
+import Data.Foldable (for_, surround, traverse_)
 import Data.Maybe (Maybe(..))
 import Data.String as String
 import Data.Traversable (traverse)
@@ -29,7 +41,7 @@ import Web.DOM.Element (toEventTarget)
 import Web.Event.Event (Event, EventType(..))
 import Web.Event.EventTarget (addEventListener, eventListener)
 import Web.HTML.HTMLElement (toElement)
-import Web.UIEvent.KeyboardEvent (KeyboardEvent, fromEvent, key)
+import Web.UIEvent.KeyboardEvent (KeyboardEvent, ctrlKey, fromEvent, key)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
 type TOCEntry =
@@ -125,12 +137,11 @@ editor = H.mkComponent
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
     Init -> do
-      eventListen <- H.liftEffect $ eventListener keyBinding
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
         H.modify_ _ { editor = Just editor_ }
-
         H.liftEffect $ do
+          eventListen <- eventListener (keyBinding editor_)
           container <- Editor.getContainer editor_
           addEventListener keydown eventListen true
             (toEventTarget $ toElement container)
@@ -327,15 +338,33 @@ surroundSelection left right ed = do
   -- Set the selection to this new range
   Selection.setSelectionRange newRange selection
 
-keyBinding :: Event -> Effect Unit
-keyBinding event = do
+keyBinding :: Types.Editor -> Event -> Effect Unit
+keyBinding editor_ event = do
   let keyboardEvent = fromEvent event :: Maybe KeyboardEvent
   case keyboardEvent of
     Nothing -> pure unit
     Just keyEvent -> do
       let pressedKey = key keyEvent
+      let ctrlKeyPressed = ctrlKey keyEvent
+      if ctrlKeyPressed then
+        case pressedKey of
+          "b" -> makeBold editor_
+          "i" -> makeItalic editor_
+          "u" -> underscore editor_
+          _ -> pure unit
+      else
+        pure unit
       case pressedKey of
         "Enter" -> log "Enter" -- Placeholder for Enter key action
         "Escape" -> log "Escape" -- Placeholder for Escape key action
         _ -> pure unit
   pure unit
+
+makeBold :: Types.Editor -> Effect Unit
+makeBold editor_ = surroundSelection "<*" ">" editor_
+
+makeItalic :: Types.Editor -> Effect Unit
+makeItalic editor_ = surroundSelection "</" ">" editor_
+
+underscore :: Types.Editor -> Effect Unit
+underscore editor_ = surroundSelection "<_" ">" editor_
