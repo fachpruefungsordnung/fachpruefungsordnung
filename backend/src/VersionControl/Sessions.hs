@@ -5,11 +5,14 @@ module VersionControl.Sessions
     , createDocument
     , getDocument
     , createDocumentCommit
+    , getCommitGraph
     )
 where
 
+import Data.Maybe (fromMaybe)
 import Data.Text
-import Data.Vector (toList)
+import Data.Vector (Vector, toList)
+import qualified Data.Vector as Vector
 import Hasql.Session (Session, statement)
 import Hasql.Transaction.Sessions
     ( IsolationLevel (..)
@@ -18,12 +21,30 @@ import Hasql.Transaction.Sessions
     )
 import UserManagement.Group (GroupID)
 import VersionControl.Commit
-import VersionControl.Document (Document, DocumentID)
+import VersionControl.Document (Document (..), DocumentID)
 import VersionControl.Error (DocumentError)
 import VersionControl.Hash
 import qualified VersionControl.Statements as Statements
 import qualified VersionControl.Transactions as Transactions
 import VersionControl.Tree
+
+-- | session to obtain the whole commit graph (all commits) of a document
+getCommitGraph :: DocumentID -> Session (Vector ExistingCommit)
+getCommitGraph docID = do
+    document <- getDocument docID
+    commits <-
+        mapM
+            (`statement` Statements.getCommitsByRoot)
+            (documentHead document)
+
+    Vector.mapM withParents $ fromMaybe Vector.empty commits
+  where
+    withParents
+        :: (CommitID, [CommitID] -> ExistingCommit)
+        -> Session ExistingCommit
+    withParents (commit, commitCons) = do
+        commitParentIDs <- statement commit Statements.getCommitParentIDs
+        return $ commitCons $ toList commitParentIDs
 
 -- | session to get a commit from the database by its 'CommitID'
 getCommit :: CommitID -> Session ExistingCommit

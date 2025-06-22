@@ -5,11 +5,13 @@ module VersionControl
     , getDocument
     , createDocument
     , createDocumentCommit
+    , getCommitGraph
     ) where
 
 import Control.Arrow (left)
 import Data.Functor ((<&>))
 import Data.Text (Text)
+import Data.Vector (Vector)
 import Hasql.Connection (Connection)
 import Hasql.Session (Session, SessionError)
 import qualified Hasql.Session as Session
@@ -26,6 +28,22 @@ import qualified VersionControl.Sessions as Sessions
 newtype Context = Context
     { unConnection :: Connection
     }
+
+-- | obtains all commits belonging to the specified document from the database.
+--   the result is a vector of commits. since commits contain all information
+--   about their relation to other commits, this list alone defines the commit graph.
+--
+--   TODO: currently, this fetches the WHOLE commit graph, meaning ALL commits of
+--   a document together with ALL relations between commits.
+--   For documents with a large history, this might become expensive.
+--   Possible solutions:
+--      - take timestamp and omit all commits older than this timestamp
+--      - limit number of commits returned. this could be done with ORDER BY and LIMIT.
+getCommitGraph
+    :: DocumentID
+    -> Context
+    -> IO (Either VersionControlError (Vector ExistingCommit))
+getCommitGraph = runSession . Sessions.getCommitGraph
 
 -- | get a document by id
 getDocument :: DocumentID -> Context -> IO (Either VersionControlError Document)

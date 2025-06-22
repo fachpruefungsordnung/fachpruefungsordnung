@@ -16,6 +16,7 @@ module VersionControl.Statements
     , createDocument
     , getDocument
     , setDocumentHead
+    , getCommitsByRoot
     )
 where
 
@@ -214,16 +215,50 @@ getCommit =
             (\(CommitID i) -> i)
             [singletonStatement|
                 select
-                id :: int4,
-                creation_ts :: timestamp,
-                author :: uuid,
-                message :: text?,
-                root :: bytea,
-                base :: int4?
+                    id :: int4,
+                    creation_ts :: timestamp,
+                    author :: uuid,
+                    message :: text?,
+                    root :: bytea,
+                    base :: int4?
                 from
-                commits
+                    commits
                 where
-                id = $1 :: int4
+                    id = $1 :: int4
+            |]
+
+getCommitsByRoot
+    :: Statement CommitID (Vector (CommitID, [CommitID] -> ExistingCommit))
+getCommitsByRoot =
+    rmap
+        ( fmap
+            ( \(ref, ts, author, message, root, base) ->
+                ( CommitID ref
+                , \parents ->
+                    ExistingCommit
+                        (CommitHeader (CommitID ref) ts)
+                        ( CommitBody
+                            (CommitInfo author message parents)
+                            (Ref (Hash root))
+                            (CommitID <$> base)
+                        )
+                )
+            )
+        )
+        $ lmap
+            unCommitID
+            [vectorStatement|
+                select
+                    id :: int4,
+                    creation_ts :: timestamp,
+                    author :: uuid,
+                    message :: text?,
+                    root :: bytea,
+                    base :: int4?
+                from
+                    commits
+                where
+                    id = $1 :: int4 or root_commit = $1 :: int4
             |]
 
 -- | get commit node by commit id.
