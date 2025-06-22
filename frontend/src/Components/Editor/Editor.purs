@@ -3,26 +3,20 @@ module FPO.Components.Editor
   , Output(..)
   , Query(..)
   , State
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
   , TOCEntry
   , _pdfSlideBar
-=======
->>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
   , addAnnotation
   , addChangeListener
   , editor
   , findAllIndicesOf
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
   , removeMarkerByPosition
-=======
   , removeMarkerByID
   , removeMarkerByIDs
   , removeMarkerByPosition
   , removeMarkerByRange
   , removeMarkerByRowCol
   , surroundSelection
->>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
-  )
+  ) where
 
 import Prelude
 
@@ -32,62 +26,40 @@ import Ace.EditSession as Session
 import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
-import Ace.Selection as Selection
 import Ace.Types as Types
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
-import Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
-import Data.Array (intercalate, (..), (:))
-import Data.Array (filter, filterA, intercalate, sortBy, (..), (:))
-=======
 import Data.Array (filter, filterA, intercalate, (..), (:))
->>>>>>> 0a5eade (moved AnnotatedMarker and TOCEntry to Types.purs):frontend/src/Components/Editor.purs
 import Data.Array as Array
 import Data.Foldable (elem, for_, surround, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
+import Data.Array (intercalate, (..), (:))
+import Data.Array as Array
+import Data.Foldable (for_, traverse_)
+import Data.Maybe (Maybe(..))
 import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
-import FPO.Data.Store as Store
-import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
-import FPO.Translations.Util (FPOState, selectTranslator)
-=======
-import FPO.Types (AnnotatedMarker, TOCEntry, sortMarkers)
->>>>>>> 0a5eade (moved AnnotatedMarker and TOCEntry to Types.purs):frontend/src/Components/Editor.purs
-=======
 import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
->>>>>>> e76fbdb (removed endRow and endCol from AnnotedMarker):frontend/src/Components/Editor.purs
-=======
 import Effect.Class.Console (log)
->>>>>>> 684a8b0 (Some key presses will be logged in the console):frontend/src/Components/Editor.purs
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, ref, style, title) as HP
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
 import Web.DOM.Element (toEventTarget)
 import Web.Event.EventTarget (addEventListener, eventListener)
 import Web.HTML.HTMLElement (toElement)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
-=======
 import Halogen.Themes.Bootstrap5 as HB
->>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
-=======
 import Type.Proxy (Proxy(Proxy))
 import Web.DOM.Element (toEventTarget)
-import Web.Event.Event (Event, EventType(..))
 import Web.Event.EventTarget (addEventListener, eventListener)
 import Web.HTML.HTMLElement (toElement)
-import Web.UIEvent.KeyboardEvent (KeyboardEvent, ctrlKey, fromEvent, key)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
 type TOCEntry =
@@ -95,9 +67,7 @@ type TOCEntry =
   , name :: String
   , content :: Maybe (Array String)
   }
->>>>>>> 684a8b0 (Some key presses will be logged in the console):frontend/src/Components/Editor.purs
 
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
 type AnnotatedMarker =
   { id :: Int
   , type :: String
@@ -120,10 +90,6 @@ type TOCEntry =
 
 type State = FPOState
   ( editor :: Maybe Types.Editor
-=======
-type State =
-  { editor :: Maybe Types.Editor
->>>>>>> 0a5eade (moved AnnotatedMarker and TOCEntry to Types.purs):frontend/src/Components/Editor.purs
   , tocEntry :: Maybe TOCEntry
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
@@ -141,10 +107,7 @@ data Action
   | Bold
   | Italic
   | Underline
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
   | Receive (Connected FPOTranslator Unit)
-=======
->>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
 
 -- We use a query to get the content of the editor
 data Query a
@@ -189,38 +152,25 @@ editor = connect selectTranslator $ H.mkComponent
           [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
           [ HH.button
               [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
               , HP.title (translate (label :: _ "editor_textBold") state.translator)
-=======
-              , HP.title "Text fett formatieren"
->>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
               , HE.onClick \_ -> Bold
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-bold" ] ] [] ]
           , HH.button
               [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
               , HP.title (translate (label :: _ "editor_textItalic") state.translator)
-=======
-              , HP.title "Text kursiv formatieren"
->>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
               , HE.onClick \_ -> Italic
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-italic" ] ] [] ]
           , HH.button
               [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
               , HP.title
                   (translate (label :: _ "editor_textUnderline") state.translator)
               , HE.onClick \_ -> Underline
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-underline" ] ] [] ]
-=======
-              , HP.title "Text unterstreichen"
-              , HE.onClick \_ -> Underline
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-italic" ] ] [] ]
->>>>>>> be62f84 (New buttons for bold, italic, underline):frontend/src/Components/Editor.purs
           , HH.button
               [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
               , HE.onClick \_ -> Comment
@@ -252,14 +202,7 @@ editor = connect selectTranslator $ H.mkComponent
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
         H.modify_ _ { editor = Just editor_ }
         H.liftEffect $ do
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
           eventListen <- eventListener (keyBinding editor_)
-=======
->>>>>>> 684a8b0 (Some key presses will be logged in the console):frontend/src/Components/Editor.purs
-=======
-          eventListen <- eventListener (keyBinding editor_)
->>>>>>> 46c9c1c (bold, italic and underscore as keybindings):frontend/src/Components/Editor.purs
           container <- Editor.getContainer editor_
           addEventListener keydown eventListen true
             (toEventTarget $ toElement container)
@@ -307,7 +250,6 @@ editor = connect selectTranslator $ H.mkComponent
             )
             document
 
-<<<<<<< HEAD:frontend/src/Components/Editor/Editor.purs
     Bold -> do
       H.gets _.editor >>= traverse_ \ed ->
         H.liftEffect $ do
@@ -325,8 +267,6 @@ editor = connect selectTranslator $ H.mkComponent
         H.liftEffect $ do
           underscore ed
           Editor.focus ed
-=======
->>>>>>> 09e577d (Remove "Delete" and "Paragraph from Actions):frontend/src/Components/Editor.purs
 
     Comment -> do
       H.gets _.editor >>= traverse_ \ed -> do
@@ -380,19 +320,19 @@ editor = connect selectTranslator $ H.mkComponent
     Bold -> do
       H.gets _.editor >>= traverse_ \ed ->
         H.liftEffect $ do
-          surroundSelection "<*" ">" ed
+          makeBold ed
           Editor.focus ed
 
     Italic -> do
       H.gets _.editor >>= traverse_ \ed ->
         H.liftEffect $ do
-          surroundSelection "</" ">" ed
+          makeItalic ed
           Editor.focus ed
 
     Underline -> do
       H.gets _.editor >>= traverse_ \ed ->
         H.liftEffect $ do
-          surroundSelection "<_" ">" ed
+          underscore ed
           Editor.focus ed
 
     ShowWarning -> do
@@ -547,71 +487,8 @@ addAnnotation annotation session = do
   anns <- Session.getAnnotations session
   Session.setAnnotations (annotation : anns) session
 
--- | Surrounds the selected text with the given left and right strings
--- | and positions the cursor after the inserted left text.
-surroundSelection :: String -> String -> Types.Editor -> Effect Unit
-surroundSelection left right ed = do
-  session <- Editor.getSession ed
-  selection <- Editor.getSelection ed
-  range <- Selection.getRange selection
-  selectedText <- Session.getTextRange range session
-
-  -- Get the start position
-  startPos <- Range.getStart range
-
-  -- Insert the surrounded text
-  let newText = left <> selectedText <> right
-  Session.replace range newText session
-
-  -- Calculate new cursor position (after the left part)
-  let newColumn = (Types.getColumn startPos) + (String.length left)
-
-  -- Move cursor to new position
-  Editor.moveCursorTo (Types.getRow startPos) (Just newColumn) Nothing ed
-  -- Create a new range that encompasses the entire surrounded text
-  newRange <- Range.create
-    (Types.getRow startPos)
-    ((Types.getColumn startPos) + (String.length left))
-    (Types.getRow startPos)
-    ((Types.getColumn startPos) + (String.length newText) - (String.length right))
-
-  -- Set the selection to this new range
-  Selection.setSelectionRange newRange selection
-
-keyBinding :: Types.Editor -> Event -> Effect Unit
-keyBinding editor_ event = do
-  let keyboardEvent = fromEvent event :: Maybe KeyboardEvent
-  case keyboardEvent of
-    Nothing -> pure unit
-    Just keyEvent -> do
-      let pressedKey = key keyEvent
-      let ctrlKeyPressed = ctrlKey keyEvent
-      if ctrlKeyPressed then
-        case pressedKey of
-          "b" -> makeBold editor_
-          "i" -> makeItalic editor_
-          "u" -> underscore editor_
-          _ -> pure unit
-      else
-        pure unit
-      case pressedKey of
-        "Enter" -> log "Enter" -- Placeholder for Enter key action
-        "Escape" -> log "Escape" -- Placeholder for Escape key action
-        _ -> pure unit
-  pure unit
-
-makeBold :: Types.Editor -> Effect Unit
-makeBold editor_ = surroundSelection "<*" ">" editor_
-
-makeItalic :: Types.Editor -> Effect Unit
-makeItalic editor_ = surroundSelection "</" ">" editor_
-
-underscore :: Types.Editor -> Effect Unit
-underscore editor_ = surroundSelection "<_" ">" editor_
-
 -- Multiple marker removal functions
 -- These functions remove markers by IDs, range, position, or row/column.
-
 removeMarkerByIDs
   :: Array Int
   -> Array AnnotatedMarker
