@@ -1,5 +1,7 @@
 module VersionControl.Transactions
     ( createCommit
+    , createDocumentCommit
+    , setDocumentHead
     )
 where
 
@@ -7,22 +9,22 @@ import Data.Maybe (fromMaybe)
 import Hasql.Transaction (Transaction, statement)
 import VersionControl.Commit
 import VersionControl.Document (Document (..), DocumentID, withNewDocumentHead)
+import VersionControl.Error (DocumentError (..))
 import VersionControl.Hash
-import VersionControl.Merge (MergeResult)
 import qualified VersionControl.Statements as Statements
 import VersionControl.Tree
 
+-- | transaction to create a new document
 createDocumentCommit
-    :: DocumentID -> CreateCommit -> Transaction (Either HeadUpdateError Document)
+    :: DocumentID -> CreateCommit -> Transaction (Either DocumentError Document)
 createDocumentCommit documentId commamit = do
     commit <- createCommit commamit
     let commitId = commitHeaderID $ existingCommitHeader commit
     setDocumentHead documentId commitId
 
-data HeadUpdateError = HierWerdenNurKinderMitGleichenElternVerheiratetError
-
+-- | transaction to update the head commit of a document
 setDocumentHead
-    :: DocumentID -> CommitID -> Transaction (Either HeadUpdateError Document)
+    :: DocumentID -> CommitID -> Transaction (Either DocumentError Document)
 setDocumentHead documentId commitId = do
     document <- statement documentId Statements.getDocument
     oldHead <-
@@ -37,7 +39,7 @@ setDocumentHead documentId commitId = do
                             <*> commitNodeRootCommit newHead
             if equalRoots
                 then updateHead document
-                else return $ Left HierWerdenNurKinderMitGleichenElternVerheiratetError
+                else return $ Left DocumentNewHeadCommitUnrelated
         Nothing -> updateHead document
   where
     updateHead doc = do

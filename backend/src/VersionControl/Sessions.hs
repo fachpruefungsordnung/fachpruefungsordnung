@@ -4,6 +4,7 @@ module VersionControl.Sessions
     , getVersion
     , createDocument
     , getDocument
+    , createDocumentCommit
     )
 where
 
@@ -18,6 +19,7 @@ import Hasql.Transaction.Sessions
 import UserManagement.Group (GroupID)
 import VersionControl.Commit
 import VersionControl.Document (Document, DocumentID)
+import VersionControl.Error (DocumentError)
 import VersionControl.Hash
 import qualified VersionControl.Statements as Statements
 import qualified VersionControl.Transactions as Transactions
@@ -46,6 +48,15 @@ createCommit commit =
 -- | session to create a new document
 createDocument :: Text -> GroupID -> Session DocumentID
 createDocument = curry $ flip statement Statements.createDocument
+
+-- | session to create a new commit in a document
+createDocumentCommit
+    :: DocumentID -> CreateCommit -> Session (Either DocumentError Document)
+createDocumentCommit document commit =
+    transaction
+        Serializable
+        Write
+        $ Transactions.createDocumentCommit document commit
 
 -- | session to get an existing document
 getDocument :: DocumentID -> Session Document
