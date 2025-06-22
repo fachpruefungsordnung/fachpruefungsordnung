@@ -35,7 +35,6 @@ keyBinding editor_ event = do
         case pressedKey of
           "b" -> makeBold editor_
           "i" -> makeItalic editor_
-          "u" -> underscore editor_
           _ -> pure unit
       else
         pure unit
