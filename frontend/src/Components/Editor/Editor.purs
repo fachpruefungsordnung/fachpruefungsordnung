@@ -29,11 +29,17 @@ import Data.String as String
 import Data.Traversable (traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
+import FPO.Data.Store as Store
+import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, ref, style, title) as HP
+import Halogen.Store.Connect (Connected, connect)
+import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
+import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
 import Web.DOM.Element (toEventTarget)
 import Web.Event.EventTarget (addEventListener, eventListener)
@@ -46,12 +52,12 @@ type TOCEntry =
   , content :: Maybe (Array String)
   }
 
-type State =
-  { editor :: Maybe Types.Editor
+type State = FPOState
+  ( editor :: Maybe Types.Editor
   , tocEntry :: Maybe TOCEntry
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
-  }
+  )
 
 _pdfSlideBar = Proxy :: Proxy "pdfSlideBar"
 
@@ -65,6 +71,7 @@ data Action
   | Bold
   | Italic
   | Underline
+  | Receive (Connected FPOTranslator Unit)
 
 -- We use a query to get the content of the editor
 data Query a
@@ -75,48 +82,52 @@ data Query a
   | ChangeSection TOCEntry a
 
 editor
-  :: forall input m
+  :: forall m
    . MonadEffect m
-  => H.Component Query input Output m
-editor = H.mkComponent
-  { initialState: const initialState
+  => MonadStore Store.Action Store.Store m
+  => H.Component Query Unit Output m
+editor = connect selectTranslator $ H.mkComponent
+  { initialState
   , render
   , eval: H.mkEval H.defaultEval
       { initialize = Just Init
       , handleAction = handleAction
       , handleQuery = handleQuery
+      , receive = Just <<< Receive
       }
   }
   where
-  initialState :: State
-  initialState =
-    { editor: Nothing
+  initialState :: Connected FPOTranslator Unit -> State
+  initialState { context } =
+    { translator: fromFpoTranslator context
+    , editor: Nothing
     , tocEntry: Nothing
     , pdfWarningAvailable: false
     , pdfWarningIsShown: false
     }
 
-  render :: State -> forall slots. H.ComponentHTML Action slots m
-  render _ =
+  render :: State -> H.ComponentHTML Action () m
+  render state =
     HH.div
       [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
       [ HH.div
           [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
           [ HH.button
               [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title "Text fett formatieren"
+              , HP.title (translate (label :: _ "editor_textBold") state.translator)
               , HE.onClick \_ -> Bold
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-bold" ] ] [] ]
           , HH.button
               [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title "Text kursiv formatieren"
+              , HP.title (translate (label :: _ "editor_textItalic") state.translator)
               , HE.onClick \_ -> Italic
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-italic" ] ] [] ]
           , HH.button
               [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title "Text unterstreichen"
+              , HP.title
+                  (translate (label :: _ "editor_textUnderline") state.translator)
               , HE.onClick \_ -> Underline
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-underline" ] ] [] ]
@@ -186,6 +197,8 @@ editor = H.mkComponent
 
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
+
+    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
 
   handleQuery
     :: forall slots a

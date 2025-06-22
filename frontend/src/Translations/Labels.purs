@@ -10,6 +10,7 @@ import FPO.Translations.ResetPassword (dePasswordReset, enPasswordReset)
 import Record (merge)
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord, toRecord)
+import Translations.Components.Editor (deEditor, enEditor)
 import Translations.Page.Page404 (dePage404, enPage404)
 
 -- | Übersetzungen zusammenführen
@@ -17,7 +18,9 @@ en :: Translation Labels
 en = fromRecord $
   merge (toRecord enAdminPanel)
     ( merge
-        (merge (toRecord enCommon) (toRecord enHome))
+        ( merge (toRecord enCommon)
+            (merge (toRecord enEditor) (toRecord enHome))
+        )
         ( merge
             (merge (toRecord enLogin) (toRecord enPage404))
             (merge (toRecord enPasswordReset) (toRecord enProfile))
@@ -28,7 +31,9 @@ de :: Translation Labels
 de = fromRecord $
   merge (toRecord deAdminPanel)
     ( merge
-        (merge (toRecord deCommon) (toRecord deHome))
+        ( merge (toRecord deCommon)
+            (merge (toRecord deEditor) (toRecord deHome))
+        )
         ( merge
             (merge (toRecord deLogin) (toRecord dePage404))
             (merge (toRecord dePasswordReset) (toRecord deProfile))
@@ -50,6 +55,11 @@ type Labels =
       ::: "common_home"
       ::: "common_password"
       ::: "common_submit"
+
+      -- | Editor Page
+      ::: "editor_textBold"
+      ::: "editor_textItalic"
+      ::: "editor_textUnderline"
 
       -- | Home Page
       ::: "home_pleaseLogInA"

@@ -14,10 +14,12 @@ import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
+import FPO.Data.Store as Store
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
 import Web.HTML as Web.HTML
@@ -105,7 +107,11 @@ type Slots =
 _editor = Proxy :: Proxy "editor"
 _preview = Proxy :: Proxy "preview"
 
-splitview :: forall query m. MonadAff m => H.Component query Input Output m
+splitview
+  :: forall query m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => H.Component query Input Output m
 splitview = H.mkComponent
   { initialState: \_ ->
       { dragTarget: Nothing
