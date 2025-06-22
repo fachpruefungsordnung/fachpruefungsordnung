@@ -20,8 +20,9 @@ import Hasql.Transaction.Sessions
     , transaction
     )
 import UserManagement.Group (GroupID)
+import UserManagement.Group (GroupID)
 import VersionControl.Commit
-import VersionControl.Document (Document (..), DocumentID)
+import VersionControl.Document (Document, DocumentID)
 import VersionControl.Error (DocumentError)
 import VersionControl.Hash
 import qualified VersionControl.Statements as Statements
@@ -52,9 +53,13 @@ getCommit commitID = do
     commit <- statement commitID Statements.getCommit
     commitParentIDs <- statement commitID Statements.getCommitParentIDs
     replaceRoot $ commit $ toList commitParentIDs
+    commitParentIDs <- statement commitID Statements.getCommitParentIDs
+    replaceRoot $ commit $ toList commitParentIDs
   where
     replaceRoot (ExistingCommit header (CommitBody info (Ref ref) base)) = do
+    replaceRoot (ExistingCommit header (CommitBody info (Ref ref) base)) = do
         valueRoot <- getVersion ref
+        return $ ExistingCommit header $ CommitBody info (Value valueRoot) base
         return $ ExistingCommit header $ CommitBody info (Value valueRoot) base
     replaceRoot commit = return commit
 
@@ -67,7 +72,7 @@ createCommit commit =
         $ Transactions.createCommit commit
 
 -- | session to create a new document
-createDocument :: Text -> GroupID -> Session Document
+createDocument :: Text -> GroupID -> Session DocumentID
 createDocument = curry $ flip statement Statements.createDocument
 
 -- | session to create a new commit in a document
