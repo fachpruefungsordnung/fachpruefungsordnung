@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module VersionControl.Document
@@ -14,24 +13,27 @@ import qualified Data.HashMap.Strict.InsOrd as InsOrd
 import Data.OpenApi
     ( NamedSchema (..)
     , OpenApiType (..)
+    , ToParamSchema (..)
     , ToSchema (..)
     , declareSchemaRef
+    , exclusiveMinimum
+    , minimum_
     , properties
     , required
     , type_
     )
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
-import GHC.Generics (Generic)
 import GHC.Int (Int32)
 import UserManagement.Group (GroupID)
 import VersionControl.Commit (CommitID)
+import Web.HttpApiData (FromHttpApiData (..))
 
 -- | id type for documents
 newtype DocumentID = DocumentID
     { unDocumentID :: Int32
     }
-    deriving (Show, Generic, Eq, Ord)
+    deriving (Show, Eq, Ord)
 
 instance ToJSON DocumentID where
     toJSON = toJSON . unDocumentID
@@ -41,6 +43,16 @@ instance FromJSON DocumentID where
 
 instance ToSchema DocumentID where
     declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
+
+instance ToParamSchema DocumentID where
+    toParamSchema _ =
+        mempty
+            & type_ ?~ OpenApiInteger
+            & minimum_ ?~ 0
+            & exclusiveMinimum ?~ False
+
+instance FromHttpApiData DocumentID where
+    parseUrlPiece = (DocumentID <$>) . parseUrlPiece
 
 -- | represents a document
 data Document = Document

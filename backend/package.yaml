@@ -45,6 +45,7 @@ dependencies:
   - servant-auth-server
   - servant-openapi3
   - openapi3
+  - http-api-data
   - tagged
   - wai
   - wai-app-static
