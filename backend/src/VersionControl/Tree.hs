@@ -308,6 +308,7 @@ data DataEdge = DataEdge
     , dataEdgeChildTitle :: Text
     }
 
+-- | obtains a list of relational-style edges from a tree.
 dataEdges :: Tree (Hashed NodeWithRef) -> [DataEdge]
 dataEdges (Tree (Hashed parentHash _) children) =
     zipWith fromEdge [1, 2 ..] children
