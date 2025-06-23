@@ -19,6 +19,7 @@ import Servant.Auth.Server
 import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
 import Server.HandlerUtil
+import Server.Handlers.RenderHandlers (RenderAPI, renderServer)
 import qualified UserManagement.Document as Document
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
@@ -27,38 +28,35 @@ import VersionControl.Document (DocumentID)
 import Prelude hiding (readFile)
 
 type DocumentAPI =
-    Auth AuthMethod Auth.Token
-        :> "documents"
-        :> Capture "documentID" DocumentID
-        :> Get '[JSON] ExistingCommit
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" DocumentID
-            :> Delete '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" DocumentID
-            :> "external"
-            :> Get '[JSON] [(User.UserID, Document.DocPermission)]
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" DocumentID
-            :> "external"
-            :> Capture "userID" User.UserID
-            :> Get '[JSON] (Maybe Document.DocPermission)
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" DocumentID
-            :> "external"
-            :> Capture "userID" User.UserID
-            :> ReqBody '[JSON] Document.DocPermission
-            :> Put '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "documents"
-            :> Capture "documentID" DocumentID
-            :> "external"
-            :> Capture "userID" User.UserID
-            :> Delete '[JSON] NoContent
+    "documents"
+        :> ( Auth AuthMethod Auth.Token
+                :> Capture "documentID" DocumentID
+                :> Get '[JSON] ExistingCommit
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "documentID" DocumentID
+                    :> Delete '[JSON] NoContent
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "documentID" DocumentID
+                    :> "external"
+                    :> Get '[JSON] [(User.UserID, Document.DocPermission)]
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "documentID" DocumentID
+                    :> "external"
+                    :> Capture "userID" User.UserID
+                    :> Get '[JSON] (Maybe Document.DocPermission)
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "documentID" DocumentID
+                    :> "external"
+                    :> Capture "userID" User.UserID
+                    :> ReqBody '[JSON] Document.DocPermission
+                    :> Put '[JSON] NoContent
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "documentID" DocumentID
+                    :> "external"
+                    :> Capture "userID" User.UserID
+                    :> Delete '[JSON] NoContent
+                :<|> RenderAPI
+           )
 
 documentServer :: Server DocumentAPI
 documentServer =
@@ -68,6 +66,7 @@ documentServer =
         :<|> getExternalUserDocumentHandler
         :<|> putExternalUserDocumentHandler
         :<|> deleteExternalUserDocumentHandler
+        :<|> renderServer
 
 getDocumentHandler
     :: AuthResult Auth.Token -> DocumentID -> Handler ExistingCommit

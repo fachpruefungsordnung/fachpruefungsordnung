@@ -27,23 +27,21 @@ import VersionControl.Commit (ExistingCommit)
 import Prelude hiding (readFile)
 
 type GroupAPI =
-    Auth AuthMethod Auth.Token
-        :> "groups"
-        :> ReqBody '[JSON] Group.Group
-        :> Post '[JSON] Group.GroupID
-        :<|> Auth AuthMethod Auth.Token
-            :> "groups"
-            :> Capture "groupID" Group.GroupID
-            :> Get '[JSON] [User.UserInfo]
-        :<|> Auth AuthMethod Auth.Token
-            :> "groups"
-            :> Capture "groupID" Group.GroupID
-            :> Delete '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "groups"
-            :> Capture "groupID" Group.GroupID
-            :> "documents"
-            :> Get '[JSON] [ExistingCommit]
+    "groups"
+        :> ( Auth AuthMethod Auth.Token
+                :> ReqBody '[JSON] Group.Group
+                :> Post '[JSON] Group.GroupID
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "groupID" Group.GroupID
+                    :> Get '[JSON] [User.UserInfo]
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "groupID" Group.GroupID
+                    :> Delete '[JSON] NoContent
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "groupID" Group.GroupID
+                    :> "documents"
+                    :> Get '[JSON] [ExistingCommit]
+           )
 
 groupServer :: Server GroupAPI
 groupServer =

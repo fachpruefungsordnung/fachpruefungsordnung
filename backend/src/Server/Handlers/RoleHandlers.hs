@@ -25,32 +25,29 @@ import qualified UserManagement.User as User
 import Prelude hiding (readFile)
 
 type RoleAPI =
-    Auth AuthMethod Auth.Token
-        :> "roles"
-        :> Capture "groupID" Group.GroupID
-        :> Capture "userId" User.UserID
-        :> Get '[JSON] User.Role
-        :<|> Auth AuthMethod Auth.Token
-            :> "roles"
-            :> Capture "groupID" Group.GroupID
-            :> Capture "userId" User.UserID
-            :> ReqBody '[JSON] User.Role
-            :> Put '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "roles"
-            :> Capture "groupID" Group.GroupID
-            :> Capture "userId" User.UserID
-            :> Delete '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "roles"
-            :> "superadmin"
-            :> Capture "userId" User.UserID
-            :> Put '[JSON] NoContent
-        :<|> Auth AuthMethod Auth.Token
-            :> "roles"
-            :> "superadmin"
-            :> Capture "userId" User.UserID
-            :> Delete '[JSON] NoContent
+    "roles"
+        :> ( Auth AuthMethod Auth.Token
+                :> Capture "groupID" Group.GroupID
+                :> Capture "userId" User.UserID
+                :> Get '[JSON] User.Role
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "groupID" Group.GroupID
+                    :> Capture "userId" User.UserID
+                    :> ReqBody '[JSON] User.Role
+                    :> Put '[JSON] NoContent
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "groupID" Group.GroupID
+                    :> Capture "userId" User.UserID
+                    :> Delete '[JSON] NoContent
+                :<|> Auth AuthMethod Auth.Token
+                    :> "superadmin"
+                    :> Capture "userId" User.UserID
+                    :> Put '[JSON] NoContent
+                :<|> Auth AuthMethod Auth.Token
+                    :> "superadmin"
+                    :> Capture "userId" User.UserID
+                    :> Delete '[JSON] NoContent
+           )
 
 roleServer :: Server RoleAPI
 roleServer =

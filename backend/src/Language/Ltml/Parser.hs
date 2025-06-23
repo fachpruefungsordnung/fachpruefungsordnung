@@ -34,7 +34,7 @@ type Parser = Parsec Void Text
 
 type MonadParser m = (MonadParsec Void Text m, MonadFail m)
 
-class ParserWrapper m where
+class (MonadParser m) => ParserWrapper m where
     wrapParser :: Parser a -> m a
 
 instance ParserWrapper Parser where

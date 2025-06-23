@@ -49,6 +49,7 @@ COPY index.html index.html
 COPY --from=build /build/index.js index.js
 
 # TODO: resources folder
+COPY static static
 COPY favicon.png favicon.png
 
 COPY docker-entrypoint.sh docker-entrypoint.sh

@@ -23,8 +23,11 @@ import qualified Data.HashMap.Strict.InsOrd as InsOrd
 import Data.OpenApi
     ( NamedSchema (..)
     , OpenApiType (..)
+    , ToParamSchema (..)
     , ToSchema (..)
     , declareSchemaRef
+    , exclusiveMinimum
+    , minimum_
     , properties
     , required
     , type_
@@ -37,6 +40,7 @@ import GHC.Generics
 import GHC.Int
 import VersionControl.Hash
 import VersionControl.Tree
+import Web.HttpApiData (FromHttpApiData (..))
 
 -- | represents the id of a commit
 newtype CommitID = CommitID
@@ -52,6 +56,16 @@ instance FromJSON CommitID where
 
 instance ToSchema CommitID where
     declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
+
+instance ToParamSchema CommitID where
+    toParamSchema _ =
+        mempty
+            & type_ ?~ OpenApiInteger
+            & minimum_ ?~ 0
+            & exclusiveMinimum ?~ False
+
+instance FromHttpApiData CommitID where
+    parseUrlPiece = (CommitID <$>) . parseUrlPiece
 
 -- | represents a reference to a commit or the commit itself
 type CommitRef = Ref CommitID ExistingCommit

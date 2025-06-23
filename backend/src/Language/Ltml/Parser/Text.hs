@@ -1,7 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Language.Ltml.Parser.Text
@@ -12,10 +14,11 @@ where
 
 import Control.Applicative (empty, (<|>))
 import Control.Applicative.Combinators (choice)
-import Control.Monad (void)
 import Control.Monad.State (StateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import qualified Data.Char as Char (isControl)
+import Data.List (singleton)
+import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy (Proxy))
 import Data.Text (Text)
 import qualified Data.Text as Text (singleton)
@@ -41,16 +44,20 @@ import Language.Ltml.Parser
     )
 import Language.Ltml.Parser.Keyword (keywordP, mlKeywordP)
 import Language.Ltml.Parser.Label (labelP, labelingP)
-import Language.Ltml.Parser.MiTree (hangingBlock', hangingBlock_, miForest)
+import Language.Ltml.Parser.MiTree
+    ( MiElementConfig (..)
+    , hangingBlock'
+    , hangingBlock_
+    , miForest
+    )
 import Text.Megaparsec
-    ( eof
-    , notFollowedBy
+    ( notFollowedBy
     , satisfy
     , some
     , takeWhile1P
     , try
     )
-import Text.Megaparsec.Char (char)
+import Text.Megaparsec.Char (char, string)
 
 type ParagraphParser =
     StateT
@@ -61,7 +68,7 @@ instance ParserWrapper ParagraphParser where
     wrapParser = lift
 
 textForestP
-    :: ( MonadParser m
+    :: ( ParserWrapper m
        , StyleP style
        , EnumP enumType enumItem
        , SpecialP m special
@@ -74,27 +81,38 @@ elementPF
     :: forall m style enumItem special
      . (MonadParser m, StyleP style, SpecialP m special)
     => m [TextTree style enumItem special]
-    -> m (TextTree style enumItem special)
-elementPF p =
-    Special <$> specialP
-        <|> Word <$> wordP (Proxy :: Proxy special)
-        <|> Reference <$ char '{' <* char ':' <*> labelP <* char '}'
-        <|> Styled <$ char '<' <*> styleP <*> p <* char '>'
+    -> m (MiElementConfig, [TextTree style enumItem special])
+elementPF p = fmap (maybeToList . fmap Special) <$> specialP <|> regularP
+  where
+    regularP :: m (MiElementConfig, [TextTree style enumItem special])
+    regularP =
+        fmap ((regularCfg,) . singleton) $
+            Word <$> wordP (Proxy :: Proxy special)
+                <|> Reference <$ char '{' <* char ':' <*> labelP <* char '}'
+                <|> Styled <$ char '<' <*> styleP <*> p <* char '>'
+      where
+        regularCfg =
+            MiElementConfig
+                { miecPermitEnd = True
+                , miecPermitChild = True
+                , miecRetainTrailingWhitespace = True
+                }
 
 childPF
-    :: (ParserWrapper m, EnumP enumType enumItem)
+    :: forall m style enumType enumItem special
+     . (ParserWrapper m, EnumP enumType enumItem, SpecialP m special)
     => TextType enumType
     -> m (TextTree style enumItem special)
 childPF (TextType enumTypes footnoteTypes) =
-    wrapParser $
-        EnumChild <$> choice (fmap enumItemP enumTypes)
-            <|> Footnote <$> choice (fmap footnoteTextP footnoteTypes)
+    wrapParser (EnumChild <$> choice (fmap enumItemP enumTypes))
+        <* postEnumChildP (Proxy :: Proxy special)
+        <|> wrapParser (Footnote <$> choice (fmap footnoteTextP footnoteTypes))
 
 footnoteTextP :: FootnoteType -> Parser [FootnoteTextTree]
 footnoteTextP (FootnoteType kw tt) = hangingTextP kw tt
 
 hangingTextP
-    :: ( MonadParser m
+    :: ( ParserWrapper m
        , StyleP style
        , EnumP enumType enumItem
        , SpecialP m special
@@ -105,7 +123,7 @@ hangingTextP
 hangingTextP kw t = hangingBlock_ (keywordP kw) elementPF (childPF t)
 
 hangingTextP'
-    :: ( MonadParser m
+    :: ( ParserWrapper m
        , StyleP style
        , EnumP enumType enumItem
        , SpecialP m special
@@ -136,51 +154,78 @@ instance EnumP Void Void where
 instance EnumP EnumType EnumItem where
     enumItemP (EnumType kw tt) = EnumItem <$> hangingTextP kw tt
 
-class (ParserWrapper m) => SpecialP m special | special -> m where
-    specialP :: m special
+class SpecialP m special | special -> m where
+    specialP :: m (MiElementConfig, Maybe special)
     wordP :: Proxy special -> m Text
+    postEnumChildP :: Proxy special -> m ()
 
 instance SpecialP Parser Void where
     specialP = empty
 
     wordP _ = gWordP isWordChar isWordSpecialChar
 
+    postEnumChildP _ = pure ()
+
 instance SpecialP ParagraphParser SentenceStart where
-    specialP = do
-        isSentenceStartExpected <- get
-        if isSentenceStartExpected
-            then (labeledSSP <|> unlabeledSSP) <* put False
-            else empty
+    specialP =
+        fmap (specialCfg,) $
+            Nothing <$ continueP
+                <|> Just <$> sentenceStartP
       where
-        -- Labeled sentence start tokens (SSTs) may occur whenever the state
-        -- permits, while unlabeled SSPs are not permitted at the end of a
-        -- paragraph (followed by `\n` or EOF), or before styling tags
-        -- (`<`, `>`).
-        --  - For styling tags, parsing an unlabeled SST is delayed until
-        --    after them, while a labaled SST may occur either before or after
-        --    a styling tag.
-        --  - Labeled SSTs should also be disallowed at the end of a
-        --    paragraph, but that is non-trivial to catch during parsing, and
-        --    probably better done later (TODO).
-        --    - TODO: Also consider the case where that SST is the paragraph's
-        --      only token.
+        -- Sentence start tokens (SSTs) must be followed by a regular element;
+        -- that is, they must not occur at the end of their parent element
+        -- (particularly, a paragraph), or directly preceding a text child.
+        --  - This is enforced via `specialCfg`.
+        --  - Note that unlabeled (i.e., empty) SSTs
+        --    - are impossible before text children and at a paragraph's end
+        --      anyways (unless on their own (empty) line, see below), and
+        --    - could also be appropriately restricted by ensuring they are
+        --      not followed by `>`, `\n`, or EOF.
+        --
+        -- Further, unlabeled SSTs must not occur as only element of an input
+        -- line (for that input line would be empty).
+        --  - We prohibit this by checking for a succeeding newline character.
+        --  - The EOF case is already covered by
+        --    `specialCfg { miecPermitEnd = False }`.
+        --
+        -- Otherwise, labeled SSTs may occur whenever the state permits,
+        -- while unlabeled SSTs are not permitted before an opening styling
+        -- tag (`<X` for some `X`).
+        --  - Parsing an unlabeled SST is delayed until after the opening
+        --    styling tag, while a labeled SST may occur either before or
+        --    after an opening styling tag.
 
-        -- TODO: Avoid `try`.
-        labeledSSP :: ParagraphParser SentenceStart
-        labeledSSP = SentenceStart . Just <$> try labelingP
+        specialCfg =
+            MiElementConfig
+                { miecPermitEnd = False
+                , miecPermitChild = False
+                , miecRetainTrailingWhitespace = False
+                }
 
-        unlabeledSSP :: ParagraphParser SentenceStart
-        unlabeledSSP =
-            SentenceStart Nothing <$ notFollowedBy specialSuccP
+        sentenceStartP = do
+            isSentenceStartExpected <- get
+            if isSentenceStartExpected
+                then (labeledSSP <|> unlabeledSSP) <* put False
+                else empty
           where
-            specialSuccP :: ParagraphParser ()
-            specialSuccP = void (satisfy isSpecialSuccChar) <|> eof
-              where
-                isSpecialSuccChar :: Char -> Bool
-                isSpecialSuccChar '\n' = True
-                isSpecialSuccChar '<' = True
-                isSpecialSuccChar '>' = True
-                isSpecialSuccChar _ = False
+            -- TODO: Avoid `try`.
+            labeledSSP :: ParagraphParser SentenceStart
+            labeledSSP = SentenceStart . Just <$> try labelingP
+
+            unlabeledSSP :: ParagraphParser SentenceStart
+            unlabeledSSP =
+                SentenceStart Nothing <$ notFollowedBy (char '\n' <|> char '<')
+
+        -- The `{>}` token means to continue the current sentence.
+        --  - It is meant to be used after an enumeration, but can be used
+        --    anywhere where a sentence start is permitted.
+        --  - The same rules as for labeled SSTs apply w.r.t. placement.
+        continueP = do
+            isSentenceStartExpected <- get
+            _ <- string "{>}"
+            if isSentenceStartExpected
+                then put False
+                else fail "Unexpected sentence continuation token."
 
     wordP _ = sentenceWordP <|> sentenceEndP
       where
@@ -189,6 +234,9 @@ instance SpecialP ParagraphParser SentenceStart where
 
         sentenceEndP :: ParagraphParser Text
         sentenceEndP = Text.singleton <$> satisfy isSentenceEndChar <* put True
+
+    -- An enumeration child ends a sentence.
+    postEnumChildP _ = put True
 
 gWordP :: (MonadParser m) => (Char -> Bool) -> (Char -> Bool) -> m Text
 gWordP isValid isSpecial = mconcat <$> some (regularWordP <|> escapedCharP)
