@@ -26,6 +26,7 @@
             "halogen-subscriptions",
             "http-methods",
             "integers",
+            "lists",
             "maybe",
             "now",
             "prelude",
