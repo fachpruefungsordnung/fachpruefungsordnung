@@ -313,7 +313,8 @@ addExternalDocPermission
     :: Statement (User.UserID, Document.DocumentID, Text) ()
 addExternalDocPermission =
     lmap
-        (\(user, document, permission) -> (user, Document.unDocumentID document, permission))
+        ( \(user, document, permission) -> (user, Document.unDocumentID document, permission)
+        )
         [resultlessStatement|
             insert into external_document_rights (user_id, document_id, permission)
             values ($1 :: uuid, $2 :: int4, $3 :: text :: docpermission)
@@ -323,7 +324,8 @@ updateExternalDocPermission
     :: Statement (User.UserID, Document.DocumentID, Text) ()
 updateExternalDocPermission =
     lmap
-        (\(user, document, permission) -> (user, Document.unDocumentID document, permission))
+        ( \(user, document, permission) -> (user, Document.unDocumentID document, permission)
+        )
         [resultlessStatement|
             update external_document_rights
             set permission = $3 :: text :: docpermission
