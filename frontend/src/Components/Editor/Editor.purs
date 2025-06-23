@@ -3,8 +3,6 @@ module FPO.Components.Editor
   , Output(..)
   , Query(..)
   , State
-  , TOCEntry
-  , _pdfSlideBar
   , addAnnotation
   , addChangeListener
   , editor
@@ -15,7 +13,6 @@ module FPO.Components.Editor
   , removeMarkerByPosition
   , removeMarkerByRange
   , removeMarkerByRowCol
-  , surroundSelection
   ) where
 
 import Prelude
@@ -27,25 +24,30 @@ import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
 import Ace.Types as Types
-import Data.Array (filter, filterA, intercalate, (..), (:))
-import Data.Array as Array
-import Data.Foldable (elem, for_, surround, traverse_)
-import Data.Maybe (Maybe(..), fromMaybe)
 import Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
+import Data.Array (filter, filterA, intercalate, (..), (:))
 import Data.Array (intercalate, (..), (:))
 import Data.Array as Array
+import Data.Array as Array
+import Data.Foldable (elem, for_, surround, traverse_)
 import Data.Foldable (for_, traverse_)
 import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
-import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
 import Effect.Class.Console (log)
+import FPO.Data.Store as Store
+import FPO.Translations.Translator (FPOTranslator(..), fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, ref, style, title) as HP
+import Halogen.Store.Connect (Connected, connect)
+import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
@@ -53,12 +55,6 @@ import Web.DOM.Element (toEventTarget)
 import Web.Event.EventTarget (addEventListener, eventListener)
 import Web.HTML.HTMLElement (toElement)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
-
-type TOCEntry =
-  { id :: Int
-  , name :: String
-  , content :: Maybe (Array String)
-  }
 
 type State = FPOState
   ( editor :: Maybe Types.Editor
@@ -141,8 +137,6 @@ editor = connect selectTranslator $ H.mkComponent
               , HE.onClick \_ -> Underline
               ]
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-underline" ] ] [] ]
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-italic" ] ] [] ]
           , HH.button
               [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
               , HE.onClick \_ -> Comment
