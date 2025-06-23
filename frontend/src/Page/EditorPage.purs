@@ -9,9 +9,11 @@ import Prelude
 
 import Effect.Aff.Class (class MonadAff)
 import FPO.Component.Splitview as Splitview
+import FPO.Data.Store as Store
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
+import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(..))
 
@@ -28,6 +30,7 @@ _splitview = Proxy :: Proxy "splitview"
 component
   :: forall query input output m
    . MonadAff m
+  => MonadStore Store.Action Store.Store m
   => H.Component query input output m
 component =
   H.mkComponent

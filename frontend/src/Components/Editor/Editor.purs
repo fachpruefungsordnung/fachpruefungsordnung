@@ -1,16 +1,26 @@
-module FPO.Components.Editor where
+module FPO.Components.Editor
+  ( Action(..)
+  , Output(..)
+  , Query(..)
+  , State
+  , _pdfSlideBar
+  , addAnnotation
+  , addChangeListener
+  , editor
+  , findAllIndicesOf
+  ) where
 
 import Prelude
 
 import Ace (ace, editNode) as Ace
 import Ace.Document as Document
-import Ace.EditSession as EditSession
 import Ace.EditSession as Session
 import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
 import Ace.Types as Types
 import Data.Array (filter, filterA, head, intercalate, (..), (:))
+import Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
 import Data.Array as Array
 import Data.Foldable (elem, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -20,19 +30,30 @@ import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
 import FPO.Types (AnnotatedMarker, CommentSection, TOCEntry, markerToAnnotation, sortMarkers)
+import FPO.Data.Store as Store
+import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
-import Halogen.HTML.Properties (classes, ref, style) as HP
+import Halogen.HTML.Properties (classes, ref, style, title) as HP
+import Halogen.Store.Connect (Connected, connect)
+import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
+import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
+import Web.DOM.Element (toEventTarget)
+import Web.Event.EventTarget (addEventListener, eventListener)
+import Web.HTML.HTMLElement (toElement)
+import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
-type State =
-  { mEditor :: Maybe Types.Editor
+type State = FPOState
+  ( mEditor :: Maybe Types.Editor
   , mTocEntry :: Maybe TOCEntry
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
-  }
+  )
 
 _pdfSlideBar = Proxy :: Proxy "pdfSlideBar"
 
@@ -44,12 +65,14 @@ data Output
 
 data Action
   = Init
-  | Paragraph
-  | Delete
   | Comment
   | DeleteComment
   | ShowWarning
   | SelectComment
+  | Bold
+  | Italic
+  | Underline
+  | Receive (Connected FPOTranslator Unit)
 
 -- We use a query to get the content of the editor
 data Query a
@@ -62,49 +85,57 @@ data Query a
   | ChangeSection TOCEntry a
 
 editor
-  :: forall input m
+  :: forall m
    . MonadEffect m
-  => H.Component Query input Output m
-editor = H.mkComponent
-  { initialState: const initialState
+  => MonadStore Store.Action Store.Store m
+  => H.Component Query Unit Output m
+editor = connect selectTranslator $ H.mkComponent
+  { initialState
   , render
   , eval: H.mkEval H.defaultEval
       { initialize = Just Init
       , handleAction = handleAction
       , handleQuery = handleQuery
+      , receive = Just <<< Receive
       }
   }
   where
-  initialState :: State
-  initialState =
-    { mEditor: Nothing
+  initialState :: Connected FPOTranslator Unit -> State
+  initialState { context } =
+    { translator: fromFpoTranslator context
+    , mEditor: Nothing
     , mTocEntry: Nothing
     , pdfWarningAvailable: false
     , pdfWarningIsShown: false
     }
 
-  render :: State -> forall slots. H.ComponentHTML Action slots m
-  render _ =
+  render :: State -> H.ComponentHTML Action () m
+  render state =
     HH.div
       [ HE.onClick $ const SelectComment
       , HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
       [ HH.div -- Second toolbar
 
-          [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap2 ] ]
+        [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
           [ HH.button
-              [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
-              , HE.onClick \_ -> Paragraph
+              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+              , HP.title (translate (label :: _ "editor_textBold") state.translator)
+              , HE.onClick \_ -> Bold
               ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-paragraph" ] ] []
-              , HH.text " Paragraph"
-              ]
+              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-bold" ] ] [] ]
           , HH.button
-              [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
-              , HE.onClick \_ -> Delete
+              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+              , HP.title (translate (label :: _ "editor_textItalic") state.translator)
+              , HE.onClick \_ -> Italic
               ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ] ] []
-              , HH.text " Delete"
+              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-italic" ] ] [] ]
+          , HH.button
+              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+              , HP.title
+                  (translate (label :: _ "editor_textUnderline") state.translator)
+              , HE.onClick \_ -> Underline
               ]
+              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-underline" ] ] [] ]
           , HH.button
               [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
               , HE.onClick \_ -> Comment
@@ -119,8 +150,8 @@ editor = H.mkComponent
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ] ] []
               , HH.text "Delete Comment"
               ]
-          ]
-      , HH.div -- Editor container
+            ]
+        , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
           , HP.classes [ HB.flexGrow1 ]
@@ -137,12 +168,16 @@ editor = H.mkComponent
         H.modify_ _ { mEditor = Just editor_ }
 
         H.liftEffect $ do
+          eventListen <- eventListener (keyBinding editor_)
+          container <- Editor.getContainer editor_
+          addEventListener keydown eventListen true
+            (toEventTarget $ toElement container)
           session <- Editor.getSession editor_
           document <- Session.getDocument session
 
           -- Set the editor's theme and mode
           Editor.setTheme "ace/theme/github" editor_
-          EditSession.setMode "ace/mode/custom_mode" session
+          Session.setMode "ace/mode/custom_mode" session
           Editor.setEnableLiveAutocompletion true editor_
 
           -- Add a change listener to the editor
@@ -181,19 +216,23 @@ editor = H.mkComponent
             )
             document
 
-    Delete -> do
-      H.gets _.mEditor >>= traverse_ \ed -> do
+    Bold -> do
+      H.gets _.mEditor >>= traverse_ \ed ->
         H.liftEffect $ do
-          row <- Types.getRow <$> Editor.getCursorPosition ed
-          document <- Editor.getSession ed >>= Session.getDocument
-          Document.removeLines row row document
+          makeBold ed
+          Editor.focus ed
 
-    Paragraph -> do
-      H.gets _.mEditor >>= traverse_ \ed -> do
+    Italic -> do
+      H.gets _.mEditor >>= traverse_ \ed ->
         H.liftEffect $ do
-          row <- Types.getRow <$> Editor.getCursorPosition ed
-          document <- Editor.getSession ed >>= Session.getDocument
-          Document.insertLines row [ "Paragraph", "=========" ] document
+          makeItalic ed
+          Editor.focus ed
+
+    Underline -> do
+      H.gets _.mEditor >>= traverse_ \ed ->
+        H.liftEffect $ do
+          underscore ed
+          Editor.focus ed
 
     Comment -> do
       H.gets _.mEditor >>= traverse_ \ed -> do
@@ -270,6 +309,8 @@ editor = H.mkComponent
           Just marker -> case marker.mCommentSection of
             Nothing -> pure unit
             Just commentSection -> H.raise (SelectedCommentSection tocEntry.id marker.id commentSection)
+
+    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
 
   handleQuery
     :: forall slots a
