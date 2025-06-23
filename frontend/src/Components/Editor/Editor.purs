@@ -19,8 +19,8 @@ import Ace.Editor as Editor
 import Ace.Marker as Marker
 import Ace.Range as Range
 import Ace.Types as Types
-import Data.Array (filter, filterA, head, intercalate, (..), (:))
 import Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
+import Data.Array (filter, filterA, head, intercalate, (..), (:))
 import Data.Array as Array
 import Data.Foldable (elem, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -29,10 +29,16 @@ import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Class (class MonadEffect)
-import FPO.Types (AnnotatedMarker, CommentSection, TOCEntry, markerToAnnotation, sortMarkers)
 import FPO.Data.Store as Store
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.Types
+  ( AnnotatedMarker
+  , CommentSection
+  , TOCEntry
+  , markerToAnnotation
+  , sortMarkers
+  )
 import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
 import Halogen as H
 import Halogen.HTML as HH
@@ -113,10 +119,11 @@ editor = connect selectTranslator $ H.mkComponent
   render state =
     HH.div
       [ HE.onClick $ const SelectComment
-      , HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
+      , HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ]
+      ]
       [ HH.div -- Second toolbar
 
-        [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+          [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
           [ HH.button
               [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
               , HP.title (translate (label :: _ "editor_textBold") state.translator)
@@ -150,8 +157,8 @@ editor = connect selectTranslator $ H.mkComponent
               [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ] ] []
               , HH.text "Delete Comment"
               ]
-            ]
-        , HH.div -- Editor container
+          ]
+      , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
           , HP.classes [ HB.flexGrow1 ]
@@ -249,7 +256,7 @@ editor = connect selectTranslator $ H.mkComponent
           let
             newCommentSection =
               { markerID: newID
-              ,  comments: []
+              , comments: []
               , resolved: false
               }
             newMarker =
@@ -264,7 +271,7 @@ editor = connect selectTranslator $ H.mkComponent
           pure newMarker
         H.modify_ \st ->
           st
-            { mTocEntry = st.mTocEntry <#> \entry -> 
+            { mTocEntry = st.mTocEntry <#> \entry ->
                 entry { markers = sortMarkers (newMarker : entry.markers) }
             }
 
@@ -279,7 +286,10 @@ editor = connect selectTranslator $ H.mkComponent
             let markers = tocEntry.markers
 
             -- remove the marker at the cursor position and return the remaining markers
-            (Tuple newMarkers deletedIDs) <- H.liftEffect $ removeMarkerByPosition cursor markers session
+            (Tuple newMarkers deletedIDs) <- H.liftEffect $ removeMarkerByPosition
+              cursor
+              markers
+              session
             let newTOCEntry = tocEntry { markers = newMarkers }
             H.modify_ \st ->
               st { mTocEntry = Just newTOCEntry }
@@ -287,15 +297,15 @@ editor = connect selectTranslator $ H.mkComponent
 
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
-    
+
     SelectComment -> do
       H.gets _.mEditor >>= traverse_ \ed -> do
         cursor <- H.liftEffect $ Editor.getCursorPosition ed
         state <- H.get
         -- extract markers from the current TOC entry
-        let 
+        let
           tocEntry = case state.mTocEntry of
-            Nothing -> { id: -1 , name: "No entry" , content: "", markers: [] }
+            Nothing -> { id: -1, name: "No entry", content: "", markers: [] }
             Just e -> e
           markers = tocEntry.markers
           row = Types.getRow cursor
@@ -303,12 +313,15 @@ editor = connect selectTranslator $ H.mkComponent
 
         -- remove the marker at the cursor position and return the remaining markers
         targetRange <- H.liftEffect $ Range.create row col row col
-        matching <- H.liftEffect $ filterA (\m -> Range.containsRange targetRange m.range) markers
+        matching <- H.liftEffect $ filterA
+          (\m -> Range.containsRange targetRange m.range)
+          markers
         case head matching of
           Nothing -> pure unit
           Just marker -> case marker.mCommentSection of
             Nothing -> pure unit
-            Just commentSection -> H.raise (SelectedCommentSection tocEntry.id marker.id commentSection)
+            Just commentSection -> H.raise
+              (SelectedCommentSection tocEntry.id marker.id commentSection)
 
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
 
@@ -319,7 +332,7 @@ editor = connect selectTranslator $ H.mkComponent
   handleQuery = case _ of
 
     ChangeSection entry a -> do
-      let 
+      let
         comments = case head entry.markers of
           Nothing -> []
           Just marker -> case marker.mCommentSection of
@@ -469,7 +482,7 @@ removeMarkerByIDs
   :: Array Int
   -> Array AnnotatedMarker
   -> Types.EditSession
-  -> Effect (Tuple (Array AnnotatedMarker) (Array Int) )
+  -> Effect (Tuple (Array AnnotatedMarker) (Array Int))
 removeMarkerByIDs targetIDs markers session = do
   -- Remove all markers with the given IDs
   for_ targetIDs \targetID -> Session.removeMarker targetID session
@@ -481,20 +494,20 @@ removeMarkerByIDs targetIDs markers session = do
   let annotations = map markerToAnnotation remainingMarkers
   Session.setAnnotations annotations session
 
-  pure (Tuple remainingMarkers targetIDs) 
+  pure (Tuple remainingMarkers targetIDs)
 
 removeMarkerByID
   :: Int
   -> Array AnnotatedMarker
   -> Types.EditSession
-  -> Effect (Tuple (Array AnnotatedMarker) (Array Int) )
+  -> Effect (Tuple (Array AnnotatedMarker) (Array Int))
 removeMarkerByID targetID = removeMarkerByIDs [ targetID ]
 
 removeMarkerByRange
   :: Types.Range
   -> Array AnnotatedMarker
   -> Types.EditSession
-  -> Effect (Tuple (Array AnnotatedMarker) (Array Int) )
+  -> Effect (Tuple (Array AnnotatedMarker) (Array Int))
 removeMarkerByRange targetRange markers session = do
   matching <- filterA (\m -> Range.containsRange targetRange m.range) markers
   let ids = map _.id matching
@@ -504,7 +517,7 @@ removeMarkerByPosition
   :: Types.Position
   -> Array AnnotatedMarker
   -> Types.EditSession
-  -> Effect (Tuple (Array AnnotatedMarker) (Array Int) )
+  -> Effect (Tuple (Array AnnotatedMarker) (Array Int))
 removeMarkerByPosition targetPos marker session = do
   let
     row = Types.getRow targetPos
@@ -517,7 +530,7 @@ removeMarkerByRowCol
   -> Int
   -> Array AnnotatedMarker
   -> Types.EditSession
-  -> Effect (Tuple (Array AnnotatedMarker) (Array Int) )
+  -> Effect (Tuple (Array AnnotatedMarker) (Array Int))
 removeMarkerByRowCol row col marker session = do
   targetRange <- Range.create row col row col
   removeMarkerByRange targetRange marker session

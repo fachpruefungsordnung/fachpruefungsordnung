@@ -13,14 +13,21 @@ import Data.Array (head, intercalate, range)
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
-import Effect.Now (nowDateTime)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Now (nowDateTime)
 import FPO.Components.Comment as Comment
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
-import FPO.Types (AnnotatedMarker, Comment, CommentSection, TOCEntry, findTOCEntry, timeStampsVersions)
 import FPO.Data.Store as Store
+import FPO.Types
+  ( AnnotatedMarker
+  , Comment
+  , CommentSection
+  , TOCEntry
+  , findTOCEntry
+  , timeStampsVersions
+  )
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -31,7 +38,6 @@ import Type.Proxy (Proxy(Proxy))
 import Web.HTML as Web.HTML
 import Web.HTML.Window as Web.HTML.Window
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
-
 
 data DragTarget = ResizeLeft | ResizeRight
 
@@ -95,7 +101,7 @@ type State =
   , tocEntries :: Array TOCEntry
 
   -- How the timestamp has to be formatted
-  , mTimeFormatter:: Maybe Formatter
+  , mTimeFormatter :: Maybe Formatter
 
   -- Boolean flags for UI state
   , sidebarShown :: Boolean
@@ -256,17 +262,22 @@ splitview = H.mkComponent
       HH.div
         [ HP.classes [ HB.overflowAuto, HB.p1 ]
         , HP.style $
-            "flex: 0 0 " <> show (state.sidebarRatio * 100.0) <>
-              "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"<>
-              if state.sidebarShown && state.tocShown then "" else "display: none;"
+            "flex: 0 0 " <> show (state.sidebarRatio * 100.0)
+              <>
+                "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"
+              <>
+                if state.sidebarShown && state.tocShown then "" else "display: none;"
         ]
         [ HH.slot _toc unit TOC.tocview unit HandleTOC ]
     , HH.div
         [ HP.classes [ HB.overflowAuto, HB.p1 ]
         , HP.style $
-            "flex: 0 0 " <> show (state.sidebarRatio * 100.0) <>
-              "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"<>
-              if state.sidebarShown && not state.tocShown then "" else "display: none;"
+            "flex: 0 0 " <> show (state.sidebarRatio * 100.0)
+              <>
+                "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248);"
+              <>
+                if state.sidebarShown && not state.tocShown then ""
+                else "display: none;"
         ]
         [ HH.slot _comment unit Comment.commentview unit HandleComment ]
     -- Left Resizer
@@ -316,7 +327,8 @@ splitview = H.mkComponent
       -- --     Just entry -> entry
       -- -- H.tell _editor unit (Editor.ChangeSection firstEntry)
       let timeFormatter = head timeStampsVersions
-      H.modify_ \st -> do st { tocEntries = exampleTOCEntries, mTimeFormatter = timeFormatter }
+      H.modify_ \st -> do
+        st { tocEntries = exampleTOCEntries, mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
       H.tell _toc unit (TOC.ReceiveTOCs exampleTOCEntries)
 
@@ -464,7 +476,7 @@ splitview = H.mkComponent
 
     -- Query handler
 
-    HandleComment output ->  case output of
+    HandleComment output -> case output of
 
       Comment.CloseCommentSectionO -> do
         H.modify_ \st -> st { tocShown = true }
@@ -473,47 +485,54 @@ splitview = H.mkComponent
         H.tell _editor unit Editor.SaveSection
         state <- H.get
         let
-          updatedTOCEntries = map (\entry ->
-            if entry.id /= tocID then entry
-            else 
-              let
-                newMarkers = (map (\marker ->
-                  if marker.id /= markerID then marker
-                  else marker { mCommentSection = Just newCommentSection }
-                ) entry.markers)
-              in
-                entry { markers = newMarkers }
-            ) state.tocEntries
+          updatedTOCEntries = map
+            ( \entry ->
+                if entry.id /= tocID then entry
+                else
+                  let
+                    newMarkers =
+                      ( map
+                          ( \marker ->
+                              if marker.id /= markerID then marker
+                              else marker { mCommentSection = Just newCommentSection }
+                          )
+                          entry.markers
+                      )
+                  in
+                    entry { markers = newMarkers }
+            )
+            state.tocEntries
         H.modify_ \s -> s { tocEntries = updatedTOCEntries }
-        let 
+        let
           entry = case (findTOCEntry tocID updatedTOCEntries) of
             Nothing -> { id: -1, name: "No Entry", content: "", markers: [] }
-            Just e  -> e
+            Just e -> e
         H.tell _editor unit (Editor.ChangeSection entry)
-        
+
     HandleEditor output -> case output of
 
       Editor.ClickedQuery response -> H.tell _preview unit
         (Preview.GotEditorQuery response)
 
       Editor.DeletedComment tocEntry deletedIDs -> do
-        H.modify_ \st -> 
-          st 
+        H.modify_ \st ->
+          st
             { tocEntries =
-              map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
+                map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
             }
         H.tell _comment unit (Comment.DeletedComment tocEntry.id deletedIDs)
 
-      Editor.SavedSection tocEntry -> 
-        H.modify_ \st -> 
-          st 
+      Editor.SavedSection tocEntry ->
+        H.modify_ \st ->
+          st
             { tocEntries =
-              map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
+                map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
             }
 
       Editor.SelectedCommentSection tocID markerID commentSection -> do
         H.modify_ \st -> st { tocShown = false }
-        H.tell _comment unit (Comment.SelectedCommentSection tocID markerID commentSection)
+        H.tell _comment unit
+          (Comment.SelectedCommentSection tocID markerID commentSection)
 
     HandlePreview _ -> pure unit
 
@@ -522,15 +541,16 @@ splitview = H.mkComponent
       TOC.ChangeSection selectEntry -> do
         H.tell _editor unit Editor.SaveSection
         state <- H.get
-        let 
+        let
           entry = case (findTOCEntry selectEntry.id state.tocEntries) of
             Nothing -> { id: -1, name: "No Entry", content: "", markers: [] }
-            Just e  -> e
+            Just e -> e
         H.tell _editor unit (Editor.ChangeSection entry)
 
 -- Create example TOC entries for testing purposes in Init
 
-createExampleTOCEntries :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array TOCEntry)
+createExampleTOCEntries
+  :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array TOCEntry)
 createExampleTOCEntries = do
   -- Since all example entries are similar, we create the same markers for all
   exampleMarkers <- createExampleMarkers
@@ -543,7 +563,8 @@ createExampleTOCEntries = do
           , content: createExampleTOCText n
           , markers: exampleMarkers
           }
-      ) (range 1 11)
+      )
+      (range 1 11)
   pure entries
 
 createExampleTOCText :: Int -> String
@@ -578,26 +599,31 @@ createExampleTOCText n =
     , "NOTE: We're using this style as a placeholder."
     ]
 
-createExampleMarkers :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array AnnotatedMarker)
+createExampleMarkers
+  :: forall m
+   . MonadAff m
+  => H.HalogenM State Action Slots Output m (Array AnnotatedMarker)
 createExampleMarkers = do
   mark <- H.liftEffect $ Range.create 7 3 7 26
   commentSection <- createExampleCommentSection
-  let entry = 
-        { id: 1
-        , type: "info"
-        , range: mark
-        , startRow: 7
-        , startCol: 3
-        -- TODO make this a real comment
-        , mCommentSection: Just commentSection
-        }
+  let
+    entry =
+      { id: 1
+      , type: "info"
+      , range: mark
+      , startRow: 7
+      , startCol: 3
+      -- TODO make this a real comment
+      , mCommentSection: Just commentSection
+      }
   pure [ entry ]
 
-createExampleCommentSection :: forall m. MonadAff m => H.HalogenM State Action Slots Output m CommentSection
+createExampleCommentSection
+  :: forall m. MonadAff m => H.HalogenM State Action Slots Output m CommentSection
 createExampleCommentSection = do
   comments <- createExampleComments
   let
-    commentSection = 
+    commentSection =
       { -- Since in init, all markers have the same ID
         markerID: 1
       , comments: comments
@@ -605,10 +631,11 @@ createExampleCommentSection = do
       }
   pure commentSection
 
-createExampleComments :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array Comment)
+createExampleComments
+  :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array Comment)
 createExampleComments = do
   now <- H.liftEffect nowDateTime
-  let 
+  let
     comments = map
       ( \n ->
           { author: "Author " <> show (mod n 2)

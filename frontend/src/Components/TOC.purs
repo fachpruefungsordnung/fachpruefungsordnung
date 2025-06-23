@@ -19,8 +19,7 @@ data Action
   = Init
   | JumpToSection ShortendTOCEntry
 
-data Query a 
-  = ReceiveTOCs (Array TOCEntry) a
+data Query a = ReceiveTOCs (Array TOCEntry) a
 
 type State =
   { tocEntries :: Array ShortendTOCEntry
@@ -43,7 +42,7 @@ tocview = H.mkComponent
   render state =
     HH.div_
       ( map
-          ( \{ id, name} ->
+          ( \{ id, name } ->
               HH.div
                 [ HP.title ("Jump to section " <> name)
                 , HP.style
@@ -86,12 +85,13 @@ tocview = H.mkComponent
 
     ReceiveTOCs entries a -> do
       let
-        shortendEntries = map 
-          (\e ->
+        shortendEntries = map
+          ( \e ->
               { id: e.id
               , name: e.name
               }
-          ) entries
+          )
+          entries
       H.modify_ \state -> state { tocEntries = shortendEntries }
       pure (Just a)
 
