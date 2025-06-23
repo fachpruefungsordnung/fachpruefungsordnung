@@ -2,24 +2,31 @@ module FPO.Components.Comment where
 
 import Prelude
 
+import Data.Array (snoc, uncons)
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..))
+import Data.String.CodeUnits (length)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Now (nowDateTime)
 import FPO.Types (Comment, CommentSection)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
+import FPO.Data.Request (getUser)
 
 type Input = Unit
 
-data Output = UpdateComment Int Int CommentSection
+data Output 
+  = CloseCommentSectionO
+  | UpdateComment Int Int CommentSection
 
 data Action
   = Init
   | UpdateDraft String
   | SendComment
+  | CloseCommentSectionA
 
 data Query a 
   = ReceiveTimeFormatter (Maybe Formatter) a
@@ -28,7 +35,7 @@ data Query a
 type State =
   { tocID :: Int
   , markerID :: Int
-  , commentsection :: Maybe CommentSection
+  , commentSection :: Maybe CommentSection
   , commentDraft :: String
   , timeFormatter :: Maybe Formatter
   }
@@ -38,7 +45,7 @@ commentview = H.mkComponent
   { initialState: \_ -> 
   { tocID: -1
   , markerID: -1
-  , commentsection: Nothing
+  , commentSection: Nothing
   , commentDraft: "" 
   , timeFormatter: Nothing
   }
@@ -52,20 +59,81 @@ commentview = H.mkComponent
   where
 
   render :: State -> forall slots. H.ComponentHTML Action slots m
-  render state = case state.commentsection of
+  render state = case state.commentSection of
     Nothing -> HH.text ""  
     Just commentSection ->
       HH.div [ HP.style "comment-section space-y-3" ]
-        ( map (renderComment state.timeFormatter) commentSection.comments 
-            <> [ renderInput state.commentDraft ]
+        ( [ HH.div
+            [ HP.classes [ HB.dFlex, HB.justifyContentBetween, HB.alignItemsCenter ] ]
+            [ HH.h4_ [ HH.text "Comments" ]
+            , HH.button
+                [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+                , HP.style
+                    "background-color: #fdecea; \
+                    \color: #b71c1c; \
+                    \padding: 0.2rem 0.4rem; \
+                    \font-size: 0.75rem; \
+                    \line-height: 1; \
+                    \border: 1px solid #f5c6cb; \
+                    \border-radius: 0.2rem;"
+                , HE.onClick \_ -> CloseCommentSectionA
+                ]
+                [ HH.text "×" ]
+            ]
+          ]
+          <> renderComments state.timeFormatter commentSection.comments
+          <> [renderInput state.commentDraft]
         )
-  
+
+  renderComments :: Maybe Formatter -> Array Comment -> forall slots. Array (H.ComponentHTML Action slots m)
+  renderComments mFormatter comments = case uncons comments of
+    Nothing -> [ HH.text "" ]
+    Just {head: c, tail: cs} ->
+         [ renderFirstComment mFormatter c ]
+      <> map (renderComment mFormatter) cs
+
+  renderFirstComment :: Maybe Formatter -> Comment -> forall slots. H.ComponentHTML Action slots m
+  renderFirstComment mFormatter c =
+    HH.div
+      [ HP.classes
+          [ HB.p2
+          , HB.mb2
+          , HB.border
+          , HB.rounded
+          , HB.shadowSm
+          , HB.dFlex
+          , HB.flexColumn
+          ]
+      , HP.style "background-color:rgba(246, 250, 0, 0.9);"
+      ]
+      [ 
+        HH.div_
+          [ HH.div
+            [ HP.style "font-weight: 600; font-size: 1.2rem;" ]
+            [ HH.text c.author ]
+          , HH.div 
+            [ HP.classes [ HB.mt1 ] 
+            , HP.style "font-size: 1rem;" 
+            ] 
+            [ HH.text c.content ]
+          ]
+      , HH.div
+          [ HP.classes [ HB.mt2 ]
+          , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;" ]
+          [ HH.text $
+              case mFormatter of
+                Nothing      -> "No timestamp found."
+                Just formatter -> format formatter c.timestamp
+          ]
+      ]
+
   renderComment :: Maybe Formatter -> Comment -> forall slots. H.ComponentHTML Action slots m
   renderComment mFormatter c =
     HH.div
       [ HP.classes
-          [ HB.p3
-          , HB.mb3
+          [ HB.p1
+          , HB.mb1
+          , HB.mx2
           , HB.border
           , HB.rounded
           , HB.shadowSm
@@ -74,19 +142,24 @@ commentview = H.mkComponent
           ]
       , HP.style "background-color: #fff9c4;"
       ]
-      [ -- Inhalt
+      [ 
         HH.div_
-          [ HH.div_ [ HH.text c.author ]
-          , HH.div [ HP.classes [ HB.mt1 ] ] [ HH.text c.content ]
+          [ HH.div
+            [ HP.style "font-weight: 500; font-size: 1rem;" ]
+            [ HH.text c.author ]
+          , HH.div 
+            [ HP.classes [ HB.mt1 ] 
+            , HP.style "font-size: 0.875rem;" 
+            ] 
+            [ HH.text c.content ]
           ]
-        -- Zeitstempel klein und unten rechts
       , HH.div
           [ HP.classes [ HB.mt2 ]
           , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;" ]
           [ HH.text $
               case mFormatter of
                 Nothing      -> "No timestamp found."
-                Just formatr -> format formatr c.timestamp
+                Just formatter -> format formatter c.timestamp
           ]
       ]
 
@@ -117,7 +190,27 @@ commentview = H.mkComponent
         state { commentDraft = draft }
     
     SendComment -> do
-      pure unit
+      state <- H.get
+      if length state.commentDraft == 0 then 
+        pure unit
+      else 
+        case state.commentSection of
+          Nothing -> pure unit
+          Just commentSection -> do
+            now <- H.liftEffect nowDateTime
+            user <- H.liftAff getUser
+            let 
+              author = case user of
+                Nothing -> "Guest"
+                Just u  -> u.userName
+              newComment        = { author: author , timestamp: now, content: state.commentDraft }
+              comments          = commentSection.comments
+              newCommentSection = commentSection { comments = snoc comments newComment }
+            H.modify_ \st -> st { commentSection = Just newCommentSection, commentDraft = "" }
+            H.raise (UpdateComment state.tocID state.markerID newCommentSection)
+
+    CloseCommentSectionA ->
+      H.raise CloseCommentSectionO
 
   handleQuery
     :: forall slots a
@@ -133,6 +226,6 @@ commentview = H.mkComponent
       H.modify_ \state -> state 
         { tocID = tocID
         , markerID = markerID
-        , commentsection = Just section }
+        , commentSection = Just section }
       pure (Just a)
 

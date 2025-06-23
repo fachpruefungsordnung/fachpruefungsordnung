@@ -448,26 +448,30 @@ splitview = H.mkComponent
 
     HandleComment output ->  case output of
 
+      Comment.CloseCommentSectionO -> do
+        H.modify_ \st -> st { tocShown = true }
+
       Comment.UpdateComment tocID markerID newCommentSection -> do
+        H.tell _editor unit Editor.SaveSection
         state <- H.get
-
         let
-          updatedTOCEntries =
-            map (\entry ->
-              if entry.id /= tocID then entry
-              else let
-                newMarkers = case entry.markers of
-                  Just markers ->
-                    Just (map (\marker ->
-                      if marker.id /= markerID then marker
-                      else marker { commentSection = Just newCommentSection }
-                    ) markers)
-                  Nothing -> Nothing
-                in
-                  entry { markers = newMarkers }
+          updatedTOCEntries = map (\entry ->
+            if entry.id /= tocID then entry
+            else 
+              let
+                newMarkers = (map (\marker ->
+                  if marker.id /= markerID then marker
+                  else marker { mCommentSection = Just newCommentSection }
+                ) entry.markers)
+              in
+                entry { markers = newMarkers }
             ) state.tocEntries
-
         H.modify_ \s -> s { tocEntries = updatedTOCEntries }
+        let 
+          entry = case (findTOCEntry tocID updatedTOCEntries) of
+            Nothing -> { id: -1, name: "No Entry", content: "", markers: [] }
+            Just e  -> e
+        H.tell _editor unit (Editor.ChangeSection entry)
         
     HandleEditor output -> case output of
 
@@ -492,9 +496,10 @@ splitview = H.mkComponent
       TOC.ChangeSection selectEntry -> do
         H.tell _editor unit Editor.SaveSection
         state <- H.get
-        let entry = case (findTOCEntry selectEntry.id state.tocEntries) of
-              Nothing -> { id: -1, name: "No Entry", content: Nothing, markers: Nothing }
-              Just e  -> e
+        let 
+          entry = case (findTOCEntry selectEntry.id state.tocEntries) of
+            Nothing -> { id: -1, name: "No Entry", content: "", markers: [] }
+            Just e  -> e
         H.tell _editor unit (Editor.ChangeSection entry)
 
 -- Create example TOC entries for testing purposes in Init
@@ -509,8 +514,8 @@ createExampleTOCEntries = do
       ( \n ->
           { id: n
           , name: "§" <> show n <> " This is Paragraph " <> show n
-          , content: Just $ createExampleTOCText n
-          , markers: Just exampleMarkers
+          , content: createExampleTOCText n
+          , markers: exampleMarkers
           }
       ) (range 1 11)
   pure entries
@@ -558,7 +563,7 @@ createExampleMarkers = do
         , startRow: 7
         , startCol: 3
         -- TODO make this a real comment
-        , commentSection: Just commentSection
+        , mCommentSection: Just commentSection
         }
   pure [ entry ]
 

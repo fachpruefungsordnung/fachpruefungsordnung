@@ -15,7 +15,7 @@ type AnnotatedMarker =
   , range :: Types.Range
   , startRow :: Int
   , startCol :: Int
-  , commentSection :: Maybe CommentSection
+  , mCommentSection :: Maybe CommentSection
   }
 
 type CommentSection =
@@ -33,8 +33,8 @@ type Comment =
 type TOCEntry =
   { id :: Int
   , name :: String
-  , content :: Maybe String
-  , markers :: Maybe (Array AnnotatedMarker)
+  , content :: String
+  , markers :: Array AnnotatedMarker
   }
 
 -- shortend version for TOC component to not update its content
@@ -50,9 +50,8 @@ findTOCEntry tocID tocEntries = find (\e -> e.id == tocID) tocEntries
 findCommentSection :: Int -> Int -> Array TOCEntry -> Maybe CommentSection
 findCommentSection tocID markerID tocEntries = do
   entry  <- findTOCEntry tocID tocEntries
-  markers <- entry.markers
-  marker <- find (\m -> m.id == markerID) markers
-  marker.commentSection
+  marker <- find (\m -> m.id == markerID) entry.markers
+  marker.mCommentSection
 
 sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker
 sortMarkers = sortBy (comparing _.startRow <> comparing _.startCol)

@@ -206,42 +206,41 @@ editor = H.mkComponent
             sCol = Types.getColumn start
           newID <- Session.addMarker range "my-marker" "text" false session
           let
+            newCommentSection =
+              { markerID: newID
+              ,  comments: []
+              , resolved: false
+              }
             newMarker =
               { id: newID
               , type: "info"
               , range: range
               , startRow: sRow
               , startCol: sCol
-              , commentSection: Nothing
+              , mCommentSection: Just newCommentSection
               }
           addAnnotation (markerToAnnotation newMarker) session
           pure newMarker
         H.modify_ \st ->
           st
-            { tocEntry = st.tocEntry <#> \entry ->
-                let
-                  updatedMarkers = sortMarkers case entry.markers of
-                    Just ms -> newMarker : ms
-                    Nothing -> [ newMarker ]
-                in
-                  entry { markers = Just updatedMarkers }
+            { tocEntry = st.tocEntry <#> \entry -> 
+                entry { markers = sortMarkers (newMarker : entry.markers) }
             }
 
     DeleteComment -> do
       H.gets _.editor >>= traverse_ \ed -> do
-        session <- H.liftEffect $ Editor.getSession ed
-        cursor <- H.liftEffect $ Editor.getCursorPosition ed
         state <- H.get
-        -- extract markers from the current TOC entry
-        let markers = fromMaybe [] (state.tocEntry >>= _.markers)
+        case state.tocEntry of
+          Nothing -> pure unit
+          Just tocEntry -> do
+            session <- H.liftEffect $ Editor.getSession ed
+            cursor <- H.liftEffect $ Editor.getCursorPosition ed
+            let markers = tocEntry.markers
 
-        -- remove the marker at the cursor position and return the remaining markers
-        newMarkers <- H.liftEffect $ removeMarkerByPosition cursor markers session
-        H.modify_ \st ->
-          st
-            { tocEntry = st.tocEntry <#> \entry ->
-                entry { markers = Just newMarkers }
-            }
+            -- remove the marker at the cursor position and return the remaining markers
+            newMarkers <- H.liftEffect $ removeMarkerByPosition cursor markers session
+            H.modify_ \st ->
+              st { tocEntry = Just (tocEntry { markers = newMarkers } ) }
 
     ShowWarning -> do
       H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
@@ -253,9 +252,9 @@ editor = H.mkComponent
         -- extract markers from the current TOC entry
         let 
           tocEntry = case state.tocEntry of
-            Nothing -> { id: -1 , name: "No entry" , content: Nothing, markers: Nothing }
+            Nothing -> { id: -1 , name: "No entry" , content: "", markers: [] }
             Just e -> e
-          markers = fromMaybe [] (state.tocEntry >>= _.markers)
+          markers = tocEntry.markers
           row = Types.getRow cursor
           col = Types.getColumn cursor
 
@@ -264,7 +263,7 @@ editor = H.mkComponent
         matching <- H.liftEffect $ filterA (\m -> Range.containsRange targetRange m.range) markers
         case head matching of
           Nothing -> pure unit
-          Just marker -> case marker.commentSection of
+          Just marker -> case marker.mCommentSection of
             Nothing -> pure unit
             Just commentSection -> H.raise (SelectedCommentSection tocEntry.id marker.id commentSection)
 
@@ -275,6 +274,12 @@ editor = H.mkComponent
   handleQuery = case _ of
 
     ChangeSection entry a -> do
+      let 
+        comments = case head entry.markers of
+          Nothing -> []
+          Just marker -> case marker.mCommentSection of
+            Nothing -> []
+            Just commentSection -> commentSection.comments
       H.modify_ \state -> state { tocEntry = Just entry }
 
       -- Put the content of the section into the editor and update markers
@@ -284,7 +289,7 @@ editor = H.mkComponent
           document <- Session.getDocument session
 
           -- Set editor content
-          let content = fromMaybe "" entry.content
+          let content = entry.content
           Document.setValue content document
 
           -- Remove existing markers
@@ -297,14 +302,14 @@ editor = H.mkComponent
           Session.clearAnnotations session
 
           -- Reinsert markers with new IDs and annotations
-          for (fromMaybe [] entry.markers) \marker -> do
+          for (entry.markers) \marker -> do
             newID <- Session.addMarker marker.range "my-marker" "text" false session
             addAnnotation (markerToAnnotation marker) session
             pure marker { id = newID }
 
         -- Update state with new marker IDs
         H.modify_ \st ->
-          st { tocEntry = Just entry { markers = Just updatedMarkers } }
+          st { tocEntry = Just entry { markers = updatedMarkers } }
 
       pure (Just a)
 
@@ -326,10 +331,10 @@ editor = H.mkComponent
 
         entry = case state.tocEntry of
           Nothing ->
-            { id: -1, name: "Section not found", content: Nothing, markers: Nothing }
+            { id: -1, name: "Section not found", content: "", markers: [] }
           Just e -> e
 
-        newEntry = entry { content = Just contentText }
+        newEntry = entry { content = contentText }
 
       H.modify_ \st -> st { tocEntry = Just newEntry }
       H.raise (SavedSection newEntry)
