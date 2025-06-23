@@ -23,7 +23,7 @@ import Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, undersco
 import Data.Array (filter, filterA, head, intercalate, (..), (:))
 import Data.Array as Array
 import Data.Foldable (elem, for_, traverse_)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.String as String
 import Data.Traversable (for, traverse)
 import Data.Tuple (Tuple(..))
@@ -39,7 +39,6 @@ import FPO.Types
   , markerToAnnotation
   , sortMarkers
   )
-import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -332,12 +331,6 @@ editor = connect selectTranslator $ H.mkComponent
   handleQuery = case _ of
 
     ChangeSection entry a -> do
-      let
-        comments = case head entry.markers of
-          Nothing -> []
-          Just marker -> case marker.mCommentSection of
-            Nothing -> []
-            Just commentSection -> commentSection.comments
       H.modify_ \state -> state { mTocEntry = Just entry }
 
       -- Put the content of the section into the editor and update markers
@@ -475,6 +468,7 @@ addAnnotation annotation session = do
 
 -- Multiple marker removal functions
 -- These functions remove markers by IDs, range, position, or row/column.
+-- Commented some out, just in case we may need them in the future
 
 -- The base function for all other removeMarker functions
 -- Remove marker based on the ids and return the remaining markers and the deleted ids
@@ -496,12 +490,12 @@ removeMarkerByIDs targetIDs markers session = do
 
   pure (Tuple remainingMarkers targetIDs)
 
-removeMarkerByID
-  :: Int
-  -> Array AnnotatedMarker
-  -> Types.EditSession
-  -> Effect (Tuple (Array AnnotatedMarker) (Array Int))
-removeMarkerByID targetID = removeMarkerByIDs [ targetID ]
+-- removeMarkerByID
+--   :: Int
+--   -> Array AnnotatedMarker
+--   -> Types.EditSession
+--   -> Effect (Tuple (Array AnnotatedMarker) (Array Int))
+-- removeMarkerByID targetID = removeMarkerByIDs [ targetID ]
 
 removeMarkerByRange
   :: Types.Range
@@ -525,12 +519,12 @@ removeMarkerByPosition targetPos marker session = do
   targetRange <- Range.create row col row col
   removeMarkerByRange targetRange marker session
 
-removeMarkerByRowCol
-  :: Int
-  -> Int
-  -> Array AnnotatedMarker
-  -> Types.EditSession
-  -> Effect (Tuple (Array AnnotatedMarker) (Array Int))
-removeMarkerByRowCol row col marker session = do
-  targetRange <- Range.create row col row col
-  removeMarkerByRange targetRange marker session
+-- removeMarkerByRowCol
+--   :: Int
+--   -> Int
+--   -> Array AnnotatedMarker
+--   -> Types.EditSession
+--   -> Effect (Tuple (Array AnnotatedMarker) (Array Int))
+-- removeMarkerByRowCol row col marker session = do
+--   targetRange <- Range.create row col row col
+--   removeMarkerByRange targetRange marker session
