@@ -24,12 +24,12 @@ data Query a
 
 type State =
   { tocEntries :: Array ShortendTOCEntry
-  , slectedTocEntry :: Maybe Int
+  , mSelectedTocEntry :: Maybe Int
   }
 
 tocview :: forall m. MonadAff m => H.Component Query Input Output m
 tocview = H.mkComponent
-  { initialState: \_ -> { tocEntries: [], slectedTocEntry: Nothing }
+  { initialState: \_ -> { tocEntries: [], mSelectedTocEntry: Nothing }
   , render
   , eval: H.mkEval $ H.defaultEval
       { initialize = Just Init
@@ -54,7 +54,7 @@ tocview = H.mkComponent
                     , HP.classes
                         ( [ HB.textTruncate ]
                             <>
-                              if Just id == state.slectedTocEntry then
+                              if Just id == state.mSelectedTocEntry then
                                 [ HB.fwBold ]
                               else []
                         )
@@ -75,7 +75,7 @@ tocview = H.mkComponent
 
     JumpToSection entry -> do
       H.modify_ \state ->
-        state { slectedTocEntry = Just entry.id }
+        state { mSelectedTocEntry = Just entry.id }
       H.raise (ChangeSection entry)
 
   handleQuery

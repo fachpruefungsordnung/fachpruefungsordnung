@@ -2,7 +2,7 @@ module FPO.Components.Comment where
 
 import Prelude
 
-import Data.Array (snoc, uncons)
+import Data.Array (elem, snoc, uncons)
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..))
 import Data.String.CodeUnits (length)
@@ -29,15 +29,16 @@ data Action
   | CloseCommentSectionA
 
 data Query a 
-  = ReceiveTimeFormatter (Maybe Formatter) a
+  = DeletedComment Int (Array Int) a
+  | ReceiveTimeFormatter (Maybe Formatter) a
   | SelectedCommentSection Int Int CommentSection a
 
 type State =
   { tocID :: Int
   , markerID :: Int
-  , commentSection :: Maybe CommentSection
+  , mCommentSection :: Maybe CommentSection
   , commentDraft :: String
-  , timeFormatter :: Maybe Formatter
+  , mTimeFormatter :: Maybe Formatter
   }
 
 commentview :: forall m. MonadAff m => H.Component Query Input Output m
@@ -45,9 +46,9 @@ commentview = H.mkComponent
   { initialState: \_ -> 
   { tocID: -1
   , markerID: -1
-  , commentSection: Nothing
+  , mCommentSection: Nothing
   , commentDraft: "" 
-  , timeFormatter: Nothing
+  , mTimeFormatter: Nothing
   }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -59,7 +60,7 @@ commentview = H.mkComponent
   where
 
   render :: State -> forall slots. H.ComponentHTML Action slots m
-  render state = case state.commentSection of
+  render state = case state.mCommentSection of
     Nothing -> HH.text ""  
     Just commentSection ->
       HH.div [ HP.style "comment-section space-y-3" ]
@@ -81,7 +82,7 @@ commentview = H.mkComponent
                 [ HH.text "×" ]
             ]
           ]
-          <> renderComments state.timeFormatter commentSection.comments
+          <> renderComments state.mTimeFormatter commentSection.comments
           <> [renderInput state.commentDraft]
         )
 
@@ -194,7 +195,7 @@ commentview = H.mkComponent
       if length state.commentDraft == 0 then 
         pure unit
       else 
-        case state.commentSection of
+        case state.mCommentSection of
           Nothing -> pure unit
           Just commentSection -> do
             now <- H.liftEffect nowDateTime
@@ -206,7 +207,7 @@ commentview = H.mkComponent
               newComment        = { author: author , timestamp: now, content: state.commentDraft }
               comments          = commentSection.comments
               newCommentSection = commentSection { comments = snoc comments newComment }
-            H.modify_ \st -> st { commentSection = Just newCommentSection, commentDraft = "" }
+            H.modify_ \st -> st { mCommentSection = Just newCommentSection, commentDraft = "" }
             H.raise (UpdateComment state.tocID state.markerID newCommentSection)
 
     CloseCommentSectionA ->
@@ -218,14 +219,22 @@ commentview = H.mkComponent
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
 
-    ReceiveTimeFormatter timeFormatter a -> do
-      H.modify_ \state -> state  { timeFormatter = timeFormatter }
+    DeletedComment changedTocID deletedIDs a -> do
+      state <- H.get
+      if changedTocID == state.tocID && elem state.markerID deletedIDs then
+        H.raise CloseCommentSectionO
+      else
+        pure unit
+      pure (Just a)
+
+    ReceiveTimeFormatter mTimeFormatter a -> do
+      H.modify_ \state -> state  { mTimeFormatter = mTimeFormatter }
       pure (Just a)
 
     SelectedCommentSection tocID markerID section a -> do
       H.modify_ \state -> state 
         { tocID = tocID
         , markerID = markerID
-        , commentSection = Just section }
+        , mCommentSection = Just section }
       pure (Just a)
 

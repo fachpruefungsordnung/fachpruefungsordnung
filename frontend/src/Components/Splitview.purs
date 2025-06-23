@@ -61,7 +61,7 @@ data Action
   | HandleTOC TOC.Output
 
 type State =
-  { dragTarget :: Maybe DragTarget
+  { mDragTarget :: Maybe DragTarget
 
   -- Store the width values as ratios of the total width
   -- TODO: Using the ratios to keep the ratio, when resizing the window
@@ -86,14 +86,14 @@ type State =
   -- 2. Throuth QueryEditor, where the editor collects its content and sends it
   --   to the preview component.
   -- TODO: Which one to use?
-  , editorContent :: Maybe (Array String)
+  , mEditorContent :: Maybe (Array String)
 
   -- Store tocEntries and send some parts to its children components
   -- TODO load/upload from/to backend
   , tocEntries :: Array TOCEntry
 
   -- How the timestamp has to be formatted
-  , timeFormatter:: Maybe Formatter
+  , mTimeFormatter:: Maybe Formatter
 
   -- Boolean flags for UI state
   , sidebarShown :: Boolean
@@ -118,7 +118,7 @@ _toc = Proxy :: Proxy "toc"
 splitview :: forall query m. MonadAff m => H.Component query Input Output m
 splitview = H.mkComponent
   { initialState: \_ ->
-      { dragTarget: Nothing
+      { mDragTarget: Nothing
       , startMouseRatio: 0.0
       , startSidebarRatio: 0.0
       , startMiddleRatio: 0.0
@@ -126,9 +126,9 @@ splitview = H.mkComponent
       , middleRatio: 0.4
       , lastExpandedSidebarRatio: 0.2
       , lastExpandedMiddleRatio: 0.4
-      , editorContent: Nothing
+      , mEditorContent: Nothing
       , tocEntries: []
-      , timeFormatter: Nothing
+      , mTimeFormatter: Nothing
       , sidebarShown: true
       , tocShown: true
       , previewShown: true
@@ -280,7 +280,7 @@ splitview = H.mkComponent
                 "%; box-sizing: border-box; min-height: 0; overflow: hidden; min-width: 6ch;"
         ]
         [ HH.slot _preview unit Preview.preview
-            { editorContent: state.editorContent }
+            { editorContent: state.mEditorContent }
             HandlePreview
         ]
     ]
@@ -298,7 +298,7 @@ splitview = H.mkComponent
       -- --     Just entry -> entry
       -- -- H.tell _editor unit (Editor.ChangeSection firstEntry)
       let timeFormatter = head timeStampsVersions
-      H.modify_ \st -> do st { tocEntries = exampleTOCEntries, timeFormatter = timeFormatter }
+      H.modify_ \st -> do st { tocEntries = exampleTOCEntries, mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
       H.tell _toc unit (TOC.ReceiveTOCs exampleTOCEntries)
 
@@ -312,7 +312,7 @@ splitview = H.mkComponent
         width = toNumber intWidth
         ratioX = x / width
       H.modify_ \st -> st
-        { dragTarget = Just which
+        { mDragTarget = Just which
         , startMouseRatio = ratioX
         , startSidebarRatio = st.sidebarRatio
         , startMiddleRatio = st.middleRatio
@@ -320,7 +320,7 @@ splitview = H.mkComponent
 
     -- Stop resizing, when mouse is released (is detected by browser)
     StopResize _ ->
-      H.modify_ \st -> st { dragTarget = Nothing }
+      H.modify_ \st -> st { mDragTarget = Nothing }
 
     -- While mouse is hold down, resizer move to position of mouse
     -- (with certain rules)
@@ -338,7 +338,7 @@ splitview = H.mkComponent
         clamp :: Number -> Number -> Number -> Number
         clamp minVal maxVal xval = max minVal (min maxVal xval)
 
-      mt <- H.gets _.dragTarget
+      mt <- H.gets _.mDragTarget
       mx <- H.gets _.startMouseRatio
 
       case mt of
@@ -478,11 +478,19 @@ splitview = H.mkComponent
       Editor.ClickedQuery response -> H.tell _preview unit
         (Preview.GotEditorQuery response)
 
-      Editor.SavedSection entry -> 
+      Editor.DeletedComment tocEntry deletedIDs -> do
         H.modify_ \st -> 
           st 
             { tocEntries =
-              map (\e -> if e.id == entry.id then entry else e) st.tocEntries
+              map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
+            }
+        H.tell _comment unit (Comment.DeletedComment tocEntry.id deletedIDs)
+
+      Editor.SavedSection tocEntry -> 
+        H.modify_ \st -> 
+          st 
+            { tocEntries =
+              map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
             }
 
       Editor.SelectedCommentSection tocID markerID commentSection -> do
