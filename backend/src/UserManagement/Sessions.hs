@@ -35,10 +35,11 @@ import qualified Data.Bifunctor (second)
 import Data.Text (Text)
 import Data.Vector (Vector)
 import Hasql.Session (Session, statement)
-import qualified UserManagement.Document as Document
+import qualified UserManagement.DocumentPermission as Permission
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Statements as Statements
 import qualified UserManagement.User as User
+import qualified VersionControl.Document as Document
 
 getUsers :: Session (Vector User.User)
 getUsers = statement () Statements.getUsers
@@ -118,28 +119,28 @@ checkGroupDocPermission :: User.UserID -> Document.DocumentID -> Session Bool
 checkGroupDocPermission uid did = statement (uid, did) Statements.checkGroupDocPermission
 
 getExternalDocPermission
-    :: User.UserID -> Document.DocumentID -> Session (Maybe Document.DocPermission)
+    :: User.UserID -> Document.DocumentID -> Session (Maybe Permission.DocPermission)
 getExternalDocPermission uid did = statement (uid, did) Statements.getExternalDocPermission
 
 getDocumentGroupID :: Document.DocumentID -> Session (Maybe Group.GroupID)
 getDocumentGroupID did = statement did Statements.getDocumentGroupID
 
 getAllExternalUsersOfDocument
-    :: Document.DocumentID -> Session [(User.UserID, Document.DocPermission)]
+    :: Document.DocumentID -> Session [(User.UserID, Permission.DocPermission)]
 getAllExternalUsersOfDocument did = do
     users <- statement did Statements.getAllExternalUsersOfDocument
     return [(user, perm) | (user, Just perm) <- users]
 
 addExternalDocPermission
-    :: User.UserID -> Document.DocumentID -> Document.DocPermission -> Session ()
+    :: User.UserID -> Document.DocumentID -> Permission.DocPermission -> Session ()
 addExternalDocPermission uid did perm =
-    let perm' = Document.permissionToText perm
+    let perm' = Permission.permissionToText perm
      in statement (uid, did, perm') Statements.addExternalDocPermission
 
 updateExternalDocPermission
-    :: User.UserID -> Document.DocumentID -> Document.DocPermission -> Session ()
+    :: User.UserID -> Document.DocumentID -> Permission.DocPermission -> Session ()
 updateExternalDocPermission uid did perm =
-    let perm' = Document.permissionToText perm
+    let perm' = Permission.permissionToText perm
      in statement (uid, did, perm') Statements.updateExternalDocPermission
 
 deleteExternalDocPermission :: User.UserID -> Document.DocumentID -> Session ()

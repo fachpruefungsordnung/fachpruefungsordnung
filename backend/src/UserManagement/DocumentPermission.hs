@@ -4,9 +4,8 @@
 
 {-# HLINT ignore "Use infix" #-}
 
-module UserManagement.Document
-    ( DocumentID
-    , DocPermission (..)
+module UserManagement.DocumentPermission
+    ( DocPermission (..)
     , Permission (..)
     , hasPermission
     , permissionToText
@@ -18,7 +17,6 @@ import Data.OpenApi (ToSchema)
 import Data.Text (Text, pack, unpack)
 import GHC.Generics (Generic)
 import Text.Read (readMaybe)
-import VersionControl.Document (DocumentID)
 
 data DocPermission = Reader | Reviewer | Editer
     deriving (Eq, Generic)

@@ -26,7 +26,7 @@ import Hasql.Connection (Connection)
 import Hasql.Session (run)
 import Servant
 import qualified Server.Auth as Auth
-import qualified UserManagement.Document as Document
+import qualified UserManagement.DocumentPermission as Permission
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
@@ -89,12 +89,12 @@ checkDocPermission
     :: Connection
     -> User.UserID
     -> DocumentID
-    -> Handler (Maybe Document.DocPermission)
+    -> Handler (Maybe Permission.DocPermission)
 checkDocPermission conn userID docID = do
     eIsMember <- liftIO $ run (Sessions.checkGroupDocPermission userID docID) conn
     case eIsMember of
         Left _ -> throwError errDatabaseAccessFailed
-        Right True -> return $ Just Document.Editer -- user is member of right group
+        Right True -> return $ Just Permission.Editer -- user is member of right group
         Right False -> do
             ePerm <- liftIO $ run (Sessions.getExternalDocPermission userID docID) conn
             case ePerm of
