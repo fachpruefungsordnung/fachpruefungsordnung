@@ -187,7 +187,8 @@ component =
   -- Creates a list of (dummy) groups with pagination.
   renderGroupList :: State -> H.ComponentHTML Action Slots m
   renderGroupList state =
-    addCard "List of Groups" [ HP.classes [ HB.col5, HB.me5 ] ] $ HH.div_
+    addCard "List of Groups"
+      [ HP.classes [ HB.col6, HB.me5 ], HP.style "max-height: 200px" ] $ HH.div_
       [ HH.div [ HP.classes [ HB.col12 ] ]
           [ addColumn
               state.groupNameFilter
@@ -199,14 +200,16 @@ component =
           ]
       , HH.ul [ HP.classes [ HB.listGroup ] ]
           $ map createGroupEntry grps
-              <> replicate (10 - length grps)
+              <> replicate (groupsPerPage - length grps)
                 (emptyEntryGen [ buttonDeleteGroup "(not a group)" ])
       , HH.slot _pagination unit P.component ps SetPage
       ]
     where
-    grps = slice (state.page * 10) ((state.page + 1) * 10) state.filteredGroups
+    groupsPerPage = 7
+    grps = slice (state.page * groupsPerPage) ((state.page + 1) * groupsPerPage)
+      state.filteredGroups
     ps =
-      { pages: P.calculatePageCount (length state.filteredGroups) 10
+      { pages: P.calculatePageCount (length state.filteredGroups) groupsPerPage
       , style: P.Compact 1
       , reaction: P.PreservePage
       }
@@ -214,7 +217,7 @@ component =
   -- Creates a form to create a new (dummy) group.
   renderNewGroupForm :: forall w. State -> HH.HTML w Action
   renderNewGroupForm state =
-    addCard "Create New Group" [ HP.classes [ HB.col3 ] ] $ HH.div_
+    addCard "Create New Group" [ HP.classes [ HB.col4 ] ] $ HH.div_
       [ HH.div [ HP.classes [ HB.col ] ]
           [ addColumn
               state.groupNameCreate
