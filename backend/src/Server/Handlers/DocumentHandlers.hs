@@ -12,6 +12,8 @@ module Server.Handlers.DocumentHandlers
     ) where
 
 import Control.Monad.IO.Class
+import Data.Text (Text)
+import Data.Vector (Vector)
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
@@ -23,53 +25,75 @@ import Server.Handlers.RenderHandlers (RenderAPI, renderServer)
 import qualified UserManagement.DocumentPermission as Permission
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
+import qualified UserManagement.Group as Group
 import VersionControl.Commit
 import VersionControl.Document as Document
+import VersionControl
 import Prelude hiding (readFile)
 
 type DocumentAPI =
     "documents"
-        :> ( Auth AuthMethod Auth.Token
-                :> Capture "documentID" Document.DocumentID
-                :> Get '[JSON] ExistingCommit
+                :> ( Auth AuthMethod Auth.Token
+                    :> Capture "documentID" Document.DocumentID
+                    :> Get '[JSON] Document 
+                :<|> Auth AuthMethod Auth.Token
+                    :> ReqBody '[JSON] (Text, Group.GroupID)
+                    :> Post '[JSON] Document 
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "documentID" Document.DocumentID
-                    :> Delete '[JSON] NoContent
-                :<|> Auth AuthMethod Auth.Token
-                    :> Capture "documentID" Document.DocumentID
-                    :> "external"
-                    :> Get '[JSON] [(User.UserID, Permission.DocPermission)]
-                :<|> Auth AuthMethod Auth.Token
-                    :> Capture "documentID" Document.DocumentID
-                    :> "external"
-                    :> Capture "userID" User.UserID
-                    :> Get '[JSON] (Maybe Permission.DocPermission)
-                :<|> Auth AuthMethod Auth.Token
-                    :> Capture "documentID" Document.DocumentID
-                    :> "external"
-                    :> Capture "userID" User.UserID
-                    :> ReqBody '[JSON] Permission.DocPermission
-                    :> Put '[JSON] NoContent
-                :<|> Auth AuthMethod Auth.Token
-                    :> Capture "documentID" Document.DocumentID
-                    :> "external"
-                    :> Capture "userID" User.UserID
-                    :> Delete '[JSON] NoContent
+                    :> Delete '[JSON] NoContent 
+                :<|>
+                    "commits"
+                        :> ( Auth AuthMethod Auth.Token
+                            :> Capture "documentID" Document.DocumentID
+                            :> Get '[JSON] (Vector ExistingCommit) 
+                        :<|> Auth AuthMethod Auth.Token
+                            :> Capture "documentID" Document.DocumentID
+                            :> ReqBody '[JSON] CreateCommit
+                            :> Post '[JSON] Document 
+                        :<|> Auth AuthMethod Auth.Token
+                            :> Capture "documentID" Document.DocumentID
+                            :> Capture "commitID" CommitID
+                            :> Get '[JSON] ExistingCommit
+                        )
+                :<|>
+                    "external"
+                        :> ( Auth AuthMethod Auth.Token
+                            :> Capture "documentID" Document.DocumentID
+                            :> Get '[JSON] [(User.UserID, Permission.DocPermission)]
+                        :<|> Auth AuthMethod Auth.Token
+                            :> Capture "documentID" Document.DocumentID
+                            :> Capture "userID" User.UserID
+                            :> Get '[JSON] (Maybe Permission.DocPermission)
+                        :<|> Auth AuthMethod Auth.Token
+                            :> Capture "documentID" Document.DocumentID
+                            :> Capture "userID" User.UserID
+                            :> ReqBody '[JSON] Permission.DocPermission
+                            :> Put '[JSON] NoContent
+                        :<|> Auth AuthMethod Auth.Token
+                            :> Capture "documentID" Document.DocumentID
+                            :> Capture "userID" User.UserID
+                            :> Delete '[JSON] NoContent
+                        )
                 :<|> RenderAPI
            )
 
 documentServer :: Server DocumentAPI
 documentServer =
     getDocumentHandler
+        :<|> postDocumentHandler
         :<|> deleteDocumentHandler
-        :<|> getAllExternalUsersDocumentHandler
+        :<|> (getAllCommitsHandler
+        :<|> postCommitHandler
+        :<|> getCommitHandler)
+        :<|> (getAllExternalUsersDocumentHandler
         :<|> getExternalUserDocumentHandler
         :<|> putExternalUserDocumentHandler
-        :<|> deleteExternalUserDocumentHandler
+        :<|> deleteExternalUserDocumentHandler)
         :<|> renderServer
 
 getDocumentHandler
-    :: AuthResult Auth.Token -> Document.DocumentID -> Handler ExistingCommit
+    :: AuthResult Auth.Token -> Document.DocumentID -> Handler Document
 getDocumentHandler (Authenticated Auth.Token {..}) docID = do
     conn <- tryGetDBConnection
     mPerm <- checkDocPermission conn subject docID
@@ -77,9 +101,29 @@ getDocumentHandler (Authenticated Auth.Token {..}) docID = do
         Nothing -> throwError errNoPermission
         Just perm ->
             if Permission.hasPermission perm Permission.Read
-                then undefined -- TODO: function for returning doc
+                then do
+                    eDocument <- liftIO $ getDocument docID (Context conn)
+                    case eDocument of
+                        Left _ -> throwError errDatabaseAccessFailed
+                        Right doc -> return doc
+
                 else throwError errNoPermission
 getDocumentHandler _ _ = throwError errNotLoggedIn
+
+postDocumentHandler
+    :: AuthResult Auth.Token -> (Text, Group.GroupID) -> Handler Document
+postDocumentHandler (Authenticated token) (name, groupID) = do
+    conn <- tryGetDBConnection
+    ifSuperOrAdminDo conn token groupID (postDocument conn)
+  where
+    postDocument :: Connection -> Handler Document
+    postDocument conn = do
+        eAction <- liftIO $ createDocument name groupID (Context conn)
+        case eAction of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right doc -> return doc
+
+postDocumentHandler _ _ = throwError errNotLoggedIn
 
 deleteDocumentHandler
     :: AuthResult Auth.Token -> Document.DocumentID -> Handler NoContent
@@ -91,6 +135,57 @@ deleteDocumentHandler (Authenticated token) docID = do
     deleteDoc :: Document.DocumentID -> Handler NoContent
     deleteDoc = undefined -- TODO: function call to delete document
 deleteDocumentHandler _ _ = throwError errNotLoggedIn
+
+getAllCommitsHandler
+    :: AuthResult Auth.Token -> Document.DocumentID -> Handler (Vector ExistingCommit)
+getAllCommitsHandler (Authenticated Auth.Token {..}) docID = do
+    conn <- tryGetDBConnection
+    mPerm <- checkDocPermission conn subject docID
+    case mPerm of
+        Nothing -> throwError errNoPermission
+        Just perm ->
+            if Permission.hasPermission perm Permission.Read
+                then do
+                    eVector <- liftIO $ getCommitGraph docID (Context conn)
+                    case eVector of
+                        Left _ -> throwError errDatabaseAccessFailed
+                        Right vec -> return vec
+            else throwError errNoPermission
+getAllCommitsHandler _ _ = throwError errNotLoggedIn
+
+postCommitHandler
+    :: AuthResult Auth.Token -> Document.DocumentID -> CreateCommit -> Handler Document
+postCommitHandler (Authenticated Auth.Token {..}) docID cc = do
+    conn <- tryGetDBConnection
+    mPerm <- checkDocPermission conn subject docID
+    case mPerm of
+        Nothing -> throwError errNoPermission
+        Just perm ->
+            if Permission.hasPermission perm Permission.Edit
+                then do
+                    eDocument <- liftIO $ createDocumentCommit docID cc (Context conn)
+                    case eDocument of
+                        Left _ -> throwError errDatabaseAccessFailed
+                        Right doc -> return doc
+            else throwError errNoPermission
+postCommitHandler _ _ _ = throwError errNotLoggedIn
+
+getCommitHandler
+    :: AuthResult Auth.Token -> Document.DocumentID -> CommitID -> Handler ExistingCommit
+getCommitHandler (Authenticated Auth.Token {..}) docID commitID = do
+    conn <- tryGetDBConnection
+    mPerm <- checkDocPermission conn subject docID
+    case mPerm of
+        Nothing -> throwError errNoPermission
+        Just perm ->
+            if Permission.hasPermission perm Permission.Edit
+                then do
+                    eCommit <- liftIO $ getCommit commitID (Context conn)
+                    case eCommit of
+                        Left _ -> throwError errDatabaseAccessFailed
+                        Right com -> return com
+            else throwError errNoPermission
+getCommitHandler _ _ _ = throwError errNotLoggedIn
 
 getAllExternalUsersDocumentHandler
     :: AuthResult Auth.Token
