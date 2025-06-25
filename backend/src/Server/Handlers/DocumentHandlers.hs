@@ -23,58 +23,56 @@ import qualified Server.Auth as Auth
 import Server.HandlerUtil
 import Server.Handlers.RenderHandlers (RenderAPI, renderServer)
 import qualified UserManagement.DocumentPermission as Permission
+import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
-import qualified UserManagement.Group as Group
+import VersionControl
 import VersionControl.Commit
 import VersionControl.Document as Document
-import VersionControl
 import Prelude hiding (readFile)
 
 type DocumentAPI =
     "documents"
-                :> ( Auth AuthMethod Auth.Token
-                    :> Capture "documentID" Document.DocumentID
-                    :> Get '[JSON] Document 
+        :> ( Auth AuthMethod Auth.Token
+                :> Capture "documentID" Document.DocumentID
+                :> Get '[JSON] Document
                 :<|> Auth AuthMethod Auth.Token
                     :> ReqBody '[JSON] (Text, Group.GroupID)
-                    :> Post '[JSON] Document 
+                    :> Post '[JSON] Document
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "documentID" Document.DocumentID
-                    :> Delete '[JSON] NoContent 
-                :<|>
-                    "commits"
-                        :> ( Auth AuthMethod Auth.Token
+                    :> Delete '[JSON] NoContent
+                :<|> "commits"
+                    :> ( Auth AuthMethod Auth.Token
                             :> Capture "documentID" Document.DocumentID
-                            :> Get '[JSON] (Vector ExistingCommit) 
-                        :<|> Auth AuthMethod Auth.Token
-                            :> Capture "documentID" Document.DocumentID
-                            :> ReqBody '[JSON] CreateCommit
-                            :> Post '[JSON] Document 
-                        :<|> Auth AuthMethod Auth.Token
-                            :> Capture "documentID" Document.DocumentID
-                            :> Capture "commitID" CommitID
-                            :> Get '[JSON] ExistingCommit
-                        )
-                :<|>
-                    "external"
-                        :> ( Auth AuthMethod Auth.Token
+                            :> Get '[JSON] (Vector ExistingCommit)
+                            :<|> Auth AuthMethod Auth.Token
+                                :> Capture "documentID" Document.DocumentID
+                                :> ReqBody '[JSON] CreateCommit
+                                :> Post '[JSON] Document
+                            :<|> Auth AuthMethod Auth.Token
+                                :> Capture "documentID" Document.DocumentID
+                                :> Capture "commitID" CommitID
+                                :> Get '[JSON] ExistingCommit
+                       )
+                :<|> "external"
+                    :> ( Auth AuthMethod Auth.Token
                             :> Capture "documentID" Document.DocumentID
                             :> Get '[JSON] [(User.UserID, Permission.DocPermission)]
-                        :<|> Auth AuthMethod Auth.Token
-                            :> Capture "documentID" Document.DocumentID
-                            :> Capture "userID" User.UserID
-                            :> Get '[JSON] (Maybe Permission.DocPermission)
-                        :<|> Auth AuthMethod Auth.Token
-                            :> Capture "documentID" Document.DocumentID
-                            :> Capture "userID" User.UserID
-                            :> ReqBody '[JSON] Permission.DocPermission
-                            :> Put '[JSON] NoContent
-                        :<|> Auth AuthMethod Auth.Token
-                            :> Capture "documentID" Document.DocumentID
-                            :> Capture "userID" User.UserID
-                            :> Delete '[JSON] NoContent
-                        )
+                            :<|> Auth AuthMethod Auth.Token
+                                :> Capture "documentID" Document.DocumentID
+                                :> Capture "userID" User.UserID
+                                :> Get '[JSON] (Maybe Permission.DocPermission)
+                            :<|> Auth AuthMethod Auth.Token
+                                :> Capture "documentID" Document.DocumentID
+                                :> Capture "userID" User.UserID
+                                :> ReqBody '[JSON] Permission.DocPermission
+                                :> Put '[JSON] NoContent
+                            :<|> Auth AuthMethod Auth.Token
+                                :> Capture "documentID" Document.DocumentID
+                                :> Capture "userID" User.UserID
+                                :> Delete '[JSON] NoContent
+                       )
                 :<|> RenderAPI
            )
 
@@ -83,13 +81,15 @@ documentServer =
     getDocumentHandler
         :<|> postDocumentHandler
         :<|> deleteDocumentHandler
-        :<|> (getAllCommitsHandler
-        :<|> postCommitHandler
-        :<|> getCommitHandler)
-        :<|> (getAllExternalUsersDocumentHandler
-        :<|> getExternalUserDocumentHandler
-        :<|> putExternalUserDocumentHandler
-        :<|> deleteExternalUserDocumentHandler)
+        :<|> ( getAllCommitsHandler
+                :<|> postCommitHandler
+                :<|> getCommitHandler
+             )
+        :<|> ( getAllExternalUsersDocumentHandler
+                :<|> getExternalUserDocumentHandler
+                :<|> putExternalUserDocumentHandler
+                :<|> deleteExternalUserDocumentHandler
+             )
         :<|> renderServer
 
 getDocumentHandler
@@ -106,7 +106,6 @@ getDocumentHandler (Authenticated Auth.Token {..}) docID = do
                     case eDocument of
                         Left _ -> throwError errDatabaseAccessFailed
                         Right doc -> return doc
-
                 else throwError errNoPermission
 getDocumentHandler _ _ = throwError errNotLoggedIn
 
@@ -122,7 +121,6 @@ postDocumentHandler (Authenticated token) (name, groupID) = do
         case eAction of
             Left _ -> throwError errDatabaseAccessFailed
             Right doc -> return doc
-
 postDocumentHandler _ _ = throwError errNotLoggedIn
 
 deleteDocumentHandler
@@ -150,7 +148,7 @@ getAllCommitsHandler (Authenticated Auth.Token {..}) docID = do
                     case eVector of
                         Left _ -> throwError errDatabaseAccessFailed
                         Right vec -> return vec
-            else throwError errNoPermission
+                else throwError errNoPermission
 getAllCommitsHandler _ _ = throwError errNotLoggedIn
 
 postCommitHandler
@@ -167,11 +165,14 @@ postCommitHandler (Authenticated Auth.Token {..}) docID cc = do
                     case eDocument of
                         Left _ -> throwError errDatabaseAccessFailed
                         Right doc -> return doc
-            else throwError errNoPermission
+                else throwError errNoPermission
 postCommitHandler _ _ _ = throwError errNotLoggedIn
 
 getCommitHandler
-    :: AuthResult Auth.Token -> Document.DocumentID -> CommitID -> Handler ExistingCommit
+    :: AuthResult Auth.Token
+    -> Document.DocumentID
+    -> CommitID
+    -> Handler ExistingCommit
 getCommitHandler (Authenticated Auth.Token {..}) docID commitID = do
     conn <- tryGetDBConnection
     mPerm <- checkDocPermission conn subject docID
@@ -184,7 +185,7 @@ getCommitHandler (Authenticated Auth.Token {..}) docID commitID = do
                     case eCommit of
                         Left _ -> throwError errDatabaseAccessFailed
                         Right com -> return com
-            else throwError errNoPermission
+                else throwError errNoPermission
 getCommitHandler _ _ _ = throwError errNotLoggedIn
 
 getAllExternalUsersDocumentHandler
