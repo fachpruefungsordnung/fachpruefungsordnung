@@ -1,5 +1,5 @@
 module UserManagement.Sessions
-    ( getUsers
+    ( getAllUsers
     , getUserByEmail
     , getUserByID
     , getUserID
@@ -34,15 +34,14 @@ where
 
 import qualified Data.Bifunctor (second)
 import Data.Text (Text)
-import Data.Vector (Vector)
 import Hasql.Session (Session, statement)
 import qualified UserManagement.Document as Document
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Statements as Statements
 import qualified UserManagement.User as User
 
-getUsers :: Session (Vector User.User)
-getUsers = statement () Statements.getUsers
+getAllUsers :: Session [User.User]
+getAllUsers = statement () Statements.getAllUsers
 
 getUserID :: Text -> Session User.UserID
 getUserID userEmail = statement userEmail Statements.getUserID
@@ -69,7 +68,7 @@ getUserRoleInGroup uid group =
     maybe Nothing User.textToRole
         <$> statement (uid, group) Statements.getUserRoleInGroup
 
-putUser :: User.User -> Session User.UserID
+putUser :: User.UserCreate -> Session User.UserID
 putUser user = statement user Statements.putUser
 
 deleteUser :: User.UserID -> Session ()

@@ -35,8 +35,10 @@ type UserAPI =
             :> Get '[JSON] User.FullUser
         :<|> "users"
             :> ( Auth AuthMethod Auth.Token
-                    :> Capture "userId" User.UserID
-                    :> Get '[JSON] User.FullUser
+                    :> Get '[JSON] [User.User]
+                    :<|> Auth AuthMethod Auth.Token
+                        :> Capture "userId" User.UserID
+                        :> Get '[JSON] User.FullUser
                     :<|> Auth AuthMethod Auth.Token
                         :> Capture "userId" User.UserID
                         :> Delete '[JSON] NoContent
@@ -50,6 +52,7 @@ userServer :: Server UserAPI
 userServer =
     registerHandler
         :<|> meHandler
+        :<|> getAllUsersHandler
         :<|> getUserHandler
         :<|> deleteUserHandler
         :<|> patchUserHandler
@@ -70,7 +73,7 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
                     liftIO $
                         Session.run
                             ( Sessions.putUser
-                                ( User.User
+                                ( User.UserCreate
                                     registerName
                                     registerEmail
                                     hashedText
@@ -89,6 +92,16 @@ registerHandler _ _ = throwError errNotLoggedIn
 meHandler :: AuthResult Auth.Token -> Handler User.FullUser
 meHandler auth@(Authenticated Auth.Token {..}) = getUserHandler auth subject
 meHandler _ = throwError errNotLoggedIn
+
+-- | Returns a list of all users to anyone thats logged in.
+getAllUsersHandler :: AuthResult Auth.Token -> Handler [User.User]
+getAllUsersHandler (Authenticated _) = do
+    conn <- tryGetDBConnection
+    eUsers <- liftIO $ Session.run Sessions.getAllUsers conn
+    case eUsers of
+        Left _ -> throwError errDatabaseAccessFailed
+        Right users -> return users
+getAllUsersHandler _ = throwError errNotLoggedIn
 
 getUserHandler
     :: AuthResult Auth.Token -> User.UserID -> Handler User.FullUser

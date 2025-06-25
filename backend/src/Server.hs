@@ -23,10 +23,8 @@ import Data.OpenApi
     , version
     )
 import Data.UUID (toString)
-import Data.Vector (toList)
 import Database (getConnection)
 import GHC.Int (Int32)
-import qualified Hasql.Session as Session
 import Network.Wai.Handler.Warp (run)
 import Servant
 import Servant.Auth.Server
@@ -39,8 +37,6 @@ import Server.Handlers.DocumentHandlers
 import Server.Handlers.GroupHandlers
 import Server.Handlers.RoleHandlers
 import Server.Handlers.UserHandlers
-import qualified UserManagement.Sessions as Sessions
-import qualified UserManagement.User as User
 import qualified VersionControl as VC
 import VersionControl.Commit
 import Prelude hiding (readFile)
@@ -51,7 +47,6 @@ type DebugAPI =
 
 type PublicAPI =
     "ping" :> Get '[JSON] String
-        :<|> "users" :> Get '[JSON] [User.User]
         :<|> "document" :> Get '[PDF] PDFByteString
         :<|> DebugAPI
         :<|> AuthAPI
@@ -71,12 +66,6 @@ type DocumentedAPI = SwaggerAPI :<|> PublicAPI :<|> ProtectedAPI
 
 pingHandler :: Handler String
 pingHandler = return "pong"
-
-userHandler :: Handler [User.User]
-userHandler = liftIO $ do
-    Right connection <- getConnection
-    Right vector <- Session.run Sessions.getUsers connection
-    return $ toList vector
 
 getCommitHandler :: Int32 -> Handler ExistingCommit
 getCommitHandler id' = liftIO $ do
@@ -125,7 +114,6 @@ server :: CookieSettings -> JWTSettings -> Server DocumentedAPI
 server cookieSett jwtSett =
     return swagger
         :<|> ( pingHandler
-                :<|> userHandler
                 :<|> documentHandler
                 :<|> debugAPIHandler
                 :<|> authServer cookieSett jwtSett

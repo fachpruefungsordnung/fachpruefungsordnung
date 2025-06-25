@@ -5,6 +5,7 @@
 
 module UserManagement.User
     ( User (..)
+    , UserCreate (..)
     , FullUser (..)
     , UserInfo (..)
     , Role (..)
@@ -25,15 +26,22 @@ import qualified UserManagement.Group as Group
 type UserID = UUID
 
 data User = User
-    { userName :: Text
+    { userID :: UserID
+    , userName :: Text
     , userEmail :: Text
-    , userPwhash :: Text
     }
     deriving (Eq, Show, Generic)
 
 instance ToJSON User
 instance FromJSON User
 instance ToSchema User
+
+data UserCreate = UserCreate
+    {
+    userCreateName :: Text
+    , userCreateEmail :: Text
+    , userCreatePWHash :: Text
+    }
 
 data FullUser = FullUser
     { fullUserID :: UserID

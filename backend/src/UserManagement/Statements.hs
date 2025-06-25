@@ -2,7 +2,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 module UserManagement.Statements
-    ( getUsers
+    ( getAllUsers
     , getUserByEmail
     , getUserByID
     , putUser
@@ -80,7 +80,7 @@ getUserByEmail =
     rmap
         (fmap (uncurryN User.User))
         [maybeStatement|
-     select name :: text, email :: text, pwhash :: text
+     select id :: uuid, name :: text, email :: text
      from users
      where email = $1 :: text
    |]
@@ -90,7 +90,7 @@ getUserByID =
     rmap
         (fmap (uncurryN User.User))
         [maybeStatement|
-     select name :: text, email :: text, pwhash :: text
+     select id :: uuid, name :: text, email :: text
      from users
      where id = $1 :: uuid
    |]
@@ -121,12 +121,13 @@ getUserRoleInGroup =
         where u.id = $1 :: uuid and g.id = $2 :: int4
       |]
 
-getUsers :: Statement () (Vector User.User)
-getUsers =
-    rmap
-        (fmap (uncurryN User.User))
-        [vectorStatement|
-      select name :: text, email :: text, pwhash :: text
+getAllUsers :: Statement () [User.User]
+getAllUsers =
+    fmap (\(id, name, email) -> User.User (id :: User.UserID) name email)
+        <$> rmap
+            toList
+            [vectorStatement|
+      select id :: uuid, name :: text, email :: text
       from users
     |]
 
@@ -143,10 +144,10 @@ getAllUserRoles =
     where u.id = $1 :: uuid
   |]
 
-putUser :: Statement User.User User.UserID
+putUser :: Statement User.UserCreate User.UserID
 putUser =
     lmap
-        (\(User.User name email pwhash) -> (name, email, pwhash))
+        (\(User.UserCreate name email pwhash) -> (name, email, pwhash))
         [singletonStatement|
       insert into users (name, email, pwhash)
       values ($1 :: text, $2 :: text, $3 :: text)
