@@ -37,8 +37,7 @@ instance FromJSON User
 instance ToSchema User
 
 data UserCreate = UserCreate
-    {
-    userCreateName :: Text
+    { userCreateName :: Text
     , userCreateEmail :: Text
     , userCreatePWHash :: Text
     }
