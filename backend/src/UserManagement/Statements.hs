@@ -16,6 +16,7 @@ module UserManagement.Statements
     , updateUserEmail
     , updateUserPWHash
     , addGroup
+    , getAllGroupsOverview
     , deleteGroup
     , addRole
     , updateUserRoleInGroup
@@ -193,6 +194,16 @@ addGroup =
       insert into groups (name, description)
       values ($1 :: text, $2 :: text?)
       returning id :: int4
+    |]
+
+getAllGroupsOverview :: Statement () [Group.GroupOverview]
+getAllGroupsOverview =
+    fmap (\(id, name) -> Group.GroupOverview (id :: Group.GroupID) name)
+        <$> rmap
+            toList
+            [vectorStatement|
+        select id :: int4, name :: text
+        from groups
     |]
 
 deleteGroup :: Statement Group.GroupID ()

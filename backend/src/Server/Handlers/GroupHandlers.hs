@@ -29,8 +29,10 @@ import Prelude hiding (readFile)
 type GroupAPI =
     "groups"
         :> ( Auth AuthMethod Auth.Token
-                :> ReqBody '[JSON] Group.Group
+                :> ReqBody '[JSON] Group.GroupCreate
                 :> Post '[JSON] Group.GroupID
+                :<|> Auth AuthMethod Auth.Token
+                    :> Get '[JSON] [Group.GroupOverview]
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "groupID" Group.GroupID
                     :> Get '[JSON] [User.UserInfo]
@@ -46,27 +48,14 @@ type GroupAPI =
 groupServer :: Server GroupAPI
 groupServer =
     createGroupHandler
+        :<|> getAllGroupsHandler
         :<|> groupMembersHandler
         :<|> deleteGroupHandler
         :<|> getAllGroupDocumentsHandler
 
-groupMembersHandler
-    :: AuthResult Auth.Token -> Group.GroupID -> Handler [User.UserInfo]
-groupMembersHandler (Authenticated token) groupID = do
-    conn <- tryGetDBConnection
-    ifSuperOrAdminDo conn token groupID (getMembers conn)
-  where
-    getMembers :: Connection -> Handler [User.UserInfo]
-    getMembers conn = do
-        eMembers <- liftIO $ Session.run (Sessions.getMembersOfGroup groupID) conn
-        case eMembers of
-            Left _ -> throwError errDatabaseAccessFailed
-            Right members -> return members
-groupMembersHandler _ _ = throwError errNotLoggedIn
-
 createGroupHandler
-    :: AuthResult Auth.Token -> Group.Group -> Handler Group.GroupID
-createGroupHandler (Authenticated Auth.Token {..}) (Group.Group {..}) = do
+    :: AuthResult Auth.Token -> Group.GroupCreate -> Handler Group.GroupID
+createGroupHandler (Authenticated Auth.Token {..}) (Group.GroupCreate {..}) = do
     conn <- tryGetDBConnection
     if isSuperadmin
         then createGroup conn
@@ -88,11 +77,40 @@ createGroupHandler (Authenticated Auth.Token {..}) (Group.Group {..}) = do
     createGroup :: Connection -> Handler Group.GroupID
     createGroup conn = do
         eGroupID <-
-            liftIO $ Session.run (Sessions.addGroup groupName groupDescription) conn
+            liftIO $
+                Session.run (Sessions.addGroup groupCreateName groupCreateDescription) conn
         case eGroupID of
             Left _ -> throwError errDatabaseAccessFailed
             Right groupID -> return groupID
 createGroupHandler _ _ = throwError errNotLoggedIn
+
+-- | If the logged in user is SuperAdmin returns list of all existing groups as
+--   [(GroupID, GroupName)]
+getAllGroupsHandler :: AuthResult Auth.Token -> Handler [Group.GroupOverview]
+getAllGroupsHandler (Authenticated Auth.Token {..}) =
+    if isSuperadmin
+        then do
+            conn <- tryGetDBConnection
+            eGroups <- liftIO $ Session.run Sessions.getAllGroupsOverview conn
+            case eGroups of
+                Left _ -> throwError errDatabaseAccessFailed
+                Right groups -> return groups
+        else throwError errSuperAdminOnly
+getAllGroupsHandler _ = throwError errNotLoggedIn
+
+groupMembersHandler
+    :: AuthResult Auth.Token -> Group.GroupID -> Handler [User.UserInfo]
+groupMembersHandler (Authenticated token) groupID = do
+    conn <- tryGetDBConnection
+    ifSuperOrAdminDo conn token groupID (getMembers conn)
+  where
+    getMembers :: Connection -> Handler [User.UserInfo]
+    getMembers conn = do
+        eMembers <- liftIO $ Session.run (Sessions.getMembersOfGroup groupID) conn
+        case eMembers of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right members -> return members
+groupMembersHandler _ _ = throwError errNotLoggedIn
 
 deleteGroupHandler
     :: AuthResult Auth.Token -> Group.GroupID -> Handler NoContent
