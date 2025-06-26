@@ -29,6 +29,8 @@ import Prelude hiding (readFile)
 type DocumentAPI =
     "documents"
         :> ( Auth AuthMethod Auth.Token
+                :> Get '[JSON] [Document]
+                :<|> Auth AuthMethod Auth.Token
                 :> Capture "documentID" Document.DocumentID
                 :> Get '[JSON] ExistingCommit
                 :<|> Auth AuthMethod Auth.Token
@@ -59,13 +61,25 @@ type DocumentAPI =
 
 documentServer :: Server DocumentAPI
 documentServer =
-    getDocumentHandler
+    getMyDocumentsHandler
+        :<|> getDocumentHandler
+        :<|> postDocumentHandler
         :<|> deleteDocumentHandler
         :<|> getAllExternalUsersDocumentHandler
         :<|> getExternalUserDocumentHandler
         :<|> putExternalUserDocumentHandler
         :<|> deleteExternalUserDocumentHandler
         :<|> renderServer
+
+getMyDocumentsHandler
+    :: AuthResult Auth.Token ->  Handler [Document]
+getMyDocumentsHandler (Authenticated Auth.Token {..}) = do
+    conn <- tryGetDBConnection
+    eList <- liftIO $ Session.run (Sessions.getAllVisibleDocuments subject) conn
+    case eList of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right list -> return list
+getMyDocumentsHandler _ = throwError errNotLoggedIn
 
 getDocumentHandler
     :: AuthResult Auth.Token -> Document.DocumentID -> Handler ExistingCommit

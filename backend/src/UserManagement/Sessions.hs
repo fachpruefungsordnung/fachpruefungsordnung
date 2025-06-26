@@ -30,6 +30,8 @@ module UserManagement.Sessions
     , addExternalDocPermission
     , updateExternalDocPermission
     , deleteExternalDocPermission
+    , getAllVisibleDocuments
+    , getAllDocumentsOfGroup
     )
 where
 
@@ -152,3 +154,9 @@ updateExternalDocPermission uid did perm =
 
 deleteExternalDocPermission :: User.UserID -> Document.DocumentID -> Session ()
 deleteExternalDocPermission uid did = statement (uid, did) Statements.deleteExternalDocPermission
+
+getAllVisibleDocuments :: User.UserID -> Session [Document.Document]
+getAllVisibleDocuments uid = statement uid Statements.getAllVisibleDocuments
+
+getAllDocumentsOfGroup :: Group.GroupID -> Session [Document.Document]
+getAllDocumentsOfGroup gid = statement gid Statements.getAllDocumentsOfGroup

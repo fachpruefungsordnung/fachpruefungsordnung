@@ -33,6 +33,8 @@ module UserManagement.Statements
     , addExternalDocPermission
     , updateExternalDocPermission
     , deleteExternalDocPermission
+    , getAllVisibleDocuments
+    , getAllDocumentsOfGroup
     )
 where
 
@@ -46,9 +48,11 @@ import GHC.Int
 import Hasql.Statement
 import Hasql.TH
 import UserManagement.Document (textToPermission)
-import qualified UserManagement.Document as Document
+import qualified UserManagement.Permission as Permission
 import qualified UserManagement.Group as Group
 import qualified UserManagement.User as User
+import qualified VersionControl.Document as Document
+import qualified VersionControl.Commit as Commit
 import Prelude hiding (id)
 
 getUserID :: Statement Text User.UserID
@@ -307,7 +311,7 @@ checkGroupDocPermission =
 
 -- | extract the DocPermission for external document editors if they exist
 getExternalDocPermission
-    :: Statement (User.UserID, Document.DocumentID) (Maybe Document.DocPermission)
+    :: Statement (User.UserID, Document.DocumentID) (Maybe Permission.DocPermission)
 getExternalDocPermission =
     rmap
         (>>= textToPermission)
@@ -354,7 +358,7 @@ deleteExternalDocPermission =
       |]
 
 getAllExternalUsersOfDocument
-    :: Statement Document.DocumentID [(User.UserID, Maybe Document.DocPermission)]
+    :: Statement Document.DocumentID [(User.UserID, Maybe Permission.DocPermission)]
 getAllExternalUsersOfDocument =
     rmap
         (fmap (Data.Bifunctor.second textToPermission) . toList)
@@ -363,3 +367,55 @@ getAllExternalUsersOfDocument =
           from external_document_rights
           where document_id = $1 :: int4
         |]
+
+getAllVisibleDocuments :: Statement User.UserID [Document.Document]
+getAllVisibleDocuments =
+    rmap
+      (fmap ( \(document, name, groupID, headCommit) ->
+            Document.Document
+                (Document.DocumentID document)
+                name
+                groupID
+                (Commit.CommitID <$> headCommit)
+        ) . toList)
+
+    [vectorStatement|
+      (select 
+        d.id :: int4,
+        d.name :: text,
+        d.group_id :: int4,
+        d.head :: int4?
+      from roles r
+      join documents d on d.group_id = r.group_id
+      where r.user_id = $1 :: uuid)
+      union
+      (select 
+        d.id :: int4,
+        d.name :: text,
+        d.group_id :: int4,
+        d.head :: int4?
+      from documents d
+      join external_document_rights e on d.document_id = e.document_id
+      where e.user_id = $1 :: uuid)
+    |]
+
+getAllDocumentsOfGroup :: Statement Group.GroupID [Document.Document]
+getAllDocumentsOfGroup =
+    rmap
+      (fmap ( \(document, name, groupID, headCommit) ->
+            Document.Document
+                (Document.DocumentID document)
+                name
+                groupID
+                (Commit.CommitID <$> headCommit)
+        ) . toList)
+
+    [vectorStatement|
+      select 
+        id :: int4,
+        name :: text,
+        group_id :: int4,
+        head :: int4?
+      from documents
+      where group_id = $1 :: int4
+    |]
