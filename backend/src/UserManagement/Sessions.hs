@@ -13,6 +13,7 @@ module UserManagement.Sessions
     , getLoginRequirements
     , getAllUserRoles
     , addGroup
+    , getGroupInfo
     , getAllGroupsOverview
     , deleteGroup
     , addRole
@@ -85,6 +86,10 @@ updateUserPWHash uid pwhash = statement (pwhash, uid) Statements.updateUserName
 
 addGroup :: Text -> Maybe Text -> Session Group.GroupID
 addGroup group description = statement (group, description) Statements.addGroup
+
+-- | returns name and description of specified group
+getGroupInfo :: Group.GroupID -> Session Group.GroupCreate
+getGroupInfo groupID = statement groupID Statements.getGroupInfo
 
 getAllGroupsOverview :: Session [Group.GroupOverview]
 getAllGroupsOverview = statement () Statements.getAllGroupsOverview

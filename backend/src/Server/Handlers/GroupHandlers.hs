@@ -35,7 +35,7 @@ type GroupAPI =
                     :> Get '[JSON] [Group.GroupOverview]
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "groupID" Group.GroupID
-                    :> Get '[JSON] [User.UserInfo]
+                    :> Get '[JSON] Group.Group
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "groupID" Group.GroupID
                     :> Delete '[JSON] NoContent
@@ -49,7 +49,7 @@ groupServer :: Server GroupAPI
 groupServer =
     createGroupHandler
         :<|> getAllGroupsHandler
-        :<|> groupMembersHandler
+        :<|> getGroupHandler
         :<|> deleteGroupHandler
         :<|> getAllGroupDocumentsHandler
 
@@ -98,19 +98,28 @@ getAllGroupsHandler (Authenticated Auth.Token {..}) =
         else throwError errSuperAdminOnly
 getAllGroupsHandler _ = throwError errNotLoggedIn
 
-groupMembersHandler
-    :: AuthResult Auth.Token -> Group.GroupID -> Handler [User.UserInfo]
-groupMembersHandler (Authenticated token) groupID = do
+getGroupHandler
+    :: AuthResult Auth.Token -> Group.GroupID -> Handler Group.Group
+getGroupHandler (Authenticated token) groupID = do
     conn <- tryGetDBConnection
-    ifSuperOrAdminDo conn token groupID (getMembers conn)
+    ifSuperOrAdminDo conn token groupID (getGroup conn)
   where
+    getGroup :: Connection -> Handler Group.Group
+    getGroup conn = do
+        eGroupInfo <- liftIO $ Session.run (Sessions.getGroupInfo groupID) conn
+        case eGroupInfo of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right (Group.GroupCreate name mDesc) -> do
+                members <- getMembers conn
+                return $ Group.Group groupID name mDesc members
+
     getMembers :: Connection -> Handler [User.UserInfo]
     getMembers conn = do
         eMembers <- liftIO $ Session.run (Sessions.getMembersOfGroup groupID) conn
         case eMembers of
             Left _ -> throwError errDatabaseAccessFailed
             Right members -> return members
-groupMembersHandler _ _ = throwError errNotLoggedIn
+getGroupHandler _ _ = throwError errNotLoggedIn
 
 deleteGroupHandler
     :: AuthResult Auth.Token -> Group.GroupID -> Handler NoContent

@@ -16,6 +16,7 @@ module UserManagement.Statements
     , updateUserEmail
     , updateUserPWHash
     , addGroup
+    , getGroupInfo
     , getAllGroupsOverview
     , deleteGroup
     , addRole
@@ -195,6 +196,15 @@ addGroup =
       insert into groups (name, description)
       values ($1 :: text, $2 :: text?)
       returning id :: int4
+    |]
+
+getGroupInfo :: Statement Group.GroupID Group.GroupCreate
+getGroupInfo =
+    uncurry Group.GroupCreate
+        <$> [singletonStatement|
+        select name :: text, description :: text?
+        from groups
+        where id = $1 :: int4
     |]
 
 getAllGroupsOverview :: Statement () [Group.GroupOverview]
