@@ -1,4 +1,4 @@
-CREATE TYPE DocPermission AS ENUM ('read', 'review', 'edit');
+CREATE TYPE DocPermission AS ENUM ('reader', 'reviewer', 'editor');
 
 CREATE TABLE IF NOT EXISTS external_document_rights (
     user_id UUID NOT NULL,

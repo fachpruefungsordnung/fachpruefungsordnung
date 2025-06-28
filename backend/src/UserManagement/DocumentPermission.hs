@@ -4,9 +4,8 @@
 
 {-# HLINT ignore "Use infix" #-}
 
-module UserManagement.Document
-    ( DocumentID
-    , DocPermission (..)
+module UserManagement.DocumentPermission
+    ( DocPermission (..)
     , Permission (..)
     , hasPermission
     , permissionToText
@@ -17,12 +16,9 @@ import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
 import Data.Text (Text, pack, unpack)
 import GHC.Generics (Generic)
-import GHC.Int (Int32)
 import Text.Read (readMaybe)
 
-type DocumentID = Int32
-
-data DocPermission = Reader | Reviewer | Editer
+data DocPermission = Reader | Reviewer | Editor
     deriving (Eq, Generic)
 
 data Permission = Read | Comment | Edit
@@ -31,7 +27,7 @@ data Permission = Read | Comment | Edit
 hasPermission :: DocPermission -> Permission -> Bool
 hasPermission Reader Read = True
 hasPermission Reviewer p = elem p [Read, Comment]
-hasPermission Editer p = elem p [Read, Comment, Edit]
+hasPermission Editor p = elem p [Read, Comment, Edit]
 hasPermission _ _ = False
 
 instance Ord DocPermission where
@@ -49,13 +45,13 @@ instance Show DocPermission where
     show s = case s of
         Reader -> "reader"
         Reviewer -> "reviewer"
-        Editer -> "editer"
+        Editor -> "editor"
 
 instance Read DocPermission where
     readsPrec _ s = case lex s of
         [("reader", rs)] -> [(Reader, rs)]
         [("reviewer", rs)] -> [(Reviewer, rs)]
-        [("editer", rs)] -> [(Editer, rs)]
+        [("editor", rs)] -> [(Editor, rs)]
         _ -> []
 
 -- Convert to/from Text
