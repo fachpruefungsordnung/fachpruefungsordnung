@@ -12,20 +12,24 @@ module FPO.Page.Admin.Users (component) where
 
 import Prelude
 
-import Data.Array (filter, length, replicate, slice, (..), (:))
+import Affjax.StatusCode (StatusCode(..))
+import Data.Argonaut (decodeJson)
+import Data.Array (filter, length, replicate, slice, (:))
+import Data.Either (Either(..))
+import Data.JSON (UserForOverview(..), getName)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
+import Effect.Console (log)
 import FPO.Components.Pagination as P
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (getUser)
+import FPO.Data.Request (getJson, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Page.HTML (addButton, addCard, addColumn, emptyEntryText)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import Halogen (liftAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -60,8 +64,8 @@ data Action
 type State = FPOState
   ( error :: Maybe String
   , page :: Int
-  , users :: Array String
-  , filteredUsers :: Array String
+  , users :: Array UserForOverview
+  , filteredUsers :: Array UserForOverview
   , filterUsername :: String
   , createUsername :: String
   )
@@ -115,12 +119,20 @@ component =
       --       the error of missing credentials), but for now,
       --       we just check if the user is an admin and redirect
       --       to a 404 page if not.
-      u <- liftAff $ getUser
-      when (fromMaybe true (not <$> _.isAdmin <$> u)) $
-        navigate Page404
+      u <- H.liftAff $ getUser
+      when (fromMaybe true (not <$> _.isAdmin <$> u)) $ navigate Page404
 
-      let users = map (\i -> if i == 23 then "test" else "User " <> show i) (1 .. 55)
-      H.modify_ _ { users = users, filteredUsers = users }
+      userReponse <- H.liftAff $ getJson "/users"
+      case userReponse of
+        Left _ -> navigate Page404
+        Right { status, body } -> case status of
+          StatusCode 200 -> case decodeJson body of
+            Left err -> do
+              H.liftEffect $ log $ "Error decoding users: " <> show err
+              navigate Page404
+            Right users -> do
+              H.modify_ _ { users = users, filteredUsers = users }
+          _ -> navigate Page404
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
     DoNothing -> do
@@ -132,18 +144,25 @@ component =
     ChangeCreateUsername username -> do
       H.modify_ _ { createUsername = username }
     Filter -> do
-      s <- H.get
+      state <- H.get
       let
-        filteredUsers = filter (\u -> contains (Pattern s.filterUsername) u) s.users
+        filteredUsers = filter
+          (\u -> contains (Pattern state.filterUsername) (getName u))
+          state.users
       H.modify_ _ { filteredUsers = filteredUsers }
     CreateUser -> do
-      newUser <- H.gets _.createUsername
-      if newUser == "" then H.modify_ _ { error = Just "Username cannot be empty." }
+      newUsername <- H.gets _.createUsername
+
+      let
+        newUserForOverview = UserForOverview
+          { userEmail: "", userID: "", userName: newUsername }
+      if newUsername == "" then H.modify_ _
+        { error = Just "Username cannot be empty." }
       else do
-        H.modify_ \s -> s
+        H.modify_ \state -> state
           { error = Nothing
-          , users = newUser : s.users
-          , filteredUsers = newUser : s.users
+          , users = newUserForOverview : state.users
+          , filteredUsers = newUserForOverview : state.users
           , createUsername = ""
           }
 
@@ -248,7 +267,8 @@ component =
       ]
 
   -- Creates a (dummy) user entry for the list.
-  createUserEntry :: forall w. String -> HH.HTML w Action
-  createUserEntry userName =
+  createUserEntry :: forall w. UserForOverview -> HH.HTML w Action
+  createUserEntry (UserForOverview { userName }) =
     HH.li [ HP.classes [ HB.listGroupItem ] ]
       [ HH.text userName ]
+

@@ -3,7 +3,8 @@ module Data.JSON where
 
 import Prelude
 
-import Data.Argonaut (Json, JsonDecodeError, decodeJson, (.:))
+import Data.Argonaut (Json, decodeJson, (.:))
+import Data.Argonaut.Decode (JsonDecodeError)
 import Data.Either (Either)
 import FPO.Data.Store (User)
 
