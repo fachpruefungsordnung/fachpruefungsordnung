@@ -16,7 +16,7 @@ import Web.Storage.Storage (getItem, setItem) as LocalStorage
 
 type User = { userName :: String, isAdmin :: Boolean }
 
-type Group = { groupName :: String, groupId :: Int }
+type Group = { groupOverviewName :: String, groupOverviewId :: Int }
 
 type GroupCreate = { groupCreateName :: String, groupCreateDescription :: String }
 

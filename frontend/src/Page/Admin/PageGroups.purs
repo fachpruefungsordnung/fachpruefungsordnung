@@ -169,7 +169,7 @@ component =
         Loaded gs -> do
           let
             filteredGroups = filter
-              (\g -> contains (Pattern s.groupNameFilter) g.groupName)
+              (\g -> contains (Pattern s.groupNameFilter) g.groupOverviewName)
               gs
           H.modify_ _ { filteredGroups = filteredGroups }
         Loading -> do
@@ -211,7 +211,7 @@ component =
                   Right newId -> do
                     H.modify_ _
                       { error = Nothing
-                      , groups = Loaded $ { groupName: newGroupName, groupId: newId }
+                      , groups = Loaded $ { groupOverviewName: newGroupName, groupOverviewId: newId }
                           : gs
                       , groupNameCreate = ""
                       }
@@ -241,7 +241,7 @@ component =
       s <- H.get
       case s.groups of
         Loaded gs -> do
-          let groupId = _.groupId <$> find (\g -> g.groupName == groupName) gs
+          let groupId = _.groupOverviewId <$> find (\g -> g.groupOverviewName == groupName) gs
 
           case groupId of
             Nothing -> do
@@ -262,7 +262,7 @@ component =
                     liftEffect $ log $ "Deleted group: " <> groupName
                     H.modify_ _
                       { error = Nothing
-                      , groups = Loaded $ filter (\g -> g.groupName /= groupName) gs
+                      , groups = Loaded $ filter (\g -> g.groupOverviewName /= groupName) gs
                       }
               setWaiting false
           handleAction Filter
@@ -361,8 +361,8 @@ component =
           , HB.alignItemsCenter
           ]
       ]
-      [ HH.text group.groupName
-      , buttonDeleteGroup state group.groupName
+      [ HH.text group.groupOverviewName
+      , buttonDeleteGroup state group.groupOverviewName
       ]
 
   buttonDeleteGroup :: forall w. State -> String -> HH.HTML w Action

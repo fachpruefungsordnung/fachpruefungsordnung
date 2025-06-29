@@ -23,9 +23,9 @@ decodeUser json = do
 decodeGroup :: Json -> Either JsonDecodeError Group
 decodeGroup json = do
   obj <- decodeJson json
-  name <- obj .: "groupName"
-  id <- obj .: "groupID"
-  pure { groupName: name, groupId: id }
+  name <- obj .: "groupOverviewName"
+  id <- obj .: "groupOverviewID"
+  pure { groupOverviewName: name, groupOverviewId: id }
 
 encodeGroupCreate :: GroupCreate -> Json
 encodeGroupCreate = encodeJson
