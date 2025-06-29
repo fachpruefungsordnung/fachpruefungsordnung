@@ -211,8 +211,9 @@ component =
                   Right newId -> do
                     H.modify_ _
                       { error = Nothing
-                      , groups = Loaded $ { groupOverviewName: newGroupName, groupOverviewId: newId }
-                          : gs
+                      , groups = Loaded $
+                          { groupOverviewName: newGroupName, groupOverviewId: newId }
+                            : gs
                       , groupNameCreate = ""
                       }
             handleAction Filter
@@ -241,7 +242,10 @@ component =
       s <- H.get
       case s.groups of
         Loaded gs -> do
-          let groupId = _.groupOverviewId <$> find (\g -> g.groupOverviewName == groupName) gs
+          let
+            groupId = _.groupOverviewId <$> find
+              (\g -> g.groupOverviewName == groupName)
+              gs
 
           case groupId of
             Nothing -> do
@@ -262,7 +266,9 @@ component =
                     liftEffect $ log $ "Deleted group: " <> groupName
                     H.modify_ _
                       { error = Nothing
-                      , groups = Loaded $ filter (\g -> g.groupOverviewName /= groupName) gs
+                      , groups = Loaded $ filter
+                          (\g -> g.groupOverviewName /= groupName)
+                          gs
                       }
               setWaiting false
           handleAction Filter
