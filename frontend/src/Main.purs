@@ -113,7 +113,15 @@ component =
   where
   render :: State -> H.ComponentHTML Action Slots m
   render state = HH.div
-    [ HP.classes [ HB.dFlex, HB.flexColumn, HB.vh100, HB.p0, HB.overflowHidden ] ]
+    [ HP.classes
+        [ HB.dFlex
+        , HB.flexColumn
+        , HB.vh100
+        , HB.p0
+        , HB.overflowYAuto
+        , HB.overflowXHidden
+        ]
+    ]
     [ HH.slot_ _navbar unit Navbar.navbar unit
     , case state.route of
         Nothing -> HH.slot_ _page404 unit Page404.component unit
