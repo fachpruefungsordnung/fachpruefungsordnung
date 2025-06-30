@@ -2,7 +2,7 @@
 {-# LANGUAGE QuasiQuotes #-}
 
 module UserManagement.Statements
-    ( getUsers
+    ( getAllUsers
     , getUserByEmail
     , getUserByID
     , putUser
@@ -16,6 +16,8 @@ module UserManagement.Statements
     , updateUserEmail
     , updateUserPWHash
     , addGroup
+    , getGroupInfo
+    , getAllGroupsOverview
     , deleteGroup
     , addRole
     , updateUserRoleInGroup
@@ -79,7 +81,7 @@ getUserByEmail =
     rmap
         (fmap (uncurryN User.User))
         [maybeStatement|
-     select name :: text, email :: text, pwhash :: text
+     select id :: uuid, name :: text, email :: text
      from users
      where email = $1 :: text
    |]
@@ -89,7 +91,7 @@ getUserByID =
     rmap
         (fmap (uncurryN User.User))
         [maybeStatement|
-     select name :: text, email :: text, pwhash :: text
+     select id :: uuid, name :: text, email :: text
      from users
      where id = $1 :: uuid
    |]
@@ -120,12 +122,13 @@ getUserRoleInGroup =
         where u.id = $1 :: uuid and g.id = $2 :: int4
       |]
 
-getUsers :: Statement () (Vector User.User)
-getUsers =
-    rmap
-        (fmap (uncurryN User.User))
-        [vectorStatement|
-      select name :: text, email :: text, pwhash :: text
+getAllUsers :: Statement () [User.User]
+getAllUsers =
+    fmap (\(id, name, email) -> User.User (id :: User.UserID) name email)
+        <$> rmap
+            toList
+            [vectorStatement|
+      select id :: uuid, name :: text, email :: text
       from users
     |]
 
@@ -142,10 +145,10 @@ getAllUserRoles =
     where u.id = $1 :: uuid
   |]
 
-putUser :: Statement User.User User.UserID
+putUser :: Statement User.UserCreate User.UserID
 putUser =
     lmap
-        (\(User.User name email pwhash) -> (name, email, pwhash))
+        (\(User.UserCreate name email pwhash) -> (name, email, pwhash))
         [singletonStatement|
       insert into users (name, email, pwhash)
       values ($1 :: text, $2 :: text, $3 :: text)
@@ -193,6 +196,25 @@ addGroup =
       insert into groups (name, description)
       values ($1 :: text, $2 :: text?)
       returning id :: int4
+    |]
+
+getGroupInfo :: Statement Group.GroupID Group.GroupCreate
+getGroupInfo =
+    uncurry Group.GroupCreate
+        <$> [singletonStatement|
+        select name :: text, description :: text?
+        from groups
+        where id = $1 :: int4
+    |]
+
+getAllGroupsOverview :: Statement () [Group.GroupOverview]
+getAllGroupsOverview =
+    fmap (\(id, name) -> Group.GroupOverview (id :: Group.GroupID) name)
+        <$> rmap
+            toList
+            [vectorStatement|
+        select id :: int4, name :: text
+        from groups
     |]
 
 deleteGroup :: Statement Group.GroupID ()

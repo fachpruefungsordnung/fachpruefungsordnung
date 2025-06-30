@@ -5,6 +5,7 @@
 
 module UserManagement.User
     ( User (..)
+    , UserCreate (..)
     , FullUser (..)
     , UserInfo (..)
     , Role (..)
@@ -19,15 +20,15 @@ import Data.OpenApi (ToSchema)
 import Data.Text (Text, pack, unpack)
 import Data.UUID (UUID)
 import GHC.Generics (Generic)
+import GHC.Int (Int32)
 import Text.Read (readMaybe)
-import qualified UserManagement.Group as Group
 
 type UserID = UUID
 
 data User = User
-    { userName :: Text
+    { userID :: UserID
+    , userName :: Text
     , userEmail :: Text
-    , userPwhash :: Text
     }
     deriving (Eq, Show, Generic)
 
@@ -35,12 +36,21 @@ instance ToJSON User
 instance FromJSON User
 instance ToSchema User
 
+data UserCreate = UserCreate
+    { userCreateName :: Text
+    , userCreateEmail :: Text
+    , userCreatePWHash :: Text
+    }
+
+-- | duplicate definition because of import cycle with UserManagement.Group :'(
+type GroupID = Int32
+
 data FullUser = FullUser
     { fullUserID :: UserID
     , fullUserName :: Text
     , fullUserEmail :: Text
     , fullUserIsSuperadmin :: Bool
-    , fullUserRoles :: [(Group.GroupID, Role)]
+    , fullUserRoles :: [(GroupID, Role)]
     }
     deriving (Show, Generic)
 

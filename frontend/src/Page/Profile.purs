@@ -7,7 +7,7 @@ import Prelude
 import Data.Maybe (Maybe(..), fromMaybe)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (getUser)
+import FPO.Data.Request (LoadState(..), getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (User)
 import FPO.Data.Store as Store
@@ -23,21 +23,19 @@ import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
 
--- | State of an asynchronous load operation.
--- | It can either be in a loading state or have successfully loaded data.
--- |
+data Action
+  = Initialize
+  | Receive (Connected FPOTranslator Input)
+
 -- | TODO: Because `handleAction` handles the case of failing to load the user
 -- |       explicitly (by navigating to the login page), we do not care about
 -- |       the error case here. We should look for a more general approach to
 -- |       handle loading entities in the future. Right now, this is at least
 -- |       more descriptive than using `Maybe`.
-data LoadState a = Loading | Loaded a
-
-data Action
-  = Initialize
-  | Receive (Connected FPOTranslator Input)
-
-type State = FPOState (user :: LoadState User, loginSuccessfulBanner :: Boolean)
+type State = FPOState
+  ( user :: LoadState User
+  , loginSuccessfulBanner :: Boolean
+  )
 
 type Input = { loginSuccessfulBanner :: Maybe Boolean }
 

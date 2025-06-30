@@ -6,22 +6,27 @@ module FPO.Data.Request where
 
 import Prelude
 
-import Affjax (AffjaxDriver, Error, Request, Response, request)
+import Affjax (AffjaxDriver, Error(..), Request, Response, request)
 import Affjax.RequestBody (json) as RequestBody
 import Affjax.RequestHeader (RequestHeader(RequestHeader))
 import Affjax.ResponseFormat (ResponseFormat)
 import Affjax.ResponseFormat (blob, document, ignore, json, string) as AXRF
+import Affjax.StatusCode (StatusCode(..))
+import Data.Argonaut (JsonDecodeError)
 import Data.Argonaut.Core (Json)
+import Data.Argonaut.Decode.Decoders (decodeArray)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.JSON (decodeUser)
+import Data.JSON (decodeGroup, decodeUser, encodeGroupCreate)
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (Aff)
+import Effect.Aff as Exn
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import FPO.Data.Store (User)
+import FPO.Data.Store (Group, GroupCreate, User)
+import Foreign (renderForeignError)
 import Web.DOM.Document (Document)
 import Web.File.Blob (Blob)
 
@@ -46,23 +51,52 @@ defaultFpoRequest responseFormat url method = do
     , timeout: Nothing
     }
 
+-- | Prints an error message based on the type of error.
+-- | The error message is prefixed with the provided string.
+printError :: String -> Error -> String
+printError str = case _ of
+  RequestContentError err ->
+    str <> ": " <> err
+  ResponseBodyError err _ ->
+    str <> ": " <> renderForeignError err
+  TimeoutError ->
+    str <> ": timeout"
+  RequestFailedError ->
+    str <> ": request failed"
+  XHROtherError err ->
+    str <> ": " <> Exn.message err
+
 -- | High-level requests ---------------------------------------------------
 
--- | Fetches the current user from the server, based on the `/me` endpoint.
-getUser :: Aff (Maybe User)
-getUser = do
-  userResponse <- getJson "/me"
-  case userResponse of
+-- | State of an asynchronous load operation.
+-- | It can either be in a loading state or have successfully loaded data.
+data LoadState a = Loading | Loaded a
+
+getFromJSONEndpoint
+  :: forall a. (Json -> Either JsonDecodeError a) -> String -> Aff (Maybe a)
+getFromJSONEndpoint decode url = do
+  response <- getJson url
+  case response of
     Left _ ->
       pure Nothing
     Right res -> do
-      case decodeUser (res.body) of
+      case decode (res.body) of
         Left err -> do
-          liftEffect $ log $ "Error decoding user: " <> show err
+          liftEffect $ log $ "Error Decoding: " <> show err
           pure Nothing
-        Right user -> do
-          liftEffect $ log $ "User decoded successfully: " <> show user
-          pure $ Just user
+        Right val -> do
+          pure $ Just val
+
+-- | Fetches the current user from the server.
+getUser :: Aff (Maybe User)
+getUser = getFromJSONEndpoint decodeUser "/me"
+
+-- | Fetches the groups of the current user from the server.
+getGroups :: Aff (Maybe (Array Group))
+getGroups = getFromJSONEndpoint (decodeArray decodeGroup) "/groups"
+
+addGroup :: GroupCreate -> Aff (Either Error (Response Json))
+addGroup group = postJson "/groups" (encodeGroupCreate group)
 
 -- | GET-Requests ----------------------------------------------------------
 
@@ -125,3 +159,19 @@ postBlob url body = do
   fpoRequest <- liftEffect $ defaultFpoRequest AXRF.blob ("/api" <> url) POST
   let request' = fpoRequest { content = Just (RequestBody.json body) }
   liftAff $ request driver request'
+
+-- | DELETE Requests -------------------------------------------------------
+
+-- | Makes a DELETE request and expects a Null response.
+deleteIgnore :: String -> Aff (Either Error (Response Unit))
+deleteIgnore url = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.ignore ("/api" <> url) DELETE
+  liftAff $ request driver fpoRequest
+
+-- | Auxiliary Functions -----------------------------------------------------
+
+-- | Extracts the status code from a response.
+getStatusCode :: forall a. Response a -> Int
+getStatusCode response = extract $ response.status
+  where
+  extract (StatusCode code) = code

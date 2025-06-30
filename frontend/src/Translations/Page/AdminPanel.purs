@@ -4,17 +4,20 @@ import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)
 
 type AdminPanelLabels =
-  ( "ap_adminPanel"
+  ( "au_groupManagement"
+      ::: "au_userManagement"
       ::: SNil
   )
 
 enAdminPanel :: Translation AdminPanelLabels
 enAdminPanel = fromRecord
-  { ap_adminPanel: "Admin Panel"
+  { au_groupManagement: "Group Management"
+  , au_userManagement: "User Management"
   }
 
 deAdminPanel :: Translation AdminPanelLabels
 deAdminPanel = fromRecord
-  { ap_adminPanel: "Adminpanel"
+  { au_groupManagement: "Gruppenverwaltung"
+  , au_userManagement: "Nutzerverwaltung"
   }
 

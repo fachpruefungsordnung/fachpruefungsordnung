@@ -1,5 +1,5 @@
 module UserManagement.Sessions
-    ( getUsers
+    ( getAllUsers
     , getUserByEmail
     , getUserByID
     , getUserID
@@ -13,6 +13,8 @@ module UserManagement.Sessions
     , getLoginRequirements
     , getAllUserRoles
     , addGroup
+    , getGroupInfo
+    , getAllGroupsOverview
     , deleteGroup
     , addRole
     , updateUserRoleInGroup
@@ -33,7 +35,6 @@ where
 
 import qualified Data.Bifunctor (second)
 import Data.Text (Text)
-import Data.Vector (Vector)
 import qualified DocumentManagement.Document as Document
 import Hasql.Session (Session, statement)
 import qualified UserManagement.DocumentPermission as Permission
@@ -41,8 +42,8 @@ import qualified UserManagement.Group as Group
 import qualified UserManagement.Statements as Statements
 import qualified UserManagement.User as User
 
-getUsers :: Session (Vector User.User)
-getUsers = statement () Statements.getUsers
+getAllUsers :: Session [User.User]
+getAllUsers = statement () Statements.getAllUsers
 
 getUserID :: Text -> Session User.UserID
 getUserID userEmail = statement userEmail Statements.getUserID
@@ -69,7 +70,7 @@ getUserRoleInGroup uid group =
     maybe Nothing User.textToRole
         <$> statement (uid, group) Statements.getUserRoleInGroup
 
-putUser :: User.User -> Session User.UserID
+putUser :: User.UserCreate -> Session User.UserID
 putUser user = statement user Statements.putUser
 
 deleteUser :: User.UserID -> Session ()
@@ -86,6 +87,13 @@ updateUserPWHash uid pwhash = statement (pwhash, uid) Statements.updateUserName
 
 addGroup :: Text -> Maybe Text -> Session Group.GroupID
 addGroup group description = statement (group, description) Statements.addGroup
+
+-- | returns name and description of specified group
+getGroupInfo :: Group.GroupID -> Session Group.GroupCreate
+getGroupInfo groupID = statement groupID Statements.getGroupInfo
+
+getAllGroupsOverview :: Session [Group.GroupOverview]
+getAllGroupsOverview = statement () Statements.getAllGroupsOverview
 
 deleteGroup :: Group.GroupID -> Session ()
 deleteGroup groupID = statement groupID Statements.deleteGroup

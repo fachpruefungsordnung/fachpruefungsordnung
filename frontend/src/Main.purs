@@ -21,7 +21,8 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..), routeCodec, routeToString)
 import FPO.Data.Store (User, loadLanguage)
 import FPO.Data.Store as Store
-import FPO.Page.AdminPanel as AdminPanel
+import FPO.Page.Admin.Groups as AdminViewGroups
+import FPO.Page.Admin.Users as AdminViewUsers
 import FPO.Page.EditorPage as EditorPage
 import FPO.Page.Home as Home
 import FPO.Page.Login as Login
@@ -76,7 +77,8 @@ _home = Proxy :: Proxy "home"
 _editor = Proxy :: Proxy "editor"
 _login = Proxy :: Proxy "login"
 _resetPassword = Proxy :: Proxy "resetPassword"
-_adminPanel = Proxy :: Proxy "adminPanel"
+_adminUsers = Proxy :: Proxy "adminPanelUsers"
+_adminGroups = Proxy :: Proxy "adminPanelGroups"
 _page404 = Proxy :: Proxy "page404"
 _profile = Proxy :: Proxy "profile"
 
@@ -86,7 +88,8 @@ type Slots =
   , login :: forall q. H.Slot q Void Unit
   , navbar :: H.Slot Navbar.Query Void Unit
   , resetPassword :: forall q. H.Slot q Void Unit
-  , adminPanel :: forall q. H.Slot q Void Unit
+  , adminPanelUsers :: forall q. H.Slot q Void Unit
+  , adminPanelGroups :: forall q. H.Slot q Void Unit
   , page404 :: forall q. H.Slot q Void Unit
   , profile :: forall q. H.Slot q Void Unit
   )
@@ -119,7 +122,8 @@ component =
           Editor -> HH.slot_ _editor unit EditorPage.component unit
           Login -> HH.slot_ _login unit Login.component unit
           PasswordReset -> HH.slot_ _resetPassword unit PasswordReset.component unit
-          AdminPanel -> HH.slot_ _adminPanel unit AdminPanel.component unit
+          AdminViewUsers -> HH.slot_ _adminUsers unit AdminViewUsers.component unit
+          AdminViewGroups -> HH.slot_ _adminGroups unit AdminViewGroups.component unit
           Page404 -> HH.slot_ _page404 unit Page404.component unit
           Profile { loginSuccessful } -> HH.slot_ _profile unit Profile.component
             { loginSuccessfulBanner: loginSuccessful }

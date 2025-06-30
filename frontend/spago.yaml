@@ -15,17 +15,22 @@ package:
     - either
     - enums
     - foldable-traversable
+    - foreign
+    - formatters
     - halogen
     - halogen-bootstrap5
     - halogen-store
     - halogen-subscriptions
     - http-methods
     - integers
+    - lists
     - maybe
+    - newtype
     - now
     - prelude
     - record
     - record-extra
+    - refs
     - routing
     - routing-duplex
     - safe-coerce
@@ -33,6 +38,7 @@ package:
     - strings
     - tailrec
     - tuples
+    - unsafe-coerce
     - web-dom
     - web-events
     - web-file

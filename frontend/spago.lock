@@ -19,17 +19,22 @@
             "either",
             "enums",
             "foldable-traversable",
+            "foreign",
+            "formatters",
             "halogen",
             "halogen-bootstrap5",
             "halogen-store",
             "halogen-subscriptions",
             "http-methods",
             "integers",
+            "lists",
             "maybe",
+            "newtype",
             "now",
             "prelude",
             "record",
             "record-extra",
+            "refs",
             "routing",
             "routing-duplex",
             "safe-coerce",
@@ -37,6 +42,7 @@
             "strings",
             "tailrec",
             "tuples",
+            "unsafe-coerce",
             "web-dom",
             "web-events",
             "web-file",
@@ -70,11 +76,13 @@
             "enums",
             "exceptions",
             "exists",
+            "fixed-points",
             "foldable-traversable",
             "foreign",
             "foreign-object",
             "fork",
             "form-urlencoded",
+            "formatters",
             "free",
             "freeap",
             "functions",
@@ -106,6 +114,7 @@
             "ordered-collections",
             "orders",
             "parallel",
+            "parsing",
             "partial",
             "prelude",
             "profunctor",
@@ -128,6 +137,7 @@
             "type-equality",
             "typelevel-prelude",
             "unfoldable",
+            "unicode",
             "unsafe-coerce",
             "unsafe-reference",
             "validation",
@@ -1021,6 +1031,17 @@
         "unsafe-coerce"
       ]
     },
+    "fixed-points": {
+      "type": "registry",
+      "version": "7.0.0",
+      "integrity": "sha256-hTl5fzeG4mzAOFzEzAeNH7kJvJgYCH7x3v2NdX9pOE4=",
+      "dependencies": [
+        "exists",
+        "newtype",
+        "prelude",
+        "transformers"
+      ]
+    },
     "foldable-traversable": {
       "type": "registry",
       "version": "6.0.0",
@@ -1094,6 +1115,20 @@
         "prelude",
         "strings",
         "tuples"
+      ]
+    },
+    "formatters": {
+      "type": "registry",
+      "version": "7.0.0",
+      "integrity": "sha256-5JaC9d2p0xoqJWjWxlHH19R4iJwFTBr4j7SlYcLgicE=",
+      "dependencies": [
+        "datetime",
+        "fixed-points",
+        "lists",
+        "numbers",
+        "parsing",
+        "prelude",
+        "transformers"
       ]
     },
     "free": {
@@ -1527,6 +1562,38 @@
         "transformers"
       ]
     },
+    "parsing": {
+      "type": "registry",
+      "version": "10.3.0",
+      "integrity": "sha256-ykIVIZcsyRcMxui1ZH+4GLzoVTstv6BRVZyz55+2TvI=",
+      "dependencies": [
+        "arrays",
+        "control",
+        "effect",
+        "either",
+        "enums",
+        "foldable-traversable",
+        "functions",
+        "identity",
+        "integers",
+        "lazy",
+        "lists",
+        "maybe",
+        "newtype",
+        "nullable",
+        "numbers",
+        "partial",
+        "prelude",
+        "st",
+        "strings",
+        "tailrec",
+        "transformers",
+        "tuples",
+        "unfoldable",
+        "unicode",
+        "unsafe-coerce"
+      ]
+    },
     "partial": {
       "type": "registry",
       "version": "4.0.0",
@@ -1844,6 +1911,16 @@
         "partial",
         "prelude",
         "tuples"
+      ]
+    },
+    "unicode": {
+      "type": "registry",
+      "version": "6.0.0",
+      "integrity": "sha256-QJnTVZpmihEAUiMeYrfkusVoziJWp2hJsgi9bMQLue8=",
+      "dependencies": [
+        "foldable-traversable",
+        "maybe",
+        "strings"
       ]
     },
     "unsafe-coerce": {

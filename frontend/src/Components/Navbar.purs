@@ -9,7 +9,7 @@ module FPO.Components.Navbar where
 
 import Prelude
 
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getIgnore, getUser)
@@ -83,14 +83,24 @@ navbar = connect (selectEq identity) $ H.mkComponent
             [ HH.text "FPO-Editor" ]
         , HH.div [ HP.classes [ HB.navbarCollapse ] ]
             [ HH.ul [ HP.classes [ HB.navbarNav, HB.meAuto ] ]
-                [ HH.li [ HP.classes [ HB.navItem ] ]
-                    [ navButton
-                        (translate (label :: _ "common_home") state.translator)
-                        Home
-                    ]
-                , HH.li [ HP.classes [ HB.navItem ] ]
-                    [ navButton "Editor" Editor ]
-                ]
+                ( [ HH.li [ HP.classes [ HB.navItem ] ]
+                      [ navButton
+                          (translate (label :: _ "common_home") state.translator)
+                          Home
+                      ]
+                  , HH.li [ HP.classes [ HB.navItem ] ]
+                      [ navButton "Editor" Editor ]
+                  ]
+                    <>
+                      if (maybe false _.isAdmin state.user) then
+                        [ HH.li [ HP.classes [ HB.navItem ] ]
+                            [ navButton "Users" AdminViewUsers ]
+                        , HH.li [ HP.classes [ HB.navItem ] ]
+                            [ navButton "Groups" AdminViewGroups ]
+                        ]
+                      else []
+                )
+
             -- Right side of the navbar
             , HH.ul [ HP.classes [ HB.navbarNav, HB.msAuto ] ]
                 [ languageDropdown state.language
@@ -171,9 +181,13 @@ navbar = connect (selectEq identity) $ H.mkComponent
               <>
                 ( if user.isAdmin then
                     [ dropdownEntry
-                        (translate (label :: _ "ap_adminPanel") state.translator)
-                        "exclamation-octagon"
-                        (Navigate AdminPanel) `addClass` HB.bgWarningSubtle
+                        (translate (label :: _ "au_userManagement") state.translator)
+                        "person-exclamation"
+                        (Navigate AdminViewUsers) `addClass` HB.bgWarningSubtle
+                    , dropdownEntry
+                        (translate (label :: _ "au_groupManagement") state.translator)
+                        "people"
+                        (Navigate AdminViewGroups) `addClass` HB.bgWarningSubtle
                     ]
                   else []
                 )

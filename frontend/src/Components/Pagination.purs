@@ -15,6 +15,7 @@ module FPO.Components.Pagination
   , Query(..)
   , Reaction(..)
   , Style(..)
+  , calculatePageCount
   , component
   ) where
 
@@ -27,6 +28,13 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
+
+-- | Calculates the number of pages based on the total number of items
+-- | and the number of items per page.
+calculatePageCount :: Int -> Int -> Int
+calculatePageCount totalItems itemsPerPage =
+  max 1 $ totalItems `div` itemsPerPage +
+    if totalItems `mod` itemsPerPage > 0 then 1 else 0
 
 type Input = { pages :: Int, style :: Style, reaction :: Reaction }
 

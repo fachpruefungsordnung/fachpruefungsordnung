@@ -4,7 +4,6 @@ module Language.Lsd.AST.Type.Section
     , PreSectionType (..)
     , HeadingType (..)
     , PreHeadingType (..)
-    , SectionChildType (..)
     )
 where
 
@@ -21,11 +20,13 @@ newtype SectionFormat
     deriving (Show)
 
 data SectionType
-    = SectionType
+    = -- | Section type
+      SectionType
         Keyword
         HeadingType
         SectionFormat
-        (SimpleRegex SectionChildType)
+        (Either ParagraphType (SimpleRegex SectionType))
+        -- ^ children's type(s)
 
 data PreSectionType
     = PreSectionType
@@ -43,7 +44,3 @@ data PreHeadingType
     = PreHeadingType
         HeadingFormat
         (PreTextType Void)
-
-data SectionChildType
-    = SectionChildSectionType SectionType
-    | SectionChildParagraphType ParagraphType

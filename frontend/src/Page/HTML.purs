@@ -51,16 +51,18 @@ addColumn val str placeholder bi for act =
 -- | Creates a button with an icon.
 addButton
   :: forall w a
-   . String -- ^ button text
+   . Boolean -- ^ whether the button is enabled
+  -> String -- ^ button text
   -> Maybe String -- ^ optional, prepended icon
   -> (MouseEvent -> a) -- ^ action
   -> HH.HTML w a
-addButton text bi act =
+addButton enabled text bi act =
   HH.div [ HP.classes [ HB.inputGroup ] ]
     [ HH.button
         [ HP.type_ HP.ButtonButton
         , HP.classes [ HB.btn, HB.btnPrimary ]
         , HE.onClick act
+        , HP.disabled (not enabled)
         ]
         [ case bi of
             Just icon
@@ -92,4 +94,74 @@ addCard title e content =
             [ HH.text title ]
         , content `addClass` HB.cardBody
         ]
+    ]
+
+addModal
+  :: forall w i
+   . String -- ^ title of the modal
+  -> (MouseEvent -> i) -- ^ action for the cancel button
+  -> Array (HH.HTML w i) -- ^ content of the modal
+  -> HH.HTML w i
+addModal title cancelAction content =
+  HH.div_
+    [ HH.div
+        [ HP.classes
+            [ HB.modal, HB.fade, HB.show ]
+        , HP.id "deleteModal"
+        , HP.attr (HH.AttrName "data-bs-backdrop") "static"
+        , HP.attr (HH.AttrName "data-bs-keyboard") "false"
+        , HP.attr (HH.AttrName "tabindex") "-1"
+        -- , HP.attr (HH.AttrName "aria-labelledby") "deleteModalLabel"
+        , HP.attr (HH.AttrName "aria-hidden") "false"
+        , HP.style "display: block;"
+        ]
+        [ HH.div
+            [ HP.classes [ HH.ClassName "modal-dialog" ] ]
+            [ HH.div
+                [ HP.classes [ HH.ClassName "modal-content" ] ]
+                ( [ HH.div
+                      [ HP.classes [ HH.ClassName "modal-header" ] ]
+                      [ HH.h1
+                          [ HP.classes
+                              [ HH.ClassName "modal-title", HH.ClassName "fs-5" ]
+                          -- , HP.id "deleteModalLabel"
+                          ]
+                          [ HH.text title ]
+                      , HH.button
+                          [ HP.type_ HP.ButtonButton
+                          , HP.classes [ HB.btnClose ]
+                          , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
+                          , HP.attr (HH.AttrName "aria-label") "Close"
+                          , HE.onClick cancelAction
+                          ]
+                          []
+                      ]
+                  ] <> content
+                )
+            ]
+        ]
+    , HH.div
+        [ HP.classes
+            [ HH.ClassName "modal-backdrop"
+            , HH.ClassName "show"
+            ]
+        ]
+        []
+    ]
+
+-- | Creates an empty entry for text-based lists.
+-- | Used for padding.
+emptyEntryText :: forall w a. HH.HTML w a
+emptyEntryText = emptyEntryGen [ HH.text "(no entry)" ]
+
+-- | Creates an empty entry for lists with arbitrary content.
+-- | Used for padding.
+emptyEntryGen
+  :: forall w a
+   . Array (HH.HTML w a)
+  -> HH.HTML w a
+emptyEntryGen content =
+  HH.li [ HP.classes [ HB.listGroupItem ] ]
+    [ HH.div [ HP.classes [ HB.textCenter, HB.invisible ] ]
+        content
     ]

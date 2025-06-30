@@ -2,7 +2,16 @@
 -- | Using the Store type, we can manage the state of the application and store various
 -- | information such as account information, user data, and other relevant local data.
 
-module FPO.Data.Store where
+module FPO.Data.Store
+  ( Action(..)
+  , Group
+  , GroupCreate
+  , Store
+  , User
+  , loadLanguage
+  , reduce
+  , saveLanguage
+  ) where
 
 import Prelude
 
@@ -15,6 +24,10 @@ import Web.HTML.Window (localStorage)
 import Web.Storage.Storage (getItem, setItem) as LocalStorage
 
 type User = { userName :: String, isAdmin :: Boolean }
+
+type Group = { groupOverviewName :: String, groupOverviewId :: Int }
+
+type GroupCreate = { groupCreateName :: String, groupCreateDescription :: String }
 
 -- | The Store type represents the global state of the application.
 type Store =

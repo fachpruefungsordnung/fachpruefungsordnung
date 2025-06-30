@@ -16,7 +16,8 @@ data Route
   | Editor
   | Login
   | PasswordReset
-  | AdminPanel
+  | AdminViewUsers
+  | AdminViewGroups
   | Page404
   | Profile { loginSuccessful :: Maybe Boolean }
 
@@ -31,7 +32,8 @@ routeCodec = root $ sum
   , "Editor": "editor" / noArgs
   , "Login": "login" / noArgs
   , "PasswordReset": "password-reset" / noArgs
-  , "AdminPanel": "admin-panel" / noArgs
+  , "AdminViewUsers": "admin-users" / noArgs
+  , "AdminViewGroups": "admin-groups" / noArgs
   , "Page404": "404" / noArgs
   , "Profile": "profile" ? { loginSuccessful: optional <<< boolean }
   }
@@ -44,7 +46,8 @@ routeToString = case _ of
   Editor -> "Editor"
   Login -> "Login"
   PasswordReset -> "PasswordReset"
-  AdminPanel -> "AdminPanel"
+  AdminViewUsers -> "AdminViewUsers"
+  AdminViewGroups -> "AdminViewGroups"
   Page404 -> "Page404"
   Profile { loginSuccessful } -> "Profile" <>
     ( if loginSuccessful == Nothing then ""
