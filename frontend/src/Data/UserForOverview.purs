@@ -1,4 +1,4 @@
-module Data.UserForOverview where
+module FPO.Data.UserForOverview where
 
 import Data.Argonaut (class DecodeJson, class EncodeJson)
 import Data.Newtype (class Newtype)

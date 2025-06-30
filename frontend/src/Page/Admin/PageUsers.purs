@@ -16,8 +16,7 @@ import Affjax.StatusCode (StatusCode(..))
 import Data.Argonaut (decodeJson)
 import Data.Array (filter, length, replicate, slice, (:))
 import Data.Either (Either(..))
-import Data.JSON (UserForOverview(..), getName)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
@@ -27,6 +26,8 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getJson, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
+import FPO.Data.User (User(..))
+import FPO.Data.UserForOverview (UserForOverview(..), getName)
 import FPO.Page.HTML (addButton, addCard, addColumn, emptyEntryText)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -119,8 +120,17 @@ component =
       --       the error of missing credentials), but for now,
       --       we just check if the user is an admin and redirect
       --       to a 404 page if not.
-      u <- H.liftAff $ getUser
-      when (fromMaybe true (not <$> _.isAdmin <$> u)) $ navigate Page404
+      user <- H.liftAff $ getUser
+      case user of
+        Nothing -> do
+          H.liftEffect $ log "No user found, redirecting to 404 page."
+          navigate Page404
+        Just (User { fullUserIsSuperadmin }) ->
+          if not fullUserIsSuperadmin then do
+            H.liftEffect $ log "User is not an admin, redirecting to 404 page."
+            navigate Page404
+          else
+            pure unit
 
       userReponse <- H.liftAff $ getJson "/users"
       case userReponse of

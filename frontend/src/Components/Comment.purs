@@ -9,6 +9,7 @@ import Data.String.CodeUnits (length)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
 import FPO.Data.Request (getUser)
+import FPO.Data.User (User(..))
 import FPO.Types (Comment, CommentSection)
 import Halogen as H
 import Halogen.HTML as HH
@@ -210,7 +211,7 @@ commentview = H.mkComponent
             let
               author = case user of
                 Nothing -> "Guest"
-                Just u -> u.userName
+                Just (User { fullUserName }) -> fullUserName
               newComment =
                 { author: author, timestamp: now, content: state.commentDraft }
               comments = commentSection.comments

@@ -9,8 +9,8 @@ import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Route (Route(..))
-import FPO.Data.Store (User)
 import FPO.Data.Store as Store
+import FPO.Data.User (User(..))
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen (liftAff)
@@ -74,7 +74,7 @@ component =
           [ HH.h1 []
               [ HH.text $ translate (label :: _ "prof_profile") state.translator ]
           , case state.user of
-              Loaded user -> HH.div
+              Loaded (User { fullUserName, fullUserIsSuperadmin }) -> HH.div
                 [ HP.classes [ HB.dFlex, HB.justifyContentCenter, HB.my5 ] ]
                 [ HH.div [ HP.classes [ HB.colMd3 ] ]
                     [ HH.div [ HP.classes [ HB.textCenter, HB.mt3 ] ]
@@ -100,7 +100,7 @@ component =
                                             state.translator
                                         ) <> ": "
                                     ]
-                                , HH.text user.userName
+                                , HH.text fullUserName
                                 ]
                             , HH.li [ HP.classes [ HB.listGroupItem ] ]
                                 [ HH.strong_
@@ -112,12 +112,12 @@ component =
                                 , HH.span
                                     [ HP.classes
                                         [ HB.badge
-                                        , if user.isAdmin then HB.bgPrimary
+                                        , if fullUserIsSuperadmin then HB.bgPrimary
                                           else HB.bgSecondary
                                         ]
                                     ]
                                     [ HH.text $
-                                        if user.isAdmin then "Administrator"
+                                        if fullUserIsSuperadmin then "Administrator"
                                         else "Member"
                                     ]
                                 ]

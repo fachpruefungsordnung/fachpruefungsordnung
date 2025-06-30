@@ -19,8 +19,9 @@ import FPO.AppM (runAppM)
 import FPO.Components.Navbar as Navbar
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..), routeCodec, routeToString)
-import FPO.Data.Store (User, loadLanguage)
+import FPO.Data.Store (loadLanguage)
 import FPO.Data.Store as Store
+import FPO.Data.User (User(..))
 import FPO.Page.Admin.Groups as AdminViewGroups
 import FPO.Page.Admin.Users as AdminViewUsers
 import FPO.Page.EditorPage as EditorPage
@@ -195,5 +196,5 @@ handleInitialResponse :: Either Error (Response String) -> Maybe User
 handleInitialResponse = case _ of
   Left _ -> Nothing
   Right { status, body } -> case status of
-    StatusCode 200 -> Just { userName: body, isAdmin: false }
+    StatusCode 200 -> Just $ User { fullUserName: body, fullUserIsSuperadmin: false }
     _ -> Nothing

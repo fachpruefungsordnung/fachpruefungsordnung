@@ -11,17 +11,17 @@ import Affjax.RequestBody (json) as RequestBody
 import Affjax.RequestHeader (RequestHeader(RequestHeader))
 import Affjax.ResponseFormat (ResponseFormat)
 import Affjax.ResponseFormat (blob, document, ignore, json, string) as AXRF
+import Data.Argonaut (decodeJson)
 import Data.Argonaut.Core (Json)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
-import Data.JSON (decodeUser)
 import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import FPO.Data.Store (User)
+import FPO.Data.User (User)
 import Web.DOM.Document (Document)
 import Web.File.Blob (Blob)
 
@@ -56,7 +56,7 @@ getUser = do
     Left _ ->
       pure Nothing
     Right res -> do
-      case decodeUser (res.body) of
+      case decodeJson (res.body) of
         Left err -> do
           liftEffect $ log $ "Error decoding user: " <> show err
           pure Nothing

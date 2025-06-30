@@ -18,6 +18,7 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
+import FPO.Data.User (User(..))
 import FPO.Page.HTML (addButton, addCard, addColumn, emptyEntryGen)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -122,9 +123,14 @@ component =
       --       the error of missing credentials), but for now,
       --       we just check if the user is an admin and redirect
       --       to a 404 page if not.
-      u <- liftAff $ getUser
-      when (fromMaybe true (not <$> _.isAdmin <$> u)) $
-        navigate Page404
+      user <- H.liftAff $ getUser
+      case user of
+        Nothing -> navigate Page404
+        Just (User { fullUserIsSuperadmin }) ->
+          if not fullUserIsSuperadmin then
+            navigate Page404
+          else
+            pure unit
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
     SetPage (P.Clicked p) -> do

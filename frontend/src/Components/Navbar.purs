@@ -9,13 +9,14 @@ module FPO.Components.Navbar where
 
 import Prelude
 
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff, liftAff)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getIgnore, getUser)
 import FPO.Data.Route (Route(..))
-import FPO.Data.Store (User, saveLanguage)
+import FPO.Data.Store (saveLanguage)
 import FPO.Data.Store as Store
+import FPO.Data.User (User(..), isAdminMaybe)
 import FPO.Page.HTML (addClass)
 import FPO.Translations.Translator
   ( FPOTranslator(..)
@@ -72,47 +73,48 @@ navbar = connect (selectEq identity) $ H.mkComponent
   }
   where
   render :: State -> H.ComponentHTML Action () m
-  render state = HH.nav
-    [ HP.classes [ HB.navbar, HB.navbarExpandSm, HB.bgBodyTertiary ] ]
-    [ HH.div [ HP.classes [ HB.containerFluid ] ]
-        [ HH.a
-            [ HP.classes [ HB.navbarBrand ]
-            , HE.onClick (const $ Navigate Home)
-            , HP.style "cursor: pointer"
-            ]
-            [ HH.text "FPO-Editor" ]
-        , HH.div [ HP.classes [ HB.navbarCollapse ] ]
-            [ HH.ul [ HP.classes [ HB.navbarNav, HB.meAuto ] ]
-                ( [ HH.li [ HP.classes [ HB.navItem ] ]
-                      [ navButton
-                          (translate (label :: _ "common_home") state.translator)
-                          Home
-                      ]
-                  , HH.li [ HP.classes [ HB.navItem ] ]
-                      [ navButton "Editor" Editor ]
-                  ]
-                    <>
-                      if (maybe false _.isAdmin state.user) then
-                        [ HH.li [ HP.classes [ HB.navItem ] ]
-                            [ navButton "Users" AdminViewUsers ]
-                        , HH.li [ HP.classes [ HB.navItem ] ]
-                            [ navButton "Groups" AdminViewGroups ]
+  render state =
+    HH.div
+      [ HP.classes [ HB.navbar, HB.navbarExpandSm, HB.bgBodyTertiary ] ]
+      [ HH.div [ HP.classes [ HB.containerFluid ] ]
+          [ HH.a
+              [ HP.classes [ HB.navbarBrand ]
+              , HE.onClick (const $ Navigate Home)
+              , HP.style "cursor: pointer"
+              ]
+              [ HH.text "FPO-Editor" ]
+          , HH.div [ HP.classes [ HB.navbarCollapse ] ]
+              [ HH.ul [ HP.classes [ HB.navbarNav, HB.meAuto ] ]
+                  ( [ HH.li [ HP.classes [ HB.navItem ] ]
+                        [ navButton
+                            (translate (label :: _ "common_home") state.translator)
+                            Home
                         ]
-                      else []
-                )
-
-            -- Right side of the navbar
-            , HH.ul [ HP.classes [ HB.navbarNav, HB.msAuto ] ]
-                [ languageDropdown state.language
-                , HH.li [ HP.classes [ HB.navItem ] ]
-                    [ case state.user of
-                        Nothing -> navButton "Login" Login
-                        Just user -> userDropdown state user
+                    , HH.li [ HP.classes [ HB.navItem ] ]
+                        [ navButton "Editor" Editor ]
                     ]
-                ]
-            ]
-        ]
-    ]
+                      <>
+                        if (isAdminMaybe state.user) then
+                          [ HH.li [ HP.classes [ HB.navItem ] ]
+                              [ navButton "Users" AdminViewUsers ]
+                          , HH.li [ HP.classes [ HB.navItem ] ]
+                              [ navButton "Groups" AdminViewGroups ]
+                          ]
+                        else []
+                  )
+
+              -- Right side of the navbar
+              , HH.ul [ HP.classes [ HB.navbarNav, HB.msAuto ] ]
+                  [ languageDropdown state.language
+                  , HH.li [ HP.classes [ HB.navItem ] ]
+                      [ case state.user of
+                          Nothing -> navButton "Login" Login
+                          Just user -> userDropdown state user
+                      ]
+                  ]
+              ]
+          ]
+      ]
 
   handleAction
     :: forall slots
@@ -157,7 +159,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
 
   -- Creates a user dropdown with user icon and logout option.
   userDropdown :: State -> User -> H.ComponentHTML Action () m
-  userDropdown state user =
+  userDropdown state (User { fullUserName, fullUserIsSuperadmin }) =
     HH.li
       [ HP.classes [ HB.navItem, HB.dropdown ] ]
       [ HH.a
@@ -167,7 +169,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
           , HP.attr (AttrName "aria-expanded") "false"
           ]
           [ HH.i [ HP.classes [ ClassName "bi-person", HB.me1 ] ] []
-          , HH.text user.userName
+          , HH.text fullUserName
           ]
       , HH.ul
           [ HP.classes [ HB.dropdownMenu, HB.dropdownMenuEnd ]
@@ -179,7 +181,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                 (Navigate (Profile { loginSuccessful: Nothing }))
             ]
               <>
-                ( if user.isAdmin then
+                ( if fullUserIsSuperadmin then
                     [ dropdownEntry
                         (translate (label :: _ "au_userManagement") state.translator)
                         "person-exclamation"
