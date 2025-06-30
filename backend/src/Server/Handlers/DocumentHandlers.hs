@@ -179,7 +179,7 @@ getCommitHandler (Authenticated Auth.Token {..}) docID commitID = do
     case mPerm of
         Nothing -> throwError errNoPermission
         Just perm ->
-            if Permission.hasPermission perm Permission.Edit
+            if Permission.hasPermission perm Permission.Read
                 then do
                     eCommit <- liftIO $ getCommit commitID (Context conn)
                     case eCommit of
