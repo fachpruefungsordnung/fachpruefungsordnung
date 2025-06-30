@@ -2,7 +2,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module VersionControl.Hash
+module DocumentManagement.Hash
     ( Hashable (..)
     , Hashed (..)
     , Hash (..)

@@ -22,6 +22,7 @@ module Server.HandlerUtil
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Database (getConnection)
+import DocumentManagement.Document (DocumentID)
 import Hasql.Connection (Connection)
 import Hasql.Session (run)
 import Servant
@@ -30,7 +31,6 @@ import qualified UserManagement.DocumentPermission as Permission
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
-import VersionControl.Document (DocumentID)
 
 -- | Checks if User is SuperAdmin or Admin in the given group.
 --   If so, it calls the given callback Handler;

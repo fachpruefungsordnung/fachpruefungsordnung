@@ -25,6 +25,8 @@ import Data.OpenApi
 import Data.UUID (toString)
 import Data.Vector (toList)
 import Database (getConnection)
+import qualified DocumentManagement as VC
+import DocumentManagement.Commit
 import GHC.Int (Int32)
 import qualified Hasql.Session as Session
 import Network.Wai.Handler.Warp (run)
@@ -41,8 +43,6 @@ import Server.Handlers.RoleHandlers
 import Server.Handlers.UserHandlers
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
-import qualified VersionControl as VC
-import VersionControl.Commit
 import Prelude hiding (readFile)
 
 type DebugAPI =

@@ -1,4 +1,4 @@
-module VersionControl.Transactions
+module DocumentManagement.Transactions
     ( createCommit
     , createDocumentCommit
     , setDocumentHead
@@ -6,13 +6,17 @@ module VersionControl.Transactions
 where
 
 import Data.Maybe (fromMaybe)
+import DocumentManagement.Commit
+import DocumentManagement.Document
+    ( Document (..)
+    , DocumentID
+    , withNewDocumentHead
+    )
+import DocumentManagement.Error (DocumentError (..))
+import DocumentManagement.Hash
+import qualified DocumentManagement.Statements as Statements
+import DocumentManagement.Tree
 import Hasql.Transaction (Transaction, statement)
-import VersionControl.Commit
-import VersionControl.Document (Document (..), DocumentID, withNewDocumentHead)
-import VersionControl.Error (DocumentError (..))
-import VersionControl.Hash
-import qualified VersionControl.Statements as Statements
-import VersionControl.Tree
 
 -- | transaction to create a new document
 createDocumentCommit

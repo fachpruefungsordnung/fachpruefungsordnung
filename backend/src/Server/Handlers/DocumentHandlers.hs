@@ -14,6 +14,9 @@ module Server.Handlers.DocumentHandlers
 import Control.Monad.IO.Class
 import Data.Text (Text)
 import Data.Vector (Vector)
+import DocumentManagement
+import DocumentManagement.Commit
+import DocumentManagement.Document as Document
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
@@ -26,9 +29,6 @@ import qualified UserManagement.DocumentPermission as Permission
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
-import VersionControl
-import VersionControl.Commit
-import VersionControl.Document as Document
 import Prelude hiding (readFile)
 
 type DocumentAPI =

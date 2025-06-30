@@ -1,4 +1,4 @@
-module VersionControl.Sessions
+module DocumentManagement.Sessions
     ( createCommit
     , getCommit
     , getVersion
@@ -13,6 +13,13 @@ import Data.Maybe (fromMaybe)
 import Data.Text
 import Data.Vector (Vector, toList)
 import qualified Data.Vector as Vector
+import DocumentManagement.Commit
+import DocumentManagement.Document (Document (..), DocumentID)
+import DocumentManagement.Error (DocumentError)
+import DocumentManagement.Hash
+import qualified DocumentManagement.Statements as Statements
+import qualified DocumentManagement.Transactions as Transactions
+import DocumentManagement.Tree
 import Hasql.Session (Session, statement)
 import Hasql.Transaction.Sessions
     ( IsolationLevel (..)
@@ -20,13 +27,6 @@ import Hasql.Transaction.Sessions
     , transaction
     )
 import UserManagement.Group (GroupID)
-import VersionControl.Commit
-import VersionControl.Document (Document (..), DocumentID)
-import VersionControl.Error (DocumentError)
-import VersionControl.Hash
-import qualified VersionControl.Statements as Statements
-import qualified VersionControl.Transactions as Transactions
-import VersionControl.Tree
 
 -- | session to obtain the whole commit graph (all commits) of a document
 getCommitGraph :: DocumentID -> Session (Vector ExistingCommit)

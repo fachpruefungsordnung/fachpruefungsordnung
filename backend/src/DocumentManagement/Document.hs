@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module VersionControl.Document
+module DocumentManagement.Document
     ( Document (..)
     , DocumentID (..)
     , withNewDocumentHead
@@ -24,9 +24,9 @@ import Data.OpenApi
     )
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
+import DocumentManagement.Commit (CommitID)
 import GHC.Int (Int32)
 import UserManagement.Group (GroupID)
-import VersionControl.Commit (CommitID)
 import Web.HttpApiData (FromHttpApiData (..))
 
 -- | id type for documents

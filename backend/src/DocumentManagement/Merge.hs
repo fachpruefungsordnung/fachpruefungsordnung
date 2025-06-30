@@ -1,13 +1,13 @@
-module VersionControl.Merge
+module DocumentManagement.Merge
     ( MergeResult (..)
     , ConflictTree (..)
     , ConflictTreeEdge (..)
     ) where
 
 import Data.Text (Text)
-import VersionControl.Commit (CommitHeader, CreateCommit, ExistingCommit)
-import VersionControl.Hash (Hashed)
-import VersionControl.Tree (NodeWithRef, TreeRef)
+import DocumentManagement.Commit (CommitHeader, CreateCommit, ExistingCommit)
+import DocumentManagement.Hash (Hashed)
+import DocumentManagement.Tree (NodeWithRef, TreeRef)
 
 -- TODO: implement merge :)
 

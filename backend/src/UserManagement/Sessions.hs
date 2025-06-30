@@ -34,12 +34,12 @@ where
 import qualified Data.Bifunctor (second)
 import Data.Text (Text)
 import Data.Vector (Vector)
+import qualified DocumentManagement.Document as Document
 import Hasql.Session (Session, statement)
 import qualified UserManagement.DocumentPermission as Permission
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Statements as Statements
 import qualified UserManagement.User as User
-import qualified VersionControl.Document as Document
 
 getUsers :: Session (Vector User.User)
 getUsers = statement () Statements.getUsers

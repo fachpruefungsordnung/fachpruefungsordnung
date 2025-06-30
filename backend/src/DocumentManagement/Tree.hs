@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module VersionControl.Tree
+module DocumentManagement.Tree
     ( Tree (..)
     , Ref (..)
     , TreeRef
@@ -45,9 +45,9 @@ import Data.OpenApi
     )
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
+import DocumentManagement.Hash (Hash (..), Hashable (..), Hashed (..))
 import GHC.Generics
 import GHC.Int
-import VersionControl.Hash (Hash (..), Hashable (..), Hashed (..))
 import Web.HttpApiData (FromHttpApiData (..))
 
 -- | represents the id of a `Node`

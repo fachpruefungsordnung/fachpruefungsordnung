@@ -6,14 +6,14 @@ module Lib
 where
 
 import Database (getConnection, migrate)
+import DocumentManagement as VC
+import DocumentManagement.Commit
+import DocumentManagement.Tree
 import Hasql.Connection (Connection)
 import Hasql.Session (statement)
 import qualified Hasql.Session as Session
 import Server
 import qualified UserManagement.Statements as UStatements
-import VersionControl as VC
-import VersionControl.Commit
-import VersionControl.Tree
 
 -- a good example document with example content and example structure
 testTree :: Tree NodeWithMaybeRef

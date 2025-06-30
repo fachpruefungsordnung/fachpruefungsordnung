@@ -13,6 +13,7 @@ module Server.Handlers.GroupHandlers
     ) where
 
 import Control.Monad.IO.Class
+import DocumentManagement.Commit (ExistingCommit)
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
@@ -23,7 +24,6 @@ import Server.HandlerUtil
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
-import VersionControl.Commit (ExistingCommit)
 import Prelude hiding (readFile)
 
 type GroupAPI =

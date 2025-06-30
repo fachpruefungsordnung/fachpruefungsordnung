@@ -1,7 +1,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module VersionControl.Commit
+module DocumentManagement.Commit
     ( CreateCommit (..)
     , ExistingCommit (..)
     , CommitHeader (..)
@@ -36,10 +36,10 @@ import Data.Proxy
 import Data.Text
 import Data.Time (LocalTime)
 import Data.UUID
+import DocumentManagement.Hash
+import DocumentManagement.Tree
 import GHC.Generics
 import GHC.Int
-import VersionControl.Hash
-import VersionControl.Tree
 import Web.HttpApiData (FromHttpApiData (..))
 
 -- | represents the id of a commit

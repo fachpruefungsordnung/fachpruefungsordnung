@@ -1,4 +1,4 @@
-module VersionControl
+module DocumentManagement
     ( Context (..)
     , createCommit
     , getCommit
@@ -12,17 +12,17 @@ import Control.Arrow (left)
 import Data.Functor ((<&>))
 import Data.Text (Text)
 import Data.Vector (Vector)
+import DocumentManagement.Commit (CommitID, CreateCommit, ExistingCommit)
+import DocumentManagement.Document (Document, DocumentID)
+import DocumentManagement.Error
+    ( DocumentManagementError (..)
+    , flattenDocumentManagementError
+    )
+import qualified DocumentManagement.Sessions as Sessions
 import Hasql.Connection (Connection)
 import Hasql.Session (Session, SessionError)
 import qualified Hasql.Session as Session
 import UserManagement.Group (GroupID)
-import VersionControl.Commit (CommitID, CreateCommit, ExistingCommit)
-import VersionControl.Document (Document, DocumentID)
-import VersionControl.Error
-    ( VersionControlError (..)
-    , flattenVersionControlError
-    )
-import qualified VersionControl.Sessions as Sessions
 
 -- | context for the version control (currently just a database connection)
 newtype Context = Context
@@ -44,7 +44,7 @@ getCommitGraph
     -- ^ the id of the document of the requested commits graph
     -> Context
     -- ^ version control context
-    -> IO (Either VersionControlError (Vector ExistingCommit))
+    -> IO (Either DocumentManagementError (Vector ExistingCommit))
 getCommitGraph = runSession . Sessions.getCommitGraph
 
 -- | get a document by id
@@ -53,7 +53,7 @@ getDocument
     -- ^ the id of the document to get
     -> Context
     -- ^ version control context
-    -> IO (Either VersionControlError Document)
+    -> IO (Either DocumentManagementError Document)
     -- ^ holds the requested document or an error
 getDocument = runSession . Sessions.getDocument
 
@@ -65,7 +65,7 @@ createDocument
     -- ^ The group which owns the document
     -> Context
     -- ^ version control context
-    -> IO (Either VersionControlError Document)
+    -> IO (Either DocumentManagementError Document)
     -- ^ holds the newly created document or an error
 createDocument = (runSession .) . Sessions.createDocument
 
@@ -75,7 +75,7 @@ createCommit
     -- ^ not-yet existing commit, intendet to be made persistent by this operation
     -> Context
     -- ^ version control context
-    -> IO (Either VersionControlError ExistingCommit)
+    -> IO (Either DocumentManagementError ExistingCommit)
     -- ^ holds the newly created commit or an error
 createCommit = runSession . Sessions.createCommit
 
@@ -95,10 +95,10 @@ createDocumentCommit
     -- ^ not-yet existing commit, intendet to be made persistent by this operation
     -> Context
     -- ^ version control context
-    -> IO (Either VersionControlError Document)
+    -> IO (Either DocumentManagementError Document)
     -- ^ holds the document with the newly created commit or an error
 createDocumentCommit documentID commit ctx =
-    flattenVersionControlError
+    flattenDocumentManagementError
         <$> createDocumentCommit' documentID commit ctx
   where
     createDocumentCommit' = (runSession .) . Sessions.createDocumentCommit
@@ -109,18 +109,18 @@ getCommit
     -- ^ the id of the commit to obtain from the database
     -> Context
     -- ^ version control context
-    -> IO (Either VersionControlError ExistingCommit)
+    -> IO (Either DocumentManagementError ExistingCommit)
     -- ^ holds the requested commit or an error
 getCommit = runSession . Sessions.getCommit
 
--- | runs a session and maps a potential error to a `VersionControlError`
-runSession :: Session a -> Context -> IO (Either VersionControlError a)
+-- | runs a session and maps a potential error to a `DocumentManagementError`
+runSession :: Session a -> Context -> IO (Either DocumentManagementError a)
 runSession session ctx =
     Session.run
         session
         (unConnection ctx)
         <&> mapResult
 
--- | maps a potential error to a `VersionControlError`
-mapResult :: Either SessionError a -> Either VersionControlError a
+-- | maps a potential error to a `DocumentManagementError`
+mapResult :: Either SessionError a -> Either DocumentManagementError a
 mapResult = left (DatabaseError . show)

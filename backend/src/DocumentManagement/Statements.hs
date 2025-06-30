@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 
-module VersionControl.Statements
+module DocumentManagement.Statements
     ( createNode
     , getNodeKind
     , putVersion
@@ -23,13 +23,13 @@ where
 import Data.Profunctor (lmap, rmap)
 import Data.Text
 import Data.Vector
+import DocumentManagement.Commit
+import DocumentManagement.Document (Document (..), DocumentID (..))
+import DocumentManagement.Hash (Hash (..), Hashed (..))
+import DocumentManagement.Tree
 import Hasql.Statement
 import Hasql.TH
 import UserManagement.Group (GroupID)
-import VersionControl.Commit
-import VersionControl.Document (Document (..), DocumentID (..))
-import VersionControl.Hash (Hash (..), Hashed (..))
-import VersionControl.Tree
 
 -- | statement to create a node of a certain kind
 createNode :: Statement Text NodeID
