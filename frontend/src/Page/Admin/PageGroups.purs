@@ -9,7 +9,7 @@ module FPO.Page.Admin.Groups
 import Prelude
 
 import Data.Array (filter, length, replicate, slice, (:))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
@@ -22,7 +22,6 @@ import FPO.Data.User (User(..))
 import FPO.Page.HTML (addButton, addCard, addColumn, emptyEntryGen)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import Halogen (liftAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE

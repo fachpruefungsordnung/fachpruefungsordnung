@@ -5,7 +5,7 @@ import Data.Newtype (class Newtype)
 
 newtype UserForOverview = UserForOverview
   { userEmail :: String
-  , userID :: String
+  , userPwhash :: String
   , userName :: String
   }
 

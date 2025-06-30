@@ -165,7 +165,7 @@ component =
 
       let
         newUserForOverview = UserForOverview
-          { userEmail: "", userID: "", userName: newUsername }
+          { userEmail: "", userPwhash: "", userName: newUsername }
       if newUsername == "" then H.modify_ _
         { error = Just "Username cannot be empty." }
       else do
