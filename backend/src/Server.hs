@@ -39,8 +39,6 @@ import Server.Handlers.DocumentHandlers
 import Server.Handlers.GroupHandlers
 import Server.Handlers.RoleHandlers
 import Server.Handlers.UserHandlers
-import qualified DocumentManagement as VC
-import DocumentManagement.Commit
 import Prelude hiding (readFile)
 
 type DebugAPI =
