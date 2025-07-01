@@ -15,12 +15,12 @@ import Affjax.StatusCode (StatusCode(StatusCode))
 import Data.Argonaut.Encode.Class (encodeJson)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Dto.Login (LoginDto)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (postString) as Request
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
+import FPO.Dto.Login (LoginDto)
 import FPO.Page.HTML (addColumn)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)

@@ -16,13 +16,13 @@ import Affjax (printError)
 import Data.Argonaut (decodeJson, encodeJson)
 import Data.Array (filter, length, replicate, slice)
 import Data.Either (Either(..))
-import Data.Email as Email
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (contains, null)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console (log)
 import FPO.Components.Pagination as P
+import FPO.Data.Email as Email
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (LoadState(..), getFromJSONEndpoint, getUser, postJson)
 import FPO.Data.Route (Route(..))

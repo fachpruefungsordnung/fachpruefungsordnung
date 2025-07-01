@@ -1,19 +1,19 @@
 module FPO.Translations.Labels where
 
 import Data.Function (($))
-import FPO.Translations.AdminPanel (deAdminPanel, enAdminPanel)
 import FPO.Translations.Common (deCommon, enCommon)
-import FPO.Translations.Home (deHome, enHome)
-import FPO.Translations.Login (deLogin, enLogin)
-import FPO.Translations.Profile (deProfile, enProfile)
-import FPO.Translations.ResetPassword (dePasswordReset, enPasswordReset)
+import FPO.Translations.Components.Editor (deEditor, enEditor)
+import FPO.Translations.Components.Navbar (deNavbar, enNavbar)
+import FPO.Translations.Page.Admin.PageUsers (deAdminUserPage, enAdminUserPage)
+import FPO.Translations.Page.AdminPanel (deAdminPanel, enAdminPanel)
+import FPO.Translations.Page.Home (deHome, enHome)
+import FPO.Translations.Page.Login (deLogin, enLogin)
+import FPO.Translations.Page.Page404 (dePage404, enPage404)
+import FPO.Translations.Page.Profile (deProfile, enProfile)
+import FPO.Translations.Page.ResetPassword (dePasswordReset, enPasswordReset)
 import Record (merge)
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord, toRecord)
-import Translations.Components.Editor (deEditor, enEditor)
-import Translations.Components.Navbar (deNavbar, enNavbar)
-import Translations.Page.Admin.PageUsers (deAdminUserPage, enAdminUserPage)
-import Translations.Page.Page404 (dePage404, enPage404)
 
 -- | Übersetzungen zusammenführen
 en :: Translation Labels

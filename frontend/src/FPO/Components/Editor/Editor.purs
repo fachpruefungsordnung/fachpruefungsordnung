@@ -20,7 +20,6 @@ import Ace.EditSession as Session
 import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
-import Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
 import Data.Array (filter, intercalate, uncons, (:))
 import Data.Foldable (find, for_, traverse_)
 import Data.Maybe (Maybe(..), maybe)
@@ -30,6 +29,12 @@ import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
+import FPO.Components.Editor.Keybindings
+  ( keyBinding
+  , makeBold
+  , makeItalic
+  , underscore
+  )
 import FPO.Data.Request (getUser)
 import FPO.Data.Store as Store
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
