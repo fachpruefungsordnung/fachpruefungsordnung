@@ -1,4 +1,4 @@
-#!/usr/bin/sh
+#!/bin/sh
 set -eu
 
 TEMPLATE=/etc/nginx/templates/ssl.conf.template
