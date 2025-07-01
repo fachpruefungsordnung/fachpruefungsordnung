@@ -7,10 +7,8 @@ module Language.Ltml.ToPandoc.Text
     )
 where
 
-import Control.Monad.Reader (asks)
 import Data.Either.Utils (leftMerge, leftMergeMap)
 import Data.List (singleton)
-import qualified Data.Map as Map (lookup)
 import Data.Text (Text)
 import Data.Void (Void, absurd)
 import Language.Ltml.AST.Label (unLabel)
@@ -21,7 +19,7 @@ import Language.Ltml.AST.Text
     , SentenceStart (SentenceStart)
     , TextTree (..)
     )
-import Language.Ltml.ToPandoc (ToPandoc)
+import Language.Ltml.ToPandoc (ToPandoc, getVisibleIdent)
 import qualified Text.Pandoc.Definition as P
     ( Block (OrderedList, Plain)
     , Inline (..)
@@ -50,7 +48,7 @@ textTreeW (Word w) = rsi $ P.Str w
 textTreeW Space = rsi P.Space
 textTreeW (Special special) = rsi $ specialW special
 textTreeW (Reference lbl) = do
-    (ident, tgt) <- asks (f . Map.lookup lbl)
+    (ident, tgt) <- f <$> getVisibleIdent lbl
     rsi $ P.Link ("", [], []) [P.Str ident] tgt
   where
     f :: Maybe Text -> (Text, P.Target)

@@ -5,20 +5,23 @@ module Language.Ltml.ToPandoc.Section
     )
 where
 
-import Control.Applicative.Utils ((<:>))
 import Language.Ltml.AST.Node (Node (Node))
 import Language.Ltml.AST.Section (Heading (Heading), Section (Section))
-import Language.Ltml.ToPandoc (ToPandoc)
+import Language.Ltml.ToPandoc (ToPandoc, headed)
 import Language.Ltml.ToPandoc.Label (mLabelW)
 import Language.Ltml.ToPandoc.Paragraph (paragraphW)
 import Language.Ltml.ToPandoc.Text (inlineTextW)
-import qualified Text.Pandoc.Definition as P (Block (Div, Header))
+import qualified Text.Pandoc.Definition as P
+    ( Attr
+    , Block (Div)
+    , Inline
+    )
 
 -- TODO: The `div` should likely be a `section`.
 -- TODO: Do not ignore format.
 sectionW :: Node Section -> ToPandoc P.Block
 sectionW (Node mLabel (Section _ heading children)) =
-    P.Div <$> attrW <*> (headingW heading <:> childrenW children)
+    P.Div <$> attrW <*> (headed (headingW heading) (childrenW children))
   where
     attrW = (,[],[]) <$> mLabelW mLabel
 
@@ -26,6 +29,5 @@ sectionW (Node mLabel (Section _ heading children)) =
     childrenW (Right secs) = mapM sectionW secs
 
 -- TODO: Do not ignore format.
--- TODO: Proper heading level.
-headingW :: Heading -> ToPandoc P.Block
-headingW (Heading _ xs) = P.Header 1 (mempty, [], []) <$> inlineTextW xs
+headingW :: Heading -> ToPandoc (P.Attr, [P.Inline])
+headingW (Heading _ xs) = ((mempty, [], []),) <$> inlineTextW xs
