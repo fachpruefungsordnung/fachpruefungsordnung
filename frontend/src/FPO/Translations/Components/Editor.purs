@@ -1,4 +1,4 @@
-module Translations.Components.Editor where
+module FPO.Translations.Components.Editor where
 
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)

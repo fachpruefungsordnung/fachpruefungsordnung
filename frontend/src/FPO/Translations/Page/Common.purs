@@ -1,4 +1,4 @@
-module FPO.Translations.Common where
+module FPO.Translations.Page.Common where
 
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)

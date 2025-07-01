@@ -1,4 +1,4 @@
-module FPO.Translations.Profile where
+module FPO.Translations.Page.Profile where
 
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)

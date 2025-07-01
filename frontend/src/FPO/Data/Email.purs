@@ -1,4 +1,4 @@
-module Data.Email where
+module FPO.Data.Email where
 
 import Data.Either (Either(..))
 import Data.String.Regex (regex, test)

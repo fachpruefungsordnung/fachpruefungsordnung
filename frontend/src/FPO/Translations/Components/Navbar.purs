@@ -1,4 +1,4 @@
-module Translations.Components.Navbar where
+module FPO.Translations.Components.Navbar where
 
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)

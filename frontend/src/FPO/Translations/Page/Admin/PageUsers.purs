@@ -1,4 +1,4 @@
-module Translations.Page.Admin.PageUsers where
+module FPO.Translations.Page.Admin.PageUsers where
 
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)

@@ -1,5 +1,5 @@
 -- | Module for handling JSON data in the application.
-module Data.JSON where
+module FPO.Data.JSON where
 
 import Prelude
 

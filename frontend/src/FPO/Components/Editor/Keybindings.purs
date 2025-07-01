@@ -1,4 +1,4 @@
-module Components.Editor.Keybindings where
+module FPO.Components.Editor.Keybindings where
 
 import Prelude
 

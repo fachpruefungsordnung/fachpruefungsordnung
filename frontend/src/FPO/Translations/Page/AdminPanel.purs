@@ -1,4 +1,8 @@
-module FPO.Translations.AdminPanel where
+module FPO.Translations.Page.AdminPanel
+  ( AdminPanelLabels
+  , deAdminPanel
+  , enAdminPanel
+  ) where
 
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)

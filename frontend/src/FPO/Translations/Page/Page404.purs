@@ -1,4 +1,4 @@
-module Translations.Page.Page404 where
+module FPO.Translations.Page.Page404 where
 
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)
