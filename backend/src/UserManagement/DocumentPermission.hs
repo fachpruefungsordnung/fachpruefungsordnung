@@ -11,11 +11,13 @@ module UserManagement.DocumentPermission
     , permissionToText
     , textToPermission
     , UsersPermission (..)
+    , DocumentWithPermission (..)
     ) where
 
 import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
 import Data.Text (Text, pack, unpack)
+import DocumentManagement.Document as Document
 import GHC.Generics (Generic)
 import Text.Read (readMaybe)
 import UserManagement.User as User (UserID)
@@ -72,3 +74,12 @@ data UsersPermission = UsersPermission
 instance ToJSON UsersPermission
 instance FromJSON UsersPermission
 instance ToSchema UsersPermission
+
+data DocumentWithPermission = DocumentWithPermission
+    { documentPermission :: DocPermission
+    , document :: Document.Document
+    }
+    deriving (Generic)
+
+instance ToJSON DocumentWithPermission
+instance ToSchema DocumentWithPermission

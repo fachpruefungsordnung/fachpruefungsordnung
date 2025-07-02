@@ -85,7 +85,7 @@ addRoleInGroup conn userID groupID role = do
         Left _ -> throwError errFailedToSetRole
 
 -- | Check if User is Member (or Admin) of the group that owns the specified document
---   or return external DocPermission. Members will always get `Edit` permission.
+--   or return external DocPermission. Members will always get `Editor` permission.
 -- Nothing            -> both paths failed (no permission)
 -- Just DocPermission -> User has given access rights
 checkDocPermission

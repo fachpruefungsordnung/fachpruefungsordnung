@@ -15,7 +15,7 @@ module Server.Handlers.UserHandlers
 import Control.Monad.IO.Class
 import Data.Password.Argon2
 import Data.Text (Text)
-import DocumentManagement.Document as Document (Document)
+import DocumentManagement.Document as Document
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
@@ -23,6 +23,7 @@ import Servant.Auth.Server
 import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
 import Server.HandlerUtil
+import qualified UserManagement.DocumentPermission as Permission
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 import Prelude hiding (readFile)
@@ -37,7 +38,7 @@ type UserAPI =
                     :> Get '[JSON] User.FullUser
                     :<|> Auth AuthMethod Auth.Token
                         :> "documents"
-                        :> Get '[JSON] [Document]
+                        :> Get '[JSON] [Permission.DocumentWithPermission]
                     :<|> Auth AuthMethod Auth.Token
                         :> "reset-password"
                         :> ReqBody '[JSON] Text
@@ -59,7 +60,7 @@ type UserAPI =
                     :<|> Auth AuthMethod Auth.Token
                         :> Capture "userId" User.UserID
                         :> "documents"
-                        :> Get '[JSON] [Document]
+                        :> Get '[JSON] [Permission.DocumentWithPermission]
                )
 
 userServer :: Server UserAPI
@@ -111,12 +112,15 @@ meHandler :: AuthResult Auth.Token -> Handler User.FullUser
 meHandler auth@(Authenticated Auth.Token {..}) = getUserHandler auth subject
 meHandler _ = throwError errNotLoggedIn
 
-getMyDocumentsHandler :: AuthResult Auth.Token -> Handler [Document]
+getMyDocumentsHandler
+    :: AuthResult Auth.Token -> Handler [Permission.DocumentWithPermission]
 getMyDocumentsHandler auth@(Authenticated Auth.Token {..}) = getUsersDocumentsHandler auth subject
 getMyDocumentsHandler _ = throwError errNotLoggedIn
 
 getUsersDocumentsHandler
-    :: AuthResult Auth.Token -> User.UserID -> Handler [Document]
+    :: AuthResult Auth.Token
+    -> User.UserID
+    -> Handler [Permission.DocumentWithPermission]
 getUsersDocumentsHandler (Authenticated Auth.Token {..}) requestedUserID = do
     if isSuperadmin || subject == requestedUserID
         then do
@@ -124,7 +128,17 @@ getUsersDocumentsHandler (Authenticated Auth.Token {..}) requestedUserID = do
             eList <- liftIO $ Session.run (Sessions.getAllVisibleDocuments subject) conn
             case eList of
                 Left _ -> throwError errDatabaseAccessFailed
-                Right list -> return list
+                Right docList -> do
+                    mapM
+                        ( \doc -> do
+                            mPerm <- checkDocPermission conn subject (Document.documentID doc)
+                            case mPerm of
+                                -- this should not happen, since the document is listed in visible documents,
+                                -- so the user should have atleast read permissions
+                                Nothing -> throwError errDatabaseAccessFailed
+                                Just perm -> return $ Permission.DocumentWithPermission perm doc
+                        )
+                        docList
         else throwError errSuperAdminOnly
 getUsersDocumentsHandler _ _ = throwError errNotLoggedIn
 
