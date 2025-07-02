@@ -44,14 +44,14 @@ import Data.Profunctor (lmap, rmap)
 import Data.Text
 import Data.Tuple.Curry (uncurryN)
 import Data.Vector
+import qualified DocumentManagement.Commit as Commit
+import qualified DocumentManagement.Document as Document
 import GHC.Int
 import Hasql.Statement
 import Hasql.TH
 import qualified UserManagement.DocumentPermission as Permission
 import qualified UserManagement.Group as Group
 import qualified UserManagement.User as User
-import qualified DocumentManagement.Document as Document
-import qualified DocumentManagement.Commit as Commit
 import Prelude hiding (id)
 
 getUserID :: Statement Text User.UserID
@@ -382,15 +382,17 @@ getAllExternalUsersOfDocument =
 getAllVisibleDocuments :: Statement User.UserID [Document.Document]
 getAllVisibleDocuments =
     rmap
-      (fmap ( \(document, name, groupID, headCommit) ->
-            Document.Document
-                (Document.DocumentID document)
-                name
-                groupID
-                (Commit.CommitID <$> headCommit)
-        ) . toList)
-
-    [vectorStatement|
+        ( fmap
+            ( \(document, name, groupID, headCommit) ->
+                Document.Document
+                    (Document.DocumentID document)
+                    name
+                    groupID
+                    (Commit.CommitID <$> headCommit)
+            )
+            . toList
+        )
+        [vectorStatement|
       (select 
         d.id :: int4,
         d.name :: text,
@@ -413,15 +415,17 @@ getAllVisibleDocuments =
 getAllDocumentsOfGroup :: Statement Group.GroupID [Document.Document]
 getAllDocumentsOfGroup =
     rmap
-      (fmap ( \(document, name, groupID, headCommit) ->
-            Document.Document
-                (Document.DocumentID document)
-                name
-                groupID
-                (Commit.CommitID <$> headCommit)
-        ) . toList)
-
-    [vectorStatement|
+        ( fmap
+            ( \(document, name, groupID, headCommit) ->
+                Document.Document
+                    (Document.DocumentID document)
+                    name
+                    groupID
+                    (Commit.CommitID <$> headCommit)
+            )
+            . toList
+        )
+        [vectorStatement|
       select 
         id :: int4,
         name :: text,
@@ -430,4 +434,3 @@ getAllDocumentsOfGroup =
       from documents
       where group_id = $1 :: int4
     |]
-

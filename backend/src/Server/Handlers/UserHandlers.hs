@@ -14,6 +14,7 @@ module Server.Handlers.UserHandlers
 
 import Control.Monad.IO.Class
 import Data.Password.Argon2
+import DocumentManagement.Document as Document (Document)
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
@@ -24,8 +25,6 @@ import Server.HandlerUtil
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 import Prelude hiding (readFile)
-import DocumentManagement.Document as Document ( Document )
-
 
 type UserAPI =
     Auth AuthMethod Auth.Token
@@ -36,7 +35,8 @@ type UserAPI =
             :> "me"
             :> Get '[JSON] User.FullUser
         :<|> Auth AuthMethod Auth.Token
-            :> "me" :> "documents"
+            :> "me"
+            :> "documents"
             :> Get '[JSON] [Document]
         :<|> "users"
             :> ( Auth AuthMethod Auth.Token
@@ -100,13 +100,13 @@ meHandler auth@(Authenticated Auth.Token {..}) = getUserHandler auth subject
 meHandler _ = throwError errNotLoggedIn
 
 getMyDocumentsHandler
-    :: AuthResult Auth.Token ->  Handler [Document]
+    :: AuthResult Auth.Token -> Handler [Document]
 getMyDocumentsHandler (Authenticated Auth.Token {..}) = do
     conn <- tryGetDBConnection
     eList <- liftIO $ Session.run (Sessions.getAllVisibleDocuments subject) conn
     case eList of
-            Left _ -> throwError errDatabaseAccessFailed
-            Right list -> return list
+        Left _ -> throwError errDatabaseAccessFailed
+        Right list -> return list
 getMyDocumentsHandler _ = throwError errNotLoggedIn
 
 -- | Returns a list of all users to anyone thats logged in.

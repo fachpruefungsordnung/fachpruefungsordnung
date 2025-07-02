@@ -13,6 +13,7 @@ module Server.Handlers.GroupHandlers
     ) where
 
 import Control.Monad.IO.Class
+import qualified DocumentManagement.Document as Document
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
@@ -23,7 +24,6 @@ import Server.HandlerUtil
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
-import qualified DocumentManagement.Document as Document
 
 import Prelude hiding (readFile)
 
