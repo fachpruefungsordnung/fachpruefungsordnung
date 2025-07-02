@@ -50,13 +50,14 @@ superSectionT =
         ( SectionFormat
             (FormatString [PlaceholderAtom Arabic])
         )
-        ( SimpleRegex
-            (Sequence [])
-            ( Disjunction
-                [ Star $ Disjunction [SectionChildSectionType sectionT]
-                ]
-            )
-            (Sequence [])
+        ( Right $
+            SimpleRegex
+                (Sequence [])
+                ( Disjunction
+                    [ Star $ Disjunction [sectionT]
+                    ]
+                )
+                (Sequence [])
         )
 
 sectionT :: SectionType
@@ -76,13 +77,7 @@ sectionT =
         ( SectionFormat
             (FormatString [PlaceholderAtom Arabic])
         )
-        ( SimpleRegex
-            (Sequence [])
-            ( Disjunction
-                [Star $ Disjunction [SectionChildParagraphType paragraphT]]
-            )
-            (Sequence [])
-        )
+        (Left paragraphT)
 
 paragraphT :: ParagraphType
 paragraphT =

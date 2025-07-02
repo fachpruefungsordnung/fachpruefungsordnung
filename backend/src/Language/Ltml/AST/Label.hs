@@ -3,5 +3,7 @@ module Language.Ltml.AST.Label
     )
 where
 
-newtype Label = Label String
-    deriving (Show)
+import Data.Text (Text)
+
+newtype Label = Label {unLabel :: Text}
+    deriving (Show, Eq, Ord)

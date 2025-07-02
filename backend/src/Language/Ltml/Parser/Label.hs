@@ -6,21 +6,20 @@ module Language.Ltml.Parser.Label
     )
 where
 
-import Control.Applicative.Utils ((<:>))
 import qualified Data.Char as Char (isAsciiLower, isDigit)
-import qualified Data.Text as Text (unpack)
+import qualified Data.Text as Text (cons)
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.Parser (MonadParser)
 import Text.Megaparsec (satisfy, takeWhileP, (<?>))
 import Text.Megaparsec.Char (char)
 
 labelP :: (MonadParser m) => m Label
-labelP = Label <$> (headP <:> tailP) <?> "label"
+labelP = Label <$> (Text.cons <$> headP <*> tailP) <?> "label"
   where
     isFirst = Char.isAsciiLower
     isLater c = Char.isAsciiLower c || Char.isDigit c || c `elem` "_-"
     headP = satisfy isFirst
-    tailP = Text.unpack <$> takeWhileP (Just "label character") isLater
+    tailP = takeWhileP (Just "label character") isLater
 
 labelingP :: (MonadParser m) => m Label
 labelingP = char '{' *> labelP <* char ':' <* char '}'

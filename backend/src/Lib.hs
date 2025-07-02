@@ -6,14 +6,14 @@ module Lib
 where
 
 import Database (getConnection, migrate)
+import DocumentManagement as DM
+import DocumentManagement.Commit
+import DocumentManagement.Tree
 import Hasql.Connection (Connection)
 import Hasql.Session (statement)
 import qualified Hasql.Session as Session
 import Server
 import qualified UserManagement.Statements as UStatements
-import VersionControl as VC
-import VersionControl.Commit
-import VersionControl.Tree
 
 -- a good example document with example content and example structure
 testTree :: Tree NodeWithMaybeRef
@@ -56,7 +56,7 @@ testCommits conn = do
             CreateCommit
                 (CommitInfo userId (Just "Test Commit") [])
                 (Value testTree)
-    Right newCommit <- VC.createCommit commit1 $ VC.Context conn
+    Right newCommit <- DM.createCommit commit1 $ DM.Context conn
     let commit2 =
             CreateCommit
                 ( CommitInfo
@@ -65,7 +65,7 @@ testCommits conn = do
                     [commitHeaderID (existingCommitHeader newCommit)]
                 )
                 (Value testTree)
-    Right newCommit2 <- VC.createCommit commit2 $ VC.Context conn
+    Right newCommit2 <- DM.createCommit commit2 $ DM.Context conn
     return newCommit2
   where
     getUserID email = Session.run (statement email UStatements.getUserID)

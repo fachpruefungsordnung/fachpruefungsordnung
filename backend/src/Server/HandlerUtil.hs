@@ -22,11 +22,12 @@ module Server.HandlerUtil
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Database (getConnection)
+import DocumentManagement.Document (DocumentID)
 import Hasql.Connection (Connection)
 import Hasql.Session (run)
 import Servant
 import qualified Server.Auth as Auth
-import qualified UserManagement.Document as Document
+import qualified UserManagement.DocumentPermission as Permission
 import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
@@ -87,13 +88,13 @@ addRoleInGroup conn userID groupID role = do
 checkDocPermission
     :: Connection
     -> User.UserID
-    -> Document.DocumentID
-    -> Handler (Maybe Document.DocPermission)
+    -> DocumentID
+    -> Handler (Maybe Permission.DocPermission)
 checkDocPermission conn userID docID = do
     eIsMember <- liftIO $ run (Sessions.checkGroupDocPermission userID docID) conn
     case eIsMember of
         Left _ -> throwError errDatabaseAccessFailed
-        Right True -> return $ Just Document.Editer -- user is member of right group
+        Right True -> return $ Just Permission.Editor -- user is member of right group
         Right False -> do
             ePerm <- liftIO $ run (Sessions.getExternalDocPermission userID docID) conn
             case ePerm of
@@ -102,7 +103,7 @@ checkDocPermission conn userID docID = do
                 Right (Just perm) -> return $ Just perm
 
 -- | Get the groupID of the group that owns the specified document
-getGroupOfDocument :: Connection -> Document.DocumentID -> Handler Group.GroupID
+getGroupOfDocument :: Connection -> DocumentID -> Handler Group.GroupID
 getGroupOfDocument conn docID = do
     emgroupID <- liftIO $ run (Sessions.getDocumentGroupID docID) conn
     case emgroupID of

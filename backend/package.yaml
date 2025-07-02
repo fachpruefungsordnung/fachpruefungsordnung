@@ -65,6 +65,7 @@ dependencies:
   - mtl
   - transformers
   - pretty-simple
+  - pandoc-types
 
 ghc-options:
   - -Wall

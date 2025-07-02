@@ -24,6 +24,8 @@ import Data.OpenApi
     )
 import Data.UUID (toString)
 import Database (getConnection)
+import qualified DocumentManagement as DM
+import DocumentManagement.Commit
 import GHC.Int (Int32)
 import Network.Wai.Handler.Warp (run)
 import Servant
@@ -37,8 +39,6 @@ import Server.Handlers.DocumentHandlers
 import Server.Handlers.GroupHandlers
 import Server.Handlers.RoleHandlers
 import Server.Handlers.UserHandlers
-import qualified VersionControl as VC
-import VersionControl.Commit
 import Prelude hiding (readFile)
 
 type DebugAPI =
@@ -70,13 +70,13 @@ pingHandler = return "pong"
 getCommitHandler :: Int32 -> Handler ExistingCommit
 getCommitHandler id' = liftIO $ do
     Right connection <- getConnection
-    Right commit <- VC.getCommit (CommitID id') $ VC.Context connection
+    Right commit <- DM.getCommit (CommitID id') $ DM.Context connection
     return commit
 
 postCommitHandler :: CreateCommit -> Handler ExistingCommit
 postCommitHandler commit = liftIO $ do
     Right connection <- getConnection
-    Right newCommit <- VC.createCommit commit $ VC.Context connection
+    Right newCommit <- DM.createCommit commit $ DM.Context connection
     return newCommit
 
 debugAPIHandler

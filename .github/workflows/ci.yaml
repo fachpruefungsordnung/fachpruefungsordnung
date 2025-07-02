@@ -73,6 +73,7 @@ jobs:
           working-directory: backend
           stack-build-arguments: --fast --no-test
           test: false
+          upgrade-stack: false
 
   check-frontend:
     name: Check Frontend
