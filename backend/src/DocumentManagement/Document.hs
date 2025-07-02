@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module DocumentManagement.Document
     ( Document (..)
@@ -27,10 +27,10 @@ import Data.OpenApi
 import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import DocumentManagement.Commit (CommitID)
+import GHC.Generics (Generic)
 import GHC.Int (Int32)
 import UserManagement.Group (GroupID)
 import Web.HttpApiData (FromHttpApiData (..))
-import GHC.Generics (Generic)
 
 -- | id type for documents
 newtype DocumentID = DocumentID

@@ -242,7 +242,8 @@ putExternalUserDocumentHandler (Authenticated token) docID Permission.UsersPermi
             Left _ -> throwError errDatabaseAccessFailed
             Right Nothing -> do
                 eAction <-
-                    liftIO $ Session.run (Sessions.addExternalDocPermission userID docID permission) conn
+                    liftIO $
+                        Session.run (Sessions.addExternalDocPermission userID docID permission) conn
                 case eAction of
                     Left _ -> throwError errDatabaseAccessFailed
                     Right _ -> return NoContent
