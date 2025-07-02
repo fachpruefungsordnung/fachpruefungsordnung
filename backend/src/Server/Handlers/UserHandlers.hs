@@ -14,7 +14,7 @@ module Server.Handlers.UserHandlers
 
 import Control.Monad.IO.Class
 import Data.Password.Argon2
-import Data.Text ( Text )
+import Data.Text (Text)
 import DocumentManagement.Document as Document (Document)
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
@@ -34,14 +34,14 @@ type UserAPI =
         :> Post '[JSON] NoContent
         :<|> "me"
             :> ( Auth AuthMethod Auth.Token
-                :> Get '[JSON] User.FullUser
-            :<|> Auth AuthMethod Auth.Token
-                :> "documents"
-                :> Get '[JSON] [Document]
-            :<|> Auth AuthMethod Auth.Token
-                :> "reset-password"
-                :> ReqBody '[JSON] Text
-                :> Patch '[JSON] NoContent
+                    :> Get '[JSON] User.FullUser
+                    :<|> Auth AuthMethod Auth.Token
+                        :> "documents"
+                        :> Get '[JSON] [Document]
+                    :<|> Auth AuthMethod Auth.Token
+                        :> "reset-password"
+                        :> ReqBody '[JSON] Text
+                        :> Patch '[JSON] NoContent
                )
         :<|> "users"
             :> ( Auth AuthMethod Auth.Token
@@ -61,9 +61,10 @@ type UserAPI =
 userServer :: Server UserAPI
 userServer =
     registerHandler
-        :<|> (meHandler
-        :<|> getMyDocumentsHandler
-        :<|> updateMyPasswordHandler)
+        :<|> ( meHandler
+                :<|> getMyDocumentsHandler
+                :<|> updateMyPasswordHandler
+             )
         :<|> getAllUsersHandler
         :<|> getUserHandler
         :<|> deleteUserHandler
@@ -119,7 +120,8 @@ updateMyPasswordHandler :: AuthResult Auth.Token -> Text -> Handler NoContent
 updateMyPasswordHandler (Authenticated Auth.Token {..}) newPassword = do
     conn <- tryGetDBConnection
     PasswordHash hashedText <- liftIO $ hashPassword $ mkPassword newPassword
-    eAction <- liftIO $ Session.run (Sessions.updateUserPWHash subject hashedText) conn
+    eAction <-
+        liftIO $ Session.run (Sessions.updateUserPWHash subject hashedText) conn
     case eAction of
         Left _ -> throwError errDatabaseAccessFailed
         Right _ -> return NoContent
