@@ -51,6 +51,10 @@ type UserAPI =
                         :> Capture "userId" User.UserID
                         :> ReqBody '[JSON] Auth.UserUpdate
                         :> Patch '[JSON] NoContent
+                    :<|> Auth AuthMethod Auth.Token
+                        :> Capture "userId" User.UserID
+                        :> "documents"
+                        :> Get '[JSON] [Document]
                )
 
 userServer :: Server UserAPI
@@ -62,6 +66,7 @@ userServer =
         :<|> getUserHandler
         :<|> deleteUserHandler
         :<|> patchUserHandler
+        :<|> getUsersDocumentsHandler
 
 registerHandler
     :: AuthResult Auth.Token -> Auth.UserRegisterData -> Handler NoContent
@@ -99,15 +104,22 @@ meHandler :: AuthResult Auth.Token -> Handler User.FullUser
 meHandler auth@(Authenticated Auth.Token {..}) = getUserHandler auth subject
 meHandler _ = throwError errNotLoggedIn
 
-getMyDocumentsHandler
-    :: AuthResult Auth.Token -> Handler [Document]
-getMyDocumentsHandler (Authenticated Auth.Token {..}) = do
-    conn <- tryGetDBConnection
-    eList <- liftIO $ Session.run (Sessions.getAllVisibleDocuments subject) conn
-    case eList of
-        Left _ -> throwError errDatabaseAccessFailed
-        Right list -> return list
+getMyDocumentsHandler :: AuthResult Auth.Token -> Handler [Document]
+getMyDocumentsHandler auth@(Authenticated Auth.Token {..}) = getUsersDocumentsHandler auth subject
 getMyDocumentsHandler _ = throwError errNotLoggedIn
+
+getUsersDocumentsHandler
+    :: AuthResult Auth.Token -> User.UserID -> Handler [Document]
+getUsersDocumentsHandler (Authenticated Auth.Token {..}) requestedUserID = do
+    if isSuperadmin || subject == requestedUserID
+        then do
+            conn <- tryGetDBConnection
+            eList <- liftIO $ Session.run (Sessions.getAllVisibleDocuments subject) conn
+            case eList of
+                Left _ -> throwError errDatabaseAccessFailed
+                Right list -> return list
+        else throwError errSuperAdminOnly
+getUsersDocumentsHandler _ _ = throwError errNotLoggedIn
 
 -- | Returns a list of all users to anyone thats logged in.
 getAllUsersHandler :: AuthResult Auth.Token -> Handler [User.User]

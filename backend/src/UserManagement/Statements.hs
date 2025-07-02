@@ -393,7 +393,7 @@ getAllVisibleDocuments =
             . toList
         )
         [vectorStatement|
-      (select 
+      (select
         d.id :: int4,
         d.name :: text,
         d.group_id :: int4,
@@ -402,13 +402,13 @@ getAllVisibleDocuments =
       join documents d on d.group_id = r.group_id
       where r.user_id = $1 :: uuid)
       union
-      (select 
+      (select
         d.id :: int4,
         d.name :: text,
         d.group_id :: int4,
         d.head :: int4?
       from documents d
-      join external_document_rights e on d.document_id = e.document_id
+      join external_document_rights e on d.id = e.document_id
       where e.user_id = $1 :: uuid)
     |]
 
@@ -426,7 +426,7 @@ getAllDocumentsOfGroup =
             . toList
         )
         [vectorStatement|
-      select 
+      select
         id :: int4,
         name :: text,
         group_id :: int4,
