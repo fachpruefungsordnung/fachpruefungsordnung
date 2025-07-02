@@ -140,7 +140,7 @@ getAllGroupDocumentsHandler
     :: AuthResult Auth.Token -> Group.GroupID -> Handler [Document.Document]
 getAllGroupDocumentsHandler (Authenticated token) groupID = do
     conn <- tryGetDBConnection
-    ifGroupMemberDo conn token groupID (getAllDocs conn)
+    ifSuperOrGroupMemberDo conn token groupID (getAllDocs conn)
   where
     getAllDocs :: Connection -> Handler [Document.Document]
     getAllDocs conn = do
