@@ -16,7 +16,7 @@ import Data.Text (Text)
 import Data.Vector (Vector)
 import DocumentManagement
 import DocumentManagement.Commit
-import DocumentManagement.Document as Document
+import DocumentManagement.Document as Document ( Document, DocumentID )
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
@@ -34,76 +34,65 @@ import Prelude hiding (readFile)
 type DocumentAPI =
     "documents"
         :> ( Auth AuthMethod Auth.Token
-                :> Get '[JSON] [Document]
-                :<|> Auth AuthMethod Auth.Token
-                :> Capture "documentID" Document.DocumentID
-                :> Get '[JSON] Document
-                :<|> Auth AuthMethod Auth.Token
-                    :> ReqBody '[JSON] (Text, Group.GroupID)
-                    :> Post '[JSON] Document
-                :<|> Auth AuthMethod Auth.Token
-                    :> Capture "documentID" Document.DocumentID
-                    :> Delete '[JSON] NoContent
-                :<|> "commits"
-                    :> ( Auth AuthMethod Auth.Token
-                            :> Capture "documentID" Document.DocumentID
-                            :> Get '[JSON] (Vector ExistingCommit)
-                            :<|> Auth AuthMethod Auth.Token
-                                :> Capture "documentID" Document.DocumentID
-                                :> ReqBody '[JSON] CreateCommit
-                                :> Post '[JSON] Document
-                            :<|> Auth AuthMethod Auth.Token
-                                :> Capture "documentID" Document.DocumentID
-                                :> Capture "commitID" CommitID
-                                :> Get '[JSON] ExistingCommit
-                       )
-                :<|> "external"
-                    :> ( Auth AuthMethod Auth.Token
-                            :> Capture "documentID" Document.DocumentID
-                            :> Get '[JSON] [(User.UserID, Permission.DocPermission)]
-                            :<|> Auth AuthMethod Auth.Token
-                                :> Capture "documentID" Document.DocumentID
-                                :> Capture "userID" User.UserID
-                                :> Get '[JSON] (Maybe Permission.DocPermission)
-                            :<|> Auth AuthMethod Auth.Token
-                                :> Capture "documentID" Document.DocumentID
-                                :> Capture "userID" User.UserID
-                                :> ReqBody '[JSON] Permission.DocPermission
-                                :> Put '[JSON] NoContent
-                            :<|> Auth AuthMethod Auth.Token
-                                :> Capture "documentID" Document.DocumentID
-                                :> Capture "userID" User.UserID
-                                :> Delete '[JSON] NoContent
-                       )
-                :<|> RenderAPI
+            :> Capture "documentID" Document.DocumentID
+            :> Get '[JSON] Document
+        :<|> Auth AuthMethod Auth.Token
+            :> ReqBody '[JSON] (Text, Group.GroupID)
+            :> Post '[JSON] Document
+        :<|> Auth AuthMethod Auth.Token
+            :> Capture "documentID" Document.DocumentID
+            :> Delete '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> Capture "documentID" Document.DocumentID
+            :> "commits"
+            :> Get '[JSON] (Vector ExistingCommit)
+        :<|> Auth AuthMethod Auth.Token
+            :> Capture "documentID" Document.DocumentID
+            :> "commits"
+            :> ReqBody '[JSON] CreateCommit
+            :> Post '[JSON] Document
+        :<|> Auth AuthMethod Auth.Token
+            :> Capture "documentID" Document.DocumentID
+            :> "commits"
+            :> Capture "commitID" CommitID
+            :> Get '[JSON] ExistingCommit
+        :<|> Auth AuthMethod Auth.Token
+            :> Capture "documentID" Document.DocumentID
+            :> "external"
+            :> Get '[JSON] [(User.UserID, Permission.DocPermission)]
+        :<|> Auth AuthMethod Auth.Token
+            :> Capture "documentID" Document.DocumentID
+            :> "external"
+            :> Capture "userID" User.UserID
+            :> Get '[JSON] (Maybe Permission.DocPermission)
+        :<|> Auth AuthMethod Auth.Token
+            :> Capture "documentID" Document.DocumentID
+            :> "external"
+            :> Capture "userID" User.UserID
+            :> ReqBody '[JSON] Permission.DocPermission
+            :> Put '[JSON] NoContent
+        :<|> Auth AuthMethod Auth.Token
+            :> Capture "documentID" Document.DocumentID
+            :> "external"
+            :> Capture "userID" User.UserID
+            :> Delete '[JSON] NoContent
+
+        :<|> RenderAPI
            )
 
 documentServer :: Server DocumentAPI
 documentServer =
-    getMyDocumentsHandler
-        :<|> getDocumentHandler
+        getDocumentHandler
         :<|> postDocumentHandler
         :<|> deleteDocumentHandler
-        :<|> ( getAllCommitsHandler
-                :<|> postCommitHandler
-                :<|> getCommitHandler
-             )
-        :<|> ( getAllExternalUsersDocumentHandler
-                :<|> getExternalUserDocumentHandler
-                :<|> putExternalUserDocumentHandler
-                :<|> deleteExternalUserDocumentHandler
-             )
+        :<|> getAllCommitsHandler
+        :<|> postCommitHandler
+        :<|> getCommitHandler     
+        :<|> getAllExternalUsersDocumentHandler
+        :<|> getExternalUserDocumentHandler
+        :<|> putExternalUserDocumentHandler
+        :<|> deleteExternalUserDocumentHandler
         :<|> renderServer
-
-getMyDocumentsHandler
-    :: AuthResult Auth.Token ->  Handler [Document]
-getMyDocumentsHandler (Authenticated Auth.Token {..}) = do
-    conn <- tryGetDBConnection
-    eList <- liftIO $ Session.run (Sessions.getAllVisibleDocuments subject) conn
-    case eList of
-            Left _ -> throwError errDatabaseAccessFailed
-            Right list -> return list
-getMyDocumentsHandler _ = throwError errNotLoggedIn
 
 getDocumentHandler
     :: AuthResult Auth.Token -> Document.DocumentID -> Handler Document

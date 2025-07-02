@@ -24,6 +24,8 @@ import Server.HandlerUtil
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 import Prelude hiding (readFile)
+import DocumentManagement.Document as Document ( Document )
+
 
 type UserAPI =
     Auth AuthMethod Auth.Token
@@ -33,6 +35,9 @@ type UserAPI =
         :<|> Auth AuthMethod Auth.Token
             :> "me"
             :> Get '[JSON] User.FullUser
+        :<|> Auth AuthMethod Auth.Token
+            :> "me" :> "documents"
+            :> Get '[JSON] [Document]
         :<|> "users"
             :> ( Auth AuthMethod Auth.Token
                     :> Get '[JSON] [User.User]
@@ -52,6 +57,7 @@ userServer :: Server UserAPI
 userServer =
     registerHandler
         :<|> meHandler
+        :<|> getMyDocumentsHandler
         :<|> getAllUsersHandler
         :<|> getUserHandler
         :<|> deleteUserHandler
@@ -92,6 +98,16 @@ registerHandler _ _ = throwError errNotLoggedIn
 meHandler :: AuthResult Auth.Token -> Handler User.FullUser
 meHandler auth@(Authenticated Auth.Token {..}) = getUserHandler auth subject
 meHandler _ = throwError errNotLoggedIn
+
+getMyDocumentsHandler
+    :: AuthResult Auth.Token ->  Handler [Document]
+getMyDocumentsHandler (Authenticated Auth.Token {..}) = do
+    conn <- tryGetDBConnection
+    eList <- liftIO $ Session.run (Sessions.getAllVisibleDocuments subject) conn
+    case eList of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right list -> return list
+getMyDocumentsHandler _ = throwError errNotLoggedIn
 
 -- | Returns a list of all users to anyone thats logged in.
 getAllUsersHandler :: AuthResult Auth.Token -> Handler [User.User]

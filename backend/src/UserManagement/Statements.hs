@@ -44,15 +44,14 @@ import Data.Profunctor (lmap, rmap)
 import Data.Text
 import Data.Tuple.Curry (uncurryN)
 import Data.Vector
-import qualified DocumentManagement.Document as Document
 import GHC.Int
 import Hasql.Statement
 import Hasql.TH
 import qualified UserManagement.DocumentPermission as Permission
 import qualified UserManagement.Group as Group
 import qualified UserManagement.User as User
-import qualified VersionControl.Document as Document
-import qualified VersionControl.Commit as Commit
+import qualified DocumentManagement.Document as Document
+import qualified DocumentManagement.Commit as Commit
 import Prelude hiding (id)
 
 getUserID :: Statement Text User.UserID
