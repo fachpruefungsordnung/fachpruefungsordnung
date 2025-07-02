@@ -24,6 +24,7 @@ module UserManagement.Sessions
     , removeSuperadmin
     , checkSuperadmin
     , checkGroupDocPermission
+    , checkGroupNameExistence
     , getExternalDocPermission
     , getDocumentGroupID
     , getAllExternalUsersOfDocument
@@ -127,6 +128,9 @@ checkSuperadmin uid = statement uid Statements.checkSuperadmin
 
 checkGroupDocPermission :: User.UserID -> Document.DocumentID -> Session Bool
 checkGroupDocPermission uid did = statement (uid, did) Statements.checkGroupDocPermission
+
+checkGroupNameExistence :: Text -> Session Bool
+checkGroupNameExistence name = statement name Statements.checkGroupNameExistence
 
 getExternalDocPermission
     :: User.UserID -> Document.DocumentID -> Session (Maybe Permission.DocPermission)

@@ -27,6 +27,7 @@ module UserManagement.Statements
     , removeSuperadmin
     , checkSuperadmin
     , checkGroupDocPermission
+    , checkGroupNameExistence
     , getExternalDocPermission
     , getDocumentGroupID
     , getAllExternalUsersOfDocument
@@ -306,6 +307,16 @@ checkGroupDocPermission =
                 from roles r
                 join documents d on d.group_id = r.group_id
                 where r.user_id = $1 :: uuid and d.id = $2 :: int4
+            ) :: bool
+        |]
+
+checkGroupNameExistence :: Statement Text Bool
+checkGroupNameExistence =
+    [singletonStatement|
+            select exists (
+                select 1
+                from groups
+                where name = $1 :: text
             ) :: bool
         |]
 

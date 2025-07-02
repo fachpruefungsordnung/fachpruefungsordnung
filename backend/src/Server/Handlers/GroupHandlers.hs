@@ -77,12 +77,18 @@ createGroupHandler (Authenticated Auth.Token {..}) (Group.GroupCreate {..}) = do
   where
     createGroup :: Connection -> Handler Group.GroupID
     createGroup conn = do
-        eGroupID <-
-            liftIO $
-                Session.run (Sessions.addGroup groupCreateName groupCreateDescription) conn
-        case eGroupID of
+        eBool <-
+            liftIO $ Session.run (Sessions.checkGroupNameExistence groupCreateName) conn
+        case eBool of
             Left _ -> throwError errDatabaseAccessFailed
-            Right groupID -> return groupID
+            Right True -> throwError $ err409 {errBody = "A group with that name exists already."}
+            Right False -> do
+                eGroupID <-
+                    liftIO $
+                        Session.run (Sessions.addGroup groupCreateName groupCreateDescription) conn
+                case eGroupID of
+                    Left _ -> throwError errDatabaseAccessFailed
+                    Right groupID -> return groupID
 createGroupHandler _ _ = throwError errNotLoggedIn
 
 -- | If the logged in user is SuperAdmin returns list of all existing groups as
