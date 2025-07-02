@@ -7,6 +7,7 @@ module UserManagement.User
     ( User (..)
     , UserCreate (..)
     , FullUser (..)
+    , GroupRole (..)
     , UserInfo (..)
     , Role (..)
     , UserID
@@ -50,12 +51,20 @@ data FullUser = FullUser
     , fullUserName :: Text
     , fullUserEmail :: Text
     , fullUserIsSuperadmin :: Bool
-    , fullUserRoles :: [(GroupID, Role)]
+    , fullUserRoles :: [GroupRole]
     }
-    deriving (Show, Generic)
+    deriving (Generic)
+
+data GroupRole = GroupRole
+    { groupID :: GroupID
+    , role :: Role
+    }
+    deriving (Generic)
+
+instance ToJSON GroupRole
+instance ToSchema GroupRole
 
 instance ToJSON FullUser
-instance FromJSON FullUser
 instance ToSchema FullUser
 
 -- | used for necessary user info inside a group

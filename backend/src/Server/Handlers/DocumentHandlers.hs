@@ -12,11 +12,10 @@ module Server.Handlers.DocumentHandlers
     ) where
 
 import Control.Monad.IO.Class
-import Data.Text (Text)
 import Data.Vector (Vector)
 import DocumentManagement
 import DocumentManagement.Commit
-import DocumentManagement.Document as Document (Document, DocumentID)
+import DocumentManagement.Document as Document
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
@@ -26,7 +25,6 @@ import qualified Server.Auth as Auth
 import Server.HandlerUtil
 import Server.Handlers.RenderHandlers (RenderAPI, renderServer)
 import qualified UserManagement.DocumentPermission as Permission
-import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 import Prelude hiding (readFile)
@@ -37,7 +35,7 @@ type DocumentAPI =
                 :> Capture "documentID" Document.DocumentID
                 :> Get '[JSON] Document
                 :<|> Auth AuthMethod Auth.Token
-                    :> ReqBody '[JSON] (Text, Group.GroupID)
+                    :> ReqBody '[JSON] Document.DocumentCreate
                     :> Post '[JSON] Document
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "documentID" Document.DocumentID
@@ -59,7 +57,7 @@ type DocumentAPI =
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "documentID" Document.DocumentID
                     :> "external"
-                    :> Get '[JSON] [(User.UserID, Permission.DocPermission)]
+                    :> Get '[JSON] [Permission.UsersPermission]
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "documentID" Document.DocumentID
                     :> "external"
@@ -68,8 +66,7 @@ type DocumentAPI =
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "documentID" Document.DocumentID
                     :> "external"
-                    :> Capture "userID" User.UserID
-                    :> ReqBody '[JSON] Permission.DocPermission
+                    :> ReqBody '[JSON] Permission.UsersPermission
                     :> Put '[JSON] NoContent
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "documentID" Document.DocumentID
@@ -111,14 +108,15 @@ getDocumentHandler (Authenticated Auth.Token {..}) docID = do
 getDocumentHandler _ _ = throwError errNotLoggedIn
 
 postDocumentHandler
-    :: AuthResult Auth.Token -> (Text, Group.GroupID) -> Handler Document
-postDocumentHandler (Authenticated token) (name, groupID) = do
+    :: AuthResult Auth.Token -> Document.DocumentCreate -> Handler Document
+postDocumentHandler (Authenticated token) Document.DocumentCreate {..} = do
     conn <- tryGetDBConnection
-    ifSuperOrAdminDo conn token groupID (postDocument conn)
+    ifSuperOrAdminDo conn token documentCreateGroupId (postDocument conn)
   where
     postDocument :: Connection -> Handler Document
     postDocument conn = do
-        eAction <- liftIO $ createDocument name groupID (Context conn)
+        eAction <-
+            liftIO $ createDocument documentCreateName documentCreateGroupId (Context conn)
         case eAction of
             Left _ -> throwError errDatabaseAccessFailed
             Right doc -> return doc
@@ -192,19 +190,19 @@ getCommitHandler _ _ _ = throwError errNotLoggedIn
 getAllExternalUsersDocumentHandler
     :: AuthResult Auth.Token
     -> Document.DocumentID
-    -> Handler [(User.UserID, Permission.DocPermission)]
+    -> Handler [Permission.UsersPermission]
 getAllExternalUsersDocumentHandler (Authenticated token) docID = do
     conn <- tryGetDBConnection
     groupID <- getGroupOfDocument conn docID
     ifSuperOrAdminDo conn token groupID (getUsers conn)
   where
-    getUsers :: Connection -> Handler [(User.UserID, Permission.DocPermission)]
+    getUsers :: Connection -> Handler [Permission.UsersPermission]
     getUsers conn = do
         eUserlist <-
             liftIO $ Session.run (Sessions.getAllExternalUsersOfDocument docID) conn
         case eUserlist of
             Left _ -> throwError errDatabaseAccessFailed
-            Right userList -> return userList
+            Right userList -> return $ uncurry Permission.UsersPermission <$> userList
 getAllExternalUsersDocumentHandler _ _ = throwError errNotLoggedIn
 
 getExternalUserDocumentHandler
@@ -229,10 +227,9 @@ getExternalUserDocumentHandler _ _ _ = throwError errNotLoggedIn
 putExternalUserDocumentHandler
     :: AuthResult Auth.Token
     -> Document.DocumentID
-    -> User.UserID
-    -> Permission.DocPermission
+    -> Permission.UsersPermission
     -> Handler NoContent
-putExternalUserDocumentHandler (Authenticated token) docID userID perm = do
+putExternalUserDocumentHandler (Authenticated token) docID Permission.UsersPermission {..} = do
     conn <- tryGetDBConnection
     groupID <- getGroupOfDocument conn docID
     ifSuperOrAdminDo conn token groupID (postUser conn)
@@ -245,18 +242,18 @@ putExternalUserDocumentHandler (Authenticated token) docID userID perm = do
             Left _ -> throwError errDatabaseAccessFailed
             Right Nothing -> do
                 eAction <-
-                    liftIO $ Session.run (Sessions.addExternalDocPermission userID docID perm) conn
+                    liftIO $ Session.run (Sessions.addExternalDocPermission userID docID permission) conn
                 case eAction of
                     Left _ -> throwError errDatabaseAccessFailed
                     Right _ -> return NoContent
             Right (Just _) -> do
                 eAction <-
                     liftIO $
-                        Session.run (Sessions.updateExternalDocPermission userID docID perm) conn
+                        Session.run (Sessions.updateExternalDocPermission userID docID permission) conn
                 case eAction of
                     Left _ -> throwError errDatabaseAccessFailed
                     Right _ -> return NoContent
-putExternalUserDocumentHandler _ _ _ _ = throwError errNotLoggedIn
+putExternalUserDocumentHandler _ _ _ = throwError errNotLoggedIn
 
 deleteExternalUserDocumentHandler
     :: AuthResult Auth.Token

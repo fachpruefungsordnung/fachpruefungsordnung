@@ -296,8 +296,7 @@ createDocument =
             insert into documents
                 (name, group_id)
             values
-                ($1 :: text),
-                ($2 :: int4)
+                ($1 :: text, $2 :: int4)
             returning id :: int4, name :: text, group_id :: int4
         |]
 

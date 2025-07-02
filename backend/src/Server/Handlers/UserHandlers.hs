@@ -138,7 +138,7 @@ getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
                             case eAction' of
                                 Left _ -> throwError errDatabaseAccessFailed
                                 Right roles ->
-                                    let roles' = [(group, role) | (group, Just role) <- roles]
+                                    let roles' = [User.GroupRole group role | (group, Just role) <- roles]
                                      in return $ User.FullUser requestedUserID userName userEmail isSuper roles'
         else
             throwError errSuperAdminOnly
