@@ -11,7 +11,6 @@ module FPO.Page.Admin.DocOverview (component) where
 
 import Prelude
 
--- | Copied over. Redundant imports to be removed later
 import Data.Array (filter, head, length, null, replicate, slice, (..))
 import Data.DateTime (DateTime)
 import Data.Int (toNumber)
@@ -54,8 +53,6 @@ type Slots =
 
 type Input = Int
 type GroupID = Int
-
-data Sorting = TitleAsc | TitleDesc | LastUpdatedAsc | LastUpdatedDesc
 
 -- preliminary data type. So far everything seems to use different data for documents, this should be changed.
 type Document =
@@ -137,10 +134,11 @@ component =
       $
         ( case state.requestDelete of
             Just documentID ->
-              [ deleteConfirmationModal documentID (docNameFromID state)
+              [ deleteConfirmationModal state.translator documentID
+                  (docNameFromID state)
                   CancelDeleteDocument
                   ConfirmDeleteDocument
-                  "document"
+                  (translate (label :: _ "common_document") state.translator)
               ]
             Nothing -> []
         ) <>

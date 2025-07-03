@@ -127,9 +127,10 @@ component =
       $
         ( case state.requestDelete of
             Just groupName ->
-              [ deleteConfirmationModal groupName (const groupName) CancelDeleteGroup
+              [ deleteConfirmationModal state.translator groupName (const groupName)
+                  CancelDeleteGroup
                   ConfirmDeleteGroup
-                  "group"
+                  (translate (label :: _ "common_theGroup") state.translator)
               ]
             Nothing -> case state.requestCreate of
               Just groupName -> [ createGroupModal state groupName ]
@@ -178,7 +179,10 @@ component =
               gs
           H.modify_ _ { filteredGroups = filteredGroups }
         Loading -> do
-          H.modify_ _ { error = Just "Groups are still loading." }
+          H.modify_ _
+            { error = Just $
+                (translate (label :: _ "admin_groups_stillLoading") s.translator)
+            }
     ChangeCreateGroupName group -> do
       H.modify_ _ { groupNameCreate = group, error = Nothing }
     ChangeCreateGroupDescription desc -> do
@@ -192,7 +196,7 @@ component =
       newGroupName <- H.gets _.groupNameCreate
       s <- H.get
       if newGroupName == "" then H.modify_ _
-        { error = Just "Group name cannot be empty." }
+        { error = Just (translate (label :: _ "admin_groups_notEmpty") s.translator) }
       else do
         case s.groups of
           Loaded gs -> do
@@ -205,13 +209,20 @@ component =
             case response of
               Left err -> do
                 H.modify_ _
-                  { error = Just $ printError "Error creating group" err
+                  { error = Just $ printError
+                      ( translate (label :: _ "admin_groups_errCreatingGroup")
+                          s.translator
+                      )
+                      err
                   }
               Right content -> do
                 case decodeInt content.body of
                   Left err -> do
                     H.modify_ _
-                      { error = Just $ "Error decoding group ID: " <> show err
+                      { error = Just $
+                          ( translate (label :: _ "admin_groups_errDecodingGroupId")
+                              s.translator
+                          ) <> ": " <> show err
                       }
                   Right newId -> do
                     H.modify_ _
@@ -223,7 +234,10 @@ component =
                       }
             handleAction Filter
           Loading -> do
-            H.modify_ _ { error = Just "Groups are still loading." }
+            H.modify_ _
+              { error = Just
+                  (translate (label :: _ "admin_groups_stillLoading") s.translator)
+              }
 
       setWaiting false
     CancelCreateGroup -> do
@@ -254,17 +268,28 @@ component =
 
           case groupId of
             Nothing -> do
-              H.modify_ _ { error = Just "Group not found." }
+              H.modify_ _
+                { error = Just $ translate (label :: _ "admin_groups_errNotFound")
+                    s.translator
+                }
             Just gId -> do
               setWaiting true
               res <- liftAff $ deleteIgnore $ "/groups/" <> show gId
               case res of
                 Left err -> do
-                  H.modify_ _ { error = Just $ printError "Error deleting group" err }
+                  H.modify_ _
+                    { error = Just $ printError
+                        ( translate (label :: _ "admin_groups_errDeletingGroup")
+                            s.translator
+                        )
+                        err
+                    }
                 Right status -> do
                   if getStatusCode status /= 200 then
                     H.modify_ _
-                      { error = Just "Failed to delete group."
+                      { error = Just $ translate
+                          (label :: _ "admin_groups_failedDeletingGroup")
+                          s.translator
                       , requestDelete = Nothing
                       }
                   else do
@@ -278,7 +303,10 @@ component =
               setWaiting false
           handleAction Filter
         Loading -> do
-          H.modify_ _ { error = Just "Groups are still loading." }
+          H.modify_ _
+            { error = Just
+                (translate (label :: _ "admin_groups_stillLoading") s.translator)
+            }
 
   -- | Specifies the waiting state.
   setWaiting :: Boolean -> H.HalogenM State Action Slots output m Unit
@@ -311,12 +339,13 @@ component =
   -- Creates a list of (dummy) groups with pagination.
   renderGroupList :: State -> H.ComponentHTML Action Slots m
   renderGroupList state =
-    addCard "List of Groups" [ HP.classes [ HB.col5, HB.me5 ] ] $ HH.div_
+    addCard (translate (label :: _ "admin_groups_listOfGroups") state.translator)
+      [ HP.classes [ HB.col5, HB.me5 ] ] $ HH.div_
       [ HH.div [ HP.classes [ HB.col12 ] ]
           [ addColumn
               state.groupNameFilter
               ""
-              "Search for Groups"
+              (translate (label :: _ "admin_groups_searchForGroups") state.translator)
               "bi-search"
               HP.InputText
               ChangeFilterGroupName
@@ -340,12 +369,13 @@ component =
   -- Creates a form to create a new (dummy) group.
   renderNewGroupForm :: forall w. State -> HH.HTML w Action
   renderNewGroupForm state =
-    addCard "Create New Group" [ HP.classes [ HB.col3 ] ] $ HH.div_
+    addCard (translate (label :: _ "admin_groups_createNewGroup") state.translator)
+      [ HP.classes [ HB.col3 ] ] $ HH.div_
       [ HH.div [ HP.classes [ HB.col ] ]
           [ addColumn
               state.groupNameCreate
               ""
-              "Group Name"
+              (translate (label :: _ "admin_groups_groupName") state.translator)
               "bi-people"
               HP.InputText
               ChangeCreateGroupName
@@ -354,7 +384,7 @@ component =
           [ HH.div [ HP.classes [ HB.dInlineBlock ] ]
               [ addButton
                   (not state.waiting)
-                  "Create"
+                  (translate (label :: _ "common_create") state.translator)
                   (Just "bi-plus-circle")
                   (const (RequestCreateGroup state.groupNameCreate))
               ]
@@ -388,7 +418,8 @@ component =
   -- Modal for creating a new group.
   createGroupModal :: forall w. State -> String -> HH.HTML w Action
   createGroupModal state groupName =
-    addModal "Create Group" (const CancelCreateGroup) $
+    addModal (translate (label :: _ "admin_groups_createGroup") state.translator)
+      (const CancelCreateGroup) $
       [ HH.div
           [ HP.classes [ HB.modalBody ] ]
           [ HH.div
@@ -397,12 +428,16 @@ component =
                   [ HP.for "groupName"
                   , HP.classes [ HH.ClassName "form-label" ]
                   ]
-                  [ HH.text "Group Name" ]
+                  [ HH.text $ translate (label :: _ "admin_groups_groupName")
+                      state.translator
+                  ]
               , HH.input
                   [ HP.type_ HP.InputText
                   , HP.classes [ HH.ClassName "form-control" ]
                   , HP.id "groupName"
-                  , HP.placeholder "Enter group name"
+                  , HP.placeholder $ translate
+                      (label :: _ "admin_groups_enterGroupName")
+                      state.translator
                   , HP.value groupName
                   , HP.required true
                   , HE.onValueInput ChangeCreateGroupName
@@ -414,11 +449,15 @@ component =
                   [ HP.for "groupDescription"
                   , HP.classes [ HH.ClassName "form-label" ]
                   ]
-                  [ HH.text "Description" ]
+                  [ HH.text $ translate (label :: _ "admin_groups_desc")
+                      state.translator
+                  ]
               , HH.textarea
                   [ HP.classes [ HH.ClassName "form-control" ]
                   , HP.id "groupDescription"
-                  , HP.placeholder "Enter group description (optional)"
+                  , HP.placeholder $ translate
+                      (label :: _ "admin_groups_enterGroupDesc")
+                      state.translator
                   , HP.rows 3
                   , HE.onValueInput ChangeCreateGroupDescription
                   ]
@@ -433,14 +472,14 @@ component =
               , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
               , HE.onClick (const CancelCreateGroup)
               ]
-              [ HH.text "Cancel" ]
+              [ HH.text $ translate (label :: _ "common_cancel") state.translator ]
           , HH.button
               [ HP.type_ HP.ButtonButton
               , HP.classes [ HB.btn, HB.btnPrimary ]
               , HE.onClick (const ConfirmCreateGroup)
               , HP.disabled (state.waiting || state.groupNameCreate == "")
               ]
-              [ HH.text "Create" ]
+              [ HH.text $ translate (label :: _ "common_create") state.translator ]
           ]
       ]
 

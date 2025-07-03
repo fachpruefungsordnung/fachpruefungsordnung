@@ -4,6 +4,7 @@ import Data.Function (($))
 import FPO.Translations.Common (deCommon, enCommon)
 import FPO.Translations.Components.Editor (deEditor, enEditor)
 import FPO.Translations.Components.Navbar (deNavbar, enNavbar)
+import FPO.Translations.Page.Admin.PageGroups (deAdminGroupPage, enAdminGroupPage)
 import FPO.Translations.Page.Admin.PageUsers (deAdminUserPage, enAdminUserPage)
 import FPO.Translations.Page.AdminPanel (deAdminPanel, enAdminPanel)
 import FPO.Translations.Page.Home (deHome, enHome)
@@ -20,7 +21,10 @@ en :: Translation Labels
 en = fromRecord $
   merge (toRecord enAdminPanel)
     ( merge
-        ( merge (merge (toRecord enAdminUserPage) (toRecord enCommon))
+        ( merge
+            ( merge (merge (toRecord enAdminGroupPage) (toRecord enAdminUserPage))
+                (toRecord enCommon)
+            )
             (merge (toRecord enEditor) (merge (toRecord enNavbar) (toRecord enHome)))
         )
         ( merge
@@ -33,7 +37,10 @@ de :: Translation Labels
 de = fromRecord $
   merge (toRecord deAdminPanel)
     ( merge
-        ( merge (merge (toRecord deAdminUserPage) (toRecord deCommon))
+        ( merge
+            ( merge (merge (toRecord deAdminGroupPage) (toRecord deAdminUserPage))
+                (toRecord deCommon)
+            )
             (merge (toRecord deEditor) (merge (toRecord deNavbar) (toRecord deHome)))
         )
         ( merge
@@ -49,13 +56,33 @@ de = fromRecord $
 -- | Because of this constraint, it's sensible to use
 -- | appropriate prefixes for strongly related labels.
 type Labels =
-  ( "admin_users_create"
+  ( -- | Admin Groups Page
+    "admin_groups_createGroup"
+      ::: "admin_groups_createNewGroup"
+      ::: "admin_groups_desc"
+      ::: "admin_groups_enterGroupDesc"
+      ::: "admin_groups_enterGroupName"
+      ::: "admin_groups_errCreatingGroup"
+      ::: "admin_groups_errDecodingGroupId"
+      ::: "admin_groups_errDeletingGroup"
+      ::: "admin_groups_errNotFound"
+      ::: "admin_groups_failedDeletingGroup"
+      ::: "admin_groups_groupName"
+      ::: "admin_groups_listOfGroups"
+      ::: "admin_groups_notEmpty"
+      ::: "admin_groups_searchForGroups"
+      ::: "admin_groups_stillLoading"
+
+      -- | Admin Users Page
+      ::: "admin_users_create"
       ::: "admin_users_createNewUser"
       ::: "admin_users_failedToCreateUser"
+      ::: "admin_users_failedToDeleteUser"
       ::: "admin_users_failedToLoadUsers"
       ::: "admin_users_goToProfilePage"
       ::: "admin_users_listOfUsers"
       ::: "admin_users_successfullyCreatedUser"
+      ::: "admin_users_theUser"
 
       -- | Admin Panel
       ::: "au_documentManagement"
@@ -64,12 +91,20 @@ type Labels =
       ::: "au_userManagement"
 
       -- | Common Phrases
+      ::: "common_cancel"
+      ::: "common_create"
+      ::: "common_delete"
+      ::: "common_deletePhraseA"
+      ::: "common_deletePhraseB"
+      ::: "common_document"
       ::: "common_email"
       ::: "common_emailAddress"
       ::: "common_filterBy"
+      ::: "common_group"
       ::: "common_home"
       ::: "common_password"
       ::: "common_submit"
+      ::: "common_theGroup"
       ::: "common_userName"
 
       -- | Editor Page
@@ -92,7 +127,7 @@ type Labels =
       -- | Login Page
       ::: "login_passwordForgotten"
 
-      -- | Navar 
+      -- | Navar
       ::: "navbar_documents"
       ::: "navbar_groups"
       ::: "navbar_users"

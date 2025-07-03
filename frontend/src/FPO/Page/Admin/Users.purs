@@ -140,7 +140,7 @@ component =
     HH.div
       [ HP.classes [ HB.container, HB.dFlex, HB.justifyContentCenter, HB.my5 ]
       ]
-      [ renderDeleteModal state.requestDeleteUser
+      [ renderDeleteModal state
       , renderUserManagement state
       , case state.error of
           Just err -> HH.div
@@ -183,8 +183,12 @@ component =
       response <- H.liftAff $ deleteIgnore ("/users/" <> userId)
       case response of
         Left err -> do
+          s <- H.get
           H.modify_ _
-            { error = Just ("Failed to delete user: " <> (printError err))
+            { error = Just
+                ( translate (label :: _ "admin_users_failedToDeleteUser")
+                    s.translator <> ": " <> (printError err)
+                )
             , requestDeleteUser = Nothing
             }
         Right _ -> do
@@ -392,16 +396,17 @@ component =
           ]
       ]
 
-renderDeleteModal :: forall m. Maybe UserOverviewDto -> HH.HTML m Action
-renderDeleteModal requestDeleteUser =
-  case requestDeleteUser of
+renderDeleteModal :: forall m. State -> HH.HTML m Action
+renderDeleteModal state =
+  case state.requestDeleteUser of
     Nothing -> HH.div [ HP.classes [ HB.dNone ] ] []
     Just userOverviewDto -> deleteConfirmationModal
+      state.translator
       userOverviewDto
       UserOverviewDto.getName
       CloseDeleteModal
       (PerformDeleteUser <<< UserOverviewDto.getID)
-      "User"
+      (translate (label :: _ "admin_users_theUser") state.translator)
 
 isCreateUserFormValid :: CreateUserDto -> Boolean
 isCreateUserFormValid createUserDto =
