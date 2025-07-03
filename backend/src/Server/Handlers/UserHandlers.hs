@@ -32,7 +32,7 @@ type UserAPI =
     Auth AuthMethod Auth.Token
         :> "register"
         :> ReqBody '[JSON] Auth.UserRegisterData
-        :> Post '[JSON] NoContent
+        :> Post '[JSON] User.UserID
         :<|> "me"
             :> ( Auth AuthMethod Auth.Token
                     :> Get '[JSON] User.FullUser
@@ -80,7 +80,7 @@ userServer =
 --   If a groupID is given, the new user will be added
 --   to this group as a `Member`.
 registerHandler
-    :: AuthResult Auth.Token -> Auth.UserRegisterData -> Handler NoContent
+    :: AuthResult Auth.Token -> Auth.UserRegisterData -> Handler User.UserID
 registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ mGroupID) = do
     conn <- tryGetDBConnection
     case mGroupID of
@@ -88,7 +88,7 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ mGrou
             ifSuperOrAnyAdminDo
                 conn
                 token
-                (addNewUser conn regData >> return NoContent)
+                (addNewUser conn regData)
         Just groupID ->
             ifSuperOrAdminDo
                 conn
@@ -97,7 +97,7 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ mGrou
                 ( addNewUser conn regData
                     >>= \userID ->
                         addRoleInGroup conn userID groupID User.Member
-                            >> return NoContent
+                            >> return userID
                 )
   where
     addNewUser :: Connection -> Auth.UserRegisterData -> Handler User.UserID
