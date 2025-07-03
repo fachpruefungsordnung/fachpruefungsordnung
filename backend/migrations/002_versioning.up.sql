@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS trees (
 
 CREATE TABLE IF NOT EXISTS commits (
     id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
-    creation_ts TIMESTAMP NOT NULL DEFAULT NOW (),
+    creation_ts TIMESTAMP NOT NULL DEFAULT NOW(),
     author UUID NOT NULL REFERENCES users (id),
     message TEXT NOT NULL,
     root BYTEA NOT NULL REFERENCES node_versions (hash),
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS commit_trees (
 );
 
 CREATE TABLE IF NOT EXISTS commit_base (
-    commit INTEGER PRIMARY KEY NOT NULL REFERENCES commits (id),
+    COMMIT INTEGER PRIMARY KEY NOT NULL REFERENCES commits (id),
     base INTEGER NOT NULL REFERENCES commits (id) -- parent, if only one exists, lca of parents otherwise
 );
 
