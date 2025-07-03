@@ -56,27 +56,12 @@ groupServer =
 
 createGroupHandler
     :: AuthResult Auth.Token -> Group.GroupCreate -> Handler Group.GroupID
-createGroupHandler (Authenticated Auth.Token {..}) (Group.GroupCreate {..}) = do
+createGroupHandler (Authenticated token@Auth.Token {..}) (Group.GroupCreate {..}) = do
     conn <- tryGetDBConnection
-    if isSuperadmin
-        then createGroup conn
-        else do
-            -- Check if User is Admin in ANY group
-            eRoles <- liftIO $ Session.run (Sessions.getAllUserRoles subject) conn
-            case eRoles of
-                Left _ -> throwError errDatabaseAccessFailed
-                Right roles ->
-                    if any (\(_, mr) -> mr == Just User.Admin) roles
-                        then do
-                            groupID <- createGroup conn
-                            addRoleInGroup conn subject groupID User.Admin
-                            return groupID
-                        else
-                            throwError $
-                                err403 {errBody = "You need to be Admin of any group to perform this action!\n"}
+    ifSuperOrAnyAdminDo conn token (createGroupAndAddAdmin conn)
   where
-    createGroup :: Connection -> Handler Group.GroupID
-    createGroup conn = do
+    createGroupAndAddAdmin :: Connection -> Handler Group.GroupID
+    createGroupAndAddAdmin conn = do
         eBool <-
             liftIO $ Session.run (Sessions.checkGroupNameExistence groupCreateName) conn
         case eBool of
@@ -88,7 +73,8 @@ createGroupHandler (Authenticated Auth.Token {..}) (Group.GroupCreate {..}) = do
                         Session.run (Sessions.addGroup groupCreateName groupCreateDescription) conn
                 case eGroupID of
                     Left _ -> throwError errDatabaseAccessFailed
-                    Right groupID -> return groupID
+                    Right groupID ->
+                        addRoleInGroup conn subject groupID User.Admin >> return groupID
 createGroupHandler _ _ = throwError errNotLoggedIn
 
 -- | If the logged in user is SuperAdmin returns list of all existing groups as

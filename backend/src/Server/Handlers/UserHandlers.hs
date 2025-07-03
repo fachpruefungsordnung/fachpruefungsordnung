@@ -76,14 +76,32 @@ userServer =
         :<|> patchUserHandler
         :<|> getUsersDocumentsHandler
 
+-- | Adds a new user to the system, if the logged in User is `Admin` or `SuperAdmin`.
+--   If a groupID is given, the new user will be added
+--   to this group as a `Member`.
 registerHandler
     :: AuthResult Auth.Token -> Auth.UserRegisterData -> Handler NoContent
-registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) = do
+registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ mGroupID) = do
     conn <- tryGetDBConnection
-    ifSuperOrAdminDo conn token gID (addNewMember regData conn)
+    case mGroupID of
+        Nothing ->
+            ifSuperOrAnyAdminDo
+                conn
+                token
+                (addNewUser conn regData >> return NoContent)
+        Just groupID ->
+            ifSuperOrAdminDo
+                conn
+                token
+                groupID
+                ( addNewUser conn regData
+                    >>= \userID ->
+                        addRoleInGroup conn userID groupID User.Member
+                            >> return NoContent
+                )
   where
-    addNewMember :: Auth.UserRegisterData -> Connection -> Handler NoContent
-    addNewMember (Auth.UserRegisterData {..}) conn = do
+    addNewUser :: Connection -> Auth.UserRegisterData -> Handler User.UserID
+    addNewUser conn (Auth.UserRegisterData {..}) = do
         eUser <- liftIO $ Session.run (Sessions.getUserByEmail registerEmail) conn
         case eUser of
             Right Nothing -> do
@@ -100,11 +118,9 @@ registerHandler (Authenticated token) regData@(Auth.UserRegisterData _ _ _ gID) 
                             )
                             conn
                 case eAction of
-                    Left _ -> throwError $ err500 {errBody = "user creation failed!\n"}
-                    Right userID -> do
-                        addRoleInGroup conn userID groupID User.Member
-                        return NoContent
-            Right (Just _) -> throwError $ err409 {errBody = "a user with that email exists already."}
+                    Left _ -> throwError errUserCreationFailed
+                    Right userID -> return userID
+            Right (Just _) -> throwError errEmailAlreadyUsed
             Left _ -> throwError errDatabaseAccessFailed
 registerHandler _ _ = throwError errNotLoggedIn
 

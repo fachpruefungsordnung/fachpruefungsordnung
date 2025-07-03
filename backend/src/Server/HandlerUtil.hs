@@ -4,6 +4,7 @@
 module Server.HandlerUtil
     ( ifSuperOrAdminDo
     , ifSuperOrGroupMemberDo
+    , ifSuperOrAnyAdminDo
     , tryGetDBConnection
     , addRoleInGroup
     , checkDocPermission
@@ -11,9 +12,11 @@ module Server.HandlerUtil
     , errDatabaseConnectionFailed
     , errDatabaseAccessFailed
     , errNoMemberOfThisGroup
+    , errNoAdminInAnyGroup
     , errNoAdminOfThisGroup
     , errSuperAdminOnly
     , errNotLoggedIn
+    , errUserCreationFailed
     , errUserNotFound
     , errEmailAlreadyUsed
     , errDocumentDoesNotExist
@@ -54,7 +57,7 @@ ifSuperOrAdminDo conn (Auth.Token {..}) groupID callback =
 
 -- | Checks if user is Member (or Admin) in specified group or Superadmin.
 --   If so, it calls the given callback Handler;
--- Otherwise, it throws a 403 error.
+--   Otherwise, it throws a 403 error.
 ifSuperOrGroupMemberDo
     :: Connection -> Auth.Token -> Group.GroupID -> Handler a -> Handler a
 ifSuperOrGroupMemberDo conn (Auth.Token {..}) groupID callback = do
@@ -66,6 +69,24 @@ ifSuperOrGroupMemberDo conn (Auth.Token {..}) groupID callback = do
                 Left _ -> throwError errDatabaseAccessFailed
                 Right False -> throwError errNoMemberOfThisGroup
                 Right True -> callback
+
+-- | Checks if user is SuperAdmin or Admin in ANY Group.
+--   If so, it calss the given callback Handler;
+--   Otherwise, it throws a 403 error.
+ifSuperOrAnyAdminDo :: Connection -> Auth.Token -> Handler a -> Handler a
+ifSuperOrAnyAdminDo conn (Auth.Token {..}) callback =
+    if isSuperadmin
+        then callback
+        else do
+            -- Check if User is Admin in ANY group
+            eRoles <- liftIO $ run (Sessions.getAllUserRoles subject) conn
+            case eRoles of
+                Left _ -> throwError errDatabaseAccessFailed
+                Right [] -> throwError errNoAdminInAnyGroup
+                Right roles ->
+                    if any (\(_, mr) -> mr == Just User.Admin) roles
+                        then callback
+                        else throwError errNoAdminInAnyGroup
 
 -- | Gets DB Connection and throws 500 error if it fails
 tryGetDBConnection :: Handler Connection
@@ -122,7 +143,7 @@ errDatabaseAccessFailed :: ServerError
 errDatabaseAccessFailed = err500 {errBody = "Database access failed!\n"}
 
 errFailedToSetRole :: ServerError
-errFailedToSetRole = err500 {errBody = "Failed to set role in Database!"}
+errFailedToSetRole = err500 {errBody = "Failed to set role in Database!\n"}
 
 errNoMemberOfThisGroup :: ServerError
 errNoMemberOfThisGroup =
@@ -134,6 +155,9 @@ errNoAdminOfThisGroup :: ServerError
 errNoAdminOfThisGroup =
     err403 {errBody = "You have to be Admin of the group to perform this action!\n"}
 
+errNoAdminInAnyGroup :: ServerError
+errNoAdminInAnyGroup = err403 {errBody = "You have to be an Admin to perform this action!\n"}
+
 errSuperAdminOnly :: ServerError
 errSuperAdminOnly =
     err403 {errBody = "You have to be Superadmin to perform this action!\n"}
@@ -144,14 +168,17 @@ errNotLoggedIn =
         { errBody = "Not allowed! You need to be logged in to perform this action.\n"
         }
 
+errUserCreationFailed :: ServerError
+errUserCreationFailed = err500 {errBody = "User creation failed!\n"}
+
 errUserNotFound :: ServerError
-errUserNotFound = err404 {errBody = "User not member of this group."}
+errUserNotFound = err404 {errBody = "User not member of this group.\n"}
 
 errEmailAlreadyUsed :: ServerError
-errEmailAlreadyUsed = err409 {errBody = "Email is already in use."}
+errEmailAlreadyUsed = err409 {errBody = "Email is already in use.\n"}
 
 errDocumentDoesNotExist :: ServerError
-errDocumentDoesNotExist = err404 {errBody = "Document not found."}
+errDocumentDoesNotExist = err404 {errBody = "Document not found.\n"}
 
 errNoPermission :: ServerError
-errNoPermission = err403 {errBody = "Insufficient permission to perform this action."}
+errNoPermission = err403 {errBody = "Insufficient permission to perform this action.\n"}

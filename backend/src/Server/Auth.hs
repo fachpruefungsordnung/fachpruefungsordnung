@@ -51,7 +51,7 @@ data UserRegisterData = UserRegisterData
     { registerName :: Text
     , registerEmail :: Text
     , registerPassword :: Text
-    , groupID :: Group.GroupID
+    , groupID :: Maybe Group.GroupID
     }
     deriving (Generic, FromJSON, ToSchema)
 
