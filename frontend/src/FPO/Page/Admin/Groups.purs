@@ -32,7 +32,14 @@ import FPO.Data.Request
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (Group)
 import FPO.Data.Store as Store
-import FPO.Page.HTML (addButton, addCard, addColumn, addModal, emptyEntryGen)
+import FPO.Page.HTML
+  ( addButton
+  , addCard
+  , addColumn
+  , addError
+  , addModal
+  , emptyEntryGen
+  )
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen (liftAff, liftEffect)
@@ -123,7 +130,7 @@ component =
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
-      [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
+      [ HP.classes [ HB.container, HB.my5 ] ]
       $
         ( case state.requestDelete of
             Just groupName ->
@@ -137,13 +144,7 @@ component =
               Nothing -> []
         ) <>
           [ renderGroupManagement state
-          , HH.div [ HP.classes [ HB.textCenter ] ]
-              [ case state.error of
-                  Just err -> HH.div
-                    [ HP.classes [ HB.alert, HB.alertDanger, HB.mt5 ] ]
-                    [ HH.text err ]
-                  Nothing -> HH.text ""
-              ]
+          , addError state.error
           ]
 
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
@@ -315,18 +316,17 @@ component =
 
   renderGroupManagement :: State -> H.ComponentHTML Action Slots m
   renderGroupManagement state =
-    HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-      [ HH.div [ HP.classes [ HB.colSm12, HB.colMd10, HB.colLg9 ] ]
-          [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-              [ HH.text $ translate (label :: _ "au_groupManagement") state.translator
-              ]
-          , case state.groups of
-              Loading ->
-                HH.div [ HP.classes [ HB.textCenter, HB.mt5 ] ]
-                  [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
-              Loaded _ ->
-                renderGroupListView state
+    HH.div_
+      [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+          [ HH.text $ translate (label :: _ "au_groupManagement")
+              state.translator
           ]
+      , case state.groups of
+          Loading ->
+            HH.div [ HP.classes [ HB.textCenter, HB.mt5 ] ]
+              [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
+          Loaded _ ->
+            renderGroupListView state
       ]
 
   renderGroupListView :: State -> H.ComponentHTML Action Slots m
@@ -339,22 +339,25 @@ component =
   -- Creates a list of (dummy) groups with pagination.
   renderGroupList :: State -> H.ComponentHTML Action Slots m
   renderGroupList state =
-    addCard (translate (label :: _ "admin_groups_listOfGroups") state.translator)
-      [ HP.classes [ HB.col5, HB.me5 ] ] $ HH.div_
-      [ HH.div [ HP.classes [ HB.col12 ] ]
-          [ addColumn
-              state.groupNameFilter
-              ""
-              (translate (label :: _ "admin_groups_searchForGroups") state.translator)
-              "bi-search"
-              HP.InputText
-              ChangeFilterGroupName
-          ]
-      , HH.ul [ HP.classes [ HB.listGroup ] ]
-          $ map (createGroupEntry state) grps
-              <> replicate (groupsPerPage - length grps)
-                (emptyEntryGen [ buttonDeleteGroup state "(not a group)" ])
-      , HH.slot _pagination unit P.component ps SetPage
+    HH.div [ HP.classes [ HB.col12, HB.colMd6, HB.colLg5, HB.meLg5, HB.mb4 ] ]
+      [ addCard (translate (label :: _ "admin_groups_listOfGroups") state.translator)
+          [] $
+          HH.div_
+            [ addColumn
+                state.groupNameFilter
+                ""
+                ( translate (label :: _ "admin_groups_searchForGroups")
+                    state.translator
+                )
+                "bi-search"
+                HP.InputText
+                ChangeFilterGroupName
+            , HH.ul [ HP.classes [ HB.listGroup ] ]
+                $ map (createGroupEntry state) grps
+                    <> replicate (groupsPerPage - length grps)
+                      (emptyEntryGen [ buttonDeleteGroup state "(not a group)" ])
+            , HH.slot _pagination unit P.component ps SetPage
+            ]
       ]
     where
     grps = slice (state.page * groupsPerPage) ((state.page + 1) * groupsPerPage)
@@ -369,26 +372,30 @@ component =
   -- Creates a form to create a new (dummy) group.
   renderNewGroupForm :: forall w. State -> HH.HTML w Action
   renderNewGroupForm state =
-    addCard (translate (label :: _ "admin_groups_createNewGroup") state.translator)
-      [ HP.classes [ HB.col3 ] ] $ HH.div_
-      [ HH.div [ HP.classes [ HB.col ] ]
-          [ addColumn
-              state.groupNameCreate
-              ""
-              (translate (label :: _ "admin_groups_groupName") state.translator)
-              "bi-people"
-              HP.InputText
-              ChangeCreateGroupName
-          ]
-      , HH.div [ HP.classes [ HB.col12, HB.textCenter ] ]
-          [ HH.div [ HP.classes [ HB.dInlineBlock ] ]
-              [ addButton
-                  (not state.waiting)
-                  (translate (label :: _ "common_create") state.translator)
-                  (Just "bi-plus-circle")
-                  (const (RequestCreateGroup state.groupNameCreate))
+    HH.div [ HP.classes [ HB.col12, HB.colMd4, HB.colLg3, HB.mb4 ] ]
+      [ addCard
+          (translate (label :: _ "admin_groups_createNewGroup") state.translator)
+          []
+          $ HH.div_
+              [ addColumn
+                  state.groupNameCreate
+                  ""
+                  ( translate (label :: _ "admin_groups_groupName")
+                      state.translator
+                  )
+                  "bi-people"
+                  HP.InputText
+                  ChangeCreateGroupName
+              , HH.div [ HP.classes [ HB.col12, HB.textCenter ] ]
+                  [ HH.div [ HP.classes [ HB.dInlineBlock ] ]
+                      [ addButton
+                          (not state.waiting)
+                          (translate (label :: _ "common_create") state.translator)
+                          (Just "bi-plus-circle")
+                          (const (RequestCreateGroup state.groupNameCreate))
+                      ]
+                  ]
               ]
-          ]
       ]
 
   -- Creates a (dummy) group entry for the list.

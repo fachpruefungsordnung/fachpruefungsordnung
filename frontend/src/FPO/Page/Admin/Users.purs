@@ -46,7 +46,14 @@ import FPO.Dto.CreateUserDto
 import FPO.Dto.CreateUserDto as CreateUserDto
 import FPO.Dto.UserOverviewDto (UserOverviewDto)
 import FPO.Dto.UserOverviewDto as UserOverviewDto
-import FPO.Page.HTML (addButton, addCard, addColumn, deleteButton, emptyEntryText)
+import FPO.Page.HTML
+  ( addButton
+  , addCard
+  , addColumn
+  , addError
+  , deleteButton
+  , emptyEntryText
+  )
 import FPO.Translations.Labels (Labels)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -142,20 +149,12 @@ component =
       ]
       [ renderDeleteModal state
       , renderUserManagement state
-      , case state.error of
-          Just err -> HH.div
-            [ HP.classes [ HB.alert, HB.alertDanger, HB.textCenter, HB.mt5 ] ]
-            [ HH.text err ]
-          Nothing -> HH.text ""
+      , addError state.error
       ]
 
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
-      -- TODO: Usually, we would fetch some data here (and handle
-      --       the error of missing credentials), but for now,
-      --       we just check if the user is an admin and redirect
-      --       to a 404 page if not.
       u <- H.liftAff $ getUser
       when (fromMaybe true (not <$> _.isAdmin <$> u)) $ navigate Page404
       fetchAndLoadUsers

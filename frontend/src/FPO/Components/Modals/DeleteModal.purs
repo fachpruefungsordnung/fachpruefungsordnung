@@ -4,6 +4,7 @@ module FPO.Components.Modals.DeleteModal
 
 import Prelude
 
+import Data.Array (singleton)
 import FPO.Page.HTML (addModal)
 import FPO.Translations.Labels (Labels)
 import Halogen.HTML as HH
@@ -47,13 +48,14 @@ deleteConfirmationModal
   addModal "Confirm Delete" (const cancelAction) $
     [ HH.div
         [ HP.classes [ HB.modalBody ] ]
-        [ HH.text
-            ( translate (label :: _ "common_deletePhraseA") translator
-                <> objectTypeName
-                <> " "
-                <> toObjectName objectIdentifier
-                <> translate (label :: _ "common_deletePhraseB") translator
-            )
+        [ HH.text $
+            translate (label :: _ "common_deletePhraseA") translator
+              <> objectTypeName
+              <> " "
+        , HH.i_ $ singleton $ HH.text $
+            toObjectName objectIdentifier
+        , HH.text $
+            translate (label :: _ "common_deletePhraseB") translator
         ]
     , HH.div
         [ HP.classes [ HB.modalFooter ] ]

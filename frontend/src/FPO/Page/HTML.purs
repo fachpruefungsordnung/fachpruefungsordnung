@@ -1,5 +1,5 @@
 -- | This module contains some HTML helpers and goodies for the FPO app,
--- | useful for creating and reusing HTML components.
+-- | useful for creating and reusing HTML components and pages.
 
 module FPO.Page.HTML where
 
@@ -113,7 +113,7 @@ addCard
   -> HH.HTML w i
 addCard title e content =
   HH.div e
-    [ HH.div [ HP.classes [ HB.card ] ]
+    [ HH.div ([ HP.classes [ HB.card ] ])
         [ HH.h5 [ HP.classes [ HB.cardHeader ] ]
             [ HH.text title ]
         , content `addClass` HB.cardBody
@@ -135,7 +135,6 @@ addModal title cancelAction content =
         , HP.attr (HH.AttrName "data-bs-backdrop") "static"
         , HP.attr (HH.AttrName "data-bs-keyboard") "false"
         , HP.attr (HH.AttrName "tabindex") "-1"
-        -- , HP.attr (HH.AttrName "aria-labelledby") "deleteModalLabel"
         , HP.attr (HH.AttrName "aria-hidden") "false"
         , HP.style "display: block;"
         ]
@@ -148,7 +147,6 @@ addModal title cancelAction content =
                       [ HH.h1
                           [ HP.classes
                               [ HH.ClassName "modal-title", HH.ClassName "fs-5" ]
-                          -- , HP.id "deleteModalLabel"
                           ]
                           [ HH.text title ]
                       , HH.button
@@ -173,6 +171,7 @@ addModal title cancelAction content =
         []
     ]
 
+-- | Creates a delete button with an icon.
 deleteButton :: forall w a. (MouseEvent -> a) -> HH.HTML w a
 deleteButton action =
   HH.button
@@ -196,4 +195,18 @@ emptyEntryGen content =
   HH.li [ HP.classes [ HB.listGroupItem ] ]
     [ HH.div [ HP.classes [ HB.textCenter, HB.invisible ] ]
         content
+    ]
+
+-- | Adds an error message to the page.
+addError
+  :: forall w i
+   . Maybe String -- ^ error message
+  -> HH.HTML w i
+addError msg =
+  HH.div [ HP.classes [ HB.textCenter ] ]
+    [ case msg of
+        Just err -> HH.div
+          [ HP.classes [ HB.alert, HB.alertDanger, HB.mt5 ] ]
+          [ HH.text err ]
+        Nothing -> HH.text ""
     ]
