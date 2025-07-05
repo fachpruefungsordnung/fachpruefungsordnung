@@ -145,6 +145,7 @@ type Labels =
       ::: "common_filterBy"
       ::: "common_group"
       ::: "common_home"
+      ::: "common_members"
       ::: "common_password"
       ::: "common_project"
       ::: "common_submit"
@@ -165,7 +166,9 @@ type Labels =
       -- | Group Projects Page
 
       ::: "gp_groupProjects"
+      ::: "gp_newProject"
       ::: "gp_projectManagement"
+      ::: "gp_searchProjects"
 
       -- | Home Page
       ::: "home_pleaseLogInA"

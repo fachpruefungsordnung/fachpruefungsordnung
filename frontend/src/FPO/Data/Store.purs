@@ -4,6 +4,8 @@
 
 module FPO.Data.Store
   ( Action(..)
+  , Document
+  , DocumentPlusPermission
   , Group
   , GroupCreate
   , Store
@@ -26,6 +28,11 @@ import Web.Storage.Storage (getItem, setItem) as LocalStorage
 type User = { userName :: String, isAdmin :: Boolean }
 
 type Group = { groupOverviewName :: String, groupOverviewId :: Int }
+
+-- as of now, headCommit may be empty, so it is a Maybe value.
+type Document = { group :: Int, headCommit :: Maybe Int, id :: Int, name :: String }
+
+type DocumentPlusPermission = { document :: Document, documentPermission :: String }
 
 type GroupCreate = { groupCreateName :: String, groupCreateDescription :: String }
 

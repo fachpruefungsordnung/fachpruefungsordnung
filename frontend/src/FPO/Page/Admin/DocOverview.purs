@@ -1,18 +1,26 @@
 -- | Overview of Documents belonging to Group
 
 -- Things to change in this file:
+-- always loading for group 1 (see initialize and ConfirmDeleteDocument)
 -- No connection to Backend yet
 -- different Docs lead to same editor
 -- both buttons not funtional yet
 -- many things same as in Home.purs or PageGroups.purs. Need to relocate reusable code fragments.
 -- archive column should have checkboxes
 
+-- to change: the project/document structure between pages isn't standardized.
+-- This must be changed. For now, the toDocument function translates as needed and makes up
+-- missing data
+
 module FPO.Page.Admin.DocOverview (component) where
 
 import Prelude
 
+import Affjax (printError)
+import Affjax.StatusCode (StatusCode(StatusCode))
 import Data.Array (filter, head, length, null, replicate, slice, (..))
 import Data.DateTime (DateTime)
+import Data.Either (Either(..))
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (contains)
@@ -25,7 +33,7 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (getUser)
+import FPO.Data.Request (deleteIgnore, getDocumentsFromURL, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Page.HTML (addCard, addColumn)
@@ -167,7 +175,7 @@ component =
   renderDocumentListView :: State -> H.ComponentHTML Action Slots m
   renderDocumentListView state =
     HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-      [ renderSideButtons
+      [ renderSideButtons state
       , renderDocumentsOverview state
       ]
 
@@ -177,7 +185,7 @@ component =
     HH.div [ HP.classes [ HB.col9, HB.justifyContentCenter ] ]
       [ addCard
           (translate (label :: _ "gp_groupProjects") state.translator)
-          [ HP.classes [ HB.colSm11, HB.colMd10, HB.colLg8 ] ]
+          [ HP.classes [ HB.colSm11, HB.colMd10, HB.colLg9 ] ]
           (renderDocumentOverview state)
       ]
 
@@ -190,7 +198,7 @@ component =
               [ addColumn
                   state.documentNameFilter
                   ""
-                  "Search for Documents"
+                  (translate (label :: _ "gp_searchProjects") state.translator)
                   "bi-search"
                   HP.InputText
                   ChangeFilterDocumentName
@@ -215,17 +223,20 @@ component =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
       [ HH.colgroup_
-          [ HH.col [ HP.style "width: 40%;" ] -- 'Title' column
-          , HH.col [ HP.style "width: 25%;" ] -- 'Last Updated' column
-          , HH.col [ HP.style "width: 25%;" ] -- 'Archived' column
+          [ HH.col [ HP.style "width: 55%;" ] -- 'Title' column
+          , HH.col [ HP.style "width: 35%;" ] -- 'Last Updated' column
+          -- archiving feature not supported for now
+          -- , HH.col [ HP.style "width: 25%;" ] -- 'Archived' column
           , HH.col [ HP.style "width: 10%;" ] -- 'Delete' column
           ]
-      , HH.slot _tablehead unit TH.component tableCols ChangeSorting
+      , HH.slot _tablehead unit TH.component
+          { columns: tableCols, sortedBy: "Last Updated" }
+          ChangeSorting
       , HH.tbody_ $
           if null docs then
             [ HH.tr []
                 [ HH.td
-                    [ HP.colSpan 4
+                    [ HP.colSpan 3
                     , HP.classes [ HB.textCenter ]
                     ]
                     [ HH.i_ [ HH.text "No documents found" ] ]
@@ -234,7 +245,7 @@ component =
           else
             ( map (renderDocumentRow state) docs
                 <> replicate (10 - length docs) emptyDocumentRow
-            ) -- Fill up to 5 rows
+            ) -- Fill up to 10 rows
       ]
     where
     tableCols = TH.createTableColumns
@@ -244,9 +255,10 @@ component =
       , { title: "Last Updated"
         , style: Just TH.Numeric
         }
-      , { title: "Archived?"
-        , style: Nothing
-        }
+      -- archiving feature not supported for now
+      {-       , { title: "Archived?"
+      , style: Nothing
+      } -}
       , { title: "Delete?"
         , style: Nothing
         }
@@ -263,8 +275,9 @@ component =
           [ HH.text document.body.name ]
       , HH.td [ HP.classes [ HB.textCenter ] ]
           [ HH.text $ formatRelativeTime state.currentTime document.header.updatedTs ]
-      , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text (show document.header.archivedStatus) ]
+      -- archiving feature not supported for now
+      {-       , HH.td [ HP.classes [ HB.textCenter ] ]
+      [ HH.text (show document.header.archivedStatus) ] -}
       , HH.td [ HP.classes [ HB.textCenter ] ]
           [ buttonDeleteDocument document.header.id ]
       ]
@@ -274,38 +287,38 @@ component =
   emptyDocumentRow =
     HH.tr []
       [ HH.td
-          [ HP.colSpan 4
+          [ HP.colSpan 3
           , HP.classes [ HB.textCenter, HB.invisible ]
           ]
           [ HH.text $ "Empty Row", buttonDeleteDocument (-1) ]
       ]
 
-  renderSideButtons :: forall w. HH.HTML w Action
-  renderSideButtons =
+  renderSideButtons :: forall w. State -> HH.HTML w Action
+  renderSideButtons state =
     HH.div [ HP.classes [ HB.col, HB.justifyContentCenter ] ]
-      [ renderToMemberButton
-      , renderCreateDocButton
+      [ renderToMemberButton state
+      , renderCreateDocButton state
       ]
 
-  renderToMemberButton :: forall w. HH.HTML w Action
-  renderToMemberButton =
+  renderToMemberButton :: forall w. State -> HH.HTML w Action
+  renderToMemberButton state =
     HH.div [ HP.classes [ HB.inputGroup ] ]
       [ HH.button
           [ HP.classes [ HB.btn, HB.btnOutlineInfo, HB.btnLg, HB.p4, HB.textDark ]
           , HE.onClick (const $ DoNothing)
           ]
-          [ HH.text "Members" ]
+          [ HH.text $ translate (label :: _ "common_members") state.translator ]
       ]
 
-  renderCreateDocButton :: forall w. HH.HTML w Action
-  renderCreateDocButton =
+  renderCreateDocButton :: forall w. State -> HH.HTML w Action
+  renderCreateDocButton state =
     HH.div [ HP.classes [ HB.inputGroup ] ]
       [ HH.button
           [ HP.classes
               [ HB.btn, HB.btnOutlineInfo, HB.btnLg, HB.p4, HB.mt5, HB.textDark ]
           , HE.onClick (const $ DoNothing)
           ]
-          [ HH.text "Create Document" ]
+          [ HH.text $ translate (label :: _ "gp_newProject") state.translator ]
       ]
 
   buttonDeleteDocument :: forall w. Int -> HH.HTML w Action
@@ -324,9 +337,18 @@ component =
         navigate Page404
       now <- H.liftEffect nowDateTime
       H.modify_ _
-        { documents = mockDocuments now
+        { documents = []
         , currentTime = Just now
         }
+      documents <- liftAff
+        (getDocumentsFromURL ("/groups/" <> show 1 <> "/documents"))
+      case documents of
+        Just docs -> do
+          H.modify_ _ { documents = toDocs docs now }
+          pure unit
+        Nothing -> do
+          navigate Login
+          pure unit
       handleAction Filter
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -353,11 +375,28 @@ component =
         , requestDelete = Nothing
         }
     ConfirmDeleteDocument docID -> do
-      H.modify_ \s -> s
-        { error = Nothing
-        , documents = filter (\d -> d.header.id /= docID) s.documents
-        , requestDelete = Nothing
-        }
+      deleteResponse <- liftAff (deleteIgnore ("/documents/" <> show docID))
+      case deleteResponse of
+        Left err -> do
+          H.modify_ \s -> s
+            { error = Just (printError err)
+            }
+        Right _ -> do
+          log "Deleted Document"
+          now <- H.liftEffect nowDateTime
+          documents <- liftAff
+            (getDocumentsFromURL ("/groups/" <> show 1 <> "/documents"))
+          case documents of
+            Just docs -> do
+              H.modify_ \s -> s
+                { error = Nothing
+                , documents = toDocs docs now
+                , requestDelete = Nothing
+                }
+              pure unit
+            Nothing -> do
+              navigate Login
+              pure unit
       handleAction Filter
     ViewDocument documentID -> do
       s <- H.get
@@ -393,25 +432,26 @@ component =
     DoNothing ->
       pure unit
 
+  -- transforms Document data from backend into data for this page
+  toDocs :: Array Store.Document -> DateTime -> Array Document
+  toDocs docs now = map
+    ( \doc ->
+        { body:
+            { name: doc.name
+            , text: "This text should not be read, else there is an error"
+            }
+        , header:
+            { updatedTs: now
+            , id: doc.id
+            , archivedStatus: false
+            }
+        }
+    )
+    docs
+
   docNameFromID :: State -> Int -> String
   docNameFromID state id =
     case head (filter (\doc -> doc.header.id == id) state.documents) of
       Just doc -> doc.body.name
       Nothing -> "Unknown Name"
 
-  mockDocuments :: DateTime -> Array Document
-  mockDocuments now =
-    map
-      ( \i ->
-          { body:
-              { name: "Doc" <> (show i)
-              , text: "This is the" <> show i <> "-th Document"
-              }
-          , header:
-              { updatedTs: adjustDateTime (Days (toNumber i)) now
-              , id: i
-              , archivedStatus: false
-              }
-          }
-      )
-      (0 .. 23)

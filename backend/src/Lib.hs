@@ -8,6 +8,7 @@ where
 import Database (getConnection, migrate)
 import DocumentManagement as DM
 import DocumentManagement.Commit
+import DocumentManagement.Document
 import DocumentManagement.Tree
 import Hasql.Connection (Connection)
 import Hasql.Session (statement)
@@ -49,6 +50,12 @@ testTree =
             )
         ]
 
+testDocuments :: Connection -> IO Document
+testDocuments conn = do 
+    Right newDocument1 <- DM.createDocument "testdocument1" 1 (DM.Context conn)
+    Right newDocument2 <- DM.createDocument "testdocument2" 1 (DM.Context conn)
+    return newDocument1
+
 testCommits :: Connection -> IO ExistingCommit
 testCommits conn = do
     Right userId <- getUserID "test@test.com" conn
@@ -77,5 +84,7 @@ someFunc = do
     -- Datenbank zumüllen :)
     commit <- testCommits connection
     print commit
+    document <- testDocuments connection
+    print document
     runServer
     return ()

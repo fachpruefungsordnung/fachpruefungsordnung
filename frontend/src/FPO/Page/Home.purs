@@ -5,6 +5,10 @@
 -- | the user to navigate to the editor by clicking on the title.
 -- | The user must be logged in to see the projects.
 
+-- to change: the project/document structure between pages isn't standardized.
+-- This must be changed. For now, the toProject function translates as needed and makes up
+-- missing data
+
 module FPO.Page.Home (component, adjustDateTime, formatRelativeTime) where
 
 import Prelude
@@ -29,7 +33,7 @@ import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (getUser)
+import FPO.Data.Request (getDocumentsFromURLWithPermission, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (User)
 import FPO.Data.Store as Store
@@ -137,12 +141,19 @@ component =
       store <- getStore
       u <- liftAff getUser
       now <- liftEffect nowDateTime
-      H.modify_ _
-        { user = u
-        , translator = fromFpoTranslator store.translator
-        , projects = mockProjects now
-        , currentTime = Just now
-        }
+      documents <- liftAff (getDocumentsFromURLWithPermission ("/me/documents"))
+      case documents of
+        Just docs -> do
+          H.modify_ _
+            { user = u
+            , translator = fromFpoTranslator store.translator
+            , projects = toProject docs now
+            , currentTime = Just now
+            }
+          pure unit
+        Nothing -> do
+          navigate Login
+          pure unit
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject projectName -> do
       log $ "Routing to editor for project " <> projectName
@@ -240,7 +251,9 @@ component =
           [ HH.col [ HP.style "width: 70%;" ] -- 'Title' column
           , HH.col [ HP.style "width: 30%;" ] -- 'Last Updated' column
           ]
-      , HH.slot _tablehead unit TH.component tableCols ChangeSorting
+      , HH.slot _tablehead unit TH.component
+          { columns: tableCols, sortedBy: "Last Updated" }
+          ChangeSorting
       , HH.tbody_ $
           if null ps then
             [ HH.tr []
@@ -294,42 +307,20 @@ component =
   filterProjects query projects =
     filter (\p -> contains (Pattern $ toLower query) (toLower p.name)) projects
 
-  -- Create mock projects with proper DateTime values
-  mockProjects :: DateTime -> Array Project
-  mockProjects now =
-    [ { name: "FPO Informatik 1-Fach M.Sc. 2025"
-      , description: "Hier gibt es Zusatzinformationen!"
-      , version: "1.2"
-      , collaborators: 3
-      , updated: adjustDateTime (Hours 6.0) now
-      }
-    , { name: "FPO Elektrotechnik und Informationstechnik B.Sc. 2022"
+-- transforms Document data from backend into data for this page
+toProject :: Array Store.DocumentPlusPermission -> DateTime -> Array Project
+toProject docs now = map
+  ( \doc ->
+      { name: doc.document.name
       , description:
-          (<>)
-            "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed eiusmod tempor"
-            "incidunt Hello! ut labore et dolore magna aliqua. Ut enim ad minim veniam"
-      , version: "4.8"
-      , collaborators: 4
-      , updated: adjustDateTime (Days 3.0) now
+          "This text should not be read, else there is eihter an error, or i am missing something"
+      , version:
+          "This text should not be read, else there is eihter an error, or i am missing something"
+      , collaborators: -1
+      , updated: now
       }
-    , { name: "FPO Materialwissenschaft B.Sc."
-      , description: "An older project for testing absolute date formatting"
-      , version: "2.1"
-      , collaborators: 2
-      , updated: adjustDateTime (Days (179.0)) now
-      }
-    ]
-      <>
-        map
-          ( \i ->
-              { name: "Another FPO Project #" <> show i
-              , description: "This is a mock project for testing purposes."
-              , version: "1.0"
-              , collaborators: 42
-              , updated: adjustDateTime (Hours $ toNumber i) now
-              }
-          )
-          (0 .. 4)
+  )
+  docs
 
 -- Helper function to adjust a DateTime by a duration (subtract from current time)
 adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime

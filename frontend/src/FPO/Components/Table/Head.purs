@@ -32,7 +32,7 @@ type Title = String
 --       initial state, but it would be a more sensible design.
 type Column = { title :: Title, style :: Maybe SortingStyle, order :: Order }
 
-type Input = Array Column
+type Input = { columns :: Array Column, sortedBy :: String }
 
 -- | Output type for the component, which emits
 -- | the clicked column title and its sorting state.
@@ -75,7 +75,7 @@ component =
     }
   where
   initialState :: Input -> State
-  initialState input = { active: "", cols: input }
+  initialState input = { active: input.sortedBy, cols: input.columns }
 
   render :: State -> H.ComponentHTML Action () m
   render state = HH.thead
