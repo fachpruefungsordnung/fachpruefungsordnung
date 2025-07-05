@@ -12,7 +12,7 @@ import Affjax.RequestHeader (RequestHeader(RequestHeader))
 import Affjax.ResponseFormat (ResponseFormat)
 import Affjax.ResponseFormat (blob, document, ignore, json, string) as AXRF
 import Affjax.StatusCode (StatusCode(..))
-import Data.Argonaut (JsonDecodeError)
+import Data.Argonaut (JsonDecodeError, decodeJson, encodeJson)
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode.Decoders (decodeArray)
 import Data.Either (Either(..))
@@ -24,8 +24,9 @@ import Effect.Aff as Exn
 import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
-import FPO.Data.JSON (decodeGroup, decodeUser, encodeGroupCreate)
-import FPO.Data.Store (Group, GroupCreate, User)
+import FPO.Data.JSON (decodeUser)
+import FPO.Data.Store (User)
+import FPO.Dto.GroupDto (GroupCreate, GroupOverview)
 import Foreign (renderForeignError)
 import Web.DOM.Document (Document)
 import Web.File.Blob (Blob)
@@ -92,11 +93,11 @@ getUser :: Aff (Maybe User)
 getUser = getFromJSONEndpoint decodeUser "/me"
 
 -- | Fetches the groups of the current user from the server.
-getGroups :: Aff (Maybe (Array Group))
-getGroups = getFromJSONEndpoint (decodeArray decodeGroup) "/groups"
+getGroups :: Aff (Maybe (Array GroupOverview))
+getGroups = getFromJSONEndpoint (decodeArray decodeJson) "/groups"
 
 addGroup :: GroupCreate -> Aff (Either Error (Response Json))
-addGroup group = postJson "/groups" (encodeGroupCreate group)
+addGroup group = postJson "/groups" (encodeJson group)
 
 -- | GET-Requests ----------------------------------------------------------
 

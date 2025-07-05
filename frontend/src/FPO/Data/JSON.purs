@@ -3,10 +3,10 @@ module FPO.Data.JSON where
 
 import Prelude
 
-import Data.Argonaut (Json, decodeJson, encodeJson, (.:))
+import Data.Argonaut (Json, decodeJson, (.:))
 import Data.Argonaut.Decode (JsonDecodeError)
 import Data.Either (Either)
-import FPO.Data.Store (Group, GroupCreate, User)
+import FPO.Data.Store (User)
 
 -- | TODO: It might be better to implement `instance DecodeJson User`, but
 -- |       this forces us to use Data instead of Type..
@@ -19,14 +19,3 @@ decodeUser json = do
   name <- obj .: "fullUserName"
   admin <- obj .: "fullUserIsSuperadmin"
   pure { userName: name, isAdmin: admin }
-
--- | Decodes a JSON object into a `Group`.
-decodeGroup :: Json -> Either JsonDecodeError Group
-decodeGroup json = do
-  obj <- decodeJson json
-  name <- obj .: "groupOverviewName"
-  id <- obj .: "groupOverviewID"
-  pure { groupOverviewName: name, groupOverviewId: id }
-
-encodeGroupCreate :: GroupCreate -> Json
-encodeGroupCreate = encodeJson

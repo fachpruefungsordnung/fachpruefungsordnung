@@ -30,8 +30,13 @@ import FPO.Data.Request
   , printError
   )
 import FPO.Data.Route (Route(..))
-import FPO.Data.Store (Group)
 import FPO.Data.Store as Store
+import FPO.Dto.GroupDto
+  ( GroupCreate(..)
+  , GroupOverview(..)
+  , getGroupOverviewID
+  , getGroupOverviewName
+  )
 import FPO.Page.HTML
   ( addButton
   , addCard
@@ -80,8 +85,8 @@ data Action
 type State = FPOState
   ( error :: Maybe String
   , page :: Int
-  , groups :: LoadState (Array Group)
-  , filteredGroups :: Array Group
+  , groups :: LoadState (Array GroupOverview)
+  , filteredGroups :: Array GroupOverview
   , groupNameCreate :: String
   , groupDescriptionCreate :: String
   , groupNameFilter :: String
@@ -176,7 +181,7 @@ component =
         Loaded gs -> do
           let
             filteredGroups = filter
-              (\g -> contains (Pattern s.groupNameFilter) g.groupOverviewName)
+              (contains (Pattern s.groupNameFilter) <<< getGroupOverviewName)
               gs
           H.modify_ _ { filteredGroups = filteredGroups }
         Loading -> do
@@ -202,10 +207,12 @@ component =
         case s.groups of
           Loaded gs -> do
             setWaiting true
-            response <- handleAuthReq (Just AdminViewGroups) $ liftAff $ addGroup
-              { groupCreateName: newGroupName
-              , groupCreateDescription: s.groupDescriptionCreate
-              }
+            response <- handleAuthReq (Just AdminViewGroups) $ liftAff $ addGroup $
+              ( GroupCreate
+                  { groupCreateName: newGroupName
+                  , groupCreateDescription: s.groupDescriptionCreate
+                  }
+              )
 
             case response of
               Left err -> do
@@ -225,11 +232,14 @@ component =
                               s.translator
                           ) <> ": " <> show err
                       }
-                  Right newId -> do
+                  Right newID -> do
                     H.modify_ _
                       { error = Nothing
                       , groups = Loaded $
-                          { groupOverviewName: newGroupName, groupOverviewId: newId }
+                          GroupOverview
+                            { groupOverviewName: newGroupName
+                            , groupOverviewID: newID
+                            }
                             : gs
                       , groupNameCreate = ""
                       }
@@ -263,8 +273,8 @@ component =
       case s.groups of
         Loaded gs -> do
           let
-            groupId = _.groupOverviewId <$> find
-              (\g -> g.groupOverviewName == groupName)
+            groupId = getGroupOverviewID <$> find
+              (\g -> getGroupOverviewName g == groupName)
               gs
 
           case groupId of
@@ -298,7 +308,7 @@ component =
                     H.modify_ _
                       { error = Nothing
                       , groups = Loaded $ filter
-                          (\g -> g.groupOverviewName /= groupName)
+                          (\g -> getGroupOverviewName g /= groupName)
                           gs
                       }
               setWaiting false
@@ -399,8 +409,8 @@ component =
       ]
 
   -- Creates a (dummy) group entry for the list.
-  createGroupEntry :: forall w. State -> Group -> HH.HTML w Action
-  createGroupEntry state group =
+  createGroupEntry :: forall w. State -> GroupOverview -> HH.HTML w Action
+  createGroupEntry state (GroupOverview g) =
     HH.li
       [ HP.classes
           [ HB.listGroupItem
@@ -409,8 +419,8 @@ component =
           , HB.alignItemsCenter
           ]
       ]
-      [ HH.text group.groupOverviewName
-      , buttonDeleteGroup state group.groupOverviewName
+      [ HH.text g.groupOverviewName
+      , buttonDeleteGroup state g.groupOverviewName
       ]
 
   buttonDeleteGroup :: forall w. State -> String -> HH.HTML w Action
