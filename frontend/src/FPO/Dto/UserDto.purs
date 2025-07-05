@@ -1,18 +1,19 @@
--- | Module for handling JSON data in the application.
-module FPO.Data.JSON where
+module FPO.Dto.UserDto where
 
 import Prelude
 
-import Data.Argonaut (Json, decodeJson, (.:))
-import Data.Argonaut.Decode (JsonDecodeError)
+import Data.Argonaut (Json, JsonDecodeError, decodeJson, (.:))
 import Data.Either (Either)
-import FPO.Data.Store (User)
 
--- | TODO: It might be better to implement `instance DecodeJson User`, but
--- |       this forces us to use Data instead of Type..
 -- | TODO: This is an incomplete representation of a user.
 -- |
+-- | Representation of a user in the application.
+type User = { userName :: String, isAdmin :: Boolean }
+
 -- | Decodes a JSON object into a `User`.
+-- |
+-- | TODO: It might be better to implement `instance DecodeJson User`, but
+-- |       this forces us to use Data instead of Type..
 decodeUser :: Json -> Either JsonDecodeError User
 decodeUser json = do
   obj <- decodeJson json

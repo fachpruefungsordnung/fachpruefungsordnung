@@ -14,8 +14,9 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getIgnore, getUser)
 import FPO.Data.Route (Route(..))
-import FPO.Data.Store (User, saveLanguage)
+import FPO.Data.Store (saveLanguage)
 import FPO.Data.Store as Store
+import FPO.Dto.UserDto (User)
 import FPO.Page.HTML (addClass)
 import FPO.Translations.Translator
   ( FPOTranslator(..)

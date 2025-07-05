@@ -19,8 +19,9 @@ import FPO.AppM (runAppM)
 import FPO.Components.Navbar as Navbar
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..), routeCodec, routeToString)
-import FPO.Data.Store (User, loadLanguage)
+import FPO.Data.Store (loadLanguage)
 import FPO.Data.Store as Store
+import FPO.Dto.UserDto (User)
 import FPO.Page.Admin.DocOverview as ViewGroupDocuments
 import FPO.Page.Admin.Groups as AdminViewGroups
 import FPO.Page.Admin.Users as AdminViewUsers

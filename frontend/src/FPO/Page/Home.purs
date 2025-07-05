@@ -31,8 +31,8 @@ import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Route (Route(..))
-import FPO.Data.Store (User)
 import FPO.Data.Store as Store
+import FPO.Dto.UserDto (User)
 import FPO.Page.HTML (addCard, addColumn)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)

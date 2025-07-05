@@ -1,12 +1,11 @@
 -- | Admin user overview and management page.
 -- |
--- | TODO: Implement the actual admin panel functionality, see mockups.
--- |       For a start, this page connects with the backend
--- |       and checks if we're even allowed to access this page, then
--- |       handles the response accordingly.
--- |       Also, this page implements a very simple dummy/mockup user
--- |       management system, which allows us to filter and create users
--- |       (not connected to the backend yet).
+-- | TODO:
+-- | - Implement the `goToProfilePage` funcionality
+-- |   (for users other than the one logged in).
+-- | - Trying to delete oneself fails in the backend,
+-- |   but no error is shown in the UI. Perhaps, we should
+-- |   simply prohibit deleting oneself in the UI?
 
 module FPO.Page.Admin.Users (component) where
 
