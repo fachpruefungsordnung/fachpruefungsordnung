@@ -452,4 +452,3 @@ component =
     case head (filter (\doc -> doc.header.id == id) state.documents) of
       Just doc -> doc.body.name
       Nothing -> "Unknown Name"
-

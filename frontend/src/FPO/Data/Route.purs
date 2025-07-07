@@ -18,6 +18,7 @@ data Route
   | PasswordReset
   | AdminViewUsers
   | AdminViewGroups
+  | AdminViewGroupMembers Int
   | ViewGroupDocuments Int
   | Page404
   | Profile { loginSuccessful :: Maybe Boolean }
@@ -35,6 +36,7 @@ routeCodec = root $ sum
   , "PasswordReset": "password-reset" / noArgs
   , "AdminViewUsers": "admin-users" / noArgs
   , "AdminViewGroups": "admin-groups" / noArgs
+  , "AdminViewGroupMembers": "admin-group-members" / int segment
   , "ViewGroupDocuments": "view-group-documents" / int segment
   , "Page404": "404" / noArgs
   , "Profile": "profile" ? { loginSuccessful: optional <<< boolean }
@@ -50,6 +52,7 @@ routeToString = case _ of
   PasswordReset -> "PasswordReset"
   AdminViewUsers -> "AdminViewUsers"
   AdminViewGroups -> "AdminViewGroups"
+  AdminViewGroupMembers groupID -> "AdminViewGroupMembers:" <> show groupID
   ViewGroupDocuments groupID -> "ViewGroupDocuments:" <> show groupID
   Page404 -> "Page404"
   Profile { loginSuccessful } -> "Profile" <>

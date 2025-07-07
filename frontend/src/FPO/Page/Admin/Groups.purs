@@ -81,6 +81,7 @@ data Action
   | ConfirmDeleteGroup String
   | CancelDeleteGroup
   | Filter
+  | NavToGroupMembers Int
 
 type State = FPOState
   ( error :: Maybe String
@@ -318,6 +319,10 @@ component =
             { error = Just
                 (translate (label :: _ "admin_groups_stillLoading") s.translator)
             }
+    NavToGroupMembers groupID -> do
+      -- Navigate to the group members page.
+      -- This will load the group members and display them.
+      navigate $ AdminViewGroupMembers groupID
 
   -- | Specifies the waiting state.
   setWaiting :: Boolean -> H.HalogenM State Action Slots output m Unit
@@ -418,6 +423,8 @@ component =
           , HB.justifyContentBetween
           , HB.alignItemsCenter
           ]
+      , HE.onClick (const $ NavToGroupMembers g.groupOverviewID)
+      , HP.style "cursor: pointer;"
       ]
       [ HH.text g.groupOverviewName
       , buttonDeleteGroup state g.groupOverviewName
