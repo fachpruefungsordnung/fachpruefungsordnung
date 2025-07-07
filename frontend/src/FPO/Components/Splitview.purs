@@ -8,7 +8,8 @@ module FPO.Component.Splitview where
 
 import Prelude
 
-import Data.Array (find, head, intercalate, range)
+import Data.Array (find, head, intercalate, range, uncons)
+import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -18,6 +19,9 @@ import FPO.Components.Comment as Comment
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
+import FPO.Dto.DocumentDto (Tree(..), Edge(..), NodeWithRef(..))
+import FPO.Dto.DocumentDto as DocumentDto
+import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Types
   ( AnnotatedMarker
@@ -67,6 +71,8 @@ data Action
   | HandleEditor Editor.Output
   | HandlePreview Preview.Output
   | HandleTOC TOC.Output
+  | GET
+  | POST
 
 type State =
   { mDragTarget :: Maybe DragTarget
@@ -169,6 +175,16 @@ splitview = H.mkComponent
           ]
           [ HH.text "[≡]" ]
       , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const GET
+          ]
+          [ HH.text "GET" ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const POST
+          ]
+          [ HH.text "POST" ]
       , HH.button
           [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
           , HE.onClick $ const ClickedHTTPRequest
@@ -421,6 +437,29 @@ splitview = H.mkComponent
 
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
+
+    POST -> do
+      state <- H.get
+      let 
+        tree = convertTOCtoTree state.tocEntries
+      rep <- H.liftAff $ 
+        Request.postJson "/commits" (DocumentDto.encodeCreateCommit tree)
+      -- debugging logs in
+      case rep of 
+        Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
+        Right _ -> pure unit
+          -- H.liftEffect $ Console.log "Successfully posted TOC to server"
+
+    GET -> do
+      fetchedTree <- H.liftAff $ 
+        Request.getFromJSONEndpoint DocumentDto.decodeDocument "/commits/1"
+      let 
+        tree = case fetchedTree of
+          Nothing -> []
+          Just t -> convertTreeToTOC t
+      H.modify_ \st -> do
+        st { tocEntries = tree}
+      H.tell _toc unit (TOC.ReceiveTOCs tree)
 
     Init -> do
       exampleTOCEntries <- createExampleTOCEntries
@@ -779,3 +818,50 @@ findCommentSection tocEntries tocID markerID = do
   marker <- find (\m -> m.id == markerID) tocEntry.markers
   marker.mCommentSection
 
+convertTreeToTOC :: Tree -> Array TOCEntry
+convertTreeToTOC = go
+  where
+    go (Tree { node: NodeWithRef { id, kind, content }, children }) =
+      let
+        entry :: TOCEntry
+        entry =
+          { id
+          , name: kind
+          , content: fromMaybe "" content
+          , newMarkerNextID: 0
+          , markers: []
+          }
+
+        childEntries = children >>= \(Edge { child }) -> go child
+      in
+        [entry] <> childEntries
+
+convertTOCtoTree :: Array TOCEntry -> Tree
+convertTOCtoTree tocEntries = case uncons tocEntries of
+  Nothing ->
+    Tree
+      { node: NodeWithRef { id: 0, kind: "empty", content: Nothing }
+      , children: []
+      }
+
+  Just { head: root, tail: rest } ->
+    Tree
+      { node: NodeWithRef
+          { id: root.id
+          , kind: root.name
+          , content: Just root.content
+          }
+      , children: rest <#> \entry ->
+          Edge
+            { title: entry.name
+            , child:
+                Tree
+                  { node: NodeWithRef
+                      { id: entry.id
+                      , kind: entry.name
+                      , content: Just entry.content
+                      }
+                  , children: []
+                  }
+            }
+      }
