@@ -2,11 +2,11 @@ module FPO.Dto.DocumentDto where
 
 import Prelude
 
-import Data.Either (Either)
-import Data.Maybe (Maybe, fromMaybe)
 import Data.Argonaut (Json)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError, decodeJson, (.:))
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
+import Data.Either (Either)
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype, unwrap)
 
 newtype NodeWithRef = NodeWithRef
@@ -34,7 +34,7 @@ derive instance newtypeNodeWithRef :: Newtype NodeWithRef _
 instance decodeJsonNodeWithRef :: DecodeJson NodeWithRef where
   decodeJson json = do
     obj <- decodeJson json
-    inner <- obj .: "content"  -- neu: extrahiere das innere Objekt
+    inner <- obj .: "content" -- neu: extrahiere das innere Objekt
     id <- inner .: "id"
     kind <- inner .: "kind"
     content <- inner .: "content"
@@ -78,11 +78,12 @@ instance encodeJsonTree :: EncodeJson Tree where
       , children
       }
 
-
 -- show instances for debugging purposes
 instance showNodeWithRef :: Show NodeWithRef where
   show (NodeWithRef { id, kind, content }) =
-    "NodeWithRef { id: " <> show id <> ", kind: " <> show kind <> ", content: " <> show content <> " }"
+    "NodeWithRef { id: " <> show id <> ", kind: " <> show kind <> ", content: "
+      <> show content
+      <> " }"
 
 instance showEdge :: Show Edge where
   show (Edge { title, child }) =
@@ -91,7 +92,6 @@ instance showEdge :: Show Edge where
 instance showTree :: Show Tree where
   show (Tree { node, children }) =
     "Tree { node: " <> show node <> ", children: " <> show children <> " }"
-
 
 decodeDocument :: Json -> Either JsonDecodeError Tree
 decodeDocument json = do
@@ -108,22 +108,24 @@ encodeCreateCommit tree =
     { info:
         { author: "00000000-0000-0000-0000-000000000000"
         , message: "Initial commit"
-        , parents: [1]
+        , parents: [ 1 ]
         }
     , root: encodeTree tree
     }
 
 encodeTree :: Tree -> Json
 encodeTree (Tree { node, children }) =
-  let { id, kind, content } = unwrap node in
-  encodeJson
-    { node:
-        { id
-        , kind
-        , content: fromMaybe "" content
-        }
-    , edges: map encodeEdge children
-    }
+  let
+    { id, kind, content } = unwrap node
+  in
+    encodeJson
+      { node:
+          { id
+          , kind
+          , content: fromMaybe "" content
+          }
+      , edges: map encodeEdge children
+      }
 
 encodeEdge :: Edge -> Json
 encodeEdge (Edge { title, child }) =

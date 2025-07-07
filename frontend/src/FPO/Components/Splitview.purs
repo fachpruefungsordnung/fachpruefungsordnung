@@ -19,10 +19,10 @@ import FPO.Components.Comment as Comment
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
-import FPO.Dto.DocumentDto (Tree(..), Edge(..), NodeWithRef(..))
-import FPO.Dto.DocumentDto as DocumentDto
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
+import FPO.Dto.DocumentDto (Edge(..), NodeWithRef(..), Tree(..))
+import FPO.Dto.DocumentDto as DocumentDto
 import FPO.Types
   ( AnnotatedMarker
   , Comment
@@ -440,25 +440,25 @@ splitview = H.mkComponent
 
     POST -> do
       state <- H.get
-      let 
+      let
         tree = convertTOCtoTree state.tocEntries
-      rep <- H.liftAff $ 
+      rep <- H.liftAff $
         Request.postJson "/commits" (DocumentDto.encodeCreateCommit tree)
       -- debugging logs in
-      case rep of 
+      case rep of
         Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
         Right _ -> pure unit
-          -- H.liftEffect $ Console.log "Successfully posted TOC to server"
+    -- H.liftEffect $ Console.log "Successfully posted TOC to server"
 
     GET -> do
-      fetchedTree <- H.liftAff $ 
+      fetchedTree <- H.liftAff $
         Request.getFromJSONEndpoint DocumentDto.decodeDocument "/commits/1"
-      let 
+      let
         tree = case fetchedTree of
           Nothing -> []
           Just t -> convertTreeToTOC t
       H.modify_ \st -> do
-        st { tocEntries = tree}
+        st { tocEntries = tree }
       H.tell _toc unit (TOC.ReceiveTOCs tree)
 
     Init -> do
@@ -821,20 +821,20 @@ findCommentSection tocEntries tocID markerID = do
 convertTreeToTOC :: Tree -> Array TOCEntry
 convertTreeToTOC = go
   where
-    go (Tree { node: NodeWithRef { id, kind, content }, children }) =
-      let
-        entry :: TOCEntry
-        entry =
-          { id
-          , name: kind
-          , content: fromMaybe "" content
-          , newMarkerNextID: 0
-          , markers: []
-          }
+  go (Tree { node: NodeWithRef { id, kind, content }, children }) =
+    let
+      entry :: TOCEntry
+      entry =
+        { id
+        , name: kind
+        , content: fromMaybe "" content
+        , newMarkerNextID: 0
+        , markers: []
+        }
 
-        childEntries = children >>= \(Edge { child }) -> go child
-      in
-        [entry] <> childEntries
+      childEntries = children >>= \(Edge { child }) -> go child
+    in
+      [ entry ] <> childEntries
 
 convertTOCtoTree :: Array TOCEntry -> Tree
 convertTOCtoTree tocEntries = case uncons tocEntries of
