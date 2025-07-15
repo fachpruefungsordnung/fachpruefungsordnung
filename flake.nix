@@ -1,6 +1,6 @@
 # https://docs.haskellstack.org/en/stable/topics/nix_integration/
 {
-  description = "my project description";
+  description = "Fachprüfungsordnungseditor";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.flake-utils.url = "github:numtide/flake-utils";
 
