@@ -30,6 +30,7 @@ cabal.project.local~
 
 # Secrets
 .env*
+!.envrc
 !.env.example
 
 # IDEs / Editor (remove as needed)
