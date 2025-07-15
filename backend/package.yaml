@@ -57,6 +57,7 @@ dependencies:
   - filepath
   - text
   - lucid2
+  - clay
   - password
   - jose
   - uuid

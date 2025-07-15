@@ -18,6 +18,7 @@ import Language.Ltml.AST.Node
 import Language.Ltml.AST.Paragraph
 import Language.Ltml.AST.Section
 import Language.Ltml.AST.Text
+import qualified Language.Ltml.HTML.CSS.ClassNames as Class
 
 testAST :: Document
 testAST =
@@ -52,11 +53,19 @@ testAST =
             ]
         )
 
-test :: IO ()
-test = renderToFile "out.html" (html_ $ toHtml testAST)
+testHtml :: IO ()
+testHtml = renderToFile "static/out.html" (docToHtml testAST)
 
 renderHtml :: Document -> ByteString
-renderHtml document = renderBS $ html_ $ toHtml document
+renderHtml document = renderBS $ docToHtml document
+
+docToHtml :: Document -> Html ()
+docToHtml doc = html_ $ do
+    head_ $ do
+        title_ "Test Dokument"
+        link_ [rel_ "stylesheet", href_ "out.css"]
+    body_ $ do
+        toHtml doc
 
 instance ToHtml Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
@@ -95,7 +104,7 @@ class ToHtmlStyle style where
 instance ToHtmlStyle FontStyle where
     toHtmlStyle Bold = b_
     toHtmlStyle Italics = i_
-    toHtmlStyle Underlined = span_ [class_ "underline"]
+    toHtmlStyle Underlined = span_ [class_ Class.underlined]
 
 instance ToHtml Label where
     toHtml label = toHtml $ unLabel label
