@@ -40,3 +40,6 @@ cabal.project.local~
 
 # Other
 .DS_Store
+
+# HTML Testfile
+out.html
