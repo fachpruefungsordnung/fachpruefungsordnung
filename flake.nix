@@ -3,23 +3,38 @@
   description = "Fachprüfungsordnungseditor";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.flake-utils.url = "github:numtide/flake-utils";
+  inputs.easy-purescript-nix.url = "github:justinwoo/easy-purescript-nix";
 
   outputs =
     {
       self,
       nixpkgs,
       flake-utils,
+      easy-purescript-nix,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
+        welcomeText = mode: ''
+            __
+           / _|
+          | |_ _ __   ___
+          |  _| '_ \ / _ \\
+          | | | |_) | (_) |
+          |_| | .__/ \___(_)
+              | | Dev Shell
+              |_| ${mode}
+
+        '';
+
         pkgs = nixpkgs.legacyPackages.${system};
+        easyPs = easy-purescript-nix.packages.${system};
 
         hPkgs = pkgs.haskell.packages."ghc984";
         # need to match Stackage LTS version
         # from stack.yaml snapshot
 
-        myDevTools = [
+        backendDevTools = [
           hPkgs.ghc # GHC compiler in the desired version (will be available on PATH)
           hPkgs.ghcid # Continuous terminal Haskell compile checker
           hPkgs.ormolu # Haskell formatter
@@ -33,6 +48,23 @@
           pkgs.zlib # External C library needed by some Haskell packages
           pkgs.postgresql
         ];
+
+        frontendDevTools = [
+          easyPs.purs
+          easyPs.spago
+          easyPs.purescript-language-server
+          easyPs.purs-tidy
+          pkgs.purescript
+          pkgs.nodePackages.purescript-language-server
+          pkgs.nodePackages.purs-tidy
+          pkgs.nodejs_22
+          pkgs.esbuild
+        ];
+
+        frontendShellHook = ''
+          source <(spago --bash-completion-script `which spago`)
+          source <(node --completion-bash)
+        '';
 
         # Wrap Stack to work with our Nix integration. We do not want to modify
         # stack.yaml so non-Nix users do not notice anything.
@@ -54,28 +86,28 @@
         };
       in
       {
-        devShells.default = pkgs.mkShell {
-          buildInputs = myDevTools;
-
-          # Make external Nix c libraries like zlib known to GHC, like
-          # pkgs.haskell.lib.buildStackProject does
-          # https://github.com/NixOS/nixpkgs/blob/d64780ea0e22b5f61cd6012a456869c702a72f20/pkgs/development/haskell-modules/generic-stack-builder.nix#L38
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath myDevTools;
-
+        devShells.frontend = pkgs.mkShell {
+          buildInputs = frontendDevTools;
           shellHook = ''
-            welcome_text=$(cat <<END
-               __
-              / _|
-             | |_ _ __   ___
-             |  _| '_ \ / _ \\
-             | | | |_) | (_) |
-             |_| | .__/ \___(_)
-                 | | Dev Shell
-                 |_|
+            echo "${welcomeText "Frontend"}"
+            ${frontendShellHook}
+          '';
+        };
 
-            END
-            )
-            echo "$welcome_text"
+        devShells.backend = pkgs.mkShell {
+          buildInputs = backendDevTools;
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath backendDevTools;
+          shellHook = ''
+            echo "${welcomeText "Backend"}"
+          '';
+        };
+
+        devShells.default = pkgs.mkShell {
+          buildInputs = backendDevTools ++ frontendDevTools;
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath backendDevTools;
+          shellHook = ''
+            echo "${welcomeText "Fullstack"}"
+            ${frontendShellHook}
           '';
         };
       }
