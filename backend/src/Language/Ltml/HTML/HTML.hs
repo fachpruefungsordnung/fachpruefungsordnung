@@ -1,11 +1,13 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Language.Ltml.HTML.HTML () where
 
-import Data.ByteString.Lazy
-import Data.Text
+import Data.ByteString.Lazy (ByteString)
+import Data.Text (Text)
 import Lucid
 
 import Language.Lsd.AST.Format
@@ -47,19 +49,31 @@ testAST =
                                 , Styled Underlined [Word "Underlined"]
                                 ]
                             )
+                        , Node
+                            (Just (Label "Zweite Node Label"))
+                            ( Paragraph
+                                (ParagraphFormat (FormatString []))
+                                [ Enum
+                                    ( Enumeration
+                                        [ EnumItem [Word "Erstes Item"]
+                                        , EnumItem [Word "Zweites Item 1", Styled Bold [Word "Zweites Item 2"]]
+                                        ]
+                                    )
+                                ]
+                            )
                         ]
                     )
                 )
             ]
         )
 
-testHtml :: IO ()
+testHtml :: (ToHtml EnumItem) => IO ()
 testHtml = renderToFile "static/out.html" (docToHtml testAST)
 
-renderHtml :: Document -> ByteString
+renderHtml :: (ToHtml EnumItem) => Document -> ByteString
 renderHtml document = renderBS $ docToHtml document
 
-docToHtml :: Document -> Html ()
+docToHtml :: (ToHtml EnumItem) => Document -> Html ()
 docToHtml doc = html_ $ do
     head_ $ do
         title_ "Test Dokument"
@@ -67,7 +81,7 @@ docToHtml doc = html_ $ do
     body_ $ do
         toHtml doc
 
-instance ToHtml Document where
+instance (ToHtml EnumItem) => ToHtml Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
     toHtml (Document format header body) = case body of
         DocumentBody [] -> return ()
@@ -80,22 +94,22 @@ instance (ToHtml a) => ToHtml (Node a) where
             h2_ (toHtml label)
             toHtml a
 
-instance ToHtml Section where
+instance (ToHtml EnumItem) => ToHtml Section where
     toHtml (Section format heading children) = case children of
         Right cs -> toHtml cs
         Left cs -> toHtml cs
 
-instance ToHtml Paragraph where
+instance (ToHtml EnumItem) => ToHtml Paragraph where
     toHtml (Paragraph format textTrees) = toHtml textTrees
 
-instance (ToHtmlStyle style) => ToHtml (TextTree style enum special) where
+instance (ToHtmlStyle style, ToHtml enum) => ToHtml (TextTree style enum special) where
     toHtml textTree = case textTree of
         Word text -> toHtml text
         Space -> toHtml (" " :: Text)
         Special _ -> toHtml ("Error: Special not supported yet" :: Text)
         Reference label -> toHtml label
         Styled style textTrees -> toHtmlStyle style $ toHtml textTrees
-        Enum enum -> toHtml ("Error: Enum not supported yet" :: Text)
+        Enum enum -> toHtml enum
         Footnote _ -> toHtml ("Error: FootNotes not supported yet" :: Text)
 
 class ToHtmlStyle style where
@@ -105,6 +119,12 @@ instance ToHtmlStyle FontStyle where
     toHtmlStyle Bold = b_
     toHtmlStyle Italics = i_
     toHtmlStyle Underlined = span_ [class_ Class.underlined]
+
+instance (ToHtml EnumItem) => ToHtml Enumeration where
+    toHtml (Enumeration enumItems) = ol_ $ foldr ((>>) . li_ . toHtml) mempty enumItems
+
+instance ToHtml EnumItem where
+    toHtml (EnumItem textTree) = toHtml textTree
 
 instance ToHtml Label where
     toHtml label = toHtml $ unLabel label
