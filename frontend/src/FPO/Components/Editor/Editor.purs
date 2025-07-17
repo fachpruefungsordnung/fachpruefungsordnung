@@ -20,6 +20,7 @@ import Ace.EditSession as Session
 import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
+import Ace.UndoManager as UndoMgr
 import Data.Array (filter, intercalate, uncons, (:))
 import Data.Foldable (find, for_, traverse_)
 import Data.Maybe (Maybe(..), maybe)
@@ -451,6 +452,10 @@ editor = connect selectTranslator $ H.mkComponent
           -- Set editor content
           let content = entry.content
           Document.setValue content document
+
+          -- Reset Undo history
+          undoMgr <- Session.getUndoManager session
+          UndoMgr.reset undoMgr
 
           -- Remove existing markers
           for_ state.liveMarkers \lm -> do

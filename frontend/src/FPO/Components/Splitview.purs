@@ -628,10 +628,9 @@ splitview = H.mkComponent
         H.tell _editor unit Editor.SaveSection
         state <- H.get
         let
-          updatedTOCEntries = map 
+          updatedTOCEntries = map
             ( \entry ->
-              if entry.id /= tocID 
-                then entry
+                if entry.id /= tocID then entry
                 else
                   let
                     newMarkers =

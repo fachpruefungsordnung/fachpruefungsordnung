@@ -6,8 +6,8 @@ import Data.Array (concatMap)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
+import FPO.Dto.TreeDto (Edge(..), Tree(..))
 import FPO.Types (ShortendTOCEntry, TOCTree, shortenTOC)
-import FPO.Dto.TreeDto (Tree(..), Edge(..))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -66,43 +66,53 @@ tocview = H.mkComponent
     ReceiveTOCs entries a -> do
       let
         shortendEntries = map shortenTOC entries
-      H.modify_ \state -> state { tocEntries = shortendEntries }
+      H.modify_ \state ->
+        state { tocEntries = shortendEntries, mSelectedTocEntry = Nothing }
       pure (Just a)
 
-  treeToHTML :: 
-    Int -> 
-    Maybe Int ->
-    Tree ShortendTOCEntry -> 
-    forall slots. Array (H.ComponentHTML Action slots m)
+  treeToHTML
+    :: Int
+    -> Maybe Int
+    -> Tree ShortendTOCEntry
+    -> forall slots
+     . Array (H.ComponentHTML Action slots m)
   treeToHTML _ _ Empty = []
   treeToHTML n mSelectedTocEntry (Node { node, children }) =
-    [
-      HH.div
+    [ HH.div
         [ HP.title ("Jump to section " <> name)
         , HP.style
-            ("white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0; padding-left: "<> (show (1.5 * toNumber n)) <>"rem;")
+            ( "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0; padding-left: "
+                <> (show (1.5 * toNumber n))
+                <> "rem;"
+            )
         ]
         [ HH.span
-            [ HE.onClick \_ -> JumpToSection { id, name }
-            , HP.classes
-                ( [ HB.textTruncate ]
-                    <>
-                      if Just id == mSelectedTocEntry then
-                        [ HB.fwBold ]
-                      else []
-                )
-            , HP.style
-                ( if n == 0 then " font-size: 2rem;" 
-                    else "cursor: pointer; display: inline-block; min-width: 6ch;" <>
-                      if n == 1 then " font-size: 1.25rem;" 
-                      else ""
-                )
-            ]
-            [ HH.text ( (if n == 1 then "§" else "") <> name) ]
+            ( ( if n == 0 then []
+                else [ HE.onClick \_ -> JumpToSection { id, name } ]
+              )
+                <>
+                  [ HP.classes
+                      ( [ HB.textTruncate ]
+                          <>
+                            if Just id == mSelectedTocEntry then
+                              [ HB.fwBold ]
+                            else []
+                      )
+                  , HP.style
+                      ( if n == 0 then " font-size: 2rem;"
+                        else "cursor: pointer; display: inline-block; min-width: 6ch;"
+                          <>
+                            if n == 1 then " font-size: 1.25rem;"
+                            else ""
+                      )
+                  ]
+            )
+            [ HH.text ((if n == 1 then "§" else "") <> name) ]
         ]
-    ] <> concatMap 
-      (\(Edge { child }) -> 
-        treeToHTML (n + 1) mSelectedTocEntry child
-      ) children
+    ] <> concatMap
+      ( \(Edge { child }) ->
+          treeToHTML (n + 1) mSelectedTocEntry child
+      )
+      children
     where
-      { id, name } = node
+    { id, name } = node

@@ -1,18 +1,18 @@
 module FPO.Dto.TreeDto
-    ( Tree(..)
-    , Edge(..)
-    , findTree
-    ) where
+  ( Tree(..)
+  , Edge(..)
+  , findTree
+  ) where
 
 import Prelude
 
 import Control.Alt ((<|>))
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
-import Data.Maybe (Maybe(..))
 import Data.Foldable (foldr)
+import Data.Maybe (Maybe(..))
 
-data Tree a 
+data Tree a
   = Empty
   | Node { node :: a, children :: Array (Edge a) }
 
@@ -21,11 +21,10 @@ data Edge a = Edge
   , child :: Tree a
   }
 
-derive instance functorTree :: Functor Tree 
-  -- map f (Tree { node, children }) = Tree { node: f node, children: map (map f) children }
-derive instance functorEdge :: Functor Edge 
-  -- map f (Edge { title, child }) = Edge { title, child: map f child }
-
+derive instance functorTree :: Functor Tree
+-- map f (Tree { node, children }) = Tree { node: f node, children: map (map f) children }
+derive instance functorEdge :: Functor Edge
+-- map f (Edge { title, child }) = Edge { title, child: map f child }
 
 -- derive instance newtypeTree :: Newtype (Tree a) _
 -- derive instance newtypeEdge :: Newtype (Edge a) _
@@ -64,7 +63,7 @@ instance showEdge :: Show a => Show (Edge a) where
     "Edge { title: " <> show title <> ", child: " <> show child <> " }"
 
 instance showTree :: Show a => Show (Tree a) where
-  show Empty                     = "Empty"
+  show Empty = "Empty"
   show (Node { node, children }) =
     "Tree { node: " <> show node <> ", children: " <> show children <> " }"
 

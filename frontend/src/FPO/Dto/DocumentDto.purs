@@ -8,7 +8,7 @@ import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Either (Either)
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype, unwrap)
-import FPO.Dto.TreeDto (Tree(..), Edge(..))
+import FPO.Dto.TreeDto (Edge(..), Tree(..))
 
 newtype NodeWithRef = NodeWithRef
   { id :: Int
