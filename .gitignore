@@ -30,6 +30,7 @@ cabal.project.local~
 
 # Secrets
 .env*
+!.envrc
 !.env.example
 
 # IDEs / Editor (remove as needed)
@@ -37,6 +38,12 @@ cabal.project.local~
 .intellij/
 .zed/
 .idea/
+
+# direnv, nix und so
+.direnv
+/output
+/spago.yaml
+
 
 # Other
 .DS_Store
