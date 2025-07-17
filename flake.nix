@@ -104,7 +104,7 @@
           '';
         };
 
-        devShells.backend = pkgs.mkShell {
+        devShells.default = pkgs.mkShell {
           buildInputs = backendDevTools;
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath backendDevTools;
           shellHook = ''
@@ -112,7 +112,7 @@
           '';
         };
 
-        devShells.default = pkgs.mkShell {
+        devShells.fullstack = pkgs.mkShell {
           buildInputs = backendDevTools ++ frontendDevTools;
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath backendDevTools;
           shellHook = ''
