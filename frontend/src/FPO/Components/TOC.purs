@@ -2,9 +2,12 @@ module FPO.Components.TOC where
 
 import Prelude
 
+import Data.Array (concatMap)
+import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
-import FPO.Types (ShortendTOCEntry, TOCEntry)
+import FPO.Types (ShortendTOCEntry, TOCTree, shortenTOC)
+import FPO.Dto.TreeDto (Tree(..), Edge(..))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -19,16 +22,16 @@ data Action
   = Init
   | JumpToSection ShortendTOCEntry
 
-data Query a = ReceiveTOCs (Array TOCEntry) a
+data Query a = ReceiveTOCs (TOCTree) a
 
 type State =
-  { tocEntries :: Array ShortendTOCEntry
+  { tocEntries :: Tree ShortendTOCEntry
   , mSelectedTocEntry :: Maybe Int
   }
 
 tocview :: forall m. MonadAff m => H.Component Query Input Output m
 tocview = H.mkComponent
-  { initialState: \_ -> { tocEntries: [], mSelectedTocEntry: Nothing }
+  { initialState: \_ -> { tocEntries: Empty, mSelectedTocEntry: Nothing }
   , render
   , eval: H.mkEval $ H.defaultEval
       { initialize = Just Init
@@ -41,30 +44,7 @@ tocview = H.mkComponent
   render :: State -> forall slots. H.ComponentHTML Action slots m
   render state =
     HH.div_
-      ( map
-          ( \{ id, name } ->
-              HH.div
-                [ HP.title ("Jump to section " <> name)
-                , HP.style
-                    "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0; padding-left: 1rem;"
-                ]
-                [ HH.span
-                    [ HE.onClick \_ -> JumpToSection { id, name }
-                    , HP.classes
-                        ( [ HB.textTruncate ]
-                            <>
-                              if Just id == state.mSelectedTocEntry then
-                                [ HB.fwBold ]
-                              else []
-                        )
-                    , HP.style
-                        "cursor: pointer; display: inline-block; min-width: 6ch;"
-                    ]
-                    [ HH.text name ]
-                ]
-          )
-          state.tocEntries
-      )
+      (treeToHTML 0 state.mSelectedTocEntry state.tocEntries)
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
@@ -85,13 +65,44 @@ tocview = H.mkComponent
 
     ReceiveTOCs entries a -> do
       let
-        shortendEntries = map
-          ( \e ->
-              { id: e.id
-              , name: e.name
-              }
-          )
-          entries
+        shortendEntries = map shortenTOC entries
       H.modify_ \state -> state { tocEntries = shortendEntries }
       pure (Just a)
 
+  treeToHTML :: 
+    Int -> 
+    Maybe Int ->
+    Tree ShortendTOCEntry -> 
+    forall slots. Array (H.ComponentHTML Action slots m)
+  treeToHTML _ _ Empty = []
+  treeToHTML n mSelectedTocEntry (Node { node, children }) =
+    [
+      HH.div
+        [ HP.title ("Jump to section " <> name)
+        , HP.style
+            ("white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0; padding-left: "<> (show (1.5 * toNumber n)) <>"rem;")
+        ]
+        [ HH.span
+            [ HE.onClick \_ -> JumpToSection { id, name }
+            , HP.classes
+                ( [ HB.textTruncate ]
+                    <>
+                      if Just id == mSelectedTocEntry then
+                        [ HB.fwBold ]
+                      else []
+                )
+            , HP.style
+                ( if n == 0 then " font-size: 2rem;" 
+                    else "cursor: pointer; display: inline-block; min-width: 6ch;" <>
+                      if n == 1 then " font-size: 1.25rem;" 
+                      else ""
+                )
+            ]
+            [ HH.text ( (if n == 1 then "§" else "") <> name) ]
+        ]
+    ] <> concatMap 
+      (\(Edge { child }) -> 
+        treeToHTML (n + 1) mSelectedTocEntry child
+      ) children
+    where
+      { id, name } = node

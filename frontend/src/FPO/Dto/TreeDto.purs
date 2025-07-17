@@ -68,6 +68,8 @@ instance showTree :: Show a => Show (Tree a) where
   show (Node { node, children }) =
     "Tree { node: " <> show node <> ", children: " <> show children <> " }"
 
+-- TODO: DFS. Maybe use a different search method? But maybe not necessary,
+-- because the document tree may never be that large to notice. 
 findTree :: forall a. (a -> Boolean) -> Tree a -> Maybe a
 findTree _ Empty = Nothing
 findTree predicate (Node { node, children }) =

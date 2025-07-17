@@ -8,7 +8,7 @@ module FPO.Component.Splitview where
 
 import Prelude
 
-import Data.Array (find, head, intercalate, range, uncons)
+import Data.Array (find, head, intercalate, range)
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
@@ -21,15 +21,19 @@ import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto (Edge(..), NodeWithRef(..), Tree(..))
 import FPO.Dto.DocumentDto as DocumentDto
+import FPO.Dto.TreeDto (Tree(..), findTree)
 import FPO.Types
   ( AnnotatedMarker
   , Comment
   , CommentSection
   , TOCEntry
+  , TOCTree
+  , documentTreeToTOCTree
+  , emptyTOCEntry
   , findTOCEntry
   , timeStampsVersions
+  , tocTreeToDocumentTree
   )
 import Halogen as H
 import Halogen.HTML as HH
@@ -104,7 +108,7 @@ type State =
 
   -- Store tocEntries and send some parts to its children components
   -- TODO load/upload from/to backend
-  , tocEntries :: Array TOCEntry
+  , tocEntries :: TOCTree
 
   -- How the timestamp has to be formatted
   , mTimeFormatter :: Maybe Formatter
@@ -145,7 +149,7 @@ splitview = H.mkComponent
       , lastExpandedSidebarRatio: 0.2
       , lastExpandedPreviewRatio: 0.4
       , mEditorContent: Nothing
-      , tocEntries: []
+      , tocEntries: Empty
       , mTimeFormatter: Nothing
       , sidebarShown: true
       , tocShown: true
@@ -290,11 +294,6 @@ splitview = H.mkComponent
             , HE.onClick \_ -> ToggleSidebar
             ]
             [ HH.text "×" ]
-        , HH.h4
-            [ HP.style
-                "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
-            ]
-            [ HH.text "Section Overview (§)" ]
         , HH.slot _toc unit TOC.tocview unit HandleTOC
         ]
     -- Comment
@@ -441,7 +440,7 @@ splitview = H.mkComponent
     POST -> do
       state <- H.get
       let
-        tree = convertTOCtoTree state.tocEntries
+        tree = tocTreeToDocumentTree state.tocEntries
       rep <- H.liftAff $
         Request.postJson "/commits" (DocumentDto.encodeCreateCommit tree)
       -- debugging logs in
@@ -455,14 +454,14 @@ splitview = H.mkComponent
         Request.getFromJSONEndpoint DocumentDto.decodeDocument "/commits/1"
       let
         tree = case fetchedTree of
-          Nothing -> []
-          Just t -> convertTreeToTOC t
+          Nothing -> Empty
+          Just t -> documentTreeToTOCTree t
       H.modify_ \st -> do
         st { tocEntries = tree }
       H.tell _toc unit (TOC.ReceiveTOCs tree)
 
     Init -> do
-      exampleTOCEntries <- createExampleTOCEntries
+      -- exampleTOCEntries <- createExampleTOCEntries
       -- -- Comment it out for now, to let the other text show up first in editor
       -- -- head has to be imported from Data.Array
       -- -- Put first entry in editor
@@ -472,9 +471,9 @@ splitview = H.mkComponent
       -- -- H.tell _editor unit (Editor.ChangeSection firstEntry)
       let timeFormatter = head timeStampsVersions
       H.modify_ \st -> do
-        st { tocEntries = exampleTOCEntries, mTimeFormatter = timeFormatter }
+        st { tocEntries = Empty, mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
-      H.tell _toc unit (TOC.ReceiveTOCs exampleTOCEntries)
+      H.tell _toc unit (TOC.ReceiveTOCs Empty)
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -629,9 +628,10 @@ splitview = H.mkComponent
         H.tell _editor unit Editor.SaveSection
         state <- H.get
         let
-          updatedTOCEntries = map
+          updatedTOCEntries = map 
             ( \entry ->
-                if entry.id /= tocID then entry
+              if entry.id /= tocID 
+                then entry
                 else
                   let
                     newMarkers =
@@ -647,13 +647,8 @@ splitview = H.mkComponent
             )
             state.tocEntries
           updateTOCEntry = fromMaybe
-            { id: -1
-            , name: "not found"
-            , content: ""
-            , newMarkerNextID: -1
-            , markers: []
-            }
-            (find (\e -> e.id == tocID) updatedTOCEntries)
+            emptyTOCEntry
+            (findTree (\e -> e.id == tocID) updatedTOCEntries)
         H.modify_ \s -> s { tocEntries = updatedTOCEntries }
         H.tell _editor unit (Editor.ChangeSection updateTOCEntry)
 
@@ -702,13 +697,7 @@ splitview = H.mkComponent
         state <- H.get
         let
           entry = case (findTOCEntry selectEntry.id state.tocEntries) of
-            Nothing ->
-              { id: -1
-              , name: "No Entry"
-              , content: ""
-              , newMarkerNextID: 0
-              , markers: []
-              }
+            Nothing -> emptyTOCEntry
             Just e -> e
         H.tell _editor unit (Editor.ChangeSection entry)
 
@@ -812,56 +801,8 @@ createExampleComments = do
       (range 1 6)
   pure comments
 
-findCommentSection :: Array TOCEntry -> Int -> Int -> Maybe CommentSection
+findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
 findCommentSection tocEntries tocID markerID = do
-  tocEntry <- find (\entry -> entry.id == tocID) tocEntries
+  tocEntry <- findTree (\entry -> entry.id == tocID) tocEntries
   marker <- find (\m -> m.id == markerID) tocEntry.markers
   marker.mCommentSection
-
-convertTreeToTOC :: Tree -> Array TOCEntry
-convertTreeToTOC = go
-  where
-  go (Tree { node: NodeWithRef { id, kind, content }, children }) =
-    let
-      entry :: TOCEntry
-      entry =
-        { id
-        , name: kind
-        , content: fromMaybe "" content
-        , newMarkerNextID: 0
-        , markers: []
-        }
-
-      childEntries = children >>= \(Edge { child }) -> go child
-    in
-      [ entry ] <> childEntries
-
-convertTOCtoTree :: Array TOCEntry -> Tree
-convertTOCtoTree tocEntries = case uncons tocEntries of
-  Nothing ->
-    Tree
-      { node: NodeWithRef { id: 0, kind: "empty", content: Nothing }
-      , children: []
-      }
-
-  Just { head: root, tail: rest } ->
-    Tree
-      { node: NodeWithRef
-          { id: root.id
-          , kind: root.name
-          , content: Just root.content
-          }
-      , children: rest <#> \entry ->
-          Edge
-            { title: entry.name
-            , child:
-                Tree
-                  { node: NodeWithRef
-                      { id: entry.id
-                      , kind: entry.name
-                      , content: Just entry.content
-                      }
-                  , children: []
-                  }
-            }
-      }
