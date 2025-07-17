@@ -3,14 +3,12 @@
   description = "Fachprüfungsordnungseditor";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   inputs.flake-utils.url = "github:numtide/flake-utils";
-  inputs.easy-purescript-nix.url = "github:justinwoo/easy-purescript-nix";
 
   outputs =
     {
       self,
       nixpkgs,
       flake-utils,
-      easy-purescript-nix,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -24,11 +22,9 @@
           |_| | .__/ \___(_)
               | | Dev Shell
               |_| ${mode}
-
         '';
 
         pkgs = nixpkgs.legacyPackages.${system};
-        easyPs = easy-purescript-nix.packages.${system};
 
         hPkgs = pkgs.haskell.packages."ghc984";
         # need to match Stackage LTS version
@@ -50,18 +46,32 @@
         ];
 
         frontendDevTools = [
-          easyPs.purs
-          easyPs.spago
-          easyPs.purescript-language-server
-          easyPs.purs-tidy
           pkgs.purescript
-          pkgs.nodePackages.purescript-language-server
-          pkgs.nodePackages.purs-tidy
           pkgs.nodejs_22
           pkgs.esbuild
+
+          (pkgs.writeShellScriptBin "spago" ''
+            exec ${pkgs.nodejs_22}/bin/npx spago@next "$@"
+          '')
+
+          (pkgs.writeShellScriptBin "purescript-language-server" ''
+            exec ${pkgs.nodejs_22}/bin/npx purescript-language-server "$@"
+          '')
+
+          (pkgs.writeShellScriptBin "purs-tidy" ''
+            exec ${pkgs.nodejs_22}/bin/npx purs-tidy "$@"
+          '')
         ];
 
+        # ja ja ist vollkatastrophe, aber bleibt jetzt erst mal so.
         frontendShellHook = ''
+          mkdir -p ./frontend/output
+          ln -s ./frontend/spago.yaml spago.yaml > /dev/null 2>&1
+          ln -s ./frontend/output output > /dev/null 2>&1
+          cd ./frontend
+          npm install && npm install spago@next && npm install purs-tidy \
+            && npm install purescript-language-server && spago install && clear
+          cd ..
           source <(spago --bash-completion-script `which spago`)
           source <(node --completion-bash)
         '';
@@ -106,8 +116,8 @@
           buildInputs = backendDevTools ++ frontendDevTools;
           LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath backendDevTools;
           shellHook = ''
-            echo "${welcomeText "Fullstack"}"
             ${frontendShellHook}
+            echo "${welcomeText "Fullstack"}"
           '';
         };
       }

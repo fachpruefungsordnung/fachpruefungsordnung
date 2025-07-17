@@ -39,5 +39,11 @@ cabal.project.local~
 .zed/
 .idea/
 
+# direnv, nix und so
+.direnv
+/output
+/spago.yaml
+
+
 # Other
 .DS_Store
