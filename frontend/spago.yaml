@@ -9,6 +9,7 @@ package:
     - argonaut-core
     - arrays
     - console
+    - control
     - datetime
     - dom-indexed
     - effect
