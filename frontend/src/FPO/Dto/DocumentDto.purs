@@ -8,6 +8,7 @@ import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Either (Either)
 import Data.Maybe (Maybe, fromMaybe)
 import Data.Newtype (class Newtype, unwrap)
+import FPO.Dto.TreeDto (Tree(..), Edge(..))
 
 newtype NodeWithRef = NodeWithRef
   { id :: Int
@@ -15,17 +16,7 @@ newtype NodeWithRef = NodeWithRef
   , content :: Maybe String
   }
 
-newtype Tree = Tree
-  { node :: NodeWithRef
-  , children :: Array Edge
-  }
-
-newtype Edge = Edge
-  { title :: String
-  , child :: Tree
-  }
-
-type DocumentTree = Tree
+type DocumentTree = Tree NodeWithRef
 
 newtype DocumentHeader = DH
   { group :: Int, headCommit :: Maybe Int, id :: Int, name :: String }
@@ -37,8 +28,6 @@ derive instance newtypeDocumentHeader :: Newtype DocumentHeader _
 derive instance newtypeDocumentHeaderPlusPermission ::
   Newtype DocumentHeaderPlusPermission _
 
-derive instance newtypeTree :: Newtype Tree _
-derive instance newtypeEdge :: Newtype Edge _
 derive instance newtypeNodeWithRef :: Newtype NodeWithRef _
 
 instance decodeJsonHeader :: DecodeJson DocumentHeader where
@@ -75,20 +64,6 @@ instance decodeJsonNodeWithRef :: DecodeJson NodeWithRef where
     content <- inner .: "content"
     pure $ NodeWithRef { id, kind, content }
 
-instance decodeJsonEdge :: DecodeJson Edge where
-  decodeJson json = do
-    obj <- decodeJson json
-    title <- obj .: "title"
-    child <- obj .: "child"
-    pure $ Edge { title, child }
-
-instance decodeJsonTree :: DecodeJson Tree where
-  decodeJson json = do
-    obj <- decodeJson json
-    node <- obj .: "node"
-    children <- obj .: "children"
-    pure $ Tree { node, children }
-
 instance encodeJsonNodeWithRef :: EncodeJson NodeWithRef where
   encodeJson (NodeWithRef { id, kind, content }) =
     encodeJson
@@ -99,20 +74,6 @@ instance encodeJsonNodeWithRef :: EncodeJson NodeWithRef where
           }
       }
 
-instance encodeJsonEdge :: EncodeJson Edge where
-  encodeJson (Edge { title, child }) =
-    encodeJson
-      { title
-      , child
-      }
-
-instance encodeJsonTree :: EncodeJson Tree where
-  encodeJson (Tree { node, children }) =
-    encodeJson
-      { node
-      , children
-      }
-
 -- show instances for debugging purposes
 instance showNodeWithRef :: Show NodeWithRef where
   show (NodeWithRef { id, kind, content }) =
@@ -120,15 +81,7 @@ instance showNodeWithRef :: Show NodeWithRef where
       <> show content
       <> " }"
 
-instance showEdge :: Show Edge where
-  show (Edge { title, child }) =
-    "Edge { title: " <> show title <> ", child: " <> show child <> " }"
-
-instance showTree :: Show Tree where
-  show (Tree { node, children }) =
-    "Tree { node: " <> show node <> ", children: " <> show children <> " }"
-
-decodeDocument :: Json -> Either JsonDecodeError Tree
+decodeDocument :: Json -> Either JsonDecodeError DocumentTree
 decodeDocument json = do
   obj <- decodeJson json
   body <- obj .: "body"
@@ -137,7 +90,7 @@ decodeDocument json = do
 
 -- Encode instances
 -- | Erzeugt ein JSON-Objekt mit Dummy-Daten passend zur Upload-Schnittstelle
-encodeCreateCommit :: Tree -> Json
+encodeCreateCommit :: DocumentTree -> Json
 encodeCreateCommit tree =
   encodeJson
     { info:
@@ -148,8 +101,9 @@ encodeCreateCommit tree =
     , root: encodeTree tree
     }
 
-encodeTree :: Tree -> Json
-encodeTree (Tree { node, children }) =
+encodeTree :: DocumentTree -> Json
+encodeTree Empty = encodeJson {}
+encodeTree (Node { node, children }) =
   let
     { id, kind, content } = unwrap node
   in
@@ -162,7 +116,7 @@ encodeTree (Tree { node, children }) =
       , edges: map encodeEdge children
       }
 
-encodeEdge :: Edge -> Json
+encodeEdge :: Edge NodeWithRef -> Json
 encodeEdge (Edge { title, child }) =
   encodeJson
     { title
