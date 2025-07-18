@@ -13,9 +13,9 @@ where
 -- können die Inhalte eines bestimmten Paragraphen oder Knoten abgerufen werden.
 -- Mit einem POST auf den gleichen Endpunkt kann der Paragraph oder Knoten bearbeitet
 -- werden. Dabei wird dieser Endpunkt sowohl genutzt, um die Inhalte zu verändern,
--- als auch um die Struktur zu ändern. Ist die `children` Eigentschaft gesetzt,
+-- als auch um die Struktur zu ändern. Ist die `children` Eigenschaft gesetzt,
 -- so werden die angegebenen Nodes in der gegebenen Reihenfolge fortan als Kindknoten
--- des bearbeiteten Knotens behandelt. Ist die `Content` Eigentschaft gesetzt,
+-- des bearbeiteten Knotens behandelt. Ist die `Content` Eigenschaft gesetzt,
 -- so wird der Inhalt des Paragraphen (oder Knoten?) geändert.
 -- TODO: Sollen Knoten sowohl Text als auch Kindknoten haben können?
 --       -> Äußerst relevant für interne Darstellung oberhalb des Datalayers und
@@ -58,7 +58,7 @@ data Version
     { versionID :: VersionID
     , versionNode :: Node
     , versionAuthor :: UUID
-    , versionContent :: Hashed Text
+    , versionContent :: Maybe (Hashed Text)
     , versionChildren :: [NodeID]
     }
 
