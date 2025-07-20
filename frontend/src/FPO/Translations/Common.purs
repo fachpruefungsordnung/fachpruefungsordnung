@@ -54,7 +54,7 @@ deCommon = fromRecord
   , common_deletePhraseA: "Sind Sie sicher, dass Sie "
   , common_deletePhraseB: " löschen möchten?"
   , common_email: "E-Mail"
-  , common_emailAddress: "E-Mail Addresse"
+  , common_emailAddress: "E-Mail-Addresse"
   , common_filterBy: "Filtern nach"
   , common_group: "Gruppe"
   , common_home: "Start"
