@@ -56,24 +56,25 @@ testDocuments conn = do
     Right newDocument2 <- DM.createDocument "testdocument2" 1 (DM.Context conn)
     return newDocument1
 
-testCommits :: Connection -> IO ExistingCommit
-testCommits conn = do
+-- | Creates two commits, linking one of the commits to the specified document.
+testCommits :: DocumentID -> Connection -> IO ExistingCommit
+testCommits docID conn = do
     Right userId <- getUserID "test@test.com" conn
     let commit1 =
             CreateCommit
                 (CommitInfo userId (Just "Test Commit") [])
                 (Value testTree)
-    Right newCommit <- DM.createCommit commit1 $ DM.Context conn
+    Right newCommit1 <- DM.createCommit commit1 $ DM.Context conn
     let commit2 =
             CreateCommit
                 ( CommitInfo
                     userId
                     (Just "Another Commit")
-                    [commitHeaderID (existingCommitHeader newCommit)]
+                    [commitHeaderID (existingCommitHeader newCommit1)]
                 )
                 (Value testTree)
-    Right newCommit2 <- DM.createCommit commit2 $ DM.Context conn
-    return newCommit2
+    _ <- DM.createDocumentCommit docID commit2 $ DM.Context conn
+    return newCommit1
   where
     getUserID email = Session.run (statement email UStatements.getUserID)
 
@@ -82,9 +83,9 @@ someFunc = do
     Right connection <- getConnection
     Right _ <- migrate connection
     -- Datenbank zumüllen :)
-    commit <- testCommits connection
-    print commit
     document <- testDocuments connection
     print document
+    commit <- testCommits (documentID document) connection
+    print commit
     runServer
     return ()
