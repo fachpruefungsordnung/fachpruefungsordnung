@@ -186,14 +186,16 @@ splitview docID = H.mkComponent
       , toolbarButton "Save" SaveSection
       , toolbarButton "Query Editor" QueryEditor
       , toolbarButton "Load PDF" ClickLoadPdf
-      , toolbarButton ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning") ShowWarning
+      , toolbarButton
+          ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning")
+          ShowWarning
       ]
     where
-      toolbarButton label act = HH.button
-        [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-        , HE.onClick $ const act
-        ]
-        [ HH.text label ]
+    toolbarButton label act = HH.button
+      [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+      , HE.onClick $ const act
+      ]
+      [ HH.text label ]
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
   renderSplit state =
@@ -470,6 +472,8 @@ splitview docID = H.mkComponent
         st { tocEntries = Empty, mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
       H.tell _toc unit (TOC.ReceiveTOCs Empty)
+      -- Load the initial TOC entries into the editor
+      handleAction GET
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
