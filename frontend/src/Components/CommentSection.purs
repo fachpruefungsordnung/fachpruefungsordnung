@@ -16,13 +16,11 @@ import Halogen.Themes.Bootstrap5 as HB
 type Input = Unit
 
 -- DeleteComment later
-data Output 
-  = JumpToCommentSection
+data Output = JumpToCommentSection
 
-data Action
-  = Init
+data Action = Init
 
-data Query a 
+data Query a
   = ReceiveTimeFormatter (Maybe Formatter) a
   | ReceiveTOC TOCEntry a
 
@@ -45,17 +43,18 @@ commentSectionview = H.mkComponent
 
   render :: State -> forall slots. H.ComponentHTML Action slots m
   render state = case state.mTocEntry of
-    Nothing -> 
-      HH.div [ HP.style "padding: 1rem;" ] 
-      [ HH.text "No comments in this section." ]
+    Nothing ->
+      HH.div [ HP.style "padding: 1rem;" ]
+        [ HH.text "No comments in this section." ]
     Just tocEntry ->
       HH.div [ HP.style "comment-section space-y-3" ]
         ( mapMaybe
-            (\m -> case m.mCommentSection of
-              Nothing -> Nothing
-              Just cs -> case head cs.comments of
+            ( \m -> case m.mCommentSection of
                 Nothing -> Nothing
-                Just c -> Just (renderFirstComment state.mTimeFormatter c))
+                Just cs -> case head cs.comments of
+                  Nothing -> Nothing
+                  Just c -> Just (renderFirstComment state.mTimeFormatter c)
+            )
             tocEntry.markers
         )
 

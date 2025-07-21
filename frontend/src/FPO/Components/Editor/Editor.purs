@@ -356,7 +356,7 @@ editor = connect selectTranslator $ H.mkComponent
           doc <- Session.getDocument session
           Document.getAllLines doc
 
-        let 
+        let
           contentText = intercalate "\n" allLines
           newLiveMarkers = case mLiveMarker of
             Nothing -> state.liveMarkers
@@ -477,7 +477,7 @@ editor = connect selectTranslator $ H.mkComponent
           -- Add annotations from marker
           tmp <- for (entry.markers) \marker -> do
             addAnchor marker session
-          
+
           pure (catMaybes tmp)
 
         -- Update state with new marker IDs
@@ -551,7 +551,7 @@ editor = connect selectTranslator $ H.mkComponent
           >>= Document.getAllLines
       H.raise (ClickedQuery allLines)
       pure (Just a)
-    
+
     SendCommentSections a -> do
       state <- H.get
       -- Send the current comment sections to the splitview
@@ -611,7 +611,7 @@ addAnnotation annotation session = do
   Session.setAnnotations (annotation : anns) session
 
 addAnchor :: AnnotatedMarker -> Types.EditSession -> Effect (Maybe LiveMarker)
-addAnchor marker session = 
+addAnchor marker session =
   if (marker.startRow == marker.endRow && marker.startCol == marker.endCol) then
     pure Nothing -- No valid range, so no marker
   else do
@@ -649,12 +649,14 @@ addAnchor marker session =
     Anchor.onChange startAnchor rerenderMarker
     Anchor.onChange endAnchor rerenderMarker
     addAnnotation (markerToAnnotation marker) session
-    pure (Just
-      { annotedMarkerID: marker.id
-      , startAnchor: startAnchor
-      , endAnchor: endAnchor
-      , ref: markerRef
-      })
+    pure
+      ( Just
+          { annotedMarkerID: marker.id
+          , startAnchor: startAnchor
+          , endAnchor: endAnchor
+          , ref: markerRef
+          }
+      )
 
 removeLiveMarker :: LiveMarker -> Types.EditSession -> Effect Unit
 removeLiveMarker lm session = do

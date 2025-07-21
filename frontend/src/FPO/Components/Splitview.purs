@@ -289,13 +289,14 @@ splitview = H.mkComponent
               <>
                 "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
               <>
-                if state.sidebarShown 
-                && not state.commentSectionShown 
-                && not state.commentShown
-                && state.tocShown then 
-                  "" 
-                else 
-                    "display: none;"
+                if
+                  state.sidebarShown
+                    && not state.commentSectionShown
+                    && not state.commentShown
+                    && state.tocShown then
+                  ""
+                else
+                  "display: none;"
         ]
         [ HH.button
             [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
@@ -324,9 +325,9 @@ splitview = H.mkComponent
               <>
                 "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
               <>
-                if state.sidebarShown && state.commentShown then 
+                if state.sidebarShown && state.commentShown then
                   ""
-                else 
+                else
                   "display: none;"
         ]
         [ HH.button
@@ -361,11 +362,12 @@ splitview = H.mkComponent
               <>
                 "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
               <>
-                if state.sidebarShown 
-                && not state.commentShown
-                && state.commentSectionShown then 
+                if
+                  state.sidebarShown
+                    && not state.commentShown
+                    && state.commentSectionShown then
                   ""
-                else 
+                else
                   "display: none;"
         ]
         [ HH.button
@@ -390,7 +392,8 @@ splitview = H.mkComponent
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
             ]
             [ HH.text "All comments" ]
-        , HH.slot _commentSection unit CommentSection.commentSectionview unit HandleCommentSection
+        , HH.slot _commentSection unit CommentSection.commentSectionview unit
+            HandleCommentSection
         ]
     -- Left Resizer
     , HH.div
@@ -633,7 +636,7 @@ splitview = H.mkComponent
 
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
-    ToggleCommentSection shown -> 
+    ToggleCommentSection shown ->
       if shown then do
         H.tell _editor unit Editor.SendCommentSections
         H.modify_ \st -> st { commentShown = false, commentSectionShown = shown }
@@ -719,7 +722,7 @@ splitview = H.mkComponent
             (findTree (\e -> e.id == tocID) updatedTOCEntries)
         H.modify_ \s -> s { tocEntries = updatedTOCEntries }
         H.tell _editor unit (Editor.ChangeSection updateTOCEntry)
-    
+
     HandleCommentSection output -> case output of
 
       CommentSection.JumpToCommentSection -> pure unit
@@ -759,8 +762,8 @@ splitview = H.mkComponent
           Just commentSection -> do
             H.tell _comment unit
               (Comment.SelectedCommentSection tocID markerID commentSection)
-      
-      Editor.SendingTOC tocEntry-> do
+
+      Editor.SendingTOC tocEntry -> do
         H.tell _commentSection unit (CommentSection.ReceiveTOC tocEntry)
     HandlePreview _ -> pure unit
 
