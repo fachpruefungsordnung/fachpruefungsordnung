@@ -3,7 +3,6 @@
 -- Things to change in this file:
 -- always loading for group 1 (see initialize and ConfirmDeleteDocument)
 -- No connection to Backend yet
--- different Docs lead to same editor
 -- both buttons not funtional yet
 -- many things same as in Home.purs or PageGroups.purs. Need to relocate reusable code fragments.
 -- archive column should have checkboxes
@@ -401,7 +400,7 @@ component =
       case s.requestDelete of
         Nothing -> do
           log ("Routing to editor for project " <> ((docNameFromID s) documentID))
-          navigate Editor
+          navigate (Editor { docID: documentID })
         _ ->
           pure unit
     ChangeSorting (TH.Clicked title order) -> do

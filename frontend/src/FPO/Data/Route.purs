@@ -6,6 +6,7 @@ import Prelude hiding ((/))
 
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(Nothing), fromMaybe)
+import FPO.Dto.DocumentDto (DocumentID)
 import Routing.Duplex (RouteDuplex', boolean, int, optional, root, segment)
 import Routing.Duplex.Generic (noArgs, sum)
 import Routing.Duplex.Generic.Syntax ((/), (?))
@@ -13,7 +14,7 @@ import Routing.Duplex.Generic.Syntax ((/), (?))
 -- | Represents all available routes in the application.
 data Route
   = Home
-  | Editor
+  | Editor { docID :: DocumentID }
   | Login
   | PasswordReset
   | AdminViewUsers
@@ -30,7 +31,7 @@ derive instance ordRoute :: Ord Route
 routeCodec :: RouteDuplex' Route
 routeCodec = root $ sum
   { "Home": noArgs
-  , "Editor": "editor" / noArgs
+  , "Editor": "editor" ? { docID: int }
   , "Login": "login" / noArgs
   , "PasswordReset": "password-reset" / noArgs
   , "AdminViewUsers": "admin-users" / noArgs
@@ -45,7 +46,7 @@ routeCodec = root $ sum
 routeToString :: Route -> String
 routeToString = case _ of
   Home -> "Home"
-  Editor -> "Editor"
+  Editor docID -> "Editor:" <> show docID
   Login -> "Login"
   PasswordReset -> "PasswordReset"
   AdminViewUsers -> "AdminViewUsers"

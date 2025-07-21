@@ -19,12 +19,7 @@ import Data.Enum (fromEnum)
 import Data.Int (floor)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), contains, toLower)
-import Data.Time.Duration
-  ( class Duration
-  , Seconds(..)
-  , negateDuration
-  , toDuration
-  )
+import Data.Time.Duration (class Duration, Seconds(..), negateDuration, toDuration)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class.Console (log)
 import Effect.Now (nowDateTime)
@@ -34,7 +29,12 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getDocumentsFromURLWithPermission, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto (DocumentHeaderPlusPermission, getDHPPName)
+import FPO.Dto.DocumentDto
+  ( DocumentHeaderPlusPermission
+  , DocumentID
+  , getDHPPID
+  , getDHPPName
+  )
 import FPO.Dto.UserDto (User)
 import FPO.Page.HTML (addCard, addColumn)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
@@ -60,7 +60,7 @@ data Sorting = TitleAsc | TitleDesc | LastUpdatedAsc | LastUpdatedDesc
 data Action
   = Initialize
   | NavLogin
-  | ViewProject String
+  | ViewProject Project
   | Receive (Connected FPOTranslator Input)
   | DoNothing
   | ChangeSorting TH.Output
@@ -78,9 +78,7 @@ type State = FPOState
 -- | Model for Projects with proper DateTime.
 type Project =
   { name :: String
-  , description :: String
-  , version :: String
-  , collaborators :: Int
+  , documentID :: DocumentID
   , updated :: DateTime
   }
 
@@ -154,9 +152,9 @@ component =
           navigate Login
           pure unit
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
-    ViewProject projectName -> do
-      log $ "Routing to editor for project " <> projectName
-      navigate Editor
+    ViewProject project -> do
+      log $ "Routing to editor for project " <> project.name
+      navigate (Editor { docID: project.documentID })
     NavLogin -> do
       updateStore $ Store.SetLoginRedirect (Just Home)
       navigate Login
@@ -282,7 +280,7 @@ component =
   renderProjectRow :: forall w. State -> Project -> HH.HTML w Action
   renderProjectRow state project =
     HH.tr
-      [ HE.onClick $ const $ ViewProject project.name
+      [ HE.onClick $ const $ ViewProject project
       , HP.style "cursor: pointer;"
       ]
       [ HH.td [ HP.classes [ HB.textCenter ] ]
@@ -311,11 +309,7 @@ toProject :: Array DocumentHeaderPlusPermission -> DateTime -> Array Project
 toProject docs now = map
   ( \doc ->
       { name: getDHPPName doc
-      , description:
-          "This text should not be read, else there is eihter an error, or i am missing something"
-      , version:
-          "This text should not be read, else there is eihter an error, or i am missing something"
-      , collaborators: -1
+      , documentID: getDHPPID doc
       , updated: now
       }
   )

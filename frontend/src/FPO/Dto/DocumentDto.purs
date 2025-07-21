@@ -18,8 +18,11 @@ newtype NodeWithRef = NodeWithRef
 
 type DocumentTree = Tree NodeWithRef
 
+type DocumentID = Int
+type CommitID = Int
+
 newtype DocumentHeader = DH
-  { group :: Int, headCommit :: Maybe Int, id :: Int, name :: String }
+  { group :: Int, headCommit :: Maybe CommitID, id :: DocumentID, name :: String }
 
 newtype DocumentHeaderPlusPermission = DHPP
   { document :: DocumentHeader, documentPermission :: String }
@@ -52,8 +55,14 @@ getDHName (DH dh) = dh.name
 getDHID :: DocumentHeader -> Int
 getDHID (DH dh) = dh.id
 
+getDHHeadCommit :: DocumentHeader -> Maybe CommitID
+getDHHeadCommit (DH dh) = dh.headCommit
+
 getDHPPName :: DocumentHeaderPlusPermission -> String
 getDHPPName (DHPP dhpp) = getDHName dhpp.document
+
+getDHPPID :: DocumentHeaderPlusPermission -> Int
+getDHPPID (DHPP dhpp) = getDHID dhpp.document
 
 instance decodeJsonNodeWithRef :: DecodeJson NodeWithRef where
   decodeJson json = do
