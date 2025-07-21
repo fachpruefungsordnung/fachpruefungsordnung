@@ -16,6 +16,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
 import FPO.Components.Comment as Comment
+import FPO.Components.CommentSection as CommentSection
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
@@ -68,10 +69,12 @@ data Action
   | ShowWarning
   -- Toggle buttons
   | ToggleComment
+  | ToggleCommentSection Boolean
   | ToggleSidebar
   | TogglePreview
   -- Query Output
   | HandleComment Comment.Output
+  | HandleCommentSection CommentSection.Output
   | HandleEditor Editor.Output
   | HandlePreview Preview.Output
   | HandleTOC TOC.Output
@@ -116,6 +119,8 @@ type State =
   -- Boolean flags for UI state
   , sidebarShown :: Boolean
   , tocShown :: Boolean
+  , commentSectionShown :: Boolean
+  , commentShown :: Boolean
   , previewShown :: Boolean
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
@@ -123,12 +128,14 @@ type State =
 
 type Slots =
   ( comment :: H.Slot Comment.Query Comment.Output Unit
+  , commentSection :: H.Slot CommentSection.Query CommentSection.Output Unit
   , editor :: H.Slot Editor.Query Editor.Output Unit
   , preview :: H.Slot Preview.Query Preview.Output Unit
   , toc :: H.Slot TOC.Query TOC.Output Unit
   )
 
 _comment = Proxy :: Proxy "comment"
+_commentSection = Proxy :: Proxy "commentSection"
 _editor = Proxy :: Proxy "editor"
 _preview = Proxy :: Proxy "preview"
 _toc = Proxy :: Proxy "toc"
@@ -153,6 +160,8 @@ splitview = H.mkComponent
       , mTimeFormatter: Nothing
       , sidebarShown: true
       , tocShown: true
+      , commentSectionShown: false
+      , commentShown: false
       , previewShown: true
       , pdfWarningAvailable: false
       , pdfWarningIsShown: false
@@ -189,6 +198,11 @@ splitview = H.mkComponent
           , HE.onClick $ const POST
           ]
           [ HH.text "POST" ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+          , HE.onClick $ const $ ToggleCommentSection true
+          ]
+          [ HH.text "All Comments" ]
       , HH.button
           [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
           , HE.onClick $ const ClickedHTTPRequest
@@ -275,7 +289,13 @@ splitview = H.mkComponent
               <>
                 "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
               <>
-                if state.sidebarShown && state.tocShown then "" else "display: none;"
+                if state.sidebarShown 
+                && not state.commentSectionShown 
+                && not state.commentShown
+                && state.tocShown then 
+                  "" 
+                else 
+                    "display: none;"
         ]
         [ HH.button
             [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
@@ -304,8 +324,10 @@ splitview = H.mkComponent
               <>
                 "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
               <>
-                if state.sidebarShown && not state.tocShown then ""
-                else "display: none;"
+                if state.sidebarShown && state.commentShown then 
+                  ""
+                else 
+                  "display: none;"
         ]
         [ HH.button
             [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
@@ -330,6 +352,45 @@ splitview = H.mkComponent
             ]
             [ HH.text "Conversation" ]
         , HH.slot _comment unit Comment.commentview unit HandleComment
+        ]
+    -- CommentSection
+    , HH.div
+        [ HP.classes [ HB.overflowAuto, HB.p1 ]
+        , HP.style $
+            "flex: 0 0 " <> show (state.sidebarRatio * 100.0)
+              <>
+                "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
+              <>
+                if state.sidebarShown 
+                && not state.commentShown
+                && state.commentSectionShown then 
+                  ""
+                else 
+                  "display: none;"
+        ]
+        [ HH.button
+            [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+            , HP.style
+                "position: absolute; \
+                \top: 0.5rem; \
+                \right: 0.5rem; \
+                \background-color: #fdecea; \
+                \color: #b71c1c; \
+                \padding: 0.2rem 0.4rem; \
+                \font-size: 0.75rem; \
+                \line-height: 1; \
+                \border: 1px solid #f5c6cb; \
+                \border-radius: 0.2rem; \
+                \z-index: 10;"
+            , HE.onClick \_ -> ToggleCommentSection false
+            ]
+            [ HH.text "×" ]
+        , HH.h4
+            [ HP.style
+                "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
+            ]
+            [ HH.text "All comments" ]
+        , HH.slot _commentSection unit CommentSection.commentSectionview unit HandleCommentSection
         ]
     -- Left Resizer
     , HH.div
@@ -473,6 +534,7 @@ splitview = H.mkComponent
       H.modify_ \st -> do
         st { tocEntries = Empty, mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
+      H.tell _commentSection unit (CommentSection.ReceiveTimeFormatter timeFormatter)
       H.tell _toc unit (TOC.ReceiveTOCs Empty)
 
     -- Resizing as long as mouse is hold down on window
@@ -569,7 +631,14 @@ splitview = H.mkComponent
 
     -- Toggle actions
 
-    ToggleComment -> H.modify_ \st -> st { tocShown = true }
+    ToggleComment -> H.modify_ \st -> st { commentShown = false }
+
+    ToggleCommentSection shown -> 
+      if shown then do
+        H.tell _editor unit Editor.SendCommentSections
+        H.modify_ \st -> st { commentShown = false, commentSectionShown = shown }
+      else
+        H.modify_ \st -> st { commentSectionShown = shown }
 
     -- Toggle the sidebar
     -- Add logic in calculating the middle ratio
@@ -622,7 +691,7 @@ splitview = H.mkComponent
     HandleComment output -> case output of
 
       Comment.CloseCommentSection -> do
-        H.modify_ \st -> st { tocShown = true }
+        H.modify_ \st -> st { commentShown = false }
 
       Comment.UpdateComment tocID markerID newCommentSection -> do
         H.tell _editor unit Editor.SaveSection
@@ -650,6 +719,10 @@ splitview = H.mkComponent
             (findTree (\e -> e.id == tocID) updatedTOCEntries)
         H.modify_ \s -> s { tocEntries = updatedTOCEntries }
         H.tell _editor unit (Editor.ChangeSection updateTOCEntry)
+    
+    HandleCommentSection output -> case output of
+
+      CommentSection.JumpToCommentSection -> pure unit
 
     HandleEditor output -> case output of
 
@@ -674,19 +747,21 @@ splitview = H.mkComponent
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get
         if state.sidebarShown then
-          H.modify_ \st -> st { tocShown = false }
+          H.modify_ \st -> st { commentShown = true }
         else
           H.modify_ \st -> st
             { sidebarRatio = st.lastExpandedSidebarRatio
             , sidebarShown = true
-            , tocShown = false
+            , commentShown = true
             }
         case (findCommentSection state.tocEntries tocID markerID) of
           Nothing -> pure unit
           Just commentSection -> do
             H.tell _comment unit
               (Comment.SelectedCommentSection tocID markerID commentSection)
-
+      
+      Editor.SendingTOC tocEntry-> do
+        H.tell _commentSection unit (CommentSection.ReceiveTOC tocEntry)
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
