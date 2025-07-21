@@ -9,7 +9,6 @@ import Effect.Aff.Class (class MonadAff)
 import FPO.Types (Comment, TOCEntry)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
 
