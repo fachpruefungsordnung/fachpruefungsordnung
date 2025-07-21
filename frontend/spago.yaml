@@ -38,6 +38,7 @@ package:
     - simple-i18n
     - strings
     - tailrec
+    - transformers
     - tuples
     - unsafe-coerce
     - web-dom
