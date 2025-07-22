@@ -20,7 +20,8 @@ import Ace.EditSession as Session
 import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
-import Data.Array (filter, intercalate, uncons, (:))
+import Ace.UndoManager as UndoMgr
+import Data.Array (catMaybes, filter, intercalate, uncons, (:))
 import Data.Foldable (find, for_, traverse_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.String as String
@@ -80,6 +81,7 @@ data Output
   | DeletedComment TOCEntry (Array Int)
   | SavedSection TOCEntry
   | SelectedCommentSection Int Int
+  | SendingTOC TOCEntry
 
 data Action
   = Init
@@ -105,6 +107,7 @@ data Query a
   | LoadPdf a
   -- receive the selected TOC and put its content into the editor
   | ChangeSection TOCEntry a
+  | SendCommentSections a
 
 editor
   :: forall m
@@ -261,37 +264,7 @@ editor = connect selectTranslator $ H.mkComponent
           addChangeListener editor_
 
           -- Add some example text
-          Document.setValue
-            ( intercalate "\n" $
-                [ "# Project Overview"
-                , ""
-                , "-- This is a developer comment."
-                , ""
-                , "## To-Do List"
-                , ""
-                , "1. Document initial setup."
-                , "2. <*Define the API*>                        % LTML: bold"
-                , "3. <_Underline important interface items_>   % LTML: underline"
-                , "4. </Emphasize optional features/>           % LTML: italic"
-                , ""
-                , "/* Note: Nested styles are allowed,"
-                , "   but not transitively within the same tag type!"
-                , "   Written in a code block."
-                , "*/"
-                , ""
-                , "<*This is </allowed/>*>                      % valid nesting"
-                , "<*This is <*not allowed*>*>                  % invalid, but still highlighted"
-                , ""
-                , "## Status"
-                , ""
-                , "Errors can already be marked as such, see error!"
-                , ""
-                , "TODO: Write the README file."
-                , "FIXME: The parser fails on nested blocks."
-                , "NOTE: We're using this style as a placeholder."
-                ]
-            )
-            document
+          Document.setValue "" document
 
     Bold -> do
       H.gets _.mEditor >>= traverse_ \ed ->
@@ -377,13 +350,17 @@ editor = connect selectTranslator $ H.mkComponent
             , mCommentSection: Just newCommentSection
             }
 
-        liveMarker <- H.liftEffect $ addAnchor newMarker session
+        mLiveMarker <- H.liftEffect $ addAnchor newMarker session
         -- Textinhalt holen
         allLines <- H.liftEffect do
           doc <- Session.getDocument session
           Document.getAllLines doc
 
-        let contentText = intercalate "\n" allLines
+        let
+          contentText = intercalate "\n" allLines
+          newLiveMarkers = case mLiveMarker of
+            Nothing -> state.liveMarkers
+            Just lm -> lm : state.liveMarkers
 
         case state.mTocEntry of
           Just entry -> do
@@ -398,7 +375,7 @@ editor = connect selectTranslator $ H.mkComponent
             H.modify_ \st ->
               st
                 { mTocEntry = Just newEntry
-                , liveMarkers = (liveMarker : st.liveMarkers)
+                , liveMarkers = newLiveMarkers
                 }
             H.raise (SavedSection newEntry)
           Nothing -> pure unit
@@ -482,6 +459,10 @@ editor = connect selectTranslator $ H.mkComponent
           let content = entry.content
           Document.setValue content document
 
+          -- Reset Undo history
+          undoMgr <- Session.getUndoManager session
+          UndoMgr.reset undoMgr
+
           -- Remove existing markers
           for_ state.liveMarkers \lm -> do
             removeLiveMarker lm session
@@ -494,8 +475,10 @@ editor = connect selectTranslator $ H.mkComponent
           Session.clearAnnotations session
 
           -- Add annotations from marker
-          for (entry.markers) \marker -> do
+          tmp <- for (entry.markers) \marker -> do
             addAnchor marker session
+
+          pure (catMaybes tmp)
 
         -- Update state with new marker IDs
         H.modify_ \st ->
@@ -569,6 +552,15 @@ editor = connect selectTranslator $ H.mkComponent
       H.raise (ClickedQuery allLines)
       pure (Just a)
 
+    SendCommentSections a -> do
+      state <- H.get
+      -- Send the current comment sections to the splitview
+      case state.mTocEntry of
+        Nothing -> pure unit
+        Just tocEntry -> do
+          H.raise (SendingTOC tocEntry)
+      pure (Just a)
+
 -- | Change listener for the editor.
 --
 --   This function should implement stuff like parsing and syntax analysis,
@@ -618,48 +610,53 @@ addAnnotation annotation session = do
   anns <- Session.getAnnotations session
   Session.setAnnotations (annotation : anns) session
 
-addAnchor :: AnnotatedMarker -> Types.EditSession -> Effect LiveMarker
-addAnchor marker session = do
-  document <- Session.getDocument session
-  startAnchor <- Document.createAnchor marker.startRow marker.startCol document
-  endAnchor <- Document.createAnchor marker.endRow marker.endCol document
-  Anchor.setInsertRight true endAnchor
+addAnchor :: AnnotatedMarker -> Types.EditSession -> Effect (Maybe LiveMarker)
+addAnchor marker session =
+  if (marker.startRow == marker.endRow && marker.startCol == marker.endCol) then
+    pure Nothing -- No valid range, so no marker
+  else do
+    document <- Session.getDocument session
+    startAnchor <- Document.createAnchor marker.startRow marker.startCol document
+    endAnchor <- Document.createAnchor marker.endRow marker.endCol document
+    Anchor.setInsertRight true endAnchor
 
-  range <- createMarkerRange marker
-  id <- Session.addMarker range "my-marker" "string" false session
-  markerRef <- Ref.new id
+    range <- createMarkerRange marker
+    id <- Session.addMarker range "my-marker" "string" false session
+    markerRef <- Ref.new id
 
-  let
-    rerenderMarker _ = do
-      Ref.read markerRef >>= flip Session.removeMarker session
-      Types.Position { row: startRow, column: startColumn } <- Anchor.getPosition
-        startAnchor
-      Types.Position { row: endRow, column: endColumn } <- Anchor.getPosition
-        endAnchor
-      markRange <- Range.create
-        startRow
-        startColumn
-        endRow
-        endColumn
-      newId <- Session.addMarker
-        markRange
-        "my-marker"
-        "string"
-        false
-        session
+    let
+      rerenderMarker _ = do
+        Ref.read markerRef >>= flip Session.removeMarker session
+        Types.Position { row: startRow, column: startColumn } <- Anchor.getPosition
+          startAnchor
+        Types.Position { row: endRow, column: endColumn } <- Anchor.getPosition
+          endAnchor
+        markRange <- Range.create
+          startRow
+          startColumn
+          endRow
+          endColumn
+        newId <- Session.addMarker
+          markRange
+          "my-marker"
+          "string"
+          false
+          session
 
-      Ref.write newId markerRef
-      pure unit
+        Ref.write newId markerRef
+        pure unit
 
-  Anchor.onChange startAnchor rerenderMarker
-  Anchor.onChange endAnchor rerenderMarker
-  addAnnotation (markerToAnnotation marker) session
-  pure
-    { annotedMarkerID: marker.id
-    , startAnchor: startAnchor
-    , endAnchor: endAnchor
-    , ref: markerRef
-    }
+    Anchor.onChange startAnchor rerenderMarker
+    Anchor.onChange endAnchor rerenderMarker
+    addAnnotation (markerToAnnotation marker) session
+    pure
+      ( Just
+          { annotedMarkerID: marker.id
+          , startAnchor: startAnchor
+          , endAnchor: endAnchor
+          , ref: markerRef
+          }
+      )
 
 removeLiveMarker :: LiveMarker -> Types.EditSession -> Effect Unit
 removeLiveMarker lm session = do

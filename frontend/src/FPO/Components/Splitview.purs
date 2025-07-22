@@ -8,7 +8,8 @@ module FPO.Component.Splitview where
 
 import Prelude
 
-import Data.Array (find, head, intercalate, range, uncons)
+import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
+import Data.Array (find, head, intercalate, range)
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
@@ -16,20 +17,26 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
 import FPO.Components.Comment as Comment
+import FPO.Components.CommentSection as CommentSection
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto (Edge(..), NodeWithRef(..), Tree(..))
+import FPO.Dto.DocumentDto (DocumentID, getDHHeadCommit)
 import FPO.Dto.DocumentDto as DocumentDto
+import FPO.Dto.TreeDto (Tree(..), findTree)
 import FPO.Types
   ( AnnotatedMarker
   , Comment
   , CommentSection
   , TOCEntry
+  , TOCTree
+  , documentTreeToTOCTree
+  , emptyTOCEntry
   , findTOCEntry
   , timeStampsVersions
+  , tocTreeToDocumentTree
   )
 import Halogen as H
 import Halogen.HTML as HH
@@ -64,13 +71,16 @@ data Action
   | ShowWarning
   -- Toggle buttons
   | ToggleComment
+  | ToggleCommentSection Boolean
   | ToggleSidebar
   | TogglePreview
   -- Query Output
   | HandleComment Comment.Output
+  | HandleCommentSection CommentSection.Output
   | HandleEditor Editor.Output
   | HandlePreview Preview.Output
   | HandleTOC TOC.Output
+  | ForceGET
   | GET
   | POST
 
@@ -104,7 +114,7 @@ type State =
 
   -- Store tocEntries and send some parts to its children components
   -- TODO load/upload from/to backend
-  , tocEntries :: Array TOCEntry
+  , tocEntries :: TOCTree
 
   -- How the timestamp has to be formatted
   , mTimeFormatter :: Maybe Formatter
@@ -112,6 +122,8 @@ type State =
   -- Boolean flags for UI state
   , sidebarShown :: Boolean
   , tocShown :: Boolean
+  , commentSectionShown :: Boolean
+  , commentShown :: Boolean
   , previewShown :: Boolean
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
@@ -119,12 +131,14 @@ type State =
 
 type Slots =
   ( comment :: H.Slot Comment.Query Comment.Output Unit
+  , commentSection :: H.Slot CommentSection.Query CommentSection.Output Unit
   , editor :: H.Slot Editor.Query Editor.Output Unit
   , preview :: H.Slot Preview.Query Preview.Output Unit
   , toc :: H.Slot TOC.Query TOC.Output Unit
   )
 
 _comment = Proxy :: Proxy "comment"
+_commentSection = Proxy :: Proxy "commentSection"
 _editor = Proxy :: Proxy "editor"
 _preview = Proxy :: Proxy "preview"
 _toc = Proxy :: Proxy "toc"
@@ -133,8 +147,9 @@ splitview
   :: forall query m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => H.Component query Input Output m
-splitview = H.mkComponent
+  => DocumentID
+  -> H.Component query Input Output m
+splitview docID = H.mkComponent
   { initialState: \_ ->
       { mDragTarget: Nothing
       , startMouseRatio: 0.0
@@ -145,10 +160,12 @@ splitview = H.mkComponent
       , lastExpandedSidebarRatio: 0.2
       , lastExpandedPreviewRatio: 0.4
       , mEditorContent: Nothing
-      , tocEntries: []
+      , tocEntries: Empty
       , mTimeFormatter: Nothing
       , sidebarShown: true
       , tocShown: true
+      , commentSectionShown: false
+      , commentShown: false
       , previewShown: true
       , pdfWarningAvailable: false
       , pdfWarningIsShown: false
@@ -169,51 +186,26 @@ splitview = H.mkComponent
     -- First Toolbar
     HH.div
       [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
-      [ HH.button
-          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-          , HE.onClick $ const ToggleSidebar
-          ]
-          [ HH.text "[≡]" ]
+      [ toolbarButton "[=]" ToggleSidebar
       , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
-      , HH.button
-          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-          , HE.onClick $ const GET
-          ]
-          [ HH.text "GET" ]
-      , HH.button
-          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-          , HE.onClick $ const POST
-          ]
-          [ HH.text "POST" ]
-      , HH.button
-          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-          , HE.onClick $ const ClickedHTTPRequest
-          ]
-          [ HH.text "Click Me for HTTP request" ]
-      , HH.button
-          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-          , HE.onClick $ const SaveSection
-          ]
-          [ HH.text "Save" ]
-      , HH.button
-          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-          , HE.onClick $ const QueryEditor
-          ]
-          [ HH.text "Query Editor" ]
-      , HH.button
-          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-          , HE.onClick $ const ClickLoadPdf
-          ]
-          [ HH.text "Load PDF" ]
-      , if not state.pdfWarningAvailable then HH.div_ []
-        else HH.button
-          [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-          , HE.onClick $ const ShowWarning
-          ]
-          [ HH.text
-              ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning")
-          ]
+      , toolbarButton "ForceGET" ForceGET
+      , toolbarButton "GET" GET
+      , toolbarButton "POST" POST
+      , toolbarButton "All Comments" (ToggleCommentSection true)
+      , toolbarButton "Click Me for HTTPRequest" ClickedHTTPRequest
+      , toolbarButton "Save" SaveSection
+      , toolbarButton "Query Editor" QueryEditor
+      , toolbarButton "Load PDF" ClickLoadPdf
+      , toolbarButton
+          ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning")
+          ShowWarning
       ]
+    where
+    toolbarButton label act = HH.button
+      [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
+      , HE.onClick $ const act
+      ]
+      [ HH.text label ]
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
   renderSplit state =
@@ -271,7 +263,14 @@ splitview = H.mkComponent
               <>
                 "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
               <>
-                if state.sidebarShown && state.tocShown then "" else "display: none;"
+                if
+                  state.sidebarShown
+                    && not state.commentSectionShown
+                    && not state.commentShown
+                    && state.tocShown then
+                  ""
+                else
+                  "display: none;"
         ]
         [ HH.button
             [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
@@ -290,11 +289,6 @@ splitview = H.mkComponent
             , HE.onClick \_ -> ToggleSidebar
             ]
             [ HH.text "×" ]
-        , HH.h4
-            [ HP.style
-                "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
-            ]
-            [ HH.text "Section Overview (§)" ]
         , HH.slot _toc unit TOC.tocview unit HandleTOC
         ]
     -- Comment
@@ -305,8 +299,10 @@ splitview = H.mkComponent
               <>
                 "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
               <>
-                if state.sidebarShown && not state.tocShown then ""
-                else "display: none;"
+                if state.sidebarShown && state.commentShown then
+                  ""
+                else
+                  "display: none;"
         ]
         [ HH.button
             [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
@@ -331,6 +327,47 @@ splitview = H.mkComponent
             ]
             [ HH.text "Conversation" ]
         , HH.slot _comment unit Comment.commentview unit HandleComment
+        ]
+    -- CommentSection
+    , HH.div
+        [ HP.classes [ HB.overflowAuto, HB.p1 ]
+        , HP.style $
+            "flex: 0 0 " <> show (state.sidebarRatio * 100.0)
+              <>
+                "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
+              <>
+                if
+                  state.sidebarShown
+                    && not state.commentShown
+                    && state.commentSectionShown then
+                  ""
+                else
+                  "display: none;"
+        ]
+        [ HH.button
+            [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+            , HP.style
+                "position: absolute; \
+                \top: 0.5rem; \
+                \right: 0.5rem; \
+                \background-color: #fdecea; \
+                \color: #b71c1c; \
+                \padding: 0.2rem 0.4rem; \
+                \font-size: 0.75rem; \
+                \line-height: 1; \
+                \border: 1px solid #f5c6cb; \
+                \border-radius: 0.2rem; \
+                \z-index: 10;"
+            , HE.onClick \_ -> ToggleCommentSection false
+            ]
+            [ HH.text "×" ]
+        , HH.h4
+            [ HP.style
+                "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
+            ]
+            [ HH.text "All comments" ]
+        , HH.slot _commentSection unit CommentSection.commentSectionview unit
+            HandleCommentSection
         ]
     -- Left Resizer
     , HH.div
@@ -441,7 +478,7 @@ splitview = H.mkComponent
     POST -> do
       state <- H.get
       let
-        tree = convertTOCtoTree state.tocEntries
+        tree = tocTreeToDocumentTree state.tocEntries
       rep <- H.liftAff $
         Request.postJson "/commits" (DocumentDto.encodeCreateCommit tree)
       -- debugging logs in
@@ -449,20 +486,40 @@ splitview = H.mkComponent
         Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
         Right _ -> pure unit
     -- H.liftEffect $ Console.log "Successfully posted TOC to server"
-
-    GET -> do
+    ForceGET -> do
+      -- Forces a GET request to fetch the latest document tree of commit #1.
       fetchedTree <- H.liftAff $
         Request.getFromJSONEndpoint DocumentDto.decodeDocument "/commits/1"
       let
         tree = case fetchedTree of
-          Nothing -> []
-          Just t -> convertTreeToTOC t
+          Nothing -> Empty
+          Just t -> documentTreeToTOCTree t
       H.modify_ \st -> do
         st { tocEntries = tree }
       H.tell _toc unit (TOC.ReceiveTOCs tree)
+    GET -> do
+      -- TODO: As of now, the editor page and splitview are parametrized by the document ID
+      --       as given by the route. We could also handle the docID as an input to the component,
+      --       instead, but parameters are more convenient and also there is no existence issue;
+      --       in other words, the editor cannot exist with no document ID.
+      --
+      --       Here, we can simply fetch the latest commit (head commit) of the document and
+      --       write the content into the editor. Because requests like these are very common,
+      --       we should think of a way to have a uniform and clean request handling system, especially
+      --       regarding authentification and error handling. Right now, the editor page is simply empty
+      --       if the document retrieval fails in any way.
+      finalTree <- fromMaybe Empty <$> runMaybeT do
+        doc <- MaybeT $ H.liftAff $ Request.getDocumentHeader docID
+        headCommit <- MaybeT $ pure $ getDHHeadCommit doc
+        fetchedTree <- MaybeT $ H.liftAff
+          $ Request.getFromJSONEndpoint DocumentDto.decodeDocument
+          $ "/commits/" <> show headCommit
+        pure $ documentTreeToTOCTree fetchedTree
 
+      H.modify_ _ { tocEntries = finalTree }
+      H.tell _toc unit (TOC.ReceiveTOCs finalTree)
     Init -> do
-      exampleTOCEntries <- createExampleTOCEntries
+      -- exampleTOCEntries <- createExampleTOCEntries
       -- -- Comment it out for now, to let the other text show up first in editor
       -- -- head has to be imported from Data.Array
       -- -- Put first entry in editor
@@ -472,9 +529,12 @@ splitview = H.mkComponent
       -- -- H.tell _editor unit (Editor.ChangeSection firstEntry)
       let timeFormatter = head timeStampsVersions
       H.modify_ \st -> do
-        st { tocEntries = exampleTOCEntries, mTimeFormatter = timeFormatter }
+        st { tocEntries = Empty, mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
-      H.tell _toc unit (TOC.ReceiveTOCs exampleTOCEntries)
+      H.tell _commentSection unit (CommentSection.ReceiveTimeFormatter timeFormatter)
+      H.tell _toc unit (TOC.ReceiveTOCs Empty)
+      -- Load the initial TOC entries into the editor
+      handleAction GET
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -570,7 +630,14 @@ splitview = H.mkComponent
 
     -- Toggle actions
 
-    ToggleComment -> H.modify_ \st -> st { tocShown = true }
+    ToggleComment -> H.modify_ \st -> st { commentShown = false }
+
+    ToggleCommentSection shown ->
+      if shown then do
+        H.tell _editor unit Editor.SendCommentSections
+        H.modify_ \st -> st { commentShown = false, commentSectionShown = shown }
+      else
+        H.modify_ \st -> st { commentSectionShown = shown }
 
     -- Toggle the sidebar
     -- Add logic in calculating the middle ratio
@@ -599,7 +666,7 @@ splitview = H.mkComponent
       totalWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let
         w = toNumber totalWidth
-        -- resizer size is 8, but there are 2 resizers. 
+        -- resizer size is 8, but there are 2 resizers.
         -- Also resizer size is not in sidebarRatio
         resizerWidth = 16.0
         resizerRatio = resizerWidth / w
@@ -623,7 +690,7 @@ splitview = H.mkComponent
     HandleComment output -> case output of
 
       Comment.CloseCommentSection -> do
-        H.modify_ \st -> st { tocShown = true }
+        H.modify_ \st -> st { commentShown = false }
 
       Comment.UpdateComment tocID markerID newCommentSection -> do
         H.tell _editor unit Editor.SaveSection
@@ -647,15 +714,14 @@ splitview = H.mkComponent
             )
             state.tocEntries
           updateTOCEntry = fromMaybe
-            { id: -1
-            , name: "not found"
-            , content: ""
-            , newMarkerNextID: -1
-            , markers: []
-            }
-            (find (\e -> e.id == tocID) updatedTOCEntries)
+            emptyTOCEntry
+            (findTree (\e -> e.id == tocID) updatedTOCEntries)
         H.modify_ \s -> s { tocEntries = updatedTOCEntries }
         H.tell _editor unit (Editor.ChangeSection updateTOCEntry)
+
+    HandleCommentSection output -> case output of
+
+      CommentSection.JumpToCommentSection -> pure unit
 
     HandleEditor output -> case output of
 
@@ -680,12 +746,12 @@ splitview = H.mkComponent
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get
         if state.sidebarShown then
-          H.modify_ \st -> st { tocShown = false }
+          H.modify_ \st -> st { commentShown = true }
         else
           H.modify_ \st -> st
             { sidebarRatio = st.lastExpandedSidebarRatio
             , sidebarShown = true
-            , tocShown = false
+            , commentShown = true
             }
         case (findCommentSection state.tocEntries tocID markerID) of
           Nothing -> pure unit
@@ -693,6 +759,8 @@ splitview = H.mkComponent
             H.tell _comment unit
               (Comment.SelectedCommentSection tocID markerID commentSection)
 
+      Editor.SendingTOC tocEntry -> do
+        H.tell _commentSection unit (CommentSection.ReceiveTOC tocEntry)
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
@@ -702,13 +770,7 @@ splitview = H.mkComponent
         state <- H.get
         let
           entry = case (findTOCEntry selectEntry.id state.tocEntries) of
-            Nothing ->
-              { id: -1
-              , name: "No Entry"
-              , content: ""
-              , newMarkerNextID: 0
-              , markers: []
-              }
+            Nothing -> emptyTOCEntry
             Just e -> e
         H.tell _editor unit (Editor.ChangeSection entry)
 
@@ -812,56 +874,8 @@ createExampleComments = do
       (range 1 6)
   pure comments
 
-findCommentSection :: Array TOCEntry -> Int -> Int -> Maybe CommentSection
+findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
 findCommentSection tocEntries tocID markerID = do
-  tocEntry <- find (\entry -> entry.id == tocID) tocEntries
+  tocEntry <- findTree (\entry -> entry.id == tocID) tocEntries
   marker <- find (\m -> m.id == markerID) tocEntry.markers
   marker.mCommentSection
-
-convertTreeToTOC :: Tree -> Array TOCEntry
-convertTreeToTOC = go
-  where
-  go (Tree { node: NodeWithRef { id, kind, content }, children }) =
-    let
-      entry :: TOCEntry
-      entry =
-        { id
-        , name: kind
-        , content: fromMaybe "" content
-        , newMarkerNextID: 0
-        , markers: []
-        }
-
-      childEntries = children >>= \(Edge { child }) -> go child
-    in
-      [ entry ] <> childEntries
-
-convertTOCtoTree :: Array TOCEntry -> Tree
-convertTOCtoTree tocEntries = case uncons tocEntries of
-  Nothing ->
-    Tree
-      { node: NodeWithRef { id: 0, kind: "empty", content: Nothing }
-      , children: []
-      }
-
-  Just { head: root, tail: rest } ->
-    Tree
-      { node: NodeWithRef
-          { id: root.id
-          , kind: root.name
-          , content: Just root.content
-          }
-      , children: rest <#> \entry ->
-          Edge
-            { title: entry.name
-            , child:
-                Tree
-                  { node: NodeWithRef
-                      { id: entry.id
-                      , kind: entry.name
-                      , content: Just entry.content
-                      }
-                  , children: []
-                  }
-            }
-      }

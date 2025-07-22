@@ -131,7 +131,7 @@ component =
         Nothing -> HH.slot_ _page404 unit Page404.component unit
         Just p -> case p of
           Home -> HH.slot_ _home unit Home.component unit
-          Editor -> HH.slot_ _editor unit EditorPage.component unit
+          Editor { docID } -> HH.slot_ _editor unit (EditorPage.component docID) unit
           Login -> HH.slot_ _login unit Login.component unit
           PasswordReset -> HH.slot_ _resetPassword unit PasswordReset.component unit
           AdminViewUsers -> HH.slot_ _adminUsers unit AdminViewUsers.component unit

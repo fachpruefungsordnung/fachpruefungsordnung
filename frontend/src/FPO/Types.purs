@@ -7,7 +7,9 @@ import Data.Array (find, sortBy)
 import Data.DateTime (DateTime)
 import Data.Formatter.DateTime (Formatter, FormatterCommand(..))
 import Data.List (List(..), (:))
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..), fromMaybe)
+import FPO.Dto.DocumentDto (DocumentTree, NodeWithRef(..))
+import FPO.Dto.TreeDto (Tree, findTree)
 
 -- TODO We can also store different markers, such as errors. But do we want to?
 type AnnotatedMarker =
@@ -50,10 +52,22 @@ type ShortendTOCEntry =
   , name :: String
   }
 
-findTOCEntry :: Int -> Array TOCEntry -> Maybe TOCEntry
-findTOCEntry tocID tocEntries = find (\e -> e.id == tocID) tocEntries
+type TOCTree = Tree TOCEntry
 
-findCommentSection :: Int -> Int -> Array TOCEntry -> Maybe CommentSection
+-- Empty TOCEntry in case of errors
+emptyTOCEntry :: TOCEntry
+emptyTOCEntry =
+  { id: -1
+  , name: "Error"
+  , content: "Error"
+  , newMarkerNextID: -1
+  , markers: []
+  }
+
+findTOCEntry :: Int -> TOCTree -> Maybe TOCEntry
+findTOCEntry tocID tocEntries = findTree (\e -> e.id == tocID) tocEntries
+
+findCommentSection :: Int -> Int -> TOCTree -> Maybe CommentSection
 findCommentSection tocID markerID tocEntries = do
   entry <- findTOCEntry tocID tocEntries
   marker <- find (\m -> m.id == markerID) entry.markers
@@ -70,6 +84,9 @@ markerToAnnotation m =
   , type: m.type
   }
 
+shortenTOC :: TOCEntry -> ShortendTOCEntry
+shortenTOC { id, name } = { id, name }
+
 -- TODO create more timestamps versions and discuss, where to store this
 timeStampsVersions :: Array Formatter
 timeStampsVersions =
@@ -85,3 +102,24 @@ timeStampsVersions =
         : Nil
     )
   ]
+
+-- Tree functions for TOC
+
+nodeWithRefToTOCEntry :: NodeWithRef -> TOCEntry
+nodeWithRefToTOCEntry (NodeWithRef { id, kind, content }) =
+  { id: id
+  , name: kind
+  , content: fromMaybe "" content
+  , newMarkerNextID: 0
+  , markers: []
+  }
+
+tocEntryToNodeWithRef :: TOCEntry -> NodeWithRef
+tocEntryToNodeWithRef { id, name, content } =
+  NodeWithRef { id, kind: name, content: Just content }
+
+documentTreeToTOCTree :: DocumentTree -> TOCTree
+documentTreeToTOCTree = map nodeWithRefToTOCEntry
+
+tocTreeToDocumentTree :: TOCTree -> DocumentTree
+tocTreeToDocumentTree = map tocEntryToNodeWithRef

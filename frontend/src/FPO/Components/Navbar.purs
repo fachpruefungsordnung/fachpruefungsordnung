@@ -89,8 +89,10 @@ navbar = connect (selectEq identity) $ H.mkComponent
                           (translate (label :: _ "common_home") state.translator)
                           Home
                       ]
+                  -- TODO: This doesn't make sense anymore and should be removed.
+                  --       We keep this for convenience for now.
                   , HH.li [ HP.classes [ HB.navItem ] ]
-                      [ navButton "Editor" Editor ]
+                      [ navButton "Editor" (Editor { docID: 1 }) ]
                   ]
                     <>
                       if (maybe false _.isAdmin state.user) then

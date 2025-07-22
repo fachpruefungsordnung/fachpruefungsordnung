@@ -9,6 +9,7 @@ package:
     - argonaut-core
     - arrays
     - console
+    - control
     - datetime
     - dom-indexed
     - effect
@@ -37,6 +38,7 @@ package:
     - simple-i18n
     - strings
     - tailrec
+    - transformers
     - tuples
     - unsafe-coerce
     - web-dom

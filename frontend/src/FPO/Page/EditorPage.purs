@@ -10,6 +10,7 @@ import Prelude
 import Effect.Aff.Class (class MonadAff)
 import FPO.Component.Splitview as Splitview
 import FPO.Data.Store as Store
+import FPO.Dto.DocumentDto (DocumentID)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -31,8 +32,9 @@ component
   :: forall query input output m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => H.Component query input output m
-component =
+  => DocumentID
+  -> H.Component query input output m
+component docID =
   H.mkComponent
     { initialState: const {}
     , render
@@ -42,7 +44,7 @@ component =
   render :: State -> H.ComponentHTML Action Slots m
   render _ =
     HH.div [ HP.classes [ HB.flexGrow1, HB.p0, HB.overflowHidden ] ]
-      [ HH.slot _splitview unit Splitview.splitview unit HandleSplitview
+      [ HH.slot _splitview unit (Splitview.splitview docID) unit HandleSplitview
       ]
 
   handleAction :: MonadAff m => Action -> H.HalogenM State Action Slots output m Unit
