@@ -188,7 +188,7 @@ preview = H.mkComponent
     ShowOrHideWarning -> H.modify_ \state -> state
       { showWarning = not state.showWarning }
 
-    Receive { editorContent } -> H.modify_ \state -> state
+    Receive { editorContent } -> H.modify_ _
       { editorContent = editorContent }
 
   handleQuery
