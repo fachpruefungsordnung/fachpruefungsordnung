@@ -336,10 +336,9 @@ splitview docID = H.mkComponent
               <>
                 "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
               <>
-                if
-                  state.sidebarShown
-                    && not state.commentShown
-                    && state.commentSectionShown then
+                if state.sidebarShown
+                   && not state.commentShown
+                   && state.commentSectionShown then
                   ""
                 else
                   "display: none;"
@@ -721,7 +720,10 @@ splitview docID = H.mkComponent
 
     HandleCommentSection output -> case output of
 
-      CommentSection.JumpToCommentSection -> pure unit
+      CommentSection.JumpToCommentSection tocID markerID commentSection -> do
+        H.modify_ \st -> st {  commentShown = true }
+        H.tell _comment unit
+          (Comment.SelectedCommentSection tocID markerID commentSection)
 
     HandleEditor output -> case output of
 
