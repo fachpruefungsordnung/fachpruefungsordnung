@@ -1,4 +1,4 @@
-module FPO.Components.CommentSection where
+module FPO.Components.CommentOverview where
 
 import Prelude
 
@@ -31,8 +31,8 @@ type State =
   , mTimeFormatter :: Maybe Formatter
   }
 
-commentSectionview :: forall m. MonadAff m => H.Component Query Input Output m
-commentSectionview = H.mkComponent
+commentOverviewview :: forall m. MonadAff m => H.Component Query Input Output m
+commentOverviewview = H.mkComponent
   { initialState: \_ -> { mTocEntry: Nothing, mTimeFormatter: Nothing }
   , render
   , eval: H.mkEval $ H.defaultEval
