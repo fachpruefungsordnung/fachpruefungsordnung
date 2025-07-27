@@ -18,7 +18,7 @@ type Input = Unit
 -- DeleteComment later
 data Output = JumpToCommentSection Int Int CommentSection
 
-data Action 
+data Action
   = Init
   | SelectCommentSection Int Int CommentSection
 
@@ -55,7 +55,8 @@ commentOverviewview = H.mkComponent
                 Nothing -> Nothing
                 Just cs -> case head cs.comments of
                   Nothing -> Nothing
-                  Just c -> Just (renderFirstComment state.mTimeFormatter c tocEntry.id m.id cs)
+                  Just c -> Just
+                    (renderFirstComment state.mTimeFormatter c tocEntry.id m.id cs)
             )
             tocEntry.markers
         )
@@ -84,12 +85,13 @@ commentOverviewview = H.mkComponent
       pure (Just a)
 
   renderFirstComment
-    :: Maybe Formatter 
-    -> Comment 
+    :: Maybe Formatter
+    -> Comment
     -> Int
     -> Int
     -> CommentSection
-    -> forall slots. H.ComponentHTML Action slots m
+    -> forall slots
+     . H.ComponentHTML Action slots m
   renderFirstComment mFormatter c tocID markerID cs =
     HH.div
       [ HP.classes

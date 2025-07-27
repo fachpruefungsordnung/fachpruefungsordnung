@@ -336,9 +336,10 @@ splitview docID = H.mkComponent
               <>
                 "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
               <>
-                if state.sidebarShown
-                   && not state.commentShown
-                   && state.commentOverviewShown then
+                if
+                  state.sidebarShown
+                    && not state.commentShown
+                    && state.commentOverviewShown then
                   ""
                 else
                   "display: none;"
@@ -530,7 +531,8 @@ splitview docID = H.mkComponent
       H.modify_ \st -> do
         st { tocEntries = Empty, mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
-      H.tell _commentOverview unit (CommentOverview.ReceiveTimeFormatter timeFormatter)
+      H.tell _commentOverview unit
+        (CommentOverview.ReceiveTimeFormatter timeFormatter)
       H.tell _toc unit (TOC.ReceiveTOCs Empty)
       -- Load the initial TOC entries into the editor
       handleAction GET
@@ -721,7 +723,7 @@ splitview docID = H.mkComponent
     HandleCommentOverview output -> case output of
 
       CommentOverview.JumpToCommentSection tocID markerID commentSection -> do
-        H.modify_ \st -> st {  commentShown = true }
+        H.modify_ \st -> st { commentShown = true }
         H.tell _comment unit
           (Comment.SelectedCommentSection tocID markerID commentSection)
 

@@ -92,51 +92,51 @@ timeStampsVersions :: Array Formatter
 timeStampsVersions =
   [ -- DD.MM.YY HH:mm
     ( DayOfMonthTwoDigits
-    : Placeholder "."
-    : MonthShort
-    : Placeholder "."
-    : YearTwoDigits
-    : Placeholder " "
-    : Hours24
-    : Placeholder ":"
-    : MinutesTwoDigits
-    : Nil
+        : Placeholder "."
+        : MonthShort
+        : Placeholder "."
+        : YearTwoDigits
+        : Placeholder " "
+        : Hours24
+        : Placeholder ":"
+        : MinutesTwoDigits
+        : Nil
     )
   -- DD/MM/YY HH:mm
   , ( DayOfMonthTwoDigits
-    : Placeholder "/"
-    : MonthShort
-    : Placeholder "/"
-    : YearTwoDigits
-    : Placeholder " "
-    : Hours24
-    : Placeholder ":"
-    : MinutesTwoDigits
-    : Nil
+        : Placeholder "/"
+        : MonthShort
+        : Placeholder "/"
+        : YearTwoDigits
+        : Placeholder " "
+        : Hours24
+        : Placeholder ":"
+        : MinutesTwoDigits
+        : Nil
     )
   -- MM/DD/YY HH:mm
   , ( MonthShort
-    : Placeholder "/"
-    : DayOfMonthTwoDigits
-    : Placeholder "/"
-    : YearTwoDigits
-    : Placeholder " "
-    : Hours24
-    : Placeholder ":"
-    : MinutesTwoDigits
-    : Nil
+        : Placeholder "/"
+        : DayOfMonthTwoDigits
+        : Placeholder "/"
+        : YearTwoDigits
+        : Placeholder " "
+        : Hours24
+        : Placeholder ":"
+        : MinutesTwoDigits
+        : Nil
     )
   -- YY/MM/DD HH:mm
   , ( YearTwoDigits
-    : Placeholder "/"
-    : MonthShort
-    : Placeholder "/"
-    : DayOfMonthTwoDigits
-    : Placeholder " "
-    : Hours24
-    : Placeholder ":"
-    : MinutesTwoDigits
-    : Nil
+        : Placeholder "/"
+        : MonthShort
+        : Placeholder "/"
+        : DayOfMonthTwoDigits
+        : Placeholder " "
+        : Hours24
+        : Placeholder ":"
+        : MinutesTwoDigits
+        : Nil
     )
   ]
 
