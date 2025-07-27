@@ -378,6 +378,8 @@ editor = connect selectTranslator $ H.mkComponent
                 , liveMarkers = newLiveMarkers
                 }
             H.raise (SavedSection newEntry)
+            H.raise
+              (SelectedCommentSection entry.id newMarker.id)
           Nothing -> pure unit
 
     DeleteComment -> do
