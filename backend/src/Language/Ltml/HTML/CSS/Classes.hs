@@ -50,7 +50,7 @@ classStyle EnumFail = enumCounter (className EnumFail) (stringCounter "x. ")
 toClassSelector :: Class -> Selector
 toClassSelector c = fromString ("." ++ unpack (className c))
 
------------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 -- | Example Enumertion Levels for an FPO
 enumLevel :: Int -> Text

@@ -4,19 +4,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE InstanceSigs #-}
 
-module Language.Ltml.HTML.HTML () where
+module Language.Ltml.HTML.HTML (renderHtml, docToHtml, sectionToHtml) where
 
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
-import Data.Text.Lazy (unpack)
 import Lucid
 
 import Control.Monad.Reader
-import Language.Lsd.AST.Format
-import Language.Lsd.AST.Type.Document
-import Language.Lsd.AST.Type.Paragraph
-import Language.Lsd.AST.Type.Section
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.Label
 import Language.Ltml.AST.Node
@@ -25,70 +21,32 @@ import Language.Ltml.AST.Section
 import Language.Ltml.AST.Text
 import Language.Ltml.HTML.CSS.Classes (enumLevel)
 import qualified Language.Ltml.HTML.CSS.Classes as Class
-
-testAST :: Document
-testAST =
-    Document
-        DocumentFormat
-        DocumentHeader
-        ( DocumentBody
-            [ Node
-                Nothing
-                ( Section
-                    (SectionFormat (FormatString []))
-                    (Heading (FormatString []) [])
-                    ( Left
-                        [ Node
-                            (Just (Label "label"))
-                            ( Paragraph
-                                (ParagraphFormat (FormatString []))
-                                [ Word "Das ist im Paragraph"
-                                , Word "Ohne Space"
-                                , Space
-                                , Word "Nach dem Space"
-                                , Word "\n"
-                                , Word "Neue Zeile?"
-                                , Styled Bold [Word "Bold"]
-                                , Styled Italics [Word "Italic"]
-                                , Styled Underlined [Word "Underlined"]
-                                ]
-                            )
-                        , Node
-                            (Just (Label "Zweite Node Label"))
-                            ( Paragraph
-                                (ParagraphFormat (FormatString []))
-                                [ Enum
-                                    ( Enumeration
-                                        [ EnumItem [Word "Erstes Item"]
-                                        , EnumItem [Word "Zweites Item 1", Styled Bold [Word "Zweites Item 2"]]
-                                        , EnumItem
-                                            [ Enum
-                                                ( Enumeration [EnumItem [Word "Zweite Aufzählung 1"], EnumItem [Word "Zweite 2"]]
-                                                )
-                                            ]
-                                        ]
-                                    )
-                                ]
-                            )
-                        ]
-                    )
-                )
-            ]
-        )
-
-testHtml :: IO ()
-testHtml = writeFile "static/out.html" (unpack $ renderText $ docToHtml testAST)
+import Language.Lsd.AST.Format (HeadingFormat, FormatString (..))
 
 renderHtml :: Document -> ByteString
 renderHtml document = renderBS $ docToHtml document
 
 docToHtml :: Document -> Html ()
-docToHtml doc = html_ $ do
+docToHtml = aToHtml
+
+sectionToHtml :: Node Section -> Html ()
+sectionToHtml = aToHtml
+
+-- | Internal function that creates final HTML wrapper and header
+aToHtml :: (ToHtmlM a) => a -> Html ()
+aToHtml a = html_ $ do
     head_ $ do
         title_ "Test Dokument"
         link_ [rel_ "stylesheet", href_ "out.css"]
     body_ $ do
-        runReader (toHtmlM doc) 0
+        runReader (toHtmlM a) (State {enumNestingLevel = 0})
+
+newtype State = State
+    { enumNestingLevel :: Int
+    }
+
+class ToHtmlM a where
+    toHtmlM :: a -> Reader State (Html ())
 
 instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
@@ -109,8 +67,22 @@ instance ToHtmlM Section where
         Right cs -> toHtmlM cs
         Left cs -> toHtmlM cs
 
+instance ToHtmlM Heading where
+    toHtmlM (Heading format textTree) = undefined 
+
+-- instance ToHtmlFormat HeadingFormat where
+--     toHtmlFormat :: HeadingFormat -> (Int, Text) -> Html ()
+--     toHtmlFormat (FormatString as) (id, text) = case as of
+--         [] -> h2_ ""
+        
+-- -- | Generates function that builds needed text based on some input
+-- --   For example: id and heading text -> h2_ <heading with id> 
+-- class ToHtmlFormat format where
+--     toHtmlFormat :: format -> a -> Html ()
+
 instance ToHtmlM Paragraph where
     toHtmlM (Paragraph format textTrees) = toHtmlM textTrees
+
 
 instance (ToHtmlStyle style, ToHtmlM enum) => ToHtmlM (TextTree style enum special) where
     toHtmlM textTree = case textTree of
@@ -130,17 +102,16 @@ instance ToHtmlStyle FontStyle where
     toHtmlStyle Italics = i_
     toHtmlStyle Underlined = span_ [class_ (Class.className Class.Underlined)]
 
--- instance (ToHtml EnumItem) => ToHtml Enumeration where
---     toHtml (Enumeration enumItems) = ol_ [class_ (Class.className Class.EnumNum)] $ foldr ((>>) . li_ . toHtml) mempty enumItems
-
-class ToHtmlM a where
-    toHtmlM :: a -> Reader Int (Html ())
-
 instance ToHtmlM Enumeration where
     toHtmlM (Enumeration enumItems) = do
-        level <- ask
-        nested <- mapM (local (+ 1) . toHtmlM) enumItems
-        return $ ol_ [class_ $ enumLevel level] $ foldr ((>>) . li_) mempty nested
+        state <- ask
+        nested <-
+            mapM
+                (local (\s -> s {enumNestingLevel = enumNestingLevel s + 1}) . toHtmlM)
+                enumItems
+        return $
+            ol_ [class_ $ enumLevel (enumNestingLevel state)] $
+                foldr ((>>) . li_) mempty nested
 
 instance ToHtmlM EnumItem where
     toHtmlM (EnumItem textTrees) = toHtmlM textTrees

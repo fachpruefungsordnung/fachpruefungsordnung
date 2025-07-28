@@ -14,10 +14,14 @@ import Language.Ltml.AST.Paragraph
 import Language.Ltml.AST.Section
 import Language.Ltml.AST.Text
 import Language.Ltml.Parser.Section (sectionP)
-import Language.Ltml.Pretty (prettyParseTest)
 import Language.Ltml.HTML.HTML 
 
 import Prelude hiding (Enum, Word, readFile)
+import Language.Ltml.AST.Document (Document (..), DocumentHeader (..), DocumentBody (..))
+import Language.Lsd.AST.Type.Document (DocumentFormat(..))
+import Lucid (renderToFile)
+import Text.Megaparsec (runParser)
+import Language.Ltml.HTML.CSS.CSS (writeCss)
 
 testSection :: Node Section
 testSection =
@@ -147,8 +151,69 @@ testSection =
             )
         )
 
-testDoc = readFile "src/Language/Ltml/HTML/test.txt"
+testDoc = readFile "src/Language/Ltml/HTML/Test/test.txt"
 
+parseTest :: IO ()
 parseTest = do
     text <- testDoc
-    prettyParseTest (sectionP sectionT empty) text
+    case runParser (sectionP sectionT empty) "" text of
+        Left _ -> error "parsing failed"
+        Right nodeSection -> do 
+            renderToFile "src/Language/Ltml/HTML/Test/out.html" (sectionToHtml nodeSection)
+            writeCss "src/Language/Ltml/HTML/Test/out.css"
+
+
+-------------------------------------------------------------------------------
+
+testAST :: Document
+testAST =
+    Document
+        DocumentFormat
+        DocumentHeader
+        ( DocumentBody
+            [ Node
+                Nothing
+                ( Section
+                    (SectionFormat (FormatString []))
+                    (Heading (FormatString []) [])
+                    ( Left
+                        [ Node
+                            (Just (Label "label"))
+                            ( Paragraph
+                                (ParagraphFormat (FormatString []))
+                                [ Word "Das ist im Paragraph"
+                                , Word "Ohne Space"
+                                , Space
+                                , Word "Nach dem Space"
+                                , Word "\n"
+                                , Word "Neue Zeile?"
+                                , Styled Bold [Word "Bold"]
+                                , Styled Italics [Word "Italic"]
+                                , Styled Underlined [Word "Underlined"]
+                                ]
+                            )
+                        , Node
+                            (Just (Label "Zweite Node Label"))
+                            ( Paragraph
+                                (ParagraphFormat (FormatString []))
+                                [ Enum
+                                    ( Enumeration
+                                        [ EnumItem [Word "Erstes Item"]
+                                        , EnumItem [Word "Zweites Item 1", Styled Bold [Word "Zweites Item 2"]]
+                                        , EnumItem
+                                            [ Enum
+                                                ( Enumeration [EnumItem [Word "Zweite Aufzählung 1"], EnumItem [Word "Zweite 2"]]
+                                                )
+                                            ]
+                                        ]
+                                    )
+                                ]
+                            )
+                        ]
+                    )
+                )
+            ]
+        )
+
+testHtml :: IO ()
+testHtml = renderToFile "static/out.html" (docToHtml testAST)

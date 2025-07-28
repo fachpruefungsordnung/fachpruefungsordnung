@@ -22,8 +22,10 @@ counterIncrement t = "counter-increment" -: t
 -- | Type for concatinating strings (e.g. "(") with counters (e.g. counter(item))
 newtype Counter = Counter {unCounter :: Text}
 
+-- | Translates Counter into actual CSS property
+-- (uses CSS content)  
 counter :: Counter -> Css
-counter c = "counter" -: unCounter c
+counter c = "content" -: unCounter c
 
 counterNum :: Text -> Counter
 counterNum t = Counter $ "counter(" <> t <> ")"

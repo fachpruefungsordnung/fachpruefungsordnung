@@ -49,4 +49,4 @@ cabal.project.local~
 .DS_Store
 
 # HTML and CSS Testfiles
-testHtml
+backend/src/Language/Ltml/HTML/Test
