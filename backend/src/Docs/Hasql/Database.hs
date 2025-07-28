@@ -19,8 +19,8 @@ import Hasql.Transaction.Sessions
 
 import Docs.Database
 
-import Docs.Hasql.Sessions as Sessions
-import Docs.Hasql.Transactions as Transactions
+import qualified Docs.Hasql.Sessions as Sessions
+import qualified Docs.Hasql.Transactions as Transactions
 
 newtype HasqlSession a
     = HasqlSession
@@ -34,10 +34,10 @@ run = Session.run . unHasqlSession
 -- access rights
 
 instance HasCheckDocPermission HasqlSession where
-    checkDocumentPermission _ _ _ = return True -- TODO!
+    checkDocumentPermission = ((HasqlSession .) .) . Sessions.hasPermission
 
-instance HasCheckGroupPermission HasqlSession where
-    checkGroupPermission _ _ _ = return True -- TODO!
+instance HasIsGroupAdmin HasqlSession where
+    isGroupAdmin = (HasqlSession .) . Sessions.isGroupAdmin
 
 -- exists
 
@@ -94,10 +94,10 @@ runTransaction = (Session.run . transaction Serializable Write) . unHasqlTransac
 -- access rights
 
 instance HasCheckDocPermission HasqlTransaction where
-    checkDocumentPermission _ _ _ = return True -- TODO!
+    checkDocumentPermission = ((HasqlTransaction .) .) . Transactions.hasPermission
 
-instance HasCheckGroupPermission HasqlTransaction where
-    checkGroupPermission _ _ _ = return True -- TODO!
+instance HasIsGroupAdmin HasqlTransaction where
+    isGroupAdmin = (HasqlTransaction .) . Transactions.isGroupAdmin
 
 -- exists
 

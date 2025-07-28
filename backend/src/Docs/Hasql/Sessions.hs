@@ -15,6 +15,8 @@ module Docs.Hasql.Sessions
     , existsTextElement
     , existsTextRevision
     , existsTreeRevision
+    , hasPermission
+    , isGroupAdmin
     ) where
 
 import Data.Functor ((<&>))
@@ -30,6 +32,7 @@ import Hasql.Transaction.Sessions
     , transaction
     )
 
+import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
@@ -150,3 +153,11 @@ getDocumentRevisionHistory
 getDocumentRevisionHistory id_ before =
     statement (id_, before) Statements.getDocumentRevisionHistory
         <&> DocumentHistory id_ . Vector.toList
+
+hasPermission :: UserID -> DocumentID -> Permission -> Session Bool
+hasPermission userID docID perms =
+    statement (userID, docID, perms) Statements.hasDocPermission
+
+isGroupAdmin :: UserID -> GroupID -> Session Bool
+isGroupAdmin userID groupID =
+    statement (userID, groupID) Statements.isGroupAdmin

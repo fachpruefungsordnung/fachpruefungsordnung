@@ -8,6 +8,8 @@ module Docs.Hasql.Transactions
     , existsTextElement
     , getLatestTextRevisionID
     , isTextElementInDocument
+    , hasPermission
+    , isGroupAdmin
     ) where
 
 import qualified Crypto.Hash.SHA1 as SHA1
@@ -18,6 +20,8 @@ import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Vector as Vector
 
+import UserManagement.DocumentPermission (Permission)
+import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
 import Docs.Document (DocumentID)
@@ -95,3 +99,11 @@ putTree (Node metaData children) = do
     putSubTree :: Tree TextElementID -> Transaction TreeEdgeChildRef
     putSubTree (Leaf id_) = return $ TreeEdgeRefToTextElement id_
     putSubTree (Tree node) = putTree node <&> TreeEdgeRefToNode
+
+hasPermission :: UserID -> DocumentID -> Permission -> Transaction Bool
+hasPermission userID docID perms =
+    statement (userID, docID, perms) Statements.hasDocPermission
+
+isGroupAdmin :: UserID -> GroupID -> Transaction Bool
+isGroupAdmin userID groupID =
+    statement (userID, groupID) Statements.isGroupAdmin

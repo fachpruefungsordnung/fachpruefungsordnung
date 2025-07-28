@@ -356,13 +356,11 @@ guardDocsResult (Left err) = throwError $ mapErr err
                         ++ show (unDocumentID docID)
                         ++ "!\n"
             }
-    mapErr (Docs.NoPermissionInGroup groupID perms) =
+    mapErr (Docs.NoPermissionInGroup groupID) =
         err403
             { errBody =
                 LBS.pack $
-                    "You are not allowed to "
-                        ++ show perms
-                        ++ " in group "
+                    "You are not an admin in group "
                         ++ show groupID
                         ++ "!\n"
             }

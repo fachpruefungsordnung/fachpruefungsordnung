@@ -1,6 +1,6 @@
 module Docs.Database
     ( HasCheckDocPermission (..)
-    , HasCheckGroupPermission (..)
+    , HasIsGroupAdmin (..)
     , HasExistsDocument (..)
     , HasExistsTextElement (..)
     , HasExistsTextRevision (..)
@@ -46,8 +46,8 @@ import Docs.TreeRevision (TreeRevision, TreeRevisionHistory, TreeRevisionRef)
 class (Monad m) => HasCheckDocPermission m where
     checkDocumentPermission :: UserID -> DocumentID -> Permission -> m Bool
 
-class (Monad m) => HasCheckGroupPermission m where
-    checkGroupPermission :: UserID -> GroupID -> Permission -> m Bool
+class (Monad m) => HasIsGroupAdmin m where
+    isGroupAdmin :: UserID -> GroupID -> m Bool
 
 -- exists
 
@@ -89,7 +89,7 @@ class (HasCheckDocPermission m, HasExistsDocument m) => HasGetDocumentHistory m 
 
 -- create
 
-class (HasCheckGroupPermission m) => HasCreateDocument m where
+class (HasIsGroupAdmin m) => HasCreateDocument m where
     createDocument :: Text -> GroupID -> m Document
 
 class (HasCheckDocPermission m, HasExistsDocument m) => HasCreateTextElement m where

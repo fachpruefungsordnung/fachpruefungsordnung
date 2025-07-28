@@ -28,7 +28,6 @@ import UserManagement.User (UserID)
 
 import Docs.Database
     ( HasCheckDocPermission
-    , HasCheckGroupPermission
     , HasCreateDocument
     , HasCreateTextElement
     , HasCreateTextRevision
@@ -43,6 +42,7 @@ import Docs.Database
     , HasGetTextHistory
     , HasGetTreeHistory
     , HasGetTreeRevision
+    , HasIsGroupAdmin
     )
 import qualified Docs.Database as DB
 import Docs.Document (Document, DocumentID)
@@ -71,7 +71,7 @@ import Docs.TreeRevision
 
 data Error
     = NoPermission DocumentID Permission
-    | NoPermissionInGroup GroupID Permission
+    | NoPermissionInGroup GroupID
     | DocumentNotFound DocumentID
     | TextElementNotFound TextElementRef
     | TextRevisionNotFound TextRevisionRef
@@ -86,7 +86,7 @@ createDocument
     -> Text
     -> m (Result Document)
 createDocument userID groupID title = runExceptT $ do
-    guardGroupPermission Edit groupID userID
+    guardGroupAdmin groupID userID
     lift $ DB.createDocument title groupID
 
 getDocument
@@ -215,16 +215,15 @@ guardPermission perms docID userID = do
     unless hasPermission $
         throwError (NoPermission docID perms)
 
-guardGroupPermission
-    :: (HasCheckGroupPermission m)
-    => Permission
-    -> GroupID
+guardGroupAdmin
+    :: (HasIsGroupAdmin m)
+    => GroupID
     -> UserID
     -> ExceptT Error m ()
-guardGroupPermission perms groupID userID = do
-    hasPermission <- lift $ DB.checkGroupPermission userID groupID perms
+guardGroupAdmin groupID userID = do
+    hasPermission <- lift $ DB.isGroupAdmin userID groupID
     unless hasPermission $
-        throwError (NoPermissionInGroup groupID perms)
+        throwError (NoPermissionInGroup groupID)
 
 guardExistsDocument
     :: (HasExistsDocument m)

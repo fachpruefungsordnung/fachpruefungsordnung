@@ -26,6 +26,8 @@ module Docs.Hasql.Statements
     , existsTreeRevision
     , existsTextElement
     , existsTextRevision
+    , hasDocPermission
+    , isGroupAdmin
     ) where
 
 import Control.Applicative ((<|>))
@@ -47,9 +49,11 @@ import Hasql.TH
     , vectorStatement
     )
 
+import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
+import qualified Data.Text as Text
 import Docs.Document (Document (Document), DocumentID (..))
 import qualified Docs.Document as Document
 import Docs.DocumentHistory (DocumentHistoryItem)
@@ -731,3 +735,44 @@ getDocumentRevisionHistory =
                 LIMIT
                     10
             |]
+
+-- Natürlich schreibe ich dir einen Kommentar, der sagt, dass hier das UserManagement beginnt!
+
+hasDocPermission :: Statement (UserID, DocumentID, Permission) Bool
+hasDocPermission =
+    lmap
+        mapInput
+        [singletonStatement|
+            select exists (
+                SELECT
+                    1
+                FROM
+                    roles r
+                JOIN
+                    documents d ON d.group_id = r.group_id
+                    LEFT JOIN external_document_rights e ON e.user_id = r.user_id
+                WHERE
+                    r.user_id = $1 :: uuid
+                    AND (
+                        d.id = $2 :: int4
+                        OR (e.document_id = $2 :: int4 AND e.permission >= $3 :: text)
+                    )
+            ) :: bool
+        |]
+  where
+    mapInput :: (UserID, DocumentID, Permission) -> (UUID, Int32, Text)
+    mapInput (userID, docID, perms) =
+        (userID, unDocumentID docID, Text.pack $ show perms)
+
+isGroupAdmin :: Statement (UserID, GroupID) Bool
+isGroupAdmin =
+    [singletonStatement|
+        select exists (
+            SELECT
+                1
+            FROM
+                roles
+            WHERE
+                user_id = $1 :: uuid AND group_id = $2 :: int AND role = 'admin'
+        ) :: bool
+    |]
