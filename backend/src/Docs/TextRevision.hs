@@ -23,7 +23,6 @@ import Data.Scientific (toBoundedInteger)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time (UTCTime)
-import Data.UUID (UUID)
 
 import Text.Read (readMaybe)
 
@@ -62,6 +61,7 @@ import Docs.TextElement
     , TextElementRef (..)
     , prettyPrintTextElementRef
     )
+import Docs.UserRef (UserRef)
 
 data TextRevisionRef
     = TextRevisionRef
@@ -170,7 +170,7 @@ specificTextRevision (Specific id_) = Just id_
 data TextRevisionHeader = TextRevisionHeader
     { identifier :: TextRevisionID
     , timestamp :: UTCTime
-    , author :: UUID
+    , author :: UserRef
     }
     deriving (Show, Generic)
 

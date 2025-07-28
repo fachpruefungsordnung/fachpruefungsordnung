@@ -298,40 +298,57 @@ getTextElement =
                     id = $1 :: int4
             |]
 
-uncurryTextRevisionHeader :: (Int32, UTCTime, UUID) -> TextRevisionHeader
-uncurryTextRevisionHeader (id_, timestamp, author) =
+uncurryTextRevisionHeader :: (Int32, UTCTime, UUID, Text) -> TextRevisionHeader
+uncurryTextRevisionHeader (id_, timestamp, authorID, authorName) =
     TextRevisionHeader
         { TextRevision.identifier = TextRevisionID id_
         , TextRevision.timestamp = timestamp
-        , TextRevision.author = author
+        , TextRevision.author =
+            UserRef
+                { UserRef.identifier = authorID
+                , UserRef.name = authorName
+                }
         }
 
-uncurryTextRevision :: (Int32, UTCTime, UUID, Text) -> TextRevision
-uncurryTextRevision (id_, timestamp, author, content) =
+uncurryTextRevision :: (Int32, UTCTime, UUID, Text, Text) -> TextRevision
+uncurryTextRevision (id_, timestamp, authorID, authorName, content) =
     TextRevision
-        (uncurryTextRevisionHeader (id_, timestamp, author))
+        (uncurryTextRevisionHeader (id_, timestamp, authorID, authorName))
         content
 
 uncurryTextElementRevision
-    :: (Int32, TextElementKind, Maybe Int32, Maybe UTCTime, Maybe UUID, Maybe Text)
+    :: ( Int32
+       , TextElementKind
+       , Maybe Int32
+       , Maybe UTCTime
+       , Maybe UUID
+       , Maybe Text
+       , Maybe Text
+       )
     -> TextElementRevision
-uncurryTextElementRevision (id_, kind, revisionID, timestamp, author, content) =
-    TextElementRevision
-        TextElement
-            { TextElement.identifier = TextElementID id_
-            , TextElement.kind = kind
-            }
-        $ do
-            trRevisionID <- revisionID
-            trTimestamp <- timestamp
-            trAuthor <- author
-            TextRevision
-                TextRevisionHeader
-                    { TextRevision.identifier = TextRevisionID trRevisionID
-                    , TextRevision.timestamp = trTimestamp
-                    , TextRevision.author = trAuthor
-                    }
-                <$> content
+uncurryTextElementRevision
+    (id_, kind, revisionID, timestamp, authorID, authorName, content) =
+        TextElementRevision
+            TextElement
+                { TextElement.identifier = TextElementID id_
+                , TextElement.kind = kind
+                }
+            $ do
+                trRevisionID <- revisionID
+                trTimestamp <- timestamp
+                trAuthorID <- authorID
+                trAuthorName <- authorName
+                TextRevision
+                    TextRevisionHeader
+                        { TextRevision.identifier = TextRevisionID trRevisionID
+                        , TextRevision.timestamp = trTimestamp
+                        , TextRevision.author =
+                            UserRef
+                                { UserRef.identifier = trAuthorID
+                                , UserRef.name = trAuthorName
+                                }
+                        }
+                    <$> content
 
 createTextRevision :: Statement (TextElementID, UUID, Text) TextRevision
 createTextRevision =
@@ -340,15 +357,26 @@ createTextRevision =
         $ rmap
             uncurryTextRevision
             [singletonStatement|
-                insert into doc_text_revisions
-                    (text_element, author, content)
-                values
-                    ($1 :: int4, $2 :: uuid, $3 :: text)
-                returning
-                    id :: int4,
-                    creation_ts :: timestamptz,
-                    author :: uuid,
-                    content :: text
+                WITH inserted AS (
+                    insert into doc_text_revisions
+                        (text_element, author, content)
+                    values
+                        ($1 :: int4, $2 :: uuid, $3 :: text)
+                    returning
+                        id :: int4,
+                        creation_ts :: timestamptz,
+                        author :: uuid,
+                        content :: text
+                )
+                SELECT
+                    inserted.id :: int4,
+                    inserted.creation_ts :: timestamptz,
+                    inserted.author :: uuid,
+                    users.name :: text,
+                    inserted.content :: text
+                FROM
+                    inserted
+                    JOIN users on users.id = inserted.author
             |]
   where
     mapInput (elementID, author, content) =
@@ -363,17 +391,19 @@ getTextRevision =
             (uncurryTextRevision <$>)
             [maybeStatement|
                 select
-                    id :: int4,
-                    creation_ts :: timestamptz,
-                    author :: uuid,
-                    content :: text
+                    tr.id :: int4,
+                    tr.creation_ts :: timestamptz,
+                    tr.author :: uuid,
+                    u.name :: text,
+                    tr.content :: text
                 from
-                    doc_text_revisions
+                    doc_text_revisions tr
+                    join users u on tr.author = u.id
                 where
-                    text_element = $1 :: int4
-                    and ($2 :: int4? is null or id = $2 :: int4?)
+                    tr.text_element = $1 :: int4
+                    and ($2 :: int4? is null or tr.id = $2 :: int4?)
                 order by
-                    creation_ts desc
+                    tr.creation_ts desc
                 limit 1
             |]
 
@@ -388,10 +418,12 @@ getTextRevisionHistory =
                 SELECT
                     tr.id :: INT4,
                     tr.creation_ts :: TIMESTAMPTZ,
-                    tr.author :: UUID
+                    tr.author :: UUID,
+                    u.name :: TEXT
                 FROM
                     doc_text_revisions tr
                     JOIN doc_text_elements te ON tr.text_element = te.id
+                    JOIN users u on tr.author = u.id
                 WHERE
                     te.document = $1 :: INT4
                     AND tr.text_element = $2 :: INT4
@@ -442,10 +474,12 @@ getTextElementRevision =
                     tr.id :: int4?,
                     tr.creation_ts :: timestamptz?,
                     tr.author :: uuid?,
+                    u.name :: text?,
                     tr.content :: text?
                 from
                     doc_text_revisions tr
                     join doc_text_elements te on te.id = tr.text_element
+                    join users u on tr.author = u.id
                 where
                     te.document = $1 :: int4
                     and te.id = $2 :: int4
@@ -592,22 +626,28 @@ getTreeEdgesByParent =
                     e.position ASC
             |]
 
-uncurryTreeRevisionHeader :: (Int32, UTCTime, UserID) -> TreeRevisionHeader
-uncurryTreeRevisionHeader (id_, timestamp, author) =
+uncurryTreeRevisionHeader
+    :: (Int32, UTCTime, UserID, Text) -> TreeRevisionHeader
+uncurryTreeRevisionHeader (id_, timestamp, authorID, authorName) =
     TreeRevisionHeader
         { TreeRevision.identifier = TreeRevisionID id_
         , TreeRevision.timestamp = timestamp
-        , TreeRevision.author = author
+        , TreeRevision.author =
+            UserRef
+                { UserRef.identifier = authorID
+                , UserRef.name = authorName
+                }
         }
 
-uncurryTreeRevision :: (Int32, UTCTime, UserID) -> Node a -> TreeRevision a
+uncurryTreeRevision
+    :: (Int32, UTCTime, UserID, Text) -> Node a -> TreeRevision a
 uncurryTreeRevision = TreeRevision . uncurryTreeRevisionHeader
 
 uncurryTreeRevisionWithRoot
-    :: (Int32, UTCTime, UserID, ByteString)
+    :: (Int32, UTCTime, UserID, Text, ByteString)
     -> (Hash, Node a -> TreeRevision a)
-uncurryTreeRevisionWithRoot (id_, ts, author, root) =
-    (Hash root, uncurryTreeRevision (id_, ts, author))
+uncurryTreeRevisionWithRoot (id_, ts, authorID, authorName, root) =
+    (Hash root, uncurryTreeRevision (id_, ts, authorID, authorName))
 
 putTreeRevision
     :: Statement (DocumentID, UserID, Hash) (Node a -> TreeRevision a)
@@ -617,14 +657,24 @@ putTreeRevision =
         $ rmap
             uncurryTreeRevision
             [singletonStatement|
-                insert into doc_tree_revisions
-                    (document, author, root)
-                values
-                    ($1 :: int4, $2 :: uuid, $3 :: bytea)
-                returning
-                    id :: int4,
-                    creation_ts :: timestamptz,
-                    author :: uuid
+                WITH inserted AS (
+                    insert into doc_tree_revisions
+                        (document, author, root)
+                    values
+                        ($1 :: int4, $2 :: uuid, $3 :: bytea)
+                    returning
+                        id :: int4,
+                        creation_ts :: timestamptz,
+                        author :: uuid
+                )
+                SELECT
+                    inserted.id :: int4,
+                    inserted.creation_ts :: timestamptz,
+                    inserted.author :: uuid,
+                    users.name :: text
+                FROM
+                    inserted
+                    JOIN users ON users.id = inserted.author
             |]
   where
     mapInput (docID, userID, rootHash) =
@@ -639,17 +689,19 @@ getTreeRevision =
             uncurryTreeRevisionWithRoot
             [singletonStatement|
                 select
-                    id :: int4,
-                    creation_ts :: timestamptz,
-                    author :: uuid,
-                    root :: bytea
+                    tr.id :: int4,
+                    tr.creation_ts :: timestamptz,
+                    tr.author :: uuid,
+                    u.name :: text,
+                    tr.root :: bytea
                 from
-                    doc_tree_revisions
+                    doc_tree_revisions tr
+                    join users u on tr.author = u.id
                 where
-                    document = $1 :: int4
-                    and ($2 :: int4? is null or id = $2 :: int4?)
+                    tr.document = $1 :: int4
+                    and ($2 :: int4? is null or tr.id = $2 :: int4?)
                 order by
-                    creation_ts desc
+                    tr.creation_ts desc
                 limit 1
             |]
 
@@ -666,16 +718,18 @@ getTreeRevisionHistory =
             (uncurryTreeRevisionHeader <$>)
             [vectorStatement|
                 SELECT
-                    id :: INT4,
-                    creation_ts :: TIMESTAMPTZ,
-                    author :: UUID
+                    tr.id :: INT4,
+                    tr.creation_ts :: TIMESTAMPTZ,
+                    tr.author :: UUID,
+                    u.name :: TEXT
                 FROM
-                    doc_tree_revisions
+                    doc_tree_revisions tr
+                    JOIN users u on tr.author = u.id
                 WHERE
-                    document = $1 :: INT4
-                    AND creation_ts < COALESCE($2 :: TIMESTAMPTZ?, NOW())
+                    tr.document = $1 :: INT4
+                    AND tr.creation_ts < COALESCE($2 :: TIMESTAMPTZ?, NOW())
                 ORDER BY
-                    creation_ts DESC
+                    tr.creation_ts DESC
                 LIMIT
                     10
             |]
@@ -695,8 +749,8 @@ getTextElementIDsForDocument =
             |]
 
 uncurryHistoryItem
-    :: (Maybe Int32, Int32, UTCTime, UserID) -> DocumentHistoryItem
-uncurryHistoryItem (textID, revID, ts, authorID) =
+    :: (Maybe Int32, Int32, UTCTime, UserID, Text) -> DocumentHistoryItem
+uncurryHistoryItem (textID, revID, ts, authorID, authorName) =
     case textID of
         Just id_ ->
             DocumentHistory.Text
@@ -704,14 +758,22 @@ uncurryHistoryItem (textID, revID, ts, authorID) =
                 TextRevisionHeader
                     { TextRevision.identifier = TextRevisionID revID
                     , TextRevision.timestamp = ts
-                    , TextRevision.author = authorID
+                    , TextRevision.author =
+                        UserRef
+                            { UserRef.identifier = authorID
+                            , UserRef.name = authorName
+                            }
                     }
         Nothing ->
             DocumentHistory.Tree
                 TreeRevisionHeader
                     { TreeRevision.identifier = TreeRevisionID revID
                     , TreeRevision.timestamp = ts
-                    , TreeRevision.author = authorID
+                    , TreeRevision.author =
+                        UserRef
+                            { UserRef.identifier = authorID
+                            , UserRef.name = authorName
+                            }
                     }
 
 getDocumentRevisionHistory
@@ -723,17 +785,19 @@ getDocumentRevisionHistory =
             (uncurryHistoryItem <$>)
             [vectorStatement|
                 SELECT
-                    text_element :: INT4?,
-                    id :: INT4,
-                    creation_ts :: TIMESTAMPTZ,
-                    author :: UUID
+                    dr.text_element :: INT4?,
+                    dr.id :: INT4,
+                    dr.creation_ts :: TIMESTAMPTZ,
+                    dr.author :: UUID,
+                    u.name :: TEXT
                 FROM
-                    doc_revisions
+                    doc_revisions dr
+                    JOIN users u ON dr.author = u.id
                 WHERE
-                    document = $1 :: INT4
-                    AND creation_ts < COALESCE($2 :: TIMESTAMPTZ?, NOW())
+                    dr.document = $1 :: INT4
+                    AND dr.creation_ts < COALESCE($2 :: TIMESTAMPTZ?, NOW())
                 ORDER BY
-                    creation_ts DESC
+                    dr.creation_ts DESC
                 LIMIT
                     10
             |]

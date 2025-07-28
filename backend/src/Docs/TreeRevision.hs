@@ -25,7 +25,6 @@ import Data.Scientific (toBoundedInteger)
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time (UTCTime)
-import Data.UUID (UUID)
 
 import Text.Read (readMaybe)
 
@@ -60,6 +59,7 @@ import Docs.TextElement (TextElement, TextElementID)
 import Docs.TextRevision (TextElementRevision, TextRevision)
 import Docs.Tree (Node)
 import qualified Docs.Tree as Tree
+import Docs.UserRef (UserRef)
 
 data TreeRevisionRef
     = TreeRevisionRef
@@ -160,7 +160,7 @@ instance FromHttpApiData TreeRevisionID where
 data TreeRevisionHeader = TreeRevisionHeader
     { identifier :: TreeRevisionID
     , timestamp :: UTCTime
-    , author :: UUID
+    , author :: UserRef
     }
     deriving (Generic)
 
