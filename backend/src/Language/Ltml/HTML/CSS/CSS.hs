@@ -2,22 +2,21 @@
 
 module Language.Ltml.HTML.CSS.CSS () where
 
-import Clay
-import Data.String (fromString)
-import qualified Data.Text as T
+import Clay hiding (map)
+
 import Data.Text.Lazy (unpack)
-import qualified Language.Ltml.HTML.CSS.ClassNames as Class
+import Language.Ltml.HTML.CSS.Classes
 
 writeCss :: IO ()
 writeCss = writeFile "static/out.css" (unpack $ render mainStylesheet)
+
+-- | List of all Css Classes defined in Language.Ltml.HTML.CSS.Classes
+cssClasses :: [Css]
+cssClasses = map classStyle [minBound .. maxBound]
 
 mainStylesheet :: Css
 mainStylesheet = do
     body ? do
         fontFamily ["Arial"] [sansSerif]
 
-    toClassSelector Class.underlined ? do
-        textDecoration underline
-
-toClassSelector :: T.Text -> Selector
-toClassSelector s = fromString ("." ++ T.unpack s)
+    mconcat cssClasses

@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
@@ -8,8 +9,10 @@ module Language.Ltml.HTML.HTML () where
 
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
+import Data.Text.Lazy (unpack)
 import Lucid
 
+import Control.Monad.Reader
 import Language.Lsd.AST.Format
 import Language.Lsd.AST.Type.Document
 import Language.Lsd.AST.Type.Paragraph
@@ -20,7 +23,8 @@ import Language.Ltml.AST.Node
 import Language.Ltml.AST.Paragraph
 import Language.Ltml.AST.Section
 import Language.Ltml.AST.Text
-import qualified Language.Ltml.HTML.CSS.ClassNames as Class
+import Language.Ltml.HTML.CSS.Classes (enumLevel)
+import qualified Language.Ltml.HTML.CSS.Classes as Class
 
 testAST :: Document
 testAST =
@@ -29,13 +33,13 @@ testAST =
         DocumentHeader
         ( DocumentBody
             [ Node
-                (Just (Label "Heading 1"))
+                Nothing
                 ( Section
                     (SectionFormat (FormatString []))
                     (Heading (FormatString []) [])
                     ( Left
                         [ Node
-                            (Just (Label "Erste Node Label"))
+                            (Just (Label "label"))
                             ( Paragraph
                                 (ParagraphFormat (FormatString []))
                                 [ Word "Das ist im Paragraph"
@@ -57,6 +61,11 @@ testAST =
                                     ( Enumeration
                                         [ EnumItem [Word "Erstes Item"]
                                         , EnumItem [Word "Zweites Item 1", Styled Bold [Word "Zweites Item 2"]]
+                                        , EnumItem
+                                            [ Enum
+                                                ( Enumeration [EnumItem [Word "Zweite Aufzählung 1"], EnumItem [Word "Zweite 2"]]
+                                                )
+                                            ]
                                         ]
                                     )
                                 ]
@@ -67,50 +76,51 @@ testAST =
             ]
         )
 
-testHtml :: (ToHtml EnumItem) => IO ()
-testHtml = renderToFile "static/out.html" (docToHtml testAST)
+testHtml :: IO ()
+testHtml = writeFile "static/out.html" (unpack $ renderText $ docToHtml testAST)
 
-renderHtml :: (ToHtml EnumItem) => Document -> ByteString
+renderHtml :: Document -> ByteString
 renderHtml document = renderBS $ docToHtml document
 
-docToHtml :: (ToHtml EnumItem) => Document -> Html ()
+docToHtml :: Document -> Html ()
 docToHtml doc = html_ $ do
     head_ $ do
         title_ "Test Dokument"
         link_ [rel_ "stylesheet", href_ "out.css"]
     body_ $ do
-        toHtml doc
+        runReader (toHtmlM doc) 0
 
-instance (ToHtml EnumItem) => ToHtml Document where
+instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
-    toHtml (Document format header body) = case body of
-        DocumentBody [] -> return ()
-        DocumentBody nodes -> toHtml nodes
+    toHtmlM (Document format header body) = case body of
+        DocumentBody [] -> return $ return ()
+        DocumentBody nodes -> toHtmlM nodes
 
-instance (ToHtml a) => ToHtml (Node a) where
-    toHtml (Node maybeLabel a) = case maybeLabel of
-        Nothing -> toHtml a
+instance (ToHtmlM a) => ToHtmlM (Node a) where
+    toHtmlM (Node maybeLabel a) = case maybeLabel of
+        Nothing -> toHtmlM a
         Just label -> do
-            h2_ (toHtml label)
-            toHtml a
+            labelHtml <- b_ <$> toHtmlM label
+            aHtml <- toHtmlM a
+            return (labelHtml <> aHtml)
 
-instance (ToHtml EnumItem) => ToHtml Section where
-    toHtml (Section format heading children) = case children of
-        Right cs -> toHtml cs
-        Left cs -> toHtml cs
+instance ToHtmlM Section where
+    toHtmlM (Section format heading children) = case children of
+        Right cs -> toHtmlM cs
+        Left cs -> toHtmlM cs
 
-instance (ToHtml EnumItem) => ToHtml Paragraph where
-    toHtml (Paragraph format textTrees) = toHtml textTrees
+instance ToHtmlM Paragraph where
+    toHtmlM (Paragraph format textTrees) = toHtmlM textTrees
 
-instance (ToHtmlStyle style, ToHtml enum) => ToHtml (TextTree style enum special) where
-    toHtml textTree = case textTree of
-        Word text -> toHtml text
-        Space -> toHtml (" " :: Text)
-        Special _ -> toHtml ("Error: Special not supported yet" :: Text)
-        Reference label -> toHtml label
-        Styled style textTrees -> toHtmlStyle style $ toHtml textTrees
-        Enum enum -> toHtml enum
-        Footnote _ -> toHtml ("Error: FootNotes not supported yet" :: Text)
+instance (ToHtmlStyle style, ToHtmlM enum) => ToHtmlM (TextTree style enum special) where
+    toHtmlM textTree = case textTree of
+        Word text -> return $ toHtml text
+        Space -> return $ toHtml (" " :: Text)
+        Special _ -> return $ toHtml ("Error: Special not supported yet" :: Text)
+        Reference label -> toHtmlM label
+        Styled style textTrees -> toHtmlStyle style <$> toHtmlM textTrees
+        Enum enum -> toHtmlM enum
+        Footnote _ -> return $ toHtml ("Error: FootNotes not supported yet" :: Text)
 
 class ToHtmlStyle style where
     toHtmlStyle :: (Monad m) => style -> (HtmlT m a -> HtmlT m a)
@@ -118,19 +128,29 @@ class ToHtmlStyle style where
 instance ToHtmlStyle FontStyle where
     toHtmlStyle Bold = b_
     toHtmlStyle Italics = i_
-    toHtmlStyle Underlined = span_ [class_ Class.underlined]
+    toHtmlStyle Underlined = span_ [class_ (Class.className Class.Underlined)]
 
-instance (ToHtml EnumItem) => ToHtml Enumeration where
-    toHtml (Enumeration enumItems) = ol_ $ foldr ((>>) . li_ . toHtml) mempty enumItems
+-- instance (ToHtml EnumItem) => ToHtml Enumeration where
+--     toHtml (Enumeration enumItems) = ol_ [class_ (Class.className Class.EnumNum)] $ foldr ((>>) . li_ . toHtml) mempty enumItems
 
-instance ToHtml EnumItem where
-    toHtml (EnumItem textTree) = toHtml textTree
+class ToHtmlM a where
+    toHtmlM :: a -> Reader Int (Html ())
 
-instance ToHtml Label where
-    toHtml label = toHtml $ unLabel label
+instance ToHtmlM Enumeration where
+    toHtmlM (Enumeration enumItems) = do
+        level <- ask
+        nested <- mapM (local (+ 1) . toHtmlM) enumItems
+        return $ ol_ [class_ $ enumLevel level] $ foldr ((>>) . li_) mempty nested
 
-instance (ToHtml a) => ToHtml [a] where
-    toHtml [] = mempty
-    toHtml (a : as) = do
-        toHtml a
-        toHtml as
+instance ToHtmlM EnumItem where
+    toHtmlM (EnumItem textTrees) = toHtmlM textTrees
+
+instance ToHtmlM Label where
+    toHtmlM label = return $ toHtml $ unLabel label
+
+instance (ToHtmlM a) => ToHtmlM [a] where
+    toHtmlM [] = return mempty
+    toHtmlM (a : as) = do
+        aHtml <- toHtmlM a
+        asHtml <- toHtmlM as
+        return (aHtml <> asHtml)
