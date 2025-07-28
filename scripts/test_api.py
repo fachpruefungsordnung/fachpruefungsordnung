@@ -34,6 +34,9 @@ class Client:
     def document_tree(self, doc_id: int, revision: Literal["latest"] | int) -> str:
         return self.get_json(f"v2/docs/{doc_id}/tree/{revision}")
 
+    def document_tree_full(self, doc_id: int, revision: Literal["latest"] | int) -> str:
+        return self.get_json(f"v2/docs/{doc_id}/tree/{revision}/full")
+
     def document_history(self, doc_id: int) -> str:
         return self.get_json(f"v2/docs/{doc_id}/history")
 
@@ -76,5 +79,5 @@ if __name__ == "__main__":
         "123"
     )
     print(client.document(1))
-    print(client.document_tree(1, "latest"))
+    print(client.document_tree_full(1, "latest"))
     print(client.document_history(1))
