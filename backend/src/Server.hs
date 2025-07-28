@@ -110,7 +110,8 @@ swagger =
         & info . version .~ "1.0"
         & info . description ?~ "This is the API for the Fachprüfungsordnung editor."
         & info . license ?~ "AGPL3"
-        & servers .~ ["https://batailley.informatik.uni-kiel.de/api/"]
+        & servers
+            .~ ["https://batailley.informatik.uni-kiel.de/api/", "http://localhost:8080/api/"]
 
 server :: CookieSettings -> JWTSettings -> Server DocumentedAPI
 server cookieSett jwtSett =

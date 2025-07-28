@@ -231,8 +231,8 @@ getDocuments =
                 dr.author_name :: text?
             FROM
                 docs d
-                JOIN roles r ON r.group_id = d."group"
-                JOIN external_document_rights edr ON d.id = edr.document_id
+                LEFT JOIN roles r ON r.group_id = d."group"
+                LEFT JOIN external_document_rights edr ON d.id = edr.document_id
                 LEFT JOIN LATERAL (
                     SELECT
                         dr.creation_ts,
