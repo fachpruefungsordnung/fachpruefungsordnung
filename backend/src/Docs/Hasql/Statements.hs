@@ -749,13 +749,13 @@ hasDocPermission =
                 FROM
                     roles r
                 JOIN
-                    documents d ON d.group_id = r.group_id
+                    docs d ON d."group" = r.group_id
                     LEFT JOIN external_document_rights e ON e.user_id = r.user_id
                 WHERE
                     r.user_id = $1 :: uuid
                     AND (
                         d.id = $2 :: int4
-                        OR (e.document_id = $2 :: int4 AND e.permission >= $3 :: text)
+                        OR (e.document_id = $2 :: int4 AND e.permission >= ($3 :: text :: docpermission))
                     )
             ) :: bool
         |]
