@@ -27,7 +27,7 @@ import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
 import Docs.Database
-    ( HasCheckDocPermission
+    ( HasCheckPermission
     , HasCreateDocument
     , HasCreateTextElement
     , HasCreateTextRevision
@@ -205,7 +205,7 @@ getDocumentHistory userID docID time = runExceptT $ do
 -- guards
 
 guardPermission
-    :: (HasCheckDocPermission m)
+    :: (HasCheckPermission m)
     => Permission
     -> DocumentID
     -> UserID

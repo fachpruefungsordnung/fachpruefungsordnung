@@ -1,13 +1,10 @@
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Use infix" #-}
 
 module UserManagement.DocumentPermission
-    ( DocPermission (..)
-    , Permission (..)
-    , hasPermission
+    ( Permission (..)
     , permissionToText
     , textToPermission
     , UsersPermission (..)
@@ -22,52 +19,36 @@ import GHC.Generics (Generic)
 import Text.Read (readMaybe)
 import UserManagement.User as User (UserID)
 
-data DocPermission = Reader | Reviewer | Editor
-    deriving (Eq, Generic)
-
 data Permission = Read | Comment | Edit
-    deriving (Eq, Enum, Bounded, Show)
+    deriving (Generic, Eq, Enum, Ord, Bounded)
 
-hasPermission :: DocPermission -> Permission -> Bool
-hasPermission Reader Read = True
-hasPermission Reviewer p = elem p [Read, Comment]
-hasPermission Editor p = elem p [Read, Comment, Edit]
-hasPermission _ _ = False
-
-instance Ord DocPermission where
-    (<=) :: DocPermission -> DocPermission -> Bool
-    a <= b =
-        all
-            (\p -> not (hasPermission a p) || hasPermission b p)
-            [minBound .. maxBound] -- list of all Permissions
-
-instance ToJSON DocPermission
-instance FromJSON DocPermission
-instance ToSchema DocPermission
-
-instance Show DocPermission where
+instance Show Permission where
     show s = case s of
-        Reader -> "reader"
-        Reviewer -> "reviewer"
-        Editor -> "editor"
+        Read -> "read"
+        Comment -> "comment"
+        Edit -> "edit"
 
-instance Read DocPermission where
+instance Read Permission where
     readsPrec _ s = case lex s of
-        [("reader", rs)] -> [(Reader, rs)]
-        [("reviewer", rs)] -> [(Reviewer, rs)]
-        [("editor", rs)] -> [(Editor, rs)]
+        [("read", rs)] -> [(Read, rs)]
+        [("comment", rs)] -> [(Comment, rs)]
+        [("edit", rs)] -> [(Edit, rs)]
         _ -> []
 
+instance ToJSON Permission
+instance FromJSON Permission
+instance ToSchema Permission
+
 -- Convert to/from Text
-permissionToText :: DocPermission -> Text
+permissionToText :: Permission -> Text
 permissionToText = pack . show
 
-textToPermission :: Text -> Maybe DocPermission
+textToPermission :: Text -> Maybe Permission
 textToPermission = readMaybe . unpack
 
 data UsersPermission = UsersPermission
     { userID :: User.UserID
-    , permission :: DocPermission
+    , permission :: Permission
     }
     deriving (Generic)
 
@@ -76,7 +57,7 @@ instance FromJSON UsersPermission
 instance ToSchema UsersPermission
 
 data DocumentWithPermission = DocumentWithPermission
-    { documentPermission :: DocPermission
+    { documentPermission :: Permission
     , document :: Document.Document
     }
     deriving (Generic)

@@ -26,7 +26,7 @@ module Docs.Hasql.Statements
     , existsTreeRevision
     , existsTextElement
     , existsTextRevision
-    , hasDocPermission
+    , hasPermission
     , isGroupAdmin
     ) where
 
@@ -738,8 +738,8 @@ getDocumentRevisionHistory =
 
 -- Natürlich schreibe ich dir einen Kommentar, der sagt, dass hier das UserManagement beginnt!
 
-hasDocPermission :: Statement (UserID, DocumentID, Permission) Bool
-hasDocPermission =
+hasPermission :: Statement (UserID, DocumentID, Permission) Bool
+hasPermission =
     lmap
         mapInput
         [singletonStatement|
@@ -755,7 +755,7 @@ hasDocPermission =
                     r.user_id = $1 :: uuid
                     AND (
                         d.id = $2 :: int4
-                        OR (e.document_id = $2 :: int4 AND e.permission >= ($3 :: text :: docpermission))
+                        OR (e.document_id = $2 :: int4 AND e.permission >= ($3 :: text :: permission))
                     )
             ) :: bool
         |]

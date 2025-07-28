@@ -156,7 +156,7 @@ getDocumentRevisionHistory id_ before =
 
 hasPermission :: UserID -> DocumentID -> Permission -> Session Bool
 hasPermission userID docID perms =
-    statement (userID, docID, perms) Statements.hasDocPermission
+    statement (userID, docID, perms) Statements.hasPermission
 
 isGroupAdmin :: UserID -> GroupID -> Session Bool
 isGroupAdmin userID groupID =

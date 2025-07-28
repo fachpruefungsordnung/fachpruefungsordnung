@@ -33,7 +33,7 @@ run = Session.run . unHasqlSession
 
 -- access rights
 
-instance HasCheckDocPermission HasqlSession where
+instance HasCheckPermission HasqlSession where
     checkDocumentPermission = ((HasqlSession .) .) . Sessions.hasPermission
 
 instance HasIsGroupAdmin HasqlSession where
@@ -93,7 +93,7 @@ runTransaction = (Session.run . transaction Serializable Write) . unHasqlTransac
 
 -- access rights
 
-instance HasCheckDocPermission HasqlTransaction where
+instance HasCheckPermission HasqlTransaction where
     checkDocumentPermission = ((HasqlTransaction .) .) . Transactions.hasPermission
 
 instance HasIsGroupAdmin HasqlTransaction where

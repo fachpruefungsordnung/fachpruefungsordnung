@@ -102,7 +102,7 @@ putTree (Node metaData children) = do
 
 hasPermission :: UserID -> DocumentID -> Permission -> Transaction Bool
 hasPermission userID docID perms =
-    statement (userID, docID, perms) Statements.hasDocPermission
+    statement (userID, docID, perms) Statements.hasPermission
 
 isGroupAdmin :: UserID -> GroupID -> Transaction Bool
 isGroupAdmin userID groupID =
