@@ -61,6 +61,7 @@ import Docs.TreeRevision
     , TreeRevisionRef (..)
     )
 import DocumentManagement.Hash (Hash)
+import GHC.Int (Int32)
 
 existsDocument :: DocumentID -> Session Bool
 existsDocument = flip statement Statements.existsDocument
@@ -137,21 +138,21 @@ getTree rootHash = do
             (TreeEdgeToNode hash header) -> fromHeader hash header <&> Tree.Tree
 
 getTextRevisionHistory
-    :: TextElementRef -> Maybe UTCTime -> Session TextRevisionHistory
-getTextRevisionHistory ref before =
-    statement (ref, before) Statements.getTextRevisionHistory
+    :: TextElementRef -> Maybe UTCTime -> Int32 -> Session TextRevisionHistory
+getTextRevisionHistory ref before limit =
+    statement (ref, before, limit) Statements.getTextRevisionHistory
         <&> TextRevisionHistory ref . Vector.toList
 
 getTreeRevisionHistory
-    :: DocumentID -> Maybe UTCTime -> Session TreeRevisionHistory
-getTreeRevisionHistory id_ before =
-    statement (id_, before) Statements.getTreeRevisionHistory
+    :: DocumentID -> Maybe UTCTime -> Int32 -> Session TreeRevisionHistory
+getTreeRevisionHistory id_ before limit =
+    statement (id_, before, limit) Statements.getTreeRevisionHistory
         <&> TreeRevisionHistory id_ . Vector.toList
 
 getDocumentRevisionHistory
-    :: DocumentID -> Maybe UTCTime -> Session DocumentHistory
-getDocumentRevisionHistory id_ before =
-    statement (id_, before) Statements.getDocumentRevisionHistory
+    :: DocumentID -> Maybe UTCTime -> Int32 -> Session DocumentHistory
+getDocumentRevisionHistory id_ before limit =
+    statement (id_, before, limit) Statements.getDocumentRevisionHistory
         <&> DocumentHistory id_ . Vector.toList
 
 hasPermission :: UserID -> DocumentID -> Permission -> Session Bool

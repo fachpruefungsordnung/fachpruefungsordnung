@@ -167,6 +167,7 @@ type GetTextHistory =
         :> Capture "textElementID" TextElementID
         :> "history"
         :> QueryParam "before" UTCTime
+        :> QueryParam "limit" Docs.Limit
         :> Get '[JSON] TextRevisionHistory
 
 type GetTreeHistory =
@@ -175,6 +176,7 @@ type GetTreeHistory =
         :> "tree"
         :> "history"
         :> QueryParam "before" UTCTime
+        :> QueryParam "limit" Docs.Limit
         :> Get '[JSON] TreeRevisionHistory
 
 type GetDocumentHistory =
@@ -182,6 +184,7 @@ type GetDocumentHistory =
         :> Capture "documentID" DocumentID
         :> "history"
         :> QueryParam "before" UTCTime
+        :> QueryParam "limit" Docs.Limit
         :> Get '[JSON] DocumentHistory
 
 docsServer :: Server DocsAPI
@@ -309,8 +312,9 @@ getTextHistoryHandler
     -> DocumentID
     -> TextElementID
     -> Maybe UTCTime
+    -> Maybe Docs.Limit
     -> Handler TextRevisionHistory
-getTextHistoryHandler auth docID textID before = do
+getTextHistoryHandler auth docID textID before limit = do
     userID <- getUser auth
     withDB $
         run $
@@ -318,24 +322,27 @@ getTextHistoryHandler auth docID textID before = do
                 userID
                 (TextElementRef docID textID)
                 before
+                limit
 
 getTreeHistoryHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> Maybe UTCTime
+    -> Maybe Docs.Limit
     -> Handler TreeRevisionHistory
-getTreeHistoryHandler auth docID before = do
+getTreeHistoryHandler auth docID before limit = do
     userID <- getUser auth
-    withDB $ run $ Docs.getTreeHistory userID docID before
+    withDB $ run $ Docs.getTreeHistory userID docID before limit
 
 getDocumentHistoryHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> Maybe UTCTime
+    -> Maybe Docs.Limit
     -> Handler DocumentHistory
-getDocumentHistoryHandler auth docID before = do
+getDocumentHistoryHandler auth docID before limit = do
     userID <- getUser auth
-    withDB $ run $ Docs.getDocumentHistory userID docID before
+    withDB $ run $ Docs.getDocumentHistory userID docID before limit
 
 -- utililty
 

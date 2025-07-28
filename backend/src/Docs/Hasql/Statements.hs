@@ -31,7 +31,7 @@ module Docs.Hasql.Statements
     ) where
 
 import Control.Applicative ((<|>))
-import Data.Bifunctor (bimap, first)
+import Data.Bifunctor (bimap)
 import Data.ByteString (ByteString)
 import Data.Profunctor (lmap, rmap)
 import Data.Text (Text)
@@ -408,7 +408,7 @@ getTextRevision =
             |]
 
 getTextRevisionHistory
-    :: Statement (TextElementRef, Maybe UTCTime) (Vector TextRevisionHeader)
+    :: Statement (TextElementRef, Maybe UTCTime, Int32) (Vector TextRevisionHeader)
 getTextRevisionHistory =
     lmap
         mapInput
@@ -431,11 +431,11 @@ getTextRevisionHistory =
                 ORDER BY
                     tr.creation_ts DESC
                 LIMIT
-                    10
+                    $4 :: INT4
             |]
   where
-    mapInput (TextElementRef docID textID, maybeTimestamp) =
-        (unDocumentID docID, unTextElementID textID, maybeTimestamp)
+    mapInput (TextElementRef docID textID, maybeTimestamp, limit) =
+        (unDocumentID docID, unTextElementID textID, maybeTimestamp, limit)
 
 getLatestTextRevisionID :: Statement TextElementRef (Maybe TextRevisionID)
 getLatestTextRevisionID =
@@ -710,10 +710,10 @@ uncurryTreeRevisionRef (TreeRevisionRef docID selector) =
     (unDocumentID docID, unTreeRevisionID <$> specificTreeRevision selector)
 
 getTreeRevisionHistory
-    :: Statement (DocumentID, Maybe UTCTime) (Vector TreeRevisionHeader)
+    :: Statement (DocumentID, Maybe UTCTime, Int32) (Vector TreeRevisionHeader)
 getTreeRevisionHistory =
     lmap
-        (first unDocumentID)
+        mapInput
         $ rmap
             (uncurryTreeRevisionHeader <$>)
             [vectorStatement|
@@ -731,8 +731,10 @@ getTreeRevisionHistory =
                 ORDER BY
                     tr.creation_ts DESC
                 LIMIT
-                    10
+                    $3 :: INT4
             |]
+  where
+    mapInput (docID, time, limit) = (unDocumentID docID, time, limit)
 
 getTextElementIDsForDocument :: Statement DocumentID (Vector TextElementID)
 getTextElementIDsForDocument =
@@ -777,10 +779,10 @@ uncurryHistoryItem (textID, revID, ts, authorID, authorName) =
                     }
 
 getDocumentRevisionHistory
-    :: Statement (DocumentID, Maybe UTCTime) (Vector DocumentHistoryItem)
+    :: Statement (DocumentID, Maybe UTCTime, Int32) (Vector DocumentHistoryItem)
 getDocumentRevisionHistory =
     lmap
-        (first unDocumentID)
+        mapInput
         $ rmap
             (uncurryHistoryItem <$>)
             [vectorStatement|
@@ -799,8 +801,10 @@ getDocumentRevisionHistory =
                 ORDER BY
                     dr.creation_ts DESC
                 LIMIT
-                    10
+                    $3 :: INT4
             |]
+  where
+    mapInput (docID, time, limit) = (unDocumentID docID, time, limit)
 
 -- Natürlich schreibe ich dir einen Kommentar, der sagt, dass hier das UserManagement beginnt!
 

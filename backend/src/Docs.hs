@@ -1,6 +1,7 @@
 module Docs
     ( Error (..)
     , Result
+    , Limit
     , createDocument
     , getDocument
     , getDocuments
@@ -28,6 +29,7 @@ import UserManagement.DocumentPermission (Permission (..))
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
+import Data.Maybe (fromMaybe)
 import Docs.Database
     ( HasCheckPermission
     , HasCreateDocument
@@ -72,6 +74,7 @@ import Docs.TreeRevision
     , TreeRevisionRef (..)
     )
 import qualified Docs.TreeRevision as TreeRevision
+import GHC.Int (Int32)
 
 data Error
     = NoPermission DocumentID Permission
@@ -82,6 +85,11 @@ data Error
     | TreeRevisionNotFound TreeRevisionRef
 
 type Result a = Either Error a
+
+type Limit = Int32
+
+defaultHistoryLimit :: Limit
+defaultHistoryLimit = 20
 
 createDocument
     :: (HasCreateDocument m)
@@ -178,33 +186,36 @@ getTextHistory
     => UserID
     -> TextElementRef
     -> Maybe UTCTime
+    -> Maybe Limit
     -> m (Result TextRevisionHistory)
-getTextHistory userID ref@(TextElementRef docID _) time = runExceptT $ do
+getTextHistory userID ref@(TextElementRef docID _) time limit = runExceptT $ do
     guardPermission Read docID userID
     guardExistsTextElement ref
-    lift $ DB.getTextHistory ref time
+    lift $ DB.getTextHistory ref time $ fromMaybe defaultHistoryLimit limit
 
 getTreeHistory
     :: (HasGetTreeHistory m)
     => UserID
     -> DocumentID
     -> Maybe UTCTime
+    -> Maybe Limit
     -> m (Result TreeRevisionHistory)
-getTreeHistory userID docID time = runExceptT $ do
+getTreeHistory userID docID time limit = runExceptT $ do
     guardPermission Read docID userID
     guardExistsDocument docID
-    lift $ DB.getTreeHistory docID time
+    lift $ DB.getTreeHistory docID time $ fromMaybe defaultHistoryLimit limit
 
 getDocumentHistory
     :: (HasGetDocumentHistory m)
     => UserID
     -> DocumentID
     -> Maybe UTCTime
+    -> Maybe Limit
     -> m (Result DocumentHistory)
-getDocumentHistory userID docID time = runExceptT $ do
+getDocumentHistory userID docID time limit = runExceptT $ do
     guardPermission Read docID userID
     guardExistsDocument docID
-    lift $ DB.getDocumentHistory docID time
+    lift $ DB.getDocumentHistory docID time $ fromMaybe defaultHistoryLimit limit
 
 getTreeWithLatestTexts
     :: (HasGetTreeRevision m, HasGetTextElementRevision m)

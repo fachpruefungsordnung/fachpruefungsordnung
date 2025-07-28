@@ -42,6 +42,7 @@ import Docs.TextRevision
     )
 import Docs.Tree (Node)
 import Docs.TreeRevision (TreeRevision, TreeRevisionHistory, TreeRevisionRef)
+import GHC.Int (Int32)
 
 class (Monad m) => HasCheckPermission m where
     checkDocumentPermission :: UserID -> DocumentID -> Permission -> m Bool
@@ -79,13 +80,14 @@ class
     getTextElementRevision :: TextRevisionRef -> m (Maybe TextElementRevision)
 
 class (HasCheckPermission m, HasExistsTextElement m) => HasGetTextHistory m where
-    getTextHistory :: TextElementRef -> Maybe UTCTime -> m TextRevisionHistory
+    getTextHistory
+        :: TextElementRef -> Maybe UTCTime -> Int32 -> m TextRevisionHistory
 
 class (HasCheckPermission m, HasExistsDocument m) => HasGetTreeHistory m where
-    getTreeHistory :: DocumentID -> Maybe UTCTime -> m TreeRevisionHistory
+    getTreeHistory :: DocumentID -> Maybe UTCTime -> Int32 -> m TreeRevisionHistory
 
 class (HasCheckPermission m, HasExistsDocument m) => HasGetDocumentHistory m where
-    getDocumentHistory :: DocumentID -> Maybe UTCTime -> m DocumentHistory
+    getDocumentHistory :: DocumentID -> Maybe UTCTime -> Int32 -> m DocumentHistory
 
 -- create
 

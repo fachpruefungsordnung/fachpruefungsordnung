@@ -66,13 +66,13 @@ instance HasGetTextElementRevision HasqlSession where
     getTextElementRevision = HasqlSession . Sessions.getTextElementRevision
 
 instance HasGetTextHistory HasqlSession where
-    getTextHistory = (HasqlSession .) . Sessions.getTextRevisionHistory
+    getTextHistory = ((HasqlSession .) .) . Sessions.getTextRevisionHistory
 
 instance HasGetTreeHistory HasqlSession where
-    getTreeHistory = (HasqlSession .) . Sessions.getTreeRevisionHistory
+    getTreeHistory = ((HasqlSession .) .) . Sessions.getTreeRevisionHistory
 
 instance HasGetDocumentHistory HasqlSession where
-    getDocumentHistory = (HasqlSession .) . Sessions.getDocumentRevisionHistory
+    getDocumentHistory = ((HasqlSession .) .) . Sessions.getDocumentRevisionHistory
 
 -- create
 
