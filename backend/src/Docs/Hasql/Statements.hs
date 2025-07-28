@@ -588,6 +588,8 @@ getTreeEdgesByParent =
                     left join doc_text_elements t on e.child_text_element = t.id
                 where
                     e.parent = $1 :: bytea
+                order by
+                    e.position ASC
             |]
 
 uncurryTreeRevisionHeader :: (Int32, UTCTime, UserID) -> TreeRevisionHeader
