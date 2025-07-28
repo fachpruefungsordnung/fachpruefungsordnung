@@ -12,12 +12,14 @@ module Docs
     , getTextHistory
     , getTreeHistory
     , getDocumentHistory
+    , getTreeWithLatestTexts
     ) where
 
 import Control.Monad (unless)
 import Control.Monad.Except (ExceptT, runExceptT, throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (find)
+import Data.Functor ((<&>))
 import Data.Text (Text)
 import Data.Time (UTCTime)
 import Data.Vector (Vector)
@@ -56,18 +58,20 @@ import Docs.TextElement
 import Docs.TextRevision
     ( ConflictStatus
     , NewTextRevision (..)
-    , TextElementRevision
+    , TextElementRevision (TextElementRevision)
     , TextRevisionHistory
     , TextRevisionRef (..)
     , TextRevisionSelector (..)
     , newTextRevision
     )
+import qualified Docs.TextRevision as TextRevision
 import Docs.Tree (Node)
 import Docs.TreeRevision
     ( TreeRevision
     , TreeRevisionHistory
     , TreeRevisionRef (..)
     )
+import qualified Docs.TreeRevision as TreeRevision
 
 data Error
     = NoPermission DocumentID Permission
@@ -201,6 +205,27 @@ getDocumentHistory userID docID time = runExceptT $ do
     guardPermission Read docID userID
     guardExistsDocument docID
     lift $ DB.getDocumentHistory docID time
+
+getTreeWithLatestTexts
+    :: (HasGetTreeRevision m, HasGetTextElementRevision m)
+    => UserID
+    -> TreeRevisionRef
+    -> m (Result (TreeRevision TextElementRevision))
+getTreeWithLatestTexts userID revision = runExceptT $ do
+    guardPermission Read docID userID
+    guardExistsDocument docID
+    guardExistsTreeRevision revision
+    lift $
+        DB.getTreeRevision revision
+            >>= TreeRevision.withTextRevisions getter'
+  where
+    (TreeRevisionRef docID _) = revision
+    getter =
+        DB.getTextElementRevision
+            . (`TextRevisionRef` TextRevision.Latest)
+            . TextElementRef docID
+    getter' = (<&> (>>= elementRevisionToRevision)) . getter
+    elementRevisionToRevision (TextElementRevision _ rev) = rev
 
 -- guards
 

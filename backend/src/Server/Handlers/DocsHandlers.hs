@@ -93,6 +93,7 @@ type DocsAPI =
                 :<|> GetTextElementRevision
                 :<|> PostTreeRevision
                 :<|> GetTreeRevision
+                :<|> GetTreeRevisionFull
                 :<|> GetTextHistory
                 :<|> GetTreeHistory
                 :<|> GetDocumentHistory
@@ -151,6 +152,14 @@ type GetTreeRevision =
         :> Capture "treeRevision" TreeRevisionSelector
         :> Get '[JSON] (TreeRevision TextElement)
 
+type GetTreeRevisionFull =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "tree"
+        :> Capture "treeRevision" TreeRevisionSelector
+        :> "full"
+        :> Get '[JSON] (TreeRevision TextElementRevision)
+
 type GetTextHistory =
     Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
@@ -185,6 +194,7 @@ docsServer =
         :<|> getTextElementRevisionHandler
         :<|> postTreeRevisionHandler
         :<|> getTreeRevisionHandler
+        :<|> getTreeRevisionFullHandler
         :<|> getTextHistoryHandler
         :<|> getTreeHistoryHandler
         :<|> getDocumentHistoryHandler
@@ -272,6 +282,18 @@ postTreeRevisionHandler
 postTreeRevisionHandler auth docID node = do
     userID <- getUser auth
     withDB $ runTransaction $ Docs.createTreeRevision userID docID node
+
+getTreeRevisionFullHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TreeRevisionSelector
+    -> Handler (TreeRevision TextElementRevision)
+getTreeRevisionFullHandler auth docID revision = do
+    userID <- getUser auth
+    withDB $
+        run $
+            Docs.getTreeWithLatestTexts userID $
+                TreeRevisionRef docID revision
 
 getTreeRevisionHandler
     :: AuthResult Auth.Token
