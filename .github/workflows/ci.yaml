@@ -105,7 +105,7 @@ jobs:
 
   test-backend:
     name: Run backend tests
-    runs-on: postgres
+    runs-on: self-hostet #postgres
     needs:
       - job-spec
       - check-backend
