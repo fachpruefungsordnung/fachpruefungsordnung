@@ -336,7 +336,11 @@ guardedDBAccess result = guardDBResult result >>= guardDocsResult
 
 guardDBResult :: Either Session.SessionError a -> Handler a
 guardDBResult (Right ok) = return ok
-guardDBResult (Left _) = throwError $ err500 {errBody = "Database error!\n"}
+guardDBResult (Left err) =
+    throwError $
+        err500
+            { errBody = LBS.pack $ "Database error: " ++ show err ++ "\n"
+            }
 
 guardDocsResult :: Docs.Result a -> Handler a
 guardDocsResult (Right ok) = return ok

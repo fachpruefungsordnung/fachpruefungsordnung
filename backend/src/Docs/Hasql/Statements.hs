@@ -580,7 +580,7 @@ getTreeEdgesByParent =
                     t.kind :: text?
                 from
                     doc_tree_edges e
-                    join doc_tree_nodes n on e.child_node = n.id
+                    join doc_tree_nodes n on e.child_node = n.hash
                     join doc_text_elements t on e.child_text_element = t.id
                 where
                     e.parent = $1 :: bytea
