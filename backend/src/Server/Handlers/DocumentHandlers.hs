@@ -98,7 +98,7 @@ getDocumentHandler (Authenticated Auth.Token {..}) docID = do
     case mPerm of
         Nothing -> throwError errNoPermission
         Just perm ->
-            if perm == Permission.Read
+            if perm >= Permission.Read
                 then do
                     eDocument <- liftIO $ getDocument docID (Context conn)
                     case eDocument of

@@ -123,8 +123,7 @@ checkPermission conn userID docID = do
             ePerm <- liftIO $ run (Sessions.getExternalPermission userID docID) conn
             case ePerm of
                 Left _ -> throwError errDatabaseAccessFailed
-                Right Nothing -> return Nothing
-                Right (Just perm) -> return $ Just perm
+                Right x -> return x
 
 -- | Get the groupID of the group that owns the specified document
 getGroupOfDocument :: Connection -> DocumentID -> Handler Group.GroupID
