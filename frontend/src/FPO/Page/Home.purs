@@ -30,7 +30,12 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getDocumentsFromURLWithPermission, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto (DocumentHeaderPlusPermission, DocumentID, getDHPPID, getDHPPName)
+import FPO.Dto.DocumentDto
+  ( DocumentHeaderPlusPermission
+  , DocumentID
+  , getDHPPID
+  , getDHPPName
+  )
 import FPO.Dto.UserDto (User)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
