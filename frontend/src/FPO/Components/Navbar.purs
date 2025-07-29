@@ -17,13 +17,13 @@ import FPO.Data.Route (Route(..))
 import FPO.Data.Store (saveLanguage)
 import FPO.Data.Store as Store
 import FPO.Dto.UserDto (User)
-import FPO.Page.HTML (addClass)
 import FPO.Translations.Translator
   ( FPOTranslator(..)
   , fromFpoTranslator
   , getTranslatorForLanguage
   )
 import FPO.Translations.Util (FPOState)
+import FPO.UI.HTML (addClass)
 import Halogen (AttrName(..), ClassName(..))
 import Halogen as H
 import Halogen.HTML as HH
@@ -115,7 +115,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                                 ( translate (label :: _ "navbar_documents")
                                     state.translator
                                 )
-                                (ViewGroupDocuments 1)
+                                (ViewGroupDocuments { groupID: 1 })
                             ]
                         ]
                       else []

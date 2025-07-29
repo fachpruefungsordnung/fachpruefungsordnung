@@ -23,14 +23,14 @@ module UserManagement.Sessions
     , addSuperadmin
     , removeSuperadmin
     , checkSuperadmin
-    , checkGroupDocPermission
+    , checkGroupPermission
     , checkGroupNameExistence
-    , getExternalDocPermission
+    , getExternalPermission
     , getDocumentGroupID
     , getAllExternalUsersOfDocument
-    , addExternalDocPermission
-    , updateExternalDocPermission
-    , deleteExternalDocPermission
+    , addExternalPermission
+    , updateExternalPermission
+    , deleteExternalPermission
     , getAllVisibleDocuments
     , getAllDocumentsOfGroup
     )
@@ -126,39 +126,39 @@ removeSuperadmin uid = statement uid Statements.removeSuperadmin
 checkSuperadmin :: User.UserID -> Session Bool
 checkSuperadmin uid = statement uid Statements.checkSuperadmin
 
-checkGroupDocPermission :: User.UserID -> Document.DocumentID -> Session Bool
-checkGroupDocPermission uid did = statement (uid, did) Statements.checkGroupDocPermission
+checkGroupPermission :: User.UserID -> Document.DocumentID -> Session Bool
+checkGroupPermission uid did = statement (uid, did) Statements.checkGroupPermission
 
 checkGroupNameExistence :: Text -> Session Bool
 checkGroupNameExistence name = statement name Statements.checkGroupNameExistence
 
-getExternalDocPermission
-    :: User.UserID -> Document.DocumentID -> Session (Maybe Permission.DocPermission)
-getExternalDocPermission uid did = statement (uid, did) Statements.getExternalDocPermission
+getExternalPermission
+    :: User.UserID -> Document.DocumentID -> Session (Maybe Permission.Permission)
+getExternalPermission uid did = statement (uid, did) Statements.getExternalPermission
 
 getDocumentGroupID :: Document.DocumentID -> Session (Maybe Group.GroupID)
 getDocumentGroupID did = statement did Statements.getDocumentGroupID
 
 getAllExternalUsersOfDocument
-    :: Document.DocumentID -> Session [(User.UserID, Permission.DocPermission)]
+    :: Document.DocumentID -> Session [(User.UserID, Permission.Permission)]
 getAllExternalUsersOfDocument did = do
     users <- statement did Statements.getAllExternalUsersOfDocument
     return [(user, perm) | (user, Just perm) <- users]
 
-addExternalDocPermission
-    :: User.UserID -> Document.DocumentID -> Permission.DocPermission -> Session ()
-addExternalDocPermission uid did perm =
+addExternalPermission
+    :: User.UserID -> Document.DocumentID -> Permission.Permission -> Session ()
+addExternalPermission uid did perm =
     let perm' = Permission.permissionToText perm
-     in statement (uid, did, perm') Statements.addExternalDocPermission
+     in statement (uid, did, perm') Statements.addExternalPermission
 
-updateExternalDocPermission
-    :: User.UserID -> Document.DocumentID -> Permission.DocPermission -> Session ()
-updateExternalDocPermission uid did perm =
+updateExternalPermission
+    :: User.UserID -> Document.DocumentID -> Permission.Permission -> Session ()
+updateExternalPermission uid did perm =
     let perm' = Permission.permissionToText perm
-     in statement (uid, did, perm') Statements.updateExternalDocPermission
+     in statement (uid, did, perm') Statements.updateExternalPermission
 
-deleteExternalDocPermission :: User.UserID -> Document.DocumentID -> Session ()
-deleteExternalDocPermission uid did = statement (uid, did) Statements.deleteExternalDocPermission
+deleteExternalPermission :: User.UserID -> Document.DocumentID -> Session ()
+deleteExternalPermission uid did = statement (uid, did) Statements.deleteExternalPermission
 
 getAllVisibleDocuments :: User.UserID -> Session [Document.Document]
 getAllVisibleDocuments uid = statement uid Statements.getAllVisibleDocuments

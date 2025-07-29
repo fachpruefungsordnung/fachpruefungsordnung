@@ -17,7 +17,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
 import FPO.Components.Comment as Comment
-import FPO.Components.CommentSection as CommentSection
+import FPO.Components.CommentOverview as CommentOverview
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
@@ -71,12 +71,12 @@ data Action
   | ShowWarning
   -- Toggle buttons
   | ToggleComment
-  | ToggleCommentSection Boolean
+  | ToggleCommentOverview Boolean
   | ToggleSidebar
   | TogglePreview
   -- Query Output
   | HandleComment Comment.Output
-  | HandleCommentSection CommentSection.Output
+  | HandleCommentOverview CommentOverview.Output
   | HandleEditor Editor.Output
   | HandlePreview Preview.Output
   | HandleTOC TOC.Output
@@ -122,7 +122,7 @@ type State =
   -- Boolean flags for UI state
   , sidebarShown :: Boolean
   , tocShown :: Boolean
-  , commentSectionShown :: Boolean
+  , commentOverviewShown :: Boolean
   , commentShown :: Boolean
   , previewShown :: Boolean
   , pdfWarningAvailable :: Boolean
@@ -131,14 +131,14 @@ type State =
 
 type Slots =
   ( comment :: H.Slot Comment.Query Comment.Output Unit
-  , commentSection :: H.Slot CommentSection.Query CommentSection.Output Unit
+  , commentOverview :: H.Slot CommentOverview.Query CommentOverview.Output Unit
   , editor :: H.Slot Editor.Query Editor.Output Unit
   , preview :: H.Slot Preview.Query Preview.Output Unit
   , toc :: H.Slot TOC.Query TOC.Output Unit
   )
 
 _comment = Proxy :: Proxy "comment"
-_commentSection = Proxy :: Proxy "commentSection"
+_commentOverview = Proxy :: Proxy "commentOverview"
 _editor = Proxy :: Proxy "editor"
 _preview = Proxy :: Proxy "preview"
 _toc = Proxy :: Proxy "toc"
@@ -164,7 +164,7 @@ splitview docID = H.mkComponent
       , mTimeFormatter: Nothing
       , sidebarShown: true
       , tocShown: true
-      , commentSectionShown: false
+      , commentOverviewShown: false
       , commentShown: false
       , previewShown: true
       , pdfWarningAvailable: false
@@ -191,7 +191,7 @@ splitview docID = H.mkComponent
       , toolbarButton "ForceGET" ForceGET
       , toolbarButton "GET" GET
       , toolbarButton "POST" POST
-      , toolbarButton "All Comments" (ToggleCommentSection true)
+      , toolbarButton "All Comments" (ToggleCommentOverview true)
       , toolbarButton "Click Me for HTTPRequest" ClickedHTTPRequest
       , toolbarButton "Save" SaveSection
       , toolbarButton "Query Editor" QueryEditor
@@ -265,7 +265,7 @@ splitview docID = H.mkComponent
               <>
                 if
                   state.sidebarShown
-                    && not state.commentSectionShown
+                    && not state.commentOverviewShown
                     && not state.commentShown
                     && state.tocShown then
                   ""
@@ -328,7 +328,7 @@ splitview docID = H.mkComponent
             [ HH.text "Conversation" ]
         , HH.slot _comment unit Comment.commentview unit HandleComment
         ]
-    -- CommentSection
+    -- CommentOverview
     , HH.div
         [ HP.classes [ HB.overflowAuto, HB.p1 ]
         , HP.style $
@@ -339,7 +339,7 @@ splitview docID = H.mkComponent
                 if
                   state.sidebarShown
                     && not state.commentShown
-                    && state.commentSectionShown then
+                    && state.commentOverviewShown then
                   ""
                 else
                   "display: none;"
@@ -358,7 +358,7 @@ splitview docID = H.mkComponent
                 \border: 1px solid #f5c6cb; \
                 \border-radius: 0.2rem; \
                 \z-index: 10;"
-            , HE.onClick \_ -> ToggleCommentSection false
+            , HE.onClick \_ -> ToggleCommentOverview false
             ]
             [ HH.text "×" ]
         , HH.h4
@@ -366,8 +366,8 @@ splitview docID = H.mkComponent
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
             ]
             [ HH.text "All comments" ]
-        , HH.slot _commentSection unit CommentSection.commentSectionview unit
-            HandleCommentSection
+        , HH.slot _commentOverview unit CommentOverview.commentOverviewview unit
+            HandleCommentOverview
         ]
     -- Left Resizer
     , HH.div
@@ -531,7 +531,8 @@ splitview docID = H.mkComponent
       H.modify_ \st -> do
         st { tocEntries = Empty, mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
-      H.tell _commentSection unit (CommentSection.ReceiveTimeFormatter timeFormatter)
+      H.tell _commentOverview unit
+        (CommentOverview.ReceiveTimeFormatter timeFormatter)
       H.tell _toc unit (TOC.ReceiveTOCs Empty)
       -- Load the initial TOC entries into the editor
       handleAction GET
@@ -632,12 +633,12 @@ splitview docID = H.mkComponent
 
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
-    ToggleCommentSection shown ->
+    ToggleCommentOverview shown ->
       if shown then do
         H.tell _editor unit Editor.SendCommentSections
-        H.modify_ \st -> st { commentShown = false, commentSectionShown = shown }
+        H.modify_ \st -> st { commentShown = false, commentOverviewShown = shown }
       else
-        H.modify_ \st -> st { commentSectionShown = shown }
+        H.modify_ \st -> st { commentOverviewShown = shown }
 
     -- Toggle the sidebar
     -- Add logic in calculating the middle ratio
@@ -719,9 +720,12 @@ splitview docID = H.mkComponent
         H.modify_ \s -> s { tocEntries = updatedTOCEntries }
         H.tell _editor unit (Editor.ChangeSection updateTOCEntry)
 
-    HandleCommentSection output -> case output of
+    HandleCommentOverview output -> case output of
 
-      CommentSection.JumpToCommentSection -> pure unit
+      CommentOverview.JumpToCommentSection tocID markerID commentSection -> do
+        H.modify_ \st -> st { commentShown = true }
+        H.tell _comment unit
+          (Comment.SelectedCommentSection tocID markerID commentSection)
 
     HandleEditor output -> case output of
 
@@ -760,7 +764,7 @@ splitview docID = H.mkComponent
               (Comment.SelectedCommentSection tocID markerID commentSection)
 
       Editor.SendingTOC tocEntry -> do
-        H.tell _commentSection unit (CommentSection.ReceiveTOC tocEntry)
+        H.tell _commentOverview unit (CommentOverview.ReceiveTOC tocEntry)
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of

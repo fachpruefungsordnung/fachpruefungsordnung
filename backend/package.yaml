@@ -23,6 +23,7 @@ dependencies:
   - Cabal
   - base >= 4.7 && < 5
   - insert-ordered-containers
+  - scientific
   - tuple
   - lens
   - profunctors

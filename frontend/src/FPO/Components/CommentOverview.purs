@@ -1,4 +1,4 @@
-module FPO.Components.CommentSection where
+module FPO.Components.CommentOverview where
 
 import Prelude
 
@@ -6,18 +6,21 @@ import Data.Array (head, mapMaybe)
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff)
-import FPO.Types (Comment, TOCEntry)
+import FPO.Types (Comment, CommentSection, TOCEntry)
 import Halogen as H
 import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
 
 type Input = Unit
 
 -- DeleteComment later
-data Output = JumpToCommentSection
+data Output = JumpToCommentSection Int Int CommentSection
 
-data Action = Init
+data Action
+  = Init
+  | SelectCommentSection Int Int CommentSection
 
 data Query a
   = ReceiveTimeFormatter (Maybe Formatter) a
@@ -28,8 +31,8 @@ type State =
   , mTimeFormatter :: Maybe Formatter
   }
 
-commentSectionview :: forall m. MonadAff m => H.Component Query Input Output m
-commentSectionview = H.mkComponent
+commentOverviewview :: forall m. MonadAff m => H.Component Query Input Output m
+commentOverviewview = H.mkComponent
   { initialState: \_ -> { mTocEntry: Nothing, mTimeFormatter: Nothing }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -52,7 +55,8 @@ commentSectionview = H.mkComponent
                 Nothing -> Nothing
                 Just cs -> case head cs.comments of
                   Nothing -> Nothing
-                  Just c -> Just (renderFirstComment state.mTimeFormatter c)
+                  Just c -> Just
+                    (renderFirstComment state.mTimeFormatter c tocEntry.id m.id cs)
             )
             tocEntry.markers
         )
@@ -62,6 +66,9 @@ commentSectionview = H.mkComponent
 
     Init -> do
       pure unit
+
+    SelectCommentSection tocID markerID commentSection -> do
+      H.raise (JumpToCommentSection tocID markerID commentSection)
 
   handleQuery
     :: forall slots a
@@ -78,8 +85,14 @@ commentSectionview = H.mkComponent
       pure (Just a)
 
   renderFirstComment
-    :: Maybe Formatter -> Comment -> forall slots. H.ComponentHTML Action slots m
-  renderFirstComment mFormatter c =
+    :: Maybe Formatter
+    -> Comment
+    -> Int
+    -> Int
+    -> CommentSection
+    -> forall slots
+     . H.ComponentHTML Action slots m
+  renderFirstComment mFormatter c tocID markerID cs =
     HH.div
       [ HP.classes
           [ HB.p2
@@ -91,6 +104,7 @@ commentSectionview = H.mkComponent
           , HB.flexColumn
           ]
       , HP.style "background-color:rgba(246, 250, 0, 0.9);"
+      , HE.onClick \_ -> SelectCommentSection tocID markerID cs
       ]
       [ HH.div_
           [ HH.div

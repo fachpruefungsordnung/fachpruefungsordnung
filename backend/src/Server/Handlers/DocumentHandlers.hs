@@ -62,7 +62,7 @@ type DocumentAPI =
                     :> Capture "documentID" Document.DocumentID
                     :> "external"
                     :> Capture "userID" User.UserID
-                    :> Get '[JSON] (Maybe Permission.DocPermission)
+                    :> Get '[JSON] (Maybe Permission.Permission)
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "documentID" Document.DocumentID
                     :> "external"
@@ -94,11 +94,11 @@ getDocumentHandler
     :: AuthResult Auth.Token -> Document.DocumentID -> Handler Document
 getDocumentHandler (Authenticated Auth.Token {..}) docID = do
     conn <- tryGetDBConnection
-    mPerm <- checkDocPermission conn subject docID
+    mPerm <- checkPermission conn subject docID
     case mPerm of
         Nothing -> throwError errNoPermission
         Just perm ->
-            if Permission.hasPermission perm Permission.Read
+            if perm >= Permission.Read
                 then do
                     eDocument <- liftIO $ getDocument docID (Context conn)
                     case eDocument of
@@ -137,11 +137,11 @@ getAllCommitsHandler
     :: AuthResult Auth.Token -> Document.DocumentID -> Handler (Vector ExistingCommit)
 getAllCommitsHandler (Authenticated Auth.Token {..}) docID = do
     conn <- tryGetDBConnection
-    mPerm <- checkDocPermission conn subject docID
+    mPerm <- checkPermission conn subject docID
     case mPerm of
         Nothing -> throwError errNoPermission
         Just perm ->
-            if Permission.hasPermission perm Permission.Read
+            if perm >= Permission.Read
                 then do
                     eVector <- liftIO $ getCommitGraph docID (Context conn)
                     case eVector of
@@ -154,11 +154,11 @@ postCommitHandler
     :: AuthResult Auth.Token -> Document.DocumentID -> CreateCommit -> Handler Document
 postCommitHandler (Authenticated Auth.Token {..}) docID cc = do
     conn <- tryGetDBConnection
-    mPerm <- checkDocPermission conn subject docID
+    mPerm <- checkPermission conn subject docID
     case mPerm of
         Nothing -> throwError errNoPermission
         Just perm ->
-            if Permission.hasPermission perm Permission.Edit
+            if perm == Permission.Edit
                 then do
                     eDocument <- liftIO $ createDocumentCommit docID cc (Context conn)
                     case eDocument of
@@ -174,11 +174,11 @@ getCommitHandler
     -> Handler ExistingCommit
 getCommitHandler (Authenticated Auth.Token {..}) docID commitID = do
     conn <- tryGetDBConnection
-    mPerm <- checkDocPermission conn subject docID
+    mPerm <- checkPermission conn subject docID
     case mPerm of
         Nothing -> throwError errNoPermission
         Just perm ->
-            if Permission.hasPermission perm Permission.Read
+            if perm >= Permission.Read
                 then do
                     eCommit <- liftIO $ getCommit commitID (Context conn)
                     case eCommit of
@@ -209,16 +209,16 @@ getExternalUserDocumentHandler
     :: AuthResult Auth.Token
     -> Document.DocumentID
     -> User.UserID
-    -> Handler (Maybe Permission.DocPermission)
+    -> Handler (Maybe Permission.Permission)
 getExternalUserDocumentHandler (Authenticated token) docID userID = do
     conn <- tryGetDBConnection
     groupID <- getGroupOfDocument conn docID
     ifSuperOrAdminDo conn token groupID (getUser conn)
   where
-    getUser :: Connection -> Handler (Maybe Permission.DocPermission)
+    getUser :: Connection -> Handler (Maybe Permission.Permission)
     getUser conn = do
         emPermission <-
-            liftIO $ Session.run (Sessions.getExternalDocPermission userID docID) conn
+            liftIO $ Session.run (Sessions.getExternalPermission userID docID) conn
         case emPermission of
             Left _ -> throwError errDatabaseAccessFailed
             Right mPermission -> return mPermission
@@ -237,20 +237,20 @@ putExternalUserDocumentHandler (Authenticated token) docID Permission.UsersPermi
     postUser :: Connection -> Handler NoContent
     postUser conn = do
         emPermission <-
-            liftIO $ Session.run (Sessions.getExternalDocPermission userID docID) conn
+            liftIO $ Session.run (Sessions.getExternalPermission userID docID) conn
         case emPermission of
             Left _ -> throwError errDatabaseAccessFailed
             Right Nothing -> do
                 eAction <-
                     liftIO $
-                        Session.run (Sessions.addExternalDocPermission userID docID permission) conn
+                        Session.run (Sessions.addExternalPermission userID docID permission) conn
                 case eAction of
                     Left _ -> throwError errDatabaseAccessFailed
                     Right _ -> return NoContent
             Right (Just _) -> do
                 eAction <-
                     liftIO $
-                        Session.run (Sessions.updateExternalDocPermission userID docID permission) conn
+                        Session.run (Sessions.updateExternalPermission userID docID permission) conn
                 case eAction of
                     Left _ -> throwError errDatabaseAccessFailed
                     Right _ -> return NoContent
@@ -269,7 +269,7 @@ deleteExternalUserDocumentHandler (Authenticated token) docID userID = do
     postUser :: Connection -> Handler NoContent
     postUser conn = do
         eAction <-
-            liftIO $ Session.run (Sessions.deleteExternalDocPermission userID docID) conn
+            liftIO $ Session.run (Sessions.deleteExternalPermission userID docID) conn
         case eAction of
             Left _ -> throwError errDatabaseAccessFailed
             Right _ -> return NoContent

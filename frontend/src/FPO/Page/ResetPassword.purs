@@ -14,9 +14,9 @@ import Data.String.Regex (regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Store as Store
-import FPO.Page.HTML (addColumn)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.HTML (addColumn)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick, onSubmit, onValueInput) as HE

@@ -44,6 +44,11 @@
           pkgs.zlib # External C library needed by some Haskell packages
           pkgs.postgresql
           pkgs.sql-formatter
+          # python
+          (pkgs.python312.withPackages (python-pkgs: [
+            python-pkgs.requests
+          ]))
+          pkgs.basedpyright
         ];
 
         frontendDevTools = [

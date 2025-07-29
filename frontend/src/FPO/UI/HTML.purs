@@ -1,12 +1,13 @@
 -- | This module contains some HTML helpers and goodies for the FPO app,
 -- | useful for creating and reusing HTML components and pages.
 
-module FPO.Page.HTML where
+module FPO.UI.HTML where
 
 import Prelude
 
 import DOM.HTML.Indexed as I
 import DOM.HTML.Indexed.InputType (InputType)
+import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.String (null)
 import Halogen.HTML as H
@@ -112,13 +113,16 @@ addCard
   -> HH.HTML w i -- ^ content of the card
   -> HH.HTML w i
 addCard title e content =
-  HH.div e
-    [ HH.div ([ HP.classes [ HB.card ] ])
-        [ HH.h5 [ HP.classes [ HB.cardHeader ] ]
-            [ HH.text title ]
-        , content `addClass` HB.cardBody
-        ]
-    ]
+  if Array.null e then cardContent
+  else HH.div e [ cardContent ]
+  where
+  cardContent =
+    HH.div
+      [ HP.classes [ HB.card ] ]
+      [ HH.h5 [ HP.classes [ HB.cardHeader ] ]
+          [ HH.text title ]
+      , content `addClass` HB.cardBody
+      ]
 
 addModal
   :: forall w i

@@ -147,7 +147,7 @@ getUsersDocumentsHandler (Authenticated Auth.Token {..}) requestedUserID = do
                 Right docList -> do
                     mapM
                         ( \doc -> do
-                            mPerm <- checkDocPermission conn subject (Document.documentID doc)
+                            mPerm <- checkPermission conn subject (Document.documentID doc)
                             case mPerm of
                                 -- this should not happen, since the document is listed in visible documents,
                                 -- so the user should have atleast read permissions

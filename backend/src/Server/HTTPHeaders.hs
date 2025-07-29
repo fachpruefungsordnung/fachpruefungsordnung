@@ -30,9 +30,6 @@ type HeaderCacheControl = Header "Cache-Control" String
 
 data CacheControl = NoCache | MaxAge Int
 
-minutes5 :: Int
-minutes5 = 300
-
 instance Show CacheControl where
     show NoCache = "no-cache"
     show (MaxAge s) = "max-age=" ++ show s

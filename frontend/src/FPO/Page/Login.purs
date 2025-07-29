@@ -21,9 +21,9 @@ import FPO.Data.Request (postString) as Request
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.Login (LoginDto)
-import FPO.Page.HTML (addColumn)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.HTML (addColumn)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick, onSubmit) as HE
