@@ -25,7 +25,7 @@ import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto (DocumentID, getDHHeadCommit)
 import FPO.Dto.DocumentDto as DocumentDto
-import FPO.Dto.TreeDto (Tree(..), findTree)
+import FPO.Dto.TreeDto (RootTree(..), findRootTree)
 import FPO.Types
   ( AnnotatedMarker
   , Comment
@@ -48,6 +48,8 @@ import Type.Proxy (Proxy(Proxy))
 import Web.HTML as Web.HTML
 import Web.HTML.Window as Web.HTML.Window
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
+
+import Effect.Console (log)
 
 data DragTarget = ResizeLeft | ResizeRight
 
@@ -488,8 +490,12 @@ splitview docID = H.mkComponent
     -- H.liftEffect $ Console.log "Successfully posted TOC to server"
     ForceGET -> do
       -- Forces a GET request to fetch the latest document tree of commit #1.
+      -- testTree <- H.liftAff $
+      --   Request.getFromJSONEndpoint DocumentDto.decodeDocument "/docs/1/tree/latest"
+      -- H.liftEffect $ log $ "ForceGET: " <> show testTree
+      -- pure unit
       fetchedTree <- H.liftAff $
-        Request.getFromJSONEndpoint DocumentDto.decodeDocument "/commits/1"
+        Request.getFromJSONEndpoint DocumentDto.decodeDocument "/docs/1/tree/latest"
       let
         tree = case fetchedTree of
           Nothing -> Empty
@@ -529,7 +535,7 @@ splitview docID = H.mkComponent
       -- -- H.tell _editor unit (Editor.ChangeSection firstEntry)
       let timeFormatter = head timeStampsVersions
       H.modify_ \st -> do
-        st { tocEntries = Empty, mTimeFormatter = timeFormatter }
+        st { mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
       H.tell _commentOverview unit
         (CommentOverview.ReceiveTimeFormatter timeFormatter)
@@ -716,7 +722,7 @@ splitview docID = H.mkComponent
             state.tocEntries
           updateTOCEntry = fromMaybe
             emptyTOCEntry
-            (findTree (\e -> e.id == tocID) updatedTOCEntries)
+            (findRootTree (\e -> e.id == tocID) updatedTOCEntries)
         H.modify_ \s -> s { tocEntries = updatedTOCEntries }
         H.tell _editor unit (Editor.ChangeSection updateTOCEntry)
 
@@ -880,6 +886,6 @@ createExampleComments = do
 
 findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
 findCommentSection tocEntries tocID markerID = do
-  tocEntry <- findTree (\entry -> entry.id == tocID) tocEntries
+  tocEntry <- findRootTree (\entry -> entry.id == tocID) tocEntries
   marker <- find (\m -> m.id == markerID) tocEntry.markers
   marker.mCommentSection

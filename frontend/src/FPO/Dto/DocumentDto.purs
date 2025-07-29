@@ -6,20 +6,19 @@ import Data.Argonaut (Json)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError, decodeJson, (.:))
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Either (Either)
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype, unwrap)
-import FPO.Dto.TreeDto (Edge(..), Tree(..))
-
-newtype NodeWithRef = NodeWithRef
-  { id :: Int
-  , kind :: String
-  , content :: Maybe String
-  }
-
-type DocumentTree = Tree NodeWithRef
+import FPO.Dto.TreeDto (Edge(..), RootTree(..), Tree(..))
 
 type DocumentID = Int
 type CommitID = Int
+
+newtype NodeHeader = NodeHeader
+  { id :: Int
+  , kind :: String
+  }
+
+type DocumentTree = RootTree NodeHeader
 
 newtype DocumentHeader = DH
   { group :: Int, headCommit :: Maybe CommitID, id :: DocumentID, name :: String }
@@ -31,7 +30,7 @@ derive instance newtypeDocumentHeader :: Newtype DocumentHeader _
 derive instance newtypeDocumentHeaderPlusPermission ::
   Newtype DocumentHeaderPlusPermission _
 
-derive instance newtypeNodeWithRef :: Newtype NodeWithRef _
+derive instance newtypeNodeHeader :: Newtype NodeHeader _
 
 instance decodeJsonHeader :: DecodeJson DocumentHeader where
   decodeJson json = do
@@ -64,37 +63,31 @@ getDHPPName (DHPP dhpp) = getDHName dhpp.document
 getDHPPID :: DocumentHeaderPlusPermission -> Int
 getDHPPID (DHPP dhpp) = getDHID dhpp.document
 
-instance decodeJsonNodeWithRef :: DecodeJson NodeWithRef where
+instance decodeJsonNodeHeader :: DecodeJson NodeHeader where
   decodeJson json = do
     obj <- decodeJson json
-    inner <- obj .: "content" -- neu: extrahiere das innere Objekt
-    id <- inner .: "id"
-    kind <- inner .: "kind"
-    content <- inner .: "content"
-    pure $ NodeWithRef { id, kind, content }
+    id <- obj .: "identifier"
+    kind <- obj .: "kind"
+    pure $ NodeHeader { id, kind }
 
-instance encodeJsonNodeWithRef :: EncodeJson NodeWithRef where
-  encodeJson (NodeWithRef { id, kind, content }) =
+instance encodeJsonNodeHeader :: EncodeJson NodeHeader where
+  encodeJson (NodeHeader { id, kind }) =
     encodeJson
       { content:
           { id
           , kind
-          , content
           }
       }
 
 -- show instances for debugging purposes
-instance showNodeWithRef :: Show NodeWithRef where
-  show (NodeWithRef { id, kind, content }) =
-    "NodeWithRef { id: " <> show id <> ", kind: " <> show kind <> ", content: "
-      <> show content
-      <> " }"
+instance showNodeHeader :: Show NodeHeader where
+  show (NodeHeader { id, kind }) =
+    "NodeHeader { id: " <> show id <> ", kind: " <> show kind <> " }"
 
 decodeDocument :: Json -> Either JsonDecodeError DocumentTree
 decodeDocument json = do
   obj <- decodeJson json
-  body <- obj .: "body"
-  root <- body .: "root"
+  root <- obj .: "root"
   decodeJson root
 
 -- Encode instances
@@ -107,27 +100,21 @@ encodeCreateCommit tree =
         , message: "Initial commit"
         , parents: [ 1 ]
         }
-    , root: encodeTree tree
+    , root: encodeRootTree tree
     }
 
-encodeTree :: DocumentTree -> Json
-encodeTree Empty = encodeJson {}
-encodeTree (Node { node, children }) =
+encodeRootTree :: DocumentTree -> Json
+encodeRootTree Empty = encodeJson {}
+encodeRootTree (RootTree { children }) =
+  encodeJson { children: map encodeEdge children }
+
+encodeTree :: Tree NodeHeader -> Json
+encodeTree (Node { children }) = encodeJson { edges: map encodeEdge children}
+encodeTree (Leaf { node }) =
   let
-    { id, kind, content } = unwrap node
+    { id, kind } = unwrap node
   in
-    encodeJson
-      { node:
-          { id
-          , kind
-          , content: fromMaybe "" content
-          }
-      , edges: map encodeEdge children
-      }
+  encodeJson { node: encodeJson { identifier: id, kind } }
 
-encodeEdge :: Edge NodeWithRef -> Json
-encodeEdge (Edge { title, child }) =
-  encodeJson
-    { title
-    , child: encodeTree child
-    }
+encodeEdge :: Edge NodeHeader -> Json
+encodeEdge (Edge child) = encodeJson { child: encodeTree child }

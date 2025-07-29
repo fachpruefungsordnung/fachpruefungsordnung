@@ -6,7 +6,7 @@ import Data.Array (concatMap)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
-import FPO.Dto.TreeDto (Edge(..), Tree(..))
+import FPO.Dto.TreeDto (Edge(..), RootTree(..), Tree(..))
 import FPO.Types (ShortendTOCEntry, TOCTree, shortenTOC)
 import Halogen as H
 import Halogen.HTML as HH
@@ -25,7 +25,7 @@ data Action
 data Query a = ReceiveTOCs (TOCTree) a
 
 type State =
-  { tocEntries :: Tree ShortendTOCEntry
+  { tocEntries :: RootTree ShortendTOCEntry
   , mSelectedTocEntry :: Maybe Int
   }
 
@@ -44,7 +44,7 @@ tocview = H.mkComponent
   render :: State -> forall slots. H.ComponentHTML Action slots m
   render state =
     HH.div_
-      (treeToHTML 0 state.mSelectedTocEntry state.tocEntries)
+      (rootTreeToHTML state.mSelectedTocEntry state.tocEntries)
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
@@ -70,14 +70,44 @@ tocview = H.mkComponent
         state { tocEntries = shortendEntries, mSelectedTocEntry = Nothing }
       pure (Just a)
 
+  rootTreeToHTML
+    :: Maybe Int
+    -> RootTree ShortendTOCEntry
+    -> forall slots
+     . Array (H.ComponentHTML Action slots m)
+  rootTreeToHTML _ Empty = []
+  rootTreeToHTML mSelectedTocEntry (RootTree { children }) =
+    [ HH.div
+        [ HP.style
+            "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0; padding-left: "
+        ]
+        [ HH.span
+            ( 
+              [ HP.classes [ HB.textTruncate ]
+              , HP.style " font-size: 2rem;"
+              ]
+            )
+            [ HH.text "Documentname" ]
+        ]
+    ] <> concatMap
+      ( \(Edge child) ->
+          treeToHTML 1 mSelectedTocEntry child
+      )
+      children
+
   treeToHTML
     :: Int
     -> Maybe Int
     -> Tree ShortendTOCEntry
     -> forall slots
      . Array (H.ComponentHTML Action slots m)
-  treeToHTML _ _ Empty = []
-  treeToHTML n mSelectedTocEntry (Node { node, children }) =
+  treeToHTML n mSelectedTocEntry (Node { children }) =
+    concatMap
+      ( \(Edge child) ->
+          treeToHTML (n + 1) mSelectedTocEntry child
+      )
+      children
+  treeToHTML n mSelectedTocEntry (Leaf { node }) =
     [ HH.div
         [ HP.title ("Jump to section " <> name)
         , HP.style
@@ -109,10 +139,6 @@ tocview = H.mkComponent
             )
             [ HH.text ((if n == 1 then "§" else "") <> name) ]
         ]
-    ] <> concatMap
-      ( \(Edge { child }) ->
-          treeToHTML (n + 1) mSelectedTocEntry child
-      )
-      children
+    ]
     where
-    { id, name } = node
+      { id, name } = node

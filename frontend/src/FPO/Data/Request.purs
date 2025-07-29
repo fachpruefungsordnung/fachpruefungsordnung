@@ -108,7 +108,7 @@ changeRole groupID userID role = do
 
 -- | Fetches the document header for a given document ID.
 getDocumentHeader :: DocumentID -> Aff (Maybe DocumentHeader)
-getDocumentHeader docID = getFromJSONEndpoint decodeJson ("/documents/" <> show docID)
+getDocumentHeader docID = getFromJSONEndpoint decodeJson ("/docs/" <> show docID <> "/tree/latest")
 
 -- | Creates a new document for the specified group.
 -- | TODO: This is according to the old API, might change in the future.

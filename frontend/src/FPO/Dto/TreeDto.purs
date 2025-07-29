@@ -1,80 +1,128 @@
 module FPO.Dto.TreeDto
   ( Tree(..)
   , Edge(..)
-  , findTree
+  , RootTree(..)
+  , findRootTree
   ) where
 
 import Prelude
 
 import Control.Alt ((<|>))
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Control.Monad.Except (throwError)
+import Data.Argonaut.Decode.Error (JsonDecodeError(TypeMismatch))
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Foldable (foldr)
 import Data.Maybe (Maybe(..))
+import Data.Traversable (traverse)
 
-data Tree a
+data RootTree a 
   = Empty
-  | Node { node :: a, children :: Array (Edge a) }
+  | RootTree { children :: Array (Edge a) }
 
-data Edge a = Edge
-  { title :: String
-  , child :: Tree a
-  }
+data Tree a 
+  = Node { title :: String, children :: Array (Edge a) }
+  | Leaf { title :: String, node :: a }
 
+data Edge a = Edge (Tree a)
+
+-- automatically derive instances for Functor
+
+derive instance functorRootTree :: Functor RootTree
 derive instance functorTree :: Functor Tree
--- map f (Tree { node, children }) = Tree { node: f node, children: map (map f) children }
 derive instance functorEdge :: Functor Edge
--- map f (Edge { title, child }) = Edge { title, child: map f child }
 
 -- derive instance newtypeTree :: Newtype (Tree a) _
 -- derive instance newtypeEdge :: Newtype (Edge a) _
 
-instance decodeJsonEdge :: DecodeJson a => DecodeJson (Edge a) where
+-- DecodeJson instances
+
+instance decodeJsonRootTree :: DecodeJson a => DecodeJson (RootTree a) where
   decodeJson json = do
     obj <- decodeJson json
-    title <- obj .: "title"
-    child <- obj .: "child"
-    pure $ Edge { title, child }
+    childrenArr <- obj .: "children"
+    children <- traverse (map Edge <<< decodeJson) childrenArr
+    pure $ RootTree { children }
+
+instance decodeJsonEdge :: DecodeJson a => DecodeJson (Edge a) where
+  decodeJson json = Edge <$> decodeJson json
 
 instance decodeJsonTree :: DecodeJson a => DecodeJson (Tree a) where
   decodeJson json = do
     obj <- decodeJson json
-    node <- obj .: "node"
-    children <- obj .: "children"
-    pure $ Node { node, children }
+    title <- obj .: "title"
+    content <- obj .: "content"
+    typ <- content .: "type"
+
+    case typ of
+      "leaf" -> do
+        leafVal <- content .: "leaf"
+        node <- decodeJson leafVal
+        pure $ Leaf { title, node }
+
+      "tree" -> do
+        node <- content .: "node"
+        childrenArr <- node .: "children"
+        children <- traverse (map Edge <<< decodeJson) childrenArr
+        pure $ Node { title, children }
+
+      _ -> throwError $ TypeMismatch $ "Unknown node type: " <> typ
+
+
+-- EncodeJson instances
+
+instance encodeJsonRootTree :: EncodeJson a => EncodeJson (RootTree a) where
+  encodeJson Empty               = encodeJson {}
+  encodeJson (RootTree children) = encodeJson { children }
 
 instance encodeJsonEdge :: EncodeJson a => EncodeJson (Edge a) where
-  encodeJson (Edge { title, child }) =
-    encodeJson
-      { title
-      , child
-      }
+  encodeJson (Edge child) = encodeJson { child }
 
 instance encodeJsonTree :: EncodeJson a => EncodeJson (Tree a) where
-  encodeJson Empty = encodeJson {}
-  encodeJson (Node { node, children }) =
+  encodeJson (Node { title, children }) =
     encodeJson
-      { node
+      { title
       , children
       }
+  encodeJson (Leaf { title, node }) =
+    encodeJson
+      { title
+      , node
+      }
+
+-- Show instances
+
+instance showRootTree :: Show a => Show (RootTree a) where
+  show Empty = "Empty"
+  show (RootTree children) =
+    "RootTree { children: " <> show children <> " }"
 
 instance showEdge :: Show a => Show (Edge a) where
-  show (Edge { title, child }) =
-    "Edge { title: " <> show title <> ", child: " <> show child <> " }"
+  show (Edge child ) =
+    "Edge { child: " <> show child <> " }"
 
 instance showTree :: Show a => Show (Tree a) where
-  show Empty = "Empty"
-  show (Node { node, children }) =
-    "Tree { node: " <> show node <> ", children: " <> show children <> " }"
+  show (Node { title, children }) =
+    "Tree { title: " <> title <> ", children: " <> show children <> " }"
+  show (Leaf { title, node }) =
+    "Tree { title: " <> title <> ", node: " <> show node <> " }"
 
 -- TODO: DFS. Maybe use a different search method? But maybe not necessary,
 -- because the document tree may never be that large to notice. 
+findRootTree :: forall a. (a -> Boolean) -> RootTree a -> Maybe a
+findRootTree _ Empty = Nothing
+findRootTree predicate (RootTree { children }) =
+  foldr
+    (\(Edge child) acc -> acc <|> findTree predicate child)
+    Nothing
+    children
+
+
 findTree :: forall a. (a -> Boolean) -> Tree a -> Maybe a
-findTree _ Empty = Nothing
-findTree predicate (Node { node, children }) =
-  if predicate node then Just node
-  else
-    foldr
-      (\(Edge { child }) acc -> acc <|> findTree predicate child)
+findTree predicate (Node { children }) = 
+  foldr
+      (\(Edge child) acc -> acc <|> findTree predicate child)
       Nothing
       children
+findTree predicate (Leaf { node }) =
+  if predicate node then Just node else Nothing
