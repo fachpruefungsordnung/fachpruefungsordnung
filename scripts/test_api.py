@@ -29,18 +29,18 @@ class Client:
             print(f"Error: {response.status_code}")
 
     def document(self, doc_id: int) -> str:
-        return self.get_json(f"v2/docs/{doc_id}")
+        return self.get_json(f"docs/{doc_id}")
 
     def document_tree(self, doc_id: int, revision: Literal["latest"] | int) -> str:
-        return self.get_json(f"v2/docs/{doc_id}/tree/{revision}")
+        return self.get_json(f"docs/{doc_id}/tree/{revision}")
 
     def document_tree_full(self, doc_id: int, revision: Literal["latest"] | int) -> str:
-        return self.get_json(f"v2/docs/{doc_id}/tree/{revision}/full")
+        return self.get_json(f"docs/{doc_id}/tree/{revision}/full")
 
     def document_history(self, doc_id: int, before: str|None=None, limit: int|None=None) -> str:
         query = "&".join([f"{name}={value}" for (name, value) in [("before", before), ("limit", limit)] if value])
         query = f"?{query}" if query else ""
-        return self.get_json(f"v2/docs/{doc_id}/history{query}")
+        return self.get_json(f"docs/{doc_id}/history{query}")
 
     def post(self, endpoint: str, payload: object) -> Response:
         return self.__session.post(
