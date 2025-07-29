@@ -38,7 +38,6 @@ type Comment =
 type TOCEntry =
   { id :: Int
   , name :: String
-  , content :: String
   -- Is stored as 32bit Int = 2,147,483,647
   -- Schould not create so many markers, right?
   , newMarkerNextID :: Int
@@ -59,7 +58,6 @@ emptyTOCEntry :: TOCEntry
 emptyTOCEntry =
   { id: -1
   , name: "Error"
-  , content: "Error"
   , newMarkerNextID: -1
   , markers: []
   }
@@ -146,7 +144,6 @@ nodeHeaderToTOCEntry :: NodeHeader -> TOCEntry
 nodeHeaderToTOCEntry (NodeHeader { id, kind }) =
   { id: id
   , name: kind
-  , content: ""
   , newMarkerNextID: 0
   , markers: []
   }

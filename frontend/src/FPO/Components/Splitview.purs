@@ -9,13 +9,12 @@ module FPO.Component.Splitview where
 import Prelude
 
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
-import Data.Array (find, head, intercalate, range)
+import Data.Array (find, head)
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Now (nowDateTime)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
 import FPO.Components.Editor as Editor
@@ -27,10 +26,7 @@ import FPO.Dto.DocumentDto (DocumentID, getDHHeadCommit)
 import FPO.Dto.DocumentDto as DocumentDto
 import FPO.Dto.TreeDto (RootTree(..), findRootTree)
 import FPO.Types
-  ( AnnotatedMarker
-  , Comment
-  , CommentSection
-  , TOCEntry
+  ( CommentSection
   , TOCTree
   , documentTreeToTOCTree
   , emptyTOCEntry
@@ -50,6 +46,7 @@ import Web.HTML.Window as Web.HTML.Window
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 
 import Effect.Console (log)
+import Data.Argonaut.Core (stringify)
 
 data DragTarget = ResizeLeft | ResizeRight
 
@@ -190,7 +187,7 @@ splitview docID = H.mkComponent
       [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
       [ toolbarButton "[=]" ToggleSidebar
       , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
-      , toolbarButton "ForceGET" ForceGET
+      , toolbarButton "ForceGETPH" ForceGET
       , toolbarButton "GET" GET
       , toolbarButton "POST" POST
       , toolbarButton "All Comments" (ToggleCommentOverview true)
@@ -490,12 +487,20 @@ splitview docID = H.mkComponent
     -- H.liftEffect $ Console.log "Successfully posted TOC to server"
     ForceGET -> do
       -- Forces a GET request to fetch the latest document tree of commit #1.
-      -- testTree <- H.liftAff $
-      --   Request.getFromJSONEndpoint DocumentDto.decodeDocument "/docs/1/tree/latest"
-      -- H.liftEffect $ log $ "ForceGET: " <> show testTree
+      test <- H.liftAff $
+      --/docs/{documentID}/text/{textElementID}/rev/{textRevision}
+        Request.getJson "/docs/1/text/1/rev/latest"
+      case test of
+        Left err -> do
+          H.liftEffect $ log $ Request.printError "test" err
+          pure unit
+        Right res -> do
+          let json = res.body
+          H.liftEffect $ log $ stringify json
       -- pure unit
       fetchedTree <- H.liftAff $
         Request.getFromJSONEndpoint DocumentDto.decodeDocument "/docs/1/tree/latest"
+      --H.liftEffect $ log $ "ForceGET: " <> show fetchedTree
       let
         tree = case fetchedTree of
           Nothing -> Empty
@@ -785,104 +790,6 @@ splitview docID = H.mkComponent
         H.tell _editor unit (Editor.ChangeSection entry)
 
 -- Create example TOC entries for testing purposes in Init
-
-createExampleTOCEntries
-  :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array TOCEntry)
-createExampleTOCEntries = do
-  -- Since all example entries are similar, we create the same markers for all
-  exampleMarkers <- createExampleMarkers
-  let
-    -- Create initial TOC entries
-    entries = map
-      ( \n ->
-          { id: n
-          , name: "§" <> show n <> " This is Paragraph " <> show n
-          , content: createExampleTOCText n
-          , newMarkerNextID: 1
-          , markers: exampleMarkers
-          }
-      )
-      (range 1 11)
-  pure entries
-
-createExampleTOCText :: Int -> String
-createExampleTOCText n =
-  intercalate "\n" $
-    [ "# This is content of §" <> show n
-    , ""
-    , "-- This is a developer comment."
-    , ""
-    , "## To-Do List"
-    , ""
-    , "1. Document initial setup."
-    , "2. <*Define the API*>                        % LTML: bold"
-    , "3. <_Underline important interface items_>   % LTML: underline"
-    , "4. </Emphasize optional features/>           % LTML: italic"
-    , ""
-    , "/* Note: Nested styles are allowed,"
-    , "   but not transitively within the same tag type!"
-    , "   Written in a code block."
-    , "*/"
-    , ""
-    , "<*This is </allowed/>*>                      % valid nesting"
-    , "<*This is <*not allowed*>*>                  % invalid, but still highlighted"
-    , ""
-    , "## Status"
-    , ""
-    , "Errors can no longer be marked as such, see error!"
-    , "Comment this section out of the code."
-    , ""
-    , "TODO: Write the README file."
-    , "FIXME: The parser fails on nested blocks."
-    , "NOTE: We're using this style as a placeholder."
-    ]
-
-createExampleMarkers
-  :: forall m
-   . MonadAff m
-  => H.HalogenM State Action Slots Output m (Array AnnotatedMarker)
-createExampleMarkers = do
-  commentSection <- createExampleCommentSection
-  let
-    entry =
-      { id: 0
-      , type: "info"
-      , startRow: 7
-      , startCol: 3
-      , endRow: 7
-      , endCol: 26
-      , markerText: "Author 1"
-      , mCommentSection: Just commentSection
-      }
-  pure [ entry ]
-
-createExampleCommentSection
-  :: forall m. MonadAff m => H.HalogenM State Action Slots Output m CommentSection
-createExampleCommentSection = do
-  comments <- createExampleComments
-  let
-    commentSection =
-      { -- Since in init, all markers have the same ID
-        markerID: 1
-      , comments: comments
-      , resolved: false
-      }
-  pure commentSection
-
-createExampleComments
-  :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array Comment)
-createExampleComments = do
-  now <- H.liftEffect nowDateTime
-  let
-    comments = map
-      ( \n ->
-          { author: "Author " <> show (mod n 2)
-          , timestamp: now
-          , content: "This is comment number " <> show n
-          }
-      )
-      (range 1 6)
-  pure comments
 
 findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
 findCommentSection tocEntries tocID markerID = do

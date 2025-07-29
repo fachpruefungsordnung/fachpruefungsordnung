@@ -351,13 +351,8 @@ editor = connect selectTranslator $ H.mkComponent
             }
 
         mLiveMarker <- H.liftEffect $ addAnchor newMarker session
-        -- Textinhalt holen
-        allLines <- H.liftEffect do
-          doc <- Session.getDocument session
-          Document.getAllLines doc
 
         let
-          contentText = intercalate "\n" allLines
           newLiveMarkers = case mLiveMarker of
             Nothing -> state.liveMarkers
             Just lm -> lm : state.liveMarkers
@@ -368,7 +363,6 @@ editor = connect selectTranslator $ H.mkComponent
               newEntry =
                 { id: entry.id
                 , name: entry.name
-                , content: contentText
                 , newMarkerNextID: entry.newMarkerNextID + 1
                 , markers: sortMarkers (newMarker : entry.markers)
                 }
@@ -426,7 +420,6 @@ editor = connect selectTranslator $ H.mkComponent
             Nothing ->
               { id: -1
               , name: "No entry"
-              , content: ""
               , newMarkerNextID: -1
               , markers: []
               }
@@ -458,7 +451,7 @@ editor = connect selectTranslator $ H.mkComponent
           document <- Session.getDocument session
 
           -- Set editor content
-          let content = entry.content
+          let content = "TODO: get content from API"
           Document.setValue content document
 
           -- Reset Undo history
@@ -510,7 +503,6 @@ editor = connect selectTranslator $ H.mkComponent
           Nothing ->
             { id: -1
             , name: "Section not found"
-            , content: ""
             , newMarkerNextID: -1
             , markers: []
             }
@@ -534,9 +526,9 @@ editor = connect selectTranslator $ H.mkComponent
                 }
       let
         newEntry = entry
-          { content = contentText
-          , markers = updatedMarkers
-          }
+          { markers = updatedMarkers }
+      
+      --TODO send the content (contentText) as POST to the server
 
       H.modify_ \st -> st { mTocEntry = Just newEntry }
       H.raise (SavedSection newEntry)
