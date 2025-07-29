@@ -54,6 +54,7 @@ import Web.HttpApiData (FromHttpApiData (..))
 
 import UserManagement.User (UserID)
 
+import Data.Typeable (typeRep)
 import Docs.Document (DocumentID (..))
 import Docs.TextElement (TextElement, TextElementID)
 import Docs.TextRevision (TextElementRevision, TextRevision)
@@ -190,14 +191,18 @@ instance (ToSchema a) => ToSchema (TreeRevision a) where
     declareNamedSchema _ = do
         headerSchema <- declareSchemaRef (Proxy :: Proxy TreeRevisionHeader)
         rootSchema <- declareSchemaRef (Proxy :: Proxy (Node a))
-        return $
-            NamedSchema (Just "TreeRevision") $
-                mempty
-                    & type_ ?~ OpenApiObject
-                    & properties
-                        .~ InsOrd.fromList
-                            [("header", headerSchema), ("root", rootSchema)]
-                    & required .~ ["header", "root"]
+        return
+            $ NamedSchema
+                (Just $ withTypeName "TreeRevision")
+            $ mempty
+                & type_ ?~ OpenApiObject
+                & properties
+                    .~ InsOrd.fromList
+                        [("header", headerSchema), ("root", rootSchema)]
+                & required .~ ["header", "root"]
+      where
+        withTypeName s = Text.pack $ s ++ " " ++ typeName
+        typeName = show $ typeRep (Proxy :: Proxy a)
 
 -- | Sequence of revisions for a document tree.
 data TreeRevisionHistory

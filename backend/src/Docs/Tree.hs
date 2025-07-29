@@ -36,6 +36,8 @@ import Data.OpenApi
     , type_
     )
 
+import qualified Data.Text as Text
+import Data.Typeable (typeRep)
 import Docs.TextElement (TextElement, TextElementID)
 import qualified Docs.TextElement as TextElement
 import Docs.TextRevision
@@ -98,7 +100,7 @@ instance (ToSchema a) => ToSchema (Tree a) where
         leafSchema <- declareSchemaRef (Proxy :: Proxy a)
 
         return $
-            NamedSchema (Just "Tree") $
+            NamedSchema (Just $ withTypeName "Tree") $
                 mempty
                     & type_ ?~ OpenApiObject
                     & oneOf
@@ -127,6 +129,8 @@ instance (ToSchema a) => ToSchema (Tree a) where
             mempty
                 & type_ ?~ OpenApiString
                 & enum_ ?~ [toJSON val]
+        withTypeName s = Text.pack $ s ++ " " ++ typeName
+        typeName = show $ typeRep (Proxy :: Proxy a)
 
 -- | An edge (from a node) to a node or leaf.
 data Edge a = Edge
