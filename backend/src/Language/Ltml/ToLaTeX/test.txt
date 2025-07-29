@@ -1,0 +1,15 @@
+={main} Main
+
+§{sectiona} Some section
+
+This paragraph is in {:sectiona} in super-section {:main}.
+
+This is another paragraph in {:sectiona}.
+Paragraphs don't have keywords and are just separated by empty lines.
+
+§{sectionb} Another section, with a title
+  spanning
+  several lines
+    ^ Also, a footnote.
+
+This paragraph is in {:sectionb} in super-section {:main}.
