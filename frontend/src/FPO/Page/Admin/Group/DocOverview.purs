@@ -88,6 +88,7 @@ data Action
   | ViewDocument DocumentID
   | ChangeSorting TH.Output
   | DoNothing
+  | NavigateToMembers
   -- | Actions regarding deletion of documents.
   -- | Handles modal and deletion logic.
   | RequestDeleteDocument Int
@@ -268,7 +269,7 @@ component =
             ]
           else
             ( map (renderDocumentRow state) docs
-                <> replicate (10 - length docs) emptyDocumentRow
+                <> replicate (10 - length docs) (emptyDocumentRow state)
             ) -- Fill up to 10 rows
       ]
     where
@@ -283,7 +284,7 @@ component =
       {-       , { title: "Archived?"
       , style: Nothing
       } -}
-      , { title: "Delete?"
+      , { title: ""
         , style: Nothing
         }
       ]
@@ -303,18 +304,18 @@ component =
       {-       , HH.td [ HP.classes [ HB.textCenter ] ]
       [ HH.text (show document.header.archivedStatus) ] -}
       , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ buttonDeleteDocument document.header.id ]
+          [ buttonDeleteDocument state document.header.id ]
       ]
 
   -- Renders an empty project row for padding.
-  emptyDocumentRow :: forall w. HH.HTML w Action
-  emptyDocumentRow =
+  emptyDocumentRow :: forall w. State -> HH.HTML w Action
+  emptyDocumentRow state =
     HH.tr []
       [ HH.td
           [ HP.colSpan 3
           , HP.classes [ HB.textCenter, HB.invisible ]
           ]
-          [ HH.text $ "Empty Row", buttonDeleteDocument (-1) ]
+          [ HH.text $ "Empty Row", buttonDeleteDocument state (-1) ]
       ]
 
   renderSideButtons :: forall w. State -> HH.HTML w Action
@@ -333,7 +334,7 @@ component =
   renderToMemberButton state =
     HH.button
       [ Style.cyanStyle
-      , HE.onClick (const $ DoNothing)
+      , HE.onClick (const NavigateToMembers)
       ]
       [ HH.text $ translate (label :: _ "common_members") state.translator ]
 
@@ -345,11 +346,14 @@ component =
       ]
       [ HH.text $ translate (label :: _ "gp_newProject") state.translator ]
 
-  buttonDeleteDocument :: forall w. Int -> HH.HTML w Action
-  buttonDeleteDocument documentID =
+  buttonDeleteDocument :: forall w. State -> Int -> HH.HTML w Action
+  buttonDeleteDocument state documentID =
     HH.button
       [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm ]
       , HE.onClick (const $ RequestDeleteDocument documentID)
+      , Style.popover
+          ( translate (label :: _ "gp_removeProject") state.translator
+          )
       ]
       [ HH.i [ HP.class_ $ HH.ClassName "bi-trash" ] [] ]
 
@@ -576,6 +580,10 @@ component =
       H.tell _pagination unit $ P.SetPageQ 0
     DoNothing ->
       pure unit
+    NavigateToMembers -> do
+      log "Routing to member overview"
+      s <- H.get
+      navigate (ViewGroupMembers { groupID: s.groupID })
 
   -- | Sets the modal waiting state if the current modal has waiting capabilities.
   -- | This is used to disable buttons and show a loading state, prohibiting further actions.

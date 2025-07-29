@@ -1,7 +1,18 @@
 -- | All DTOs and data representations related to groups.
 module FPO.Dto.GroupDto where
 
-import Data.Argonaut (class DecodeJson, class EncodeJson)
+import Prelude
+
+import Data.Argonaut
+  ( class DecodeJson
+  , class EncodeJson
+  , JsonDecodeError(..)
+  , decodeJson
+  , encodeJson
+  )
+import Data.Array (find)
+import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 
 type GroupID = Int
@@ -27,3 +38,69 @@ newtype GroupCreate = GroupCreate
 derive instance newtypeGroupCreate :: Newtype GroupCreate _
 derive newtype instance encodeJsonGroupCreate :: EncodeJson GroupCreate
 derive newtype instance decodeJsonGroupCreate :: DecodeJson GroupCreate
+
+-- | Represents a group entity, as returned by the `GET /groups/{groupID}` endpoint.
+newtype GroupDto = GroupDto
+  { groupDescription :: String
+  , groupID :: GroupID
+  , groupMembers :: Array GroupMemberDto
+  , groupName :: String
+  }
+
+getGroupName :: GroupDto -> String
+getGroupName (GroupDto g) = g.groupName
+
+getGroupMembers :: GroupDto -> Array GroupMemberDto
+getGroupMembers (GroupDto g) = g.groupMembers
+
+lookupUser :: GroupDto -> UserID -> Maybe GroupMemberDto
+lookupUser (GroupDto g) userID =
+  find (\member -> getUserInfoID member == userID) g.groupMembers
+
+derive instance newtypeGroupDto :: Newtype GroupDto _
+derive newtype instance encodeJsonGroupDto :: EncodeJson GroupDto
+derive newtype instance decodeJsonGroupDto :: DecodeJson GroupDto
+
+type UserID = String
+
+data Role = Admin | Member
+
+derive instance eqRole :: Eq Role
+
+instance encodeJsonRole :: EncodeJson Role where
+  encodeJson Admin = encodeJson "Admin"
+  encodeJson Member = encodeJson "Member"
+
+instance decodeJsonRole :: DecodeJson Role where
+  decodeJson json = do
+    str <- decodeJson json
+    case str of
+      "Admin" -> Right Admin
+      "Member" -> Right Member
+      _ -> Left $ UnexpectedValue json
+
+stringToRole :: String -> Maybe Role
+stringToRole "Admin" = Just Admin
+stringToRole "Member" = Just Member
+stringToRole _ = Nothing
+
+-- | Represents a group member entity, as returned by the `GET /groups/{groupID}` endpoint.
+newtype GroupMemberDto = GroupMemberDto
+  { userInfoEmail :: String
+  , userInfoID :: UserID
+  , userInfoName :: String
+  , userInfoRole :: Role
+  }
+
+getUserInfoName :: GroupMemberDto -> String
+getUserInfoName (GroupMemberDto m) = m.userInfoName
+
+getUserInfoRole :: GroupMemberDto -> Role
+getUserInfoRole (GroupMemberDto m) = m.userInfoRole
+
+getUserInfoID :: GroupMemberDto -> UserID
+getUserInfoID (GroupMemberDto m) = m.userInfoID
+
+derive instance newtypeGroupMemberDto :: Newtype GroupMemberDto _
+derive newtype instance encodeJsonGroupMemberDto :: EncodeJson GroupMemberDto
+derive newtype instance decodeJsonGroupMemberDto :: DecodeJson GroupMemberDto

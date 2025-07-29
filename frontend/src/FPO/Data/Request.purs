@@ -26,7 +26,7 @@ import Effect.Class (liftEffect)
 import Effect.Console (log)
 import FPO.Dto.CreateDocumentDto (DocumentCreateDto)
 import FPO.Dto.DocumentDto (DocumentHeader, DocumentHeaderPlusPermission, DocumentID)
-import FPO.Dto.GroupDto (GroupCreate, GroupOverview)
+import FPO.Dto.GroupDto (GroupCreate, GroupDto, GroupID, GroupOverview, Role, UserID)
 import FPO.Dto.UserDto (User, decodeUser)
 import Foreign (renderForeignError)
 import Web.DOM.Document (Document)
@@ -97,6 +97,15 @@ getUser = getFromJSONEndpoint decodeUser "/me"
 getGroups :: Aff (Maybe (Array GroupOverview))
 getGroups = getFromJSONEndpoint (decodeArray decodeJson) "/groups"
 
+-- | Fetches a specific group by its ID.
+getGroup :: GroupID -> Aff (Maybe GroupDto)
+getGroup groupID = getFromJSONEndpoint decodeJson ("/groups/" <> show groupID)
+
+changeRole :: GroupID -> UserID -> Role -> Aff (Either Error (Response Unit))
+changeRole groupID userID role = do
+  let body = encodeJson role
+  putIgnore ("/roles/" <> show groupID <> "/" <> userID) body
+
 -- | Fetches the document header for a given document ID.
 getDocumentHeader :: DocumentID -> Aff (Maybe DocumentHeader)
 getDocumentHeader docID = getFromJSONEndpoint decodeJson ("/documents/" <> show docID)
@@ -117,6 +126,19 @@ getDocumentsFromURLWithPermission url = getFromJSONEndpoint
 
 addGroup :: GroupCreate -> Aff (Either Error (Response Json))
 addGroup group = postJson "/groups" (encodeJson group)
+
+-- | PUT-Requests ----------------------------------------------------------
+putJson :: String -> Json -> Aff (Either Error (Response Json))
+putJson url body = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.json ("/api" <> url) PUT
+  let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
+
+putIgnore :: String -> Json -> Aff (Either Error (Response Unit))
+putIgnore url body = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.ignore ("/api" <> url) PUT
+  let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
 
 -- | GET-Requests ----------------------------------------------------------
 

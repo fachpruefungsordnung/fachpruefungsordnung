@@ -45,7 +45,8 @@ deleteConfirmationModal
   cancelAction
   confirmAction
   objectTypeName =
-  addModal "Confirm Delete" (const cancelAction) $
+  addModal (translate (label :: _ "common_confirmDelete") translator)
+    (const cancelAction) $
     [ HH.div
         [ HP.classes [ HB.modalBody ] ]
         [ HH.text $

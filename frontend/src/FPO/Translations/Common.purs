@@ -5,6 +5,7 @@ import Simple.I18n.Translation (Translation, fromRecord)
 
 type CommonLabels =
   ( "common_cancel"
+      ::: "common_confirmDelete"
       ::: "common_create"
       ::: "common_delete"
       ::: "common_deletePhraseA"
@@ -14,11 +15,15 @@ type CommonLabels =
       ::: "common_filterBy"
       ::: "common_group"
       ::: "common_home"
+      ::: "common_member"
       ::: "common_members"
+      ::: "common_membersOf"
       ::: "common_password"
       ::: "common_project"
+      ::: "common_projects"
       ::: "common_submit"
       ::: "common_theGroup"
+      ::: "common_user"
       ::: "common_userName"
       ::: SNil
   )
@@ -26,6 +31,7 @@ type CommonLabels =
 enCommon :: Translation CommonLabels
 enCommon = fromRecord
   { common_cancel: "Cancel"
+  , common_confirmDelete: "Confirm Delete"
   , common_create: "Create"
   , common_delete: "Delete"
   , common_deletePhraseA: "Are you sure you want to delete "
@@ -35,9 +41,13 @@ enCommon = fromRecord
   , common_filterBy: "Filter by"
   , common_group: "group"
   , common_home: "Home"
+  , common_member: "Member"
   , common_members: "Members"
+  , common_membersOf: "Members of "
   , common_password: "Password"
   , common_project: "project"
+  , common_projects: "Projects"
+  , common_user: "User"
   , common_userName: "User name"
   -- TODO: Change to "the group"? Not sure if this sounds better
   --       in english, but using the article might sound better in
@@ -49,6 +59,7 @@ enCommon = fromRecord
 deCommon :: Translation CommonLabels
 deCommon = fromRecord
   { common_cancel: "Abbrechen"
+  , common_confirmDelete: "Löschen bestätigen"
   , common_create: "Erstellen"
   , common_delete: "Löschen"
   , common_deletePhraseA: "Sind Sie sicher, dass Sie "
@@ -58,9 +69,13 @@ deCommon = fromRecord
   , common_filterBy: "Filtern nach"
   , common_group: "Gruppe"
   , common_home: "Start"
+  , common_member: "Mitglied"
   , common_members: "Mitglieder"
+  , common_membersOf: "Mitglieder von "
   , common_password: "Passwort"
   , common_project: "Projekt"
+  , common_projects: "Projekte"
+  , common_user: "Benutzer"
   , common_userName: "Benutzername"
   , common_theGroup: "die Gruppe"
   , common_submit: "Absenden"

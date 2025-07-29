@@ -21,6 +21,7 @@ data Route
   | AdminViewUsers
   | AdminViewGroups
   | ViewGroupDocuments { groupID :: GroupID }
+  | ViewGroupMembers { groupID :: GroupID }
   | Page404
   | Profile { loginSuccessful :: Maybe Boolean }
 
@@ -38,6 +39,7 @@ routeCodec = root $ sum
   , "AdminViewUsers": "admin-users" / noArgs
   , "AdminViewGroups": "admin-groups" / noArgs
   , "ViewGroupDocuments": "view-group-documents" ? { groupID: int }
+  , "ViewGroupMembers": "view-group-members" ? { groupID: int }
   , "Page404": "404" / noArgs
   , "Profile": "profile" ? { loginSuccessful: optional <<< boolean }
   }
@@ -53,6 +55,7 @@ routeToString = case _ of
   AdminViewUsers -> "AdminViewUsers"
   AdminViewGroups -> "AdminViewGroups"
   ViewGroupDocuments groupID -> "ViewGroupDocuments:" <> show groupID
+  ViewGroupMembers groupID -> "ViewGroupMembers:" <> show groupID
   Page404 -> "Page404"
   Profile { loginSuccessful } -> "Profile" <>
     ( if loginSuccessful == Nothing then ""

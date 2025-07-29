@@ -10,6 +10,7 @@ type GroupProjectsPageLabels =
       ::: "gp_groupProjects"
       ::: "gp_newProject"
       ::: "gp_projectManagement"
+      ::: "gp_removeProject"
       ::: "gp_searchProjects"
       ::: SNil
   )
@@ -22,6 +23,7 @@ enGroupProjectsPage = fromRecord
   , gp_groupProjects: "Projects of Group"
   , gp_newProject: "Create Project"
   , gp_projectManagement: "Project Management"
+  , gp_removeProject: "Remove Project"
   , gp_searchProjects: "Search for Projects"
   }
 
@@ -33,5 +35,6 @@ deGroupProjectsPage = fromRecord
   , gp_groupProjects: "Projekte der Gruppe"
   , gp_newProject: "Neues Projekt"
   , gp_projectManagement: "Projektverwaltung"
+  , gp_removeProject: "Projekt entfernen"
   , gp_searchProjects: "Suche nach Projekten"
   }
