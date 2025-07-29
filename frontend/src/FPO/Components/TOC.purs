@@ -101,15 +101,34 @@ tocview = H.mkComponent
     -> Tree ShortendTOCEntry
     -> forall slots
      . Array (H.ComponentHTML Action slots m)
-  treeToHTML n mSelectedTocEntry (Node { children }) =
-    concatMap
+  treeToHTML n mSelectedTocEntry (Node { title, children }) =
+    [ HH.div
+      [ HP.style
+          ( "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0; padding-left: "
+              <> (show (1.5 * toNumber n))
+              <> "rem;"
+          )
+      ]
+      [ HH.span
+        [ HP.classes [ HB.textTruncate ]
+        , HP.style
+            ( if n == 0 then " font-size: 2rem;"
+              else "cursor: pointer; display: inline-block; min-width: 6ch;"
+                <>
+                  if n == 1 then " font-size: 1.25rem;"
+                  else ""
+            )
+        ]
+        [ HH.text (title) ]
+      ]
+    ] <> concatMap
       ( \(Edge child) ->
           treeToHTML (n + 1) mSelectedTocEntry child
       )
       children
-  treeToHTML n mSelectedTocEntry (Leaf { node }) =
+  treeToHTML n mSelectedTocEntry (Leaf { title, node }) =
     [ HH.div
-        [ HP.title ("Jump to section " <> name)
+        [ HP.title ("Jump to section " <> title)
         , HP.style
             ( "white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0.25rem 0; padding-left: "
                 <> (show (1.5 * toNumber n))
@@ -118,7 +137,7 @@ tocview = H.mkComponent
         ]
         [ HH.span
             ( ( if n == 0 then []
-                else [ HE.onClick \_ -> JumpToSection { id, name } ]
+                else [ HE.onClick \_ -> JumpToSection { id, name: title } ]
               )
                 <>
                   [ HP.classes
@@ -129,16 +148,15 @@ tocview = H.mkComponent
                             else []
                       )
                   , HP.style
-                      ( if n == 0 then " font-size: 2rem;"
-                        else "cursor: pointer; display: inline-block; min-width: 6ch;"
-                          <>
-                            if n == 1 then " font-size: 1.25rem;"
-                            else ""
+                      ( "cursor: pointer; display: inline-block; min-width: 6ch;"
+                        <>
+                          if n == 1 then " font-size: 1.25rem;"
+                          else ""
                       )
                   ]
             )
-            [ HH.text ((if n == 1 then "§" else "") <> name) ]
+            [ HH.text (title) ]
         ]
     ]
     where
-      { id, name } = node
+      { id, name:_ } = node
