@@ -83,8 +83,7 @@ import Server.DTOs.Documents (Documents (Documents))
 import qualified Server.DTOs.Documents as Documents
 
 type DocsAPI =
-    "v2"
-        :> "docs"
+    "docs"
         :> ( {-   -} PostDocument
                 :<|> GetDocument
                 :<|> GetDocuments
