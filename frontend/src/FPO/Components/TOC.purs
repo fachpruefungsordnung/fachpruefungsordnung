@@ -16,11 +16,11 @@ import Halogen.Themes.Bootstrap5 as HB
 
 type Input = Unit
 
-data Output = ChangeSection ShortendTOCEntry
+data Output = ChangeSection Int
 
 data Action
   = Init
-  | JumpToSection ShortendTOCEntry
+  | JumpToSection Int
 
 data Query a = ReceiveTOCs (TOCTree) a
 
@@ -52,10 +52,10 @@ tocview = H.mkComponent
     Init -> do
       pure unit
 
-    JumpToSection entry -> do
+    JumpToSection id -> do
       H.modify_ \state ->
-        state { mSelectedTocEntry = Just entry.id }
-      H.raise (ChangeSection entry)
+        state { mSelectedTocEntry = Just id }
+      H.raise (ChangeSection id)
 
   handleQuery
     :: forall slots a
@@ -111,13 +111,7 @@ tocview = H.mkComponent
       ]
       [ HH.span
         [ HP.classes [ HB.textTruncate ]
-        , HP.style
-            ( if n == 0 then " font-size: 2rem;"
-              else "cursor: pointer; display: inline-block; min-width: 6ch;"
-                <>
-                  if n == 1 then " font-size: 1.25rem;"
-                  else ""
-            )
+        , HP.style $ if n == 1 then " font-size: 1.25rem;" else ""
         ]
         [ HH.text (title) ]
       ]
@@ -137,7 +131,7 @@ tocview = H.mkComponent
         ]
         [ HH.span
             ( ( if n == 0 then []
-                else [ HE.onClick \_ -> JumpToSection { id, name: title } ]
+                else [ HE.onClick \_ -> JumpToSection id ]
               )
                 <>
                   [ HP.classes

@@ -37,7 +37,10 @@ import FPO.Components.Editor.Keybindings
   , underscore
   )
 import FPO.Data.Request (getUser)
+import FPO.Data.Request as Request
 import FPO.Data.Store as Store
+import FPO.Dto.ContentDto (Content)
+import FPO.Dto.ContentDto as ContentDto
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
@@ -59,6 +62,7 @@ import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 type State = FPOState
   ( mEditor :: Maybe Types.Editor
   , mTocEntry :: Maybe TOCEntry
+  , mContent :: Maybe Content
   , liveMarkers :: Array LiveMarker
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
@@ -131,6 +135,7 @@ editor = connect selectTranslator $ H.mkComponent
     , mEditor: Nothing
     , liveMarkers: []
     , mTocEntry: Nothing
+    , mContent: Nothing
     , pdfWarningAvailable: false
     , pdfWarningIsShown: false
     , fontSize: 12
@@ -446,13 +451,24 @@ editor = connect selectTranslator $ H.mkComponent
       -- Put the content of the section into the editor and update markers
       H.gets _.mEditor >>= traverse_ \ed -> do
         state <- H.get
+
+        -- Get the content from server here
+        -- We need Aff for that and thus cannot go inside Eff
+        loadedContent <- H.liftAff $ 
+          Request.getFromJSONEndpoint 
+            ContentDto.decodeContent
+            ("/docs/1/text/"<> show entry.id <>"/rev/latest")
+        let
+          content = case loadedContent of
+            Nothing  -> ContentDto.failureContent
+            Just res -> res
+
         newLiveMarkers <- H.liftEffect do
           session <- Editor.getSession ed
           document <- Session.getDocument session
 
-          -- Set editor content
-          let content = "TODO: get content from API"
-          Document.setValue content document
+          -- Set the content of the editor
+          Document.setValue (ContentDto.getContentText content) document
 
           -- Reset Undo history
           undoMgr <- Session.getUndoManager session

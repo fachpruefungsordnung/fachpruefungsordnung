@@ -187,7 +187,7 @@ splitview docID = H.mkComponent
       [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
       [ toolbarButton "[=]" ToggleSidebar
       , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
-      , toolbarButton "ForceGETPH" ForceGET
+      , toolbarButton "ForceGET" ForceGET
       , toolbarButton "GET" GET
       , toolbarButton "POST" POST
       , toolbarButton "All Comments" (ToggleCommentOverview true)
@@ -500,7 +500,6 @@ splitview docID = H.mkComponent
       -- pure unit
       fetchedTree <- H.liftAff $
         Request.getFromJSONEndpoint DocumentDto.decodeDocument "/docs/1/tree/latest"
-      --H.liftEffect $ log $ "ForceGET: " <> show fetchedTree
       let
         tree = case fetchedTree of
           Nothing -> Empty
@@ -780,11 +779,11 @@ splitview docID = H.mkComponent
 
     HandleTOC output -> case output of
 
-      TOC.ChangeSection selectEntry -> do
+      TOC.ChangeSection selectedId -> do
         H.tell _editor unit Editor.SaveSection
         state <- H.get
         let
-          entry = case (findTOCEntry selectEntry.id state.tocEntries) of
+          entry = case (findTOCEntry selectedId state.tocEntries) of
             Nothing -> emptyTOCEntry
             Just e -> e
         H.tell _editor unit (Editor.ChangeSection entry)
