@@ -5,7 +5,7 @@
 
 module Language.Ltml.HTML.CSS.Classes (Class (..), className, classStyle, enumLevel) where
 
-import Clay hiding (Content, stringContent)
+import Clay
 import Data.String (fromString)
 import Data.Text (Text, unpack)
 import Language.Ltml.HTML.CSS.CustomClay
@@ -13,6 +13,8 @@ import Language.Ltml.HTML.CSS.CustomClay
 data Class
     = -- | Underlining basic text
       Underlined
+    | -- | Centered text
+      Centered
     | -- | Enum with 1., 2., 3., ...
       EnumNum
     | -- | Enum with a), b), c), ...
@@ -26,6 +28,7 @@ data Class
 -- | Returns the html class name of given Class
 className :: Class -> Text
 className Underlined = "underlined"
+className Centered = "centered"
 className EnumNum = "enumNum"
 className EnumCharPar = "enumCharPar"
 className EnumCharCharPar = "enumCharCharPar"
@@ -34,10 +37,11 @@ className EnumFail = "enumFail"
 -- | maps Class to its css style definition
 classStyle :: Class -> Css
 classStyle Underlined = toClassSelector Underlined ? textDecoration underline
+classStyle Centered = toClassSelector Centered ? textAlign center
 classStyle EnumNum =
     enumCounter
         (className EnumNum)
-        (stringCounter "(" <> counterNum "item" <> stringCounter ") ")
+        (counterNum "item" <> stringCounter ". ")
 classStyle EnumCharPar =
     enumCounter (className EnumCharPar) (counterChar "item" <> stringCounter ") ")
 classStyle EnumCharCharPar =

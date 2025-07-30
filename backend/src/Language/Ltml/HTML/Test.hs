@@ -7,14 +7,14 @@ import Data.Text.IO.Utf8 (readFile)
 import Language.Lsd.AST.Format
 import Language.Lsd.AST.Type.Paragraph
 import Language.Lsd.AST.Type.Section
-import Language.Lsd.Example.Fpo (sectionT)
+import Language.Lsd.Example.Fpo (superSectionT)
 import Language.Ltml.AST.Label
 import Language.Ltml.AST.Node
 import Language.Ltml.AST.Paragraph
 import Language.Ltml.AST.Section
 import Language.Ltml.AST.Text
 import Language.Ltml.Parser.Section (sectionP)
-import Language.Ltml.HTML.HTML 
+import Language.Ltml.HTML.HTML
 
 import Prelude hiding (Enum, Word, readFile)
 import Language.Ltml.AST.Document (Document (..), DocumentHeader (..), DocumentBody (..))
@@ -22,6 +22,7 @@ import Language.Lsd.AST.Type.Document (DocumentFormat(..))
 import Lucid (renderToFile)
 import Text.Megaparsec (runParser)
 import Language.Ltml.HTML.CSS.CSS (writeCss)
+import Language.Ltml.Pretty (prettyPrint)
 
 testSection :: Node Section
 testSection =
@@ -156,11 +157,12 @@ testDoc = readFile "src/Language/Ltml/HTML/Test/test.txt"
 parseTest :: IO ()
 parseTest = do
     text <- testDoc
-    case runParser (sectionP sectionT empty) "" text of
+    case runParser (sectionP superSectionT empty) "" text of
         Left _ -> error "parsing failed"
-        Right nodeSection -> do 
+        Right nodeSection -> do
             renderToFile "src/Language/Ltml/HTML/Test/out.html" (sectionToHtml nodeSection)
             writeCss "src/Language/Ltml/HTML/Test/out.css"
+            prettyPrint nodeSection
 
 
 -------------------------------------------------------------------------------

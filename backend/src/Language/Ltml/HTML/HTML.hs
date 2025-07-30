@@ -1,18 +1,17 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
-{-# LANGUAGE InstanceSigs #-}
 
 module Language.Ltml.HTML.HTML (renderHtml, docToHtml, sectionToHtml) where
 
+import Control.Monad.Reader
+import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
-import Lucid
-
-import Control.Monad.Reader
+import Data.Void (Void)
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.Label
 import Language.Ltml.AST.Node
@@ -21,7 +20,9 @@ import Language.Ltml.AST.Section
 import Language.Ltml.AST.Text
 import Language.Ltml.HTML.CSS.Classes (enumLevel)
 import qualified Language.Ltml.HTML.CSS.Classes as Class
-import Language.Lsd.AST.Format (HeadingFormat, FormatString (..))
+import Language.Ltml.HTML.FormatString
+import Lucid
+import Prelude hiding (id)
 
 renderHtml :: Document -> ByteString
 renderHtml document = renderBS $ docToHtml document
@@ -39,14 +40,39 @@ aToHtml a = html_ $ do
         title_ "Test Dokument"
         link_ [rel_ "stylesheet", href_ "out.css"]
     body_ $ do
-        runReader (toHtmlM a) (State {enumNestingLevel = 0})
+        evalState (runReaderT (toHtmlM a) initReaderState) initGlobalState
 
-newtype State = State
-    { enumNestingLevel :: Int
+data GlobalState = GlobalState
+    { currentSectionID :: Int
+    -- ^ tracks the current section numbering
+    , currentParagraphID :: Int
+    -- ^ tracks the current paragraph numbering
+    , labels :: [(Text, Html ())]
     }
 
+data ReaderState = ReaderState
+    { enumNestingLevel :: Int
+    -- ^ tracks the current enumeration nesting level
+    , currentSectionIDHtml :: Html ()
+    -- ^ holds the actual Html numbering that should be displayed for the current section
+    }
+
+initGlobalState :: GlobalState
+initGlobalState =
+    GlobalState
+        { currentSectionID = 1
+        , currentParagraphID = 1
+        }
+
+initReaderState :: ReaderState
+initReaderState =
+    ReaderState
+        { enumNestingLevel = 0
+        , currentSectionIDHtml = mempty
+        }
+
 class ToHtmlM a where
-    toHtmlM :: a -> Reader State (Html ())
+    toHtmlM :: a -> ReaderT ReaderState (State GlobalState) (Html ())
 
 instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
@@ -63,26 +89,40 @@ instance (ToHtmlM a) => ToHtmlM (Node a) where
             return (labelHtml <> aHtml)
 
 instance ToHtmlM Section where
-    toHtmlM (Section format heading children) = case children of
-        Right cs -> toHtmlM cs
-        Left cs -> toHtmlM cs
+    toHtmlM (Section format heading children) = do
+        globalState <- get
+        let sectionIDHtml = sectionFormat format (currentSectionID globalState)
+         in do
+                headingHtml <-
+                    local (\s -> s {currentSectionIDHtml = sectionIDHtml}) $ toHtmlM heading
+                childrenHtml <- case children of
+                    Right cs -> toHtmlM cs
+                    Left cs -> toHtmlM cs
+                -- \| increment sectionID for next section
+                modify (\s -> s {currentSectionID = currentSectionID s + 1})
+                -- \| reset paragraphID for next section
+                modify (\s -> s {currentParagraphID = 1})
 
+                return $ headingHtml <> childrenHtml
+
+-- | Instance for Heading of a Section
 instance ToHtmlM Heading where
-    toHtmlM (Heading format textTree) = undefined 
-
--- instance ToHtmlFormat HeadingFormat where
---     toHtmlFormat :: HeadingFormat -> (Int, Text) -> Html ()
---     toHtmlFormat (FormatString as) (id, text) = case as of
---         [] -> h2_ ""
-        
--- -- | Generates function that builds needed text based on some input
--- --   For example: id and heading text -> h2_ <heading with id> 
--- class ToHtmlFormat format where
---     toHtmlFormat :: format -> a -> Html ()
+    toHtmlM (Heading format textTree) = do
+        headingTextHtml <- toHtmlM textTree
+        readerState <- ask
+        return $
+            h4_ [class_ (Class.className Class.Centered)] $
+                headingFormat format (currentSectionIDHtml readerState) headingTextHtml
 
 instance ToHtmlM Paragraph where
-    toHtmlM (Paragraph format textTrees) = toHtmlM textTrees
-
+    toHtmlM :: Paragraph -> ReaderT ReaderState (State GlobalState) (Html ())
+    toHtmlM (Paragraph format textTrees) = do
+        childText <- toHtmlM textTrees
+        globalState <- get
+        let curParaID = currentParagraphID globalState
+         in do
+                modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
+                return $ paragraphFormat format curParaID <> childText
 
 instance (ToHtmlStyle style, ToHtmlM enum) => ToHtmlM (TextTree style enum special) where
     toHtmlM textTree = case textTree of
@@ -104,13 +144,13 @@ instance ToHtmlStyle FontStyle where
 
 instance ToHtmlM Enumeration where
     toHtmlM (Enumeration enumItems) = do
-        state <- ask
+        readerState <- ask
         nested <-
             mapM
                 (local (\s -> s {enumNestingLevel = enumNestingLevel s + 1}) . toHtmlM)
                 enumItems
         return $
-            ol_ [class_ $ enumLevel (enumNestingLevel state)] $
+            ol_ [class_ $ enumLevel (enumNestingLevel readerState)] $
                 foldr ((>>) . li_) mempty nested
 
 instance ToHtmlM EnumItem where
@@ -118,6 +158,11 @@ instance ToHtmlM EnumItem where
 
 instance ToHtmlM Label where
     toHtmlM label = return $ toHtml $ unLabel label
+    -- TODO: define Trie Map in GlobalState to track label references
+    -- toHtmlM label = do
+    --     modify (\s -> s {labels = (unLabel label, toHtml "Section 1" :: Html ()) : labels s})
+    --     return mempty
+
 
 instance (ToHtmlM a) => ToHtmlM [a] where
     toHtmlM [] = return mempty
@@ -125,3 +170,15 @@ instance (ToHtmlM a) => ToHtmlM [a] where
         aHtml <- toHtmlM a
         asHtml <- toHtmlM as
         return (aHtml <> asHtml)
+
+-------------------------------------------------------------------------------
+
+-- | ToHtmlM instance that can never be called, because there are
+--   no values of type Void
+instance ToHtmlM Void where
+    toHtmlM = error "toHtmlM for Void was called!"
+
+-- | ToHtmlStyle instance that can never be called, because there are
+--   no values of type Void
+instance ToHtmlStyle Void where
+    toHtmlStyle = error "toHtmlStyle for Void was called!"
