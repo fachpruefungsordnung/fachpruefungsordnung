@@ -15,6 +15,8 @@ data Class
       Underlined
     | -- | Centered text
       Centered
+    | -- | Font color red
+      FontRed
     | -- | Enum with 1., 2., 3., ...
       EnumNum
     | -- | Enum with a), b), c), ...
@@ -29,6 +31,7 @@ data Class
 className :: Class -> Text
 className Underlined = "underlined"
 className Centered = "centered"
+className FontRed = "fontRed"
 className EnumNum = "enumNum"
 className EnumCharPar = "enumCharPar"
 className EnumCharCharPar = "enumCharCharPar"
@@ -38,6 +41,7 @@ className EnumFail = "enumFail"
 classStyle :: Class -> Css
 classStyle Underlined = toClassSelector Underlined ? textDecoration underline
 classStyle Centered = toClassSelector Centered ? textAlign center
+classStyle FontRed = toClassSelector FontRed ? fontColor red
 classStyle EnumNum =
     enumCounter
         (className EnumNum)
