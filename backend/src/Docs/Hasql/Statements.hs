@@ -100,12 +100,14 @@ existsDocument =
     lmap
         unDocumentID
         [singletonStatement|
-            SELECT
-                1 :: bool
-            FROM
-                docs
-            WHERE
-                id = $1 :: int4
+            SELECT EXISTS (
+                SELECT
+                    1 :: bool
+                FROM
+                    docs
+                WHERE
+                    id = $1 :: int4
+            ) :: bool
         |]
 
 existsTreeRevision :: Statement TreeRevisionRef Bool
@@ -113,13 +115,15 @@ existsTreeRevision =
     lmap
         uncurryTreeRevisionRef
         [singletonStatement|
-            SELECT
-                1 :: bool
-            FROM
-                doc_tree_revisions
-            WHERE
-                document = $1 :: int4
-                AND ($2 :: int4? IS NULL OR id = $2 :: int4?)
+            SELECT EXISTS (
+                SELECT
+                    1
+                FROM
+                    doc_tree_revisions
+                WHERE
+                    document = $1 :: int4
+                    AND ($2 :: int4? IS NULL OR id = $2 :: int4?)
+            ) :: bool
         |]
 
 existsTextElement :: Statement TextElementRef Bool
@@ -127,13 +131,15 @@ existsTextElement =
     lmap
         uncurryTextElementRef
         [singletonStatement|
-            SELECT
-                1 :: bool
-            FROM
-                doc_text_elements
-            WHERE
-                document = $1 :: int4
-                AND id = $2 :: int4
+            SELECT EXISTS (
+                SELECT
+                    1
+                FROM
+                    doc_text_elements
+                WHERE
+                    document = $1 :: int4
+                    AND id = $2 :: int4
+            ) :: bool
         |]
 
 existsTextRevision :: Statement TextRevisionRef Bool
@@ -141,15 +147,17 @@ existsTextRevision =
     lmap
         uncurryTextRevisionRef
         [singletonStatement|
-            SELECT
-                1 :: bool
-            FROM
-                doc_text_revisions tr
-                JOIN doc_text_elements te on tr.text_element = te.id
-            WHERE
-                te.document = $1 :: int4
-                AND tr.text_element = $2 :: int4
-                AND ($3 :: int4? IS NULL OR tr.id = $3 :: int4?)
+            SELECT EXISTS (
+                SELECT
+                    1
+                FROM
+                    doc_text_revisions tr
+                    JOIN doc_text_elements te on tr.text_element = te.id
+                WHERE
+                    te.document = $1 :: int4
+                    AND tr.text_element = $2 :: int4
+                    AND ($3 :: int4? IS NULL OR tr.id = $3 :: int4?)
+            ) :: bool
         |]
 
 uncurryDocument

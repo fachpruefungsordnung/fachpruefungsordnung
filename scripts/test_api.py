@@ -42,6 +42,14 @@ class Client:
         query = f"?{query}" if query else ""
         return self.get_json(f"docs/{doc_id}/history{query}")
 
+    def document_text_revision(
+        self,
+        doc_id: int,
+        text_id: int,
+        revision: Literal["latest"] | int
+    ) -> str:
+        return self.get_json(f"docs/{doc_id}/text/{text_id}/rev/{revision}")
+
     def post(self, endpoint: str, payload: object) -> Response:
         return self.__session.post(
             url=f"{self.__host}/{endpoint}",
@@ -83,3 +91,4 @@ if __name__ == "__main__":
     print(client.document(1))
     print(client.document_tree_full(1, "latest"))
     print(client.document_history(1, limit=5))
+    print(client.document_text_revision(1, 1, "latest"))
