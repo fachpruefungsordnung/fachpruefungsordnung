@@ -60,20 +60,25 @@ instance ToHtmlM Document where
 
 -- | If a Label is present, it will be added to the GlobalState
 --   but it wont be visible in HTML
-instance (ToHtmlM a) => ToHtmlM (Node a) where
-    toHtmlM (Node maybeLabel a) = case maybeLabel of
-        Nothing -> toHtmlM a
-        Just label -> do
-            -- \| TODO: somehow track if we have a label for a section or a paragraph
-            addLabelToState label SectionRef
-            toHtmlM a
+-- instance (ToHtmlM a) => ToHtmlM (Node a) where
+--     toHtmlM (Node maybeLabel a) = case maybeLabel of
+--         Nothing -> toHtmlM a
+--         Just label -> do
+--             -- \| TODO: somehow track if we have a label for a section or a paragraph
+--             addLabelToState label SectionRef
+--             toHtmlM a
 
-instance ToHtmlM Section where
-    toHtmlM (Section format heading children) = do
+-- | This combined instances creates the sectionIDHtml before building the reference,
+--   which is needed for correct referencing
+instance ToHtmlM (Node Section) where
+    toHtmlM (Node mLabel (Section format heading children)) = do
         globalState <- get
         let sectionIDHtml = sectionFormat format (currentSectionID globalState)
          in do
                 sectionHtml <- local (\s -> s {currentSectionIDHtml = sectionIDHtml}) $ do
+                    case mLabel of
+                        Nothing -> return ()
+                        Just label -> addLabelToState label SectionRef
                     headingHtml <- toHtmlM heading
                     childrenHtml <- case children of
                         Right cs -> toHtmlM cs
@@ -86,6 +91,24 @@ instance ToHtmlM Section where
 
                 return sectionHtml
 
+-- instance ToHtmlM Section where
+--     toHtmlM (Section format heading children) = do
+--         globalState <- get
+--         let sectionIDHtml = sectionFormat format (currentSectionID globalState)
+--          in do
+--                 sectionHtml <- local (\s -> s {currentSectionIDHtml = sectionIDHtml}) $ do
+--                     headingHtml <- toHtmlM heading
+--                     childrenHtml <- case children of
+--                         Right cs -> toHtmlM cs
+--                         Left cs -> toHtmlM cs
+--                     return $ headingHtml <> childrenHtml
+--                 -- \| increment sectionID for next section
+--                 modify (\s -> s {currentSectionID = currentSectionID s + 1})
+--                 -- \| reset paragraphID for next section
+--                 modify (\s -> s {currentParagraphID = 1})
+
+--                 return sectionHtml
+
 -- | Instance for Heading of a Section
 instance ToHtmlM Heading where
     toHtmlM (Heading format textTree) = do
@@ -95,19 +118,34 @@ instance ToHtmlM Heading where
             h4_ [class_ (Class.className Class.Centered)] $
                 headingFormat format (currentSectionIDHtml readerState) headingTextHtml
 
-instance ToHtmlM Paragraph where
-    toHtmlM :: Paragraph -> ReaderT ReaderState (State GlobalState) (Html ())
-    toHtmlM (Paragraph format textTrees) = do
+instance ToHtmlM (Node Paragraph) where
+    toHtmlM (Node mLabel (Paragraph format textTrees)) = do
         globalState <- get
         let (paragraphIDHtml, mParagraphIDRawHtml) = paragraphFormat format (currentParagraphID globalState)
          in do
-                childText <-
-                    local (\s -> s {mCurrentParagraphIDHtml = mParagraphIDRawHtml}) $
-                        toHtmlM textTrees
+                childText <- local (\s -> s {mCurrentParagraphIDHtml = mParagraphIDRawHtml}) $ do
+                    case mLabel of
+                        Nothing -> return ()
+                        Just label -> addLabelToState label ParagraphRef
+                    toHtmlM textTrees
                 modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
                 -- \| Reset sentence id for next paragraph
                 modify (\s -> s {currentSentenceID = 0})
                 return $ paragraphIDHtml <> childText
+
+-- instance ToHtmlM Paragraph where
+--     toHtmlM :: Paragraph -> ReaderT ReaderState (State GlobalState) (Html ())
+--     toHtmlM (Paragraph format textTrees) = do
+--         globalState <- get
+--         let (paragraphIDHtml, mParagraphIDRawHtml) = paragraphFormat format (currentParagraphID globalState)
+--          in do
+--                 childText <-
+--                     local (\s -> s {mCurrentParagraphIDHtml = mParagraphIDRawHtml}) $
+--                         toHtmlM textTrees
+--                 modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
+--                 -- \| Reset sentence id for next paragraph
+--                 modify (\s -> s {currentSentenceID = 0})
+--                 return $ paragraphIDHtml <> childText
 
 instance
     (ToHtmlStyle style, ToHtmlM enum, ToHtmlM special)

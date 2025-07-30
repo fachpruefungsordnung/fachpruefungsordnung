@@ -26,9 +26,9 @@ genReference ref = do
                             b_
                                 [class_ (Class.className Class.FontRed)]
                                 "Error: Labeled paragraph does not have any identifier!"
-                    Just paragraphIDText -> do
+                    Just paragraphIDHtml -> do
                         sectionRef <- genReference SectionRef
-                        return $ sectionRef <> toHtml (" Absatz " <> paragraphIDText)
+                        return $ sectionRef <> toHtml (" Absatz " <> paragraphIDHtml)
         SentenceRef -> do
             globalState <- get
             paragraphRef <- genReference ParagraphRef
