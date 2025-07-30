@@ -1,22 +1,24 @@
 -- | Overview of Documents belonging to Group
 
 -- Things to change in this file:
--- always loading for group 1 (see initialize and ConfirmDeleteDocument)
--- No connection to Backend yet
--- both buttons not funtional yet
--- many things same as in Home.purs or PageGroups.purs. Need to relocate reusable code fragments.
--- archive column should have checkboxes
+--   [x] always loading for group 1 (see initialize and ConfirmDeleteDocument)
+--   [x] No connection to Backend yet
+--   [ ] button for member overview not functional yet
+--   [ ] many things same as in Home.purs or PageGroups.purs. Need to relocate reusable code fragments.
+--   [ ] archive column should have checkboxes
+--   [ ] move the creation modal to a separate file / component, and perhaps even to a separate page.
 
--- to change: the project/document structure between pages isn't standardized.
--- This must be changed. For now, the toDocument function translates as needed and makes up
--- missing data
+-- To change: The project/document structure between pages isn't standardized.
+--            This must be changed. For now, the toDocument function translates as needed and makes up
+--            missing data.
 
-module FPO.Page.Admin.DocOverview (component) where
+module FPO.Page.Admin.Group.DocOverview (component) where
 
 import Prelude
 
 import Affjax (printError)
-import Data.Array (filter, head, length, null, replicate, slice)
+import Data.Argonaut (decodeJson)
+import Data.Array (filter, head, length, null, replicate, slice, (:))
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -29,14 +31,17 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (deleteIgnore, getDocumentsFromURL, getUser)
+import FPO.Data.Request (createDocument, deleteIgnore, getDocumentsFromURL, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto (DocumentHeader, getDHID, getDHName)
-import FPO.Page.HTML (addCard, addColumn)
+import FPO.Dto.CreateDocumentDto (DocumentCreateDto(..))
+import FPO.Dto.DocumentDto (DocumentHeader(..), DocumentID, getDHID, getDHName)
+import FPO.Dto.GroupDto (GroupID)
 import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.HTML (addCard, addColumn, addModal)
+import FPO.UI.Style as Style
 import Halogen (liftAff)
 import Halogen as H
 import Halogen.HTML as HH
@@ -56,10 +61,12 @@ type Slots =
   , pagination :: H.Slot P.Query P.Output Unit
   )
 
-type Input = Int
-type GroupID = Int
+type Input = GroupID
 
--- preliminary data type. So far everything seems to use different data for documents, this should be changed.
+-- TODO: Preliminary data type. So far, everything seems to use different data for documents, this should be changed.
+--       Some fields are not (yet) available in the backend, so we need to use this data type to fill in the gaps.
+--       As soon as we have decided on a common data type for documents, all this should be changed
+--       (in the appropriate DocumentDTO module) and this preliminary data type should be replaced/removed.
 type Document =
   { body ::
       { name :: String
@@ -77,17 +84,35 @@ data Action
   | Receive (Connected FPOTranslator Input)
   | SetPage P.Output
   | ChangeFilterDocumentName String
-  | CreateDocument
-  -- | Used to set the document name for deletion confirmation
-  -- | before the user confirms the deletion using the modal.
-  | RequestDeleteDocument Int
-  -- | Actually deletes the document after confirmation.
-  | ConfirmDeleteDocument Int
-  | CancelDeleteDocument
   | Filter
-  | ViewDocument Int
+  | ViewDocument DocumentID
   | ChangeSorting TH.Output
   | DoNothing
+  | NavigateToMembers
+  -- | Actions regarding deletion of documents.
+  -- | Handles modal and deletion logic.
+  | RequestDeleteDocument Int
+  | ConfirmDeleteDocument Int
+  -- | Actions regarding creating new documents.
+  | RequestCreateDocument
+  | ConfirmCreateDocument
+  | CancelModal
+  | ChangeCreateDocumentName String
+
+-- | Simple "state machine" for the modal system.
+data ModalState
+  = NoModal
+  | DeleteDocumentModal Int
+  | CreateDocumentModal CreateDocumentModalState
+
+-- | Local state of the "create document" modal.
+type CreateDocumentModalState =
+  { waiting :: Boolean
+  , error :: Maybe String
+  }
+
+defaultCreateDocumentModalState :: CreateDocumentModalState
+defaultCreateDocumentModalState = { waiting: false, error: Nothing }
 
 type State = FPOState
   ( error :: Maybe String
@@ -98,7 +123,8 @@ type State = FPOState
   , currentTime :: Maybe DateTime
   , documentNameFilter :: String
   -- | This is used to store the document ID for deletion confirmation.
-  , requestDelete :: Maybe Int
+  , modalState :: ModalState
+  , newDocumentName :: String
   )
 
 -- | Admin panel page component.
@@ -128,24 +154,28 @@ component =
     , documentNameFilter: ""
     , filteredDocuments: []
     , error: Nothing
-    , requestDelete: Nothing
+    , modalState: NoModal
     , currentTime: Nothing
+    , newDocumentName: ""
     }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
-      [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
+      [ HP.classes [ HB.container, HB.my5 ] ]
       $
-        ( case state.requestDelete of
-            Just documentID ->
+        ( case state.modalState of
+            DeleteDocumentModal documentID ->
               [ deleteConfirmationModal state.translator documentID
                   (docNameFromID state)
-                  CancelDeleteDocument
+                  CancelModal
                   ConfirmDeleteDocument
                   (translate (label :: _ "common_project") state.translator)
               ]
-            Nothing -> []
+            CreateDocumentModal ms ->
+              [ createDocumentModal ms state
+              ]
+            _ -> []
         ) <>
           [ renderDocumentManagement state
           , HH.div [ HP.classes [ HB.textCenter ] ]
@@ -159,19 +189,17 @@ component =
 
   renderDocumentManagement :: State -> H.ComponentHTML Action Slots m
   renderDocumentManagement state =
-    HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-      [ HH.div [ HP.classes [ HB.colSm12, HB.colMd10, HB.colLg9 ] ]
-          [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-              [ HH.text $ translate (label :: _ "gp_projectManagement")
-                  state.translator
-              ]
-          , renderDocumentListView state
+    HH.div_
+      [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+          [ HH.text $ translate (label :: _ "gp_projectManagement")
+              state.translator
           ]
+      , renderDocumentListView state
       ]
 
   renderDocumentListView :: State -> H.ComponentHTML Action Slots m
   renderDocumentListView state =
-    HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
+    HH.div [ HP.classes [ HB.row ] ]
       [ renderSideButtons state
       , renderDocumentsOverview state
       ]
@@ -179,10 +207,10 @@ component =
   -- Renders the overview of projects for the user.
   renderDocumentsOverview :: State -> H.ComponentHTML Action Slots m
   renderDocumentsOverview state =
-    HH.div [ HP.classes [ HB.col9, HB.justifyContentCenter ] ]
+    HH.div [ HP.classes [ HB.col12, HB.colMd9, HB.colLg8 ] ]
       [ addCard
           (translate (label :: _ "gp_groupProjects") state.translator)
-          [ HP.classes [ HB.colSm11, HB.colMd10, HB.colLg9 ] ]
+          []
           (renderDocumentOverview state)
       ]
 
@@ -241,7 +269,7 @@ component =
             ]
           else
             ( map (renderDocumentRow state) docs
-                <> replicate (10 - length docs) emptyDocumentRow
+                <> replicate (10 - length docs) (emptyDocumentRow state)
             ) -- Fill up to 10 rows
       ]
     where
@@ -256,7 +284,7 @@ component =
       {-       , { title: "Archived?"
       , style: Nothing
       } -}
-      , { title: "Delete?"
+      , { title: ""
         , style: Nothing
         }
       ]
@@ -276,55 +304,125 @@ component =
       {-       , HH.td [ HP.classes [ HB.textCenter ] ]
       [ HH.text (show document.header.archivedStatus) ] -}
       , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ buttonDeleteDocument document.header.id ]
+          [ buttonDeleteDocument state document.header.id ]
       ]
 
   -- Renders an empty project row for padding.
-  emptyDocumentRow :: forall w. HH.HTML w Action
-  emptyDocumentRow =
+  emptyDocumentRow :: forall w. State -> HH.HTML w Action
+  emptyDocumentRow state =
     HH.tr []
       [ HH.td
           [ HP.colSpan 3
           , HP.classes [ HB.textCenter, HB.invisible ]
           ]
-          [ HH.text $ "Empty Row", buttonDeleteDocument (-1) ]
+          [ HH.text $ "Empty Row", buttonDeleteDocument state (-1) ]
       ]
 
   renderSideButtons :: forall w. State -> HH.HTML w Action
   renderSideButtons state =
-    HH.div [ HP.classes [ HB.col, HB.justifyContentCenter ] ]
-      [ renderToMemberButton state
-      , renderCreateDocButton state
+    HH.div [ HP.classes [ HB.colMd3, HB.colLg2, HB.col12, HB.mb3 ] ]
+      [ -- The grid layout allows for vertical button stacking on bigger screens
+        -- and horizontal alignment on smaller screens, just above the document list.
+        HH.div
+          [ HP.classes [ HB.dFlex, HB.dMdGrid, HB.justifyContentCenter, HB.gap2 ] ]
+          [ renderToMemberButton state
+          , renderCreateDocButton state
+          ]
       ]
 
   renderToMemberButton :: forall w. State -> HH.HTML w Action
   renderToMemberButton state =
-    HH.div [ HP.classes [ HB.inputGroup ] ]
-      [ HH.button
-          [ HP.classes [ HB.btn, HB.btnOutlineInfo, HB.btnLg, HB.p4, HB.textDark ]
-          , HE.onClick (const $ DoNothing)
-          ]
-          [ HH.text $ translate (label :: _ "common_members") state.translator ]
+    HH.button
+      [ Style.cyanStyle
+      , HE.onClick (const NavigateToMembers)
       ]
+      [ HH.text $ translate (label :: _ "common_members") state.translator ]
 
   renderCreateDocButton :: forall w. State -> HH.HTML w Action
   renderCreateDocButton state =
-    HH.div [ HP.classes [ HB.inputGroup ] ]
-      [ HH.button
-          [ HP.classes
-              [ HB.btn, HB.btnOutlineInfo, HB.btnLg, HB.p4, HB.mt5, HB.textDark ]
-          , HE.onClick (const $ DoNothing)
-          ]
-          [ HH.text $ translate (label :: _ "gp_newProject") state.translator ]
+    HH.button
+      [ Style.cyanStyle
+      , HE.onClick (const $ RequestCreateDocument)
       ]
+      [ HH.text $ translate (label :: _ "gp_newProject") state.translator ]
 
-  buttonDeleteDocument :: forall w. Int -> HH.HTML w Action
-  buttonDeleteDocument documentID =
+  buttonDeleteDocument :: forall w. State -> Int -> HH.HTML w Action
+  buttonDeleteDocument state documentID =
     HH.button
       [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm ]
       , HE.onClick (const $ RequestDeleteDocument documentID)
+      , Style.popover
+          ( translate (label :: _ "gp_removeProject") state.translator
+          )
       ]
       [ HH.i [ HP.class_ $ HH.ClassName "bi-trash" ] [] ]
+
+  createDocumentModal
+    :: forall w. CreateDocumentModalState -> State -> HH.HTML w Action
+  createDocumentModal ms state =
+    addModal (translate (label :: _ "gp_createNewProject") state.translator)
+      (const CancelModal) $
+      [ HH.div
+          [ HP.classes [ HB.modalBody ] ]
+          [ HH.div
+              [ HP.classes [ HB.mb3 ] ]
+              [ HH.label
+                  [ HP.for "docName"
+                  , HP.classes [ HH.ClassName "form-label" ]
+                  ]
+                  [ HH.text $ translate (label :: _ "gp_documentName")
+                      state.translator
+                  ]
+              , HH.input
+                  [ HP.type_ HP.InputText
+                  , HP.classes [ HH.ClassName "form-control" ]
+                  , HP.id "docName"
+                  , HP.placeholder $ translate
+                      (label :: _ "gp_enterDocumentName")
+                      state.translator
+                  , HP.required true
+                  , HE.onValueInput ChangeCreateDocumentName
+                  ]
+              ]
+          ]
+      , HH.div
+          [ HP.classes [ HB.modalFooter ] ]
+          ( ( if ms.waiting then
+                [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary, HB.me5 ] ]
+                    []
+                ]
+              else
+                case ms.error of
+                  Just err ->
+                    [ HH.div [ HP.classes [ HB.alert, HB.alertDanger, HB.w100 ] ]
+                        [ HH.text err ]
+                    ]
+                  Nothing -> []
+            )
+              <>
+                [ HH.button
+                    [ HP.type_ HP.ButtonButton
+                    , HP.classes
+                        [ HB.btn, HB.btnSecondary ]
+                    , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
+                    , HE.onClick (const CancelModal)
+                    , HP.disabled (ms.waiting)
+                    ]
+                    [ HH.text $ translate (label :: _ "common_cancel")
+                        state.translator
+                    ]
+                , HH.button
+                    [ HP.type_ HP.ButtonButton
+                    , HP.classes [ HB.btn, HB.btnPrimary ]
+                    , HE.onClick (const ConfirmCreateDocument)
+                    , HP.disabled (state.newDocumentName == "" || ms.waiting)
+                    ]
+                    [ HH.text $ translate (label :: _ "common_create")
+                        state.translator
+                    ]
+                ]
+          )
+      ]
 
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
@@ -337,15 +435,14 @@ component =
         { documents = []
         , currentTime = Just now
         }
+      s <- H.get
       documents <- liftAff
-        (getDocumentsFromURL ("/groups/" <> show 1 <> "/documents"))
+        (getDocumentsFromURL ("/groups/" <> show s.groupID <> "/documents"))
       case documents of
         Just docs -> do
-          H.modify_ _ { documents = toDocs docs now }
-          pure unit
+          H.modify_ _ { documents = toDocs now docs }
         Nothing -> do
           navigate Login
-          pure unit
       handleAction Filter
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -361,16 +458,72 @@ component =
           (\d -> contains (Pattern s.documentNameFilter) d.body.name)
           s.documents
       H.modify_ _ { filteredDocuments = filteredDocs }
-    CreateDocument -> do
-      --switch to dedicated page.
+    RequestCreateDocument -> do
+      H.modify_ _
+        { newDocumentName = ""
+        , modalState = CreateDocumentModal defaultCreateDocumentModalState
+        }
+    ConfirmCreateDocument -> do
+      s <- H.get
+      let newDocName = s.newDocumentName
+      if newDocName == "" then
+        H.modify_ _ { error = Just "Document name cannot be empty." }
+      else do
+        log ("Trying to create new document with name \"" <> newDocName <> "\"")
+
+        let
+          dto = DocumentCreateDto
+            { documentCreateGroupId: s.groupID
+            , documentCreateName: newDocName
+            }
+
+        setModalWaiting true
+
+        createResponse <- liftAff (createDocument dto)
+        case createResponse of
+          Left err -> do
+            setModalError $ printError err
+          Right result -> do
+            case decodeJson result.body of
+              Left err -> do
+                setModalError $ "Error decoding response: " <> show err
+              Right (DH h) -> do
+                H.modify_ _ { modalState = NoModal, newDocumentName = "" }
+                log "Created Document"
+
+                now <- H.liftEffect nowDateTime
+                let
+                  newDoc =
+                    { body:
+                        { name: h.name
+                        , text: "This text should not be read, else there is an error"
+                        }
+                    , header: { updatedTs: now, id: h.id, archivedStatus: false }
+                    }
+                H.modify_ \s' -> s'
+                  { documents = newDoc : s'.documents
+                  , filteredDocuments = newDoc : s'.filteredDocuments
+                  , currentTime = Just now
+                  }
+
+                -- Reset the page view
+                H.modify_ _ { documentNameFilter = "" }
+                H.tell _pagination unit $ P.SetPageQ 0
+
+        -- Either the document was created successfully and the modal is closed,
+        -- or an error occurred and is currently displayed. The user can then
+        -- interact with the modal again (try to create another document or cancel).
+        setModalWaiting false
       pure unit
     RequestDeleteDocument documentID -> do
-      H.modify_ _ { requestDelete = Just documentID }
-    CancelDeleteDocument -> do
+      H.modify_ _ { modalState = DeleteDocumentModal documentID }
+    CancelModal -> do
       H.modify_ \s -> s
         { error = Nothing
-        , requestDelete = Nothing
+        , modalState = NoModal
         }
+    ChangeCreateDocumentName docName -> do
+      H.modify_ _ { newDocumentName = docName }
     ConfirmDeleteDocument docID -> do
       deleteResponse <- liftAff (deleteIgnore ("/documents/" <> show docID))
       case deleteResponse of
@@ -381,24 +534,23 @@ component =
         Right _ -> do
           log "Deleted Document"
           now <- H.liftEffect nowDateTime
+          s <- H.get
           documents <- liftAff
-            (getDocumentsFromURL ("/groups/" <> show 1 <> "/documents"))
+            (getDocumentsFromURL ("/groups/" <> show s.groupID <> "/documents"))
           case documents of
             Just docs -> do
-              H.modify_ \s -> s
+              H.modify_ _
                 { error = Nothing
-                , documents = toDocs docs now
-                , requestDelete = Nothing
+                , documents = toDocs now docs
+                , modalState = NoModal
                 }
-              pure unit
             Nothing -> do
               navigate Login
-              pure unit
       handleAction Filter
     ViewDocument documentID -> do
       s <- H.get
-      case s.requestDelete of
-        Nothing -> do
+      case s.modalState of
+        NoModal -> do
           log ("Routing to editor for project " <> ((docNameFromID s) documentID))
           navigate (Editor { docID: documentID })
         _ ->
@@ -428,10 +580,33 @@ component =
       H.tell _pagination unit $ P.SetPageQ 0
     DoNothing ->
       pure unit
+    NavigateToMembers -> do
+      log "Routing to member overview"
+      s <- H.get
+      navigate (ViewGroupMembers { groupID: s.groupID })
+
+  -- | Sets the modal waiting state if the current modal has waiting capabilities.
+  -- | This is used to disable buttons and show a loading state, prohibiting further actions.
+  setModalWaiting :: Boolean -> H.HalogenM State Action Slots output m Unit
+  setModalWaiting w = do
+    H.modify_ \s -> s
+      { modalState = case s.modalState of
+          CreateDocumentModal ms -> CreateDocumentModal ms { waiting = w }
+          _ -> s.modalState
+      }
+
+  -- | Sets an error message in the modal state if the current modal supports error messages.
+  setModalError :: String -> H.HalogenM State Action Slots output m Unit
+  setModalError err = do
+    H.modify_ \s -> s
+      { modalState = case s.modalState of
+          CreateDocumentModal ms -> CreateDocumentModal ms { error = Just err }
+          _ -> s.modalState
+      }
 
   -- transforms Document data from backend into data for this page
-  toDocs :: Array DocumentHeader -> DateTime -> Array Document
-  toDocs docs now = map
+  toDocs :: DateTime -> Array DocumentHeader -> Array Document
+  toDocs now = map
     ( \doc ->
         { body:
             { name: getDHName doc
@@ -444,11 +619,9 @@ component =
             }
         }
     )
-    docs
 
   docNameFromID :: State -> Int -> String
   docNameFromID state id =
     case head (filter (\doc -> doc.header.id == id) state.documents) of
       Just doc -> doc.body.name
       Nothing -> "Unknown Name"
-

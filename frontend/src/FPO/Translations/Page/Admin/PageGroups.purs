@@ -19,6 +19,7 @@ type AdminGroupPageLabels =
       ::: "admin_groups_notEmpty"
       ::: "admin_groups_searchForGroups"
       ::: "admin_groups_stillLoading"
+      ::: "admin_groups_viewDocumentsPage"
       ::: SNil
   )
 
@@ -39,6 +40,7 @@ enAdminGroupPage = fromRecord
   , admin_groups_notEmpty: "Group name cannot be empty."
   , admin_groups_searchForGroups: "Search for Groups"
   , admin_groups_stillLoading: "Groups are still loading."
+  , admin_groups_viewDocumentsPage: "View Documents Page of Group"
   }
 
 deAdminGroupPage :: Translation AdminGroupPageLabels
@@ -58,5 +60,6 @@ deAdminGroupPage = fromRecord
   , admin_groups_notEmpty: "Der Gruppenname darf nicht leer sein."
   , admin_groups_searchForGroups: "Nach Gruppen suchen"
   , admin_groups_stillLoading: "Gruppen werden noch geladen."
+  , admin_groups_viewDocumentsPage: "Dokumente der Gruppe anzeigen"
   }
 

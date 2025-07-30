@@ -1,0 +1,11 @@
+/* This file is a collection of specifications regarding responsive styling */
+
+/* `responsive-btn` class makes buttons appear smaller on smaller screens,
+   very useful for the responsive button layout of the cyan buttons in the
+   group documents overview and group member overview pages. */
+@media (max-width: 767.98px) {
+  .responsive-btn {
+    font-size: 0.875rem;
+    font-weight: 400;
+  }
+}

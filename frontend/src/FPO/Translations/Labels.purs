@@ -4,6 +4,7 @@ import Data.Function (($))
 import FPO.Translations.Common (deCommon, enCommon)
 import FPO.Translations.Components.Editor (deEditor, enEditor)
 import FPO.Translations.Components.Navbar (deNavbar, enNavbar)
+import FPO.Translations.Page.Admin.GroupMembers (deGroupMemberPage, enGroupMemberPage)
 import FPO.Translations.Page.Admin.GroupProjects
   ( deGroupProjectsPage
   , enGroupProjectsPage
@@ -20,80 +21,39 @@ import Record (merge)
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord, toRecord)
 
--- | Übersetzungen zusammenführen
 en :: Translation Labels
-en = fromRecord $
-  merge
-    ( merge
-        ( merge
-            ( merge (toRecord enAdminPanel)
-                (toRecord enAdminGroupPage)
-            )
-            ( merge (toRecord enAdminUserPage)
-                (toRecord enCommon)
-            )
-        )
-        ( merge
-            ( merge (toRecord enEditor)
-                (toRecord enNavbar)
-            )
-            ( merge (toRecord enHome)
-                (toRecord enLogin)
-            )
-        )
-    )
-
-    ( merge
-        ( merge
-            ( merge (toRecord enPage404)
-                (toRecord enPasswordReset)
-            )
-            ( merge (toRecord enProfile)
-                (toRecord enGroupProjectsPage)
-            )
-        )
-        ( merge
-            (merge {} {})
-            (merge {} {})
-        )
-    )
+en = fromRecord
+  $ merge (toRecord enAdminPanel)
+  $ merge (toRecord enAdminGroupPage)
+  $ merge (toRecord enAdminUserPage)
+  $ merge (toRecord enCommon)
+  $ merge (toRecord enEditor)
+  $ merge (toRecord enNavbar)
+  $ merge (toRecord enHome)
+  $ merge (toRecord enLogin)
+  $ merge (toRecord enPage404)
+  $ merge (toRecord enPasswordReset)
+  $ merge (toRecord enProfile)
+  $ merge (toRecord enGroupProjectsPage)
+  $
+    toRecord enGroupMemberPage
 
 de :: Translation Labels
-de = fromRecord $
-  merge
-    ( merge
-        ( merge
-            ( merge (toRecord deAdminPanel)
-                (toRecord deAdminGroupPage)
-            )
-            ( merge (toRecord deAdminUserPage)
-                (toRecord deCommon)
-            )
-        )
-        ( merge
-            ( merge (toRecord deEditor)
-                (toRecord deNavbar)
-            )
-            ( merge (toRecord deHome)
-                (toRecord deLogin)
-            )
-        )
-    )
-
-    ( merge
-        ( merge
-            ( merge (toRecord dePage404)
-                (toRecord dePasswordReset)
-            )
-            ( merge (toRecord deProfile)
-                (toRecord deGroupProjectsPage)
-            )
-        )
-        ( merge
-            (merge {} {})
-            (merge {} {})
-        )
-    )
+de = fromRecord
+  $ merge (toRecord deAdminPanel)
+  $ merge (toRecord deAdminGroupPage)
+  $ merge (toRecord deAdminUserPage)
+  $ merge (toRecord deCommon)
+  $ merge (toRecord deEditor)
+  $ merge (toRecord deNavbar)
+  $ merge (toRecord deHome)
+  $ merge (toRecord deLogin)
+  $ merge (toRecord dePage404)
+  $ merge (toRecord dePasswordReset)
+  $ merge (toRecord deProfile)
+  $ merge (toRecord deGroupProjectsPage)
+  $
+    toRecord deGroupMemberPage
 
 -- | All kinds of abstract labels representing UI texts,
 -- | detached from the actual language selection.
@@ -118,6 +78,7 @@ type Labels =
       ::: "admin_groups_notEmpty"
       ::: "admin_groups_searchForGroups"
       ::: "admin_groups_stillLoading"
+      ::: "admin_groups_viewDocumentsPage"
 
       -- | Admin Users Page
       ::: "admin_users_create"
@@ -136,6 +97,7 @@ type Labels =
 
       -- | Common Phrases
       ::: "common_cancel"
+      ::: "common_confirmDelete"
       ::: "common_create"
       ::: "common_delete"
       ::: "common_deletePhraseA"
@@ -145,11 +107,15 @@ type Labels =
       ::: "common_filterBy"
       ::: "common_group"
       ::: "common_home"
+      ::: "common_member"
       ::: "common_members"
+      ::: "common_membersOf"
       ::: "common_password"
       ::: "common_project"
+      ::: "common_projects"
       ::: "common_submit"
       ::: "common_theGroup"
+      ::: "common_user"
       ::: "common_userName"
 
       -- | Editor Page
@@ -163,11 +129,22 @@ type Labels =
       ::: "editor_textUnderline"
       ::: "editor_undo"
 
-      -- | Group Projects Page
+      -- | Group Members Page
+      ::: "gm_addMember"
+      ::: "gm_memberManagement"
+      ::: "gm_membersOfGroup"
+      ::: "gm_removeMember"
+      ::: "gm_role"
+      ::: "gm_searchMembers"
 
+      -- | Group Projects Page
+      ::: "gp_createNewProject"
+      ::: "gp_documentName"
+      ::: "gp_enterDocumentName"
       ::: "gp_groupProjects"
       ::: "gp_newProject"
       ::: "gp_projectManagement"
+      ::: "gp_removeProject"
       ::: "gp_searchProjects"
 
       -- | Home Page

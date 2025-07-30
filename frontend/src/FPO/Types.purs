@@ -90,11 +90,48 @@ shortenTOC { id, name } = { id, name }
 -- TODO create more timestamps versions and discuss, where to store this
 timeStampsVersions :: Array Formatter
 timeStampsVersions =
-  [ ( DayOfMonthTwoDigits
-        : Placeholder " "
+  [ -- DD.MM.YY HH:mm
+    ( DayOfMonthTwoDigits
+        : Placeholder "."
         : MonthShort
-        : Placeholder " "
+        : Placeholder "."
         : YearTwoDigits
+        : Placeholder " "
+        : Hours24
+        : Placeholder ":"
+        : MinutesTwoDigits
+        : Nil
+    )
+  -- DD/MM/YY HH:mm
+  , ( DayOfMonthTwoDigits
+        : Placeholder "/"
+        : MonthShort
+        : Placeholder "/"
+        : YearTwoDigits
+        : Placeholder " "
+        : Hours24
+        : Placeholder ":"
+        : MinutesTwoDigits
+        : Nil
+    )
+  -- MM/DD/YY HH:mm
+  , ( MonthShort
+        : Placeholder "/"
+        : DayOfMonthTwoDigits
+        : Placeholder "/"
+        : YearTwoDigits
+        : Placeholder " "
+        : Hours24
+        : Placeholder ":"
+        : MinutesTwoDigits
+        : Nil
+    )
+  -- YY/MM/DD HH:mm
+  , ( YearTwoDigits
+        : Placeholder "/"
+        : MonthShort
+        : Placeholder "/"
+        : DayOfMonthTwoDigits
         : Placeholder " "
         : Hours24
         : Placeholder ":"

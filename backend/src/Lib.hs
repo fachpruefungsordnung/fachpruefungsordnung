@@ -6,6 +6,7 @@ module Lib
 where
 
 import Database (getConnection, migrate)
+import Docs.TestDoc (createTestDocument)
 import DocumentManagement as DM
 import DocumentManagement.Commit
 import DocumentManagement.Document
@@ -53,7 +54,6 @@ testTree =
 testDocuments :: Connection -> IO Document
 testDocuments conn = do
     Right newDocument1 <- DM.createDocument "testdocument1" 1 (DM.Context conn)
-    Right newDocument2 <- DM.createDocument "testdocument2" 1 (DM.Context conn)
     return newDocument1
 
 -- | Creates two commits, linking one of the commits to the specified document.
@@ -85,6 +85,7 @@ someFunc = do
     -- Datenbank zumüllen :)
     document <- testDocuments connection
     print document
+    createTestDocument connection
     commit <- testCommits (documentID document) connection
     print commit
     runServer

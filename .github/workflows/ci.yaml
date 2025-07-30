@@ -105,7 +105,7 @@ jobs:
 
   test-backend:
     name: Run backend tests
-    runs-on: postgres
+    runs-on: self-hosted #postgres
     needs:
       - job-spec
       - check-backend
@@ -149,6 +149,9 @@ jobs:
         uses: sbdchd/squawk-action@v2
         with:
           fail-on-violations: true
+          # We perform migrations within a transaction. Postgres does not allow
+          # concurrent index creation during transactions.
+          exclude: "require-concurrent-index-creation"
           files: ${{ steps.modified-migrations.outputs.FILES }}
           pg-version: "17.0"
           version: "latest"

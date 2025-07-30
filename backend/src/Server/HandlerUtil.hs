@@ -7,7 +7,7 @@ module Server.HandlerUtil
     , ifSuperOrAnyAdminDo
     , tryGetDBConnection
     , addRoleInGroup
-    , checkDocPermission
+    , checkPermission
     , getGroupOfDocument
     , errDatabaseConnectionFailed
     , errDatabaseAccessFailed
@@ -106,25 +106,24 @@ addRoleInGroup conn userID groupID role = do
         Left _ -> throwError errFailedToSetRole
 
 -- | Check if User is Member (or Admin) of the group that owns the specified document
---   or return external DocPermission. Members will always get `Editor` permission.
+--   or return external Permission. Members will always get `Editor` permission.
 -- Nothing            -> both paths failed (no permission)
--- Just DocPermission -> User has given access rights
-checkDocPermission
+-- Just Permission -> User has given access rights
+checkPermission
     :: Connection
     -> User.UserID
     -> DocumentID
-    -> Handler (Maybe Permission.DocPermission)
-checkDocPermission conn userID docID = do
-    eIsMember <- liftIO $ run (Sessions.checkGroupDocPermission userID docID) conn
+    -> Handler (Maybe Permission.Permission)
+checkPermission conn userID docID = do
+    eIsMember <- liftIO $ run (Sessions.checkGroupPermission userID docID) conn
     case eIsMember of
         Left _ -> throwError errDatabaseAccessFailed
-        Right True -> return $ Just Permission.Editor -- user is member of right group
+        Right True -> return $ Just Permission.Edit -- user is member of right group
         Right False -> do
-            ePerm <- liftIO $ run (Sessions.getExternalDocPermission userID docID) conn
+            ePerm <- liftIO $ run (Sessions.getExternalPermission userID docID) conn
             case ePerm of
                 Left _ -> throwError errDatabaseAccessFailed
-                Right Nothing -> return Nothing
-                Right (Just perm) -> return $ Just perm
+                Right x -> return x
 
 -- | Get the groupID of the group that owns the specified document
 getGroupOfDocument :: Connection -> DocumentID -> Handler Group.GroupID

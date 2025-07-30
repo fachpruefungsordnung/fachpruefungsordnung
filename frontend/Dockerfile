@@ -48,7 +48,6 @@ WORKDIR /home
 COPY index.html index.html
 COPY --from=build /build/index.js index.js
 
-# TODO: resources folder
 COPY static static
 COPY favicon.png favicon.png
 

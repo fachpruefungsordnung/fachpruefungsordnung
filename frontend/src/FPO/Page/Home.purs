@@ -13,6 +13,7 @@ module FPO.Page.Home (component, adjustDateTime, formatRelativeTime) where
 
 import Prelude
 
+import Control.Monad.Maybe.Trans (MaybeT(..), lift, runMaybeT)
 import Data.Array (filter, length, null, replicate, slice)
 import Data.DateTime (DateTime, adjust, date, day, diff, month, year)
 import Data.Enum (fromEnum)
@@ -36,9 +37,9 @@ import FPO.Dto.DocumentDto
   , getDHPPName
   )
 import FPO.Dto.UserDto (User)
-import FPO.Page.HTML (addCard, addColumn)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.HTML (addCard, addColumn)
 import Halogen (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
@@ -138,19 +139,15 @@ component =
       store <- getStore
       u <- liftAff getUser
       now <- liftEffect nowDateTime
-      documents <- liftAff (getDocumentsFromURLWithPermission ("/me/documents"))
-      case documents of
-        Just docs -> do
-          H.modify_ _
-            { user = u
-            , translator = fromFpoTranslator store.translator
-            , projects = toProject docs now
-            , currentTime = Just now
-            }
-          pure unit
-        Nothing -> do
-          navigate Login
-          pure unit
+      -- If the user is logged in, fetch their documents and convert them to projects.
+      void $ runMaybeT do
+        docs <- MaybeT $ liftAff (getDocumentsFromURLWithPermission "/me/documents")
+        lift $ H.modify_ _
+          { user = u
+          , translator = fromFpoTranslator store.translator
+          , projects = toProject docs now
+          , currentTime = Just now
+          }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
       log $ "Routing to editor for project " <> project.name

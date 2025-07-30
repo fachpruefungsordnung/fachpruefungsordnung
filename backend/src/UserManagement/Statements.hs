@@ -26,14 +26,14 @@ module UserManagement.Statements
     , addSuperadmin
     , removeSuperadmin
     , checkSuperadmin
-    , checkGroupDocPermission
+    , checkGroupPermission
     , checkGroupNameExistence
-    , getExternalDocPermission
+    , getExternalPermission
     , getDocumentGroupID
     , getAllExternalUsersOfDocument
-    , addExternalDocPermission
-    , updateExternalDocPermission
-    , deleteExternalDocPermission
+    , addExternalPermission
+    , updateExternalPermission
+    , deleteExternalPermission
     , getAllVisibleDocuments
     , getAllDocumentsOfGroup
     )
@@ -297,8 +297,8 @@ checkSuperadmin =
     |]
 
 -- | check if User is Member (or Admin) of the group that owns the specified document
-checkGroupDocPermission :: Statement (User.UserID, Document.DocumentID) Bool
-checkGroupDocPermission =
+checkGroupPermission :: Statement (User.UserID, Document.DocumentID) Bool
+checkGroupPermission =
     lmap
         (second Document.unDocumentID)
         [singletonStatement|
@@ -320,10 +320,10 @@ checkGroupNameExistence =
             ) :: bool
         |]
 
--- | extract the DocPermission for external document editors if they exist
-getExternalDocPermission
-    :: Statement (User.UserID, Document.DocumentID) (Maybe Permission.DocPermission)
-getExternalDocPermission =
+-- | extract the Permission for external document editors if they exist
+getExternalPermission
+    :: Statement (User.UserID, Document.DocumentID) (Maybe Permission.Permission)
+getExternalPermission =
     rmap
         (>>= Permission.textToPermission)
         $ lmap
@@ -345,31 +345,31 @@ getDocumentGroupID =
             where id = $1 :: int4
         |]
 
-addExternalDocPermission
+addExternalPermission
     :: Statement (User.UserID, Document.DocumentID, Text) ()
-addExternalDocPermission =
+addExternalPermission =
     lmap
         ( \(user, document, permission) -> (user, Document.unDocumentID document, permission)
         )
         [resultlessStatement|
             insert into external_document_rights (user_id, document_id, permission)
-            values ($1 :: uuid, $2 :: int4, $3 :: text :: docpermission)
+            values ($1 :: uuid, $2 :: int4, $3 :: text :: permission)
         |]
 
-updateExternalDocPermission
+updateExternalPermission
     :: Statement (User.UserID, Document.DocumentID, Text) ()
-updateExternalDocPermission =
+updateExternalPermission =
     lmap
         ( \(user, document, permission) -> (user, Document.unDocumentID document, permission)
         )
         [resultlessStatement|
             update external_document_rights
-            set permission = $3 :: text :: docpermission
+            set permission = $3 :: text :: permission
             where user_id = $1 :: uuid and document_id = $2 :: int4
         |]
 
-deleteExternalDocPermission :: Statement (User.UserID, Document.DocumentID) ()
-deleteExternalDocPermission =
+deleteExternalPermission :: Statement (User.UserID, Document.DocumentID) ()
+deleteExternalPermission =
     lmap
         (second Document.unDocumentID)
         [resultlessStatement|
@@ -378,7 +378,7 @@ deleteExternalDocPermission =
         |]
 
 getAllExternalUsersOfDocument
-    :: Statement Document.DocumentID [(User.UserID, Maybe Permission.DocPermission)]
+    :: Statement Document.DocumentID [(User.UserID, Maybe Permission.Permission)]
 getAllExternalUsersOfDocument =
     rmap
         (fmap (Data.Bifunctor.second Permission.textToPermission) . toList)
