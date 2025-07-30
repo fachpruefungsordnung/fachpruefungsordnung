@@ -34,8 +34,14 @@ instance showContent :: Show Content where
 decodeContent :: Json -> Either JsonDecodeError Content
 decodeContent json = decodeJson json
 
+encodeContent :: Content -> Json
+encodeContent content = encodeJson content
+
 getContentText :: Content -> String
 getContentText (Content { content }) = content
+
+setContentText :: String -> Content -> Content
+setContentText newText (Content { parent }) = Content { content: newText, parent }
 
 failureContent :: Content
 failureContent = Content { content: "Error decoding content", parent: -1 }

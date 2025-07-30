@@ -43,7 +43,7 @@ import FPO.Dto.ContentDto (Content)
 import FPO.Dto.ContentDto as ContentDto
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
+import FPO.Types (AnnotatedMarker, TOCEntry, emptyTOCEntry, markerToAnnotation, sortMarkers)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -462,6 +462,7 @@ editor = connect selectTranslator $ H.mkComponent
           content = case loadedContent of
             Nothing  -> ContentDto.failureContent
             Just res -> res
+        H.modify_ \st -> st { mContent = Just content }
 
         newLiveMarkers <- H.liftEffect do
           session <- Editor.getSession ed
@@ -503,52 +504,60 @@ editor = connect selectTranslator $ H.mkComponent
 
     SaveSection a -> do
       state <- H.get
-      allLines <- H.gets _.mEditor >>= traverse \ed -> do
-        H.liftEffect $ Editor.getSession ed
-          >>= Session.getDocument
-          >>= Document.getAllLines
+      case state.mContent of
+        Nothing -> pure (Just a)
+        Just content -> do
+          allLines <- H.gets _.mEditor >>= traverse \ed -> do
+            H.liftEffect $ Editor.getSession ed
+              >>= Session.getDocument
+              >>= Document.getAllLines
 
-      -- Save the current content of the editor
-      let
-        contentText = case allLines of
-          Just ls -> intercalate "\n" ls
-          Nothing -> ""
+          -- Save the current content of the editor
+          let
+            contentText = case allLines of
+              Just ls -> intercalate "\n" ls
+              Nothing -> ""
 
-        -- extract the current TOC entry
-        entry = case state.mTocEntry of
-          Nothing ->
-            { id: -1
-            , name: "Section not found"
-            , newMarkerNextID: -1
-            , markers: []
-            }
-          Just e -> e
+            -- place it in content
+            newContent = ContentDto.setContentText contentText content
 
-      -- Since the ids and postions in liveMarkers are changing constantly, 
-      -- extract them now and store them 
-      updatedMarkers <- H.liftEffect do
-        for entry.markers \m -> do
-          case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
-            -- TODO Should we add other markers in liveMarkers such as errors?
-            Nothing -> pure m
-            Just lm -> do
-              start <- Anchor.getPosition lm.startAnchor
-              end <- Anchor.getPosition lm.endAnchor
-              pure m
-                { startRow = Types.getRow start
-                , startCol = Types.getColumn start
-                , endRow = Types.getRow end
-                , endCol = Types.getColumn end
-                }
-      let
-        newEntry = entry
-          { markers = updatedMarkers }
-      
-      --TODO send the content (contentText) as POST to the server
+            -- extract the current TOC entry
+            entry = case state.mTocEntry of
+              Nothing -> emptyTOCEntry
+              Just e -> e
 
-      H.modify_ \st -> st { mTocEntry = Just newEntry }
-      H.raise (SavedSection newEntry)
-      pure (Just a)
+          -- Since the ids and postions in liveMarkers are changing constantly, 
+          -- extract them now and store them 
+          updatedMarkers <- H.liftEffect do
+            for entry.markers \m -> do
+              case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
+                -- TODO Should we add other markers in liveMarkers such as errors?
+                Nothing -> pure m
+                Just lm -> do
+                  start <- Anchor.getPosition lm.startAnchor
+                  end <- Anchor.getPosition lm.endAnchor
+                  pure m
+                    { startRow = Types.getRow start
+                    , startCol = Types.getColumn start
+                    , endRow = Types.getRow end
+                    , endCol = Types.getColumn end
+                    }
+          -- update the markers in entry
+          let
+            newEntry = entry
+              { markers = updatedMarkers }
+            jsonContent = ContentDto.encodeContent newContent
+          
+          -- send the new content as POST to the server
+          _ <- H.liftAff $ Request.postJson 
+            ("/docs/1/text/" <> show entry.id <> "/rev")
+            jsonContent
+
+          H.modify_ \st -> st 
+            { mTocEntry = Just newEntry
+            , mContent = Just newContent }
+          H.raise (SavedSection newEntry)
+          pure (Just a)
 
     -- Because Session does not provide a way to get all lines directly,
     -- we need to take another indirect route to get the lines.
