@@ -46,9 +46,6 @@ import Web.HTML as Web.HTML
 import Web.HTML.Window as Web.HTML.Window
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 
-import Effect.Console (log)
-import Data.Argonaut.Core (stringify)
-
 data DragTarget = ResizeLeft | ResizeRight
 
 derive instance eqDragTarget :: Eq DragTarget

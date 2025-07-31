@@ -201,7 +201,7 @@ tocview = H.mkComponent
         [ HP.classes [ HB.textTruncate ]
         , HP.style $ if n == 1 then " font-size: 1.25rem;" else ""
         ]
-        [ HH.text (title) ]
+        [ HH.text title ]
         -- Wrapper für Button + Dropdown
         , HH.div
           [ HP.style "position: relative; margin-left: 0.5rem;" ]

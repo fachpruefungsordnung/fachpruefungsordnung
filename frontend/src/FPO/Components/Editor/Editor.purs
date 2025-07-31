@@ -442,6 +442,8 @@ editor = connect selectTranslator $ H.mkComponent
 
         -- Get the content from server here
         -- We need Aff for that and thus cannot go inside Eff
+        -- TODO: After creating a new Leaf, we get Nothing in loadedContent
+        -- See, why and fix it
         loadedContent <- H.liftAff $ 
           Request.getFromJSONEndpoint 
             ContentDto.decodeContent
