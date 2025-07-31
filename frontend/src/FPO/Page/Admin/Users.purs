@@ -35,7 +35,7 @@ import FPO.Dto.CreateUserDto
   , withPassword
   )
 import FPO.Dto.CreateUserDto as CreateUserDto
-import FPO.Dto.UserOverviewDto (UserOverviewDto)
+import FPO.Dto.UserOverviewDto (UserOverviewDto, getID)
 import FPO.Dto.UserOverviewDto as UserOverviewDto
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -52,9 +52,13 @@ import Type.Proxy (Proxy(..))
 _filter = Proxy :: Proxy "filter"
 _userlist = Proxy :: Proxy "userlist"
 
+data ButtonEvent
+  = EffectDeleteUser
+  | EffectGoToProfilePage
+
 type Slots =
   ( filter :: forall q. H.Slot q Filter.Output Unit
-  , userlist :: H.Slot UserList.Query UserList.Output Unit
+  , userlist :: H.Slot UserList.Query (UserList.Output ButtonEvent) Unit
   )
 
 data Action
@@ -68,7 +72,7 @@ data Action
   | CloseDeleteModal
   | GetUser String
   | HandleFilter Filter.Output
-  | HandleUserList UserList.Output
+  | HandleUserList (UserList.Output ButtonEvent)
   | CreateUser
 
 type State = FPOState
@@ -110,7 +114,7 @@ component =
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
-      [ HP.classes [ HB.container, HB.my5 ]
+      [ HP.classes [ HB.containerXl, HB.my5 ]
       ]
       [ renderDeleteModal state
       , renderUserManagement state
@@ -156,7 +160,7 @@ component =
     GetUser _ -> navigate (Profile { loginSuccessful: Nothing })
     HandleFilter f -> do
       H.tell _userlist unit (UserList.HandleFilterQ f)
-    HandleUserList (UserList.Loading b) -> do
+    HandleUserList (UserList.Loading _) -> do
       -- We do not care about the loading state here,
       -- as the user list component handles it itself.
       -- Would be nice to have a way to either render the user
@@ -187,6 +191,11 @@ component =
             , createUserDto = CreateUserDto.empty
             }
           H.tell _userlist unit UserList.ReloadUsersQ
+    HandleUserList (UserList.ButtonPressed userOverviewDto effect) -> do
+      case effect of
+        EffectDeleteUser -> H.modify_ _ { requestDeleteUser = Just userOverviewDto }
+        EffectGoToProfilePage -> do
+          handleAction $ GetUser $ getID userOverviewDto
 
   renderUserManagement :: State -> H.ComponentHTML Action Slots m
   renderUserManagement state =
@@ -201,7 +210,7 @@ component =
   renderUserListView state =
     HH.div [ HP.classes [ HB.row, HB.justifyContentAround ] ]
       [ renderFilterBy
-      , renderUserList
+      , renderUserList state
       , renderNewUserForm state
       ]
 
@@ -209,9 +218,23 @@ component =
   renderFilterBy =
     HH.slot _filter unit Filter.component unit HandleFilter
 
-  renderUserList :: H.ComponentHTML Action Slots m
-  renderUserList =
-    HH.slot _userlist unit UserList.component unit HandleUserList
+  renderUserList :: State -> H.ComponentHTML Action Slots m
+  renderUserList state =
+    HH.slot _userlist unit UserList.component events HandleUserList
+    where
+    events =
+      [ { popover: translate (label :: _ "admin_users_deleteUser") state.translator
+        , effect: EffectDeleteUser
+        , icon: "bi-trash"
+        , classes: [ HB.btn, HB.btnOutlineDanger, HB.btnSm, HB.me2 ]
+        }
+      , { popover: translate (label :: _ "admin_users_goToProfilePage")
+            state.translator
+        , effect: EffectGoToProfilePage
+        , icon: "bi-person-fill"
+        , classes: [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
+        }
+      ]
 
   -- Creates a form to create a new (dummy) user.
   renderNewUserForm :: forall w. State -> HH.HTML w Action

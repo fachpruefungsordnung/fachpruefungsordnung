@@ -2,60 +2,92 @@
 -- | filtered by username and email. Furthermore, it allows the refetching of
 -- | users (e.g., after a user has been created or deleted).
 -- |
--- | Refer to the `Query` and `Output` types for interface documentation.
+-- | Refer to the `Input`, `Query` and `Output` types for interface documentation.
 
 module FPO.Components.UI.UserList where
 
 import Prelude
 
 import Data.Argonaut (decodeJson)
-import Data.Array (filter, length, null, replicate, slice)
+import Data.Array (filter, length, replicate, slice)
 import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), contains)
 import Data.String as String
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
-import FPO.Components.Pagination as P
 import FPO.Components.Pagination as P
 import FPO.Components.UI.UserFilter as Filter
 import FPO.Data.Request as R
 import FPO.Data.Store as Store
-import FPO.Dto.UserOverviewDto (UserOverviewDto(..))
+import FPO.Dto.UserOverviewDto (UserOverviewDto)
 import FPO.Dto.UserOverviewDto as UserOverviewDto
-import FPO.Translations.Labels (Labels)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addButton, addCard, addColumn, deleteButton)
-import FPO.UI.HTML (emptyEntryText)
-import Halogen (liftEffect)
+import FPO.UI.HTML (addCard, emptyEntryText)
+import FPO.UI.Style as Style
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Properties (InputType(..), classes) as HP
+import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import Halogen.Themes.Bootstrap5 (p4)
 import Halogen.Themes.Bootstrap5 as HB
-import Simple.I18n.Translator (Translator, label, translate)
+import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
 
 _pagination = Proxy :: Proxy "pagination"
 
-type State = FPOState
+type State ba = FPOState
   ( users :: Array UserOverviewDto
   , filteredUsers :: Array UserOverviewDto
   , page :: Int
   , loading :: Boolean
+  , buttonStyles :: Array (ButtonStyle ba)
   )
+
+type ButtonStyle ba =
+  { popover :: String
+  , effect :: ba
+  , icon :: String
+  , classes :: Array HH.ClassName
+  }
+
+-- | For the input, the parent component can pass an array of
+-- | `ButtonStyle` to set the button of the user list.
+-- | This way, for each user in the list, buttons with specific
+-- | styles and effects can be rendered. The effect is then, if
+-- | the button is pressed, passed to the parent component
+-- | (together with the associated user dto) via the `Output` type,
+-- | and the parent component can handle the specific button effect
+-- | (e.g., deleting the user, navigating to the profile page, etc.).
+-- |
+-- | The effect is polymorphic, i.e., it's best practice to use some
+-- | kind of algebraic data type (enum) to represent the possible effects
+-- | in the parent component, then do exhaustive pattern matching
+-- | on the effect and define the business logic accordingly.
+-- |
+-- | TODO: It would be nice to not only be able to pass an array of
+-- |       `ButtonStyle`, but simply pass a function that takes a `UserOverviewDto`
+-- |       and returns a div or similar, i.e., a function that can be used to
+-- |       generate whatever HTML is needed for the user list. Then, it would also
+-- |       be nice to parametrize this component over the Action type of the
+-- |       parent component, so that the parent component can define the action
+-- |       type that is returned when a button is pressed and handle it directly.
+-- |       This would've been a much nicer approach because the parent component
+-- |       could then define all possible actions and simply use `handleAction`
+-- |       to handle the button presses, with no need to define a specific data type
+-- |       to represent the button effects.
+type Input ba = Array (ButtonStyle ba)
 
 type Slots =
   ( pagination :: H.Slot P.Query P.Output Unit
   )
 
-data Action
-  = Receive (Connected FPOTranslator Unit)
+data Action ba
+  = Receive (Connected FPOTranslator (Input ba))
   | HandleFilter (Filter.Output)
   | SetPage P.Output
   | Initialize
+  | HandleButtonPressed UserOverviewDto ba
 
 data Query a
   -- | Query to reload the users list, for example,
@@ -70,19 +102,20 @@ data Query a
   -- |      itself.
   | HandleFilterQ (Filter.Output) a
 
-data Output
+data Output ba
   -- | Output to indicate to the parent whether or not the user list is
   -- | ready/loaded. This can be used to disable UI elements that depend on the
   -- | user list, e.g., the "Create User" button, if wished.
   = Loading Boolean
   -- | Output to indicate an error, e.g., when the user list could not be loaded.
   | Error String
+  | ButtonPressed UserOverviewDto ba
 
 component
-  :: forall m
+  :: forall m ba
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => H.Component Query Unit Output m
+  => H.Component Query (Input ba) (Output ba) m
 component = connect selectTranslator $ H.mkComponent
   { initialState
   , render
@@ -94,16 +127,17 @@ component = connect selectTranslator $ H.mkComponent
       }
   }
   where
-  initialState :: Connected FPOTranslator Unit -> State
-  initialState { context } =
+  initialState :: Connected FPOTranslator (Input ba) -> (State ba)
+  initialState { context, input } =
     { users: []
     , filteredUsers: []
     , translator: fromFpoTranslator context
     , page: 0
     , loading: true
+    , buttonStyles: input
     }
 
-  render :: State -> H.ComponentHTML Action Slots m
+  render :: (State ba) -> H.ComponentHTML (Action ba) Slots m
   render state =
     addCard (translate (label :: _ "admin_users_listOfUsers") state.translator)
       [ HP.classes [ HB.col12, HB.colMd6, HB.colLg6, HB.mb3 ] ] $ HH.div_
@@ -113,7 +147,7 @@ component = connect selectTranslator $ H.mkComponent
         ]
       else
         [ HH.ul [ HP.classes [ HB.listGroup ] ]
-            $ map (createUserEntry state.translator) usrs
+            $ map (createUserEntry state) usrs
                 <> replicate (10 - length usrs)
                   emptyEntryText
         , HH.slot _pagination unit P.component ps SetPage
@@ -126,40 +160,56 @@ component = connect selectTranslator $ H.mkComponent
       , reaction: P.PreservePage
       }
 
-  -- Creates a (dummy) user entry for the list.
+  -- Creates a user entry for the list.
   createUserEntry
-    :: forall w. Translator Labels -> UserOverviewDto -> HH.HTML w Action
-  createUserEntry translator userOverviewDto =
-    HH.li
-      [ HP.classes
-          [ HB.listGroupItem
-          , HB.dFlex
-          , HB.justifyContentBetween
-          , HB.alignItemsCenter
-          ]
-      ]
-      [ HH.span [ HP.classes [ HB.col5 ] ]
-          [ HH.text $ UserOverviewDto.getName userOverviewDto ]
-      -- , HH.span [ HP.classes [ HB.col5 ] ]
-      --     [ HH.text $ UserOverviewDto.getEmail userOverviewDto ]
-      -- , HH.div [ HP.classes [ HB.col2, HB.dFlex, HB.justifyContentEnd, HB.gap1 ] ]
-      --     [ deleteButton (const $ RequestDeleteUser userOverviewDto)
-      --     , HH.button
-      --         [ HP.type_ HP.ButtonButton
-      --         , HP.classes [ HB.btn, HB.btnSm, HB.btnOutlinePrimary ]
-      --         , HE.onClick $ const $ GetUser (UserOverviewDto.getID userOverviewDto)
-      --         , HP.title
-      --             (translate (label :: _ "admin_users_goToProfilePage") translator)
-      --         ]
-      --         [ HH.i [ HP.classes [ HB.bi, (H.ClassName "bi-person-fill") ] ] []
-
-      --         ]
-      --     ]
-      ]
+    :: forall w. State ba -> UserOverviewDto -> HH.HTML w (Action ba)
+  createUserEntry state userOverviewDto =
+    HH.li [ HP.classes [ HB.listGroupItem, HB.p2 ] ]
+      $
+        [ HH.div
+            [ HP.classes
+                [ HB.dFlex
+                , HB.alignItemsCenter
+                , HB.flexNowrap
+                , HB.overflowHidden
+                ]
+            ]
+            $
+              [ HH.div
+                  [ HP.classes [ HB.pe3, HB.textTruncate ]
+                  , HP.style "width: 160px; min-width: 160px; max-width: 160px;"
+                  ]
+                  [ HH.text $ UserOverviewDto.getName userOverviewDto
+                  ]
+              , HH.div
+                  [ HP.classes [ HB.pe3, HB.textTruncate, HB.flexGrow1 ]
+                  , HP.style "min-width: 60px;"
+                  ]
+                  [ HH.text $ UserOverviewDto.getEmail userOverviewDto
+                  ]
+              , HH.div [ HP.classes [ HB.dFlex, HB.gap2, HB.flexShrink0, HB.ps2 ] ]
+                  ( map (addButton userOverviewDto)
+                      state.buttonStyles
+                  )
+              ]
+        ]
+    where
+    addButton
+      :: UserOverviewDto
+      -> ButtonStyle ba
+      -> HH.HTML w (Action ba)
+    addButton dto style =
+      HH.button
+        [ HP.type_ HP.ButtonButton
+        , HP.classes style.classes
+        , HE.onClick $ const $ HandleButtonPressed dto style.effect
+        , Style.popover $ style.popover
+        ]
+        [ HH.i [ HP.classes [ HB.bi, (H.ClassName style.icon) ] ] [] ]
 
   handleAction
-    :: Action
-    -> H.HalogenM State Action Slots Output m Unit
+    :: (Action ba)
+    -> H.HalogenM (State ba) (Action ba) Slots (Output ba) m Unit
   handleAction action = case action of
     Initialize -> do
       setLoading true
@@ -189,11 +239,15 @@ component = connect selectTranslator $ H.mkComponent
       H.modify_ _ { translator = fromFpoTranslator context }
     SetPage (P.Clicked p) -> do
       H.modify_ _ { page = p }
+    HandleButtonPressed userOverviewDto effect -> do
+      H.raise $ ButtonPressed userOverviewDto effect
 
-  handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Output m (Maybe a)
+  handleQuery
+    :: forall a
+     . Query a
+    -> H.HalogenM (State ba) (Action ba) Slots (Output ba) m (Maybe a)
   handleQuery = case _ of
     ReloadUsersQ a -> do
-      liftEffect $ log "ReloadUsersQ invoked..."
       fetchAndLoadUsers
       pure $ Just a
     HandleFilterQ f a -> do
@@ -201,9 +255,8 @@ component = connect selectTranslator $ H.mkComponent
       pure $ Just a
 
   fetchAndLoadUsers
-    :: H.HalogenM State Action Slots Output m Unit
+    :: H.HalogenM (State ba) (Action ba) Slots (Output ba) m Unit
   fetchAndLoadUsers = do
-    liftEffect $ log "Fetching user data, Loading=true..."
     setLoading true
     maybeUsers <- H.liftAff $ R.getFromJSONEndpoint decodeJson "/users"
     case maybeUsers of
@@ -214,13 +267,12 @@ component = connect selectTranslator $ H.mkComponent
       Just users -> do
         H.modify_ _ { users = users, filteredUsers = users }
 
-    liftEffect $ log "Done fetching, Loading=false!"
     setLoading false
 
   setLoading
     :: MonadAff m
     => Boolean
-    -> H.HalogenM State Action Slots Output m Unit
+    -> H.HalogenM (State ba) (Action ba) Slots (Output ba) m Unit
   setLoading b = do
     H.modify_ _ { loading = b }
     H.raise $ Loading b

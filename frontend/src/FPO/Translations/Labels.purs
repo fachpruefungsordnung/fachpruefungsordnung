@@ -83,6 +83,7 @@ type Labels =
       -- | Admin Users Page
       ::: "admin_users_create"
       ::: "admin_users_createNewUser"
+      ::: "admin_users_deleteUser"
       ::: "admin_users_failedToCreateUser"
       ::: "admin_users_failedToDeleteUser"
       ::: "admin_users_failedToLoadUsers"
