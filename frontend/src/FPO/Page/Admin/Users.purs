@@ -17,7 +17,6 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (null)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console (log)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.UI.UserFilter as Filter
 import FPO.Components.UI.UserList as UserList
@@ -132,9 +131,6 @@ component =
       when (fromMaybe true (not <$> isUserSuperadmin <$> u)) $ navigate Page404
 
       H.modify_ _ { userID = getUserID <$> u }
-      s <- H.get
-      log $ "UserID: " <> (show $ s.userID)
-      log $ "UID: " <> (show $ getUserID <$> u)
 
       H.tell _userlist unit UserList.ReloadUsersQ
     Receive { context } -> do
