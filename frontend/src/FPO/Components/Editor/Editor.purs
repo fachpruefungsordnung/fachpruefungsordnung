@@ -455,7 +455,7 @@ editor docID = connect selectTranslator $ H.mkComponent
         loadedContent <- H.liftAff $
           Request.getFromJSONEndpoint
             ContentDto.decodeContent
-            ("/docs/1/text/" <> show entry.id <> "/rev/latest")
+            ("/docs/" <> show docID <> "/text/" <> show entry.id <> "/rev/latest")
         let
           content = case loadedContent of
             Nothing -> ContentDto.failureContent
@@ -544,7 +544,7 @@ editor docID = connect selectTranslator $ H.mkComponent
 
           -- send the new content as POST to the server
           _ <- H.liftAff $ Request.postJson
-            ("/docs/1/text/" <> show entry.id <> "/rev")
+            ("/docs/" <> show docID <> "/text/" <> show entry.id <> "/rev")
             jsonContent
 
           H.modify_ \st -> st
