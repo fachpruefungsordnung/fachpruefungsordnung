@@ -478,8 +478,10 @@ splitview docID = H.mkComponent
       state <- H.get
       let
         tree = tocTreeToDocumentTree state.tocEntries
+        encodedTree = DocumentDto.encodeDocumentTree tree
+
       rep <- H.liftAff $
-        Request.postJson "/commits" (DocumentDto.encodeCreateCommit tree)
+        Request.postJson "/docs/1/tree" encodedTree
       -- debugging logs in
       case rep of
         Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
@@ -487,17 +489,6 @@ splitview docID = H.mkComponent
     -- H.liftEffect $ Console.log "Successfully posted TOC to server"
     ForceGET -> do
       -- Forces a GET request to fetch the latest document tree of commit #1.
-      test <- H.liftAff $
-      --/docs/{documentID}/text/{textElementID}/rev/{textRevision}
-        Request.getJson "/docs/1/text/1/rev/latest"
-      case test of
-        Left err -> do
-          H.liftEffect $ log $ Request.printError "test" err
-          pure unit
-        Right res -> do
-          let json = res.body
-          H.liftEffect $ log $ stringify json
-      -- pure unit
       fetchedTree <- H.liftAff $
         Request.getFromJSONEndpoint DocumentDto.decodeDocument "/docs/1/tree/latest"
       let
@@ -507,6 +498,7 @@ splitview docID = H.mkComponent
       H.modify_ \st -> do
         st { tocEntries = tree }
       H.tell _toc unit (TOC.ReceiveTOCs tree)
+
     GET -> do
       -- TODO: As of now, the editor page and splitview are parametrized by the document ID
       --       as given by the route. We could also handle the docID as an input to the component,

@@ -7,8 +7,8 @@ import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError, decodeJson, (.:)
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Either (Either)
 import Data.Maybe (Maybe)
-import Data.Newtype (class Newtype, unwrap)
-import FPO.Dto.TreeDto (Edge(..), RootTree(..), Tree(..))
+import Data.Newtype (class Newtype)
+import FPO.Dto.TreeDto (RootTree)
 
 type DocumentID = Int
 type CommitID = Int
@@ -90,31 +90,6 @@ decodeDocument json = do
   root <- obj .: "root"
   decodeJson root
 
--- Encode instances
--- | Erzeugt ein JSON-Objekt mit Dummy-Daten passend zur Upload-Schnittstelle
-encodeCreateCommit :: DocumentTree -> Json
-encodeCreateCommit tree =
-  encodeJson
-    { info:
-        { author: "00000000-0000-0000-0000-000000000000"
-        , message: "Initial commit"
-        , parents: [ 1 ]
-        }
-    , root: encodeRootTree tree
-    }
 
-encodeRootTree :: DocumentTree -> Json
-encodeRootTree Empty = encodeJson {}
-encodeRootTree (RootTree { children }) =
-  encodeJson { children: map encodeEdge children }
-
-encodeTree :: Tree NodeHeader -> Json
-encodeTree (Node { children }) = encodeJson { edges: map encodeEdge children}
-encodeTree (Leaf { node }) =
-  let
-    { id, kind } = unwrap node
-  in
-  encodeJson { node: encodeJson { identifier: id, kind } }
-
-encodeEdge :: Edge NodeHeader -> Json
-encodeEdge (Edge child) = encodeJson { child: encodeTree child }
+encodeDocumentTree :: DocumentTree -> Json
+encodeDocumentTree tree = encodeJson $ map (\(NodeHeader { id }) -> id) tree

@@ -18,8 +18,8 @@ import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 
 type TreeHeader =
-  { kind :: String
-  , type :: String
+  { headerKind :: String
+  , headerType :: String
   }
 
 data RootTree a 
@@ -28,7 +28,7 @@ data RootTree a
              , header :: TreeHeader }
 
 data Tree a 
-  = Node { title :: String, children :: Array (Edge a) }
+  = Node { title :: String, children :: Array (Edge a), header :: TreeHeader }
   | Leaf { title :: String, node :: a }
 
 data Edge a = Edge (Tree a)
@@ -72,7 +72,8 @@ instance decodeJsonTree :: DecodeJson a => DecodeJson (Tree a) where
         node <- content .: "node"
         childrenArr <- node .: "children"
         children <- traverse (map Edge <<< decodeJson) childrenArr
-        pure $ Node { title, children }
+        header <- node .: "header"
+        pure $ Node { title, children, header }
 
       _ -> throwError $ TypeMismatch $ "Unknown node type: " <> typ
 
@@ -81,21 +82,30 @@ instance decodeJsonTree :: DecodeJson a => DecodeJson (Tree a) where
 
 instance encodeJsonRootTree :: EncodeJson a => EncodeJson (RootTree a) where
   encodeJson Empty               = encodeJson {}
-  encodeJson (RootTree children) = encodeJson { children }
+  encodeJson (RootTree root ) = encodeJson root
 
 instance encodeJsonEdge :: EncodeJson a => EncodeJson (Edge a) where
-  encodeJson (Edge child) = encodeJson { child }
+  encodeJson (Edge child) = encodeJson child
 
 instance encodeJsonTree :: EncodeJson a => EncodeJson (Tree a) where
-  encodeJson (Node { title, children }) =
+  encodeJson (Node { title, children, header }) =
     encodeJson
       { title
-      , children
+      , content:
+          { type: "tree"
+          , node:
+              { children: map encodeJson children
+              , header
+              }
+          }
       }
   encodeJson (Leaf { title, node }) =
     encodeJson
       { title
-      , node
+      , content:
+          { type: "leaf"
+          , leaf: node
+          }
       }
 
 -- Show instances
