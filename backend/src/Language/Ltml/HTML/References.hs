@@ -13,6 +13,8 @@ import Lucid
 data ReferenceType = SectionRef | ParagraphRef | SentenceRef
 
 -- | Generates fitting german Reference Html based on referenced type.
+--   This relies on the GlobalState being set up properly for the referenced scope.
+--   (e.g. currentParagraphIDHtml being set)
 genReference :: ReferenceType -> HtmlReaderState
 genReference ref = do
     readerState <- ask
@@ -38,6 +40,8 @@ genReference ref = do
 -- TODO: define Trie Map in GlobalState to track label references
 
 -- | Generates Reference String as Html and adds (Label, Html) pair to GlobalState
+--   This function heavily relies on the GlobalState context. 
+--   Especially the referenced scope must be evaluated (e.g. the currentSectionIDHtml must be set)
 addLabelToState
     :: Label -> ReferenceType -> ReaderT ReaderState (State GlobalState) ()
 addLabelToState label ref = do
