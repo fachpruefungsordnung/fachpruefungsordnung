@@ -3,9 +3,13 @@ module FPO.Components.TOC where
 import Prelude
 
 import Data.Array (concat, mapWithIndex)
+import Data.Either (Either(..))
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
+import FPO.Dto.PostTextDto (PostTextDto(..))
+import FPO.Dto.PostTextDto as PostTextDto
+import FPO.Data.Request as Request
 import FPO.Dto.TreeDto (Edge(..), RootTree(..), Tree(..))
 import FPO.Types (ShortendTOCEntry, TOCEntry, TOCTree, shortenTOC)
 import Halogen as H
@@ -78,9 +82,26 @@ tocview = H.mkComponent
     CreateNewSubsection path -> do
       H.modify_ \st ->
         st { showAddMenu = [-1] }
-      let 
-        newEntry = Leaf { title: "New Subsection", node: { id: 99, name: "New Subsection", newMarkerNextID: 0, markers: [] } }
-      H.raise (AddNode path newEntry)
+      gotRes <- H.liftAff $ 
+        Request.postJson "/docs/1/text/" (PostTextDto.encodePostTextDto (PostTextDto { identifier: 0, kind: "new Text" }))
+      case gotRes of
+        Left _ -> pure unit
+        Right res -> do
+          let
+            textDto = PostTextDto.decodePostTextDto res.body
+          case textDto of
+            Left _ -> pure unit
+            Right dto -> do
+              let 
+                newEntry = 
+                  Leaf 
+                    { title: "New Subsection"
+                    , node: 
+                        { id: PostTextDto.getID dto
+                        , name: "New Subsection"
+                        , newMarkerNextID: 0
+                        , markers: [] } }
+              H.raise (AddNode path newEntry)
 
     CreateNewSection path -> do
       H.modify_ \st ->

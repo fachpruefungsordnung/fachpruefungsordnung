@@ -772,8 +772,14 @@ splitview docID = H.mkComponent
         state <- H.get
         let
           newTree = addRootNode path node state.tocEntries
+          docTree = tocTreeToDocumentTree newTree
+          encodeTree = DocumentDto.encodeDocumentTree docTree
+        _ <- H.liftAff $
+          Request.postJson "/docs/1/tree" encodeTree
         H.modify_ \st -> st { tocEntries = newTree }
         H.tell _toc unit (TOC.ReceiveTOCs state.docName newTree)
+
+        pure unit
 
 findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
 findCommentSection tocEntries tocID markerID = do
