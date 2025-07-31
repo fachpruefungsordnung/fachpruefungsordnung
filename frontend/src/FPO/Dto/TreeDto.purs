@@ -2,6 +2,7 @@ module FPO.Dto.TreeDto
   ( Tree(..)
   , Edge(..)
   , RootTree(..)
+  , TreeHeader(..)
   , findRootTree
   ) where
 
@@ -16,9 +17,15 @@ import Data.Foldable (foldr)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 
+type TreeHeader =
+  { kind :: String
+  , type :: String
+  }
+
 data RootTree a 
   = Empty
-  | RootTree { children :: Array (Edge a) }
+  | RootTree { children :: Array (Edge a)
+             , header :: TreeHeader }
 
 data Tree a 
   = Node { title :: String, children :: Array (Edge a) }
@@ -40,9 +47,10 @@ derive instance functorEdge :: Functor Edge
 instance decodeJsonRootTree :: DecodeJson a => DecodeJson (RootTree a) where
   decodeJson json = do
     obj <- decodeJson json
+    header <- obj .: "header"
     childrenArr <- obj .: "children"
     children <- traverse (map Edge <<< decodeJson) childrenArr
-    pure $ RootTree { children }
+    pure $ RootTree { children, header }
 
 instance decodeJsonEdge :: DecodeJson a => DecodeJson (Edge a) where
   decodeJson json = Edge <$> decodeJson json
