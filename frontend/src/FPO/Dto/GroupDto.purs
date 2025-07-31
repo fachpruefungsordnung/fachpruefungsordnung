@@ -3,17 +3,11 @@ module FPO.Dto.GroupDto where
 
 import Prelude
 
-import Data.Argonaut
-  ( class DecodeJson
-  , class EncodeJson
-  , JsonDecodeError(..)
-  , decodeJson
-  , encodeJson
-  )
+import Data.Argonaut (class DecodeJson, class EncodeJson)
 import Data.Array (find)
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe)
 import Data.Newtype (class Newtype)
+import FPO.Dto.UserDto (Role, UserID)
 
 type GroupID = Int
 
@@ -60,29 +54,6 @@ lookupUser (GroupDto g) userID =
 derive instance newtypeGroupDto :: Newtype GroupDto _
 derive newtype instance encodeJsonGroupDto :: EncodeJson GroupDto
 derive newtype instance decodeJsonGroupDto :: DecodeJson GroupDto
-
-type UserID = String
-
-data Role = Admin | Member
-
-derive instance eqRole :: Eq Role
-
-instance encodeJsonRole :: EncodeJson Role where
-  encodeJson Admin = encodeJson "Admin"
-  encodeJson Member = encodeJson "Member"
-
-instance decodeJsonRole :: DecodeJson Role where
-  decodeJson json = do
-    str <- decodeJson json
-    case str of
-      "Admin" -> Right Admin
-      "Member" -> Right Member
-      _ -> Left $ UnexpectedValue json
-
-stringToRole :: String -> Maybe Role
-stringToRole "Admin" = Just Admin
-stringToRole "Member" = Just Member
-stringToRole _ = Nothing
 
 -- | Represents a group member entity, as returned by the `GET /groups/{groupID}` endpoint.
 newtype GroupMemberDto = GroupMemberDto

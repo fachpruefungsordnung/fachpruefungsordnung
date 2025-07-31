@@ -7,9 +7,7 @@
 
 module Main where
 
-import Affjax (Error, Response)
-import Affjax.StatusCode (StatusCode(StatusCode))
-import Data.Either (Either(Left, Right), hush)
+import Data.Either (hush)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
@@ -21,7 +19,6 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..), routeCodec, routeToString)
 import FPO.Data.Store (loadLanguage)
 import FPO.Data.Store as Store
-import FPO.Dto.UserDto (User)
 import FPO.Page.Admin.Group.DocOverview as ViewGroupDocuments
 import FPO.Page.Admin.Group.MemberOverview as ViewGroupMembers
 import FPO.Page.Admin.Groups as AdminViewGroups
@@ -211,10 +208,3 @@ main = HA.runHalogenAff do
       _response <- halogenIO.query $ H.mkTell $ NavigateQ new
       log $ "Navigated to: " <> routeToString new
       pure unit
-
-handleInitialResponse :: Either Error (Response String) -> Maybe User
-handleInitialResponse = case _ of
-  Left _ -> Nothing
-  Right { status, body } -> case status of
-    StatusCode 200 -> Just { userName: body, isAdmin: false }
-    _ -> Nothing

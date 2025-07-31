@@ -38,6 +38,7 @@ import FPO.Dto.GroupDto
   , getGroupOverviewID
   , getGroupOverviewName
   )
+import FPO.Dto.UserDto (isUserSuperadmin)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addButton, addCard, addColumn, addError, addModal, emptyEntryGen)
@@ -159,7 +160,7 @@ component =
   handleAction = case _ of
     Initialize -> do
       u <- liftAff $ getUser
-      when (fromMaybe true (not <$> _.isAdmin <$> u)) $
+      when (fromMaybe true (not <$> isUserSuperadmin <$> u)) $
         navigate Page404
 
       g <- liftAff getGroups
@@ -423,12 +424,15 @@ component =
           , HB.justifyContentBetween
           , HB.alignItemsCenter
           ]
-      , HE.onClick (const $ NavigateToGroupDocuments g.groupOverviewID)
-      , Style.popover $ translate
-          (label :: _ "admin_groups_viewDocumentsPage")
-          state.translator
       ]
-      [ HH.text g.groupOverviewName
+      [ HH.span
+          [ HE.onClick (const $ NavigateToGroupDocuments g.groupOverviewID)
+          , Style.popover $ translate
+              (label :: _ "admin_groups_viewDocumentsPage")
+              state.translator
+          ]
+          [ HH.text g.groupOverviewName
+          ]
       , buttonDeleteGroup state g.groupOverviewName
       ]
 

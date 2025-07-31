@@ -36,7 +36,7 @@ import FPO.Dto.DocumentDto
   , getDHPPID
   , getDHPPName
   )
-import FPO.Dto.UserDto (User)
+import FPO.Dto.UserDto (FullUserDto)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addCard, addColumn)
@@ -69,7 +69,7 @@ data Action
   | SetPage P.Output
 
 type State = FPOState
-  ( user :: Maybe User
+  ( user :: Maybe FullUserDto
   , projects :: Array Project
   , currentTime :: Maybe DateTime
   , searchQuery :: String
@@ -138,6 +138,7 @@ component =
     Initialize -> do
       store <- getStore
       u <- liftAff getUser
+      log $ "User: " <> show u
       now <- liftEffect nowDateTime
       -- If the user is logged in, fetch their documents and convert them to projects.
       void $ runMaybeT do
@@ -232,7 +233,7 @@ component =
     paginationSettings =
       { pages: length fps `div` 5 +
           if length fps `mod` 5 > 0 then 1 else 0
-      , style: P.Full
+      , style: P.Compact 2
       , reaction: P.FirstPage -- After changing the search query, reset to first page.
       }
 

@@ -171,7 +171,7 @@ component =
       [ HP.classes $ [ HB.pageItem ] <> if enabled then [ HB.active ] else [] ]
       [ HH.a
           [ HP.classes [ HB.pageLink ]
-          , HP.href "#"
+          , HP.style "cursor: pointer;"
           , HE.onClick $ const (SetPage pageNumber)
           ]
           [ HH.text $ show $ pageNumber + 1

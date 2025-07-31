@@ -16,7 +16,7 @@ import FPO.Data.Request (getIgnore, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (saveLanguage)
 import FPO.Data.Store as Store
-import FPO.Dto.UserDto (User)
+import FPO.Dto.UserDto (FullUserDto, getUserName, isUserSuperadmin)
 import FPO.Translations.Translator
   ( FPOTranslator(..)
   , fromFpoTranslator
@@ -36,7 +36,7 @@ import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 
-type State = FPOState (user :: Maybe User, language :: String)
+type State = FPOState (user :: Maybe FullUserDto, language :: String)
 
 data Action
   = Navigate Route
@@ -95,7 +95,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                       [ navButton "Editor" (Editor { docID: 1 }) ]
                   ]
                     <>
-                      if (maybe false _.isAdmin state.user) then
+                      if (maybe false isUserSuperadmin state.user) then
                         [ HH.li [ HP.classes [ HB.navItem ] ]
                             [ navButton
                                 ( translate (label :: _ "navbar_users")
@@ -176,7 +176,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
       [ HH.text label ]
 
   -- Creates a user dropdown with user icon and logout option.
-  userDropdown :: State -> User -> H.ComponentHTML Action () m
+  userDropdown :: State -> FullUserDto -> H.ComponentHTML Action () m
   userDropdown state user =
     HH.li
       [ HP.classes [ HB.navItem, HB.dropdown ] ]
@@ -187,7 +187,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
           , HP.attr (AttrName "aria-expanded") "false"
           ]
           [ HH.i [ HP.classes [ ClassName "bi-person", HB.me1 ] ] []
-          , HH.text user.userName
+          , HH.text $ getUserName user
           ]
       , HH.ul
           [ HP.classes [ HB.dropdownMenu, HB.dropdownMenuEnd ]
@@ -199,7 +199,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                 (Navigate (Profile { loginSuccessful: Nothing }))
             ]
               <>
-                ( if user.isAdmin then
+                ( if isUserSuperadmin user then
                     [ dropdownEntry
                         (translate (label :: _ "au_userManagement") state.translator)
                         "person-exclamation"

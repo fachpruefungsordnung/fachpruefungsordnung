@@ -12,25 +12,17 @@ module FPO.Page.Admin.Users (component) where
 import Prelude
 
 import Affjax (printError)
-import Data.Argonaut (decodeJson, encodeJson)
-import Data.Array (filter, length, replicate, slice)
+import Data.Argonaut (encodeJson)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.String (contains, null)
-import Data.String.Pattern (Pattern(..))
+import Data.String (null)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console (log)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
-import FPO.Components.Pagination as P
+import FPO.Components.UI.UserFilter as Filter
+import FPO.Components.UI.UserList as UserList
 import FPO.Data.Email as Email
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request
-  ( LoadState(..)
-  , deleteIgnore
-  , getFromJSONEndpoint
-  , getUser
-  , postJson
-  )
+import FPO.Data.Request (deleteIgnore, getUser, postJson)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.CreateUserDto
@@ -43,69 +35,54 @@ import FPO.Dto.CreateUserDto
   , withPassword
   )
 import FPO.Dto.CreateUserDto as CreateUserDto
-import FPO.Dto.UserOverviewDto (UserOverviewDto)
-import FPO.Dto.UserOverviewDto as UserOverviewDto
-import FPO.Translations.Labels (Labels)
+import FPO.Dto.UserDto (UserID, getUserID, isUserSuperadmin)
+import FPO.Dto.UserOverviewDto as UOD
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML
-  ( addButton
-  , addCard
-  , addColumn
-  , addError
-  , deleteButton
-  , emptyEntryText
-  )
+import FPO.UI.HTML (addButton, addCard, addColumn, addError)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
-import Simple.I18n.Translator (Translator, label, translate)
+import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
 
-_pagination = Proxy :: Proxy "pagination"
+_filter = Proxy :: Proxy "filter"
+_userlist = Proxy :: Proxy "userlist"
+
+data ButtonEvent
+  = EffectDeleteUser
+  | EffectGoToProfilePage
 
 type Slots =
-  ( pagination :: H.Slot P.Query P.Output Unit
+  ( filter :: forall q. H.Slot q Filter.Output Unit
+  , userlist :: H.Slot UserList.Query (UserList.Output ButtonEvent) Unit
   )
 
 data Action
   = Initialize
   | Receive (Connected FPOTranslator Unit)
-  | DoNothing -- Placeholder for future actions
-  | SetPage P.Output
-  -- TODO: Of course, we should add dedicated components for the filtering
-  --        and creation of users, but for now, we just use these actions to
-  --        demonstrate the functionality (mockup!). Or, might be even better,
-  --        to add a general component that allows us to create simple forms
-  --        with a label, input field(s), and a button. This way, we dont have to
-  --        repeat ourselves over and over again.
-  | ChangeFilterUsername String
-  | ChangeFilterEmail String
   | ChangeCreateUsername String
   | ChangeCreateEmail String
   | ChangeCreatePassword String
-  | RequestDeleteUser UserOverviewDto
+  | RequestDeleteUser UOD.UserOverviewDto
   | PerformDeleteUser String
   | CloseDeleteModal
   | GetUser String
-  | Filter
+  | HandleFilter Filter.Output
+  | HandleUserList (UserList.Output ButtonEvent)
   | CreateUser
 
 type State = FPOState
   ( error :: Maybe String
-  , page :: Int
-  , users :: LoadState (Array UserOverviewDto)
-  , filteredUsers :: Array UserOverviewDto
-  , filterUsername :: String
-  , filterEmail :: String
   , createUserDto :: CreateUserDto
   , createUserError :: Maybe String
   , createUserSuccess :: Maybe String
-  , requestDeleteUser :: Maybe UserOverviewDto
+  , requestDeleteUser :: Maybe UOD.UserOverviewDto
+  -- | The ID of the user that is currently viewing the page.
+  , userID :: Maybe UserID
   )
 
 -- | Admin panel page component.
@@ -130,21 +107,17 @@ component =
   initialState { context } =
     { translator: fromFpoTranslator context
     , error: Nothing
-    , page: 0
-    , users: Loading
-    , filteredUsers: []
-    , filterUsername: ""
-    , filterEmail: ""
     , createUserDto: CreateUserDto.empty
     , createUserError: Nothing
     , createUserSuccess: Nothing
     , requestDeleteUser: Nothing
+    , userID: Nothing
     }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
-      [ HP.classes [ HB.container, HB.my5 ]
+      [ HP.classes [ HB.containerXl, HB.my5 ]
       ]
       [ renderDeleteModal state
       , renderUserManagement state
@@ -155,17 +128,13 @@ component =
   handleAction = case _ of
     Initialize -> do
       u <- H.liftAff $ getUser
-      when (fromMaybe true (not <$> _.isAdmin <$> u)) $ navigate Page404
-      fetchAndLoadUsers
+      when (fromMaybe true (not <$> isUserSuperadmin <$> u)) $ navigate Page404
 
+      H.modify_ _ { userID = getUserID <$> u }
+
+      H.tell _userlist unit UserList.ReloadUsersQ
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
-    DoNothing -> do
-      pure unit
-    SetPage (P.Clicked p) -> do
-      H.modify_ _ { page = p }
-    ChangeFilterUsername username -> do H.modify_ _ { filterUsername = username }
-    ChangeFilterEmail email -> do H.modify_ _ { filterEmail = email }
     ChangeCreateUsername username -> do
       state <- H.get
       H.modify_ _ { createUserDto = withName username state.createUserDto }
@@ -191,32 +160,21 @@ component =
             }
         Right _ -> do
           H.modify_ _ { error = Nothing, requestDeleteUser = Nothing }
-          fetchAndLoadUsers
+          H.tell _userlist unit UserList.ReloadUsersQ
     CloseDeleteModal -> do H.modify_ _ { requestDeleteUser = Nothing }
     GetUser _ -> navigate (Profile { loginSuccessful: Nothing })
-    Filter -> do
-      state <- H.get
-      filteredUsers <- case state.users of
-        Loading -> pure []
-        Loaded userList ->
-          pure $ filter
-            ( \user ->
-                ( if null state.filterUsername then false
-                  else
-                    contains (Pattern state.filterUsername)
-                      (UserOverviewDto.getName user)
-                )
-                  ||
-                    ( if null state.filterEmail then false
-                      else
-                        contains
-                          (Pattern state.filterEmail)
-                          (UserOverviewDto.getEmail user)
-                    )
-            )
-            userList
-      log $ show (length filteredUsers)
-      H.modify_ _ { filteredUsers = filteredUsers }
+    HandleFilter f -> do
+      H.tell _userlist unit (UserList.HandleFilterQ f)
+    HandleUserList (UserList.Loading _) -> do
+      -- We do not care about the loading state here,
+      -- as the user list component handles it itself.
+      -- Would be nice to have a way to either render the user
+      -- list component (and the whole scene), or show a loading spinner
+      -- instead, but this doesnt work as the user list component
+      -- must be rendered in the scene in order to exist and do it's work :)
+      pure unit
+    HandleUserList (UserList.Error err) -> do
+      H.modify_ _ { error = Just err }
     CreateUser -> do
       state <- H.get
       response <- H.liftAff $ postJson "/register" (encodeJson state.createUserDto)
@@ -237,82 +195,53 @@ component =
                 )
             , createUserDto = CreateUserDto.empty
             }
-          fetchAndLoadUsers
+          H.tell _userlist unit UserList.ReloadUsersQ
+    HandleUserList (UserList.ButtonPressed userOverviewDto effect) -> do
+      case effect of
+        EffectDeleteUser -> H.modify_ _ { requestDeleteUser = Just userOverviewDto }
+        EffectGoToProfilePage -> do
+          handleAction $ GetUser $ UOD.getID userOverviewDto
 
   renderUserManagement :: State -> H.ComponentHTML Action Slots m
   renderUserManagement state =
-    HH.div_
+    HH.div_ $
       [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
           [ HH.text $ translate (label :: _ "au_userManagement") state.translator
           ]
-      , case state.users of
-          Loading ->
-            HH.div [ HP.classes [ HB.textCenter, HB.mt5 ] ]
-              [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
-          Loaded _ -> renderUserListView state
+      , renderUserListView state
       ]
 
   renderUserListView :: State -> H.ComponentHTML Action Slots m
   renderUserListView state =
     HH.div [ HP.classes [ HB.row, HB.justifyContentAround ] ]
-      [ renderFilterBy state
+      [ renderFilterBy
       , renderUserList state
       , renderNewUserForm state
       ]
 
-  renderFilterBy :: State -> H.ComponentHTML Action Slots m
-  renderFilterBy state =
-    addCard (translate (label :: _ "common_filterBy") state.translator)
-      [ HP.classes [ HB.col12, HB.colMd3, HB.colLg3, HB.mb3 ] ] $ HH.div
-      [ HP.classes [ HB.row ] ]
-      [ HH.div [ HP.classes [ HB.col ] ]
-          [ addColumn
-              state.filterUsername
-              (translate (label :: _ "common_userName") state.translator)
-              (translate (label :: _ "common_userName") state.translator)
-              "bi-person"
-              HP.InputText
-              ChangeFilterUsername
-          , addColumn
-              ""
-              (translate (label :: _ "common_email") state.translator)
-              (translate (label :: _ "common_email") state.translator)
-              "bi-envelope-fill"
-              HP.InputEmail
-              ChangeFilterEmail
-          ]
-      , HH.div [ HP.classes [ HB.col12, HB.textCenter ] ]
-          [ HH.div [ HP.classes [ HB.dInlineBlock ] ]
-              [ addButton
-                  true
-                  "Filter"
-                  (Just "bi-funnel")
-                  (const Filter)
-              ]
-          ]
-      ]
+  renderFilterBy :: H.ComponentHTML Action Slots m
+  renderFilterBy =
+    HH.slot _filter unit Filter.component unit HandleFilter
 
-  -- Creates a list of (dummy) users with pagination.
   renderUserList :: State -> H.ComponentHTML Action Slots m
   renderUserList state =
-    addCard (translate (label :: _ "admin_users_listOfUsers") state.translator)
-      [ HP.classes [ HB.col12, HB.colMd6, HB.colLg6, HB.mb3 ] ] $ HH.div_
-      [ HH.ul [ HP.classes [ HB.listGroup ] ]
-          $ map (createUserEntry state.translator) usrs
-              <> replicate (10 - length usrs)
-                emptyEntryText
-      -- TODO: ^ Artificially inflating the list to 10 entries
-      --         allows for a fixed overall height of the list,
-      --         but it's not a clean solution at all.
-      , HH.slot _pagination unit P.component ps SetPage
-      ]
+    HH.slot _userlist unit UserList.component events HandleUserList
     where
-    usrs = slice (state.page * 10) ((state.page + 1) * 10) state.filteredUsers
-    ps =
-      { pages: P.calculatePageCount (length state.filteredUsers) 10
-      , style: P.Compact 1
-      , reaction: P.PreservePage
-      }
+    events = \u ->
+      [ { popover: translate (label :: _ "admin_users_deleteUser") state.translator
+        , effect: EffectDeleteUser
+        , icon: "bi-trash"
+        , classes: [ HB.btn, HB.btnOutlineDanger, HB.btnSm, HB.me2 ]
+        , disabled: state.userID == Just (UOD.getID u)
+        }
+      , { popover: translate (label :: _ "admin_users_goToProfilePage")
+            state.translator
+        , effect: EffectGoToProfilePage
+        , icon: "bi-person-fill"
+        , classes: [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
+        , disabled: false
+        }
+      ]
 
   -- Creates a form to create a new (dummy) user.
   renderNewUserForm :: forall w. State -> HH.HTML w Action
@@ -363,37 +292,6 @@ component =
           Nothing -> HH.text ""
       ]
 
-  -- Creates a (dummy) user entry for the list.
-  createUserEntry
-    :: forall w. Translator Labels -> UserOverviewDto -> HH.HTML w Action
-  createUserEntry translator userOverviewDto =
-    HH.li
-      [ HP.classes
-          [ HB.listGroupItem
-          , HB.dFlex
-          , HB.justifyContentBetween
-          , HB.alignItemsCenter
-          ]
-      ]
-      [ HH.span [ HP.classes [ HB.col5 ] ]
-          [ HH.text $ UserOverviewDto.getName userOverviewDto ]
-      , HH.span [ HP.classes [ HB.col5 ] ]
-          [ HH.text $ UserOverviewDto.getEmail userOverviewDto ]
-      , HH.div [ HP.classes [ HB.col2, HB.dFlex, HB.justifyContentEnd, HB.gap1 ] ]
-          [ deleteButton (const $ RequestDeleteUser userOverviewDto)
-          , HH.button
-              [ HP.type_ HP.ButtonButton
-              , HP.classes [ HB.btn, HB.btnSm, HB.btnOutlinePrimary ]
-              , HE.onClick $ const $ GetUser (UserOverviewDto.getID userOverviewDto)
-              , HP.title
-                  (translate (label :: _ "admin_users_goToProfilePage") translator)
-              ]
-              [ HH.i [ HP.classes [ HB.bi, (H.ClassName "bi-person-fill") ] ] []
-
-              ]
-          ]
-      ]
-
 renderDeleteModal :: forall m. State -> HH.HTML m Action
 renderDeleteModal state =
   case state.requestDeleteUser of
@@ -401,9 +299,9 @@ renderDeleteModal state =
     Just userOverviewDto -> deleteConfirmationModal
       state.translator
       userOverviewDto
-      UserOverviewDto.getName
+      UOD.getName
       CloseDeleteModal
-      (PerformDeleteUser <<< UserOverviewDto.getID)
+      (PerformDeleteUser <<< UOD.getID)
       (translate (label :: _ "admin_users_theUser") state.translator)
 
 isCreateUserFormValid :: CreateUserDto -> Boolean
@@ -412,17 +310,3 @@ isCreateUserFormValid createUserDto =
     && not (null $ getEmail createUserDto)
     && not (null $ getPassword createUserDto)
     && Email.isValidEmailStrict (getEmail createUserDto)
-
-fetchAndLoadUsers
-  :: forall output m. MonadAff m => H.HalogenM State Action Slots output m Unit
-fetchAndLoadUsers = do
-  maybeUsers <- H.liftAff $ getFromJSONEndpoint decodeJson "/users"
-  case maybeUsers of
-    Nothing -> do
-      state <- H.get
-      H.modify_ _
-        { error = Just $ translate (label :: _ "admin_users_failedToLoadUsers")
-            state.translator
-        }
-    Just users -> do
-      H.modify_ _ { users = Loaded users, filteredUsers = users }

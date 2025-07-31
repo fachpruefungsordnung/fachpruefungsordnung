@@ -40,6 +40,7 @@ import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.ContentDto (Content)
 import FPO.Dto.ContentDto as ContentDto
+import FPO.Dto.UserDto (getUserName)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types (AnnotatedMarker, TOCEntry, emptyTOCEntry, markerToAnnotation, sortMarkers)
@@ -326,7 +327,7 @@ editor = connect selectTranslator $ H.mkComponent
           sCol = Types.getColumn start
           eRow = Types.getRow end
           eCol = Types.getColumn end
-          userName = maybe "Guest" _.userName user
+          userName = maybe "Guest" getUserName user
           newMarkerID = case state.mTocEntry of
             Nothing -> 0
             Just tocEntry -> tocEntry.newMarkerNextID
@@ -676,9 +677,9 @@ createMarkerRange marker = do
   range <- Range.create marker.startRow marker.startCol marker.endRow marker.endCol
   pure range
 
--- Gets all markers from this session. Then check, if the Position is in 
+-- Gets all markers from this session. Then check, if the Position is in
 -- range one of the markers. Because the markers are sorted by start Position
--- we can use the 
+-- we can use the
 --findLocalMarkerID
 
 cursorInRange :: Array LiveMarker -> Types.Position -> Effect (Maybe LiveMarker)

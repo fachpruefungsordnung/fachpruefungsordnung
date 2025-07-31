@@ -10,7 +10,7 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (LoadState(..), getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Dto.UserDto (User)
+import FPO.Dto.UserDto (FullUserDto, getUserName, isUserSuperadmin)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen (liftAff)
@@ -33,7 +33,7 @@ data Action
 -- |       handle loading entities in the future. Right now, this is at least
 -- |       more descriptive than using `Maybe`.
 type State = FPOState
-  ( user :: LoadState User
+  ( user :: LoadState FullUserDto
   , loginSuccessfulBanner :: Boolean
   )
 
@@ -98,7 +98,7 @@ component =
                                             state.translator
                                         ) <> ": "
                                     ]
-                                , HH.text user.userName
+                                , HH.text $ getUserName user
                                 ]
                             , HH.li [ HP.classes [ HB.listGroupItem ] ]
                                 [ HH.strong_
@@ -110,12 +110,12 @@ component =
                                 , HH.span
                                     [ HP.classes
                                         [ HB.badge
-                                        , if user.isAdmin then HB.bgPrimary
+                                        , if isUserSuperadmin user then HB.bgPrimary
                                           else HB.bgSecondary
                                         ]
                                     ]
                                     [ HH.text $
-                                        if user.isAdmin then "Administrator"
+                                        if isUserSuperadmin user then "Administrator"
                                         else "Member"
                                     ]
                                 ]

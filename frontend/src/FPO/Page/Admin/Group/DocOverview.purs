@@ -31,16 +31,23 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (createDocument, deleteIgnore, getDocumentsFromURL, getUser)
+import FPO.Data.Request
+  ( createDocument
+  , deleteIgnore
+  , getDocumentsFromURL
+  , getGroup
+  , getUser
+  )
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.CreateDocumentDto (DocumentCreateDto(..))
 import FPO.Dto.DocumentDto (DocumentHeader(..), DocumentID, getDHID, getDHName)
-import FPO.Dto.GroupDto (GroupID)
+import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName)
+import FPO.Dto.UserDto (isUserSuperadmin)
 import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addCard, addColumn, addModal)
+import FPO.UI.HTML (addColumn, addModal)
 import FPO.UI.Style as Style
 import Halogen (liftAff)
 import Halogen as H
@@ -118,6 +125,7 @@ type State = FPOState
   ( error :: Maybe String
   , page :: Int
   , groupID :: GroupID
+  , group :: Maybe GroupDto
   , documents :: Array Document
   , filteredDocuments :: Array Document
   , currentTime :: Maybe DateTime
@@ -157,6 +165,7 @@ component =
     , modalState: NoModal
     , currentTime: Nothing
     , newDocumentName: ""
+    , group: Nothing
     }
 
   render :: State -> H.ComponentHTML Action Slots m
@@ -190,9 +199,15 @@ component =
   renderDocumentManagement :: State -> H.ComponentHTML Action Slots m
   renderDocumentManagement state =
     HH.div_
-      [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-          [ HH.text $ translate (label :: _ "gp_projectManagement")
-              state.translator
+      [ HH.h2 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+          [ HH.text $
+              translate (label :: _ "gp_groupProjects")
+                state.translator <> " "
+          , HH.span
+              [ HP.classes
+                  [ HB.textSecondary, HB.fwBolder, HB.dInlineBlock, HB.textWrap ]
+              ]
+              [ HH.text $ fromMaybe "" $ getGroupName <$> state.group ]
           ]
       , renderDocumentListView state
       ]
@@ -208,10 +223,8 @@ component =
   renderDocumentsOverview :: State -> H.ComponentHTML Action Slots m
   renderDocumentsOverview state =
     HH.div [ HP.classes [ HB.col12, HB.colMd9, HB.colLg8 ] ]
-      [ addCard
-          (translate (label :: _ "gp_groupProjects") state.translator)
-          []
-          (renderDocumentOverview state)
+      [ HH.div [ HP.classes [ HB.card, HB.bgLightSubtle ] ]
+          [ HH.div [ HP.class_ HB.cardBody ] [ renderDocumentOverview state ] ]
       ]
 
   -- Search bar and list of projects.
@@ -313,9 +326,11 @@ component =
     HH.tr []
       [ HH.td
           [ HP.colSpan 3
-          , HP.classes [ HB.textCenter, HB.invisible ]
+          , HP.classes [ HB.textCenter ]
           ]
-          [ HH.text $ "Empty Row", buttonDeleteDocument state (-1) ]
+          [ HH.div [ HP.class_ HB.invisible ]
+              [ HH.text $ "Empty Row", buttonDeleteDocument state (-1) ]
+          ]
       ]
 
   renderSideButtons :: forall w. State -> HH.HTML w Action
@@ -428,7 +443,7 @@ component =
   handleAction = case _ of
     Initialize -> do
       u <- liftAff $ getUser
-      when (fromMaybe true (not <$> _.isAdmin <$> u)) $
+      when (fromMaybe true (not <$> isUserSuperadmin <$> u)) $
         navigate Page404
       now <- H.liftEffect nowDateTime
       H.modify_ _
@@ -442,7 +457,15 @@ component =
         Just docs -> do
           H.modify_ _ { documents = toDocs now docs }
         Nothing -> do
-          navigate Login
+          navigate Page404
+
+      g <- liftAff $ getGroup s.groupID
+      case g of
+        Just group -> do
+          H.modify_ _ { group = Just group }
+        Nothing -> do
+          navigate Page404
+
       handleAction Filter
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }

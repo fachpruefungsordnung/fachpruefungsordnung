@@ -26,8 +26,8 @@ import Effect.Class (liftEffect)
 import Effect.Console (log)
 import FPO.Dto.CreateDocumentDto (DocumentCreateDto)
 import FPO.Dto.DocumentDto (DocumentHeader, DocumentHeaderPlusPermission, DocumentID)
-import FPO.Dto.GroupDto (GroupCreate, GroupDto, GroupID, GroupOverview, Role, UserID)
-import FPO.Dto.UserDto (User, decodeUser)
+import FPO.Dto.GroupDto (GroupCreate, GroupDto, GroupID, GroupOverview)
+import FPO.Dto.UserDto (FullUserDto, Role, UserID)
 import Foreign (renderForeignError)
 import Web.DOM.Document (Document)
 import Web.File.Blob (Blob)
@@ -90,8 +90,8 @@ getFromJSONEndpoint decode url = do
           pure $ Just val
 
 -- | Fetches the current user from the server.
-getUser :: Aff (Maybe User)
-getUser = getFromJSONEndpoint decodeUser "/me"
+getUser :: Aff (Maybe FullUserDto)
+getUser = getFromJSONEndpoint decodeJson "/me"
 
 -- | Fetches the groups of the current user from the server.
 getGroups :: Aff (Maybe (Array GroupOverview))
