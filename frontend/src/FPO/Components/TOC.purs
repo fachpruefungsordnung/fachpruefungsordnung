@@ -7,7 +7,10 @@ import Data.Either (Either(..))
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
+import FPO.Dto.DocumentDto (DocumentID)
+import FPO.Dto.DocumentDto as DocumentDto
 import FPO.Data.Request as Request
+import FPO.Data.Store as Store
 import FPO.Dto.PostTextDto (PostTextDto(..))
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Dto.TreeDto (Edge(..), RootTree(..), Tree(..))
@@ -16,6 +19,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 
 type Input = Unit
@@ -31,7 +35,7 @@ data Action
   | CreateNewSubsection (Array Int)
   | CreateNewSection (Array Int)
 
-data Query a = ReceiveTOCs String (TOCTree) a
+data Query a = ReceiveTOCs (TOCTree) a
 
 type State =
   { documentName :: String
@@ -40,8 +44,13 @@ type State =
   , showAddMenu :: Array Int
   }
 
-tocview :: forall m. MonadAff m => H.Component Query Input Output m
-tocview = H.mkComponent
+tocview 
+  :: forall m
+   . MonadAff m 
+  => MonadStore Store.Action Store.Store m
+  => DocumentID
+  -> H.Component Query Input Output m
+tocview docID = H.mkComponent
   { initialState: \_ ->
       { documentName: ""
       , tocEntries: Empty
@@ -68,7 +77,13 @@ tocview = H.mkComponent
   handleAction = case _ of
 
     Init -> do
-      pure unit
+      mDoc <- H.liftAff $ Request.getDocumentHeader docID
+      let
+        docName = case mDoc of
+          Nothing -> ""
+          Just doc -> DocumentDto.getDHName doc
+      H.modify_ \st -> do
+        st { documentName = docName }
 
     JumpToSection id -> do
       H.modify_ \state ->
@@ -87,7 +102,7 @@ tocview = H.mkComponent
       H.modify_ \st ->
         st { showAddMenu = [ -1 ] }
       gotRes <- H.liftAff $
-        Request.postJson "/docs/1/text/"
+        Request.postJson ("/docs/" <> show docID <> "/text")
           ( PostTextDto.encodePostTextDto
               (PostTextDto { identifier: 0, kind: "new Text" })
           )
@@ -129,13 +144,12 @@ tocview = H.mkComponent
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
 
-    ReceiveTOCs name entries a -> do
+    ReceiveTOCs entries a -> do
       let
         shortendEntries = map shortenTOC entries
       H.modify_ \state ->
         state
-          { documentName = name
-          , tocEntries = shortendEntries
+          { tocEntries = shortendEntries
           , mSelectedTocEntry = Nothing
           }
       pure (Just a)

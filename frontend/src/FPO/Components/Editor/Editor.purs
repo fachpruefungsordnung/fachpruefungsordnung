@@ -40,6 +40,7 @@ import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.ContentDto (Content)
 import FPO.Dto.ContentDto as ContentDto
+import FPO.Dto.DocumentDto (DocumentID)
 import FPO.Dto.UserDto (getUserName)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -116,8 +117,9 @@ editor
   :: forall m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => H.Component Query Unit Output m
-editor = connect selectTranslator $ H.mkComponent
+  => DocumentID
+  -> H.Component Query Unit Output m
+editor docID = connect selectTranslator $ H.mkComponent
   { initialState
   , render
   , eval: H.mkEval H.defaultEval

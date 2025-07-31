@@ -107,7 +107,6 @@ type State =
   , mEditorContent :: Maybe (Array String)
 
   -- Store tocEntries and send some parts to its children components
-  , docName :: String
   , tocEntries :: TOCTree
 
   -- How the timestamp has to be formatted
@@ -154,7 +153,6 @@ splitview docID = H.mkComponent
       , lastExpandedSidebarRatio: 0.2
       , lastExpandedPreviewRatio: 0.4
       , mEditorContent: Nothing
-      , docName: ""
       , tocEntries: Empty
       , mTimeFormatter: Nothing
       , sidebarShown: true
@@ -233,7 +231,7 @@ splitview docID = H.mkComponent
                       , HP.style
                           "height: 100%; box-sizing: border-box; min-height: 0; overflow: hidden;"
                       ]
-                      [ HH.slot _editor unit Editor.editor unit HandleEditor ]
+                      [ HH.slot _editor unit (Editor.editor docID) unit HandleEditor ]
                   ]
               ]
             <>
@@ -279,7 +277,7 @@ splitview docID = H.mkComponent
             , HE.onClick \_ -> ToggleSidebar
             ]
             [ HH.text "×" ]
-        , HH.slot _toc unit TOC.tocview unit HandleTOC
+        , HH.slot _toc unit (TOC.tocview docID) unit HandleTOC
         ]
     -- Comment
     , HH.div
@@ -472,7 +470,7 @@ splitview docID = H.mkComponent
         encodedTree = DocumentDto.encodeDocumentTree tree
 
       rep <- H.liftAff $
-        Request.postJson "/docs/1/tree" encodedTree
+        Request.postJson ("/docs/" <> show docID <> "/tree") encodedTree
       -- debugging logs in
       case rep of
         Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
@@ -481,19 +479,14 @@ splitview docID = H.mkComponent
     ForceGET -> do
       -- Forces a GET request to fetch the latest document tree of commit #1.
       fetchedTree <- H.liftAff $
-        Request.getFromJSONEndpoint DocumentDto.decodeDocument "/docs/1/tree/latest"
-      mDoc <- H.liftAff $ Request.getDocumentHeader docID
+        Request.getFromJSONEndpoint DocumentDto.decodeDocument $ "/docs/" <> show docID <> "/tree/latest"
       let
         tree = case fetchedTree of
           Nothing -> Empty
           Just t -> documentTreeToTOCTree t
-        docName = case mDoc of
-          Nothing -> ""
-          Just doc -> DocumentDto.getDHName doc
-      -- Get document name
       H.modify_ \st -> do
-        st { docName = docName, tocEntries = tree }
-      H.tell _toc unit (TOC.ReceiveTOCs docName tree)
+        st { tocEntries = tree }
+      H.tell _toc unit (TOC.ReceiveTOCs tree)
 
     GET -> do
       -- TODO: As of now, the editor page and splitview are parametrized by the document ID
@@ -515,7 +508,7 @@ splitview docID = H.mkComponent
         pure $ documentTreeToTOCTree fetchedTree
 
       H.modify_ _ { tocEntries = finalTree }
-      H.tell _toc unit (TOC.ReceiveTOCs "" finalTree)
+      H.tell _toc unit (TOC.ReceiveTOCs finalTree)
     Init -> do
       -- exampleTOCEntries <- createExampleTOCEntries
       -- -- Comment it out for now, to let the other text show up first in editor
@@ -531,9 +524,11 @@ splitview docID = H.mkComponent
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
       H.tell _commentOverview unit
         (CommentOverview.ReceiveTimeFormatter timeFormatter)
-      H.tell _toc unit (TOC.ReceiveTOCs "" Empty)
+      H.tell _toc unit (TOC.ReceiveTOCs Empty)
       -- Load the initial TOC entries into the editor
-      handleAction GET
+      -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
+      -- or rather, we don't use commit anymore in the API
+      handleAction ForceGET
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -772,9 +767,9 @@ splitview docID = H.mkComponent
           docTree = tocTreeToDocumentTree newTree
           encodeTree = DocumentDto.encodeDocumentTree docTree
         _ <- H.liftAff $
-          Request.postJson "/docs/1/tree" encodeTree
+          Request.postJson ("/docs/" <> show docID <> "/tree") encodeTree
         H.modify_ \st -> st { tocEntries = newTree }
-        H.tell _toc unit (TOC.ReceiveTOCs state.docName newTree)
+        H.tell _toc unit (TOC.ReceiveTOCs newTree)
 
         pure unit
 
