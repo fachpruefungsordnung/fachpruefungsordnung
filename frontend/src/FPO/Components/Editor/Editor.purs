@@ -43,7 +43,13 @@ import FPO.Dto.ContentDto as ContentDto
 import FPO.Dto.UserDto (getUserName)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.Types (AnnotatedMarker, TOCEntry, emptyTOCEntry, markerToAnnotation, sortMarkers)
+import FPO.Types
+  ( AnnotatedMarker
+  , TOCEntry
+  , emptyTOCEntry
+  , markerToAnnotation
+  , sortMarkers
+  )
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -444,13 +450,13 @@ editor = connect selectTranslator $ H.mkComponent
         -- We need Aff for that and thus cannot go inside Eff
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
         -- See, why and fix it
-        loadedContent <- H.liftAff $ 
-          Request.getFromJSONEndpoint 
+        loadedContent <- H.liftAff $
+          Request.getFromJSONEndpoint
             ContentDto.decodeContent
-            ("/docs/1/text/"<> show entry.id <>"/rev/latest")
+            ("/docs/1/text/" <> show entry.id <> "/rev/latest")
         let
           content = case loadedContent of
-            Nothing  -> ContentDto.failureContent
+            Nothing -> ContentDto.failureContent
             Just res -> res
         H.modify_ \st -> st { mContent = Just content }
 
@@ -533,15 +539,16 @@ editor = connect selectTranslator $ H.mkComponent
             newEntry = entry
               { markers = updatedMarkers }
             jsonContent = ContentDto.encodeContent newContent
-          
+
           -- send the new content as POST to the server
-          _ <- H.liftAff $ Request.postJson 
+          _ <- H.liftAff $ Request.postJson
             ("/docs/1/text/" <> show entry.id <> "/rev")
             jsonContent
 
-          H.modify_ \st -> st 
+          H.modify_ \st -> st
             { mTocEntry = Just newEntry
-            , mContent = Just newContent }
+            , mContent = Just newContent
+            }
           H.raise (SavedSection newEntry)
           pure (Just a)
 

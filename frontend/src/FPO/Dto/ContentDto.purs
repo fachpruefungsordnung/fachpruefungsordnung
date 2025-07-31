@@ -25,11 +25,14 @@ instance decodeJsonContent :: DecodeJson Content where
     pure $ Content { content: con, parent: id }
 
 instance encodeJsonContent :: EncodeJson Content where
-  encodeJson (Content {content, parent}) = 
+  encodeJson (Content { content, parent }) =
     encodeJson { content: content, parent: parent }
 
 instance showContent :: Show Content where
-  show (Content {content, parent}) = "Content { content: " <> content <> ", parent: " <> show parent <> " }"
+  show (Content { content, parent }) = "Content { content: " <> content
+    <> ", parent: "
+    <> show parent
+    <> " }"
 
 decodeContent :: Json -> Either JsonDecodeError Content
 decodeContent json = decodeJson json

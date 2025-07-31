@@ -35,8 +35,7 @@ type State =
 type Input =
   { editorContent :: Maybe (Array String) }
 
-data Query a
-  = GotEditorQuery (Maybe (Array String)) a
+data Query a = GotEditorQuery (Maybe (Array String)) a
 
 preview :: forall m. MonadAff m => H.Component Query Input Output m
 preview = H.mkComponent

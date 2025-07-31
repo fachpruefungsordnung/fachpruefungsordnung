@@ -9,8 +9,8 @@ module FPO.Dto.TreeDto
 import Prelude
 
 import Control.Alt ((<|>))
-import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
 import Control.Monad.Except (throwError)
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
 import Data.Argonaut.Decode.Error (JsonDecodeError(TypeMismatch))
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Foldable (foldr)
@@ -22,12 +22,14 @@ type TreeHeader =
   , headerType :: String
   }
 
-data RootTree a 
+data RootTree a
   = Empty
-  | RootTree { children :: Array (Edge a)
-             , header :: TreeHeader }
+  | RootTree
+      { children :: Array (Edge a)
+      , header :: TreeHeader
+      }
 
-data Tree a 
+data Tree a
   = Node { title :: String, children :: Array (Edge a), header :: TreeHeader }
   | Leaf { title :: String, node :: a }
 
@@ -77,12 +79,11 @@ instance decodeJsonTree :: DecodeJson a => DecodeJson (Tree a) where
 
       _ -> throwError $ TypeMismatch $ "Unknown node type: " <> typ
 
-
 -- EncodeJson instances
 
 instance encodeJsonRootTree :: EncodeJson a => EncodeJson (RootTree a) where
-  encodeJson Empty               = encodeJson {}
-  encodeJson (RootTree root ) = encodeJson root
+  encodeJson Empty = encodeJson {}
+  encodeJson (RootTree root) = encodeJson root
 
 instance encodeJsonEdge :: EncodeJson a => EncodeJson (Edge a) where
   encodeJson (Edge child) = encodeJson child
@@ -116,7 +117,7 @@ instance showRootTree :: Show a => Show (RootTree a) where
     "RootTree { children: " <> show children <> " }"
 
 instance showEdge :: Show a => Show (Edge a) where
-  show (Edge child ) =
+  show (Edge child) =
     "Edge { child: " <> show child <> " }"
 
 instance showTree :: Show a => Show (Tree a) where
@@ -135,12 +136,11 @@ findRootTree predicate (RootTree { children }) =
     Nothing
     children
 
-
 findTree :: forall a. (a -> Boolean) -> Tree a -> Maybe a
-findTree predicate (Node { children }) = 
+findTree predicate (Node { children }) =
   foldr
-      (\(Edge child) acc -> acc <|> findTree predicate child)
-      Nothing
-      children
+    (\(Edge child) acc -> acc <|> findTree predicate child)
+    Nothing
+    children
 findTree predicate (Leaf { node }) =
   if predicate node then Just node else Nothing

@@ -487,7 +487,7 @@ splitview docID = H.mkComponent
         tree = case fetchedTree of
           Nothing -> Empty
           Just t -> documentTreeToTOCTree t
-        docName = case mDoc of 
+        docName = case mDoc of
           Nothing -> ""
           Just doc -> DocumentDto.getDHName doc
       -- Get document name
@@ -764,7 +764,7 @@ splitview docID = H.mkComponent
             Nothing -> emptyTOCEntry
             Just e -> e
         H.tell _editor unit (Editor.ChangeSection entry)
-      
+
       TOC.AddNode path node -> do
         state <- H.get
         let
@@ -785,34 +785,35 @@ findCommentSection tocEntries tocID markerID = do
   marker.mCommentSection
 
 -- Add a node in TOC tree
-addRootNode 
-  :: Array Int 
+addRootNode
+  :: Array Int
   -> Tree TOCEntry
   -> TOCTree
   -> TOCTree
-addRootNode [] entry (RootTree { children, header }) = 
+addRootNode [] entry (RootTree { children, header }) =
   RootTree { children: snoc children (Edge entry), header }
 addRootNode _ entry Empty =
-  RootTree { children: [Edge entry], header: { headerKind: "root", headerType: "root" } }
-addRootNode path entry (RootTree {children, header}) = 
+  RootTree
+    { children: [ Edge entry ], header: { headerKind: "root", headerType: "root" } }
+addRootNode path entry (RootTree { children, header }) =
   case uncons path of
-    Nothing -> 
+    Nothing ->
       RootTree { children: snoc children (Edge entry), header }
-    Just { head, tail } -> 
+    Just { head, tail } ->
       let
-        child = 
-          fromMaybe 
-            (Edge (Leaf { title: "Error", node: emptyTOCEntry })) 
+        child =
+          fromMaybe
+            (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
             (children !! head)
-        newChildren = 
+        newChildren =
           case updateAt head (addNode tail entry child) children of
             Nothing -> children
             Just res -> res
       in
         RootTree { children: newChildren, header }
-        
-addNode 
-  :: Array Int 
+
+addNode
+  :: Array Int
   -> Tree TOCEntry
   -> Edge TOCEntry
   -> Edge TOCEntry
@@ -822,15 +823,15 @@ addNode [] entry (Edge (Node { title, children, header })) =
   Edge (Node { title, children: snoc children (Edge entry), header })
 addNode path entry (Edge (Node { title, children, header })) =
   case uncons path of
-    Nothing -> 
+    Nothing ->
       Edge (Node { title, children: snoc children (Edge entry), header })
-    Just { head, tail } -> 
+    Just { head, tail } ->
       let
-        child = 
-          fromMaybe 
-            (Edge (Leaf { title: "Error", node: emptyTOCEntry })) 
+        child =
+          fromMaybe
+            (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
             (children !! head)
-        newChildren' = 
+        newChildren' =
           case updateAt head (addNode tail entry child) children of
             Nothing -> children
             Just res -> res

@@ -90,6 +90,5 @@ decodeDocument json = do
   root <- obj .: "root"
   decodeJson root
 
-
 encodeDocumentTree :: DocumentTree -> Json
 encodeDocumentTree tree = encodeJson $ map (\(NodeHeader { id }) -> id) tree
