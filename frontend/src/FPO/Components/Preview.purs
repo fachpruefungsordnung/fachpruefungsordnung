@@ -2,21 +2,15 @@ module FPO.Components.Preview where
 
 import Prelude
 
-import Affjax (printError)
-import Affjax.StatusCode (StatusCode(StatusCode))
 import Control.Monad.Rec.Class (forever)
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
+import Data.Maybe (Maybe(Just, Nothing))
 import Data.Time.Duration (Milliseconds(Milliseconds))
 import Effect.Aff (delay, forkAff) as Aff
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import FPO.Components.Button (Output(Clicked), button) as Button
-import FPO.Data.Request (getIgnore)
 import Halogen as H
 import Halogen.HTML (div, div_, pre, slot, text) as HH
-import Halogen.HTML.Elements (embed)
-import Halogen.HTML.Properties (classes, src) as HP
+import Halogen.HTML.Properties (classes) as HP
 import Halogen.Subscription (create, notify) as HS
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
