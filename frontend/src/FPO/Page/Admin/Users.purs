@@ -228,20 +228,24 @@ component =
     HH.slot _userlist unit UserList.component events HandleUserList
     where
     events = \u ->
-      [ { popover: translate (label :: _ "admin_users_deleteUser") state.translator
-        , effect: EffectDeleteUser
-        , icon: "bi-trash"
-        , classes: [ HB.btn, HB.btnOutlineDanger, HB.btnSm, HB.me2 ]
-        , disabled: state.userID == Just (UOD.getID u)
-        }
-      , { popover: translate (label :: _ "admin_users_goToProfilePage")
-            state.translator
-        , effect: EffectGoToProfilePage
-        , icon: "bi-person-fill"
-        , classes: [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
-        , disabled: false
-        }
-      ]
+      let
+        isMe = state.userID == Just (UOD.getID u)
+      in
+        [ { popover: translate (label :: _ "admin_users_deleteUser") state.translator
+          , effect: EffectDeleteUser
+          , icon: "bi-trash"
+          , classes: [ HB.btn, HB.btnOutlineDanger, HB.btnSm, HB.me2 ]
+              <> (if isMe then [ HB.opacity25 ] else [])
+          , disabled: isMe
+          }
+        , { popover: translate (label :: _ "admin_users_goToProfilePage")
+              state.translator
+          , effect: EffectGoToProfilePage
+          , icon: "bi-person-fill"
+          , classes: [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
+          , disabled: false
+          }
+        ]
 
   -- Creates a form to create a new (dummy) user.
   renderNewUserForm :: forall w. State -> HH.HTML w Action
