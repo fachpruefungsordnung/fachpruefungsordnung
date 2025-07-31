@@ -3,9 +3,6 @@
 -- | TODO:
 -- | - Implement the `goToProfilePage` funcionality
 -- |   (for users other than the one logged in).
--- | - Trying to delete oneself fails in the backend,
--- |   but no error is shown in the UI. Perhaps, we should
--- |   simply prohibit deleting oneself in the UI?
 
 module FPO.Page.Admin.Users (component) where
 

@@ -4,11 +4,9 @@ import Data.Function (($))
 import FPO.Translations.Common (deCommon, enCommon)
 import FPO.Translations.Components.Editor (deEditor, enEditor)
 import FPO.Translations.Components.Navbar (deNavbar, enNavbar)
+import FPO.Translations.Page.Admin.AddMembers (deAddMembersPage, enAddMembersPage)
 import FPO.Translations.Page.Admin.GroupMembers (deGroupMemberPage, enGroupMemberPage)
-import FPO.Translations.Page.Admin.GroupProjects
-  ( deGroupProjectsPage
-  , enGroupProjectsPage
-  )
+import FPO.Translations.Page.Admin.GroupProjects (deGroupProjectsPage, enGroupProjectsPage)
 import FPO.Translations.Page.Admin.PageGroups (deAdminGroupPage, enAdminGroupPage)
 import FPO.Translations.Page.Admin.PageUsers (deAdminUserPage, enAdminUserPage)
 import FPO.Translations.Page.AdminPanel (deAdminPanel, enAdminPanel)
@@ -26,6 +24,7 @@ en = fromRecord
   $ merge (toRecord enAdminPanel)
   $ merge (toRecord enAdminGroupPage)
   $ merge (toRecord enAdminUserPage)
+  $ merge (toRecord enAddMembersPage)
   $ merge (toRecord enCommon)
   $ merge (toRecord enEditor)
   $ merge (toRecord enNavbar)
@@ -43,6 +42,7 @@ de = fromRecord
   $ merge (toRecord deAdminPanel)
   $ merge (toRecord deAdminGroupPage)
   $ merge (toRecord deAdminUserPage)
+  $ merge (toRecord deAddMembersPage)
   $ merge (toRecord deCommon)
   $ merge (toRecord deEditor)
   $ merge (toRecord deNavbar)
@@ -137,6 +137,15 @@ type Labels =
       ::: "gm_removeMember"
       ::: "gm_role"
       ::: "gm_searchMembers"
+
+      -- | Group Manamgent - Add Members Page
+      ::: "gmam_addMember"
+      ::: "gmam_assignMembers"
+      ::: "gmam_failedToAdd"
+      ::: "gmam_failedToRemove"
+      ::: "gmam_groupNotFound"
+      ::: "gmam_loadingGroup"
+      ::: "gmam_removeMember"
 
       -- | Group Projects Page
       ::: "gp_createNewProject"

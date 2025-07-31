@@ -9,6 +9,7 @@ import Data.Argonaut
   , decodeJson
   , encodeJson
   )
+import Data.Array (any)
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..))
@@ -35,6 +36,16 @@ getUserID (FullUserDto u) = u.fullUserID
 
 isUserSuperadmin :: FullUserDto -> Boolean
 isUserSuperadmin (FullUserDto u) = u.fullUserIsSuperadmin
+
+-- | Checks if the user is an admin of a specific group.
+-- | Returns `true` if the user is an admin of the group with the given ID,
+-- | detached from the superadmin state of the user.
+-- |
+-- | See `isUserSuperadmin` for checking if the user is a superadmin.
+isAdminOf :: FullUserDto -> Int -> Boolean
+isAdminOf (FullUserDto u) groupID =
+  any (\role -> getUserRoleGroupID role == groupID && getUserRole role == Admin)
+    u.fullUserRoles
 
 getUserName :: FullUserDto -> String
 getUserName (FullUserDto u) = u.fullUserName

@@ -5,7 +5,7 @@ import Prelude
 
 import Data.Argonaut (class DecodeJson, class EncodeJson)
 import Data.Array (find)
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe, isJust)
 import Data.Newtype (class Newtype)
 import FPO.Dto.UserDto (Role, UserID)
 
@@ -50,6 +50,9 @@ getGroupMembers (GroupDto g) = g.groupMembers
 lookupUser :: GroupDto -> UserID -> Maybe GroupMemberDto
 lookupUser (GroupDto g) userID =
   find (\member -> getUserInfoID member == userID) g.groupMembers
+
+isUserInGroup :: GroupDto -> UserID -> Boolean
+isUserInGroup g = isJust <<< lookupUser g
 
 derive instance newtypeGroupDto :: Newtype GroupDto _
 derive newtype instance encodeJsonGroupDto :: EncodeJson GroupDto

@@ -106,6 +106,10 @@ changeRole groupID userID role = do
   let body = encodeJson role
   putIgnore ("/roles/" <> show groupID <> "/" <> userID) body
 
+removeUser :: GroupID -> UserID -> Aff (Either Error (Response Unit))
+removeUser groupID userID = do
+  deleteIgnore ("/roles/" <> show groupID <> "/" <> userID)
+
 -- | Fetches the document header for a given document ID.
 getDocumentHeader :: DocumentID -> Aff (Maybe DocumentHeader)
 getDocumentHeader docID = getFromJSONEndpoint decodeJson ("/documents/" <> show docID)

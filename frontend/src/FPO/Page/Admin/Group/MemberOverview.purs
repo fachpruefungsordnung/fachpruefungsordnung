@@ -70,6 +70,7 @@ data Action
   | ReloadGroupMembers
   | NavigateToDocuments
   | SetUserRole GroupMemberDto Role
+  | NavigateToUserAdder
 
 -- | Simple "state machine" for the modal system.
 data ModalState
@@ -335,7 +336,7 @@ component =
   renderAddMemberButton state =
     HH.button
       [ Style.cyanStyle
-      -- , HE.onClick (const $ DoNothing) -- TODO: Actually implement
+      , HE.onClick (const $ NavigateToUserAdder)
       ]
       [ HH.text $ translate (label :: _ "gm_addMember") state.translator ]
 
@@ -450,6 +451,8 @@ component =
                   { error = Just $ "Failed to change role: " <> show status
                   , modalState = NoModal
                   }
-
       handleAction ReloadGroupMembers
       handleAction (FilterForMember "")
+    NavigateToUserAdder -> do
+      s <- H.get
+      navigate (GroupAddMembers { groupID: s.groupID })
