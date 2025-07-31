@@ -7,10 +7,10 @@ import Data.Either (Either(..))
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
-import FPO.Dto.DocumentDto (DocumentID)
-import FPO.Dto.DocumentDto as DocumentDto
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
+import FPO.Dto.DocumentDto (DocumentID)
+import FPO.Dto.DocumentDto as DocumentDto
 import FPO.Dto.PostTextDto (PostTextDto(..))
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Dto.TreeDto (Edge(..), RootTree(..), Tree(..))
@@ -44,9 +44,9 @@ type State =
   , showAddMenu :: Array Int
   }
 
-tocview 
+tocview
   :: forall m
-   . MonadAff m 
+   . MonadAff m
   => MonadStore Store.Action Store.Store m
   => DocumentID
   -> H.Component Query Input Output m
