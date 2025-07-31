@@ -424,12 +424,15 @@ component =
           , HB.justifyContentBetween
           , HB.alignItemsCenter
           ]
-      , HE.onClick (const $ NavigateToGroupDocuments g.groupOverviewID)
-      , Style.popover $ translate
-          (label :: _ "admin_groups_viewDocumentsPage")
-          state.translator
       ]
-      [ HH.text g.groupOverviewName
+      [ HH.span
+          [ HE.onClick (const $ NavigateToGroupDocuments g.groupOverviewID)
+          , Style.popover $ translate
+              (label :: _ "admin_groups_viewDocumentsPage")
+              state.translator
+          ]
+          [ HH.text g.groupOverviewName
+          ]
       , buttonDeleteGroup state g.groupOverviewName
       ]
 
