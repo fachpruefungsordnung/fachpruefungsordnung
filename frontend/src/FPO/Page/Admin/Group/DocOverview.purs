@@ -200,13 +200,14 @@ component =
   renderDocumentManagement state =
     HH.div_
       [ HH.h2 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-          [ HH.text $ translate (label :: _ "gp_groupProjects")
-              state.translator
+          [ HH.text $
+              translate (label :: _ "gp_groupProjects")
+                state.translator <> " "
           , HH.span
               [ HP.classes
                   [ HB.textSecondary, HB.fwBolder, HB.dInlineBlock, HB.textWrap ]
               ]
-              [ HH.text $ " " <> (fromMaybe "" $ getGroupName <$> state.group) ]
+              [ HH.text $ fromMaybe "" $ getGroupName <$> state.group ]
           ]
       , renderDocumentListView state
       ]
