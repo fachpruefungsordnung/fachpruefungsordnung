@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Ltml.HTML.References (ReferenceType (..), genReference, addLabelToState) where
+module Language.Ltml.HTML.References (ReferenceType (..), addLabelToState) where
 
 import Control.Monad.Reader
 import Control.Monad.State
@@ -15,7 +15,7 @@ data ReferenceType = SectionRef | ParagraphRef | SentenceRef
 -- | Generates fitting german Reference Html based on referenced type.
 --   This relies on the GlobalState being set up properly for the referenced scope.
 --   (e.g. currentParagraphIDHtml being set)
-genReference :: ReferenceType -> HtmlReaderState
+genReference :: ReferenceType -> ReaderT ReaderState (State GlobalState) (Html ())
 genReference ref = do
     readerState <- ask
     case ref of
@@ -30,7 +30,7 @@ genReference ref = do
                                 "Error: Labeled paragraph does not have any identifier!"
                     Just paragraphIDHtml -> do
                         sectionRef <- genReference SectionRef
-                        return $ sectionRef <> toHtml (" Absatz " <> paragraphIDHtml)
+                        return $ sectionRef <> (toHtml (" Absatz " :: Text) <> paragraphIDHtml)
         SentenceRef -> do
             globalState <- get
             paragraphRef <- genReference ParagraphRef

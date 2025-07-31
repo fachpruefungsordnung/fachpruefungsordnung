@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -45,17 +44,18 @@ aToHtml a = doctypehtml_ $ do
         title_ "Test Dokument"
         link_ [rel_ "stylesheet", href_ "out.css"]
     body_ $ do
-        evalState (runReaderT (toHtmlM a) initReaderState) initGlobalState
+        let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
+         in evalDelayed delayedHtml finalState
 
 -------------------------------------------------------------------------------
 
 class ToHtmlM a where
-    toHtmlM :: a -> ReaderT ReaderState (State GlobalState) (Html ())
+    toHtmlM :: a -> HtmlReaderState
 
 instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
     toHtmlM (Document format header body) = case body of
-        DocumentBody [] -> return $ return ()
+        DocumentBody [] -> returnNow mempty
         DocumentBody nodes -> toHtmlM nodes
 
 -- | If a Label is present, it will be added to the GlobalState
@@ -114,9 +114,11 @@ instance ToHtmlM Heading where
     toHtmlM (Heading format textTree) = do
         headingTextHtml <- toHtmlM textTree
         readerState <- ask
-        return $
-            h4_ [class_ (Class.className Class.Centered)] $
-                headingFormat format (currentSectionIDHtml readerState) headingTextHtml
+        return
+            ( h4_ [class_ (Class.className Class.Centered)]
+                . headingFormat format (currentSectionIDHtml readerState)
+                <$> headingTextHtml
+            )
 
 instance ToHtmlM (Node Paragraph) where
     toHtmlM (Node mLabel (Paragraph format textTrees)) = do
@@ -131,7 +133,7 @@ instance ToHtmlM (Node Paragraph) where
                 modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
                 -- \| Reset sentence id for next paragraph
                 modify (\s -> s {currentSentenceID = 0})
-                return $ paragraphIDHtml <> childText
+                return $ div_ <$> return paragraphIDHtml <> childText
 
 -- instance ToHtmlM Paragraph where
 --     toHtmlM :: Paragraph -> ReaderT ReaderState (State GlobalState) (Html ())
@@ -152,28 +154,28 @@ instance
     => ToHtmlM (TextTree style enum special)
     where
     toHtmlM textTree = case textTree of
-        Word text -> return $ toHtml text
-        Space -> return $ toHtml (" " :: Text)
+        Word text -> returnNow $ toHtml text
+        Space -> returnNow $ toHtml (" " :: Text)
         Special special -> toHtmlM special
-        Reference label -> do
-            globalState <- get
+        Reference label -> return $ Later $ \globalState ->
             case lookup (unLabel label) $ labels globalState of
                 -- \| Label was not found in GlobalState and a red error is emitted
                 Nothing ->
-                    return $
-                        b_ [class_ (Class.className Class.FontRed)] $
-                            toHtml (("Error: Label \"" <> unLabel label <> "\" not found!") :: Text)
-                Just labelHtml -> return labelHtml
-        Styled style textTrees -> toHtmlStyle style <$> toHtmlM textTrees
+                    b_ [class_ (Class.className Class.FontRed)] $
+                        toHtml (("Error: Label \"" <> unLabel label <> "\" not found!") :: Text)
+                Just labelHtml -> labelHtml
+        Styled style textTrees -> do
+            textTreeHtml <- toHtmlM textTrees
+            return $ toHtmlStyle style <$> textTreeHtml
         Enum enum -> toHtmlM enum
-        Footnote _ -> return $ toHtml ("Error: FootNotes not supported yet" :: Text)
+        Footnote _ -> returnNow $ toHtml ("Error: FootNotes not supported yet" :: Text)
 
 -- | Increment sentence counter and add Label to GlobalState, if there is one
 instance ToHtmlM SentenceStart where
     toHtmlM (SentenceStart mLabel) = do
         modify (\s -> s {currentSentenceID = currentSentenceID s + 1})
         maybe (return ()) (\l -> addLabelToState l SentenceRef) mLabel
-        return mempty
+        returnNow mempty
 
 class ToHtmlStyle style where
     toHtmlStyle :: (Monad m) => style -> (HtmlT m a -> HtmlT m a)
@@ -190,15 +192,17 @@ instance ToHtmlM Enumeration where
             mapM
                 (local (\s -> s {enumNestingLevel = enumNestingLevel s + 1}) . toHtmlM)
                 enumItems
-        return $
-            ol_ [class_ $ enumLevel (enumNestingLevel readerState)] $
-                foldr ((>>) . li_) mempty nested
+        return $ do
+            nestedHtml <- sequence nested
+            let enumItemsHtml = foldr ((>>) . li_) (mempty :: Html ()) nestedHtml
+                in return $ ol_ [class_ $ enumLevel (enumNestingLevel readerState)] enumItemsHtml
+
 
 instance ToHtmlM EnumItem where
     toHtmlM (EnumItem textTrees) = toHtmlM textTrees
 
 instance (ToHtmlM a) => ToHtmlM [a] where
-    toHtmlM [] = return mempty
+    toHtmlM [] = returnNow mempty
     toHtmlM (a : as) = do
         aHtml <- toHtmlM a
         asHtml <- toHtmlM as
