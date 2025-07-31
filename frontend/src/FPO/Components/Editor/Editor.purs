@@ -4,7 +4,6 @@ module FPO.Components.Editor
   , Query(..)
   , State
   , LiveMarker
-  , _pdfSlideBar
   , addAnnotation
   , addChangeListener
   , editor
@@ -64,8 +63,6 @@ type State = FPOState
   , mTocEntry :: Maybe TOCEntry
   , mContent :: Maybe Content
   , liveMarkers :: Array LiveMarker
-  , pdfWarningAvailable :: Boolean
-  , pdfWarningIsShown :: Boolean
   , fontSize :: Int
   )
 
@@ -78,8 +75,6 @@ type LiveMarker =
   , ref :: Ref Int
   }
 
-_pdfSlideBar = Proxy :: Proxy "pdfSlideBar"
-
 data Output
   = ClickedQuery (Maybe (Array String))
   | DeletedComment TOCEntry (Array Int)
@@ -91,7 +86,6 @@ data Action
   = Init
   | Comment
   | DeleteComment
-  | ShowWarning
   | SelectComment
   | Bold
   | Italic
@@ -108,7 +102,6 @@ data Query a
   = QueryEditor a
   -- save the current content and send it to splitview
   | SaveSection a
-  | LoadPdf a
   -- receive the selected TOC and put its content into the editor
   | ChangeSection TOCEntry a
   | SendCommentSections a
@@ -136,8 +129,6 @@ editor = connect selectTranslator $ H.mkComponent
     , liveMarkers: []
     , mTocEntry: Nothing
     , mContent: Nothing
-    , pdfWarningAvailable: false
-    , pdfWarningIsShown: false
     , fontSize: 12
     }
 
@@ -407,9 +398,6 @@ editor = connect selectTranslator $ H.mkComponent
                   st { mTocEntry = Just newTOCEntry, liveMarkers = newLiveMarkers }
                 H.raise (DeletedComment newTOCEntry [ foundID ])
 
-    ShowWarning -> do
-      H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
-
     SelectComment -> do
       H.gets _.mEditor >>= traverse_ \ed -> do
         state <- H.get
@@ -496,10 +484,6 @@ editor = connect selectTranslator $ H.mkComponent
         H.modify_ \st ->
           st { liveMarkers = newLiveMarkers }
 
-      pure (Just a)
-
-    LoadPdf a -> do
-      H.modify_ _ { pdfWarningAvailable = true }
       pure (Just a)
 
     SaveSection a -> do

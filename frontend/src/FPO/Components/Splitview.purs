@@ -63,11 +63,8 @@ data Action
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
   -- Toolbar buttons
-  | ClickedHTTPRequest
   | SaveSection
   | QueryEditor
-  | ClickLoadPdf
-  | ShowWarning
   -- Toggle buttons
   | ToggleComment
   | ToggleCommentOverview Boolean
@@ -178,10 +175,10 @@ splitview docID = H.mkComponent
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div_
-      [ renderToolbar state, renderSplit state ]
+      [ renderToolbar, renderSplit state ]
 
-  renderToolbar :: State -> H.ComponentHTML Action Slots m
-  renderToolbar state =
+  renderToolbar :: H.ComponentHTML Action Slots m
+  renderToolbar =
     -- First Toolbar
     HH.div
       [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
@@ -191,13 +188,8 @@ splitview docID = H.mkComponent
       , toolbarButton "GET" GET
       , toolbarButton "POST" POST
       , toolbarButton "All Comments" (ToggleCommentOverview true)
-      , toolbarButton "Click Me for HTTPRequest" ClickedHTTPRequest
       , toolbarButton "Save" SaveSection
       , toolbarButton "Query Editor" QueryEditor
-      , toolbarButton "Load PDF" ClickLoadPdf
-      , toolbarButton
-          ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning")
-          ShowWarning
       ]
     where
     toolbarButton label act = HH.button
@@ -614,22 +606,11 @@ splitview docID = H.mkComponent
 
     -- Toolbar button actions
 
-    ClickedHTTPRequest -> H.tell _preview unit Preview.TellClickedHttpRequest
-
     SaveSection -> H.tell _editor unit Editor.SaveSection
 
     QueryEditor -> do
       H.tell _editor unit Editor.SaveSection
       H.tell _editor unit Editor.QueryEditor
-
-    ShowWarning -> do
-      H.modify_ \st -> st { pdfWarningIsShown = not st.pdfWarningIsShown }
-      H.tell _preview unit Preview.TellShowOrHideWarning
-
-    ClickLoadPdf -> do
-      H.modify_ \st -> st { pdfWarningAvailable = true }
-      H.tell _editor unit Editor.LoadPdf
-      H.tell _preview unit Preview.TellLoadPdf
 
     -- Toggle actions
 
