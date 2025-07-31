@@ -2,12 +2,12 @@ module FPO.Components.TOC where
 
 import Prelude
 
-import Data.Array (concat, mapWithIndex, snoc, uncons, updateAt, (!!))
+import Data.Array (concat, mapWithIndex)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Dto.TreeDto (Edge(..), RootTree(..), Tree(..))
-import FPO.Types (ShortendTOCEntry, TOCTree, shortenTOC)
+import FPO.Types (ShortendTOCEntry, TOCEntry, TOCTree, shortenTOC)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -16,7 +16,9 @@ import Halogen.Themes.Bootstrap5 as HB
 
 type Input = Unit
 
-data Output = ChangeSection Int
+data Output 
+  = ChangeSection Int
+  | AddNode (Array Int) (Tree TOCEntry)
 
 data Action
   = Init
@@ -72,20 +74,18 @@ tocview = H.mkComponent
             else [-1] }
     
     CreateNewSubsection path -> do
-      state <- H.get
-      let 
-        newEntry = Leaf { title: "New Subsection", node: { id: -1, name: "New Subsection" } }
-        newTree = addRootNode path newEntry state.tocEntries
       H.modify_ \st ->
-        st { tocEntries = newTree, showAddMenu = [-1] }
+        st { showAddMenu = [-1] }
+      let 
+        newEntry = Leaf { title: "New Subsection", node: { id: 99, name: "New Subsection", newMarkerNextID: 0, markers: [] } }
+      H.raise (AddNode path newEntry)
 
     CreateNewSection path -> do
-      state <- H.get
+      H.modify_ \st ->
+        st { showAddMenu = [-1] }
       let
         newEntry = Node { title: "New Section", children: [], header: { headerKind: "section", headerType: "section" } }
-        newTree = addRootNode path newEntry state.tocEntries
-      H.modify_ \st ->
-        st { tocEntries = newTree, showAddMenu = [-1] }
+      H.raise (AddNode path newEntry)
 
 
 
@@ -168,7 +168,7 @@ tocview = H.mkComponent
   treeToHTML menuPath n mSelectedTocEntry path (Node { title, children }) =
     [ HH.div
       [ HP.style
-          ( "white-space: nowrap; text-overflow: ellipsis; padding: 0.25rem 0; display: flex; align-items: center;"
+          ( "white-space: nowrap; text-overflow: ellipsis; padding: 0.25rem 0; display: flex; align-items: center; padding-left: "
               <> (show (1.5 * toNumber n))
               <> "rem;"
           )
@@ -246,55 +246,5 @@ tocview = H.mkComponent
     where
       { id, name:_ } = node
 
-addRootNode 
-  :: Array Int 
-  -> Tree ShortendTOCEntry
-  -> RootTree ShortendTOCEntry 
-  -> RootTree ShortendTOCEntry
-addRootNode [] entry (RootTree { children, header }) = 
-  RootTree { children: snoc children (Edge entry), header }
-addRootNode _ entry Empty =
-  RootTree { children: [Edge entry], header: { headerKind: "root", headerType: "root" } }
-addRootNode path entry (RootTree {children, header}) = 
-  case uncons path of
-    Nothing -> 
-      RootTree { children: snoc children (Edge entry), header }
-    Just { head, tail } -> 
-      let
-        child = 
-          fromMaybe 
-            (Edge (Leaf { title: "Error", node: {id: (-1), name: "error"} })) 
-            (children !! head)
-        newChildren = 
-          case updateAt head (addNode tail entry child) children of
-            Nothing -> children
-            Just res -> res
-      in
-        RootTree { children: newChildren, header }
-        
-addNode 
-  :: Array Int 
-  -> Tree ShortendTOCEntry
-  -> Edge ShortendTOCEntry 
-  -> Edge ShortendTOCEntry
-addNode _ _ (Edge (Leaf { title, node })) =
-  Edge (Leaf { title, node }) -- Cannot add to a leaf
-addNode [] entry (Edge (Node { title, children, header })) =
-  Edge (Node { title, children: snoc children (Edge entry), header })
-addNode path entry (Edge (Node { title, children, header })) =
-  case uncons path of
-    Nothing -> 
-      Edge (Node { title, children: snoc children (Edge entry), header })
-    Just { head, tail } -> 
-      let
-        child = 
-          fromMaybe 
-            (Edge (Leaf { title: "Error", node: {id: (-1), name: "error"} })) 
-            (children !! head)
-        newChildren' = 
-          case updateAt head (addNode tail entry child) children of
-            Nothing -> children
-            Just res -> res
-      in
-        Edge (Node { title, children: newChildren', header })
+
 

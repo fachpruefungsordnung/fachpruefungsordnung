@@ -9,7 +9,7 @@ module FPO.Component.Splitview where
 import Prelude
 
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
-import Data.Array (find, head)
+import Data.Array (find, head, snoc, uncons, updateAt, (!!))
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
@@ -24,9 +24,10 @@ import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto (DocumentID, getDHHeadCommit)
 import FPO.Dto.DocumentDto as DocumentDto
-import FPO.Dto.TreeDto (RootTree(..), findRootTree)
+import FPO.Dto.TreeDto (Edge(..), RootTree(..), Tree(..), findRootTree)
 import FPO.Types
   ( CommentSection
+  , TOCEntry
   , TOCTree
   , documentTreeToTOCTree
   , emptyTOCEntry
@@ -184,7 +185,7 @@ splitview docID = H.mkComponent
       [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
       [ toolbarButton "[=]" ToggleSidebar
       , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
-      , toolbarButton "ForceGET" ForceGET
+      , toolbarButton "ForceGETP" ForceGET
       , toolbarButton "GET" GET
       , toolbarButton "POST" POST
       , toolbarButton "All Comments" (ToggleCommentOverview true)
@@ -760,11 +761,69 @@ splitview docID = H.mkComponent
             Nothing -> emptyTOCEntry
             Just e -> e
         H.tell _editor unit (Editor.ChangeSection entry)
-
--- Create example TOC entries for testing purposes in Init
+      
+      TOC.AddNode path node -> do
+        state <- H.get
+        let
+          newTree = addRootNode path node state.tocEntries
+        H.modify_ \st -> st { tocEntries = newTree }
+        H.tell _toc unit (TOC.ReceiveTOCs newTree)
 
 findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
 findCommentSection tocEntries tocID markerID = do
   tocEntry <- findRootTree (\entry -> entry.id == tocID) tocEntries
   marker <- find (\m -> m.id == markerID) tocEntry.markers
   marker.mCommentSection
+
+-- Add a node in TOC tree
+addRootNode 
+  :: Array Int 
+  -> Tree TOCEntry
+  -> TOCTree
+  -> TOCTree
+addRootNode [] entry (RootTree { children, header }) = 
+  RootTree { children: snoc children (Edge entry), header }
+addRootNode _ entry Empty =
+  RootTree { children: [Edge entry], header: { headerKind: "root", headerType: "root" } }
+addRootNode path entry (RootTree {children, header}) = 
+  case uncons path of
+    Nothing -> 
+      RootTree { children: snoc children (Edge entry), header }
+    Just { head, tail } -> 
+      let
+        child = 
+          fromMaybe 
+            (Edge (Leaf { title: "Error", node: emptyTOCEntry })) 
+            (children !! head)
+        newChildren = 
+          case updateAt head (addNode tail entry child) children of
+            Nothing -> children
+            Just res -> res
+      in
+        RootTree { children: newChildren, header }
+        
+addNode 
+  :: Array Int 
+  -> Tree TOCEntry
+  -> Edge TOCEntry
+  -> Edge TOCEntry
+addNode _ _ (Edge (Leaf { title, node })) =
+  Edge (Leaf { title, node }) -- Cannot add to a leaf
+addNode [] entry (Edge (Node { title, children, header })) =
+  Edge (Node { title, children: snoc children (Edge entry), header })
+addNode path entry (Edge (Node { title, children, header })) =
+  case uncons path of
+    Nothing -> 
+      Edge (Node { title, children: snoc children (Edge entry), header })
+    Just { head, tail } -> 
+      let
+        child = 
+          fromMaybe 
+            (Edge (Leaf { title: "Error", node: emptyTOCEntry })) 
+            (children !! head)
+        newChildren' = 
+          case updateAt head (addNode tail entry child) children of
+            Nothing -> children
+            Just res -> res
+      in
+        Edge (Node { title, children: newChildren', header })
