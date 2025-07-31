@@ -110,7 +110,7 @@ type State =
   , mEditorContent :: Maybe (Array String)
 
   -- Store tocEntries and send some parts to its children components
-  -- TODO load/upload from/to backend
+  , docName :: String
   , tocEntries :: TOCTree
 
   -- How the timestamp has to be formatted
@@ -157,6 +157,7 @@ splitview docID = H.mkComponent
       , lastExpandedSidebarRatio: 0.2
       , lastExpandedPreviewRatio: 0.4
       , mEditorContent: Nothing
+      , docName: ""
       , tocEntries: Empty
       , mTimeFormatter: Nothing
       , sidebarShown: true
@@ -484,13 +485,18 @@ splitview docID = H.mkComponent
       -- Forces a GET request to fetch the latest document tree of commit #1.
       fetchedTree <- H.liftAff $
         Request.getFromJSONEndpoint DocumentDto.decodeDocument "/docs/1/tree/latest"
+      mDoc <- H.liftAff $ Request.getDocumentHeader docID
       let
         tree = case fetchedTree of
           Nothing -> Empty
           Just t -> documentTreeToTOCTree t
+        docName = case mDoc of 
+          Nothing -> ""
+          Just doc -> DocumentDto.getDHName doc
+      -- Get document name
       H.modify_ \st -> do
-        st { tocEntries = tree }
-      H.tell _toc unit (TOC.ReceiveTOCs tree)
+        st { docName = docName, tocEntries = tree }
+      H.tell _toc unit (TOC.ReceiveTOCs docName tree)
 
     GET -> do
       -- TODO: As of now, the editor page and splitview are parametrized by the document ID
@@ -512,7 +518,7 @@ splitview docID = H.mkComponent
         pure $ documentTreeToTOCTree fetchedTree
 
       H.modify_ _ { tocEntries = finalTree }
-      H.tell _toc unit (TOC.ReceiveTOCs finalTree)
+      H.tell _toc unit (TOC.ReceiveTOCs "" finalTree)
     Init -> do
       -- exampleTOCEntries <- createExampleTOCEntries
       -- -- Comment it out for now, to let the other text show up first in editor
@@ -528,7 +534,7 @@ splitview docID = H.mkComponent
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
       H.tell _commentOverview unit
         (CommentOverview.ReceiveTimeFormatter timeFormatter)
-      H.tell _toc unit (TOC.ReceiveTOCs Empty)
+      H.tell _toc unit (TOC.ReceiveTOCs "" Empty)
       -- Load the initial TOC entries into the editor
       handleAction GET
 
@@ -767,7 +773,7 @@ splitview docID = H.mkComponent
         let
           newTree = addRootNode path node state.tocEntries
         H.modify_ \st -> st { tocEntries = newTree }
-        H.tell _toc unit (TOC.ReceiveTOCs newTree)
+        H.tell _toc unit (TOC.ReceiveTOCs state.docName newTree)
 
 findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
 findCommentSection tocEntries tocID markerID = do

@@ -27,10 +27,11 @@ data Action
   | CreateNewSubsection (Array Int)
   | CreateNewSection (Array Int)
 
-data Query a = ReceiveTOCs (TOCTree) a
+data Query a = ReceiveTOCs String (TOCTree) a
 
 type State =
-  { tocEntries :: RootTree ShortendTOCEntry
+  { documentName :: String
+  , tocEntries :: RootTree ShortendTOCEntry
   , mSelectedTocEntry :: Maybe Int
   , showAddMenu :: Array Int
   }
@@ -38,7 +39,8 @@ type State =
 tocview :: forall m. MonadAff m => H.Component Query Input Output m
 tocview = H.mkComponent
   { initialState: \_ -> 
-    { tocEntries: Empty
+    { documentName: ""
+    , tocEntries: Empty
     , mSelectedTocEntry: Nothing
     , showAddMenu: [-1] }
   , render
@@ -53,7 +55,7 @@ tocview = H.mkComponent
   render :: State -> forall slots. H.ComponentHTML Action slots m
   render state =
     HH.div_
-      (rootTreeToHTML state.showAddMenu state.mSelectedTocEntry state.tocEntries)
+      (rootTreeToHTML state.documentName state.showAddMenu state.mSelectedTocEntry state.tocEntries)
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
@@ -95,21 +97,22 @@ tocview = H.mkComponent
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
 
-    ReceiveTOCs entries a -> do
+    ReceiveTOCs name entries a -> do
       let
         shortendEntries = map shortenTOC entries
       H.modify_ \state ->
-        state { tocEntries = shortendEntries, mSelectedTocEntry = Nothing }
+        state { documentName = name, tocEntries = shortendEntries, mSelectedTocEntry = Nothing }
       pure (Just a)
 
   rootTreeToHTML
-    :: Array Int
+    :: String
+    -> Array Int
     -> Maybe Int
     -> RootTree ShortendTOCEntry
     -> forall slots
      . Array (H.ComponentHTML Action slots m)
-  rootTreeToHTML _ _ Empty = []
-  rootTreeToHTML menuPath mSelectedTocEntry (RootTree { children }) =
+  rootTreeToHTML _ _ _ Empty = []
+  rootTreeToHTML docName menuPath mSelectedTocEntry (RootTree { children }) =
     [ HH.div
         [ HP.style
             "white-space: nowrap; text-overflow: ellipsis; padding: 0.25rem 0; display: flex; align-items: center;"
@@ -121,7 +124,7 @@ tocview = H.mkComponent
               ]
             )
             --TODO: use the actual document name
-            [ HH.text "Documentname" ]
+            [ HH.text docName ]
         -- Wrapper für Button + Dropdown
         , HH.div
           [ HP.style "position: relative; margin-left: 0.5rem;" ]
