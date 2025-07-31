@@ -10,7 +10,10 @@ import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.Common
 import Lucid
 
-data ReferenceType = SectionRef | ParagraphRef | SentenceRef
+data ReferenceType = SuperSectionRef -- ^ Reference to a super-section, displayed as "Abschnitt i"
+                   | SectionRef -- ^ Reference to a section, displayed as "§ i"  
+                   | ParagraphRef -- ^ Reference to a paragraph in a section, displayed as "§ i Absatz i"
+                   | SentenceRef -- ^ Reference to a sentence in a paragraph, displayed as "§ i Absatz i Satz i"
 
 -- | Generates fitting german Reference Html based on referenced type.
 --   This relies on the GlobalState being set up properly for the referenced scope.
@@ -19,6 +22,7 @@ genReference :: ReferenceType -> ReaderT ReaderState (State GlobalState) (Html (
 genReference ref = do
     readerState <- ask
     case ref of
+        SuperSectionRef -> return $ toHtml ("Abschnitt " :: Text) <> currentSuperSectionIDHtml readerState 
         SectionRef -> return $ toHtml ("§ " :: Text) <> currentSectionIDHtml readerState
         ParagraphRef ->
             let mParagraphIDText = mCurrentParagraphIDHtml readerState

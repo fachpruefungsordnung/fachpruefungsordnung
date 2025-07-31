@@ -27,22 +27,27 @@ type HtmlReaderState =
     ReaderT ReaderState (State GlobalState) (Delayed (Html ()))
 
 data GlobalState = GlobalState
-    { currentSectionID :: Int
-    -- ^ tracks the current section numbering
+    { currentSuperSectionID :: Int
+    -- ^ Tracks the current super-section number
+    , currentSectionID :: Int
+    -- ^ Tracks the current section number
     , currentParagraphID :: Int
-    -- ^ tracks the current paragraph number in the current section
+    -- ^ Tracks the current paragraph number in the current section
     , currentSentenceID :: Int
-    -- ^ tracks the current sentence number in the current paragraph
+    -- ^ Tracks the current sentence number in the current paragraph
     , labels :: [(Text, Html ())]
+    -- ^ Holds all labels and the Html element that should be displayed when this label is referenced
     }
 
 data ReaderState = ReaderState
     { enumNestingLevel :: Int
     -- ^ Tracks the current enumeration nesting level
+    , currentSuperSectionIDHtml :: Html ()
+    -- ^ Holds the actual Html identifier that should be displayed when referencing the current super-section
     , currentSectionIDHtml :: Html ()
-    -- ^ Holds the actual Html numbering that should be displayed for the current section
+    -- ^ Holds the actual Html identifier that should be displayed for the current section
     , mCurrentParagraphIDHtml :: Maybe (Html ())
-    -- ^ Holds the actual textual numbering that should be displayed when the current paragraph is referenced.
+    -- ^ Holds the actual textual identifier that should be displayed when the current paragraph is referenced.
     --   Therefore this only holds the raw identifier and does not contain any extra symbols like ")" or ".".
     --   This is a Maybe type because the FormatString may not contain any IdentifierPlaceholder.
     --   In this case this will be Nothing.

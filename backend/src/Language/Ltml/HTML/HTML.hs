@@ -58,6 +58,10 @@ instance ToHtmlM Document where
         DocumentBody [] -> returnNow mempty
         DocumentBody nodes -> toHtmlM nodes
 
+-- TODO: distinguish sections and super-sections based on Left or Right children
+--       superSectionID and superSectionIDHtml are already in States.
+-- Will super-sections ever be parsed together? Or maybe we intialize the globalState with some superSectionID from the Document type
+
 -- | This combined instances creates the sectionIDHtml before building the reference,
 --   which is needed for correct referencing
 instance ToHtmlM (Node Section) where
