@@ -17,6 +17,6 @@ intToCapital = intToLetter 64
 intToLetter :: Int -> Int -> String
 intToLetter shift n | n == 0 = "?"
                     | n <= 26 = (:[]) $ chr (n + shift)
-                    | otherwise = "?"
+                    | otherwise = intToLetter shift (mod n 27 + 1)
 
 -------------------------------------------------------------------------------

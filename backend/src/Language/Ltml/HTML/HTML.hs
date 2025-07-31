@@ -58,16 +58,6 @@ instance ToHtmlM Document where
         DocumentBody [] -> returnNow mempty
         DocumentBody nodes -> toHtmlM nodes
 
--- | If a Label is present, it will be added to the GlobalState
---   but it wont be visible in HTML
--- instance (ToHtmlM a) => ToHtmlM (Node a) where
---     toHtmlM (Node maybeLabel a) = case maybeLabel of
---         Nothing -> toHtmlM a
---         Just label -> do
---             -- \| TODO: somehow track if we have a label for a section or a paragraph
---             addLabelToState label SectionRef
---             toHtmlM a
-
 -- | This combined instances creates the sectionIDHtml before building the reference,
 --   which is needed for correct referencing
 instance ToHtmlM (Node Section) where
@@ -82,7 +72,9 @@ instance ToHtmlM (Node Section) where
                     headingHtml <- toHtmlM heading
                     childrenHtml <- case children of
                         Right cs -> toHtmlM cs
-                        Left cs -> toHtmlM cs
+                        -- \| In the Left case the children are paragraphs, so we set the needed flag for them
+                        --   to decide if the should have a visible id
+                        Left cs -> local (\s -> s {isSingleParagraph = length cs == 1}) $ toHtmlM cs
                     return $ headingHtml <> childrenHtml
                 -- \| increment sectionID for next section
                 modify (\s -> s {currentSectionID = currentSectionID s + 1})
@@ -90,24 +82,6 @@ instance ToHtmlM (Node Section) where
                 modify (\s -> s {currentParagraphID = 1})
 
                 return sectionHtml
-
--- instance ToHtmlM Section where
---     toHtmlM (Section format heading children) = do
---         globalState <- get
---         let sectionIDHtml = sectionFormat format (currentSectionID globalState)
---          in do
---                 sectionHtml <- local (\s -> s {currentSectionIDHtml = sectionIDHtml}) $ do
---                     headingHtml <- toHtmlM heading
---                     childrenHtml <- case children of
---                         Right cs -> toHtmlM cs
---                         Left cs -> toHtmlM cs
---                     return $ headingHtml <> childrenHtml
---                 -- \| increment sectionID for next section
---                 modify (\s -> s {currentSectionID = currentSectionID s + 1})
---                 -- \| reset paragraphID for next section
---                 modify (\s -> s {currentParagraphID = 1})
-
---                 return sectionHtml
 
 -- | Instance for Heading of a Section
 instance ToHtmlM Heading where
@@ -133,21 +107,15 @@ instance ToHtmlM (Node Paragraph) where
                 modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
                 -- \| Reset sentence id for next paragraph
                 modify (\s -> s {currentSentenceID = 0})
-                return $ div_ <$> return paragraphIDHtml <> childText
-
--- instance ToHtmlM Paragraph where
---     toHtmlM :: Paragraph -> ReaderT ReaderState (State GlobalState) (Html ())
---     toHtmlM (Paragraph format textTrees) = do
---         globalState <- get
---         let (paragraphIDHtml, mParagraphIDRawHtml) = paragraphFormat format (currentParagraphID globalState)
---          in do
---                 childText <-
---                     local (\s -> s {mCurrentParagraphIDHtml = mParagraphIDRawHtml}) $
---                         toHtmlM textTrees
---                 modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
---                 -- \| Reset sentence id for next paragraph
---                 modify (\s -> s {currentSentenceID = 0})
---                 return $ paragraphIDHtml <> childText
+                readerState <- ask
+                return $
+                    p_
+                        <$> if isSingleParagraph readerState
+                            then
+                                -- \| If this is the only paragraph inside this section we drop the visible paragraphID
+                                childText
+                            else
+                                return paragraphIDHtml <> childText
 
 instance
     (ToHtmlStyle style, ToHtmlM enum, ToHtmlM special)
@@ -168,7 +136,10 @@ instance
             textTreeHtml <- toHtmlM textTrees
             return $ toHtmlStyle style <$> textTreeHtml
         Enum enum -> toHtmlM enum
-        Footnote _ -> returnNow $ toHtml ("Error: FootNotes not supported yet" :: Text)
+        Footnote _ ->
+            returnNow $
+                b_ [class_ (Class.className Class.FontRed)] $
+                    toHtml ("Error: FootNotes not supported yet" :: Text)
 
 -- | Increment sentence counter and add Label to GlobalState, if there is one
 instance ToHtmlM SentenceStart where
@@ -195,8 +166,7 @@ instance ToHtmlM Enumeration where
         return $ do
             nestedHtml <- sequence nested
             let enumItemsHtml = foldr ((>>) . li_) (mempty :: Html ()) nestedHtml
-                in return $ ol_ [class_ $ enumLevel (enumNestingLevel readerState)] enumItemsHtml
-
+             in return $ ol_ [class_ $ enumLevel (enumNestingLevel readerState)] enumItemsHtml
 
 instance ToHtmlM EnumItem where
     toHtmlM (EnumItem textTrees) = toHtmlM textTrees

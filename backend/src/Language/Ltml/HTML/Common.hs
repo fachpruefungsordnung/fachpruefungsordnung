@@ -46,6 +46,8 @@ data ReaderState = ReaderState
     --   Therefore this only holds the raw identifier and does not contain any extra symbols like ")" or ".".
     --   This is a Maybe type because the FormatString may not contain any IdentifierPlaceholder.
     --   In this case this will be Nothing.
+    , isSingleParagraph :: Bool
+    -- ^ signals the child paragraph that it is the only child and thus should not have an visible identifier
     }
 
 initGlobalState :: GlobalState
@@ -63,6 +65,7 @@ initReaderState =
         { enumNestingLevel = 0
         , currentSectionIDHtml = mempty
         , mCurrentParagraphIDHtml = Nothing
+        , isSingleParagraph = False
         }
 
 -------------------------------------------------------------------------------
