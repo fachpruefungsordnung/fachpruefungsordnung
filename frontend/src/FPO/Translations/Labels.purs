@@ -6,7 +6,10 @@ import FPO.Translations.Components.Editor (deEditor, enEditor)
 import FPO.Translations.Components.Navbar (deNavbar, enNavbar)
 import FPO.Translations.Page.Admin.AddMembers (deAddMembersPage, enAddMembersPage)
 import FPO.Translations.Page.Admin.GroupMembers (deGroupMemberPage, enGroupMemberPage)
-import FPO.Translations.Page.Admin.GroupProjects (deGroupProjectsPage, enGroupProjectsPage)
+import FPO.Translations.Page.Admin.GroupProjects
+  ( deGroupProjectsPage
+  , enGroupProjectsPage
+  )
 import FPO.Translations.Page.Admin.PageGroups (deAdminGroupPage, enAdminGroupPage)
 import FPO.Translations.Page.Admin.PageUsers (deAdminUserPage, enAdminUserPage)
 import FPO.Translations.Page.AdminPanel (deAdminPanel, enAdminPanel)

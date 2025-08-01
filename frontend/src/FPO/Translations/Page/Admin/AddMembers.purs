@@ -4,13 +4,13 @@ import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)
 
 type AddMembersPageLabels =
-  (   "gmam_addMember"
-  ::: "gmam_assignMembers"
-  ::: "gmam_failedToAdd"
-  ::: "gmam_failedToRemove"
-  ::: "gmam_groupNotFound"
-  ::: "gmam_loadingGroup"
-  ::: "gmam_removeMember"
+  ( "gmam_addMember"
+      ::: "gmam_assignMembers"
+      ::: "gmam_failedToAdd"
+      ::: "gmam_failedToRemove"
+      ::: "gmam_groupNotFound"
+      ::: "gmam_loadingGroup"
+      ::: "gmam_removeMember"
       ::: SNil
   )
 

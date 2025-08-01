@@ -92,7 +92,8 @@ component =
         , addError state.error
         ]
       Nothing -> HH.div [ HP.classes [ HB.textCenter, HB.my5 ] ]
-        [ HH.h1 [] [ HH.text $ translate (label :: _ "gmam_loadingGroup") state.translator ]
+        [ HH.h1 []
+            [ HH.text $ translate (label :: _ "gmam_loadingGroup") state.translator ]
         , HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] []
         ]
 
@@ -132,7 +133,12 @@ component =
         EffectAddUser -> do
           response <- liftAff $ changeRole s.groupID (getID userOverviewDto) Member
           handleIgnoreResponse
-            (\error -> H.modify_ _ { error = Just $ translate (label :: _ "gmam_failedToAdd") s.translator <> ": " <> error })
+            ( \error -> H.modify_ _
+                { error = Just $
+                    translate (label :: _ "gmam_failedToAdd") s.translator <> ": " <>
+                      error
+                }
+            )
             (handleAction ReloadGroup)
             response
         EffectRemoveUser -> do
@@ -140,8 +146,10 @@ component =
           handleIgnoreResponse
             ( \error -> H.modify_ _
                 { error
-                   = Just $
-                      translate (label :: _ "gmam_failedToRemove") s.translator <> ": " <> error }
+                    = Just $
+                    translate (label :: _ "gmam_failedToRemove") s.translator <> ": "
+                      <> error
+                }
             )
             (handleAction ReloadGroup)
             response
@@ -154,7 +162,9 @@ component =
             { group = Just group
             }
         Nothing -> do
-          H.modify_ _ { error = Just $ translate (label :: _ "gmam_groupNotFound") s.translator }
+          H.modify_ _
+            { error = Just $ translate (label :: _ "gmam_groupNotFound") s.translator
+            }
     where
     handleIgnoreResponse onError onSuccess response =
       case response of
