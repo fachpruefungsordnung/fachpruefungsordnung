@@ -47,12 +47,12 @@ instance (ToLaTeXM enum,
     toLaTeXM (Enum enum)           = toLaTeXM enum
     toLaTeXM (Footnote tt)         = do
             tt' <- mapM toLaTeXM tt
-            pure $ footnote tt'
+            pure $ (footnote . Sequence) tt'
 
 applyFontStyle :: FontStyle -> [LaTeX] -> LaTeX
-applyFontStyle Bold       = bold
-applyFontStyle Italics    = italic
-applyFontStyle Underlined = underline
+applyFontStyle Bold       = bold . Sequence
+applyFontStyle Italics    = italic . Sequence
+applyFontStyle Underlined = underline . Sequence
 
 instance (ToLaTeXM enum,
           ToLaTeXM special)
@@ -66,7 +66,7 @@ instance (ToLaTeXM enum,
     toLaTeXM (Enum enum)           = toLaTeXM enum
     toLaTeXM (Footnote tt)         = do
             tt' <- mapM toLaTeXM tt
-            pure $ footnote tt'
+            pure $ (footnote . Sequence) tt'
 
 instance ToLaTeXM Enumeration where
 
@@ -86,9 +86,12 @@ instance ToLaTeXM SentenceStart where
 
 -------------------------------- Label -----------------------------------
 
+-- | TODO: There could be an option to know where exactly we currently are, maybe by 
+--         constantly updating the state, so that we can create a label from anywhere,
+--         highly dependent on what SentenceStart labels are supposed to be.
 instance ToLaTeXM Label where
 
-    toLaTeXM (Label t) = pure $ label $ LT.fromStrict t
+    toLaTeXM l = pure $ hyperlink l mempty
 
 class ToLaTeXM a => Labelable a where
     attachLabel :: Maybe Label -> a -> State LS.LabelState LaTeX
@@ -109,7 +112,8 @@ instance Labelable Paragraph where
                                  <> " Absatz "
                                  <> LT.pack (show (LS.paragraph st)))
         content' <- mapM toLaTeXM content
-        pure $ if LS.onlyOneParagraph st
+        let anchor = maybe mempty (`hypertarget` mempty) mLabel
+        pure $ anchor <> if LS.onlyOneParagraph st
                 then Sequence content'
                 else paragraph (formatParagraph fmt (LS.paragraph st)) (Sequence content')
 
@@ -119,9 +123,9 @@ instance ToLaTeXM Heading where
     toLaTeXM (Heading fmt tt) = do
         tt' <- mapM toLaTeXM tt
         st <- get
-        pure $ bold [formatHeading fmt
+        pure $ bold (formatHeading fmt
                         (LS.identifier st)
-                        (Sequence tt')]
+                        (Sequence tt'))
 
 instance ToLaTeXM Section where
 
@@ -153,8 +157,8 @@ instance Labelable Section where
                     headingDoc <- toLaTeXM heading
                     modify (\s -> s { isSupersection = False })
                     pure (children', headingDoc <> linebreak)
-
-        pure $ headingDoc <> Sequence children
+        let anchor = maybe headingDoc (`hypertarget` headingDoc) mLabel
+        pure $ anchor <> Sequence children
 
 -------------------------------- Node -----------------------------------
 

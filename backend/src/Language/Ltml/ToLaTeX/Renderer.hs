@@ -6,22 +6,24 @@ module Language.Ltml.ToLaTeX.Renderer (
 
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as B
-import Language.Ltml.ToLaTeX.Type
+import Language.Ltml.ToLaTeX.Type ( LaTeX(..) )
 import Data.Int (Int64)
-import Data.Map (Map, findWithDefault)
-import Language.Ltml.AST.Label (Label)
+import qualified Data.Map as Map (Map, lookup)
+import Language.Ltml.AST.Label (Label (Label))
 
-renderLaTeX :: Map Label LT.Text -> LaTeX -> LT.Text
+renderLaTeX :: Map.Map Label LT.Text -> LaTeX -> LT.Text
 renderLaTeX m = B.toLazyText . go 0
   where
     go :: Int64 -> LaTeX -> B.Builder
     go _ (Text t)       = escape t
     go _ (Raw t)        = B.fromLazyText t
-    go _ (MissingRef l) = B.fromLazyText (findWithDefault "refnotfound" l m)
+    go _ (MissingRef l@(Label t)) = case Map.lookup l m of
+                                      Nothing  -> B.fromLazyText "refnotfound"
+                                      Just ref -> B.fromText "\\hyperlink{" <> B.fromText t <> "}{" <> B.fromLazyText ref <> B.fromText "}"
     go n (Command name opts args) =
       "\\" <> B.fromLazyText name
            <> renderOpts opts
-           <> "{" <> mconcat (map (go n) args) <> "}"
+           <> mconcat (map (wrapInBraces . go n) args)
     go n (Environment name opts body) =
       "\n" <> B.fromLazyText (LT.replicate n "\t") <> "\\begin{" <> B.fromLazyText name <> "}\n"
       <> renderOpts opts
@@ -32,6 +34,9 @@ renderLaTeX m = B.toLazyText . go 0
     renderOpts :: [LT.Text] -> B.Builder
     renderOpts [] = mempty
     renderOpts os = "[" <> B.fromLazyText (LT.intercalate "," os) <> "]"
+
+    wrapInBraces :: B.Builder -> B.Builder
+    wrapInBraces b = "{" <> b <> "}"
 
     escape :: LT.Text -> B.Builder
     escape = LT.foldr escapeChar mempty

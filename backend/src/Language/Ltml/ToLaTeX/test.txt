@@ -2,6 +2,7 @@
 
 §{sectiona} Some section
 
+{paragraph:}
 This paragraph is in {:sectiona} in super-section {:main}.
 
 The next paragraph is {:sectionb}.
@@ -24,7 +25,7 @@ Some sentence with
   #
     and an item starting in a new line
 and the sentence continues
-  # with another item
+  # with another item referencing {:paragraph}
 and finally ends.  Another sentence
   # has a single item.
 

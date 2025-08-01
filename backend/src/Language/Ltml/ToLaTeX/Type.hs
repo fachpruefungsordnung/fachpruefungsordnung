@@ -4,22 +4,19 @@
 module Language.Ltml.ToLaTeX.Type (
     LaTeX (..),
     text, 
-    bold,
-    italic,
-    underline,
+    bold, italic, underline,
     footnote,
-    label, 
-    ref, 
+    hypertarget, hyperlink,
+    label,       ref,
     paragraph,
     large,
     linebreak,
-    enumerate,
-    itemize,
+    enumerate, itemize,
     center
 ) where
 
 import qualified Data.Text.Lazy as LT
-import Language.Ltml.AST.Label (Label)
+import Language.Ltml.AST.Label (Label (Label))
 
 data LaTeX
   = Text LT.Text
@@ -60,17 +57,23 @@ instance Monoid LaTeX where
 text :: LT.Text -> LaTeX
 text = Text
 
-bold :: [LaTeX] -> LaTeX
-bold = Command "textbf" []
+bold :: LaTeX -> LaTeX
+bold = Command "textbf" [] . (:[])
 
-italic :: [LaTeX] -> LaTeX
-italic = Command "emph" []
+italic :: LaTeX -> LaTeX
+italic = Command "emph" [] . (:[])
 
-underline :: [LaTeX] -> LaTeX
-underline = Command "underline" []
+underline :: LaTeX -> LaTeX
+underline = Command "underline" [] . (:[])
 
-footnote :: [LaTeX] -> LaTeX
-footnote = Command "footnote" []
+footnote :: LaTeX -> LaTeX
+footnote = Command "footnote" [] . (:[])
+
+hypertarget :: Label -> LaTeX -> LaTeX
+hypertarget (Label l) latex = Command "hypertarget" [] [Text (LT.fromStrict l), latex] 
+
+hyperlink :: Label -> LaTeX -> LaTeX
+hyperlink (Label l) latex = Command "hyperlink" [] [Text (LT.fromStrict l), latex] 
 
 -------------------------------------------------------------------------------
 {-                             text structure                                -}
@@ -80,9 +83,6 @@ label l = Command "label" [] [Text l]
 
 ref :: LT.LazyText -> LaTeX
 ref r = Command "ref" [] [Text r]
-
-paragraph :: LaTeX -> LaTeX -> LaTeX
-paragraph identifier content = Environment "tabularx" [] [Raw "{\\linewidth}{@{}lX@{}}", Sequence [identifier, Raw " & ", content]]
 
 large :: LaTeX -> LaTeX
 large content = Raw "{\\Large " <> content <> Raw "}"
@@ -101,5 +101,9 @@ itemize items = Environment "itemize" [] (map (\i -> Command "item" [] [i]) item
 
 center :: [LaTeX] -> LaTeX
 center = Environment "center" []
+
+paragraph :: LaTeX -> LaTeX -> LaTeX
+paragraph identifier content = Environment "tabularx" [] [Raw "{\\linewidth}{@{}lX@{}}", Sequence [identifier, Raw " & ", content]]
+
 
 

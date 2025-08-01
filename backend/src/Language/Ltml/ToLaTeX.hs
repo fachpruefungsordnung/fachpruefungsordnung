@@ -34,13 +34,13 @@ instance (ToLaTeX enum,
     toLaTeX (Reference (Label l)) = ref $ LT.fromStrict l
     toLaTeX (Styled style tt)     = applyFontStyle style (map toLaTeX tt)
     toLaTeX (Enum enum)           = toLaTeX enum
-    toLaTeX (Footnote tt)         = footnote (map toLaTeX tt)
+    toLaTeX (Footnote tt)         = (footnote . Sequence) (map toLaTeX tt)
 
 applyFontStyle :: FontStyle -> [LaTeX] -> LaTeX
-applyFontStyle Bold       = bold
-applyFontStyle Italics    = italic
-applyFontStyle Underlined = underline
-
+applyFontStyle Bold       = bold . Sequence
+applyFontStyle Italics    = italic . Sequence
+applyFontStyle Underlined = underline . Sequence
+ 
 instance (ToLaTeX enum, 
           ToLaTeX special) 
           => ToLaTeX (TextTree Void enum special) where
@@ -51,7 +51,7 @@ instance (ToLaTeX enum,
     toLaTeX (Reference (Label l)) = ref $ LT.fromStrict l
     toLaTeX (Styled style _)      = absurd style
     toLaTeX (Enum enum)           = toLaTeX enum
-    toLaTeX (Footnote tt)         = footnote (map toLaTeX tt)
+    toLaTeX (Footnote tt)         = (footnote . Sequence) (map toLaTeX tt)
 
 instance ToLaTeX Enumeration where
 
