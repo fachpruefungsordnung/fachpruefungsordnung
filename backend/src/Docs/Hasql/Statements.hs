@@ -283,7 +283,7 @@ getDocuments =
                 d.creation_ts :: timestamptz,
                 d.created_by :: uuid,
                 cu.name :: text,
-                COALESCE(dr.creation_ts, d.creation_ts) :: timestamptz,
+                COALESCE(dr.creation_ts, d.creation_ts) :: timestamptz AS last_edited,
                 COALESCE(dr.author_id, d.created_by) :: uuid,
                 COALESCE(dr.author_name, cu.name) :: text
             FROM
@@ -309,7 +309,7 @@ getDocuments =
                 r.user_id = $1 :: uuid
                 OR edr.user_id = $1 :: uuid
             ORDER BY
-                dr.creation_ts DESC
+                last_edited DESC
         |]
 
 getDocumentsBy :: Statement (Maybe UserID, Maybe GroupID) (Vector Document)
@@ -324,7 +324,7 @@ getDocumentsBy =
                 d.creation_ts :: timestamptz,
                 d.created_by :: uuid,
                 cu.name :: text,
-                COALESCE(dr.creation_ts, d.creation_ts) :: timestamptz,
+                COALESCE(dr.creation_ts, d.creation_ts) :: timestamptz AS last_edited,
                 COALESCE(dr.author_id, d.created_by) :: uuid,
                 COALESCE(dr.author_name, cu.name) :: text
             FROM
@@ -351,7 +351,7 @@ getDocumentsBy =
                 OR edr.user_id = $1 :: uuid?
                 OR d."group" = $2 :: int4?
             ORDER BY
-                dr.creation_ts DESC
+                last_edited DESC
         |]
 
 uncurryTextElement :: (Int32, Text) -> TextElement
