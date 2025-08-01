@@ -58,7 +58,8 @@ data ReaderState = ReaderState
 initGlobalState :: GlobalState
 initGlobalState =
     GlobalState
-        { currentSectionID = 1
+        { currentSuperSectionID = 1
+        , currentSectionID = 1
         , currentParagraphID = 1
         , currentSentenceID = 0
         , labels = []
@@ -68,6 +69,7 @@ initReaderState :: ReaderState
 initReaderState =
     ReaderState
         { enumNestingLevel = 0
+        , currentSuperSectionIDHtml = mempty
         , currentSectionIDHtml = mempty
         , mCurrentParagraphIDHtml = Nothing
         , isSingleParagraph = False

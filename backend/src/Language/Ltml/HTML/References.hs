@@ -10,19 +10,26 @@ import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.Common
 import Lucid
 
-data ReferenceType = SuperSectionRef -- ^ Reference to a super-section, displayed as "Abschnitt i"
-                   | SectionRef -- ^ Reference to a section, displayed as "§ i"  
-                   | ParagraphRef -- ^ Reference to a paragraph in a section, displayed as "§ i Absatz i"
-                   | SentenceRef -- ^ Reference to a sentence in a paragraph, displayed as "§ i Absatz i Satz i"
+data ReferenceType
+    = -- | Reference to a super-section, displayed as "Abschnitt i"
+      SuperSectionRef
+    | -- | Reference to a section, displayed as "§ i"
+      SectionRef
+    | -- | Reference to a paragraph in a section, displayed as "§ i Absatz i"
+      ParagraphRef
+    | -- | Reference to a sentence in a paragraph, displayed as "§ i Absatz i Satz i"
+      SentenceRef
 
 -- | Generates fitting german Reference Html based on referenced type.
 --   This relies on the GlobalState being set up properly for the referenced scope.
 --   (e.g. currentParagraphIDHtml being set)
-genReference :: ReferenceType -> ReaderT ReaderState (State GlobalState) (Html ())
+genReference
+    :: ReferenceType -> ReaderT ReaderState (State GlobalState) (Html ())
 genReference ref = do
     readerState <- ask
     case ref of
-        SuperSectionRef -> return $ toHtml ("Abschnitt " :: Text) <> currentSuperSectionIDHtml readerState 
+        SuperSectionRef ->
+            return $ toHtml ("Abschnitt " :: Text) <> currentSuperSectionIDHtml readerState
         SectionRef -> return $ toHtml ("§ " :: Text) <> currentSectionIDHtml readerState
         ParagraphRef ->
             let mParagraphIDText = mCurrentParagraphIDHtml readerState
@@ -38,13 +45,13 @@ genReference ref = do
         SentenceRef -> do
             globalState <- get
             paragraphRef <- genReference ParagraphRef
-            return $ paragraphRef <> toHtml (" Satz " <> show (currentSentenceID globalState))
-
+            return $
+                paragraphRef <> toHtml (" Satz " <> show (currentSentenceID globalState))
 
 -- TODO: define Trie Map in GlobalState to track label references
 
 -- | Generates Reference String as Html and adds (Label, Html) pair to GlobalState
---   This function heavily relies on the GlobalState context. 
+--   This function heavily relies on the GlobalState context.
 --   Especially the referenced scope must be evaluated (e.g. the currentSectionIDHtml must be set)
 addLabelToState
     :: Label -> ReferenceType -> ReaderT ReaderState (State GlobalState) ()

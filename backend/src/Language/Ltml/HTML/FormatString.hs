@@ -4,7 +4,7 @@ import Control.Monad.Writer
 import Language.Lsd.AST.Format
 import Language.Lsd.AST.Type.Paragraph (ParagraphFormat (..))
 import Language.Lsd.AST.Type.Section (SectionFormat (..))
-import Language.Ltml.HTML.Util (intToCapital, intToLower)
+import Language.Ltml.HTML.Util
 import Lucid (Html, ToHtml (toHtml))
 import Prelude hiding (id)
 
@@ -13,7 +13,8 @@ headingFormat :: HeadingFormat -> Html () -> Html () -> Html ()
 headingFormat (FormatString []) _ _ = mempty
 headingFormat (FormatString (a : as)) id text =
     case a of
-        StringAtom s -> toHtml s
+        -- \| replaces '\n' with <br>
+        StringAtom s -> convertNewLine s
         PlaceholderAtom IdentifierPlaceholder -> id
         PlaceholderAtom HeadingTextPlaceholder -> toHtml text
         <> headingFormat (FormatString as) id text
@@ -32,15 +33,16 @@ identifierFormat
 identifierFormat (FormatString []) _ = return mempty
 identifierFormat (FormatString (a : as)) id = do
     b <- case a of
-        StringAtom s -> return $ toHtml s
-        PlaceholderAtom Arabic -> tellAndReturnJust $ toHtml $ show id 
+        -- \| replaces '\n' with <br>
+        StringAtom s -> return $ convertNewLine s
+        PlaceholderAtom Arabic -> tellAndReturnJust $ toHtml $ show id
         -- \| convert paragraphID to single letter string
         PlaceholderAtom AlphabeticLower -> tellAndReturnJust $ toHtml $ intToLower id
         PlaceholderAtom AlphabeticUpper -> tellAndReturnJust $ toHtml $ intToCapital id
     bs <- identifierFormat (FormatString as) id
     return $ b <> bs
 
-tellAndReturnJust :: Semigroup a => a -> Writer (Maybe a) a
+tellAndReturnJust :: (Semigroup a) => a -> Writer (Maybe a) a
 tellAndReturnJust a = do
     tell $ Just a
-    return a 
+    return a

@@ -14,6 +14,7 @@ import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
 import Data.Void (Void)
+import Language.Ltml.HTML.Util
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.Label
 import Language.Ltml.AST.Node
@@ -70,9 +71,7 @@ instance ToHtmlM (Node Section) where
         let sectionIDHtml = sectionFormat format (currentSectionID globalState)
          in do
                 sectionHtml <- local (\s -> s {currentSectionIDHtml = sectionIDHtml}) $ do
-                    case mLabel of
-                        Nothing -> return ()
-                        Just label -> addLabelToState label SectionRef
+                    whenJust mLabel (\l -> addLabelToState l SectionRef)
                     headingHtml <- toHtmlM heading
                     childrenHtml <- case children of
                         Right cs -> toHtmlM cs
@@ -104,9 +103,7 @@ instance ToHtmlM (Node Paragraph) where
         let (paragraphIDHtml, mParagraphIDRawHtml) = paragraphFormat format (currentParagraphID globalState)
          in do
                 childText <- local (\s -> s {mCurrentParagraphIDHtml = mParagraphIDRawHtml}) $ do
-                    case mLabel of
-                        Nothing -> return ()
-                        Just label -> addLabelToState label ParagraphRef
+                    whenJust mLabel (\l -> addLabelToState l ParagraphRef)
                     toHtmlM textTrees
                 modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
                 -- \| Reset sentence id for next paragraph
