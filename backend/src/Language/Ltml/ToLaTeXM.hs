@@ -113,9 +113,10 @@ instance Labelable Paragraph where
                                  <> LT.pack (show (LS.paragraph st)))
         content' <- mapM toLaTeXM content
         let anchor = maybe mempty (`hypertarget` mempty) mLabel
-        pure $ anchor <> if LS.onlyOneParagraph st
-                then Sequence content'
-                else paragraph (formatParagraph fmt (LS.paragraph st)) (Sequence content')
+        pure $ anchor <> 
+                if LS.onlyOneParagraph st
+                then Sequence content' <> medskip
+                else paragraph (formatParagraph fmt (LS.paragraph st)) (Sequence content') <> medskip
 
 -------------------------------- Section -----------------------------------
 instance ToLaTeXM Heading where

@@ -17,6 +17,7 @@ import Language.Ltml.ToLaTeX.LabelState (LabelState (LabelState, labelToRef))
 import Language.Ltml.ToLaTeXM (ToLaTeXM(toLaTeXM))
 import Control.Monad.State (runState)
 import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
+import Language.Ltml.AST.Section (Section (Section))
 
 readText :: String -> Text
 readText filename = unsafePerformIO $ TIO.readFile filename
@@ -31,8 +32,11 @@ testSection = runState (
             $ runParser (sectionP superSectionT empty) "" (readText "./src/Language/Ltml/ToLaTeX/test.txt"))
             initialState
 
+
+
 runTest :: IO ()
 runTest = do
     let m = labelToRef (snd testSection)
         l = fst testSection
     TIO.putStrLn $ LT.toStrict $ renderLaTeX m l
+

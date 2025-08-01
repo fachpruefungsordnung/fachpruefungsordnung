@@ -10,6 +10,7 @@ module Language.Ltml.ToLaTeX.Type (
     label,       ref,
     paragraph,
     large,
+    medskip,
     linebreak,
     enumerate, itemize,
     center
@@ -89,6 +90,9 @@ large content = Raw "{\\Large " <> content <> Raw "}"
 
 linebreak :: LaTeX
 linebreak = Raw "\\\\"
+
+medskip :: LaTeX
+medskip = Raw "\n\\medskip\n"
 
 -------------------------------------------------------------------------------
 {-                              environments                                 -}
