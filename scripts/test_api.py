@@ -4,6 +4,18 @@ from typing import Literal
 import requests
 from requests import Response
 
+def query_str(**kwargs: object) -> str:
+    query = "&".join([
+        f"{name}={value}"
+            for (name, value)
+            in kwargs.items()
+            if value
+    ])
+    return f"?{query}" if query else ""
+
+def with_query(url: str, **kwargs: object) -> str:
+    return url + query_str(**kwargs)
+
 def json_response(response: Response) -> str:
         if 200 <= response.status_code < 300:
             return json.dumps(response.json(), indent=4)
@@ -28,6 +40,13 @@ class Client:
         else:
             print(f"Error: {response.status_code}")
 
+    def documents(self, user_id: int|None=None, group_id: int|None=None) -> str:
+        return self.get_json(with_query(
+            f"docs",
+            user=user_id,
+            group=group_id,
+        ))
+
     def document(self, doc_id: int) -> str:
         return self.get_json(f"docs/{doc_id}")
 
@@ -37,10 +56,17 @@ class Client:
     def document_tree_full(self, doc_id: int, revision: Literal["latest"] | int) -> str:
         return self.get_json(f"docs/{doc_id}/tree/{revision}/full")
 
-    def document_history(self, doc_id: int, before: str|None=None, limit: int|None=None) -> str:
-        query = "&".join([f"{name}={value}" for (name, value) in [("before", before), ("limit", limit)] if value])
-        query = f"?{query}" if query else ""
-        return self.get_json(f"docs/{doc_id}/history{query}")
+    def document_history(
+        self,
+        doc_id: int,
+        before: str|None=None,
+        limit: int|None=None
+    ) -> str:
+        return self.get_json(with_query(
+            f"docs/{doc_id}/history",
+            before=before,
+            limit=limit,
+        ))
 
     def document_text_revision(
         self,
@@ -54,13 +80,13 @@ class Client:
         return self.__session.post(
             url=f"{self.__host}/{endpoint}",
             json=payload,
-            headers=self.__headers()
+            headers=self.__headers(),
         )
 
     def get(self, endpoint: str) -> Response:
         return self.__session.get(
             url=f"{self.__host}/{endpoint}",
-            headers=self.__headers()
+            headers=self.__headers(),
         )
 
     def get_json(self, endpoint: str) -> str:
@@ -88,7 +114,8 @@ if __name__ == "__main__":
         "test@test.com",
         "123"
     )
-    print(client.document(1))
-    print(client.document_tree_full(1, "latest"))
-    print(client.document_history(1, limit=5))
-    print(client.document_text_revision(1, 1, "latest"))
+    # print(client.document(1))
+    # print(client.document_tree_full(1, "latest"))
+    # print(client.document_history(1, limit=5))
+    # print(client.document_text_revision(1, 1, "latest"))
+    print(client.documents(group_id=1))
