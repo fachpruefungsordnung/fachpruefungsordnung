@@ -1,7 +1,6 @@
 module Language.Ltml.HTML.Util (intToLower, intToCapital, whenJust, convertNewLine) where
 
 import Data.Char (chr)
-import Data.List (intersperse)
 import Lucid
 
 -- | Converts Int to corresponding lowercase letter in the alphabet.

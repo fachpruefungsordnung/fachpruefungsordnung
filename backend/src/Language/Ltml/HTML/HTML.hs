@@ -84,7 +84,7 @@ instance ToHtmlM (Node Section) where
                 -- \| reset paragraphID for next section
                 modify (\s -> s {currentParagraphID = 1})
 
-                return sectionHtml
+                return $ div_ <$> sectionHtml
 
 -- | Instance for Heading of a Section
 instance ToHtmlM Heading where
@@ -110,13 +110,11 @@ instance ToHtmlM (Node Paragraph) where
                 modify (\s -> s {currentSentenceID = 0})
                 readerState <- ask
                 return $
-                    p_
-                        <$> if isSingleParagraph readerState
-                            then
-                                -- \| If this is the only paragraph inside this section we drop the visible paragraphID
-                                childText
-                            else
-                                return paragraphIDHtml <> childText
+                    div_ [class_ (Class.className Class.Paragraph)]
+                                 -- \| If this is the only paragraph inside this section we drop the visible paragraphID
+                        <$> let idHtml = if isSingleParagraph readerState then mempty else paragraphIDHtml
+                               in
+                                return (div_ [class_ (Class.className Class.ParagraphID)] idHtml) <> div_ <$> childText
 
 instance
     (ToHtmlStyle style, ToHtmlM enum, ToHtmlM special)

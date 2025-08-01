@@ -6,12 +6,17 @@
 module Language.Ltml.HTML.CSS.Classes (Class (..), className, classStyle, enumLevel) where
 
 import Clay
+import qualified Clay.Flexbox as Flexbox
 import Data.String (fromString)
 import Data.Text (Text, unpack)
 import Language.Ltml.HTML.CSS.CustomClay
 
 data Class
-    = -- | Underlining basic text
+    = -- | Class for spacing and aligning a paragraph div
+      Paragraph
+    | -- | Class for aligning a paragraph id div inside of a pragraph div
+      ParagraphID
+    | -- | Underlining basic text
       Underlined
     | -- | Centered text
       Centered
@@ -29,6 +34,8 @@ data Class
 
 -- | Returns the html class name of given Class
 className :: Class -> Text
+className Paragraph = "paragraph"
+className ParagraphID = "paragraphID"
 className Underlined = "underlined"
 className Centered = "centered"
 className FontRed = "fontRed"
@@ -39,6 +46,8 @@ className EnumFail = "enumFail"
 
 -- | maps Class to its css style definition
 classStyle :: Class -> Css
+classStyle Paragraph = toClassSelector Paragraph ? display flex
+classStyle ParagraphID = toClassSelector ParagraphID ? Flexbox.flex 0 0 (em 2)
 classStyle Underlined = toClassSelector Underlined ? textDecoration underline
 classStyle Centered = toClassSelector Centered ? textAlign center
 classStyle FontRed = toClassSelector FontRed ? fontColor red
