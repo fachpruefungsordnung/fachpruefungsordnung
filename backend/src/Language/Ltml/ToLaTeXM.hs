@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Language.Ltml.ToLaTeXM 
+module Language.Ltml.ToLaTeXM
     (ToLaTeXM (..))
     where
 
@@ -14,7 +14,7 @@ import Language.Ltml.AST.Section (Heading (..), Section (..))
 import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.ToLaTeX.Type
 import qualified Data.Text.Lazy as LT
-import Control.Monad.State (State, MonadState (get, put))
+import Control.Monad.State (State, MonadState (get), modify)
 import qualified Language.Ltml.ToLaTeX.LabelState as LS
 import Language.Lsd.AST.Format (FormatString (FormatString), FormatAtom (StringAtom, PlaceholderAtom), IdentifierFormat, HeadingFormat, HeadingPlaceholderAtom (HeadingTextPlaceholder, IdentifierPlaceholder), EnumStyle (Arabic, AlphabeticLower, AlphabeticUpper))
 import Data.Char (chr)
@@ -33,19 +33,19 @@ instance ToLaTeXM Void where
 
 -------------------------------- Text -----------------------------------
 
-instance (ToLaTeXM enum, 
-          ToLaTeXM special) 
+instance (ToLaTeXM enum,
+          ToLaTeXM special)
           => ToLaTeXM (TextTree FontStyle enum special) where
 
     toLaTeXM (Word t)              = pure $ Text $ LT.fromStrict t
     toLaTeXM Space                 = pure $ Text $ LT.pack " "
     toLaTeXM (Special s)           = toLaTeXM s
-    toLaTeXM (Reference (Label l)) = pure $ ref $ LT.fromStrict l
+    toLaTeXM (Reference l)         = pure $ MissingRef l
     toLaTeXM (Styled style tt)     = do
             tt' <- mapM toLaTeXM tt
-            pure $ applyFontStyle style tt' 
+            pure $ applyFontStyle style tt'
     toLaTeXM (Enum enum)           = toLaTeXM enum
-    toLaTeXM (Footnote tt)         = do 
+    toLaTeXM (Footnote tt)         = do
             tt' <- mapM toLaTeXM tt
             pure $ footnote tt'
 
@@ -54,29 +54,29 @@ applyFontStyle Bold       = bold
 applyFontStyle Italics    = italic
 applyFontStyle Underlined = underline
 
-instance (ToLaTeXM enum, 
-          ToLaTeXM special) 
+instance (ToLaTeXM enum,
+          ToLaTeXM special)
           => ToLaTeXM (TextTree Void enum special) where
 
     toLaTeXM (Word t)              = pure $ Text $ LT.fromStrict t
     toLaTeXM Space                 = pure $ Text $ LT.pack " "
     toLaTeXM (Special s)           = toLaTeXM s
-    toLaTeXM (Reference (Label l)) = pure $ ref $ LT.fromStrict l
+    toLaTeXM (Reference l)         = pure $ MissingRef l
     toLaTeXM (Styled style _)      = absurd style
     toLaTeXM (Enum enum)           = toLaTeXM enum
-    toLaTeXM (Footnote tt)         = do 
+    toLaTeXM (Footnote tt)         = do
             tt' <- mapM toLaTeXM tt
             pure $ footnote tt'
 
 instance ToLaTeXM Enumeration where
 
-    toLaTeXM (Enumeration enumItems) = do 
+    toLaTeXM (Enumeration enumItems) = do
         enumItems' <- mapM toLaTeXM enumItems
         pure $ enumerate enumItems'
 
 instance ToLaTeXM EnumItem where
 
-    toLaTeXM (EnumItem tt) = do 
+    toLaTeXM (EnumItem tt) = do
         tt' <- mapM toLaTeXM tt
         pure $ Sequence tt'
 
@@ -104,20 +104,24 @@ instance Labelable Paragraph where
     attachLabel mLabel (Paragraph fmt content) = do
         _ <- LS.nextParagraph
         st <- get
+        _ <- LS.insertLabel mLabel ("§ "
+                                 <> LT.pack (show (LS.section st))
+                                 <> " Absatz "
+                                 <> LT.pack (show (LS.paragraph st)))
         content' <- mapM toLaTeXM content
-        pure $ formatParagraph fmt (LS.paragraph st) (Sequence content')
+        pure $ if LS.onlyOneParagraph st
+                then Sequence content'
+                else paragraph (formatParagraph fmt (LS.paragraph st)) (Sequence content')
 
 -------------------------------- Section -----------------------------------
 instance ToLaTeXM Heading where
 
-    toLaTeXM (Heading fmt tt) = do 
+    toLaTeXM (Heading fmt tt) = do
         tt' <- mapM toLaTeXM tt
         st <- get
-        pure $ formatHeading fmt 
-                        (if isSupersection st 
-                            then LS.supersection st 
-                            else LS.section st) 
-                        (Sequence tt')
+        pure $ bold [formatHeading fmt
+                        (LS.identifier st)
+                        (Sequence tt')]
 
 instance ToLaTeXM Section where
 
@@ -126,24 +130,31 @@ instance ToLaTeXM Section where
 
 instance Labelable Section where
     attachLabel mLabel (Section fmt heading nodes) = do
-        (children, headingDoc, sectionID) <- 
+        (children, headingDoc) <-
             case nodes of
-                Left subsections -> do 
-                    _ <- LS.nextSupersection
-                    st <- get
-                    children' <- mapM toLaTeXM subsections
-                    put st { isSupersection = True }
-                    headingDoc       <- toLaTeXM heading
-                    put st { isSupersection = False }
-                    pure (children', headingDoc, LS.supersection st)
-                Right paragraphs -> do
-                    _ <- LS.nextSection
-                    st <- get
-                    headingDoc       <- toLaTeXM heading
+                Left paragraphs -> do -- | this is a section
+                    n <- LS.nextSection
+                    _ <- LS.insertLabel mLabel ("§ "
+                                             <> LT.pack (show n))
+                    modify (\s -> s { LS.identifier = formatSection fmt (LS.section s)
+                                    , LS.onlyOneParagraph = length paragraphs == 1
+                                    })
+                    headingDoc <- toLaTeXM heading
                     children' <- mapM toLaTeXM paragraphs
-                    pure (children', headingDoc, LS.section st)
+                    pure (children', center [headingDoc])
+                Right subsections -> do -- | this is a supersection
+                    n <- LS.nextSupersection
+                    _ <- LS.insertLabel mLabel ("Abschnitt "
+                                             <> LT.pack (show n))
+                    children' <- mapM toLaTeXM subsections
+                    modify (\s -> s { isSupersection = True
+                                    , LS.identifier = formatSection fmt (LS.supersection s)
+                                    })
+                    headingDoc <- toLaTeXM heading
+                    modify (\s -> s { isSupersection = False })
+                    pure (children', headingDoc <> linebreak)
 
-        pure $ headingDoc <> formatSection fmt sectionID (Sequence children)
+        pure $ headingDoc <> Sequence children
 
 -------------------------------- Node -----------------------------------
 
@@ -169,31 +180,34 @@ instance Labelable a => ToLaTeXM (Node a) where
 
 -------------------------------- Format -----------------------------------
 
-formatIdentifier :: IdentifierFormat -> Int -> LaTeX -> LaTeX
-formatIdentifier (FormatString []) _ _ = mempty
-formatIdentifier (FormatString (StringAtom s:rest)) i latex = 
-    Text (LT.pack s) <> formatIdentifier (FormatString rest) i latex
-formatIdentifier (FormatString (PlaceholderAtom a:rest)) i latex = 
-    ( <> formatIdentifier (FormatString rest) i latex ) $
-    case a of 
+formatIdentifier :: IdentifierFormat -> Int -> LaTeX
+formatIdentifier (FormatString []) _ = mempty
+formatIdentifier (FormatString (StringAtom s:rest)) i =
+    Text (LT.pack s) <> formatIdentifier (FormatString rest) i
+formatIdentifier (FormatString (PlaceholderAtom a:rest)) i =
+    ( <> formatIdentifier (FormatString rest) i ) $
+    case a of
         Arabic          -> Text (LT.pack $ show i)
         AlphabeticLower -> Text (LT.pack [chr (i `mod` 27 + 96)])
         AlphabeticUpper -> Text (LT.pack [chr (i `mod` 27 + 64)])
-    
 
-formatHeading :: HeadingFormat -> Int -> LaTeX -> LaTeX
+
+formatHeading :: HeadingFormat -> LaTeX -> LaTeX -> LaTeX
 formatHeading (FormatString []) _ _ = mempty
-formatHeading (FormatString (StringAtom s:rest)) i latex = 
-    Text (LT.pack s) <> formatHeading (FormatString rest) i latex
-formatHeading (FormatString (PlaceholderAtom a:rest)) i latex = 
+formatHeading (FormatString (StringAtom s:rest)) i latex =
+    Sequence (map replace s) <> formatHeading (FormatString rest) i latex
+  where
+    replace '\n' = linebreak
+    replace c    = Text (LT.pack [c])
+formatHeading (FormatString (PlaceholderAtom a:rest)) i latex =
     case a of
         HeadingTextPlaceholder -> latex <> formatHeading (FormatString rest) i latex
-        IdentifierPlaceholder  -> Text (LT.pack $ show i) <> formatHeading (FormatString rest) i latex
+        IdentifierPlaceholder  -> i <> formatHeading (FormatString rest) i latex
 
 
-formatParagraph :: ParagraphFormat -> Int -> LaTeX -> LaTeX
+formatParagraph :: ParagraphFormat -> Int -> LaTeX
 formatParagraph (ParagraphFormat x) = formatIdentifier x
 
-formatSection :: SectionFormat -> Int -> LaTeX -> LaTeX
+formatSection :: SectionFormat -> Int  -> LaTeX
 formatSection (SectionFormat x) = formatIdentifier x
 

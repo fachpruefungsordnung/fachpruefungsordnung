@@ -3,10 +3,15 @@ module Language.Ltml.ToLaTeX.LabelState (
   LabelState (..),
   nextSupersection,
   nextSection,
-  nextParagraph
+  nextParagraph,
+  insertLabel
 ) where
 
 import Control.Monad.State
+import Language.Ltml.ToLaTeX.Type (LaTeX)
+import Data.Map (Map, insert)
+import Language.Ltml.AST.Label (Label)
+import qualified Data.Text.Lazy as LT
 
 -- example structure
 data Supersection = Supersection [Int] [Section]
@@ -20,11 +25,13 @@ newtype Paragraph = Paragraph [Int]
 
 -- State for labeling
 data LabelState = LabelState
-  { supersection :: Int
-  , section :: Int
-  , paragraph :: Int
-  , onlyOneParagraph :: Bool
-  , isSupersection :: Bool
+  { supersection :: Int             -- counter for supersections
+  , section :: Int                  -- counter for sections
+  , paragraph :: Int                -- counter for paragraphs within a section
+  , onlyOneParagraph :: Bool        -- needed for sections with only one paragraphs
+  , isSupersection :: Bool          -- needed for heading
+  , identifier :: LaTeX             -- identifier for formatting
+  , labelToRef :: Map Label LT.Text -- map for labels
   } deriving Show
 
 nextSupersection :: State LabelState Int
@@ -47,6 +54,10 @@ nextParagraph = do
   let n = paragraph st + 1
   put st { paragraph = n }
   pure n
+
+insertLabel :: Maybe Label -> LT.Text -> State LabelState ()
+insertLabel mLabel ident = do
+  maybe (pure ()) (\l -> modify (\s -> s { labelToRef = insert l ident (labelToRef s) })) mLabel
 
 labelSupersection :: Supersection -> State LabelState Supersection
 labelSupersection (Supersection _ children) = do
@@ -88,6 +99,6 @@ exampleTree = Supersection [] [
 -- Run it
 main :: IO ()
 main = do
-  let initialState = LabelState 0 0 0 False False
+  let initialState = LabelState 0 0 0 False False mempty mempty 
       labeled = evalState (labelSupersection exampleTree) initialState
   print labeled

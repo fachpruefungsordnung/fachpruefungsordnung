@@ -82,7 +82,7 @@ sectionT =
 paragraphT :: ParagraphType
 paragraphT =
     ParagraphType
-        (ParagraphFormat $ FormatString [PlaceholderAtom Arabic])
+        (ParagraphFormat $ FormatString [StringAtom "(", PlaceholderAtom Arabic, StringAtom ")"])
         richTextT
 
 plainTextT :: TextType Void

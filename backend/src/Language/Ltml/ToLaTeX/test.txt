@@ -4,8 +4,7 @@
 
 This paragraph is in {:sectiona} in super-section {:main}.
 
-This is another paragraph in {:sectiona}.
-Paragraphs don't have keywords and are just separated by empty lines.
+The next paragraph is {:sectionb}.
 
 §{sectionb} Another section, with a title
   spanning

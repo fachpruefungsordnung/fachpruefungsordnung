@@ -10,22 +10,23 @@ module Language.Ltml.ToLaTeX.Type (
     footnote,
     label, 
     ref, 
-    -- section,
-    -- paragraph,
+    paragraph,
+    large,
+    linebreak,
     enumerate,
     itemize,
     center
 ) where
 
 import qualified Data.Text.Lazy as LT
+import Language.Ltml.AST.Label (Label)
 
 data LaTeX
   = Text LT.Text
+  | Raw LT.Text                                -- raw unescaped LaTeX
+  | MissingRef Label
   | Command LT.Text [LT.Text] [LaTeX]          -- \command[opts]{args}
   | Environment LT.Text [LT.Text] [LaTeX]      -- \begin{env}[opts] ... \end{env}
-  | Raw LT.Text                                -- raw unescaped LaTeX
-  -- | LaTeXSection (Maybe Label) [Int] LaTeX [LaTeX]   -- type to define sections outside of latex
-  -- | LaTeXParagraph (Maybe Label) [Int] [LaTeX] -- type to define paragraphs outside of latex
   | Sequence [LaTeX]                           -- concatenation
   deriving (Show, Eq)
 
@@ -80,11 +81,14 @@ label l = Command "label" [] [Text l]
 ref :: LT.LazyText -> LaTeX
 ref r = Command "ref" [] [Text r]
 
--- section :: Maybe Label -> [Int] -> LaTeX -> [LaTeX] -> LaTeX
--- section = LaTeXSection
+paragraph :: LaTeX -> LaTeX -> LaTeX
+paragraph identifier content = Environment "tabularx" [] [Raw "{\\linewidth}{@{}lX@{}}", Sequence [identifier, Raw " & ", content]]
 
--- paragraph :: Maybe Label -> [Int] -> [LaTeX] -> LaTeX
--- paragraph = LaTeXParagraph
+large :: LaTeX -> LaTeX
+large content = Raw "{\\Large " <> content <> Raw "}"
+
+linebreak :: LaTeX
+linebreak = Raw "\\\\"
 
 -------------------------------------------------------------------------------
 {-                              environments                                 -}

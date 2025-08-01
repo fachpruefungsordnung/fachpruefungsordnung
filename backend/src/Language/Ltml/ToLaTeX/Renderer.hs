@@ -8,13 +8,16 @@ import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as B
 import Language.Ltml.ToLaTeX.Type
 import Data.Int (Int64)
+import Data.Map (Map, findWithDefault)
+import Language.Ltml.AST.Label (Label)
 
-renderLaTeX :: LaTeX -> LT.Text
-renderLaTeX = B.toLazyText . go 0
+renderLaTeX :: Map Label LT.Text -> LaTeX -> LT.Text
+renderLaTeX m = B.toLazyText . go 0
   where
     go :: Int64 -> LaTeX -> B.Builder
-    go _ (Text t)      = escape t
-    go _ (Raw t)       = B.fromLazyText t
+    go _ (Text t)       = escape t
+    go _ (Raw t)        = B.fromLazyText t
+    go _ (MissingRef l) = B.fromLazyText (findWithDefault "refnotfound" l m)
     go n (Command name opts args) =
       "\\" <> B.fromLazyText name
            <> renderOpts opts
