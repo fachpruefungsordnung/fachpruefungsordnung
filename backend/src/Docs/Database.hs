@@ -1,6 +1,7 @@
 module Docs.Database
     ( HasCheckPermission (..)
     , HasIsGroupAdmin (..)
+    , HasIsSuperAdmin (..)
     , HasExistsDocument (..)
     , HasExistsTextElement (..)
     , HasExistsTextRevision (..)
@@ -50,6 +51,9 @@ class (Monad m) => HasCheckPermission m where
 class (Monad m) => HasIsGroupAdmin m where
     isGroupAdmin :: UserID -> GroupID -> m Bool
 
+class (Monad m) => HasIsSuperAdmin m where
+    isSuperAdmin :: UserID -> m Bool
+
 -- exists
 
 class (Monad m) => HasExistsDocument m where
@@ -66,9 +70,10 @@ class (HasExistsDocument m) => HasExistsTreeRevision m where
 
 -- get
 
-class (HasCheckPermission m) => HasGetDocument m where
+class (HasCheckPermission m, HasIsGroupAdmin m, HasIsSuperAdmin m) => HasGetDocument m where
     getDocument :: DocumentID -> m (Maybe Document)
     getDocuments :: UserID -> m (Vector Document)
+    getDocumentsBy :: Maybe UserID -> Maybe GroupID -> m (Vector Document)
 
 class (HasCheckPermission m, HasExistsTreeRevision m) => HasGetTreeRevision m where
     getTreeRevision :: TreeRevisionRef -> m (TreeRevision TextElement)

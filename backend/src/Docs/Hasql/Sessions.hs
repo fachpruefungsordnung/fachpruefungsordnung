@@ -2,6 +2,7 @@ module Docs.Hasql.Sessions
     ( createDocument
     , getDocument
     , getDocuments
+    , getDocumentsBy
     , createTextElement
     , createTextRevision
     , getTextElementRevision
@@ -83,6 +84,9 @@ getDocument = (`statement` Statements.getDocument)
 
 getDocuments :: UserID -> Session (Vector Document)
 getDocuments = (`statement` Statements.getDocuments)
+
+getDocumentsBy :: Maybe UserID -> Maybe GroupID -> Session (Vector Document)
+getDocumentsBy = curry (`statement` Statements.getDocumentsBy)
 
 createTextElement :: DocumentID -> TextElementKind -> Session TextElement
 createTextElement = curry (`statement` Statements.createTextElement)

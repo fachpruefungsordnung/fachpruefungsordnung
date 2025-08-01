@@ -47,6 +47,7 @@ import Docs.Database
     , HasGetTreeHistory
     , HasGetTreeRevision
     , HasIsGroupAdmin
+    , HasIsSuperAdmin
     )
 import qualified Docs.Database as DB
 import Docs.Document (Document, DocumentID)
@@ -78,6 +79,7 @@ import GHC.Int (Int32)
 
 data Error
     = NoPermission DocumentID Permission
+    | NoPermissionForUser UserID
     | NoPermissionInGroup GroupID
     | DocumentNotFound DocumentID
     | TextElementNotFound TextElementRef
@@ -111,11 +113,20 @@ getDocument userID docID = runExceptT $ do
     document <- lift $ DB.getDocument docID
     maybe (throwError $ DocumentNotFound docID) pure document
 
+-- | Gets all documents visible by the user
+--   OR all documents by the specified group and / or user
 getDocuments
     :: (HasGetDocument m)
     => UserID
+    -> Maybe UserID
+    -> Maybe GroupID
     -> m (Result (Vector Document))
-getDocuments userID = Right <$> DB.getDocuments userID
+getDocuments userID byUserID byGroupID = case (byUserID, byGroupID) of
+    (Nothing, Nothing) -> Right <$> DB.getDocuments userID
+    _ -> runExceptT $ do
+        maybe (pure ()) (guardUserRights userID) byUserID
+        maybe (pure ()) (`guardGroupAdmin` userID) byGroupID
+        lift $ DB.getDocumentsBy byUserID byGroupID
 
 createTextElement
     :: (HasCreateTextElement m)
@@ -260,6 +271,16 @@ guardGroupAdmin groupID userID = do
     hasPermission <- lift $ DB.isGroupAdmin userID groupID
     unless hasPermission $
         throwError (NoPermissionInGroup groupID)
+
+guardUserRights
+    :: (HasIsSuperAdmin m)
+    => UserID
+    -> UserID
+    -> ExceptT Error m ()
+guardUserRights userID forUserID = do
+    superAdmin <- lift $ DB.isSuperAdmin userID
+    unless (userID == forUserID || superAdmin) $
+        throwError (NoPermissionForUser forUserID)
 
 guardExistsDocument
     :: (HasExistsDocument m)

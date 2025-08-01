@@ -19,6 +19,8 @@ import Hasql.Transaction.Sessions
 
 import Docs.Database
 
+import qualified UserManagement.Sessions as UserSessions
+
 import qualified Docs.Hasql.Sessions as Sessions
 import qualified Docs.Hasql.Transactions as Transactions
 
@@ -39,6 +41,9 @@ instance HasCheckPermission HasqlSession where
 instance HasIsGroupAdmin HasqlSession where
     isGroupAdmin = (HasqlSession .) . Sessions.isGroupAdmin
 
+instance HasIsSuperAdmin HasqlSession where
+    isSuperAdmin = HasqlSession . UserSessions.checkSuperadmin
+
 -- exists
 
 instance HasExistsDocument HasqlSession where
@@ -58,6 +63,7 @@ instance HasExistsTreeRevision HasqlSession where
 instance HasGetDocument HasqlSession where
     getDocument = HasqlSession . Sessions.getDocument
     getDocuments = HasqlSession . Sessions.getDocuments
+    getDocumentsBy = (HasqlSession .) . Sessions.getDocumentsBy
 
 instance HasGetTreeRevision HasqlSession where
     getTreeRevision = HasqlSession . Sessions.getTreeRevision
