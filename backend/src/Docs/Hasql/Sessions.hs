@@ -76,8 +76,9 @@ existsTextRevision = flip statement Statements.existsTextRevision
 existsTreeRevision :: TreeRevisionRef -> Session Bool
 existsTreeRevision = flip statement Statements.existsTreeRevision
 
-createDocument :: Text -> GroupID -> Session Document
-createDocument = curry (`statement` Statements.createDocument)
+createDocument :: Text -> GroupID -> UserID -> Session Document
+createDocument name group user =
+    statement (name, group, user) Statements.createDocument
 
 getDocument :: DocumentID -> Session (Maybe Document)
 getDocument = (`statement` Statements.getDocument)

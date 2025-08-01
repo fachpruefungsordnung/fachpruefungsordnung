@@ -101,7 +101,7 @@ createDocument
     -> m (Result Document)
 createDocument userID groupID title = runExceptT $ do
     guardGroupAdmin groupID userID
-    lift $ DB.createDocument title groupID
+    lift $ DB.createDocument title groupID userID
 
 getDocument
     :: (HasGetDocument m)

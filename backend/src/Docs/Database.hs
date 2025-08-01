@@ -97,7 +97,7 @@ class (HasCheckPermission m, HasExistsDocument m) => HasGetDocumentHistory m whe
 -- create
 
 class (HasIsGroupAdmin m) => HasCreateDocument m where
-    createDocument :: Text -> GroupID -> m Document
+    createDocument :: Text -> GroupID -> UserID -> m Document
 
 class (HasCheckPermission m, HasExistsDocument m) => HasCreateTextElement m where
     createTextElement :: DocumentID -> TextElementKind -> m TextElement

@@ -83,7 +83,7 @@ instance HasGetDocumentHistory HasqlSession where
 -- create
 
 instance HasCreateDocument HasqlSession where
-    createDocument = (HasqlSession .) . Sessions.createDocument
+    createDocument = ((HasqlSession .) .) . Sessions.createDocument
 
 instance HasCreateTextElement HasqlSession where
     createTextElement = (HasqlSession .) . Sessions.createTextElement
