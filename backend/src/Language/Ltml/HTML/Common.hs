@@ -21,7 +21,7 @@ import Lucid (Html)
 -- | The Reader Monad is used for local tracking (e.g. enumNestingLevel).
 --   The State Monad is used for global tracking (e.g. sectionIDs).
 --   The Delayed type is used for delaying the actual lookup of references in the GlobalState.
---   This allows forward references, because at first a big delayed object is build,
+--   This allows forward references, because at first a delayed object is build,
 --   which is then evaluated aterwards with the final GlobalState.
 type HtmlReaderState =
     ReaderT ReaderState (State GlobalState) (Delayed (Html ()))

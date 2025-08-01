@@ -1,7 +1,9 @@
-module Language.Ltml.HTML.Util (intToLower, intToCapital, whenJust, convertNewLine) where
+{-# LANGUAGE FlexibleContexts #-}
+module Language.Ltml.HTML.Util (intToLower, intToCapital, whenJust, convertNewLine, (<#>)) where
 
 import Data.Char (chr)
 import Lucid
+import Language.Ltml.HTML.CSS.Classes as Class
 
 -- | Converts Int to corresponding lowercase letter in the alphabet.
 --   If Int is (<= 0) or (>= 27), it returns "?"
@@ -33,7 +35,13 @@ whenJust ma fa = maybe (pure ()) fa ma
 convertNewLine :: String -> Html ()
 convertNewLine [] = mempty
 convertNewLine s =
-    let (raw, newLine) = break (== '\n') s 
+    let (raw, newLine) = break (== '\n') s
         in case newLine of
         [] -> toHtml raw
         (_:next) -> toHtml raw <> br_ [] <> convertNewLine next
+
+-------------------------------------------------------------------------------
+
+-- | Constructs HTML element with given Class 
+(<#>) :: ([Attributes] -> t) -> Class -> t
+htmlFunc <#> cssClass = htmlFunc [class_ (Class.className cssClass)]

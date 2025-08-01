@@ -14,7 +14,6 @@ import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
 import Data.Void (Void)
-import Language.Ltml.HTML.Util
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.Label
 import Language.Ltml.AST.Node
@@ -26,6 +25,7 @@ import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.Common
 import Language.Ltml.HTML.FormatString
 import Language.Ltml.HTML.References
+import Language.Ltml.HTML.Util
 import Lucid
 import Prelude hiding (id)
 
@@ -71,7 +71,7 @@ instance ToHtmlM (Node Section) where
         let sectionIDHtml = sectionFormat format (currentSectionID globalState)
          in do
                 sectionHtml <- local (\s -> s {currentSectionIDHtml = sectionIDHtml}) $ do
-                    whenJust mLabel (\l -> addLabelToState l SectionRef)
+                    addMaybeLabelToState mLabel SectionRef
                     headingHtml <- toHtmlM heading
                     childrenHtml <- case children of
                         Right cs -> toHtmlM cs
@@ -84,7 +84,7 @@ instance ToHtmlM (Node Section) where
                 -- \| reset paragraphID for next section
                 modify (\s -> s {currentParagraphID = 1})
 
-                return $ div_ <$> sectionHtml
+                return $ div_ <#> Class.Section <$> sectionHtml
 
 -- | Instance for Heading of a Section
 instance ToHtmlM Heading where
@@ -92,7 +92,7 @@ instance ToHtmlM Heading where
         headingTextHtml <- toHtmlM textTree
         readerState <- ask
         return
-            ( h4_ [class_ (Class.className Class.Centered)]
+            ( (h4_ <#> Class.Heading)
                 . headingFormat format (currentSectionIDHtml readerState)
                 <$> headingTextHtml
             )
@@ -103,18 +103,17 @@ instance ToHtmlM (Node Paragraph) where
         let (paragraphIDHtml, mParagraphIDRawHtml) = paragraphFormat format (currentParagraphID globalState)
          in do
                 childText <- local (\s -> s {mCurrentParagraphIDHtml = mParagraphIDRawHtml}) $ do
-                    whenJust mLabel (\l -> addLabelToState l ParagraphRef)
+                    addMaybeLabelToState mLabel ParagraphRef
                     toHtmlM textTrees
                 modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
                 -- \| Reset sentence id for next paragraph
                 modify (\s -> s {currentSentenceID = 0})
                 readerState <- ask
                 return $
-                    div_ [class_ (Class.className Class.Paragraph)]
-                                 -- \| If this is the only paragraph inside this section we drop the visible paragraphID
+                    div_ <#> Class.Paragraph
+                        -- \| If this is the only paragraph inside this section we drop the visible paragraphID
                         <$> let idHtml = if isSingleParagraph readerState then mempty else paragraphIDHtml
-                               in
-                                return (div_ [class_ (Class.className Class.ParagraphID)] idHtml) <> div_ <$> childText
+                             in return (div_ <#> Class.ParagraphID $ idHtml) <> div_ <#> Class.ParagraphText <$> childText
 
 instance
     (ToHtmlStyle style, ToHtmlM enum, ToHtmlM special)
@@ -128,7 +127,7 @@ instance
             case lookup (unLabel label) $ labels globalState of
                 -- \| Label was not found in GlobalState and a red error is emitted
                 Nothing ->
-                    b_ [class_ (Class.className Class.FontRed)] $
+                    b_ <#> Class.FontRed $
                         toHtml (("Error: Label \"" <> unLabel label <> "\" not found!") :: Text)
                 Just labelHtml -> labelHtml
         Styled style textTrees -> do
@@ -137,14 +136,14 @@ instance
         Enum enum -> toHtmlM enum
         Footnote _ ->
             returnNow $
-                b_ [class_ (Class.className Class.FontRed)] $
+                b_ <#> Class.FontRed $
                     toHtml ("Error: FootNotes not supported yet" :: Text)
 
 -- | Increment sentence counter and add Label to GlobalState, if there is one
 instance ToHtmlM SentenceStart where
     toHtmlM (SentenceStart mLabel) = do
         modify (\s -> s {currentSentenceID = currentSentenceID s + 1})
-        maybe (return ()) (\l -> addLabelToState l SentenceRef) mLabel
+        addMaybeLabelToState mLabel SentenceRef
         returnNow mempty
 
 class ToHtmlStyle style where
@@ -153,7 +152,7 @@ class ToHtmlStyle style where
 instance ToHtmlStyle FontStyle where
     toHtmlStyle Bold = b_
     toHtmlStyle Italics = i_
-    toHtmlStyle Underlined = span_ [class_ (Class.className Class.Underlined)]
+    toHtmlStyle Underlined = span_ <#> Class.Underlined
 
 instance ToHtmlM Enumeration where
     toHtmlM (Enumeration enumItems) = do
@@ -165,7 +164,7 @@ instance ToHtmlM Enumeration where
         return $ do
             nestedHtml <- sequence nested
             let enumItemsHtml = foldr ((>>) . li_) (mempty :: Html ()) nestedHtml
-             in return $ ol_ [class_ $ enumLevel (enumNestingLevel readerState)] enumItemsHtml
+             in return $ ol_ <#> enumLevel (enumNestingLevel readerState) $ enumItemsHtml
 
 instance ToHtmlM EnumItem where
     toHtmlM (EnumItem textTrees) = toHtmlM textTrees

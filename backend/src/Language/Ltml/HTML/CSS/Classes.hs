@@ -7,19 +7,24 @@ module Language.Ltml.HTML.CSS.Classes (Class (..), className, classStyle, enumLe
 
 import Clay
 import qualified Clay.Flexbox as Flexbox
+import Data.Char (toLower)
 import Data.String (fromString)
-import Data.Text (Text, unpack)
+import Data.Text (Text, pack, unpack)
 import Language.Ltml.HTML.CSS.CustomClay
 
 data Class
-    = -- | Class for spacing and aligning a paragraph div
+    = -- | Class for spacing and alignment of and inside of a section
+      Section
+    | -- | Class for spacing and alignment of a heading (h4 / h5)
+      Heading
+    | -- | Class for spacing and alignment of a paragraph div
       Paragraph
-    | -- | Class for aligning a paragraph id div inside of a pragraph div
+    | -- | Class for aligning a paragraph id div inside of a paragraph div
       ParagraphID
+    | -- | Class for aligning the text inside a paragraph
+      ParagraphText
     | -- | Underlining basic text
       Underlined
-    | -- | Centered text
-      Centered
     | -- | Font color red
       FontRed
     | -- | Enum with 1., 2., 3., ...
@@ -30,26 +35,27 @@ data Class
       EnumCharCharPar
     | -- | Enum for errors
       EnumFail
-    deriving (Eq, Enum, Bounded)
-
--- | Returns the html class name of given Class
-className :: Class -> Text
-className Paragraph = "paragraph"
-className ParagraphID = "paragraphID"
-className Underlined = "underlined"
-className Centered = "centered"
-className FontRed = "fontRed"
-className EnumNum = "enumNum"
-className EnumCharPar = "enumCharPar"
-className EnumCharCharPar = "enumCharCharPar"
-className EnumFail = "enumFail"
+    deriving (Show, Eq, Enum, Bounded)
 
 -- | maps Class to its css style definition
 classStyle :: Class -> Css
-classStyle Paragraph = toClassSelector Paragraph ? display flex
+classStyle Section =
+    toClassSelector Section ? do
+        display block
+        marginTop (em 2)
+classStyle Heading =
+    toClassSelector Heading ? do
+        textAlign center
+        fontWeight bold
+        marginBottom (em 0)
+classStyle Paragraph =
+    toClassSelector Paragraph ? do
+        display flex
+        marginTop (em 1)
+        marginBottom (em 1)
 classStyle ParagraphID = toClassSelector ParagraphID ? Flexbox.flex 0 0 (em 2)
+classStyle ParagraphText = toClassSelector ParagraphText ? textAlign justify
 classStyle Underlined = toClassSelector Underlined ? textDecoration underline
-classStyle Centered = toClassSelector Centered ? textAlign center
 classStyle FontRed = toClassSelector FontRed ? fontColor red
 classStyle EnumNum =
     enumCounter
@@ -63,6 +69,12 @@ classStyle EnumCharCharPar =
         (counterChar "item" <> counterChar "item" <> stringCounter ") ")
 classStyle EnumFail = enumCounter (className EnumFail) (stringCounter "x. ")
 
+-- | Returns the html class name of given Class
+className :: Class -> Text
+className cssClass = case show cssClass of
+    [] -> error "CSS Class has \"\" as show instance!"
+    (c : cs) -> pack $ toLower c : cs
+
 -- | converts Class to Clay Selector and adds "." infront for css selection
 toClassSelector :: Class -> Selector
 toClassSelector c = fromString ("." ++ unpack (className c))
@@ -70,8 +82,8 @@ toClassSelector c = fromString ("." ++ unpack (className c))
 -------------------------------------------------------------------------------
 
 -- | Example Enumertion Levels for an FPO
-enumLevel :: Int -> Text
-enumLevel i = className $ case i of
+enumLevel :: Int -> Class
+enumLevel i = case i of
     0 -> EnumNum
     1 -> EnumCharPar
     2 -> EnumCharCharPar

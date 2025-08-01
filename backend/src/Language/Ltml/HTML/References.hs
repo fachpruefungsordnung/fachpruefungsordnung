@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Ltml.HTML.References (ReferenceType (..), addLabelToState) where
+module Language.Ltml.HTML.References (ReferenceType (..), addMaybeLabelToState) where
 
 import Control.Monad.Reader
 import Control.Monad.State
@@ -9,6 +9,7 @@ import Language.Ltml.AST.Label (Label (unLabel))
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.Common
 import Lucid
+import Language.Ltml.HTML.Util
 
 data ReferenceType
     = -- | Reference to a super-section, displayed as "Abschnitt i"
@@ -36,8 +37,7 @@ genReference ref = do
              in case mParagraphIDText of
                     Nothing ->
                         return $
-                            b_
-                                [class_ (Class.className Class.FontRed)]
+                            b_ <#> Class.FontRed $ 
                                 "Error: Labeled paragraph does not have any identifier!"
                     Just paragraphIDHtml -> do
                         sectionRef <- genReference SectionRef
@@ -50,11 +50,13 @@ genReference ref = do
 
 -- TODO: define Trie Map in GlobalState to track label references
 
--- | Generates Reference String as Html and adds (Label, Html) pair to GlobalState
+-- | If (Just label): generates reference String as Html and adds (Label, Html) pair to GlobalState;
+--   else: does nothing;
 --   This function heavily relies on the GlobalState context.
 --   Especially the referenced scope must be evaluated (e.g. the currentSectionIDHtml must be set)
-addLabelToState
-    :: Label -> ReferenceType -> ReaderT ReaderState (State GlobalState) ()
-addLabelToState label ref = do
-    referenceHtml <- genReference ref
-    modify (\s -> s {labels = (unLabel label, referenceHtml) : labels s})
+addMaybeLabelToState :: Maybe Label -> ReferenceType -> ReaderT ReaderState (State GlobalState) ()
+addMaybeLabelToState mLabel ref = case mLabel of 
+    Nothing -> return ()
+    Just label -> do
+        referenceHtml <- genReference ref
+        modify (\s -> s {labels = (unLabel label, referenceHtml) : labels s})
