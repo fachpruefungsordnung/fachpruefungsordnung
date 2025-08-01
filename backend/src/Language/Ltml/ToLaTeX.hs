@@ -89,13 +89,13 @@ instance Labelable Paragraph where
 -------------------------------- Section -----------------------------------
 instance ToLaTeX Heading where
 
-    toLaTeX (Heading _ tt) = section (map toLaTeX tt)
+    toLaTeX (Heading _ tt) = Command "section" [] (map toLaTeX tt)
 
 instance ToLaTeX Section where
 
     toLaTeX (Section _ heading eNodes) = either makeSection makeSection eNodes
       where 
-        makeSection nodes = section [toLaTeX heading]
+        makeSection nodes = Command "section" [] [toLaTeX heading]
                          <> Sequence (map toLaTeX nodes)
 
 instance Labelable Section where

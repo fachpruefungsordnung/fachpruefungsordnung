@@ -10,22 +10,23 @@ module Language.Ltml.ToLaTeX.Type (
     footnote,
     label, 
     ref, 
-    section,
-    labelledSection,
-    subsection,
-    labelledSubsection,
+    -- section,
+    -- paragraph,
     enumerate,
-    itemize
+    itemize,
+    center
 ) where
 
 import qualified Data.Text.Lazy as LT
 
 data LaTeX
   = Text LT.Text
-  | Command LT.Text [LT.Text] [LaTeX]     -- \command[opts]{args}
-  | Environment LT.Text [LT.Text] [LaTeX] -- \begin{env}[opts] ... \end{env}
-  | Raw LT.Text                           -- raw unescaped LaTeX
-  | Sequence [LaTeX]                      -- concatenation
+  | Command LT.Text [LT.Text] [LaTeX]          -- \command[opts]{args}
+  | Environment LT.Text [LT.Text] [LaTeX]      -- \begin{env}[opts] ... \end{env}
+  | Raw LT.Text                                -- raw unescaped LaTeX
+  -- | LaTeXSection (Maybe Label) [Int] LaTeX [LaTeX]   -- type to define sections outside of latex
+  -- | LaTeXParagraph (Maybe Label) [Int] [LaTeX] -- type to define paragraphs outside of latex
+  | Sequence [LaTeX]                           -- concatenation
   deriving (Show, Eq)
 
 -- | We want to be able to connect LaTeX structures and avoid deeply rooted sequences.
@@ -79,17 +80,11 @@ label l = Command "label" [] [Text l]
 ref :: LT.LazyText -> LaTeX
 ref r = Command "ref" [] [Text r]
 
-section :: [LaTeX] -> LaTeX
-section = Command "section" []
+-- section :: Maybe Label -> [Int] -> LaTeX -> [LaTeX] -> LaTeX
+-- section = LaTeXSection
 
-labelledSection :: LT.Text -> [LaTeX] -> LaTeX
-labelledSection l title = Sequence [section title, label l]
-
-subsection :: [LaTeX] -> LaTeX
-subsection = Command "subsection" []
-
-labelledSubsection :: LT.Text -> [LaTeX] -> LaTeX
-labelledSubsection l title = Sequence [subsection title, label l]
+-- paragraph :: Maybe Label -> [Int] -> [LaTeX] -> LaTeX
+-- paragraph = LaTeXParagraph
 
 -------------------------------------------------------------------------------
 {-                              environments                                 -}
@@ -99,5 +94,8 @@ enumerate items = Environment "enumerate" [] (map (\i -> Command "item" [] [i]) 
 
 itemize :: [LaTeX] -> LaTeX
 itemize items = Environment "itemize" [] (map (\i -> Command "item" [] [i]) items)
+
+center :: [LaTeX] -> LaTeX
+center = Environment "center" []
 
 
