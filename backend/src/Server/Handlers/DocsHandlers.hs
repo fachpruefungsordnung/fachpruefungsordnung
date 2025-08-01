@@ -79,7 +79,10 @@ import Server.DTOs.CreateTextElement (CreateTextElement)
 import qualified Server.DTOs.CreateTextElement as CreateTextElement
 import Server.DTOs.CreateTextRevision (CreateTextRevision)
 import qualified Server.DTOs.CreateTextRevision as CreateTextRevision
-import Server.DTOs.Documents (Documents (Documents))
+import Server.DTOs.Documents
+    ( Documents (Documents)
+    , DocumentsQuery (DocumentsQuery)
+    )
 import qualified Server.DTOs.Documents as Documents
 import UserManagement.Group (GroupID)
 
@@ -236,6 +239,11 @@ getDocumentsHandler auth byUserID byGroupID = do
     return $
         Documents
             { Documents.documents = result
+            , Documents.query =
+                DocumentsQuery
+                    { Documents.user = byUserID
+                    , Documents.group = byGroupID
+                    }
             }
 
 postTextElementHandler
