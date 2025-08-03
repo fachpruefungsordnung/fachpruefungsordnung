@@ -1,4 +1,13 @@
 -- | Overview of Members belonging to a Group.
+-- |
+-- | TODO: We distinct between group-/superadmins and normal members here, but
+-- |       normal members do not have any access to this page and get 404 immediately.
+-- |       The mockup explicitly shows that normal members can see the this page, but
+-- |       no dropdown to change member roles (reasonable, since they might want to
+-- |       view the members of their group, or whatever). Though, there is no way
+-- |       to access this page for normal members. We may want to allow normal group
+-- |       members to see the list of groups they are in, and thus allow them to
+-- |       access this page.
 
 module FPO.Page.Admin.Group.MemberOverview (component) where
 
@@ -30,7 +39,7 @@ import FPO.Dto.GroupDto
   , getUserInfoRole
   , lookupUser
   )
-import FPO.Dto.UserDto (Role(..), UserID, isUserSuperadmin)
+import FPO.Dto.UserDto (Role(..), UserID, isAdminOf, isUserSuperadmin)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn)
@@ -357,8 +366,17 @@ component =
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
+      s <- H.get
       u <- liftAff $ getUser
-      H.modify_ _ { isAdmin = fromMaybe false $ isUserSuperadmin <$> u }
+      -- Superadmins are considered admins of all groups. We could also change this
+      -- such that superadmins (notice that only they can create groups) are admins
+      -- of any group they created, and they can demote themselves to members (forever
+      -- losing the admin role, until someone else promotes them again). Not sure if
+      -- this is useful.
+      H.modify_ _
+        { isAdmin = fromMaybe false $
+            (\usr -> usr `isAdminOf` s.groupID || isUserSuperadmin usr) <$> u
+        }
       handleAction ReloadGroupMembers
       handleAction $ FilterForMember ""
     Receive { context } -> do

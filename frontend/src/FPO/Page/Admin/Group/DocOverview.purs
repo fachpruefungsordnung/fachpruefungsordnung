@@ -22,7 +22,7 @@ import Data.Array (filter, head, length, null, replicate, slice, (:))
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
 import Data.Foldable (foldr)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
@@ -35,9 +35,9 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request
   ( createNewDocument
   , deleteIgnore
+  , getAuthorizedUser
   , getDocumentsQueryFromURL
   , getGroup
-  , getUser
   )
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
@@ -53,7 +53,6 @@ import FPO.Dto.DocumentDto
   , getNDHName
   )
 import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName)
-import FPO.Dto.UserDto (isUserSuperadmin)
 import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -440,15 +439,16 @@ component =
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
-      u <- liftAff $ getUser
-      when (fromMaybe true (not <$> isUserSuperadmin <$> u)) $
+      s <- H.get
+      u <- H.liftAff $ getAuthorizedUser s.groupID
+      when (isNothing u) $ do
         navigate Page404
+
       now <- H.liftEffect nowDateTime
       H.modify_ _
         { documents = []
         , currentTime = Just now
         }
-      s <- H.get
       documents <- liftAff
         (getDocumentsQueryFromURL ("/docs?group=" <> show s.groupID))
       case documents of

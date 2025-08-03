@@ -37,6 +37,12 @@ getUserID (FullUserDto u) = u.fullUserID
 isUserSuperadmin :: FullUserDto -> Boolean
 isUserSuperadmin (FullUserDto u) = u.fullUserIsSuperadmin
 
+-- | Checks if the user is admin of at least one group, or even a superadmin.
+isAdmin :: FullUserDto -> Boolean
+isAdmin (FullUserDto u) = u.fullUserIsSuperadmin || any
+  (\role -> getUserRole role == Admin)
+  u.fullUserRoles
+
 -- | Checks if the user is an admin of a specific group.
 -- | Returns `true` if the user is an admin of the group with the given ID,
 -- | detached from the superadmin state of the user.

@@ -11,11 +11,17 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import FPO.Components.UI.UserFilter as Filter
 import FPO.Components.UI.UserList as UserList
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (changeRole, getGroup, getStatusCode, getUser, removeUser)
+import FPO.Data.Request
+  ( changeRole
+  , getAuthorizedUser
+  , getGroup
+  , getStatusCode
+  , removeUser
+  )
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName, isUserInGroup)
-import FPO.Dto.UserDto (Role(..), isAdminOf, isUserSuperadmin)
+import FPO.Dto.UserDto (Role(..))
 import FPO.Dto.UserOverviewDto (getID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -101,19 +107,15 @@ component =
   handleAction = case _ of
     Initialize -> do
       s <- H.get
-      u <- H.liftAff $ getUser
+      u <- H.liftAff $ getAuthorizedUser s.groupID
       case u of
         Nothing -> do
           navigate Page404
-        Just user -> do
-          if isUserSuperadmin user || user `isAdminOf` s.groupID then do
-            handleAction ReloadGroup
-            -- User is either a superadmin or an admin of the group,
-            -- so we can proceed to load the group and user list.
-            H.tell _userlist unit UserList.ReloadUsersQ
-          else
-            -- User is not authorized to view this page, redirect to 404.
-            navigate Page404
+        Just _ -> do
+          handleAction ReloadGroup
+          -- User is either a superadmin or an admin of the group,
+          -- so we can proceed to load the group and user list.
+          H.tell _userlist unit UserList.ReloadUsersQ
     Receive { context, input } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
 

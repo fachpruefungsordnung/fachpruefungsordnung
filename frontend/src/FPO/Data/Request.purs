@@ -12,12 +12,16 @@ import Affjax.RequestHeader (RequestHeader(RequestHeader))
 import Affjax.ResponseFormat (ResponseFormat)
 import Affjax.ResponseFormat (blob, document, ignore, json, string) as AXRF
 import Affjax.StatusCode (StatusCode(..))
+import Control.Alternative (guard)
+import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Data.Argonaut (JsonDecodeError, decodeJson, encodeJson)
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode.Decoders (decodeArray)
+import Data.Array (catMaybes)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
+import Data.Traversable (traverse)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff as Exn
@@ -32,8 +36,22 @@ import FPO.Dto.DocumentDto
   , DocumentQuery
   , NewDocumentHeader
   )
-import FPO.Dto.GroupDto (GroupCreate, GroupDto, GroupID, GroupOverview)
-import FPO.Dto.UserDto (FullUserDto, Role, UserID)
+import FPO.Dto.GroupDto
+  ( GroupCreate
+  , GroupDto
+  , GroupID
+  , GroupOverview
+  , demoteToGroupOverview
+  )
+import FPO.Dto.UserDto
+  ( FullUserDto
+  , Role
+  , UserID
+  , getUserRoleGroupID
+  , getUserRoles
+  , isAdminOf
+  , isUserSuperadmin
+  )
 import Foreign (renderForeignError)
 import Web.DOM.Document (Document)
 import Web.File.Blob (Blob)
@@ -99,9 +117,39 @@ getFromJSONEndpoint decode url = do
 getUser :: Aff (Maybe FullUserDto)
 getUser = getFromJSONEndpoint decodeJson "/me"
 
--- | Fetches the groups of the current user from the server.
+-- | Fetches the authorized user for a specific group.
+-- | Returns Nothing if the user is not existing or not authorized.
+getAuthorizedUser :: GroupID -> Aff (Maybe FullUserDto)
+getAuthorizedUser groupID = runMaybeT do
+  x <- MaybeT (liftAff getUser)
+  guard (isUserSuperadmin x || x `isAdminOf` groupID)
+    $> x
+
+-- | If the user is a superadmin, it fetches all groups.
 getGroups :: Aff (Maybe (Array GroupOverview))
 getGroups = getFromJSONEndpoint (decodeArray decodeJson) "/groups"
+
+-- | Fetches all groups the user can access. For superadmins, this returns all groups.
+-- | For non-superadmins, it returns only the groups they are admin of.
+-- |
+-- | TODO: This should(?) fail if a nonempty subset of groups cannot be fetched!
+-- | TODO: Lots of requests might be made, we should consider adding another
+-- |       endpoint that returns all groups the user is admin of. This would
+-- |       be more efficient. See issue #303.
+getUserGroups :: Aff (Maybe (Array GroupOverview))
+getUserGroups = do
+  user <- getUser
+  case user of
+    Just u | isUserSuperadmin u -> getGroups
+    Just u -> do
+      let groupIDs = map getUserRoleGroupID (getUserRoles u)
+      groups <- traverse
+        (\id -> getFromJSONEndpoint decodeJson ("/groups/" <> show id))
+        groupIDs
+      pure $ Just
+        $ map demoteToGroupOverview
+        $ catMaybes groups
+    Nothing -> pure Nothing
 
 -- | Fetches a specific group by its ID.
 getGroup :: GroupID -> Aff (Maybe GroupDto)

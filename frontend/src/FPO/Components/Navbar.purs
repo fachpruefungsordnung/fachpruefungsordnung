@@ -16,7 +16,7 @@ import FPO.Data.Request (getIgnore, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (saveLanguage)
 import FPO.Data.Store as Store
-import FPO.Dto.UserDto (FullUserDto, getUserName, isUserSuperadmin)
+import FPO.Dto.UserDto (FullUserDto, getUserName, isAdmin, isUserSuperadmin)
 import FPO.Translations.Translator
   ( FPOTranslator(..)
   , fromFpoTranslator
@@ -95,30 +95,29 @@ navbar = connect (selectEq identity) $ H.mkComponent
                       [ navButton "Editor" (Editor { docID: 1 }) ]
                   ]
                     <>
-                      if (maybe false isUserSuperadmin state.user) then
-                        [ HH.li [ HP.classes [ HB.navItem ] ]
-                            [ navButton
-                                ( translate (label :: _ "navbar_users")
-                                    state.translator
-                                )
-                                AdminViewUsers
-                            ]
-                        , HH.li [ HP.classes [ HB.navItem ] ]
-                            [ navButton
-                                ( translate (label :: _ "navbar_groups")
-                                    state.translator
-                                )
-                                AdminViewGroups
-                            ]
-                        , HH.li [ HP.classes [ HB.navItem ] ]
-                            [ navButton
-                                ( translate (label :: _ "navbar_documents")
-                                    state.translator
-                                )
-                                (ViewGroupDocuments { groupID: 1 })
-                            ]
-                        ]
-                      else []
+                      ( if (maybe false isUserSuperadmin state.user) then
+                          [ HH.li [ HP.classes [ HB.navItem ] ]
+                              [ navButton
+                                  ( translate (label :: _ "navbar_users")
+                                      state.translator
+                                  )
+                                  AdminViewUsers
+                              ]
+                          ]
+                        else []
+                      )
+                    <>
+                      ( if (maybe false isAdmin state.user) then
+                          [ HH.li [ HP.classes [ HB.navItem ] ]
+                              [ navButton
+                                  ( translate (label :: _ "navbar_groups")
+                                      state.translator
+                                  )
+                                  AdminViewGroups
+                              ]
+                          ]
+                        else []
+                      )
                 )
 
             -- Right side of the navbar
@@ -201,17 +200,27 @@ navbar = connect (selectEq identity) $ H.mkComponent
               <>
                 ( if isUserSuperadmin user then
                     [ dropdownEntry
-                        (translate (label :: _ "au_userManagement") state.translator)
+                        ( translate (label :: _ "au_userManagement")
+                            state.translator
+                        )
                         "person-exclamation"
                         (Navigate AdminViewUsers) `addClass` HB.bgWarningSubtle
-                    , dropdownEntry
-                        (translate (label :: _ "au_groupManagement") state.translator)
+                    ]
+                  else []
+                )
+              <>
+                ( if isAdmin user then
+                    [ dropdownEntry
+                        ( translate (label :: _ "au_groupManagement")
+                            state.translator
+                        )
                         "people"
                         (Navigate AdminViewGroups) `addClass` HB.bgWarningSubtle
                     ]
                   else []
                 )
-              <> [ dropdownEntry "Logout" "box-arrow-right" Logout ]
+              <>
+                [ dropdownEntry "Logout" "box-arrow-right" Logout ]
           )
       ]
 

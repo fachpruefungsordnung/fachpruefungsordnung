@@ -5,8 +5,10 @@ import Prelude
 
 import Data.Argonaut (class DecodeJson, class EncodeJson)
 import Data.Array (find)
+import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe, isJust)
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import FPO.Dto.UserDto (Role, UserID)
 
 type GroupID = Int
@@ -24,6 +26,9 @@ getGroupOverviewName (GroupOverview g) = g.groupOverviewName
 derive instance newtypeGroupOverview :: Newtype GroupOverview _
 derive newtype instance encodeJsonGroupOverview :: EncodeJson GroupOverview
 derive newtype instance decodeJsonGroupOverview :: DecodeJson GroupOverview
+derive instance genericGroupOverview :: Generic GroupOverview _
+instance showGroupOverview :: Show GroupOverview where
+  show = genericShow
 
 -- | A group creation request DTO, as sent to the `POST /groups` endpoint.
 newtype GroupCreate = GroupCreate
@@ -39,6 +44,12 @@ newtype GroupDto = GroupDto
   , groupID :: GroupID
   , groupMembers :: Array GroupMemberDto
   , groupName :: String
+  }
+
+demoteToGroupOverview :: GroupDto -> GroupOverview
+demoteToGroupOverview (GroupDto g) = GroupOverview
+  { groupOverviewName: g.groupName
+  , groupOverviewID: g.groupID
   }
 
 getGroupName :: GroupDto -> String
@@ -57,6 +68,9 @@ isUserInGroup g = isJust <<< lookupUser g
 derive instance newtypeGroupDto :: Newtype GroupDto _
 derive newtype instance encodeJsonGroupDto :: EncodeJson GroupDto
 derive newtype instance decodeJsonGroupDto :: DecodeJson GroupDto
+derive instance genericGroupDto :: Generic GroupDto _
+instance showGroupDto :: Show GroupDto where
+  show = genericShow
 
 -- | Represents a group member entity, as returned by the `GET /groups/{groupID}` endpoint.
 newtype GroupMemberDto = GroupMemberDto
@@ -78,3 +92,6 @@ getUserInfoID (GroupMemberDto m) = m.userInfoID
 derive instance newtypeGroupMemberDto :: Newtype GroupMemberDto _
 derive newtype instance encodeJsonGroupMemberDto :: EncodeJson GroupMemberDto
 derive newtype instance decodeJsonGroupMemberDto :: DecodeJson GroupMemberDto
+derive instance genericGroupMemberDto :: Generic GroupMemberDto _
+instance showGroupMemberDto :: Show GroupMemberDto where
+  show = genericShow
