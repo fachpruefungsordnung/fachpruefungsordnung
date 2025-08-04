@@ -4,6 +4,7 @@ module Language.Ltml.HTML.Util
     ( intToLower
     , intToCapital
     , whenJust
+    , mapState
     , convertNewLine
     , (<#>)
     , cssClass_
@@ -40,6 +41,15 @@ intToLetter shift n
 -- | If maybe value is Nothing returns (), else passes a into function
 whenJust :: (Applicative m) => Maybe a -> (a -> m ()) -> m ()
 whenJust ma fa = maybe (pure ()) fa ma
+
+-- | Applies functions to every item in the list and
+--   chains those calls together by propagating the state s from
+--   left to right; the final state is dropped
+mapState :: (Monad m) => (s -> a -> m s) -> s -> [a] -> m ()
+mapState _ _ [] = pure ()
+mapState f s (a : as) = do
+    s' <- f s a
+    mapState f s' as
 
 -------------------------------------------------------------------------------
 

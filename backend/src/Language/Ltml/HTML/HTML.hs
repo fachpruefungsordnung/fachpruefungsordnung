@@ -7,12 +7,11 @@
 
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 
-module Language.Ltml.HTML.HTML (renderHtml, docToHtml, sectionToHtml) where
+module Language.Ltml.HTML.HTML (ToHtmlM (..), renderHtml, docToHtml, sectionToHtml, addHtmlHeader, aToHtml) where
 
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
-import Data.Text (Text)
 import Data.Void (Void)
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.Label
@@ -28,25 +27,33 @@ import Language.Ltml.HTML.References
 import Language.Ltml.HTML.Util
 import Lucid
 import Prelude hiding (id)
+import Data.Text (Text, pack)
 
 renderHtml :: Document -> ByteString
 renderHtml document = renderBS $ docToHtml document
 
 docToHtml :: Document -> Html ()
-docToHtml = aToHtml
+docToHtml = aToHtml "Test Dokument" "out.css"
 
 sectionToHtml :: Node Section -> Html ()
-sectionToHtml = aToHtml
+sectionToHtml = aToHtml "Test Dokument" "out.css"
 
--- | Internal function that creates final HTML wrapper and header
-aToHtml :: (ToHtmlM a) => a -> Html ()
-aToHtml a = doctypehtml_ $ do
-    head_ $ do
-        title_ "Test Dokument"
-        link_ [rel_ "stylesheet", href_ "out.css"]
-    body_ $ do
+-- | Internal function that renders to Html and creates final HTML wrapper
+--   with title and a path to a css file
+aToHtml :: (ToHtmlM a) => String -> FilePath -> a -> Html ()
+aToHtml title relativeCssPath a =
         let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
-         in evalDelayed delayedHtml finalState
+            body = evalDelayed delayedHtml finalState
+        in addHtmlHeader title relativeCssPath body
+
+-- | Adds html, head and body tags onto given html and
+--   sets title and css path
+addHtmlHeader :: String -> FilePath -> Html () -> Html ()
+addHtmlHeader title cssPath html = doctypehtml_ $ do
+    head_ $ do
+        title_ (toHtml title)
+        link_ [rel_ "stylesheet", href_ (pack cssPath)]
+    body_ html
 
 -------------------------------------------------------------------------------
 

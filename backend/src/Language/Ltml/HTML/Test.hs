@@ -14,6 +14,7 @@ import Language.Ltml.AST.Paragraph
 import Language.Ltml.AST.Section
 import Language.Ltml.AST.Text
 import Language.Ltml.HTML.HTML
+import Language.Ltml.HTML.Export
 import Language.Ltml.Parser.Section (sectionP)
 
 import Language.Lsd.AST.Type.Document (DocumentFormat (..))
@@ -26,6 +27,7 @@ import Language.Ltml.HTML.CSS.CSS (writeCss)
 import Language.Ltml.Pretty (prettyPrint)
 import Lucid (renderToFile)
 import Text.Megaparsec (runParser)
+import System.Directory (removeDirectoryRecursive)
 import Prelude hiding (Enum, Word, readFile)
 
 testSection :: Node Section
@@ -167,6 +169,25 @@ parseTest = do
             renderToFile "src/Language/Ltml/HTML/Test/out.html" (sectionToHtml nodeSection)
             writeCss "src/Language/Ltml/HTML/Test/out.css"
             prettyPrint nodeSection
+
+-------------------------------------------------------------------------------
+
+exportTest :: IO ()
+exportTest =
+    let testDir = "src/Language/Ltml/HTML/Test/Doc"
+        in do
+            text <- testDoc
+            case runParser (sectionP superSectionT empty) "" text of
+                Left _ -> error "parsing failed"
+                Right nodeSection -> do
+                    exportDocument
+                        (Document
+                            DocumentFormat
+                            DocumentHeader
+                            ( DocumentBody [nodeSection, nodeSection]))
+                        testDir
+            _ <- getLine
+            removeDirectoryRecursive testDir
 
 -------------------------------------------------------------------------------
 
