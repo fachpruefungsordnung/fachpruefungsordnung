@@ -20,6 +20,7 @@ import Hasql.Transaction.Sessions
 import Docs.Database
 
 import qualified UserManagement.Sessions as UserSessions
+import qualified UserManagement.Transactions as UserTransactions
 
 import qualified Docs.Hasql.Sessions as Sessions
 import qualified Docs.Hasql.Transactions as Transactions
@@ -104,6 +105,9 @@ instance HasCheckPermission HasqlTransaction where
 
 instance HasIsGroupAdmin HasqlTransaction where
     isGroupAdmin = (HasqlTransaction .) . Transactions.isGroupAdmin
+
+instance HasIsSuperAdmin HasqlTransaction where
+    isSuperAdmin = HasqlTransaction . UserTransactions.checkSuperadmin
 
 -- exists
 

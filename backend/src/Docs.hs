@@ -267,7 +267,8 @@ guardPermission
     -> ExceptT Error m ()
 guardPermission perms docID userID = do
     hasPermission <- lift $ DB.checkDocumentPermission userID docID perms
-    unless hasPermission $
+    superAdmin <- lift $ DB.isSuperAdmin userID
+    unless (hasPermission || superAdmin) $
         throwError (NoPermission docID perms)
 
 guardGroupAdmin
@@ -277,7 +278,8 @@ guardGroupAdmin
     -> ExceptT Error m ()
 guardGroupAdmin groupID userID = do
     hasPermission <- lift $ DB.isGroupAdmin userID groupID
-    unless hasPermission $
+    superAdmin <- lift $ DB.isSuperAdmin userID
+    unless (hasPermission || superAdmin) $
         throwError (NoPermissionInGroup groupID)
 
 guardUserRights
