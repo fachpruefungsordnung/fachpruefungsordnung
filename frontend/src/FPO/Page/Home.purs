@@ -1,7 +1,6 @@
--- | Home page of the application. As of now, this is simply our
--- | "sandbox" for testing components.
+-- | Home page of the application.
 -- |
--- | Right now, it displays a list of mock projects and allows
+-- | It displays a list of all accessible projects and allows
 -- | the user to navigate to the editor by clicking on the title.
 -- | The user must be logged in to see the projects.
 
@@ -30,7 +29,8 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto (NewDocumentHeader, docDateToDateTime, getNDHID, getNDHLastEdited, getNDHName)
+import FPO.Dto.DocumentDto.DocDate as DD
+import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -56,7 +56,7 @@ data Sorting = TitleAsc | TitleDesc | LastUpdatedAsc | LastUpdatedDesc
 data Action
   = Initialize
   | NavLogin
-  | ViewProject NewDocumentHeader
+  | ViewProject DH.DocumentHeader
   | Receive (Connected FPOTranslator Input)
   | DoNothing
   | ChangeSorting TH.Output
@@ -65,7 +65,7 @@ data Action
 
 type State = FPOState
   ( user :: Maybe FullUserDto
-  , projects :: Array NewDocumentHeader
+  , projects :: Array DH.DocumentHeader
   , currentTime :: Maybe DateTime
   , searchQuery :: String
   , page :: Int
@@ -139,8 +139,8 @@ component =
           }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
-      log $ "Routing to editor for project " <> (getNDHName project)
-      navigate (Editor { docID: getNDHID project })
+      log $ "Routing to editor for project " <> (DH.getName project)
+      navigate (Editor { docID: DH.getID project })
     NavLogin -> do
       updateStore $ Store.SetLoginRedirect (Just Home)
       navigate Login
@@ -154,7 +154,7 @@ component =
         "Title" ->
           TH.sortByF
             order
-            (\a b -> compare (getNDHName a) (getNDHName b))
+            (\a b -> compare (DH.getName a) (DH.getName b))
             state.projects
         "Last Updated" ->
           TH.sortByF
@@ -227,7 +227,7 @@ component =
 
   -- Renders the list of projects.
   renderProjectTable
-    :: Array NewDocumentHeader -> State -> H.ComponentHTML Action Slots m
+    :: Array DH.DocumentHeader -> State -> H.ComponentHTML Action Slots m
   renderProjectTable ps state =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
@@ -264,17 +264,17 @@ component =
       ]
 
   -- Renders a single project row in the table.
-  renderProjectRow :: forall w. State -> NewDocumentHeader -> HH.HTML w Action
+  renderProjectRow :: forall w. State -> DH.DocumentHeader -> HH.HTML w Action
   renderProjectRow state project =
     HH.tr
       [ HE.onClick $ const $ ViewProject project
       , HP.style "cursor: pointer;"
       ]
       [ HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ getNDHName project ]
+          [ HH.text $ DH.getName project ]
       , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ formatRelativeTime state.currentTime $ docDateToDateTime $
-              getNDHLastEdited project
+          [ HH.text $ formatRelativeTime state.currentTime $ DD.docDateToDateTime $
+              DH.getLastEdited project
           ]
       ]
 
@@ -289,17 +289,17 @@ component =
           [ HH.text $ "Empty Row" ]
       ]
 
-  filterProjects :: String -> Array NewDocumentHeader -> Array NewDocumentHeader
+  filterProjects :: String -> Array DH.DocumentHeader -> Array DH.DocumentHeader
   filterProjects query projects =
-    filter (\p -> contains (Pattern $ toLower query) (toLower $ getNDHName p)) projects
+    filter (\p -> contains (Pattern $ toLower query) (toLower $ DH.getName p)) projects
 
 -- | Helper function to adjust a DateTime by a duration (subtract from current time)
 adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime
 adjustDateTime duration dt =
   fromMaybe dt $ adjust (negateDuration duration) dt
 
-getEditTimestamp ∷ NewDocumentHeader → DateTime
-getEditTimestamp = docDateToDateTime <<< getNDHLastEdited
+getEditTimestamp ∷ DH.DocumentHeader → DateTime
+getEditTimestamp = DD.docDateToDateTime <<< DH.getLastEdited
 
 -- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
 formatRelativeTime :: Maybe DateTime -> DateTime -> String

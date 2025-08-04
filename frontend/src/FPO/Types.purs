@@ -8,8 +8,9 @@ import Data.DateTime (DateTime)
 import Data.Formatter.DateTime (Formatter, FormatterCommand(..))
 import Data.List (List(..), (:))
 import Data.Maybe (Maybe)
-import FPO.Dto.DocumentDto (DocumentTree, NodeHeader(..))
-import FPO.Dto.TreeDto (RootTree, findRootTree)
+import FPO.Dto.DocumentDto.DocumentTree as DT
+import FPO.Dto.DocumentDto.NodeHeader as NH
+import FPO.Dto.DocumentDto.TreeDto (RootTree, findRootTree)
 
 -- TODO We can also store different markers, such as errors. But do we want to?
 type AnnotatedMarker =
@@ -140,20 +141,20 @@ timeStampsVersions =
 
 -- Tree functions for TOC
 
-nodeHeaderToTOCEntry :: NodeHeader -> TOCEntry
-nodeHeaderToTOCEntry (NodeHeader { identifier, kind }) =
-  { id: identifier
-  , name: kind
+nodeHeaderToTOCEntry :: NH.NodeHeader -> TOCEntry
+nodeHeaderToTOCEntry nh =
+  { id: NH.getId nh
+  , name: NH.getKind nh
   , newMarkerNextID: 0
   , markers: []
   }
 
-tocEntryToNodeHeader :: TOCEntry -> NodeHeader
+tocEntryToNodeHeader :: TOCEntry -> NH.NodeHeader
 tocEntryToNodeHeader { id, name } =
-  NodeHeader { identifier: id, kind: name }
+  NH.NodeHeader { identifier: id, kind: name }
 
-documentTreeToTOCTree :: DocumentTree -> TOCTree
+documentTreeToTOCTree :: DT.DocumentTree -> TOCTree
 documentTreeToTOCTree = map nodeHeaderToTOCEntry
 
-tocTreeToDocumentTree :: TOCTree -> DocumentTree
+tocTreeToDocumentTree :: TOCTree -> DT.DocumentTree
 tocTreeToDocumentTree = map tocEntryToNodeHeader

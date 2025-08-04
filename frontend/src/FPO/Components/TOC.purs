@@ -9,11 +9,10 @@ import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto (DocumentID)
-import FPO.Dto.DocumentDto as DocumentDto
+import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..))
 import FPO.Dto.PostTextDto (PostTextDto(..))
 import FPO.Dto.PostTextDto as PostTextDto
-import FPO.Dto.TreeDto (Edge(..), RootTree(..), Tree(..))
 import FPO.Types (ShortendTOCEntry, TOCEntry, TOCTree, shortenTOC)
 import Halogen as H
 import Halogen.HTML as HH
@@ -48,7 +47,7 @@ tocview
   :: forall m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => DocumentID
+  => DH.DocumentID
   -> H.Component Query Input Output m
 tocview docID = H.mkComponent
   { initialState: \_ ->
@@ -77,11 +76,11 @@ tocview docID = H.mkComponent
   handleAction = case _ of
 
     Init -> do
-      mDoc <- H.liftAff $ Request.getNewDocumentHeader docID
+      mDoc <- H.liftAff $ Request.getDocumentHeader docID
       let
         docName = case mDoc of
           Nothing -> ""
-          Just doc -> DocumentDto.getNDHName doc
+          Just doc -> DH.getName doc
       H.modify_ \st -> do
         st { documentName = docName }
 

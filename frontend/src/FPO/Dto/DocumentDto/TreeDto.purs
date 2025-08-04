@@ -1,4 +1,4 @@
-module FPO.Dto.TreeDto
+module FPO.Dto.DocumentDto.TreeDto
   ( Tree(..)
   , Edge(..)
   , RootTree(..)
@@ -127,7 +127,7 @@ instance showTree :: Show a => Show (Tree a) where
     "Tree { title: " <> title <> ", node: " <> show node <> " }"
 
 -- TODO: DFS. Maybe use a different search method? But maybe not necessary,
--- because the document tree may never be that large to notice. 
+-- because the document tree may never be that large to notice.
 findRootTree :: forall a. (a -> Boolean) -> RootTree a -> Maybe a
 findRootTree _ Empty = Nothing
 findRootTree predicate (RootTree { children }) =

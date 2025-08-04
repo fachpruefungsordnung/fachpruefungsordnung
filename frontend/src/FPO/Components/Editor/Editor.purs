@@ -29,28 +29,17 @@ import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
-import FPO.Components.Editor.Keybindings
-  ( keyBinding
-  , makeBold
-  , makeItalic
-  , underscore
-  )
+import FPO.Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.ContentDto (Content)
 import FPO.Dto.ContentDto as ContentDto
-import FPO.Dto.DocumentDto (DocumentID)
+import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.UserDto (getUserName)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.Types
-  ( AnnotatedMarker
-  , TOCEntry
-  , emptyTOCEntry
-  , markerToAnnotation
-  , sortMarkers
-  )
+import FPO.Types (AnnotatedMarker, TOCEntry, emptyTOCEntry, markerToAnnotation, sortMarkers)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -520,8 +509,8 @@ editor docID = connect selectTranslator $ H.mkComponent
               Nothing -> emptyTOCEntry
               Just e -> e
 
-          -- Since the ids and postions in liveMarkers are changing constantly, 
-          -- extract them now and store them 
+          -- Since the ids and postions in liveMarkers are changing constantly,
+          -- extract them now and store them
           updatedMarkers <- H.liftEffect do
             for entry.markers \m -> do
               case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of

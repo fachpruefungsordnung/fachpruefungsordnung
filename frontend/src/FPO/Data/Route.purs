@@ -6,7 +6,7 @@ import Prelude hiding ((/))
 
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(Nothing), fromMaybe)
-import FPO.Dto.DocumentDto (DocumentID)
+import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.GroupDto (GroupID)
 import Routing.Duplex (RouteDuplex', boolean, int, optional, root)
 import Routing.Duplex.Generic (noArgs, sum)

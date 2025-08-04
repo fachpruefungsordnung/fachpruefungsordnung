@@ -31,25 +31,13 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request
-  ( createNewDocument
-  , deleteIgnore
-  , getAuthorizedUser
-  , getDocumentsQueryFromURL
-  , getGroup
-  )
+import FPO.Data.Request (createNewDocument, deleteIgnore, getAuthorizedUser, getDocumentsQueryFromURL, getGroup)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto(..))
-import FPO.Dto.DocumentDto
-  ( DocumentID
-  , NewDocumentHeader(..)
-  , docDateToDateTime
-  , getDQDocuments
-  , getNDHID
-  , getNDHLastEdited
-  , getNDHName
-  )
+import FPO.Dto.DocumentDto.DocDate as DD
+import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.Query as DQ
 import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName)
 import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
@@ -83,7 +71,7 @@ data Action
   | SetPage P.Output
   | ChangeFilterDocumentName String
   | Filter
-  | ViewDocument DocumentID
+  | ViewDocument DH.DocumentID
   | ChangeSorting TH.Output
   | DoNothing
   | NavigateToMembers
@@ -117,8 +105,8 @@ type State = FPOState
   , page :: Int
   , groupID :: GroupID
   , group :: Maybe GroupDto
-  , documents :: Array NewDocumentHeader
-  , filteredDocuments :: Array NewDocumentHeader
+  , documents :: Array DH.DocumentHeader
+  , filteredDocuments :: Array DH.DocumentHeader
   , currentTime :: Maybe DateTime
   , documentNameFilter :: String
   -- | This is used to store the document ID for deletion confirmation.
@@ -248,7 +236,7 @@ component =
 
   -- Renders the list of projects.
   renderDocumentList
-    :: Array NewDocumentHeader -> State -> H.ComponentHTML Action Slots m
+    :: Array DH.DocumentHeader -> State -> H.ComponentHTML Action Slots m
   renderDocumentList docs state =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
@@ -295,23 +283,23 @@ component =
       ]
 
   -- Renders a single project row in the table.
-  renderDocumentRow :: forall w. State -> NewDocumentHeader -> HH.HTML w Action
+  renderDocumentRow :: forall w. State -> DH.DocumentHeader -> HH.HTML w Action
   renderDocumentRow state document =
     HH.tr
-      [ HE.onClick $ const $ ViewDocument (getNDHID document)
+      [ HE.onClick $ const $ ViewDocument (DH.getID document)
       , HP.style "cursor: pointer;"
       ]
       [ HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text (getNDHName document) ]
+          [ HH.text (DH.getName document) ]
       , HH.td [ HP.classes [ HB.textCenter ] ]
           [ HH.text $ formatRelativeTime state.currentTime
-              (docDateToDateTime (getNDHLastEdited document))
+              (DD.docDateToDateTime (DH.getLastEdited document))
           ]
       -- archiving feature not supported for now
       {-       , HH.td [ HP.classes [ HB.textCenter ] ]
       [ HH.text (show document.header.archivedStatus) ] -}
       , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ buttonDeleteDocument state (getNDHID document) ]
+          [ buttonDeleteDocument state (DH.getID document) ]
       ]
 
   -- Renders an empty project row for padding.
@@ -355,7 +343,7 @@ component =
       ]
       [ HH.text $ translate (label :: _ "gp_newProject") state.translator ]
 
-  buttonDeleteDocument :: forall w. State -> Int -> HH.HTML w Action
+  buttonDeleteDocument :: forall w. State -> DH.DocumentID -> HH.HTML w Action
   buttonDeleteDocument state documentID =
     HH.button
       [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm ]
@@ -450,7 +438,7 @@ component =
         (getDocumentsQueryFromURL ("/docs?group=" <> show s.groupID))
       case documents of
         Just docs -> do
-          H.modify_ _ { documents = getDQDocuments docs }
+          H.modify_ _ { documents = DQ.getDocuments docs }
         Nothing -> do
           navigate Page404
 
@@ -472,7 +460,7 @@ component =
       s <- H.get
       let
         filteredDocs = filter
-          (\d -> contains (Pattern s.documentNameFilter) (getNDHName d))
+          (\d -> contains (Pattern s.documentNameFilter) (DH.getName d))
           s.documents
       H.modify_ _ { filteredDocuments = filteredDocs }
     RequestCreateDocument -> do
@@ -548,7 +536,7 @@ component =
             Just docs -> do
               H.modify_ _
                 { error = Nothing
-                , documents = getDQDocuments docs
+                , documents = DQ.getDocuments docs
                 , modalState = NoModal
                 }
             Nothing -> do
@@ -572,12 +560,12 @@ component =
         "Title" ->
           TH.sortByF
             order
-            (\a b -> compare (getNDHName a) (getNDHName b))
+            (\a b -> compare (DH.getName a) (DH.getName b))
             state.documents
         "Last Updated" ->
           TH.sortByF
             (TH.toggleSorting order) -- The newest project should be first.
-            (\a b -> compare (getNDHLastEdited a) (getNDHLastEdited b))
+            (\a b -> compare (DH.getLastEdited a) (DH.getLastEdited b))
             state.documents
         _ -> state.documents -- Ignore other columns.
 
@@ -615,6 +603,6 @@ component =
 
   docNameFromID :: State -> Int -> String
   docNameFromID state id =
-    case head (filter (\(NDH doc) -> doc.identifier == id) state.documents) of
-      Just (NDH doc) -> doc.name
+    case head (filter (\dh -> DH.getID dh == id) state.documents) of
+      Just doc -> DH.getName doc
       Nothing -> "Unknown Name"

@@ -29,28 +29,10 @@ import Effect.Aff.Class (liftAff)
 import Effect.Class (liftEffect)
 import Effect.Console (log)
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto)
-import FPO.Dto.DocumentDto
-  ( DocumentID
-  , DocumentQuery
-  , NewDocumentHeader
-  , getDQDocuments
-  )
-import FPO.Dto.GroupDto
-  ( GroupCreate
-  , GroupDto
-  , GroupID
-  , GroupOverview
-  , demoteToGroupOverview
-  )
-import FPO.Dto.UserDto
-  ( FullUserDto
-  , Role
-  , UserID
-  , getUserRoleGroupID
-  , getUserRoles
-  , isAdminOf
-  , isUserSuperadmin
-  )
+import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.Query as DQ
+import FPO.Dto.GroupDto (GroupCreate, GroupDto, GroupID, GroupOverview, demoteToGroupOverview)
+import FPO.Dto.UserDto (FullUserDto, Role, UserID, getUserRoleGroupID, getUserRoles, isAdminOf, isUserSuperadmin)
 import Foreign (renderForeignError)
 import Web.DOM.Document (Document)
 import Web.File.Blob (Blob)
@@ -164,20 +146,20 @@ removeUser groupID userID = do
   deleteIgnore ("/roles/" <> show groupID <> "/" <> userID)
 
 -- | Fetches a document header by its ID.
-getNewDocumentHeader :: DocumentID -> Aff (Maybe NewDocumentHeader)
-getNewDocumentHeader docID = getFromJSONEndpoint decodeJson ("/docs/" <> show docID)
+getDocumentHeader :: DH.DocumentID -> Aff (Maybe DH.DocumentHeader)
+getDocumentHeader docID = getFromJSONEndpoint decodeJson ("/docs/" <> show docID)
 
 -- | Creates a new document for a specified group.
 createNewDocument :: NewDocumentCreateDto -> Aff (Either Error (Response Json))
 createNewDocument dto = postJson "/docs" (encodeJson dto)
 
-getDocumentsQueryFromURL :: String -> Aff (Maybe DocumentQuery)
+getDocumentsQueryFromURL :: String -> Aff (Maybe DQ.DocumentQuery)
 getDocumentsQueryFromURL url = getFromJSONEndpoint decodeJson url
 
-getUserDocuments :: UserID -> Aff (Maybe (Array NewDocumentHeader))
+getUserDocuments :: UserID -> Aff (Maybe (Array DH.DocumentHeader))
 getUserDocuments userID = do
   dq <- getDocumentsQueryFromURL $ "/docs?user=" <> userID
-  pure $ getDQDocuments <$> dq
+  pure $ DQ.getDocuments <$> dq
 
 addGroup :: GroupCreate -> Aff (Either Error (Response Json))
 addGroup group = postJson "/groups" (encodeJson group)
