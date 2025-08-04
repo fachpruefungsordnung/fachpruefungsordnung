@@ -84,7 +84,7 @@ instance ToHtmlM (Node Section) where
                 -- \| reset paragraphID for next section
                 modify (\s -> s {currentParagraphID = 1})
 
-                return $ div_ <#> Class.Section <$> sectionHtml
+                return $ div_ [cssClass_ Class.Section, mId_ mLabel] <$> sectionHtml
 
 -- | Instance for Heading of a Section
 instance ToHtmlM Heading where
@@ -110,10 +110,11 @@ instance ToHtmlM (Node Paragraph) where
                 modify (\s -> s {currentSentenceID = 0})
                 readerState <- ask
                 return $
-                    div_ <#> Class.Paragraph
+                    div_ [cssClass_ Class.Paragraph, mId_ mLabel]
                         -- \| If this is the only paragraph inside this section we drop the visible paragraphID
                         <$> let idHtml = if isSingleParagraph readerState then mempty else paragraphIDHtml
-                             in return (div_ <#> Class.ParagraphID $ idHtml) <> div_ <#> Class.ParagraphText <$> childText
+                             in return (div_ <#> Class.ParagraphID $ idHtml) <> div_ <#> Class.ParagraphText
+                                    <$> childText
 
 instance
     (ToHtmlStyle style, ToHtmlM enum, ToHtmlM special)
@@ -129,7 +130,7 @@ instance
                 Nothing ->
                     b_ <#> Class.FontRed $
                         toHtml (("Error: Label \"" <> unLabel label <> "\" not found!") :: Text)
-                Just labelHtml -> labelHtml
+                Just labelHtml -> labelWrapperFunc globalState label labelHtml
         Styled style textTrees -> do
             textTreeHtml <- toHtmlM textTrees
             return $ toHtmlStyle style <$> textTreeHtml
@@ -144,7 +145,9 @@ instance ToHtmlM SentenceStart where
     toHtmlM (SentenceStart mLabel) = do
         modify (\s -> s {currentSentenceID = currentSentenceID s + 1})
         addMaybeLabelToState mLabel SentenceRef
-        returnNow mempty
+        case mLabel of
+            Nothing -> returnNow mempty
+            Just label -> returnNow $ span_ [id_ (unLabel label)] mempty
 
 class ToHtmlStyle style where
     toHtmlStyle :: (Monad m) => style -> (HtmlT m a -> HtmlT m a)

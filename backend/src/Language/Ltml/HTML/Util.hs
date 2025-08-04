@@ -1,9 +1,21 @@
 {-# LANGUAGE FlexibleContexts #-}
-module Language.Ltml.HTML.Util (intToLower, intToCapital, whenJust, convertNewLine, (<#>)) where
+
+module Language.Ltml.HTML.Util
+    ( intToLower
+    , intToCapital
+    , whenJust
+    , convertNewLine
+    , (<#>)
+    , cssClass_
+    , mId_
+    , jumpTag
+    ) where
 
 import Data.Char (chr)
-import Lucid
+import Data.Text (cons)
+import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.HTML.CSS.Classes as Class
+import Lucid
 
 -- | Converts Int to corresponding lowercase letter in the alphabet.
 --   If Int is (<= 0) or (>= 27), it returns "?"
@@ -36,12 +48,27 @@ convertNewLine :: String -> Html ()
 convertNewLine [] = mempty
 convertNewLine s =
     let (raw, newLine) = break (== '\n') s
-        in case newLine of
-        [] -> toHtml raw
-        (_:next) -> toHtml raw <> br_ [] <> convertNewLine next
+     in case newLine of
+            [] -> toHtml raw
+            (_ : next) -> toHtml raw <> br_ [] <> convertNewLine next
 
 -------------------------------------------------------------------------------
 
--- | Constructs HTML element with given Class 
+-- | Constructs HTML element with given Class
 (<#>) :: ([Attributes] -> t) -> Class -> t
 htmlFunc <#> cssClass = htmlFunc [class_ (Class.className cssClass)]
+
+-- | Convert CSS Class to Lucid HTML Attribute
+cssClass_ :: Class -> Attributes
+cssClass_ = class_ . Class.className
+
+-- | Adds Label as id, if it exists
+mId_ :: Maybe Label -> Attributes
+mId_ Nothing = mempty
+mId_ (Just label) = id_ $ unLabel label
+
+-------------------------------------------------------------------------------
+
+-- | Converts Label into <a href = "#<label>"> for HTML jumping
+jumpTag :: Label -> Html () -> Html ()
+jumpTag label = a_ [href_ (cons '#' $ unLabel label)]

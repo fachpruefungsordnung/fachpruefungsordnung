@@ -16,6 +16,8 @@ module Language.Ltml.HTML.Common
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (State)
 import Data.Text (Text)
+import Language.Ltml.AST.Label (Label)
+import Language.Ltml.HTML.Util (jumpTag)
 import Lucid (Html)
 
 -- | The Reader Monad is used for local tracking (e.g. enumNestingLevel).
@@ -37,6 +39,8 @@ data GlobalState = GlobalState
     -- ^ Tracks the current sentence number in the current paragraph
     , labels :: [(Text, Html ())]
     -- ^ Holds all labels and the Html element that should be displayed when this label is referenced
+    , labelWrapperFunc :: Label -> Html () -> Html ()
+    -- ^ Wrapper around the Reference Html inside the TextTree (e.g. for adding jumpTags)
     }
 
 data ReaderState = ReaderState
@@ -52,7 +56,7 @@ data ReaderState = ReaderState
     --   This is a Maybe type because the FormatString may not contain any IdentifierPlaceholder.
     --   In this case this will be Nothing.
     , isSingleParagraph :: Bool
-    -- ^ signals the child paragraph that it is the only child and thus should not have an visible identifier
+    -- ^ Signals the child paragraph that it is the only child and thus should not have an visible identifier
     }
 
 initGlobalState :: GlobalState
@@ -63,6 +67,7 @@ initGlobalState =
         , currentParagraphID = 1
         , currentSentenceID = 0
         , labels = []
+        , labelWrapperFunc = jumpTag -- const id -- jumpTag
         }
 
 initReaderState :: ReaderState

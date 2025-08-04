@@ -12,6 +12,8 @@ import Data.String (fromString)
 import Data.Text (Text, pack, unpack)
 import Language.Ltml.HTML.CSS.CustomClay
 
+-- TODO: Add vertical space between Enumitems
+
 data Class
     = -- | Class for spacing and alignment of and inside of a section
       Section
@@ -87,6 +89,7 @@ enumLevel i = case i of
     0 -> EnumNum
     1 -> EnumCharPar
     2 -> EnumCharCharPar
+    3 -> EnumNum
     _ -> EnumFail -- dont throw error but place placeholder symbol
 
 -- | Builds CSS class with specfied counter for ordered lists
