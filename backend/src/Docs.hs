@@ -140,7 +140,7 @@ createTextElement userID docID kind = runExceptT $ do
     lift $ DB.createTextElement docID kind
 
 createTextRevision
-    :: (HasCreateTextRevision m)
+    :: (HasCreateTextRevision m, HasGetTextElementRevision m)
     => UserID
     -> NewTextRevision
     -> m (Result ConflictStatus)
@@ -148,11 +148,15 @@ createTextRevision userID revision = runExceptT $ do
     let ref@(TextElementRef docID _) = newTextRevisionElement revision
     guardPermission Edit docID userID
     guardExistsTextElement ref
+    let latestRevisionRef = TextRevisionRef ref TextRevision.Latest
+    latestElementRevision <-
+        lift $ DB.getTextElementRevision latestRevisionRef
+    let latestRevision = latestElementRevision >>= TextRevision.revision
+    let createRevision = DB.createTextRevision userID ref
     lift $
         newTextRevision
-            DB.getLatestTextRevisionID
-            DB.createTextRevision
-            userID
+            latestRevision
+            createRevision
             revision
 
 getTextElementRevision

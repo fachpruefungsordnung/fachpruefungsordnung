@@ -113,6 +113,14 @@ instance HasExistsDocument HasqlTransaction where
 instance HasExistsTextElement HasqlTransaction where
     existsTextElement = HasqlTransaction . Transactions.existsTextElement
 
+instance HasExistsTextRevision HasqlTransaction where
+    existsTextRevision = HasqlTransaction . Transactions.existsTextRevision
+
+-- get
+
+instance HasGetTextElementRevision HasqlTransaction where
+    getTextElementRevision = HasqlTransaction . Transactions.getTextElementRevision
+
 -- create
 
 instance HasCreateTextRevision HasqlTransaction where
