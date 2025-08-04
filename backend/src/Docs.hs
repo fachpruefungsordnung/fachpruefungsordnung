@@ -115,6 +115,8 @@ getDocument userID docID = runExceptT $ do
 
 -- | Gets all documents visible by the user
 --   OR all documents by the specified group and / or user
+--
+--   Notice that this endpoint is always accessible to super admins.
 getDocuments
     :: (HasGetDocument m)
     => UserID
@@ -124,8 +126,10 @@ getDocuments
 getDocuments userID byUserID byGroupID = case (byUserID, byGroupID) of
     (Nothing, Nothing) -> Right <$> DB.getDocuments userID
     _ -> runExceptT $ do
-        maybe (pure ()) (guardUserRights userID) byUserID
-        maybe (pure ()) (`guardGroupAdmin` userID) byGroupID
+        sup <- lift $ DB.isSuperAdmin userID
+        unless sup $ do
+            maybe (pure ()) (guardUserRights userID) byUserID
+            maybe (pure ()) (`guardGroupAdmin` userID) byGroupID
         lift $ DB.getDocumentsBy byUserID byGroupID
 
 createTextElement
