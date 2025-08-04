@@ -40,7 +40,7 @@ data GlobalState = GlobalState
     , labels :: [(Text, Html ())]
     -- ^ Holds all labels and the Html element that should be displayed when this label is referenced
     , labelWrapperFunc :: Label -> Html () -> Html ()
-    -- ^ Wrapper around the Reference Html inside the TextTree (e.g. for adding jumpTags)
+    -- ^ Wrapper around the Reference Html inside the TextTree (e.g. for adding anchor links)
     }
 
 data ReaderState = ReaderState
