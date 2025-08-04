@@ -25,7 +25,16 @@ import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
 import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..), findRootTree)
-import FPO.Types (CommentSection, TOCEntry, TOCTree, documentTreeToTOCTree, emptyTOCEntry, findTOCEntry, timeStampsVersions, tocTreeToDocumentTree)
+import FPO.Types
+  ( CommentSection
+  , TOCEntry
+  , TOCTree
+  , documentTreeToTOCTree
+  , emptyTOCEntry
+  , findTOCEntry
+  , timeStampsVersions
+  , tocTreeToDocumentTree
+  )
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE

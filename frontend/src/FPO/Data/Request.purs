@@ -31,8 +31,22 @@ import Effect.Console (log)
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto)
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.Query as DQ
-import FPO.Dto.GroupDto (GroupCreate, GroupDto, GroupID, GroupOverview, demoteToGroupOverview)
-import FPO.Dto.UserDto (FullUserDto, Role, UserID, getUserRoleGroupID, getUserRoles, isAdminOf, isUserSuperadmin)
+import FPO.Dto.GroupDto
+  ( GroupCreate
+  , GroupDto
+  , GroupID
+  , GroupOverview
+  , demoteToGroupOverview
+  )
+import FPO.Dto.UserDto
+  ( FullUserDto
+  , Role
+  , UserID
+  , getUserRoleGroupID
+  , getUserRoles
+  , isAdminOf
+  , isUserSuperadmin
+  )
 import Foreign (renderForeignError)
 import Web.DOM.Document (Document)
 import Web.File.Blob (Blob)

@@ -2,8 +2,7 @@ module FPO.Dto.DocumentDto.NodeHeader
   ( NodeHeader(..)
   , getId
   , getKind
-  )
-  where
+  ) where
 
 import Data.Argonaut (class DecodeJson, class EncodeJson)
 

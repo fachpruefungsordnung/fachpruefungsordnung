@@ -29,7 +29,12 @@ import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
-import FPO.Components.Editor.Keybindings (keyBinding, makeBold, makeItalic, underscore)
+import FPO.Components.Editor.Keybindings
+  ( keyBinding
+  , makeBold
+  , makeItalic
+  , underscore
+  )
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
@@ -39,7 +44,13 @@ import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.UserDto (getUserName)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.Types (AnnotatedMarker, TOCEntry, emptyTOCEntry, markerToAnnotation, sortMarkers)
+import FPO.Types
+  ( AnnotatedMarker
+  , TOCEntry
+  , emptyTOCEntry
+  , markerToAnnotation
+  , sortMarkers
+  )
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE

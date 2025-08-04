@@ -291,7 +291,8 @@ component =
 
   filterProjects :: String -> Array DH.DocumentHeader -> Array DH.DocumentHeader
   filterProjects query projects =
-    filter (\p -> contains (Pattern $ toLower query) (toLower $ DH.getName p)) projects
+    filter (\p -> contains (Pattern $ toLower query) (toLower $ DH.getName p))
+      projects
 
 -- | Helper function to adjust a DateTime by a duration (subtract from current time)
 adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime

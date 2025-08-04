@@ -4,8 +4,7 @@ module FPO.Dto.DocumentDto.DocumentHeader
   , getID
   , getLastEdited
   , getName
-  )
-  where
+  ) where
 
 import Data.Argonaut (class DecodeJson)
 import FPO.Dto.DocumentDto.DocDate (DocDate)
