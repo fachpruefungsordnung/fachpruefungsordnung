@@ -141,8 +141,8 @@ timeStampsVersions =
 -- Tree functions for TOC
 
 nodeHeaderToTOCEntry :: NodeHeader -> TOCEntry
-nodeHeaderToTOCEntry (NodeHeader { id, kind }) =
-  { id: id
+nodeHeaderToTOCEntry (NodeHeader { identifier, kind }) =
+  { id: identifier
   , name: kind
   , newMarkerNextID: 0
   , markers: []
@@ -150,7 +150,7 @@ nodeHeaderToTOCEntry (NodeHeader { id, kind }) =
 
 tocEntryToNodeHeader :: TOCEntry -> NodeHeader
 tocEntryToNodeHeader { id, name } =
-  NodeHeader { id, kind: name }
+  NodeHeader { identifier: id, kind: name }
 
 documentTreeToTOCTree :: DocumentTree -> TOCTree
 documentTreeToTOCTree = map nodeHeaderToTOCEntry

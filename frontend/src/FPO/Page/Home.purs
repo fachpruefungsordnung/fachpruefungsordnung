@@ -27,16 +27,11 @@ import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (getDocumentsFromURLWithPermission, getUser)
+import FPO.Data.Request (getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto
-  ( DocumentHeaderPlusPermission
-  , DocumentID
-  , getDHPPID
-  , getDHPPName
-  )
-import FPO.Dto.UserDto (FullUserDto)
+import FPO.Dto.DocumentDto (NewDocumentHeader, docDateToDateTime, getNDHID, getNDHLastEdited, getNDHName)
+import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addCard, addColumn)
@@ -61,7 +56,7 @@ data Sorting = TitleAsc | TitleDesc | LastUpdatedAsc | LastUpdatedDesc
 data Action
   = Initialize
   | NavLogin
-  | ViewProject Project
+  | ViewProject NewDocumentHeader
   | Receive (Connected FPOTranslator Input)
   | DoNothing
   | ChangeSorting TH.Output
@@ -70,18 +65,11 @@ data Action
 
 type State = FPOState
   ( user :: Maybe FullUserDto
-  , projects :: Array Project
+  , projects :: Array NewDocumentHeader
   , currentTime :: Maybe DateTime
   , searchQuery :: String
   , page :: Int
   )
-
--- | Model for Projects with proper DateTime.
-type Project =
-  { name :: String
-  , documentID :: DocumentID
-  , updated :: DateTime
-  }
 
 type Slots =
   ( tablehead :: forall q. H.Slot q TH.Output Unit
@@ -138,21 +126,21 @@ component =
     Initialize -> do
       store <- getStore
       u <- liftAff getUser
-      log $ "User: " <> show u
       now <- liftEffect nowDateTime
       -- If the user is logged in, fetch their documents and convert them to projects.
       void $ runMaybeT do
-        docs <- MaybeT $ liftAff (getDocumentsFromURLWithPermission "/me/documents")
+        user <- MaybeT $ pure u
+        docs <- MaybeT $ liftAff $ getUserDocuments $ getUserID user
         lift $ H.modify_ _
           { user = u
           , translator = fromFpoTranslator store.translator
-          , projects = toProject docs now
+          , projects = docs
           , currentTime = Just now
           }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
-      log $ "Routing to editor for project " <> project.name
-      navigate (Editor { docID: project.documentID })
+      log $ "Routing to editor for project " <> (getNDHName project)
+      navigate (Editor { docID: getNDHID project })
     NavLogin -> do
       updateStore $ Store.SetLoginRedirect (Just Home)
       navigate Login
@@ -166,12 +154,12 @@ component =
         "Title" ->
           TH.sortByF
             order
-            (\a b -> compare a.name b.name)
+            (\a b -> compare (getNDHName a) (getNDHName b))
             state.projects
         "Last Updated" ->
           TH.sortByF
             (TH.toggleSorting order) -- The newest project should be first.
-            (\a b -> compare a.updated b.updated)
+            (\a b -> compare (getEditTimestamp a) (getEditTimestamp b))
             state.projects
         _ -> state.projects -- Ignore other columns.
 
@@ -238,7 +226,8 @@ component =
       }
 
   -- Renders the list of projects.
-  renderProjectTable :: Array Project -> State -> H.ComponentHTML Action Slots m
+  renderProjectTable
+    :: Array NewDocumentHeader -> State -> H.ComponentHTML Action Slots m
   renderProjectTable ps state =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
@@ -275,16 +264,18 @@ component =
       ]
 
   -- Renders a single project row in the table.
-  renderProjectRow :: forall w. State -> Project -> HH.HTML w Action
+  renderProjectRow :: forall w. State -> NewDocumentHeader -> HH.HTML w Action
   renderProjectRow state project =
     HH.tr
       [ HE.onClick $ const $ ViewProject project
       , HP.style "cursor: pointer;"
       ]
       [ HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text project.name ]
+          [ HH.text $ getNDHName project ]
       , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ formatRelativeTime state.currentTime project.updated ]
+          [ HH.text $ formatRelativeTime state.currentTime $ docDateToDateTime $
+              getNDHLastEdited project
+          ]
       ]
 
   -- Renders an empty project row for padding.
@@ -298,27 +289,19 @@ component =
           [ HH.text $ "Empty Row" ]
       ]
 
-  filterProjects :: String -> Array Project -> Array Project
+  filterProjects :: String -> Array NewDocumentHeader -> Array NewDocumentHeader
   filterProjects query projects =
-    filter (\p -> contains (Pattern $ toLower query) (toLower p.name)) projects
+    filter (\p -> contains (Pattern $ toLower query) (toLower $ getNDHName p)) projects
 
--- transforms Document data from backend into data for this page
-toProject :: Array DocumentHeaderPlusPermission -> DateTime -> Array Project
-toProject docs now = map
-  ( \doc ->
-      { name: getDHPPName doc
-      , documentID: getDHPPID doc
-      , updated: now
-      }
-  )
-  docs
-
--- Helper function to adjust a DateTime by a duration (subtract from current time)
+-- | Helper function to adjust a DateTime by a duration (subtract from current time)
 adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime
 adjustDateTime duration dt =
   fromMaybe dt $ adjust (negateDuration duration) dt
 
--- Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
+getEditTimestamp ∷ NewDocumentHeader → DateTime
+getEditTimestamp = docDateToDateTime <<< getNDHLastEdited
+
+-- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
 formatRelativeTime :: Maybe DateTime -> DateTime -> String
 formatRelativeTime Nothing _ = "Unknown"
 formatRelativeTime (Just current) updated =
@@ -343,7 +326,6 @@ formatRelativeTime (Just current) updated =
     else
       "Just now"
   where
-
   -- Format DateTime as absolute date (YYYY-MM-DD)
   formatAbsoluteDate :: DateTime -> String
   formatAbsoluteDate dt =

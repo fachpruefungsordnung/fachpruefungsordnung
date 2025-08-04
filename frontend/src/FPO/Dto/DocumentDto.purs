@@ -9,9 +9,11 @@ import Data.Date (canonicalDate)
 import Data.DateTime (DateTime(..))
 import Data.Either (Either(..))
 import Data.Enum (class BoundedEnum, toEnum)
+import Data.Generic.Rep (class Generic)
 import Data.Int (fromString)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 import Data.Time (Time(..))
 import Data.Tuple (fst)
 import FPO.Dto.TreeDto (RootTree)
@@ -21,81 +23,99 @@ import Parsing.String (anyTill, char, rest)
 type DocumentID = Int
 type CommitID = Int
 
-newtype NodeHeader = NodeHeader
-  { id :: Int
-  , kind :: String
-  }
+{- ---------------------- DocumentHeaderPlusPermission --------------------- -}
 
-type DocumentTree = RootTree NodeHeader
+-- newtype DocumentHeaderPlusPermission = DHPP
+--   { document :: NewDocumentHeader, documentPermission :: String }
 
-newtype DocumentHeader = DH
-  { group :: Int, headCommit :: Maybe CommitID, id :: DocumentID, name :: String }
+-- getDHPPName :: DocumentHeaderPlusPermission -> String
+-- getDHPPName (DHPP dhpp) = getNDHName dhpp.document
 
-newtype DocumentHeaderPlusPermission = DHPP
-  { document :: DocumentHeader, documentPermission :: String }
+-- getDHPPID :: DocumentHeaderPlusPermission -> Int
+-- getDHPPID (DHPP dhpp) = getNDHID dhpp.document
 
-derive instance newtypeUser :: Newtype User _
+-- derive instance newtypeDocumentHeaderPlusPermission ::
+--   Newtype DocumentHeaderPlusPermission _
 
-derive instance newtypeDocumentHeader :: Newtype DocumentHeader _
+-- instance decodeJsonHeaderPlusPermission :: DecodeJson DocumentHeaderPlusPermission where
+--   decodeJson json = do
+--     obj <- decodeJson json
+--     doc <- obj .: "document"
+--     docPerm <- obj .: "documentPermission"
+--     pure $ DHPP { document: doc, documentPermission: docPerm }
 
-derive instance newtypeDocumentHeaderPlusPermission ::
-  Newtype DocumentHeaderPlusPermission _
-
-derive instance newtypeNodeHeader :: Newtype NodeHeader _
-
-instance decodeJsonHeader :: DecodeJson DocumentHeader where
-  decodeJson json = do
-    obj <- decodeJson json
-    g <- obj .: "group"
-    h <- obj .: "headCommit"
-    i <- obj .: "id"
-    n <- obj .: "name"
-    pure $ DH { group: g, headCommit: h, id: i, name: n }
-
-instance decodeJsonHeaderPlusPermission :: DecodeJson DocumentHeaderPlusPermission where
-  decodeJson json = do
-    obj <- decodeJson json
-    doc <- obj .: "document"
-    docPerm <- obj .: "documentPermission"
-    pure $ DHPP { document: doc, documentPermission: docPerm }
-
--------------------------------------------------------
---This code is for the newer version of the API. 
---however, as the API has not been completely adapted to this new version yet, the old version must remain.
---Once all the endpoints have been changed, this should replace some of the other code in this file.
-
---newer version that is not compatible with all API endpoints yet
+{- ---------------------- User --------------------- -}
 
 newtype User = U
-  { id :: String, name :: String }
+  { identifier :: String, name :: String }
 
-newtype DocDate = DocDate DateTime
+derive instance newtypeUser :: Newtype User _
+derive newtype instance decodeJsonUser :: DecodeJson User
 
-derive newtype instance eqDocDate :: Eq DocDate
+{- ---------------------- NewDocumentHeader --------------------- -}
 
-derive newtype instance ordDocDate :: Ord DocDate
-
-{- newtype DocumentQuery = DQ
-{documents :: (Array NewDocumentHeader), query :: Query} -}
 newtype NewDocumentHeader = NDH
   { group :: Int
-  , id :: DocumentID
+  , identifier :: DocumentID
   , lastEdited :: DocDate
   , lastEditedBy :: User
   , name :: String
   }
 
+getNDHName :: NewDocumentHeader -> String
+getNDHName (NDH ndh) = ndh.name
+
+getNDHID :: NewDocumentHeader -> Int
+getNDHID (NDH ndh) = ndh.identifier
+
+getNDHLastEdited :: NewDocumentHeader -> DocDate
+getNDHLastEdited (NDH ndh) = ndh.lastEdited
+
 derive instance newtypeNewDocumentHeader :: Newtype NewDocumentHeader _
+derive newtype instance decodeJsonNewDocumentHeader :: DecodeJson NewDocumentHeader
 
---only needed for curretnly not used newer version
-instance decodeJsonUser :: DecodeJson User where
-  decodeJson json = do
-    obj <- decodeJson json
-    i <- obj .: "identifier"
-    n <- obj .: "name"
-    pure $ U { id: i, name: n }
+{- ---------------------- Query --------------------- -}
 
---only needed for currently not used newer version
+newtype Query = Q
+  { group :: Maybe Int, user :: Maybe String }
+
+derive instance newtypeQuery :: Newtype Query _
+derive newtype instance decodeJsonQuery :: DecodeJson Query
+
+newtype DocumentQuery = DQ
+  { documents :: Array NewDocumentHeader, query :: Query }
+
+getDQDocuments :: DocumentQuery -> Array NewDocumentHeader
+getDQDocuments (DQ dq) = dq.documents
+
+derive instance newtypeDocumentQuery :: Newtype DocumentQuery _
+derive newtype instance decodeJsonDocumentQuery :: DecodeJson DocumentQuery
+
+{- ---------------------- NodeHeader --------------------- -}
+
+newtype NodeHeader = NodeHeader
+  { identifier :: Int
+  , kind :: String
+  }
+
+getNHId :: NodeHeader -> Int
+getNHId (NodeHeader nh) = nh.identifier
+
+derive instance newtypeNodeHeader :: Newtype NodeHeader _
+derive newtype instance decodeJsonNodeHeader :: DecodeJson NodeHeader
+derive newtype instance encodeJsonNodeHeader :: EncodeJson NodeHeader
+
+derive instance genericNodeHeader :: Generic NodeHeader _
+instance showNodeHeader :: Show NodeHeader where
+  show = genericShow
+
+{- ---------------------- DocDate --------------------- -}
+
+newtype DocDate = DocDate DateTime
+
+docDateToDateTime :: DocDate -> DateTime
+docDateToDateTime (DocDate date) = date
+
 timeParser :: forall m a. BoundedEnum a => Monad m => Char -> ParserT String m a
 timeParser c = do
   res <- anyTill (char c)
@@ -107,7 +127,6 @@ timeParser c = do
       Nothing -> fail "not valid"
       Just a -> pure a
 
---only needed for currently not used newer version
 dateParser :: forall m. Monad m => ParserT String m DateTime
 dateParser = do
   year <- timeParser '-'
@@ -122,7 +141,6 @@ dateParser = do
     Just g -> pure $ DateTime (canonicalDate year month day)
       (Time hour minute second g)
 
---only needed for currently not used newer version
 instance decodeJsonDateTime :: DecodeJson DocDate where
   decodeJson json = do
     obj <- decodeJson json
@@ -131,144 +149,12 @@ instance decodeJsonDateTime :: DecodeJson DocDate where
       Left _ -> Left (UnexpectedValue json)
       Right datetime -> Right $ DocDate datetime
 
-derive newtype instance decodeJsonQuery :: DecodeJson Query
+derive newtype instance eqDocDate :: Eq DocDate
+derive newtype instance ordDocDate :: Ord DocDate
 
-instance decodeJsonDocumentQuery :: DecodeJson DocumentQuery where
-  decodeJson json = do
-    obj <- decodeJson json
-    d <- obj .: "documents"
-    q <- obj .: "query"
-    pure $ DQ { documents: d, query: q }
+{- ---------------------- DocumentTree --------------------- -}
 
---newer version that is not compatible with all API endpoints yet
-instance decodeJsonNewHeader :: DecodeJson NewDocumentHeader where
-  decodeJson json = do
-    obj <- decodeJson json
-    g <- obj .: "group"
-    i <- obj .: "identifier"
-    l <- obj .: "lastEdited"
-    u <- obj .: "lastEditedBy"
-    n <- obj .: "name"
-    pure $ NDH { group: g, id: i, lastEdited: l, lastEditedBy: u, name: n }
-
-getNDHName :: NewDocumentHeader -> String
-getNDHName (NDH ndh) = ndh.name
-
-getNDHID :: NewDocumentHeader -> Int
-getNDHID (NDH ndh) = ndh.id
-
-getNDHLastEdited :: NewDocumentHeader -> DocDate
-getNDHLastEdited (NDH ndh) = ndh.lastEdited
-
-docDateToDateTime :: DocDate -> DateTime
-docDateToDateTime (DocDate date) = date
-
-----------------------------------------------------------------------
---some values are sometimes missing. This code remedies this until the actual issue is fixed.
---Note: some of the parts of this code segment will be needed afterwards (such as the DocumentQuery type),
---butt will have to be modified first.
-
-newtype Query = Q
-  { group :: Int, user :: Maybe String }
-
-derive instance newtypeQuery :: Newtype Query _
-
-newtype DocumentQuery = DQ
-  { documents :: (Array NewDocumentHeaderOptional), query :: Query }
-
-derive instance newtypeDocumentQuery :: Newtype DocumentQuery _
-
-newtype NewDocumentHeaderOptional = NDHO
-  { group :: Int
-  , id :: DocumentID
-  , lastEdited :: Maybe DocDate
-  , lastEditedBy :: Maybe User
-  , name :: String
-  }
-
-derive instance newtypeNewDocumentHeaderOptional ::
-  Newtype NewDocumentHeaderOptional _
-
---newer version that is not compatible with all API endpoints yet
-instance decodeJsonNewHeaderOptional :: DecodeJson NewDocumentHeaderOptional where
-  decodeJson json = do
-    obj <- decodeJson json
-    g <- obj .: "group"
-    i <- obj .: "identifier"
-    l <- obj .: "lastEdited"
-    u <- obj .: "lastEditedBy"
-    n <- obj .: "name"
-    pure $ NDHO { group: g, id: i, lastEdited: l, lastEditedBy: u, name: n }
-
-getDQDocuments :: DocumentQuery -> Array NewDocumentHeaderOptional
-getDQDocuments (DQ dq) = dq.documents
-
-getNDHOGroup :: NewDocumentHeaderOptional -> Int
-getNDHOGroup (NDHO ndho) = ndho.group
-
-getNDHOID :: NewDocumentHeaderOptional -> DocumentID
-getNDHOID (NDHO ndho) = ndho.id
-
-getNDHOLastEdited :: NewDocumentHeaderOptional -> Maybe DocDate
-getNDHOLastEdited (NDHO ndho) = ndho.lastEdited
-
-getNDHOLastEditedBy :: NewDocumentHeaderOptional -> Maybe User
-getNDHOLastEditedBy (NDHO ndho) = ndho.lastEditedBy
-
-getNDHOName :: NewDocumentHeaderOptional -> String
-getNDHOName (NDHO ndho) = ndho.name
-
-convertOptionalToMandatory :: NewDocumentHeaderOptional -> Maybe NewDocumentHeader
-convertOptionalToMandatory doc = case getNDHOLastEdited doc of
-  Just a -> case getNDHOLastEditedBy doc of
-    Just b -> Just $ NDH
-      { group: getNDHOGroup doc
-      , id: getNDHOGroup doc
-      , lastEdited: a
-      , lastEditedBy: b
-      , name: getNDHOName doc
-      }
-
-    Nothing -> Nothing
-  Nothing -> Nothing
-
-----------------------------------------------------------------------
-
-getDHName :: DocumentHeader -> String
-getDHName (DH dh) = dh.name
-
-getDHID :: DocumentHeader -> Int
-getDHID (DH dh) = dh.id
-
-getDHHeadCommit :: DocumentHeader -> Maybe CommitID
-getDHHeadCommit (DH dh) = dh.headCommit
-
-getDHPPName :: DocumentHeaderPlusPermission -> String
-getDHPPName (DHPP dhpp) = getDHName dhpp.document
-
-getDHPPID :: DocumentHeaderPlusPermission -> Int
-getDHPPID (DHPP dhpp) = getDHID dhpp.document
-
-instance decodeJsonNodeHeader :: DecodeJson NodeHeader where
-  decodeJson json = do
-    obj <- decodeJson json
-    id <- obj .: "identifier"
-    kind <- obj .: "kind"
-    pure $ NodeHeader { id, kind }
-
-instance encodeJsonNodeHeader :: EncodeJson NodeHeader where
-  encodeJson (NodeHeader { id, kind }) =
-    encodeJson
-      { content:
-          { id
-          , kind
-          }
-      }
-
--- show instances for debugging purposes
-instance showNodeHeader :: Show NodeHeader where
-  show (NodeHeader { id, kind }) =
-    "NodeHeader { id: " <> show id <> ", kind: " <> show kind <> " }"
+type DocumentTree = RootTree NodeHeader
 
 decodeDocument :: Json -> Either JsonDecodeError DocumentTree
 decodeDocument json = do
@@ -277,4 +163,4 @@ decodeDocument json = do
   decodeJson root
 
 encodeDocumentTree :: DocumentTree -> Json
-encodeDocumentTree tree = encodeJson $ map (\(NodeHeader { id }) -> id) tree
+encodeDocumentTree = encodeJson <<< map getNHId

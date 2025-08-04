@@ -21,7 +21,6 @@ import Data.Argonaut (decodeJson)
 import Data.Array (filter, head, length, null, replicate, slice, (:))
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
-import Data.Foldable (foldr)
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
@@ -45,7 +44,6 @@ import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto(..))
 import FPO.Dto.DocumentDto
   ( DocumentID
   , NewDocumentHeader(..)
-  , convertOptionalToMandatory
   , docDateToDateTime
   , getDQDocuments
   , getNDHID
@@ -78,8 +76,6 @@ type Slots =
   )
 
 type Input = GroupID
-
-type Document = NewDocumentHeader
 
 data Action
   = Initialize
@@ -121,8 +117,8 @@ type State = FPOState
   , page :: Int
   , groupID :: GroupID
   , group :: Maybe GroupDto
-  , documents :: Array Document
-  , filteredDocuments :: Array Document
+  , documents :: Array NewDocumentHeader
+  , filteredDocuments :: Array NewDocumentHeader
   , currentTime :: Maybe DateTime
   , documentNameFilter :: String
   -- | This is used to store the document ID for deletion confirmation.
@@ -251,7 +247,8 @@ component =
       }
 
   -- Renders the list of projects.
-  renderDocumentList :: Array Document -> State -> H.ComponentHTML Action Slots m
+  renderDocumentList
+    :: Array NewDocumentHeader -> State -> H.ComponentHTML Action Slots m
   renderDocumentList docs state =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
@@ -298,7 +295,7 @@ component =
       ]
 
   -- Renders a single project row in the table.
-  renderDocumentRow :: forall w. State -> Document -> HH.HTML w Action
+  renderDocumentRow :: forall w. State -> NewDocumentHeader -> HH.HTML w Action
   renderDocumentRow state document =
     HH.tr
       [ HE.onClick $ const $ ViewDocument (getNDHID document)
@@ -453,14 +450,7 @@ component =
         (getDocumentsQueryFromURL ("/docs?group=" <> show s.groupID))
       case documents of
         Just docs -> do
-          modDocs <- pure $ foldr
-            ( \doc res -> case doc of
-                Just someDoc -> someDoc : res
-                Nothing -> res
-            )
-            []
-            (map convertOptionalToMandatory (getDQDocuments docs))
-          H.modify_ _ { documents = modDocs }
+          H.modify_ _ { documents = getDQDocuments docs }
         Nothing -> do
           navigate Page404
 
@@ -505,7 +495,6 @@ component =
 
         setModalWaiting true
 
-        {- createResponse <- liftAff (createDocument dto) -}
         createResponse <- liftAff (createNewDocument dto)
         case createResponse of
           Left err -> do
@@ -518,15 +507,12 @@ component =
                 H.modify_ _ { modalState = NoModal, newDocumentName = "" }
                 log "Created Document"
                 now <- H.liftEffect nowDateTime
-                case convertOptionalToMandatory h of
-                  Just modH ->
-                    H.modify_ \s' -> s'
-                      { documents = modH : s'.documents
-                      , filteredDocuments = modH : s'.filteredDocuments
-                      , currentTime = Just now
-                      }
-                  Nothing ->
-                    H.modify_ _ { currentTime = Just now }
+
+                H.modify_ \s' -> s'
+                  { documents = h : s'.documents
+                  , filteredDocuments = h : s'.filteredDocuments
+                  , currentTime = Just now
+                  }
 
                 -- Reset the page view
                 H.modify_ _ { documentNameFilter = "" }
@@ -555,22 +541,14 @@ component =
             }
         Right _ -> do
           log "Deleted Document"
-          --now <- H.liftEffect nowDateTime
           s <- H.get
           documents <- liftAff
             (getDocumentsQueryFromURL ("/docs?group=" <> show s.groupID))
           case documents of
             Just docs -> do
-              modDocs <- pure $ foldr
-                ( \doc res -> case doc of
-                    Just someDoc -> someDoc : res
-                    Nothing -> res
-                )
-                []
-                (map convertOptionalToMandatory (getDQDocuments docs))
               H.modify_ _
                 { error = Nothing
-                , documents = modDocs
+                , documents = getDQDocuments docs
                 , modalState = NoModal
                 }
             Nothing -> do
@@ -637,6 +615,6 @@ component =
 
   docNameFromID :: State -> Int -> String
   docNameFromID state id =
-    case head (filter (\(NDH doc) -> doc.id == id) state.documents) of
+    case head (filter (\(NDH doc) -> doc.identifier == id) state.documents) of
       Just (NDH doc) -> doc.name
       Nothing -> "Unknown Name"

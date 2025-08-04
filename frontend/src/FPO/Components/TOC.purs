@@ -77,11 +77,11 @@ tocview docID = H.mkComponent
   handleAction = case _ of
 
     Init -> do
-      mDoc <- H.liftAff $ Request.getDocumentHeader docID
+      mDoc <- H.liftAff $ Request.getNewDocumentHeader docID
       let
         docName = case mDoc of
           Nothing -> ""
-          Just doc -> DocumentDto.getDHName doc
+          Just doc -> DocumentDto.getNDHName doc
       H.modify_ \st -> do
         st { documentName = docName }
 
