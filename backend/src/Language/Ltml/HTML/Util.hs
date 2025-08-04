@@ -8,7 +8,7 @@ module Language.Ltml.HTML.Util
     , (<#>)
     , cssClass_
     , mId_
-    , jumpTag
+    , anchorLink
     ) where
 
 import Data.Char (chr)
@@ -70,5 +70,5 @@ mId_ (Just label) = id_ $ unLabel label
 -------------------------------------------------------------------------------
 
 -- | Converts Label into <a href = "#<label>"> for HTML jumping
-jumpTag :: Label -> Html () -> Html ()
-jumpTag label = a_ [href_ (cons '#' $ unLabel label)]
+anchorLink :: Label -> Html () -> Html ()
+anchorLink label = a_ [href_ (cons '#' $ unLabel label)]

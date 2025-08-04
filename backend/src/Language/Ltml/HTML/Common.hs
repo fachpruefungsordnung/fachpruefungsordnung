@@ -17,7 +17,7 @@ import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (State)
 import Data.Text (Text)
 import Language.Ltml.AST.Label (Label)
-import Language.Ltml.HTML.Util (jumpTag)
+import Language.Ltml.HTML.Util (anchorLink)
 import Lucid (Html)
 
 -- | The Reader Monad is used for local tracking (e.g. enumNestingLevel).
@@ -67,7 +67,7 @@ initGlobalState =
         , currentParagraphID = 1
         , currentSentenceID = 0
         , labels = []
-        , labelWrapperFunc = jumpTag -- const id -- jumpTag
+        , labelWrapperFunc = anchorLink -- const id -- anchorLink
         }
 
 initReaderState :: ReaderState
