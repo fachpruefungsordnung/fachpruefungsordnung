@@ -84,7 +84,7 @@ ifSuperOrAnyAdminDo conn (Auth.Token {..}) callback =
                 Left _ -> throwError errDatabaseAccessFailed
                 Right [] -> throwError errNoAdminInAnyGroup
                 Right roles ->
-                    if any (\(_, mr) -> mr == Just User.Admin) roles
+                    if any (\(_, _, mr) -> mr == Just User.Admin) roles
                         then callback
                         else throwError errNoAdminInAnyGroup
 

@@ -60,7 +60,8 @@ getUserByEmail userEmail = statement userEmail Statements.getUserByEmail
 getUserByID :: User.UserID -> Session (Maybe User.User)
 getUserByID userID = statement userID Statements.getUserByID
 
-getAllUserRoles :: User.UserID -> Session [(Group.GroupID, Maybe User.Role)]
+getAllUserRoles
+    :: User.UserID -> Session [(Group.GroupID, Text, Maybe User.Role)]
 getAllUserRoles uid =
     fmap (Data.Bifunctor.second User.textToRole)
         <$> statement uid Statements.getAllUserRoles
