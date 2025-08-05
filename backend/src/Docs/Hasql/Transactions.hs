@@ -1,7 +1,9 @@
 {-# LANGUAGE TupleSections #-}
 
 module Docs.Hasql.Transactions
-    ( createTextRevision
+    ( getTextElementRevision
+    , existsTextRevision
+    , createTextRevision
     , putTree
     , createTreeRevision
     , existsDocument
@@ -30,8 +32,10 @@ import Docs.Hasql.TreeEdge (TreeEdge (TreeEdge), TreeEdgeChildRef (..))
 import qualified Docs.Hasql.TreeEdge as TreeEdge
 import Docs.TextElement (TextElementID, TextElementRef (..))
 import Docs.TextRevision
-    ( TextRevision
+    ( TextElementRevision
+    , TextRevision
     , TextRevisionID
+    , TextRevisionRef
     )
 import Docs.Tree (Edge (Edge), Node (Node), Tree (Leaf, Tree))
 import Docs.TreeRevision (TreeRevision)
@@ -39,6 +43,14 @@ import DocumentManagement.Hash
     ( Hash (Hash)
     , Hashable (..)
     )
+
+getTextElementRevision
+    :: TextRevisionRef
+    -> Transaction (Maybe TextElementRevision)
+getTextElementRevision = flip statement Statements.getTextElementRevision
+
+existsTextRevision :: TextRevisionRef -> Transaction Bool
+existsTextRevision = flip statement Statements.existsTextRevision
 
 existsDocument :: DocumentID -> Transaction Bool
 existsDocument = flip statement Statements.existsDocument

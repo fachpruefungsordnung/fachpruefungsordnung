@@ -2,21 +2,108 @@ module FPO.Dto.UserDto where
 
 import Prelude
 
-import Data.Argonaut (Json, JsonDecodeError, decodeJson, (.:))
-import Data.Either (Either)
+import Data.Argonaut
+  ( class DecodeJson
+  , class EncodeJson
+  , JsonDecodeError(..)
+  , decodeJson
+  , encodeJson
+  )
+import Data.Array (any)
+import Data.Either (Either(..))
+import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe(..))
+import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
 
--- | TODO: This is an incomplete representation of a user.
--- |
--- | Representation of a user in the application.
-type User = { userName :: String, isAdmin :: Boolean }
+type UserID = String
 
--- | Decodes a JSON object into a `User`.
+-- | Representation of a user in the application,
+-- | based on the API's `GET /me` endpoint.
+newtype FullUserDto = FullUserDto
+  { fullUserEmail :: String
+  , fullUserID :: UserID
+  , fullUserIsSuperadmin :: Boolean
+  , fullUserName :: String
+  , fullUserRoles :: Array FullUserRoleDto
+  }
+
+getUserEmail :: FullUserDto -> String
+getUserEmail (FullUserDto u) = u.fullUserEmail
+
+getUserID :: FullUserDto -> UserID
+getUserID (FullUserDto u) = u.fullUserID
+
+isUserSuperadmin :: FullUserDto -> Boolean
+isUserSuperadmin (FullUserDto u) = u.fullUserIsSuperadmin
+
+-- | Checks if the user is admin of at least one group, or even a superadmin.
+isAdmin :: FullUserDto -> Boolean
+isAdmin (FullUserDto u) = u.fullUserIsSuperadmin || any
+  (\role -> getUserRole role == Admin)
+  u.fullUserRoles
+
+-- | Checks if the user is an admin of a specific group.
+-- | Returns `true` if the user is an admin of the group with the given ID,
+-- | detached from the superadmin state of the user.
 -- |
--- | TODO: It might be better to implement `instance DecodeJson User`, but
--- |       this forces us to use Data instead of Type..
-decodeUser :: Json -> Either JsonDecodeError User
-decodeUser json = do
-  obj <- decodeJson json
-  name <- obj .: "fullUserName"
-  admin <- obj .: "fullUserIsSuperadmin"
-  pure { userName: name, isAdmin: admin }
+-- | See `isUserSuperadmin` for checking if the user is a superadmin.
+isAdminOf :: FullUserDto -> Int -> Boolean
+isAdminOf (FullUserDto u) groupID =
+  any (\role -> getUserRoleGroupID role == groupID && getUserRole role == Admin)
+    u.fullUserRoles
+
+getUserName :: FullUserDto -> String
+getUserName (FullUserDto u) = u.fullUserName
+
+getUserRoles :: FullUserDto -> Array FullUserRoleDto
+getUserRoles (FullUserDto u) = u.fullUserRoles
+
+derive instance newtypeFullUserDto :: Newtype FullUserDto _
+derive newtype instance encodeJsonFullUserDto :: EncodeJson FullUserDto
+derive newtype instance decodeJsonFullUserDto :: DecodeJson FullUserDto
+derive instance genericFullUserDto :: Generic FullUserDto _
+instance showFullUserDto :: Show FullUserDto where
+  show = genericShow
+
+newtype FullUserRoleDto = FullUserRoleDto
+  { groupID :: Int
+  , role :: Role
+  }
+
+getUserRoleGroupID :: FullUserRoleDto -> Int
+getUserRoleGroupID (FullUserRoleDto r) = r.groupID
+
+getUserRole :: FullUserRoleDto -> Role
+getUserRole (FullUserRoleDto r) = r.role
+
+derive instance newtypeFullUserRoleDto :: Newtype FullUserRoleDto _
+derive newtype instance encodeJsonFullUserRoleDto :: EncodeJson FullUserRoleDto
+derive newtype instance decodeJsonFullUserRoleDto :: DecodeJson FullUserRoleDto
+derive instance genericFullUserRoleDto :: Generic FullUserRoleDto _
+instance showFullUserRoleDto :: Show FullUserRoleDto where
+  show = genericShow
+
+data Role = Admin | Member
+
+instance encodeJsonRole :: EncodeJson Role where
+  encodeJson Admin = encodeJson "Admin"
+  encodeJson Member = encodeJson "Member"
+
+instance decodeJsonRole :: DecodeJson Role where
+  decodeJson json = do
+    str <- decodeJson json
+    case str of
+      "Admin" -> Right Admin
+      "Member" -> Right Member
+      _ -> Left $ UnexpectedValue json
+
+stringToRole :: String -> Maybe Role
+stringToRole "Admin" = Just Admin
+stringToRole "Member" = Just Member
+stringToRole _ = Nothing
+
+derive instance eqRole :: Eq Role
+derive instance genericRole :: Generic Role _
+instance showRole :: Show Role where
+  show = genericShow

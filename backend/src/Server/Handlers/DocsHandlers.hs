@@ -79,8 +79,12 @@ import Server.DTOs.CreateTextElement (CreateTextElement)
 import qualified Server.DTOs.CreateTextElement as CreateTextElement
 import Server.DTOs.CreateTextRevision (CreateTextRevision)
 import qualified Server.DTOs.CreateTextRevision as CreateTextRevision
-import Server.DTOs.Documents (Documents (Documents))
+import Server.DTOs.Documents
+    ( Documents (Documents)
+    , DocumentsQuery (DocumentsQuery)
+    )
 import qualified Server.DTOs.Documents as Documents
+import UserManagement.Group (GroupID)
 
 type DocsAPI =
     "docs"
@@ -110,6 +114,8 @@ type GetDocument =
 
 type GetDocuments =
     Auth AuthMethod Auth.Token
+        :> QueryParam "user" UserID
+        :> QueryParam "group" GroupID
         :> Get '[JSON] Documents
 
 type PostTextElement =
@@ -224,13 +230,20 @@ getDocumentHandler auth docID = do
 
 getDocumentsHandler
     :: AuthResult Auth.Token
+    -> Maybe UserID
+    -> Maybe GroupID
     -> Handler Documents
-getDocumentsHandler auth = do
+getDocumentsHandler auth byUserID byGroupID = do
     userID <- getUser auth
-    result <- withDB $ run $ Docs.getDocuments userID
+    result <- withDB $ run $ Docs.getDocuments userID byUserID byGroupID
     return $
         Documents
             { Documents.documents = result
+            , Documents.query =
+                DocumentsQuery
+                    { Documents.user = byUserID
+                    , Documents.group = byGroupID
+                    }
             }
 
 postTextElementHandler
@@ -382,6 +395,14 @@ guardDocsResult (Left err) = throwError $ mapErr err
                         ++ show perms
                         ++ " document "
                         ++ show (unDocumentID docID)
+                        ++ "!\n"
+            }
+    mapErr (Docs.NoPermissionForUser userID) =
+        err403
+            { errBody =
+                LBS.pack $
+                    "You are not allowed to view information about "
+                        ++ show userID
                         ++ "!\n"
             }
     mapErr (Docs.NoPermissionInGroup groupID) =

@@ -57,6 +57,7 @@ data FullUser = FullUser
 
 data GroupRole = GroupRole
     { groupID :: GroupID
+    , groupName :: Text
     , role :: Role
     }
     deriving (Generic)

@@ -28,6 +28,7 @@ package:
     - maybe
     - newtype
     - now
+    - parsing
     - prelude
     - record
     - record-extra

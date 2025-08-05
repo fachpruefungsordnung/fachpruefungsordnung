@@ -4,7 +4,6 @@ module FPO.Components.Editor
   , Query(..)
   , State
   , LiveMarker
-  , _pdfSlideBar
   , addAnnotation
   , addChangeListener
   , editor
@@ -37,10 +36,21 @@ import FPO.Components.Editor.Keybindings
   , underscore
   )
 import FPO.Data.Request (getUser)
+import FPO.Data.Request as Request
 import FPO.Data.Store as Store
+import FPO.Dto.ContentDto (Content)
+import FPO.Dto.ContentDto as ContentDto
+import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
+import FPO.Dto.UserDto (getUserName)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.Types (AnnotatedMarker, TOCEntry, markerToAnnotation, sortMarkers)
+import FPO.Types
+  ( AnnotatedMarker
+  , TOCEntry
+  , emptyTOCEntry
+  , markerToAnnotation
+  , sortMarkers
+  )
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
@@ -49,7 +59,6 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
-import Type.Proxy (Proxy(Proxy))
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element (toEventTarget)
 import Web.Event.EventTarget (addEventListener, eventListener)
@@ -59,9 +68,8 @@ import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 type State = FPOState
   ( mEditor :: Maybe Types.Editor
   , mTocEntry :: Maybe TOCEntry
+  , mContent :: Maybe Content
   , liveMarkers :: Array LiveMarker
-  , pdfWarningAvailable :: Boolean
-  , pdfWarningIsShown :: Boolean
   , fontSize :: Int
   )
 
@@ -74,8 +82,6 @@ type LiveMarker =
   , ref :: Ref Int
   }
 
-_pdfSlideBar = Proxy :: Proxy "pdfSlideBar"
-
 data Output
   = ClickedQuery (Maybe (Array String))
   | DeletedComment TOCEntry (Array Int)
@@ -87,7 +93,6 @@ data Action
   = Init
   | Comment
   | DeleteComment
-  | ShowWarning
   | SelectComment
   | Bold
   | Italic
@@ -104,7 +109,6 @@ data Query a
   = QueryEditor a
   -- save the current content and send it to splitview
   | SaveSection a
-  | LoadPdf a
   -- receive the selected TOC and put its content into the editor
   | ChangeSection TOCEntry a
   | SendCommentSections a
@@ -113,8 +117,9 @@ editor
   :: forall m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => H.Component Query Unit Output m
-editor = connect selectTranslator $ H.mkComponent
+  => DocumentID
+  -> H.Component Query Unit Output m
+editor docID = connect selectTranslator $ H.mkComponent
   { initialState
   , render
   , eval: H.mkEval H.defaultEval
@@ -131,8 +136,7 @@ editor = connect selectTranslator $ H.mkComponent
     , mEditor: Nothing
     , liveMarkers: []
     , mTocEntry: Nothing
-    , pdfWarningAvailable: false
-    , pdfWarningIsShown: false
+    , mContent: Nothing
     , fontSize: 12
     }
 
@@ -330,7 +334,7 @@ editor = connect selectTranslator $ H.mkComponent
           sCol = Types.getColumn start
           eRow = Types.getRow end
           eCol = Types.getColumn end
-          userName = maybe "Guest" _.userName user
+          userName = maybe "Guest" getUserName user
           newMarkerID = case state.mTocEntry of
             Nothing -> 0
             Just tocEntry -> tocEntry.newMarkerNextID
@@ -351,13 +355,8 @@ editor = connect selectTranslator $ H.mkComponent
             }
 
         mLiveMarker <- H.liftEffect $ addAnchor newMarker session
-        -- Textinhalt holen
-        allLines <- H.liftEffect do
-          doc <- Session.getDocument session
-          Document.getAllLines doc
 
         let
-          contentText = intercalate "\n" allLines
           newLiveMarkers = case mLiveMarker of
             Nothing -> state.liveMarkers
             Just lm -> lm : state.liveMarkers
@@ -368,7 +367,6 @@ editor = connect selectTranslator $ H.mkComponent
               newEntry =
                 { id: entry.id
                 , name: entry.name
-                , content: contentText
                 , newMarkerNextID: entry.newMarkerNextID + 1
                 , markers: sortMarkers (newMarker : entry.markers)
                 }
@@ -408,9 +406,6 @@ editor = connect selectTranslator $ H.mkComponent
                   st { mTocEntry = Just newTOCEntry, liveMarkers = newLiveMarkers }
                 H.raise (DeletedComment newTOCEntry [ foundID ])
 
-    ShowWarning -> do
-      H.modify_ \state -> state { pdfWarningIsShown = not state.pdfWarningIsShown }
-
     SelectComment -> do
       H.gets _.mEditor >>= traverse_ \ed -> do
         state <- H.get
@@ -426,7 +421,6 @@ editor = connect selectTranslator $ H.mkComponent
             Nothing ->
               { id: -1
               , name: "No entry"
-              , content: ""
               , newMarkerNextID: -1
               , markers: []
               }
@@ -453,13 +447,27 @@ editor = connect selectTranslator $ H.mkComponent
       -- Put the content of the section into the editor and update markers
       H.gets _.mEditor >>= traverse_ \ed -> do
         state <- H.get
+
+        -- Get the content from server here
+        -- We need Aff for that and thus cannot go inside Eff
+        -- TODO: After creating a new Leaf, we get Nothing in loadedContent
+        -- See, why and fix it
+        loadedContent <- H.liftAff $
+          Request.getFromJSONEndpoint
+            ContentDto.decodeContent
+            ("/docs/" <> show docID <> "/text/" <> show entry.id <> "/rev/latest")
+        let
+          content = case loadedContent of
+            Nothing -> ContentDto.failureContent
+            Just res -> res
+        H.modify_ \st -> st { mContent = Just content }
+
         newLiveMarkers <- H.liftEffect do
           session <- Editor.getSession ed
           document <- Session.getDocument session
 
-          -- Set editor content
-          let content = entry.content
-          Document.setValue content document
+          -- Set the content of the editor
+          Document.setValue (ContentDto.getContentText content) document
 
           -- Reset Undo history
           undoMgr <- Session.getUndoManager session
@@ -488,59 +496,63 @@ editor = connect selectTranslator $ H.mkComponent
 
       pure (Just a)
 
-    LoadPdf a -> do
-      H.modify_ _ { pdfWarningAvailable = true }
-      pure (Just a)
-
     SaveSection a -> do
       state <- H.get
-      allLines <- H.gets _.mEditor >>= traverse \ed -> do
-        H.liftEffect $ Editor.getSession ed
-          >>= Session.getDocument
-          >>= Document.getAllLines
+      case state.mContent of
+        Nothing -> pure (Just a)
+        Just content -> do
+          allLines <- H.gets _.mEditor >>= traverse \ed -> do
+            H.liftEffect $ Editor.getSession ed
+              >>= Session.getDocument
+              >>= Document.getAllLines
 
-      -- Save the current content of the editor
-      let
-        contentText = case allLines of
-          Just ls -> intercalate "\n" ls
-          Nothing -> ""
+          -- Save the current content of the editor
+          let
+            contentText = case allLines of
+              Just ls -> intercalate "\n" ls
+              Nothing -> ""
 
-        -- extract the current TOC entry
-        entry = case state.mTocEntry of
-          Nothing ->
-            { id: -1
-            , name: "Section not found"
-            , content: ""
-            , newMarkerNextID: -1
-            , markers: []
+            -- place it in content
+            newContent = ContentDto.setContentText contentText content
+
+            -- extract the current TOC entry
+            entry = case state.mTocEntry of
+              Nothing -> emptyTOCEntry
+              Just e -> e
+
+          -- Since the ids and postions in liveMarkers are changing constantly,
+          -- extract them now and store them
+          updatedMarkers <- H.liftEffect do
+            for entry.markers \m -> do
+              case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
+                -- TODO Should we add other markers in liveMarkers such as errors?
+                Nothing -> pure m
+                Just lm -> do
+                  start <- Anchor.getPosition lm.startAnchor
+                  end <- Anchor.getPosition lm.endAnchor
+                  pure m
+                    { startRow = Types.getRow start
+                    , startCol = Types.getColumn start
+                    , endRow = Types.getRow end
+                    , endCol = Types.getColumn end
+                    }
+          -- update the markers in entry
+          let
+            newEntry = entry
+              { markers = updatedMarkers }
+            jsonContent = ContentDto.encodeContent newContent
+
+          -- send the new content as POST to the server
+          _ <- H.liftAff $ Request.postJson
+            ("/docs/" <> show docID <> "/text/" <> show entry.id <> "/rev")
+            jsonContent
+
+          H.modify_ \st -> st
+            { mTocEntry = Just newEntry
+            , mContent = Just newContent
             }
-          Just e -> e
-
-      -- Since the ids and postions in liveMarkers are changing constantly, 
-      -- extract them now and store them 
-      updatedMarkers <- H.liftEffect do
-        for entry.markers \m -> do
-          case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
-            -- TODO Should we add other markers in liveMarkers such as errors?
-            Nothing -> pure m
-            Just lm -> do
-              start <- Anchor.getPosition lm.startAnchor
-              end <- Anchor.getPosition lm.endAnchor
-              pure m
-                { startRow = Types.getRow start
-                , startCol = Types.getColumn start
-                , endRow = Types.getRow end
-                , endCol = Types.getColumn end
-                }
-      let
-        newEntry = entry
-          { content = contentText
-          , markers = updatedMarkers
-          }
-
-      H.modify_ \st -> st { mTocEntry = Just newEntry }
-      H.raise (SavedSection newEntry)
-      pure (Just a)
+          H.raise (SavedSection newEntry)
+          pure (Just a)
 
     -- Because Session does not provide a way to get all lines directly,
     -- we need to take another indirect route to get the lines.
@@ -675,9 +687,9 @@ createMarkerRange marker = do
   range <- Range.create marker.startRow marker.startCol marker.endRow marker.endCol
   pure range
 
--- Gets all markers from this session. Then check, if the Position is in 
+-- Gets all markers from this session. Then check, if the Position is in
 -- range one of the markers. Because the markers are sorted by start Position
--- we can use the 
+-- we can use the
 --findLocalMarkerID
 
 cursorInRange :: Array LiveMarker -> Types.Position -> Effect (Maybe LiveMarker)

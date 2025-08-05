@@ -1,7 +1,6 @@
--- | Home page of the application. As of now, this is simply our
--- | "sandbox" for testing components.
+-- | Home page of the application.
 -- |
--- | Right now, it displays a list of mock projects and allows
+-- | It displays a list of all accessible projects and allows
 -- | the user to navigate to the editor by clicking on the title.
 -- | The user must be logged in to see the projects.
 
@@ -27,16 +26,12 @@ import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (getDocumentsFromURLWithPermission, getUser)
+import FPO.Data.Request (getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto
-  ( DocumentHeaderPlusPermission
-  , DocumentID
-  , getDHPPID
-  , getDHPPName
-  )
-import FPO.Dto.UserDto (User)
+import FPO.Dto.DocumentDto.DocDate as DD
+import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addCard, addColumn)
@@ -61,7 +56,7 @@ data Sorting = TitleAsc | TitleDesc | LastUpdatedAsc | LastUpdatedDesc
 data Action
   = Initialize
   | NavLogin
-  | ViewProject Project
+  | ViewProject DH.DocumentHeader
   | Receive (Connected FPOTranslator Input)
   | DoNothing
   | ChangeSorting TH.Output
@@ -69,19 +64,12 @@ data Action
   | SetPage P.Output
 
 type State = FPOState
-  ( user :: Maybe User
-  , projects :: Array Project
+  ( user :: Maybe FullUserDto
+  , projects :: Array DH.DocumentHeader
   , currentTime :: Maybe DateTime
   , searchQuery :: String
   , page :: Int
   )
-
--- | Model for Projects with proper DateTime.
-type Project =
-  { name :: String
-  , documentID :: DocumentID
-  , updated :: DateTime
-  }
 
 type Slots =
   ( tablehead :: forall q. H.Slot q TH.Output Unit
@@ -141,17 +129,18 @@ component =
       now <- liftEffect nowDateTime
       -- If the user is logged in, fetch their documents and convert them to projects.
       void $ runMaybeT do
-        docs <- MaybeT $ liftAff (getDocumentsFromURLWithPermission "/me/documents")
+        user <- MaybeT $ pure u
+        docs <- MaybeT $ liftAff $ getUserDocuments $ getUserID user
         lift $ H.modify_ _
           { user = u
           , translator = fromFpoTranslator store.translator
-          , projects = toProject docs now
+          , projects = docs
           , currentTime = Just now
           }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
-      log $ "Routing to editor for project " <> project.name
-      navigate (Editor { docID: project.documentID })
+      log $ "Routing to editor for project " <> (DH.getName project)
+      navigate (Editor { docID: DH.getID project })
     NavLogin -> do
       updateStore $ Store.SetLoginRedirect (Just Home)
       navigate Login
@@ -165,12 +154,12 @@ component =
         "Title" ->
           TH.sortByF
             order
-            (\a b -> compare a.name b.name)
+            (\a b -> compare (DH.getName a) (DH.getName b))
             state.projects
         "Last Updated" ->
           TH.sortByF
             (TH.toggleSorting order) -- The newest project should be first.
-            (\a b -> compare a.updated b.updated)
+            (\a b -> compare (getEditTimestamp a) (getEditTimestamp b))
             state.projects
         _ -> state.projects -- Ignore other columns.
 
@@ -232,12 +221,13 @@ component =
     paginationSettings =
       { pages: length fps `div` 5 +
           if length fps `mod` 5 > 0 then 1 else 0
-      , style: P.Full
+      , style: P.Compact 2
       , reaction: P.FirstPage -- After changing the search query, reset to first page.
       }
 
   -- Renders the list of projects.
-  renderProjectTable :: Array Project -> State -> H.ComponentHTML Action Slots m
+  renderProjectTable
+    :: Array DH.DocumentHeader -> State -> H.ComponentHTML Action Slots m
   renderProjectTable ps state =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
@@ -274,16 +264,18 @@ component =
       ]
 
   -- Renders a single project row in the table.
-  renderProjectRow :: forall w. State -> Project -> HH.HTML w Action
+  renderProjectRow :: forall w. State -> DH.DocumentHeader -> HH.HTML w Action
   renderProjectRow state project =
     HH.tr
       [ HE.onClick $ const $ ViewProject project
       , HP.style "cursor: pointer;"
       ]
       [ HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text project.name ]
+          [ HH.text $ DH.getName project ]
       , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ formatRelativeTime state.currentTime project.updated ]
+          [ HH.text $ formatRelativeTime state.currentTime $ DD.docDateToDateTime $
+              DH.getLastEdited project
+          ]
       ]
 
   -- Renders an empty project row for padding.
@@ -297,27 +289,20 @@ component =
           [ HH.text $ "Empty Row" ]
       ]
 
-  filterProjects :: String -> Array Project -> Array Project
+  filterProjects :: String -> Array DH.DocumentHeader -> Array DH.DocumentHeader
   filterProjects query projects =
-    filter (\p -> contains (Pattern $ toLower query) (toLower p.name)) projects
+    filter (\p -> contains (Pattern $ toLower query) (toLower $ DH.getName p))
+      projects
 
--- transforms Document data from backend into data for this page
-toProject :: Array DocumentHeaderPlusPermission -> DateTime -> Array Project
-toProject docs now = map
-  ( \doc ->
-      { name: getDHPPName doc
-      , documentID: getDHPPID doc
-      , updated: now
-      }
-  )
-  docs
-
--- Helper function to adjust a DateTime by a duration (subtract from current time)
+-- | Helper function to adjust a DateTime by a duration (subtract from current time)
 adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime
 adjustDateTime duration dt =
   fromMaybe dt $ adjust (negateDuration duration) dt
 
--- Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
+getEditTimestamp ∷ DH.DocumentHeader → DateTime
+getEditTimestamp = DD.docDateToDateTime <<< DH.getLastEdited
+
+-- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
 formatRelativeTime :: Maybe DateTime -> DateTime -> String
 formatRelativeTime Nothing _ = "Unknown"
 formatRelativeTime (Just current) updated =
@@ -342,7 +327,6 @@ formatRelativeTime (Just current) updated =
     else
       "Just now"
   where
-
   -- Format DateTime as absolute date (YYYY-MM-DD)
   formatAbsoluteDate :: DateTime -> String
   formatAbsoluteDate dt =

@@ -1,6 +1,7 @@
 module Docs.Database
     ( HasCheckPermission (..)
     , HasIsGroupAdmin (..)
+    , HasIsSuperAdmin (..)
     , HasExistsDocument (..)
     , HasExistsTextElement (..)
     , HasExistsTextRevision (..)
@@ -44,11 +45,14 @@ import Docs.Tree (Node)
 import Docs.TreeRevision (TreeRevision, TreeRevisionHistory, TreeRevisionRef)
 import GHC.Int (Int32)
 
-class (Monad m) => HasCheckPermission m where
+class (HasIsSuperAdmin m) => HasCheckPermission m where
     checkDocumentPermission :: UserID -> DocumentID -> Permission -> m Bool
 
-class (Monad m) => HasIsGroupAdmin m where
+class (HasIsSuperAdmin m) => HasIsGroupAdmin m where
     isGroupAdmin :: UserID -> GroupID -> m Bool
+
+class (Monad m) => HasIsSuperAdmin m where
+    isSuperAdmin :: UserID -> m Bool
 
 -- exists
 
@@ -66,9 +70,10 @@ class (HasExistsDocument m) => HasExistsTreeRevision m where
 
 -- get
 
-class (HasCheckPermission m) => HasGetDocument m where
+class (HasCheckPermission m, HasIsGroupAdmin m, HasIsSuperAdmin m) => HasGetDocument m where
     getDocument :: DocumentID -> m (Maybe Document)
     getDocuments :: UserID -> m (Vector Document)
+    getDocumentsBy :: Maybe UserID -> Maybe GroupID -> m (Vector Document)
 
 class (HasCheckPermission m, HasExistsTreeRevision m) => HasGetTreeRevision m where
     getTreeRevision :: TreeRevisionRef -> m (TreeRevision TextElement)
@@ -92,7 +97,7 @@ class (HasCheckPermission m, HasExistsDocument m) => HasGetDocumentHistory m whe
 -- create
 
 class (HasIsGroupAdmin m) => HasCreateDocument m where
-    createDocument :: Text -> GroupID -> m Document
+    createDocument :: Text -> GroupID -> UserID -> m Document
 
 class (HasCheckPermission m, HasExistsDocument m) => HasCreateTextElement m where
     createTextElement :: DocumentID -> TextElementKind -> m TextElement

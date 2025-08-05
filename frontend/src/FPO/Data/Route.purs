@@ -6,7 +6,7 @@ import Prelude hiding ((/))
 
 import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(Nothing), fromMaybe)
-import FPO.Dto.DocumentDto (DocumentID)
+import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.GroupDto (GroupID)
 import Routing.Duplex (RouteDuplex', boolean, int, optional, root)
 import Routing.Duplex.Generic (noArgs, sum)
@@ -22,6 +22,7 @@ data Route
   | AdminViewGroups
   | ViewGroupDocuments { groupID :: GroupID }
   | ViewGroupMembers { groupID :: GroupID }
+  | GroupAddMembers { groupID :: GroupID }
   | Page404
   | Profile { loginSuccessful :: Maybe Boolean }
 
@@ -40,6 +41,7 @@ routeCodec = root $ sum
   , "AdminViewGroups": "admin-groups" / noArgs
   , "ViewGroupDocuments": "view-group-documents" ? { groupID: int }
   , "ViewGroupMembers": "view-group-members" ? { groupID: int }
+  , "GroupAddMembers": "group-add-members" ? { groupID: int }
   , "Page404": "404" / noArgs
   , "Profile": "profile" ? { loginSuccessful: optional <<< boolean }
   }
@@ -56,6 +58,7 @@ routeToString = case _ of
   AdminViewGroups -> "AdminViewGroups"
   ViewGroupDocuments groupID -> "ViewGroupDocuments:" <> show groupID
   ViewGroupMembers groupID -> "ViewGroupMembers:" <> show groupID
+  GroupAddMembers groupID -> "GroupAddMembers:" <> show groupID
   Page404 -> "Page404"
   Profile { loginSuccessful } -> "Profile" <>
     ( if loginSuccessful == Nothing then ""

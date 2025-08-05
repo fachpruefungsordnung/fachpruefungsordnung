@@ -52,8 +52,6 @@ import Data.OpenApi
     )
 import Web.HttpApiData (FromHttpApiData (..))
 
-import UserManagement.User (UserID)
-
 import Docs.Document (DocumentID)
 import Docs.TextElement
     ( TextElement
@@ -306,27 +304,27 @@ instance ToSchema ConflictStatus where
 -- | it is ignored.
 newTextRevision
     :: (Monad m)
-    => (TextElementRef -> m (Maybe TextRevisionID))
-    -- ^ gets the latest revision id for a text element (if any)
-    -> (UserID -> TextElementRef -> Text -> m TextRevision)
+    => Maybe TextRevision
+    -- ^ the latest revision for the text element (if any)
+    -> (Text -> m TextRevision)
     -- ^ creates a new text revision in the database
-    -> UserID
-    -- ^ the id of the user who intends to create the new revision
     -> NewTextRevision
     -- ^ all data needed to create a new text revision
     -> m ConflictStatus
     -- ^ either the newly created text revision or a conflict
-newTextRevision getLatestRevisionID createRevision userID newRevision = do
-    latestRevisionID <- getLatestRevisionID $ newTextRevisionElement newRevision
+newTextRevision latestRevision createRevision newRevision = do
+    let latestRevisionID = latestRevision <&> identifier . header
     let parentRevisionID = newTextRevisionParent newRevision
-    case latestRevisionID of
+    case latestRevision of
         Nothing -> createRevision' <&> NoConflict
         Just latest
-            | latestRevisionID == parentRevisionID -> createRevision' <&> NoConflict
-            | otherwise -> return $ Conflict latest
+            | content latest == newTextRevisionContent newRevision ->
+                return $ NoConflict latest
+            | latestRevisionID == parentRevisionID ->
+                createRevision' <&> NoConflict
+            | otherwise ->
+                return $ Conflict $ identifier $ header latest
   where
     createRevision' =
         createRevision
-            userID
-            (newTextRevisionElement newRevision)
             (newTextRevisionContent newRevision)

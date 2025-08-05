@@ -12,17 +12,57 @@ import Data.Void (Void)
 import Language.Lsd.AST.Common
 import Language.Lsd.AST.Format
 import Language.Lsd.AST.SimpleRegex
+import Language.Lsd.AST.Type.AppendixSection
 import Language.Lsd.AST.Type.Document
+import Language.Lsd.AST.Type.DocumentContainer
 import Language.Lsd.AST.Type.Enum
 import Language.Lsd.AST.Type.Paragraph
 import Language.Lsd.AST.Type.Section
 import Language.Lsd.AST.Type.Text
 
-fpoT :: DocumentType
+fpoT :: DocumentContainerType
 fpoT =
+    DocumentContainerType
+        DocumentContainerFormat
+        mainDocT
+        [appendixT, attachmentT]
+
+appendixT :: AppendixSectionType
+appendixT =
+    AppendixSectionType
+        ( AppendixSectionFormat
+            (FormatString [PlaceholderAtom Arabic])
+            ( FormatString
+                [ StringAtom "Anlage "
+                , PlaceholderAtom IdentifierPlaceholder
+                , StringAtom "\n"
+                , PlaceholderAtom HeadingTextPlaceholder
+                ]
+            )
+        )
+        [] -- TODO
+
+attachmentT :: AppendixSectionType
+attachmentT =
+    AppendixSectionType
+        ( AppendixSectionFormat
+            (FormatString [PlaceholderAtom Arabic])
+            ( FormatString
+                [ StringAtom "Anhang "
+                , PlaceholderAtom IdentifierPlaceholder
+                , StringAtom "\n"
+                , StringAtom "(nicht Bestandteil der Satzung)"
+                , StringAtom "\n"
+                , PlaceholderAtom HeadingTextPlaceholder
+                ]
+            )
+        )
+        [] -- TODO
+
+mainDocT :: DocumentType
+mainDocT =
     DocumentType
         DocumentFormat
-        []
         ( SimpleRegex
             (Sequence [])
             ( Disjunction

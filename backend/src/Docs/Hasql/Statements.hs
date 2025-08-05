@@ -6,6 +6,7 @@ module Docs.Hasql.Statements
     ( createDocument
     , getDocument
     , getDocuments
+    , getDocumentsBy
     , createTextElement
     , getTextElement
     , createTextRevision
@@ -100,12 +101,14 @@ existsDocument =
     lmap
         unDocumentID
         [singletonStatement|
-            SELECT
-                1 :: bool
-            FROM
-                docs
-            WHERE
-                id = $1 :: int4
+            SELECT EXISTS (
+                SELECT
+                    1 :: bool
+                FROM
+                    docs
+                WHERE
+                    id = $1 :: int4
+            ) :: bool
         |]
 
 existsTreeRevision :: Statement TreeRevisionRef Bool
@@ -113,13 +116,15 @@ existsTreeRevision =
     lmap
         uncurryTreeRevisionRef
         [singletonStatement|
-            SELECT
-                1 :: bool
-            FROM
-                doc_tree_revisions
-            WHERE
-                document = $1 :: int4
-                AND ($2 :: int4? IS NULL OR id = $2 :: int4?)
+            SELECT EXISTS (
+                SELECT
+                    1
+                FROM
+                    doc_tree_revisions
+                WHERE
+                    document = $1 :: int4
+                    AND ($2 :: int4? IS NULL OR id = $2 :: int4?)
+            ) :: bool
         |]
 
 existsTextElement :: Statement TextElementRef Bool
@@ -127,13 +132,15 @@ existsTextElement =
     lmap
         uncurryTextElementRef
         [singletonStatement|
-            SELECT
-                1 :: bool
-            FROM
-                doc_text_elements
-            WHERE
-                document = $1 :: int4
-                AND id = $2 :: int4
+            SELECT EXISTS (
+                SELECT
+                    1
+                FROM
+                    doc_text_elements
+                WHERE
+                    document = $1 :: int4
+                    AND id = $2 :: int4
+            ) :: bool
         |]
 
 existsTextRevision :: Statement TextRevisionRef Bool
@@ -141,51 +148,90 @@ existsTextRevision =
     lmap
         uncurryTextRevisionRef
         [singletonStatement|
-            SELECT
-                1 :: bool
-            FROM
-                doc_text_revisions tr
-                JOIN doc_text_elements te on tr.text_element = te.id
-            WHERE
-                te.document = $1 :: int4
-                AND tr.text_element = $2 :: int4
-                AND ($3 :: int4? IS NULL OR tr.id = $3 :: int4?)
+            SELECT EXISTS (
+                SELECT
+                    1
+                FROM
+                    doc_text_revisions tr
+                    JOIN doc_text_elements te on tr.text_element = te.id
+                WHERE
+                    te.document = $1 :: int4
+                    AND tr.text_element = $2 :: int4
+                    AND ($3 :: int4? IS NULL OR tr.id = $3 :: int4?)
+            ) :: bool
         |]
 
 uncurryDocument
-    :: (Int32, Text, Int32, Maybe UTCTime, Maybe UUID, Maybe Text) -> Document
-uncurryDocument (id_, name, groupID, lastEdited, lastEditedByID, lastEditedByName) =
-    Document
-        { Document.identifier = DocumentID id_
-        , Document.name = name
-        , Document.group = groupID
-        , Document.lastEdited = lastEdited
-        , Document.lastEditedBy = do
-            userID <- lastEditedByID
-            userName <- lastEditedByName
-            return $
+    :: ( Int32
+       , Text
+       , Int32
+       , UTCTime
+       , UUID
+       , Text
+       , UTCTime
+       , UUID
+       , Text
+       )
+    -> Document
+uncurryDocument
+    ( id_
+        , name
+        , groupID
+        , created
+        , createdByID
+        , createdByName
+        , lastEdited
+        , lastEditedByID
+        , lastEditedByName
+        ) =
+        Document
+            { Document.identifier = DocumentID id_
+            , Document.name = name
+            , Document.group = groupID
+            , Document.created = created
+            , Document.createdBy =
                 UserRef
-                    { UserRef.identifier = userID
-                    , UserRef.name = userName
+                    { UserRef.identifier = createdByID
+                    , UserRef.name = createdByName
                     }
-        }
+            , Document.lastEdited = lastEdited
+            , Document.lastEditedBy =
+                UserRef
+                    { UserRef.identifier = lastEditedByID
+                    , UserRef.name = lastEditedByName
+                    }
+            }
 
-createDocument :: Statement (Text, GroupID) Document
+createDocument :: Statement (Text, GroupID, UserID) Document
 createDocument =
     rmap
         uncurryDocument
         [singletonStatement|
-            insert into docs
-                (name, "group")
-            values
-                ($1 :: text, $2 :: int4)
-            returning
-                id :: int4,
-                name :: text,
-                "group" :: int4,
-                NULL :: timestamptz?,
-                NULL :: uuid?,
-                NULL :: text?
+            WITH inserted AS (
+                insert into docs
+                    (name, "group", created_by)
+                values
+                    ($1 :: text, $2 :: int4, $3 :: uuid)
+                returning
+                    id :: int4,
+                    name :: text,
+                    "group" :: int4,
+                    creation_ts :: timestamptz?,
+                    created_by :: uuid?
+            )
+            SELECT
+                inserted.id :: int4,
+                inserted.name :: text,
+                inserted."group" :: int4,
+                inserted.creation_ts :: timestamptz,
+                inserted.created_by :: uuid,
+                users.name :: text,
+                inserted.creation_ts :: timestamptz,
+                inserted.created_by :: uuid,
+                users.name :: text
+            FROM
+                inserted
+                LEFT JOIN users ON inserted.created_by = users.id
         |]
 
 getDocument :: Statement DocumentID (Maybe Document)
@@ -198,9 +244,12 @@ getDocument =
                     d.id :: int4,
                     d.name :: text,
                     d."group" :: int4,
-                    r.creation_ts :: timestamptz?,
-                    r.author_id :: uuid?,
-                    r.author_name :: text?
+                    d.creation_ts :: timestamptz,
+                    d.created_by :: uuid,
+                    cu.created_by_name :: text,
+                    COALESCE(r.creation_ts, d.creation_ts) :: timestamptz,
+                    COALESCE(r.author_id, d.created_by) :: uuid,
+                    COALESCE(r.author_name, cu.name) :: text
                 FROM
                     docs d
                     LEFT JOIN LATERAL (
@@ -217,6 +266,7 @@ getDocument =
                             dr.creation_ts DESC
                         LIMIT 1
                     ) r ON TRUE
+                    LEFT JOIN users cu ON d.created_by_name = cu.id
                 WHERE
                     d.id = $1 :: int4
             |]
@@ -230,9 +280,12 @@ getDocuments =
                 d.id :: int4,
                 d.name :: text,
                 d."group" :: int4,
-                dr.creation_ts :: timestamptz?,
-                dr.author_id :: uuid?,
-                dr.author_name :: text?
+                d.creation_ts :: timestamptz,
+                d.created_by :: uuid,
+                cu.name :: text,
+                COALESCE(dr.creation_ts, d.creation_ts) :: timestamptz AS last_edited,
+                COALESCE(dr.author_id, d.created_by) :: uuid,
+                COALESCE(dr.author_name, cu.name) :: text
             FROM
                 docs d
                 LEFT JOIN roles r ON r.group_id = d."group"
@@ -251,11 +304,54 @@ getDocuments =
                         dr.creation_ts DESC
                     LIMIT 1
                 ) dr ON TRUE
+                LEFT JOIN users cu ON d.created_by_name = cu.id
             WHERE
                 r.user_id = $1 :: uuid
                 OR edr.user_id = $1 :: uuid
             ORDER BY
-                dr.creation_ts DESC
+                last_edited DESC
+        |]
+
+getDocumentsBy :: Statement (Maybe UserID, Maybe GroupID) (Vector Document)
+getDocumentsBy =
+    rmap
+        (uncurryDocument <$>)
+        [vectorStatement|
+            SELECT
+                d.id :: int4,
+                d.name :: text,
+                d."group" :: int4,
+                d.creation_ts :: timestamptz,
+                d.created_by :: uuid,
+                cu.name :: text,
+                COALESCE(dr.creation_ts, d.creation_ts) :: timestamptz AS last_edited,
+                COALESCE(dr.author_id, d.created_by) :: uuid,
+                COALESCE(dr.author_name, cu.name) :: text
+            FROM
+                docs d
+                LEFT JOIN roles r ON r.group_id = d."group"
+                LEFT JOIN external_document_rights edr ON d.id = edr.document_id
+                LEFT JOIN LATERAL (
+                    SELECT
+                        dr.creation_ts,
+                        dr.author AS author_id,
+                        u.name AS author_name
+                    FROM
+                        doc_revisions dr
+                        JOIN users u ON dr.author = u.id
+                    WHERE
+                        dr.document = d.id
+                    ORDER BY
+                        dr.creation_ts DESC
+                    LIMIT 1
+                ) dr ON TRUE
+                LEFT JOIN users cu ON d.created_by = cu.id
+            WHERE
+                r.user_id = $1 :: uuid?
+                OR edr.user_id = $1 :: uuid?
+                OR d."group" = $2 :: int4?
+            ORDER BY
+                last_edited DESC
         |]
 
 uncurryTextElement :: (Int32, Text) -> TextElement

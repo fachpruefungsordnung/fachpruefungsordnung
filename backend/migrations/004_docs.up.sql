@@ -1,7 +1,9 @@
 CREATE TABLE IF NOT EXISTS docs (
     id INTEGER PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     name TEXT NOT NULL,
-    "group" INTEGER NOT NULL REFERENCES groups (id)
+    "group" INTEGER NOT NULL REFERENCES groups (id),
+    creation_ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_by UUID NOT NULL REFERENCES users (id)
 );
 
 CREATE TABLE IF NOT EXISTS doc_text_elements (

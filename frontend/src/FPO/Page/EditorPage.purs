@@ -10,7 +10,7 @@ import Prelude
 import Effect.Aff.Class (class MonadAff)
 import FPO.Component.Splitview as Splitview
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto (DocumentID)
+import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP

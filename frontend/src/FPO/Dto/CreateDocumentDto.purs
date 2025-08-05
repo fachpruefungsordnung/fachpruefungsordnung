@@ -9,7 +9,20 @@ newtype DocumentCreateDto = DocumentCreateDto
   , documentCreateName :: String
   }
 
+newtype NewDocumentCreateDto = NewDocumentCreateDto
+  { groupID :: Int
+  , title :: String
+  }
+
 derive instance newtypeDocumentCreateDto :: Newtype DocumentCreateDto _
 
 derive newtype instance encodeJsonDocumentCreateDto :: EncodeJson DocumentCreateDto
 derive newtype instance decodeJsonDocumentCreateDto :: DecodeJson DocumentCreateDto
+
+derive instance newtypeNewDocumentCreateDto :: Newtype NewDocumentCreateDto _
+
+derive newtype instance encodeJsonNewDocumentCreateDto ::
+  EncodeJson NewDocumentCreateDto
+
+derive newtype instance decodeJsonNewDocumentCreateDto ::
+  DecodeJson NewDocumentCreateDto

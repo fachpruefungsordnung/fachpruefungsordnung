@@ -47,6 +47,7 @@ import Docs.Database
     , HasGetTreeHistory
     , HasGetTreeRevision
     , HasIsGroupAdmin
+    , HasIsSuperAdmin
     )
 import qualified Docs.Database as DB
 import Docs.Document (Document, DocumentID)
@@ -78,6 +79,7 @@ import GHC.Int (Int32)
 
 data Error
     = NoPermission DocumentID Permission
+    | NoPermissionForUser UserID
     | NoPermissionInGroup GroupID
     | DocumentNotFound DocumentID
     | TextElementNotFound TextElementRef
@@ -99,7 +101,7 @@ createDocument
     -> m (Result Document)
 createDocument userID groupID title = runExceptT $ do
     guardGroupAdmin groupID userID
-    lift $ DB.createDocument title groupID
+    lift $ DB.createDocument title groupID userID
 
 getDocument
     :: (HasGetDocument m)
@@ -111,11 +113,20 @@ getDocument userID docID = runExceptT $ do
     document <- lift $ DB.getDocument docID
     maybe (throwError $ DocumentNotFound docID) pure document
 
+-- | Gets all documents visible by the user
+--   OR all documents by the specified group and / or user
 getDocuments
     :: (HasGetDocument m)
     => UserID
+    -> Maybe UserID
+    -> Maybe GroupID
     -> m (Result (Vector Document))
-getDocuments userID = Right <$> DB.getDocuments userID
+getDocuments userID byUserID byGroupID = case (byUserID, byGroupID) of
+    (Nothing, Nothing) -> Right <$> DB.getDocuments userID
+    _ -> runExceptT $ do
+        maybe (pure ()) (guardUserRights userID) byUserID
+        maybe (pure ()) (`guardGroupAdmin` userID) byGroupID
+        lift $ DB.getDocumentsBy byUserID byGroupID
 
 createTextElement
     :: (HasCreateTextElement m)
@@ -129,7 +140,7 @@ createTextElement userID docID kind = runExceptT $ do
     lift $ DB.createTextElement docID kind
 
 createTextRevision
-    :: (HasCreateTextRevision m)
+    :: (HasCreateTextRevision m, HasGetTextElementRevision m)
     => UserID
     -> NewTextRevision
     -> m (Result ConflictStatus)
@@ -137,11 +148,15 @@ createTextRevision userID revision = runExceptT $ do
     let ref@(TextElementRef docID _) = newTextRevisionElement revision
     guardPermission Edit docID userID
     guardExistsTextElement ref
+    let latestRevisionRef = TextRevisionRef ref TextRevision.Latest
+    latestElementRevision <-
+        lift $ DB.getTextElementRevision latestRevisionRef
+    let latestRevision = latestElementRevision >>= TextRevision.revision
+    let createRevision = DB.createTextRevision userID ref
     lift $
         newTextRevision
-            DB.getLatestTextRevisionID
-            DB.createTextRevision
-            userID
+            latestRevision
+            createRevision
             revision
 
 getTextElementRevision
@@ -248,7 +263,8 @@ guardPermission
     -> ExceptT Error m ()
 guardPermission perms docID userID = do
     hasPermission <- lift $ DB.checkDocumentPermission userID docID perms
-    unless hasPermission $
+    superAdmin <- lift $ DB.isSuperAdmin userID
+    unless (hasPermission || superAdmin) $
         throwError (NoPermission docID perms)
 
 guardGroupAdmin
@@ -258,8 +274,19 @@ guardGroupAdmin
     -> ExceptT Error m ()
 guardGroupAdmin groupID userID = do
     hasPermission <- lift $ DB.isGroupAdmin userID groupID
-    unless hasPermission $
+    superAdmin <- lift $ DB.isSuperAdmin userID
+    unless (hasPermission || superAdmin) $
         throwError (NoPermissionInGroup groupID)
+
+guardUserRights
+    :: (HasIsSuperAdmin m)
+    => UserID
+    -> UserID
+    -> ExceptT Error m ()
+guardUserRights userID forUserID = do
+    superAdmin <- lift $ DB.isSuperAdmin userID
+    unless (userID == forUserID || superAdmin) $
+        throwError (NoPermissionForUser forUserID)
 
 guardExistsDocument
     :: (HasExistsDocument m)

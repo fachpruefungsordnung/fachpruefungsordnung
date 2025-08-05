@@ -3,17 +3,13 @@ module FPO.Dto.GroupDto where
 
 import Prelude
 
-import Data.Argonaut
-  ( class DecodeJson
-  , class EncodeJson
-  , JsonDecodeError(..)
-  , decodeJson
-  , encodeJson
-  )
+import Data.Argonaut (class DecodeJson, class EncodeJson)
 import Data.Array (find)
-import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe, isJust)
 import Data.Newtype (class Newtype)
+import Data.Show.Generic (genericShow)
+import FPO.Dto.UserDto (Role, UserID)
 
 type GroupID = Int
 
@@ -30,6 +26,9 @@ getGroupOverviewName (GroupOverview g) = g.groupOverviewName
 derive instance newtypeGroupOverview :: Newtype GroupOverview _
 derive newtype instance encodeJsonGroupOverview :: EncodeJson GroupOverview
 derive newtype instance decodeJsonGroupOverview :: DecodeJson GroupOverview
+derive instance genericGroupOverview :: Generic GroupOverview _
+instance showGroupOverview :: Show GroupOverview where
+  show = genericShow
 
 -- | A group creation request DTO, as sent to the `POST /groups` endpoint.
 newtype GroupCreate = GroupCreate
@@ -47,6 +46,12 @@ newtype GroupDto = GroupDto
   , groupName :: String
   }
 
+demoteToGroupOverview :: GroupDto -> GroupOverview
+demoteToGroupOverview (GroupDto g) = GroupOverview
+  { groupOverviewName: g.groupName
+  , groupOverviewID: g.groupID
+  }
+
 getGroupName :: GroupDto -> String
 getGroupName (GroupDto g) = g.groupName
 
@@ -57,32 +62,15 @@ lookupUser :: GroupDto -> UserID -> Maybe GroupMemberDto
 lookupUser (GroupDto g) userID =
   find (\member -> getUserInfoID member == userID) g.groupMembers
 
+isUserInGroup :: GroupDto -> UserID -> Boolean
+isUserInGroup g = isJust <<< lookupUser g
+
 derive instance newtypeGroupDto :: Newtype GroupDto _
 derive newtype instance encodeJsonGroupDto :: EncodeJson GroupDto
 derive newtype instance decodeJsonGroupDto :: DecodeJson GroupDto
-
-type UserID = String
-
-data Role = Admin | Member
-
-derive instance eqRole :: Eq Role
-
-instance encodeJsonRole :: EncodeJson Role where
-  encodeJson Admin = encodeJson "Admin"
-  encodeJson Member = encodeJson "Member"
-
-instance decodeJsonRole :: DecodeJson Role where
-  decodeJson json = do
-    str <- decodeJson json
-    case str of
-      "Admin" -> Right Admin
-      "Member" -> Right Member
-      _ -> Left $ UnexpectedValue json
-
-stringToRole :: String -> Maybe Role
-stringToRole "Admin" = Just Admin
-stringToRole "Member" = Just Member
-stringToRole _ = Nothing
+derive instance genericGroupDto :: Generic GroupDto _
+instance showGroupDto :: Show GroupDto where
+  show = genericShow
 
 -- | Represents a group member entity, as returned by the `GET /groups/{groupID}` endpoint.
 newtype GroupMemberDto = GroupMemberDto
@@ -104,3 +92,6 @@ getUserInfoID (GroupMemberDto m) = m.userInfoID
 derive instance newtypeGroupMemberDto :: Newtype GroupMemberDto _
 derive newtype instance encodeJsonGroupMemberDto :: EncodeJson GroupMemberDto
 derive newtype instance decodeJsonGroupMemberDto :: DecodeJson GroupMemberDto
+derive instance genericGroupMemberDto :: Generic GroupMemberDto _
+instance showGroupMemberDto :: Show GroupMemberDto where
+  show = genericShow

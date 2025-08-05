@@ -19,6 +19,9 @@ import Hasql.Transaction.Sessions
 
 import Docs.Database
 
+import qualified UserManagement.Sessions as UserSessions
+import qualified UserManagement.Transactions as UserTransactions
+
 import qualified Docs.Hasql.Sessions as Sessions
 import qualified Docs.Hasql.Transactions as Transactions
 
@@ -39,6 +42,9 @@ instance HasCheckPermission HasqlSession where
 instance HasIsGroupAdmin HasqlSession where
     isGroupAdmin = (HasqlSession .) . Sessions.isGroupAdmin
 
+instance HasIsSuperAdmin HasqlSession where
+    isSuperAdmin = HasqlSession . UserSessions.checkSuperadmin
+
 -- exists
 
 instance HasExistsDocument HasqlSession where
@@ -58,6 +64,7 @@ instance HasExistsTreeRevision HasqlSession where
 instance HasGetDocument HasqlSession where
     getDocument = HasqlSession . Sessions.getDocument
     getDocuments = HasqlSession . Sessions.getDocuments
+    getDocumentsBy = (HasqlSession .) . Sessions.getDocumentsBy
 
 instance HasGetTreeRevision HasqlSession where
     getTreeRevision = HasqlSession . Sessions.getTreeRevision
@@ -77,7 +84,7 @@ instance HasGetDocumentHistory HasqlSession where
 -- create
 
 instance HasCreateDocument HasqlSession where
-    createDocument = (HasqlSession .) . Sessions.createDocument
+    createDocument = ((HasqlSession .) .) . Sessions.createDocument
 
 instance HasCreateTextElement HasqlSession where
     createTextElement = (HasqlSession .) . Sessions.createTextElement
@@ -99,6 +106,9 @@ instance HasCheckPermission HasqlTransaction where
 instance HasIsGroupAdmin HasqlTransaction where
     isGroupAdmin = (HasqlTransaction .) . Transactions.isGroupAdmin
 
+instance HasIsSuperAdmin HasqlTransaction where
+    isSuperAdmin = HasqlTransaction . UserTransactions.checkSuperadmin
+
 -- exists
 
 instance HasExistsDocument HasqlTransaction where
@@ -106,6 +116,14 @@ instance HasExistsDocument HasqlTransaction where
 
 instance HasExistsTextElement HasqlTransaction where
     existsTextElement = HasqlTransaction . Transactions.existsTextElement
+
+instance HasExistsTextRevision HasqlTransaction where
+    existsTextRevision = HasqlTransaction . Transactions.existsTextRevision
+
+-- get
+
+instance HasGetTextElementRevision HasqlTransaction where
+    getTextElementRevision = HasqlTransaction . Transactions.getTextElementRevision
 
 -- create
 

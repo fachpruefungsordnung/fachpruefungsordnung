@@ -9,6 +9,7 @@ import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
 import FPO.Data.Request (getUser)
+import FPO.Dto.UserDto (getUserName)
 import FPO.Types (Comment, CommentSection)
 import Halogen as H
 import Halogen.HTML as HH
@@ -182,7 +183,7 @@ commentview = H.mkComponent
           now <- H.liftEffect nowDateTime
           user <- H.liftAff getUser
           let
-            author = maybe "Guest" _.userName user
+            author = maybe "Guest" getUserName user
             comments = commentSection.comments
             newComment =
               { author: author, timestamp: now, content: state.commentDraft }

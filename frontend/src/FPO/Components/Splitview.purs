@@ -9,13 +9,12 @@ module FPO.Component.Splitview where
 import Prelude
 
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
-import Data.Array (find, head, intercalate, range)
+import Data.Array (find, head, snoc, uncons, updateAt, (!!))
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Now (nowDateTime)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
 import FPO.Components.Editor as Editor
@@ -23,13 +22,11 @@ import FPO.Components.Preview as Preview
 import FPO.Components.TOC as TOC
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto (DocumentID, getDHHeadCommit)
-import FPO.Dto.DocumentDto as DocumentDto
-import FPO.Dto.TreeDto (Tree(..), findTree)
+import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
+import FPO.Dto.DocumentDto.DocumentTree as DT
+import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..), findRootTree)
 import FPO.Types
-  ( AnnotatedMarker
-  , Comment
-  , CommentSection
+  ( CommentSection
   , TOCEntry
   , TOCTree
   , documentTreeToTOCTree
@@ -64,11 +61,8 @@ data Action
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
   -- Toolbar buttons
-  | ClickedHTTPRequest
   | SaveSection
   | QueryEditor
-  | ClickLoadPdf
-  | ShowWarning
   -- Toggle buttons
   | ToggleComment
   | ToggleCommentOverview Boolean
@@ -113,7 +107,6 @@ type State =
   , mEditorContent :: Maybe (Array String)
 
   -- Store tocEntries and send some parts to its children components
-  -- TODO load/upload from/to backend
   , tocEntries :: TOCTree
 
   -- How the timestamp has to be formatted
@@ -179,26 +172,21 @@ splitview docID = H.mkComponent
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div_
-      [ renderToolbar state, renderSplit state ]
+      [ renderToolbar, renderSplit state ]
 
-  renderToolbar :: State -> H.ComponentHTML Action Slots m
-  renderToolbar state =
+  renderToolbar :: H.ComponentHTML Action Slots m
+  renderToolbar =
     -- First Toolbar
     HH.div
       [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
       [ toolbarButton "[=]" ToggleSidebar
       , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
-      , toolbarButton "ForceGET" ForceGET
+      , toolbarButton "ForceGETP" ForceGET
       , toolbarButton "GET" GET
       , toolbarButton "POST" POST
       , toolbarButton "All Comments" (ToggleCommentOverview true)
-      , toolbarButton "Click Me for HTTPRequest" ClickedHTTPRequest
       , toolbarButton "Save" SaveSection
       , toolbarButton "Query Editor" QueryEditor
-      , toolbarButton "Load PDF" ClickLoadPdf
-      , toolbarButton
-          ((if state.pdfWarningIsShown then "Hide" else "Show") <> " Warning")
-          ShowWarning
       ]
     where
     toolbarButton label act = HH.button
@@ -243,7 +231,7 @@ splitview docID = H.mkComponent
                       , HP.style
                           "height: 100%; box-sizing: border-box; min-height: 0; overflow: hidden;"
                       ]
-                      [ HH.slot _editor unit Editor.editor unit HandleEditor ]
+                      [ HH.slot _editor unit (Editor.editor docID) unit HandleEditor ]
                   ]
               ]
             <>
@@ -289,7 +277,7 @@ splitview docID = H.mkComponent
             , HE.onClick \_ -> ToggleSidebar
             ]
             [ HH.text "×" ]
-        , HH.slot _toc unit TOC.tocview unit HandleTOC
+        , HH.slot _toc unit (TOC.tocview docID) unit HandleTOC
         ]
     -- Comment
     , HH.div
@@ -479,8 +467,10 @@ splitview docID = H.mkComponent
       state <- H.get
       let
         tree = tocTreeToDocumentTree state.tocEntries
+        encodedTree = DT.encodeDocumentTree tree
+
       rep <- H.liftAff $
-        Request.postJson "/commits" (DocumentDto.encodeCreateCommit tree)
+        Request.postJson ("/docs/" <> show docID <> "/tree") encodedTree
       -- debugging logs in
       case rep of
         Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
@@ -488,8 +478,9 @@ splitview docID = H.mkComponent
     -- H.liftEffect $ Console.log "Successfully posted TOC to server"
     ForceGET -> do
       -- Forces a GET request to fetch the latest document tree of commit #1.
-      fetchedTree <- H.liftAff $
-        Request.getFromJSONEndpoint DocumentDto.decodeDocument "/commits/1"
+      fetchedTree <- H.liftAff
+        $ Request.getFromJSONEndpoint DT.decodeDocument
+        $ "/docs/" <> show docID <> "/tree/latest"
       let
         tree = case fetchedTree of
           Nothing -> Empty
@@ -497,6 +488,7 @@ splitview docID = H.mkComponent
       H.modify_ \st -> do
         st { tocEntries = tree }
       H.tell _toc unit (TOC.ReceiveTOCs tree)
+
     GET -> do
       -- TODO: As of now, the editor page and splitview are parametrized by the document ID
       --       as given by the route. We could also handle the docID as an input to the component,
@@ -509,11 +501,9 @@ splitview docID = H.mkComponent
       --       regarding authentification and error handling. Right now, the editor page is simply empty
       --       if the document retrieval fails in any way.
       finalTree <- fromMaybe Empty <$> runMaybeT do
-        doc <- MaybeT $ H.liftAff $ Request.getDocumentHeader docID
-        headCommit <- MaybeT $ pure $ getDHHeadCommit doc
         fetchedTree <- MaybeT $ H.liftAff
-          $ Request.getFromJSONEndpoint DocumentDto.decodeDocument
-          $ "/commits/" <> show headCommit
+          $ Request.getFromJSONEndpoint DT.decodeDocument
+          $ "/docs/" <> show docID <> "/tree/latest"
         pure $ documentTreeToTOCTree fetchedTree
 
       H.modify_ _ { tocEntries = finalTree }
@@ -529,13 +519,15 @@ splitview docID = H.mkComponent
       -- -- H.tell _editor unit (Editor.ChangeSection firstEntry)
       let timeFormatter = head timeStampsVersions
       H.modify_ \st -> do
-        st { tocEntries = Empty, mTimeFormatter = timeFormatter }
+        st { mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
       H.tell _commentOverview unit
         (CommentOverview.ReceiveTimeFormatter timeFormatter)
       H.tell _toc unit (TOC.ReceiveTOCs Empty)
       -- Load the initial TOC entries into the editor
-      handleAction GET
+      -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
+      -- or rather, we don't use commit anymore in the API
+      handleAction ForceGET
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -612,22 +604,11 @@ splitview docID = H.mkComponent
 
     -- Toolbar button actions
 
-    ClickedHTTPRequest -> H.tell _preview unit Preview.TellClickedHttpRequest
-
     SaveSection -> H.tell _editor unit Editor.SaveSection
 
     QueryEditor -> do
       H.tell _editor unit Editor.SaveSection
       H.tell _editor unit Editor.QueryEditor
-
-    ShowWarning -> do
-      H.modify_ \st -> st { pdfWarningIsShown = not st.pdfWarningIsShown }
-      H.tell _preview unit Preview.TellShowOrHideWarning
-
-    ClickLoadPdf -> do
-      H.modify_ \st -> st { pdfWarningAvailable = true }
-      H.tell _editor unit Editor.LoadPdf
-      H.tell _preview unit Preview.TellLoadPdf
 
     -- Toggle actions
 
@@ -716,7 +697,7 @@ splitview docID = H.mkComponent
             state.tocEntries
           updateTOCEntry = fromMaybe
             emptyTOCEntry
-            (findTree (\e -> e.id == tocID) updatedTOCEntries)
+            (findRootTree (\e -> e.id == tocID) updatedTOCEntries)
         H.modify_ \s -> s { tocEntries = updatedTOCEntries }
         H.tell _editor unit (Editor.ChangeSection updateTOCEntry)
 
@@ -769,117 +750,84 @@ splitview docID = H.mkComponent
 
     HandleTOC output -> case output of
 
-      TOC.ChangeSection selectEntry -> do
+      TOC.ChangeSection selectedId -> do
         H.tell _editor unit Editor.SaveSection
         state <- H.get
         let
-          entry = case (findTOCEntry selectEntry.id state.tocEntries) of
+          entry = case (findTOCEntry selectedId state.tocEntries) of
             Nothing -> emptyTOCEntry
             Just e -> e
         H.tell _editor unit (Editor.ChangeSection entry)
 
--- Create example TOC entries for testing purposes in Init
+      TOC.AddNode path node -> do
+        state <- H.get
+        let
+          newTree = addRootNode path node state.tocEntries
+          docTree = tocTreeToDocumentTree newTree
+          encodeTree = DT.encodeDocumentTree docTree
+        _ <- H.liftAff $
+          Request.postJson ("/docs/" <> show docID <> "/tree") encodeTree
+        H.modify_ \st -> st { tocEntries = newTree }
+        H.tell _toc unit (TOC.ReceiveTOCs newTree)
 
-createExampleTOCEntries
-  :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array TOCEntry)
-createExampleTOCEntries = do
-  -- Since all example entries are similar, we create the same markers for all
-  exampleMarkers <- createExampleMarkers
-  let
-    -- Create initial TOC entries
-    entries = map
-      ( \n ->
-          { id: n
-          , name: "§" <> show n <> " This is Paragraph " <> show n
-          , content: createExampleTOCText n
-          , newMarkerNextID: 1
-          , markers: exampleMarkers
-          }
-      )
-      (range 1 11)
-  pure entries
-
-createExampleTOCText :: Int -> String
-createExampleTOCText n =
-  intercalate "\n" $
-    [ "# This is content of §" <> show n
-    , ""
-    , "-- This is a developer comment."
-    , ""
-    , "## To-Do List"
-    , ""
-    , "1. Document initial setup."
-    , "2. <*Define the API*>                        % LTML: bold"
-    , "3. <_Underline important interface items_>   % LTML: underline"
-    , "4. </Emphasize optional features/>           % LTML: italic"
-    , ""
-    , "/* Note: Nested styles are allowed,"
-    , "   but not transitively within the same tag type!"
-    , "   Written in a code block."
-    , "*/"
-    , ""
-    , "<*This is </allowed/>*>                      % valid nesting"
-    , "<*This is <*not allowed*>*>                  % invalid, but still highlighted"
-    , ""
-    , "## Status"
-    , ""
-    , "Errors can no longer be marked as such, see error!"
-    , "Comment this section out of the code."
-    , ""
-    , "TODO: Write the README file."
-    , "FIXME: The parser fails on nested blocks."
-    , "NOTE: We're using this style as a placeholder."
-    ]
-
-createExampleMarkers
-  :: forall m
-   . MonadAff m
-  => H.HalogenM State Action Slots Output m (Array AnnotatedMarker)
-createExampleMarkers = do
-  commentSection <- createExampleCommentSection
-  let
-    entry =
-      { id: 0
-      , type: "info"
-      , startRow: 7
-      , startCol: 3
-      , endRow: 7
-      , endCol: 26
-      , markerText: "Author 1"
-      , mCommentSection: Just commentSection
-      }
-  pure [ entry ]
-
-createExampleCommentSection
-  :: forall m. MonadAff m => H.HalogenM State Action Slots Output m CommentSection
-createExampleCommentSection = do
-  comments <- createExampleComments
-  let
-    commentSection =
-      { -- Since in init, all markers have the same ID
-        markerID: 1
-      , comments: comments
-      , resolved: false
-      }
-  pure commentSection
-
-createExampleComments
-  :: forall m. MonadAff m => H.HalogenM State Action Slots Output m (Array Comment)
-createExampleComments = do
-  now <- H.liftEffect nowDateTime
-  let
-    comments = map
-      ( \n ->
-          { author: "Author " <> show (mod n 2)
-          , timestamp: now
-          , content: "This is comment number " <> show n
-          }
-      )
-      (range 1 6)
-  pure comments
+        pure unit
 
 findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
 findCommentSection tocEntries tocID markerID = do
-  tocEntry <- findTree (\entry -> entry.id == tocID) tocEntries
+  tocEntry <- findRootTree (\entry -> entry.id == tocID) tocEntries
   marker <- find (\m -> m.id == markerID) tocEntry.markers
   marker.mCommentSection
+
+-- Add a node in TOC tree
+addRootNode
+  :: Array Int
+  -> Tree TOCEntry
+  -> TOCTree
+  -> TOCTree
+addRootNode [] entry (RootTree { children, header }) =
+  RootTree { children: snoc children (Edge entry), header }
+addRootNode _ entry Empty =
+  RootTree
+    { children: [ Edge entry ], header: { headerKind: "root", headerType: "root" } }
+addRootNode path entry (RootTree { children, header }) =
+  case uncons path of
+    Nothing ->
+      RootTree { children: snoc children (Edge entry), header }
+    Just { head, tail } ->
+      let
+        child =
+          fromMaybe
+            (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+            (children !! head)
+        newChildren =
+          case updateAt head (addNode tail entry child) children of
+            Nothing -> children
+            Just res -> res
+      in
+        RootTree { children: newChildren, header }
+
+addNode
+  :: Array Int
+  -> Tree TOCEntry
+  -> Edge TOCEntry
+  -> Edge TOCEntry
+addNode _ _ (Edge (Leaf { title, node })) =
+  Edge (Leaf { title, node }) -- Cannot add to a leaf
+addNode [] entry (Edge (Node { title, children, header })) =
+  Edge (Node { title, children: snoc children (Edge entry), header })
+addNode path entry (Edge (Node { title, children, header })) =
+  case uncons path of
+    Nothing ->
+      Edge (Node { title, children: snoc children (Edge entry), header })
+    Just { head, tail } ->
+      let
+        child =
+          fromMaybe
+            (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+            (children !! head)
+        newChildren' =
+          case updateAt head (addNode tail entry child) children of
+            Nothing -> children
+            Just res -> res
+      in
+        Edge (Node { title, children: newChildren', header })

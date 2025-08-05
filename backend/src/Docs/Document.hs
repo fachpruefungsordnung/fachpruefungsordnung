@@ -59,8 +59,10 @@ data Document = Document
     { identifier :: DocumentID
     , name :: Text
     , group :: GroupID
-    , lastEdited :: Maybe UTCTime
-    , lastEditedBy :: Maybe UserRef
+    , created :: UTCTime
+    , createdBy :: UserRef
+    , lastEdited :: UTCTime
+    , lastEditedBy :: UserRef
     }
     deriving (Eq, Show, Generic)
 

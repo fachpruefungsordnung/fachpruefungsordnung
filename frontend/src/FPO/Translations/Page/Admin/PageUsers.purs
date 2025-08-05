@@ -6,6 +6,7 @@ import Simple.I18n.Translation (Translation, fromRecord)
 type AdminUserPageLabels =
   ( "admin_users_create"
       ::: "admin_users_createNewUser"
+      ::: "admin_users_deleteUser"
       ::: "admin_users_failedToCreateUser"
       ::: "admin_users_failedToDeleteUser"
       ::: "admin_users_failedToLoadUsers"
@@ -20,6 +21,7 @@ enAdminUserPage :: Translation AdminUserPageLabels
 enAdminUserPage = fromRecord
   { admin_users_listOfUsers: "List of Users"
   , admin_users_createNewUser: "Create New User"
+  , admin_users_deleteUser: "Delete User"
   , admin_users_failedToCreateUser: "Failed to create user"
   , admin_users_failedToDeleteUser: "Failed to delete user"
   , admin_users_failedToLoadUsers: "Failed to load users"
@@ -33,6 +35,7 @@ deAdminUserPage :: Translation AdminUserPageLabels
 deAdminUserPage = fromRecord
   { admin_users_listOfUsers: "Liste der Nutzer"
   , admin_users_createNewUser: "Neuen Nutzer erstellen"
+  , admin_users_deleteUser: "Nutzer löschen"
   , admin_users_failedToCreateUser: "Fehler beim Erstellen des Nutzers"
   , admin_users_failedToDeleteUser: "Fehler beim Löschen des Nutzers"
   , admin_users_failedToLoadUsers: "Fehler beim Laden der Nutzer"

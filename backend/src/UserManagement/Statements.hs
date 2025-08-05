@@ -136,13 +136,13 @@ getAllUsers =
       from users
     |]
 
-getAllUserRoles :: Statement User.UserID [(Group.GroupID, Text)]
+getAllUserRoles :: Statement User.UserID [(Group.GroupID, Text, Text)]
 getAllUserRoles =
     rmap
         toList
         [vectorStatement|
 
-    select g.id :: int4, r.role :: text
+    select g.id :: int4, g.name :: text, r.role :: text
     from users u
     join roles r on u.id = r.user_id
     join groups g on g.id = r.group_id

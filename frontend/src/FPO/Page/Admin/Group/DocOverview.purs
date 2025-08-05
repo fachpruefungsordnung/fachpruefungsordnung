@@ -21,7 +21,7 @@ import Data.Argonaut (decodeJson)
 import Data.Array (filter, head, length, null, replicate, slice, (:))
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
@@ -31,16 +31,24 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (createDocument, deleteIgnore, getDocumentsFromURL, getUser)
+import FPO.Data.Request
+  ( createNewDocument
+  , deleteIgnore
+  , getAuthorizedUser
+  , getDocumentsQueryFromURL
+  , getGroup
+  )
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Dto.CreateDocumentDto (DocumentCreateDto(..))
-import FPO.Dto.DocumentDto (DocumentHeader(..), DocumentID, getDHID, getDHName)
-import FPO.Dto.GroupDto (GroupID)
+import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto(..))
+import FPO.Dto.DocumentDto.DocDate as DD
+import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.Query as DQ
+import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName)
 import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addCard, addColumn, addModal)
+import FPO.UI.HTML (addColumn, addModal)
 import FPO.UI.Style as Style
 import Halogen (liftAff)
 import Halogen as H
@@ -63,29 +71,13 @@ type Slots =
 
 type Input = GroupID
 
--- TODO: Preliminary data type. So far, everything seems to use different data for documents, this should be changed.
---       Some fields are not (yet) available in the backend, so we need to use this data type to fill in the gaps.
---       As soon as we have decided on a common data type for documents, all this should be changed
---       (in the appropriate DocumentDTO module) and this preliminary data type should be replaced/removed.
-type Document =
-  { body ::
-      { name :: String
-      , text :: String
-      }
-  , header ::
-      { updatedTs :: DateTime
-      , id :: Int
-      , archivedStatus :: Boolean
-      }
-  }
-
 data Action
   = Initialize
   | Receive (Connected FPOTranslator Input)
   | SetPage P.Output
   | ChangeFilterDocumentName String
   | Filter
-  | ViewDocument DocumentID
+  | ViewDocument DH.DocumentID
   | ChangeSorting TH.Output
   | DoNothing
   | NavigateToMembers
@@ -118,8 +110,9 @@ type State = FPOState
   ( error :: Maybe String
   , page :: Int
   , groupID :: GroupID
-  , documents :: Array Document
-  , filteredDocuments :: Array Document
+  , group :: Maybe GroupDto
+  , documents :: Array DH.DocumentHeader
+  , filteredDocuments :: Array DH.DocumentHeader
   , currentTime :: Maybe DateTime
   , documentNameFilter :: String
   -- | This is used to store the document ID for deletion confirmation.
@@ -157,6 +150,7 @@ component =
     , modalState: NoModal
     , currentTime: Nothing
     , newDocumentName: ""
+    , group: Nothing
     }
 
   render :: State -> H.ComponentHTML Action Slots m
@@ -190,9 +184,15 @@ component =
   renderDocumentManagement :: State -> H.ComponentHTML Action Slots m
   renderDocumentManagement state =
     HH.div_
-      [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-          [ HH.text $ translate (label :: _ "gp_projectManagement")
-              state.translator
+      [ HH.h2 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+          [ HH.text $
+              translate (label :: _ "gp_groupProjects")
+                state.translator <> " "
+          , HH.span
+              [ HP.classes
+                  [ HB.textSecondary, HB.fwBolder, HB.dInlineBlock, HB.textWrap ]
+              ]
+              [ HH.text $ fromMaybe "" $ getGroupName <$> state.group ]
           ]
       , renderDocumentListView state
       ]
@@ -208,10 +208,8 @@ component =
   renderDocumentsOverview :: State -> H.ComponentHTML Action Slots m
   renderDocumentsOverview state =
     HH.div [ HP.classes [ HB.col12, HB.colMd9, HB.colLg8 ] ]
-      [ addCard
-          (translate (label :: _ "gp_groupProjects") state.translator)
-          []
-          (renderDocumentOverview state)
+      [ HH.div [ HP.classes [ HB.card, HB.bgLightSubtle ] ]
+          [ HH.div [ HP.class_ HB.cardBody ] [ renderDocumentOverview state ] ]
       ]
 
   -- Search bar and list of projects.
@@ -243,7 +241,8 @@ component =
       }
 
   -- Renders the list of projects.
-  renderDocumentList :: Array Document -> State -> H.ComponentHTML Action Slots m
+  renderDocumentList
+    :: Array DH.DocumentHeader -> State -> H.ComponentHTML Action Slots m
   renderDocumentList docs state =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
@@ -290,21 +289,23 @@ component =
       ]
 
   -- Renders a single project row in the table.
-  renderDocumentRow :: forall w. State -> Document -> HH.HTML w Action
+  renderDocumentRow :: forall w. State -> DH.DocumentHeader -> HH.HTML w Action
   renderDocumentRow state document =
     HH.tr
-      [ HE.onClick $ const $ ViewDocument document.header.id
+      [ HE.onClick $ const $ ViewDocument (DH.getID document)
       , HP.style "cursor: pointer;"
       ]
       [ HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text document.body.name ]
+          [ HH.text (DH.getName document) ]
       , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ formatRelativeTime state.currentTime document.header.updatedTs ]
+          [ HH.text $ formatRelativeTime state.currentTime
+              (DD.docDateToDateTime (DH.getLastEdited document))
+          ]
       -- archiving feature not supported for now
       {-       , HH.td [ HP.classes [ HB.textCenter ] ]
       [ HH.text (show document.header.archivedStatus) ] -}
       , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ buttonDeleteDocument state document.header.id ]
+          [ buttonDeleteDocument state (DH.getID document) ]
       ]
 
   -- Renders an empty project row for padding.
@@ -313,9 +314,11 @@ component =
     HH.tr []
       [ HH.td
           [ HP.colSpan 3
-          , HP.classes [ HB.textCenter, HB.invisible ]
+          , HP.classes [ HB.textCenter ]
           ]
-          [ HH.text $ "Empty Row", buttonDeleteDocument state (-1) ]
+          [ HH.div [ HP.class_ HB.invisible ]
+              [ HH.text $ "Empty Row", buttonDeleteDocument state (-1) ]
+          ]
       ]
 
   renderSideButtons :: forall w. State -> HH.HTML w Action
@@ -346,7 +349,7 @@ component =
       ]
       [ HH.text $ translate (label :: _ "gp_newProject") state.translator ]
 
-  buttonDeleteDocument :: forall w. State -> Int -> HH.HTML w Action
+  buttonDeleteDocument :: forall w. State -> DH.DocumentID -> HH.HTML w Action
   buttonDeleteDocument state documentID =
     HH.button
       [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm ]
@@ -427,22 +430,30 @@ component =
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
-      u <- liftAff $ getUser
-      when (fromMaybe true (not <$> _.isAdmin <$> u)) $
+      s <- H.get
+      u <- H.liftAff $ getAuthorizedUser s.groupID
+      when (isNothing u) $ do
         navigate Page404
+
       now <- H.liftEffect nowDateTime
       H.modify_ _
         { documents = []
         , currentTime = Just now
         }
-      s <- H.get
       documents <- liftAff
-        (getDocumentsFromURL ("/groups/" <> show s.groupID <> "/documents"))
+        (getDocumentsQueryFromURL ("/docs?group=" <> show s.groupID))
       case documents of
         Just docs -> do
-          H.modify_ _ { documents = toDocs now docs }
+          H.modify_ _ { documents = DQ.getDocuments docs }
         Nothing -> do
-          navigate Login
+          navigate Page404
+
+      g <- liftAff $ getGroup s.groupID
+      case g of
+        Just group -> do
+          H.modify_ _ { group = Just group }
+        Nothing -> do
+          navigate Page404
       handleAction Filter
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -455,7 +466,7 @@ component =
       s <- H.get
       let
         filteredDocs = filter
-          (\d -> contains (Pattern s.documentNameFilter) d.body.name)
+          (\d -> contains (Pattern s.documentNameFilter) (DH.getName d))
           s.documents
       H.modify_ _ { filteredDocuments = filteredDocs }
     RequestCreateDocument -> do
@@ -470,16 +481,15 @@ component =
         H.modify_ _ { error = Just "Document name cannot be empty." }
       else do
         log ("Trying to create new document with name \"" <> newDocName <> "\"")
-
         let
-          dto = DocumentCreateDto
-            { documentCreateGroupId: s.groupID
-            , documentCreateName: newDocName
+          dto = NewDocumentCreateDto
+            { groupID: s.groupID
+            , title: newDocName
             }
 
         setModalWaiting true
 
-        createResponse <- liftAff (createDocument dto)
+        createResponse <- liftAff (createNewDocument dto)
         case createResponse of
           Left err -> do
             setModalError $ printError err
@@ -487,22 +497,14 @@ component =
             case decodeJson result.body of
               Left err -> do
                 setModalError $ "Error decoding response: " <> show err
-              Right (DH h) -> do
+              Right h -> do
                 H.modify_ _ { modalState = NoModal, newDocumentName = "" }
                 log "Created Document"
-
                 now <- H.liftEffect nowDateTime
-                let
-                  newDoc =
-                    { body:
-                        { name: h.name
-                        , text: "This text should not be read, else there is an error"
-                        }
-                    , header: { updatedTs: now, id: h.id, archivedStatus: false }
-                    }
+
                 H.modify_ \s' -> s'
-                  { documents = newDoc : s'.documents
-                  , filteredDocuments = newDoc : s'.filteredDocuments
+                  { documents = h : s'.documents
+                  , filteredDocuments = h : s'.filteredDocuments
                   , currentTime = Just now
                   }
 
@@ -533,19 +535,20 @@ component =
             }
         Right _ -> do
           log "Deleted Document"
-          now <- H.liftEffect nowDateTime
           s <- H.get
           documents <- liftAff
-            (getDocumentsFromURL ("/groups/" <> show s.groupID <> "/documents"))
+            (getDocumentsQueryFromURL ("/docs?group=" <> show s.groupID))
           case documents of
             Just docs -> do
               H.modify_ _
                 { error = Nothing
-                , documents = toDocs now docs
+                , documents = DQ.getDocuments docs
                 , modalState = NoModal
                 }
             Nothing -> do
-              navigate Login
+              log "No Document Found."
+              handleAction DoNothing
+      -- navigate Login
       handleAction Filter
     ViewDocument documentID -> do
       s <- H.get
@@ -563,12 +566,12 @@ component =
         "Title" ->
           TH.sortByF
             order
-            (\a b -> compare a.body.name b.body.name)
+            (\a b -> compare (DH.getName a) (DH.getName b))
             state.documents
         "Last Updated" ->
           TH.sortByF
             (TH.toggleSorting order) -- The newest project should be first.
-            (\a b -> compare a.header.updatedTs b.header.updatedTs)
+            (\a b -> compare (DH.getLastEdited a) (DH.getLastEdited b))
             state.documents
         _ -> state.documents -- Ignore other columns.
 
@@ -604,24 +607,8 @@ component =
           _ -> s.modalState
       }
 
-  -- transforms Document data from backend into data for this page
-  toDocs :: DateTime -> Array DocumentHeader -> Array Document
-  toDocs now = map
-    ( \doc ->
-        { body:
-            { name: getDHName doc
-            , text: "This text should not be read, else there is an error"
-            }
-        , header:
-            { updatedTs: now
-            , id: getDHID doc
-            , archivedStatus: false
-            }
-        }
-    )
-
   docNameFromID :: State -> Int -> String
   docNameFromID state id =
-    case head (filter (\doc -> doc.header.id == id) state.documents) of
-      Just doc -> doc.body.name
+    case head (filter (\dh -> DH.getID dh == id) state.documents) of
+      Just doc -> DH.getName doc
       Nothing -> "Unknown Name"
