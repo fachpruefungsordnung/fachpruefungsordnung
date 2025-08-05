@@ -1,0 +1,32 @@
+={main:} Main
+
+§{sectiona:} Some section
+
+{paragraph:}
+This paragraph is in {:sectiona} in super-section {:main}.
+
+The next paragraph is {:sectionb}.
+
+§{sectionb:} Another section, with a title
+  spanning
+  several lines
+    ^ Also, a footnote.
+
+Some sentence with
+  # one enumeration item,
+  # a labeled item ({:itm}),
+  # another item,
+    which spans
+    multiple lines,
+  # an item
+      # with
+      # sub-items
+    and more text,
+  #
+    and an item starting in a new line
+and the sentence continues
+  # with another item referencing {:paragraph}
+and finally ends.  Another sentence
+  # has a single item.
+
+This paragraph is in {:sectionb} in super-section {:main}.
