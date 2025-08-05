@@ -246,7 +246,7 @@ getDocument =
                     d."group" :: int4,
                     d.creation_ts :: timestamptz,
                     d.created_by :: uuid,
-                    cu.created_by_name :: text,
+                    cu.name :: text,
                     COALESCE(r.creation_ts, d.creation_ts) :: timestamptz,
                     COALESCE(r.author_id, d.created_by) :: uuid,
                     COALESCE(r.author_name, cu.name) :: text
@@ -266,7 +266,7 @@ getDocument =
                             dr.creation_ts DESC
                         LIMIT 1
                     ) r ON TRUE
-                    LEFT JOIN users cu ON d.created_by_name = cu.id
+                    LEFT JOIN users cu ON d.created_by = cu.id
                 WHERE
                     d.id = $1 :: int4
             |]
@@ -304,7 +304,7 @@ getDocuments =
                         dr.creation_ts DESC
                     LIMIT 1
                 ) dr ON TRUE
-                LEFT JOIN users cu ON d.created_by_name = cu.id
+                LEFT JOIN users cu ON d.created_by = cu.id
             WHERE
                 r.user_id = $1 :: uuid
                 OR edr.user_id = $1 :: uuid
