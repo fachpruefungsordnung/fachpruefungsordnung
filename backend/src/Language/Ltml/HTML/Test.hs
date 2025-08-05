@@ -7,7 +7,7 @@ import Data.Text.IO.Utf8 (readFile)
 import Language.Lsd.AST.Format
 import Language.Lsd.AST.Type.Paragraph
 import Language.Lsd.AST.Type.Section
-import Language.Lsd.Example.Fpo (superSectionT)
+import Language.Lsd.Example.Fpo
 import Language.Ltml.AST.Label
 import Language.Ltml.AST.Node
 import Language.Ltml.AST.Paragraph
@@ -164,7 +164,7 @@ parseTest :: IO ()
 parseTest = do
     text <- testDoc
     case runParser (sectionP superSectionT empty) "" text of
-        Left _ -> error "parsing failed"
+        Left err -> error $ show err
         Right nodeSection -> do
             renderToFile "src/Language/Ltml/HTML/Test/out.html" (sectionToHtml nodeSection)
             writeCss "src/Language/Ltml/HTML/Test/out.css"
