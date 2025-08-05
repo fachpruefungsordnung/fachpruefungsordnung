@@ -65,7 +65,7 @@ convertNewLine s =
 -------------------------------------------------------------------------------
 
 -- | Constructs HTML element with given Class
-(<#>) :: ([Attributes] -> t) -> Class -> t
+(<#>) :: ([Attributes] -> a) -> Class -> a
 htmlFunc <#> cssClass = htmlFunc [class_ (Class.className cssClass)]
 
 -- | Convert CSS Class to Lucid HTML Attribute
