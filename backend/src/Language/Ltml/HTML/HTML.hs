@@ -176,8 +176,9 @@ instance ToHtmlM Enumeration where
             let enumItemsHtml = foldr ((>>) . li_) (mempty :: Html ()) nestedHtml
              in return $ ol_ <#> enumLevel (enumNestingLevel readerState) $ enumItemsHtml
 
-instance ToHtmlM EnumItem where
-    toHtmlM (EnumItem textTrees) = toHtmlM textTrees
+instance ToHtmlM (Node EnumItem) where
+    -- TODO: Add enum labels to GlobalState and html id
+    toHtmlM (Node mLabel (EnumItem textTrees)) = toHtmlM textTrees
 
 instance (ToHtmlM a) => ToHtmlM [a] where
     toHtmlM [] = returnNow mempty
