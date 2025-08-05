@@ -12,7 +12,6 @@ import Text.Megaparsec ( empty, runParser )
 import Language.Lsd.Example.Fpo (superSectionT)
 import Language.Ltml.Parser.Section (sectionP)
 import Data.Text (Text)
-import qualified Data.Text.Lazy as LT
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.IO as TLIO
 import System.IO.Unsafe (unsafePerformIO)
