@@ -45,10 +45,10 @@ import Docs.Tree (Node)
 import Docs.TreeRevision (TreeRevision, TreeRevisionHistory, TreeRevisionRef)
 import GHC.Int (Int32)
 
-class (Monad m) => HasCheckPermission m where
+class (HasIsSuperAdmin m) => HasCheckPermission m where
     checkDocumentPermission :: UserID -> DocumentID -> Permission -> m Bool
 
-class (Monad m) => HasIsGroupAdmin m where
+class (HasIsSuperAdmin m) => HasIsGroupAdmin m where
     isGroupAdmin :: UserID -> GroupID -> m Bool
 
 class (Monad m) => HasIsSuperAdmin m where

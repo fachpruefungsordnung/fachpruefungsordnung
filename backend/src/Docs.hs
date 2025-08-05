@@ -140,7 +140,7 @@ createTextElement userID docID kind = runExceptT $ do
     lift $ DB.createTextElement docID kind
 
 createTextRevision
-    :: (HasCreateTextRevision m)
+    :: (HasCreateTextRevision m, HasGetTextElementRevision m)
     => UserID
     -> NewTextRevision
     -> m (Result ConflictStatus)
@@ -148,11 +148,15 @@ createTextRevision userID revision = runExceptT $ do
     let ref@(TextElementRef docID _) = newTextRevisionElement revision
     guardPermission Edit docID userID
     guardExistsTextElement ref
+    let latestRevisionRef = TextRevisionRef ref TextRevision.Latest
+    latestElementRevision <-
+        lift $ DB.getTextElementRevision latestRevisionRef
+    let latestRevision = latestElementRevision >>= TextRevision.revision
+    let createRevision = DB.createTextRevision userID ref
     lift $
         newTextRevision
-            DB.getLatestTextRevisionID
-            DB.createTextRevision
-            userID
+            latestRevision
+            createRevision
             revision
 
 getTextElementRevision
@@ -259,7 +263,8 @@ guardPermission
     -> ExceptT Error m ()
 guardPermission perms docID userID = do
     hasPermission <- lift $ DB.checkDocumentPermission userID docID perms
-    unless hasPermission $
+    superAdmin <- lift $ DB.isSuperAdmin userID
+    unless (hasPermission || superAdmin) $
         throwError (NoPermission docID perms)
 
 guardGroupAdmin
@@ -269,7 +274,8 @@ guardGroupAdmin
     -> ExceptT Error m ()
 guardGroupAdmin groupID userID = do
     hasPermission <- lift $ DB.isGroupAdmin userID groupID
-    unless hasPermission $
+    superAdmin <- lift $ DB.isSuperAdmin userID
+    unless (hasPermission || superAdmin) $
         throwError (NoPermissionInGroup groupID)
 
 guardUserRights
