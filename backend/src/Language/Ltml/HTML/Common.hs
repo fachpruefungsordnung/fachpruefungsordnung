@@ -70,7 +70,8 @@ initGlobalState =
         , currentSentenceID = 0
         , currentEnumItemID = 1
         , labels = []
-        , labelWrapperFunc = anchorLink -- const id -- anchorLink
+        , -- \| Default rendering method is "preview", so no anchor links
+          labelWrapperFunc = const id -- anchorLink
         }
 
 initReaderState :: ReaderState
