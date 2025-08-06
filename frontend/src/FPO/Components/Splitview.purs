@@ -212,6 +212,7 @@ splitview docID = H.mkComponent
       HH.div
         [ HE.onMouseMove HandleMouseMove
         , HE.onMouseUp StopResize
+        , HE.onMouseLeave StopResize
         , HP.classes [ HB.dFlex, HB.overflowHidden ]
         , HP.style
             ( "height: calc(100vh - " <> show (navbarHeight + toolbarHeight) <>
