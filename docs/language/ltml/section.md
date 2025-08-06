@@ -30,19 +30,19 @@ text that spans multiple lines).
 ```
 ={main:} Main
 
-§{sectionA:} Some section
+§{section_a:} Some section
 
-This paragraph is in {:sectionA} in super-section {:main}.
+This paragraph is in {:section_a} in super-section {:main}.
 
-This is another paragraph in {:sectionA}.
+This is another paragraph in {:section_a}.
 Paragraphs don't have keywords and are just separated by empty lines.
 
-§{sectionB:} Another section, with a title
+§{section_b:} Another section, with a title
   spanning
   several lines
     ^ Also, a footnote.
 
-This paragraph is in {:sectionB} in super-section {:main}.
+This paragraph is in {:section_b} in super-section {:main}.
 ```
 
 This assumes two section types, one with keyword `=` and another with keyword

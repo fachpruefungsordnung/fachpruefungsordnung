@@ -14,7 +14,7 @@ import Affjax.ResponseFormat (blob, document, ignore, json, string) as AXRF
 import Affjax.StatusCode (StatusCode(..))
 import Control.Alternative (guard)
 import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
-import Data.Argonaut (JsonDecodeError, decodeJson, encodeJson)
+import Data.Argonaut (JsonDecodeError, decodeJson, encodeJson, fromString)
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode.Decoders (decodeArray)
 import Data.Array (catMaybes)
@@ -230,6 +230,15 @@ postString :: String -> Json -> Aff (Either Error (Response String))
 postString url body = do
   fpoRequest <- liftEffect $ defaultFpoRequest AXRF.string ("/api" <> url) POST
   let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
+
+-- | Makes a POST request to render the content of a paragraph with a String body and expects a String response.
+postRenderHtml :: String -> Aff (Either Error (Response String))
+postRenderHtml content = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.string
+    ("/api/documents/render/html")
+    POST
+  let request' = fpoRequest { content = Just (RequestBody.json $ fromString content) }
   liftAff $ request driver request'
 
 -- | Makes a POST request with a JSON body and expects a JSON response.

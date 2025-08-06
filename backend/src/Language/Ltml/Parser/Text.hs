@@ -30,6 +30,7 @@ import Language.Lsd.AST.Type.Text
     , TextType (TextType)
     )
 import Language.Ltml.AST.Label (Label)
+import Language.Ltml.AST.Node (Node (Node))
 import Language.Ltml.AST.Text
     ( EnumItem (EnumItem)
     , Enumeration (Enumeration)
@@ -156,7 +157,7 @@ instance EnumP Void Void where
 instance EnumP EnumType Enumeration where
     enumP (EnumType kw tt) = Enumeration <$> someIndented enumItemP
       where
-        enumItemP = EnumItem <$> hangingTextP kw tt
+        enumItemP = uncurry Node . fmap EnumItem <$> hangingTextP' kw tt
 
 class SpecialP m special | special -> m where
     specialP :: m (MiElementConfig, Maybe special)

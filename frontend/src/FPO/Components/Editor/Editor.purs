@@ -22,7 +22,7 @@ import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
 import Data.Array (catMaybes, filter, intercalate, uncons, (:))
 import Data.Foldable (find, for_, traverse_)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
@@ -83,7 +83,7 @@ type LiveMarker =
   }
 
 data Output
-  = ClickedQuery (Maybe (Array String))
+  = ClickedQuery (Array String)
   | DeletedComment TOCEntry (Array Int)
   | SavedSection TOCEntry
   | SelectedCommentSection Int Int
@@ -563,7 +563,7 @@ editor docID = connect selectTranslator $ H.mkComponent
         H.liftEffect $ Editor.getSession ed
           >>= Session.getDocument
           >>= Document.getAllLines
-      H.raise (ClickedQuery allLines)
+      H.raise (ClickedQuery $ fromMaybe [] allLines)
       pure (Just a)
 
     SendCommentSections a -> do

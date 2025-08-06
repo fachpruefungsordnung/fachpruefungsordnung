@@ -76,7 +76,7 @@ See also the [enumeration example](./enumeration.md#example).
 ## Example
 
 ```
-{paragraphA:}
+{paragraph_a:}
 This paragraph uses all text features in a minimalistic way.
 Some of this text is <*bold>, </cursive>, <_underlined>.
 This is an enumeration:
@@ -85,11 +85,11 @@ This is an enumeration:
     # nested enumeration item
 Next, we use a footnote.
   ^ This is a footnote.
-{sentenceA:} This sentence has a label.
-This is a reference to the preceding sentence: {:sentenceA}.
+{sentence_a:} This sentence has a label.
+This is a reference to the preceding sentence: {:sentence_a}.
 This sentence spans
 multiple
-lines.  {sentenceB:} This sentence starts in-line.
+lines.  {sentence_b:} This sentence starts in-line.
 ```
 
 This assumes an enumeration keyword `#` and a footnote keyword `^`.
