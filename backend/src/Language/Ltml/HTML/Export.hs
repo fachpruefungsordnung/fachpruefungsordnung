@@ -5,9 +5,9 @@ module Language.Ltml.HTML.Export (exportDocument) where
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Control.Monad.State (runState)
 import Language.Ltml.AST.Document
-import Language.Ltml.HTML.CSS.CSS
+import Language.Ltml.HTML.CSS
 import Language.Ltml.HTML.Common
-import Language.Ltml.HTML.HTML
+import Language.Ltml.HTML
 import Language.Ltml.HTML.Util
 import Lucid
 import System.Directory

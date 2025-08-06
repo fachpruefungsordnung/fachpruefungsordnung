@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Ltml.HTML.CSS.CSS (writeCss) where
+module Language.Ltml.HTML.CSS (writeCss, mainStylesheet) where
 
 import Clay hiding (map)
 

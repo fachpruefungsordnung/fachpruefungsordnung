@@ -14,6 +14,7 @@ import Data.OpenApi
     , declareNamedSchema
     )
 import Data.Text (Text, lines, unlines)
+import Language.Ltml.HTML.Pipeline (htmlPipeline)
 import Lucid
 import Network.HTTP.Media.MediaType ((//))
 import Servant
@@ -37,7 +38,7 @@ type RenderAPI =
            )
 
 renderServer :: Server RenderAPI
-renderServer = renderHandler renderHTML :<|> renderHandler renderPlain
+renderServer = renderHandler htmlPipeline :<|> renderHandler renderPlain
 
 -- | Format type for HTML
 data HTML
@@ -58,20 +59,6 @@ instance MimeRender Plain DocByteString where
 
 instance MimeRender HTML DocByteString where
     mimeRender _ (DocByteString bs) = bs
-
-renderHTML :: Text -> ByteString
-renderHTML input =
-    let (head, body) = case lines input of
-            [] -> ("", "")
-            (x : xs) -> (x, unlines xs)
-     in do
-            renderBS $
-                html_ $ do
-                    head_ $
-                        title_ "Render Result"
-                    body_ $ do
-                        h1_ (toHtml head)
-                        p_ (toHtml body)
 
 renderPlain :: Text -> ByteString
 renderPlain = encode

@@ -7,12 +7,12 @@
 
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 
-module Language.Ltml.HTML.HTML (ToHtmlM (..), renderHtml, docToHtml, sectionToHtml, addHtmlHeader, aToHtml) where
+module Language.Ltml.HTML (ToHtmlM (..), renderHtml, docToHtml, sectionToHtml, aToHtml) where
 
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
-import Data.Text (Text, pack)
+import Data.Text (Text)
 import Data.Void (Void)
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.Label
@@ -46,15 +46,6 @@ aToHtml title relativeCssPath a =
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
         body = evalDelayed delayedHtml finalState
      in addHtmlHeader title relativeCssPath body
-
--- | Adds html, head and body tags onto given html and
---   sets title and css path
-addHtmlHeader :: String -> FilePath -> Html () -> Html ()
-addHtmlHeader title cssPath html = doctypehtml_ $ do
-    head_ $ do
-        title_ (toHtml title)
-        link_ [rel_ "stylesheet", href_ (pack cssPath)]
-    body_ html
 
 -------------------------------------------------------------------------------
 

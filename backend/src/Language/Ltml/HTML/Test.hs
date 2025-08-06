@@ -14,7 +14,7 @@ import Language.Ltml.AST.Paragraph
 import Language.Ltml.AST.Section
 import Language.Ltml.AST.Text
 import Language.Ltml.HTML.Export
-import Language.Ltml.HTML.HTML
+import Language.Ltml.HTML
 import Language.Ltml.Parser.Section (sectionP)
 
 import Language.Lsd.AST.Type.Document (DocumentFormat (..))
@@ -23,7 +23,7 @@ import Language.Ltml.AST.Document
     , DocumentBody (..)
     , DocumentHeader (..)
     )
-import Language.Ltml.HTML.CSS.CSS (writeCss)
+import Language.Ltml.HTML.CSS (writeCss)
 import Language.Ltml.Pretty (prettyPrint)
 import Lucid (renderToFile)
 import System.Directory (removeDirectoryRecursive)
