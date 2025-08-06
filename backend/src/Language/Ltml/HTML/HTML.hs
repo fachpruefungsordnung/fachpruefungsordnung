@@ -12,6 +12,7 @@ module Language.Ltml.HTML.HTML (ToHtmlM (..), renderHtml, docToHtml, sectionToHt
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
+import Data.Text (Text, pack)
 import Data.Void (Void)
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.Label
@@ -21,13 +22,13 @@ import Language.Ltml.AST.Section
 import Language.Ltml.AST.Text
 import Language.Ltml.HTML.CSS.Classes (enumLevel)
 import qualified Language.Ltml.HTML.CSS.Classes as Class
+import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.HTML.Common
 import Language.Ltml.HTML.FormatString
 import Language.Ltml.HTML.References
 import Language.Ltml.HTML.Util
 import Lucid
 import Prelude hiding (id)
-import Data.Text (Text, pack)
 
 renderHtml :: Document -> ByteString
 renderHtml document = renderBS $ docToHtml document
@@ -42,9 +43,9 @@ sectionToHtml = aToHtml "Test Dokument" "out.css"
 --   with title and a path to a css file
 aToHtml :: (ToHtmlM a) => String -> FilePath -> a -> Html ()
 aToHtml title relativeCssPath a =
-        let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
-            body = evalDelayed delayedHtml finalState
-        in addHtmlHeader title relativeCssPath body
+    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
+        body = evalDelayed delayedHtml finalState
+     in addHtmlHeader title relativeCssPath body
 
 -- | Adds html, head and body tags onto given html and
 --   sets title and css path
@@ -167,6 +168,8 @@ instance ToHtmlStyle FontStyle where
 instance ToHtmlM Enumeration where
     toHtmlM (Enumeration enumItems) = do
         readerState <- ask
+        -- \| Reset enumItemID for this Enumeration
+        modify (\s -> s {currentEnumItemID = 1})
         nested <-
             mapM
                 (local (\s -> s {enumNestingLevel = enumNestingLevel s + 1}) . toHtmlM)
@@ -177,8 +180,14 @@ instance ToHtmlM Enumeration where
              in return $ ol_ <#> enumLevel (enumNestingLevel readerState) $ enumItemsHtml
 
 instance ToHtmlM (Node EnumItem) where
-    -- TODO: Add enum labels to GlobalState and html id
-    toHtmlM (Node mLabel (EnumItem textTrees)) = toHtmlM textTrees
+    toHtmlM (Node mLabel (EnumItem textTrees)) = do
+        addMaybeLabelToState mLabel EnumItemRef
+        -- \| Save current enum item id, if nested enumerations follow and reset it
+        enumItemID <- gets currentEnumItemID
+        enumItemHtml <- toHtmlM textTrees
+        -- \| Increment enumItemID for next enumItem
+        modify (\s -> s {currentEnumItemID = enumItemID + 1})
+        return $ span_ [cssClass_ Class.EnumItem, mId_ mLabel] <$> enumItemHtml
 
 instance (ToHtmlM a) => ToHtmlM [a] where
     toHtmlM [] = returnNow mempty

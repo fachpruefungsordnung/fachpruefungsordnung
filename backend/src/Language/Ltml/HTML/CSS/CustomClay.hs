@@ -8,9 +8,11 @@ module Language.Ltml.HTML.CSS.CustomClay
     , stringCounter
     , counterReset
     , counterIncrement
+    , alignRight
+    , gap
     ) where
 
-import Clay
+import Clay hiding (a, b, s)
 import Data.Text (Text)
 
 counterReset :: Text -> Css
@@ -23,7 +25,7 @@ counterIncrement t = "counter-increment" -: t
 newtype Counter = Counter {unCounter :: Text}
 
 -- | Translates Counter into actual CSS property
--- (uses CSS content)  
+-- (uses CSS content)
 counter :: Counter -> Css
 counter c = "content" -: unCounter c
 
@@ -38,3 +40,13 @@ stringCounter t = Counter $ "\"" <> t <> "\""
 
 instance Semigroup Counter where
     Counter a <> Counter b = Counter (a <> b)
+
+-------------------------------------------------------------------------------
+
+alignRight :: TextAlign
+alignRight = other "right"
+
+-------------------------------------------------------------------------------
+
+gap :: Size LengthUnit -> Css
+gap s = "gap" -: unPlain (unValue $ value s)

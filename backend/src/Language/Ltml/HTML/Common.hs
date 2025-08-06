@@ -37,6 +37,8 @@ data GlobalState = GlobalState
     -- ^ Tracks the current paragraph number in the current section
     , currentSentenceID :: Int
     -- ^ Tracks the current sentence number in the current paragraph
+    , currentEnumItemID :: Int
+    -- ^ Tracks the current enum item number in the current enumeration
     , labels :: [(Text, Html ())]
     -- ^ Holds all labels and the Html element that should be displayed when this label is referenced
     , labelWrapperFunc :: Label -> Html () -> Html ()
@@ -66,6 +68,7 @@ initGlobalState =
         , currentSectionID = 1
         , currentParagraphID = 1
         , currentSentenceID = 0
+        , currentEnumItemID = 1
         , labels = []
         , labelWrapperFunc = anchorLink -- const id -- anchorLink
         }

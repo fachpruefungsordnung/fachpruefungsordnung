@@ -19,5 +19,7 @@ mainStylesheet :: Css
 mainStylesheet = do
     body ? do
         fontFamily ["Arial"] [sansSerif]
+        marginLeft (em 2)
+        marginRight (em 2)
 
     mconcat cssClasses

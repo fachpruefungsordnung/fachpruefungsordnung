@@ -6,8 +6,6 @@ module Language.Ltml.HTML.Util
     , whenJust
     , mapState
     , convertNewLine
-    , (<#>)
-    , cssClass_
     , mId_
     , anchorLink
     ) where
@@ -15,7 +13,6 @@ module Language.Ltml.HTML.Util
 import Data.Char (chr)
 import Data.Text (cons)
 import Language.Ltml.AST.Label (Label (..))
-import Language.Ltml.HTML.CSS.Classes as Class
 import Lucid
 
 -- | Converts Int to corresponding lowercase letter in the alphabet.
@@ -64,20 +61,10 @@ convertNewLine s =
 
 -------------------------------------------------------------------------------
 
--- | Constructs HTML element with given Class
-(<#>) :: ([Attributes] -> a) -> Class -> a
-htmlFunc <#> cssClass = htmlFunc [class_ (Class.className cssClass)]
-
--- | Convert CSS Class to Lucid HTML Attribute
-cssClass_ :: Class -> Attributes
-cssClass_ = class_ . Class.className
-
 -- | Adds Label as id, if it exists
 mId_ :: Maybe Label -> Attributes
 mId_ Nothing = mempty
 mId_ (Just label) = id_ $ unLabel label
-
--------------------------------------------------------------------------------
 
 -- | Converts Label into <a href = "#<label>"> for HTML jumping
 anchorLink :: Label -> Html () -> Html ()
