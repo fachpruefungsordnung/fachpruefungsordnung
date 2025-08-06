@@ -16,6 +16,7 @@ import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
 import FPO.Components.Editor as Editor
@@ -43,6 +44,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
+import Web.Event.Event (EventType(..), stopPropagation)
 import Web.HTML as Web.HTML
 import Web.HTML.Window as Web.HTML.Window
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
@@ -383,6 +385,11 @@ splitview docID = H.mkComponent
                 \cursor: pointer; \
                 \height: 40px; \
                 \width: 8px;"
+            -- To prevent the resizer event under the button
+            , HE.handler' (EventType "mousedown") \ev ->
+                unsafePerformEffect do
+                  stopPropagation ev
+                  pure Nothing -- Do not trigger the mouse down event under the button
             , HE.onClick \_ -> ToggleSidebar
             ]
             [ HH.text if state.sidebarShown then "⟨" else "⟩" ]
@@ -416,6 +423,11 @@ splitview docID = H.mkComponent
                 \cursor: pointer; \
                 \height: 40px; \
                 \width: 8px;"
+            -- To prevent the resizer event under the button
+            , HE.handler' (EventType "mousedown") \ev ->
+                unsafePerformEffect do
+                  stopPropagation ev
+                  pure Nothing -- Do not trigger the mouse down event under the button
             , HE.onClick \_ -> TogglePreview
             ]
             [ HH.text if state.previewShown then "⟩" else "⟨" ]
@@ -533,6 +545,9 @@ splitview docID = H.mkComponent
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
     StartResize which mouse -> do
+      case which of
+        ResizeLeft -> H.modify_ \st -> st { sidebarShown = true }
+        ResizeRight -> H.modify_ \st -> st { previewShown = true }
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let
@@ -545,6 +560,7 @@ splitview docID = H.mkComponent
         , startSidebarRatio = st.sidebarRatio
         , startPreviewRatio = st.previewRatio
         }
+      handleAction $ HandleMouseMove mouse
 
     -- Stop resizing, when mouse is released (is detected by browser)
     StopResize _ ->
@@ -654,10 +670,12 @@ splitview docID = H.mkComponent
         resizerWidth = 16.0
         resizerRatio = resizerWidth / w
       -- close preview
-      if state.previewShown then
+      if state.previewShown then do
+        let 
+          oldPreviewRatio = state.previewRatio
         H.modify_ \st -> st
           { previewRatio = resizerRatio
-          , lastExpandedPreviewRatio = st.previewRatio
+          , lastExpandedPreviewRatio = oldPreviewRatio
           , previewShown = false
           }
       -- open preview
