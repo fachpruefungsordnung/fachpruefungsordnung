@@ -21,7 +21,6 @@ package:
     - halogen
     - halogen-bootstrap5
     - halogen-store
-    - halogen-subscriptions
     - http-methods
     - integers
     - lists
@@ -38,7 +37,6 @@ package:
     - safe-coerce
     - simple-i18n
     - strings
-    - tailrec
     - transformers
     - tuples
     - unsafe-coerce

@@ -14,7 +14,9 @@ import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
+import Data.String (joinWith)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
 import FPO.Components.Editor as Editor
@@ -42,6 +44,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
+import Web.Event.Event (EventType(..), stopPropagation)
 import Web.HTML as Web.HTML
 import Web.HTML.Window as Web.HTML.Window
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
@@ -62,7 +65,7 @@ data Action
   | HandleMouseMove MouseEvent
   -- Toolbar buttons
   | SaveSection
-  | QueryEditor
+  | RenderHTML
   -- Toggle buttons
   | ToggleComment
   | ToggleCommentOverview Boolean
@@ -101,10 +104,10 @@ type State =
 
   -- There are 2 ways to send content to preview:
   -- 1. This editorContent is sent through the slot in renderPreview
-  -- 2. Throuth QueryEditor, where the editor collects its content and sends it
+  -- 2. Throuth QueryEditor of the Editor, where the editor collects its content and sends it
   --   to the preview component.
   -- TODO: Which one to use?
-  , mEditorContent :: Maybe (Array String)
+  , renderedHtml :: Maybe String
 
   -- Store tocEntries and send some parts to its children components
   , tocEntries :: TOCTree
@@ -152,7 +155,7 @@ splitview docID = H.mkComponent
       , previewRatio: 0.4
       , lastExpandedSidebarRatio: 0.2
       , lastExpandedPreviewRatio: 0.4
-      , mEditorContent: Nothing
+      , renderedHtml: Nothing
       , tocEntries: Empty
       , mTimeFormatter: Nothing
       , sidebarShown: true
@@ -186,7 +189,7 @@ splitview docID = H.mkComponent
       , toolbarButton "POST" POST
       , toolbarButton "All Comments" (ToggleCommentOverview true)
       , toolbarButton "Save" SaveSection
-      , toolbarButton "Query Editor" QueryEditor
+      , toolbarButton "Render HTML" RenderHTML
       ]
     where
     toolbarButton label act = HH.button
@@ -209,6 +212,7 @@ splitview docID = H.mkComponent
       HH.div
         [ HE.onMouseMove HandleMouseMove
         , HE.onMouseUp StopResize
+        , HE.onMouseLeave StopResize
         , HP.classes [ HB.dFlex, HB.overflowHidden ]
         , HP.style
             ( "height: calc(100vh - " <> show (navbarHeight + toolbarHeight) <>
@@ -382,6 +386,11 @@ splitview docID = H.mkComponent
                 \cursor: pointer; \
                 \height: 40px; \
                 \width: 8px;"
+            -- To prevent the resizer event under the button
+            , HE.handler' (EventType "mousedown") \ev ->
+                unsafePerformEffect do
+                  stopPropagation ev
+                  pure Nothing -- Do not trigger the mouse down event under the button
             , HE.onClick \_ -> ToggleSidebar
             ]
             [ HH.text if state.sidebarShown then "⟨" else "⟩" ]
@@ -415,6 +424,11 @@ splitview docID = H.mkComponent
                 \cursor: pointer; \
                 \height: 40px; \
                 \width: 8px;"
+            -- To prevent the resizer event under the button
+            , HE.handler' (EventType "mousedown") \ev ->
+                unsafePerformEffect do
+                  stopPropagation ev
+                  pure Nothing -- Do not trigger the mouse down event under the button
             , HE.onClick \_ -> TogglePreview
             ]
             [ HH.text if state.previewShown then "⟩" else "⟨" ]
@@ -453,7 +467,7 @@ splitview docID = H.mkComponent
                   [ HH.text "×" ]
               ]
           , HH.slot _preview unit Preview.preview
-              { editorContent: state.mEditorContent }
+              { renderedHtml: state.renderedHtml }
               HandlePreview
           ]
       else
@@ -532,6 +546,9 @@ splitview docID = H.mkComponent
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
     StartResize which mouse -> do
+      case which of
+        ResizeLeft -> H.modify_ \st -> st { sidebarShown = true }
+        ResizeRight -> H.modify_ \st -> st { previewShown = true }
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let
@@ -544,6 +561,7 @@ splitview docID = H.mkComponent
         , startSidebarRatio = st.sidebarRatio
         , startPreviewRatio = st.previewRatio
         }
+      handleAction $ HandleMouseMove mouse
 
     -- Stop resizing, when mouse is released (is detected by browser)
     StopResize _ ->
@@ -606,7 +624,7 @@ splitview docID = H.mkComponent
 
     SaveSection -> H.tell _editor unit Editor.SaveSection
 
-    QueryEditor -> do
+    RenderHTML -> do
       H.tell _editor unit Editor.SaveSection
       H.tell _editor unit Editor.QueryEditor
 
@@ -653,10 +671,12 @@ splitview docID = H.mkComponent
         resizerWidth = 16.0
         resizerRatio = resizerWidth / w
       -- close preview
-      if state.previewShown then
+      if state.previewShown then do
+        let
+          oldPreviewRatio = state.previewRatio
         H.modify_ \st -> st
           { previewRatio = resizerRatio
-          , lastExpandedPreviewRatio = st.previewRatio
+          , lastExpandedPreviewRatio = oldPreviewRatio
           , previewShown = false
           }
       -- open preview
@@ -710,8 +730,12 @@ splitview docID = H.mkComponent
 
     HandleEditor output -> case output of
 
-      Editor.ClickedQuery response -> H.tell _preview unit
-        (Preview.GotEditorQuery response)
+      Editor.ClickedQuery response -> do
+        renderedHtml' <- H.liftAff $ Request.postRenderHtml (joinWith "" response)
+        case renderedHtml' of
+          Left _ -> pure unit -- Handle error
+          Right { body } -> do
+            H.modify_ \st -> st { renderedHtml = Just body }
 
       Editor.DeletedComment tocEntry deletedIDs -> do
         H.modify_ \st ->
