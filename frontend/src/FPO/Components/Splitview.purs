@@ -672,7 +672,7 @@ splitview docID = H.mkComponent
         resizerRatio = resizerWidth / w
       -- close preview
       if state.previewShown then do
-        let 
+        let
           oldPreviewRatio = state.previewRatio
         H.modify_ \st -> st
           { previewRatio = resizerRatio
