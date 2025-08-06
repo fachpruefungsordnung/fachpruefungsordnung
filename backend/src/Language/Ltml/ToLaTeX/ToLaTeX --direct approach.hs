@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Language.Ltml.ToLaTeX 
+module Language.Ltml.ToLaTeX.Old
     (ToLaTeX (..))
     where
 

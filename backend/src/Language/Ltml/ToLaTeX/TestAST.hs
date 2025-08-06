@@ -16,8 +16,7 @@ import qualified Data.Text.IO as TIO
 import qualified Data.Text.Lazy.IO as TLIO
 import System.IO.Unsafe (unsafePerformIO)
 import Language.Ltml.ToLaTeX.Type
-import Language.Ltml.ToLaTeX.LabelState (LabelState (LabelState, labelToRef))
-import Language.Ltml.ToLaTeXM (ToLaTeXM(toLaTeXM))
+import Language.Ltml.ToLaTeX.ToLaTeXM (ToLaTeXM(toLaTeXM))
 import Control.Monad.State (runState)
 import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
 import Language.Ltml.AST.Section (Section (Section), Heading (Heading))
@@ -28,18 +27,19 @@ import Language.Ltml.AST.Paragraph (Paragraph(Paragraph))
 import Language.Lsd.AST.Type.Paragraph (ParagraphFormat(ParagraphFormat))
 import Language.Ltml.AST.Text (TextTree(Word, Space, Reference))
 import Language.Ltml.AST.Label (Label(Label))
+import Language.Ltml.ToLaTeX.GlobalState (GlobalState (GlobalState, labelToRef))
 
 readText :: String -> Text
 readText filename = unsafePerformIO $ TIO.readFile filename
 
-initialState :: LabelState
-initialState = LabelState 0 0 0 False False mempty mempty
+initialState :: GlobalState
+initialState = GlobalState 0 0 0 0 False False mempty mempty
 
 parseInputfromtxt = 
             either undefined id
             $ runParser (sectionP superSectionT empty) "" (readText "./src/Language/Ltml/ToLaTeX/test.txt")
 
-testThis :: ToLaTeXM a => a -> (LaTeX, LabelState)
+testThis :: ToLaTeXM a => a -> (LaTeX, GlobalState)
 testThis a = runState (toLaTeXM a)
             initialState
 
@@ -73,7 +73,7 @@ superSectionWithNSubsections n =
                                                 Word "refers", Space, 
                                                 Word "to", Space, 
                                                 Word "the", Space, 
-                                                Word "supersection", Space, 
+                                                Word "section", Space, 
                                                 Reference (Label "super")
                                             ]
                                     )
@@ -85,9 +85,9 @@ hugeSuperSection n = Section
                         (SectionFormat (FormatString [PlaceholderAtom Arabic]))
                         (Heading 
                                 (FormatString [
-                                                StringAtom "§ ",
+                                                StringAtom "Supersection ",
                                                 PlaceholderAtom IdentifierPlaceholder,
-                                                StringAtom "\n",
+                                                StringAtom " ",
                                                 PlaceholderAtom HeadingTextPlaceholder
                                             ])
                                 [

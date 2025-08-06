@@ -1,8 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Language.Ltml.ToLaTeXM
+module Language.Ltml.ToLaTeX.ToLaTeXM
     (ToLaTeXM (..))
     where
 
@@ -15,16 +14,14 @@ import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.ToLaTeX.Type
 import qualified Data.Text.Lazy as LT
 import Control.Monad.State (State, MonadState (get), modify)
-import qualified Language.Ltml.ToLaTeX.LabelState as LS
-import Language.Lsd.AST.Format (FormatString (FormatString), FormatAtom (StringAtom, PlaceholderAtom), IdentifierFormat, HeadingFormat, HeadingPlaceholderAtom (HeadingTextPlaceholder, IdentifierPlaceholder), EnumStyle (Arabic, AlphabeticLower, AlphabeticUpper))
-import Data.Char (chr)
-import Language.Lsd.AST.Type.Paragraph (ParagraphFormat (ParagraphFormat))
-import Language.Lsd.AST.Type.Section (SectionFormat (SectionFormat))
-import Language.Ltml.ToLaTeX.LabelState (LabelState(isSupersection))
+import qualified Language.Ltml.ToLaTeX.GlobalState as LS
+import Language.Ltml.ToLaTeX.Format
+import Language.Ltml.AST.Document (Document(..), DocumentBody(..), DocumentHeader(..))
+import Language.Lsd.AST.Type.Document (DocumentFormat(..))
 
 
 class ToLaTeXM a where
-    toLaTeXM :: a -> State LS.LabelState LaTeX
+    toLaTeXM :: a -> State LS.GlobalState LaTeX
 
 -------------------------------- Void -----------------------------------
 
@@ -82,19 +79,21 @@ instance ToLaTeXM EnumItem where
 
 instance ToLaTeXM SentenceStart where
 
-    toLaTeXM (SentenceStart mLabel) = maybe (pure mempty) toLaTeXM mLabel
+    toLaTeXM (SentenceStart mLabel) = do
+        n <- LS.nextSentence
+        LS.insertLabel mLabel (LT.pack (show n))
+        maybe (pure mempty) toLaTeXM mLabel
+
 
 -------------------------------- Label -----------------------------------
 
--- | TODO: There could be an option to know where exactly we currently are, maybe by 
---         constantly updating the state, so that we can create a label from anywhere,
---         highly dependent on what SentenceStart labels are supposed to be.
 instance ToLaTeXM Label where
 
     toLaTeXM l = pure $ hyperlink l mempty
 
 class ToLaTeXM a => Labelable a where
-    attachLabel :: Maybe Label -> a -> State LS.LabelState LaTeX
+
+    attachLabel :: Maybe Label -> a -> State LS.GlobalState LaTeX
 
 
 -------------------------------- Paragraph -----------------------------------
@@ -113,7 +112,7 @@ instance Labelable Paragraph where
                                  <> LT.pack (show (LS.paragraph st)))
         content' <- mapM toLaTeXM content
         let anchor = maybe mempty (`hypertarget` mempty) mLabel
-        pure $ anchor <> 
+        pure $ anchor <>
                 if LS.onlyOneParagraph st
                 then Sequence content' <> medskip
                 else paragraph (formatParagraph fmt (LS.paragraph st)) (Sequence content') <> medskip
@@ -134,6 +133,7 @@ instance ToLaTeXM Section where
 
 
 instance Labelable Section where
+
     attachLabel mLabel (Section fmt heading nodes) = do
         (children, headingDoc) <-
             case nodes of
@@ -152,11 +152,11 @@ instance Labelable Section where
                     _ <- LS.insertLabel mLabel ("Abschnitt "
                                              <> LT.pack (show n))
                     children' <- mapM toLaTeXM subsections
-                    modify (\s -> s { isSupersection = True
+                    modify (\s -> s { LS.isSupersection = True
                                     , LS.identifier = formatSection fmt (LS.supersection s)
                                     })
                     headingDoc <- toLaTeXM heading
-                    modify (\s -> s { isSupersection = False })
+                    modify (\s -> s { LS.isSupersection = False })
                     pure (children', headingDoc <> linebreak)
         let anchor = maybe headingDoc (`hypertarget` headingDoc) mLabel
         pure $ anchor <> Sequence children
@@ -170,49 +170,9 @@ instance Labelable a => ToLaTeXM (Node a) where
 
 -------------------------------- Document -----------------------------------
 
--- instance ToLaTeXM Document where
+instance ToLaTeXM Document where
 
---     toLaTeXM (Document _ _ (DocumentBody nodes)) = header <> T.intercalate "\n" (map toLaTeXM nodes) <> footer
---       where
---         header = "\\documentclass{article}\n"
---               <> "\\usepackage{enumitem}\n"
---               <> "% Define German legal style for enumerations\n"
---               <> "\\setlist[enumerate,1]{label=\\arabic*., left=0pt}\n"
---               <> "\\setlist[enumerate,2]{label=\\alph*), left=1.5em}\n"
---               <> "\\setlist[enumerate,3]{label=\\alph\\alph*), left=3em} \n"
---               <> "\\begin{document}\n"
---         footer = "\n\\end{document}"
-
--------------------------------- Format -----------------------------------
-
-formatIdentifier :: IdentifierFormat -> Int -> LaTeX
-formatIdentifier (FormatString []) _ = mempty
-formatIdentifier (FormatString (StringAtom s:rest)) i =
-    Text (LT.pack s) <> formatIdentifier (FormatString rest) i
-formatIdentifier (FormatString (PlaceholderAtom a:rest)) i =
-    ( <> formatIdentifier (FormatString rest) i ) $
-    case a of
-        Arabic          -> Text (LT.pack $ show i)
-        AlphabeticLower -> Text (LT.pack [chr (i `mod` 27 + 96)])
-        AlphabeticUpper -> Text (LT.pack [chr (i `mod` 27 + 64)])
-
-
-formatHeading :: HeadingFormat -> LaTeX -> LaTeX -> LaTeX
-formatHeading (FormatString []) _ _ = mempty
-formatHeading (FormatString (StringAtom s:rest)) i latex =
-    Sequence (map replace s) <> formatHeading (FormatString rest) i latex
-  where
-    replace '\n' = linebreak
-    replace c    = Text (LT.pack [c])
-formatHeading (FormatString (PlaceholderAtom a:rest)) i latex =
-    case a of
-        HeadingTextPlaceholder -> latex <> formatHeading (FormatString rest) i latex
-        IdentifierPlaceholder  -> i <> formatHeading (FormatString rest) i latex
-
-
-formatParagraph :: ParagraphFormat -> Int -> LaTeX
-formatParagraph (ParagraphFormat x) = formatIdentifier x
-
-formatSection :: SectionFormat -> Int  -> LaTeX
-formatSection (SectionFormat x) = formatIdentifier x
+    toLaTeXM (Document DocumentFormat DocumentHeader (DocumentBody nodes)) = do
+        nodes' <- mapM toLaTeXM nodes
+        pure $ staticDocumentFormat <> document (Sequence nodes')
 
