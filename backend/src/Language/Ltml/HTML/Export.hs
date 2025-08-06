@@ -5,9 +5,9 @@ module Language.Ltml.HTML.Export (exportDocument) where
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Control.Monad.State (runState)
 import Language.Ltml.AST.Document
+import Language.Ltml.HTML
 import Language.Ltml.HTML.CSS
 import Language.Ltml.HTML.Common
-import Language.Ltml.HTML
 import Language.Ltml.HTML.Util
 import Lucid
 import System.Directory
@@ -39,7 +39,7 @@ exportDocument doc@(Document format header (DocumentBody nodeSections)) path =
             -- \| TODO: Add actual Document title
             renderToFile
                 (path </> "index.html")
-                (aToHtml "Tolles Dokument" relativeCssFilePath doc)
+                (addHtmlHeader "Tolles Dokument" relativeCssFilePath $ aToHtml doc)
             mapState (exportSingleSection absSectionsDir) initGlobalState nodeSections
 
 -- | Render section with given initial state and creates .html file

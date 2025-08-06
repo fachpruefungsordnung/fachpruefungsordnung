@@ -13,9 +13,8 @@ import Data.OpenApi
     , binarySchema
     , declareNamedSchema
     )
-import Data.Text (Text, lines, unlines)
+import Data.Text (Text)
 import Language.Ltml.HTML.Pipeline (htmlPipeline)
-import Lucid
 import Network.HTTP.Media.MediaType ((//))
 import Servant
 import Servant.Auth.Server
@@ -72,5 +71,6 @@ type RenderRoute format =
 -- | Generic renderHandler which takes a render function
 renderHandler
     :: (a -> ByteString) -> AuthResult Auth.Token -> a -> Handler DocByteString
-renderHandler renderFunc (Authenticated _) input = return $ DocByteString $ renderFunc input
+renderHandler renderFunc (Authenticated _) input = do
+    return $ DocByteString $ renderFunc input
 renderHandler _ _ _ = throwError errNotLoggedIn

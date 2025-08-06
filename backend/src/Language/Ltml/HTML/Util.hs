@@ -75,6 +75,8 @@ addHtmlHeader title cssPath html = doctypehtml_ $ do
         link_ [rel_ "stylesheet", href_ (pack cssPath)]
     body_ html
 
+-- | Adds html, head and body tags onto given html and
+--   sets title, renders and inlines given css
 addInlineCssHeader :: String -> Css -> Html () -> Html ()
 addInlineCssHeader title css html =
     doctypehtml_ $ do

@@ -34,18 +34,16 @@ renderHtml :: Document -> ByteString
 renderHtml document = renderBS $ docToHtml document
 
 docToHtml :: Document -> Html ()
-docToHtml = aToHtml "Test Dokument" "out.css"
+docToHtml doc = addHtmlHeader "Test Dokument" "out.css" (aToHtml doc)
 
 sectionToHtml :: Node Section -> Html ()
-sectionToHtml = aToHtml "Test Dokument" "out.css"
+sectionToHtml sec = addHtmlHeader "Test Dokument" "out.css" (aToHtml sec)
 
--- | Internal function that renders to Html and creates final HTML wrapper
---   with title and a path to a css file
-aToHtml :: (ToHtmlM a) => String -> FilePath -> a -> Html ()
-aToHtml title relativeCssPath a =
+-- | Internal function that renders to Html
+aToHtml :: (ToHtmlM a) => a -> Html ()
+aToHtml a =
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
-        body = evalDelayed delayedHtml finalState
-     in addHtmlHeader title relativeCssPath body
+     in evalDelayed delayedHtml finalState
 
 -------------------------------------------------------------------------------
 
