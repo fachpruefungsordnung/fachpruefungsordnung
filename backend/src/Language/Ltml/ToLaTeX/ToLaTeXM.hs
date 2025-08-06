@@ -73,7 +73,12 @@ instance ToLaTeXM Enumeration where
 
 instance ToLaTeXM EnumItem where
 
-    toLaTeXM (EnumItem tt) = do
+    toLaTeXM = attachLabel Nothing
+
+-- TODO: reimplement the labelling with a list to track the label of the enum.
+instance Labelable EnumItem where
+
+    attachLabel mLabel (EnumItem tt) = do
         tt' <- mapM toLaTeXM tt
         pure $ Sequence tt'
 
