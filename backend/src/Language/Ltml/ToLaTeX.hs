@@ -1,5 +1,5 @@
 module Language.Ltml.ToLaTeX
-    ( generatePDFFromSection,
+    ( generatePDFFromSection
     --   generatePDFFromDocument
     ) where
 
@@ -8,6 +8,7 @@ import qualified Data.ByteString.Lazy as BS
 import Data.Text (Text)
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.IO as LTIO
+import Data.Void (Void)
 import Language.Lsd.Example.Fpo (superSectionT)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX.Format (staticDocumentFormat)
@@ -23,8 +24,7 @@ import System.Process
     , readCreateProcessWithExitCode
     , shell
     )
-import Text.Megaparsec (empty, errorBundlePretty, runParser, Parsec)
-import Data.Void (Void)
+import Text.Megaparsec (Parsec, empty, errorBundlePretty, runParser)
 
 initialGlobalState :: GlobalState
 initialGlobalState =
@@ -39,7 +39,8 @@ initialGlobalState =
         mempty
         mempty
 
-generatePDFfromParsed :: Parsec Void Text a -> (a -> LT.Text) -> Text -> IO (Either String BS.ByteString)
+generatePDFfromParsed
+    :: Parsec Void Text a -> (a -> LT.Text) -> Text -> IO (Either String BS.ByteString)
 generatePDFfromParsed parser render input =
     case runParser parser "" input of
         Left err -> return $ Left (errorBundlePretty err)
@@ -61,7 +62,7 @@ generatePDFfromParsed parser render input =
                 case exitCode of
                     ExitFailure _ -> do
                         let cleanErr = drop 3094 stdout -- omitting the preambel of the pdflatex output here.
-                                                        -- could be different on another system and thus maybe revert later
+                        -- could be different on another system and thus maybe revert later
                         return $ Left cleanErr
                     ExitSuccess -> do
                         pdf <- BS.readFile pdfFile
@@ -82,8 +83,6 @@ generatePDFFromSection =
     sectionToText sec =
         let (latexSection, gs) = runState (toLaTeXM sec) initialGlobalState
          in renderLaTeX (labelToRef gs) (staticDocumentFormat <> document latexSection)
-
-
 
 -- -- | TODO: what to do with auxiliary files and multiple requests in case of asynchronicity
 -- mkPDF :: FilePath -> IO (Either String BS.ByteString)
