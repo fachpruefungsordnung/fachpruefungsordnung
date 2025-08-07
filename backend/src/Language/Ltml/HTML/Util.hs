@@ -7,16 +7,12 @@ module Language.Ltml.HTML.Util
     , whenJust
     , mapState
     , convertNewLine
-    , addHtmlHeader
-    , addInlineCssHeader
     , mId_
     , anchorLink
     ) where
 
-import Clay (Css, render)
 import Data.Char (chr)
-import Data.Text (cons, pack)
-import Data.Text.Lazy (toStrict)
+import Data.Text (cons)
 import Language.Ltml.AST.Label (Label (..))
 import Lucid
 
@@ -65,25 +61,6 @@ convertNewLine s =
             (_ : next) -> toHtml raw <> br_ [] <> convertNewLine next
 
 -------------------------------------------------------------------------------
-
--- | Adds html, head and body tags onto given html and
---   sets title and css path
-addHtmlHeader :: String -> FilePath -> Html () -> Html ()
-addHtmlHeader title cssPath html = doctypehtml_ $ do
-    head_ $ do
-        title_ (toHtml title)
-        link_ [rel_ "stylesheet", href_ (pack cssPath)]
-    body_ html
-
--- | Adds html, head and body tags onto given html and
---   sets title, renders and inlines given css
-addInlineCssHeader :: String -> Css -> Html () -> Html ()
-addInlineCssHeader title css html =
-    doctypehtml_ $ do
-        head_ $ do
-            title_ (toHtml title)
-            style_ (toStrict $ render css)
-        body_ html
 
 -- | Adds Label as id, if it exists
 mId_ :: Maybe Label -> Attributes

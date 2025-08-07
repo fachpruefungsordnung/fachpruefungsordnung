@@ -8,7 +8,7 @@ import Data.Text (Text)
 import Language.Lsd.Example.Fpo (sectionT)
 import Language.Ltml.HTML (aToHtml)
 import Language.Ltml.HTML.CSS (mainStylesheet)
-import Language.Ltml.HTML.Util
+import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.Parser.Section (sectionP)
 import Lucid
 import Text.Megaparsec (runParser)
@@ -20,11 +20,9 @@ htmlPipeline input =
         Left _ -> renderBS errorHtml
         Right nodeSection ->
             let body = aToHtml nodeSection
-             in renderBS $ addInlineCssHeader "HTML Render Result" mainStylesheet body
+             in renderBS $ addInlineCssHeader mainStylesheet body
 
 errorHtml :: Html ()
 errorHtml = doctypehtml_ $ do
-    head_ $ do
-        title_ "Parsing Failed"
     body_ $ do
         h3_ "Parsing failed!"

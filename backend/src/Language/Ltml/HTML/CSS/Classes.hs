@@ -19,10 +19,10 @@ import Data.Text (Text, pack, unpack)
 import Language.Ltml.HTML.CSS.CustomClay
 import Language.Ltml.HTML.Util (intToLower)
 
--- TODO: Add vertical space between Enumitems
-
 data Class
-    = -- | Class for spacing and alignment of and inside of a section
+    = -- | Class for styling that should be applied to the whole document (HTML body)
+      Document
+    | -- | Class for spacing and alignment of and inside of a section
       Section
     | -- | Class for spacing and alignment of a heading (h4 / h5)
       Heading
@@ -50,6 +50,11 @@ data Class
 
 -- | maps Class to its css style definition
 classStyle :: Class -> Css
+classStyle Document =
+    toClassSelector Document ? do
+        fontFamily ["Arial"] [sansSerif]
+        marginLeft (em 2)
+        marginRight (em 2)
 classStyle Section =
     toClassSelector Section ? do
         display block

@@ -7,6 +7,7 @@ import Control.Monad.State (runState)
 import Language.Ltml.AST.Document
 import Language.Ltml.HTML
 import Language.Ltml.HTML.CSS
+import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.HTML.Common
 import Language.Ltml.HTML.Util
 import Lucid

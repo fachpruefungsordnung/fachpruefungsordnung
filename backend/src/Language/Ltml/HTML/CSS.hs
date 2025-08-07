@@ -16,10 +16,4 @@ cssClasses :: [Css]
 cssClasses = map classStyle [minBound .. maxBound]
 
 mainStylesheet :: Css
-mainStylesheet = do
-    body ? do
-        fontFamily ["Arial"] [sansSerif]
-        marginLeft (em 2)
-        marginRight (em 2)
-
-    mconcat cssClasses
+mainStylesheet = mconcat cssClasses
