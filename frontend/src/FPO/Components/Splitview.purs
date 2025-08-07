@@ -65,8 +65,6 @@ data Action
   | StartResize DragTarget MouseEvent
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
-  -- Toolbar buttons
-  | RenderHTML
   -- Toggle buttons
   | ToggleComment
   | ToggleCommentOverview Boolean
@@ -185,7 +183,6 @@ splitview docID = H.mkComponent
       [ toolbarButton "[=]" ToggleSidebar
       , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
       , toolbarButton "All Comments" (ToggleCommentOverview true)
-      , toolbarButton "Render HTML" RenderHTML
       ]
     where
     toolbarButton label act = HH.button
@@ -595,12 +592,6 @@ splitview docID = H.mkComponent
               }
 
         _ -> pure unit
-
-    -- Toolbar button actions
-
-    RenderHTML -> do
-      -- H.tell _editor unit Editor.SaveSection 
-      H.tell _editor unit Editor.QueryEditor
 
     -- Toggle actions
 

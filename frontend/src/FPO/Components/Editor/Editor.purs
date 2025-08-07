@@ -108,6 +108,7 @@ data Action
   | Undo
   | Redo
   | Save
+  | RenderHTML
   | Receive (Connected FPOTranslator Unit)
 
 -- We use a query to get the content of the editor
@@ -209,6 +210,17 @@ editor docID = connect selectTranslator $ H.mkComponent
                   "" -- TODO editor_save einfügen
                   Save
                   "bi-floppy"
+              , HH.button
+                  [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.px2, HB.py0, HB.m0 ]
+                  , HP.title "Render HTML" -- TODO editor_render_html einfügen
+                  , HE.onClick \_ -> RenderHTML
+                  ]
+                  [ HH.small_
+                      [ HH.text "Render" ]
+                  , HH.i
+                      [ HP.classes [ HB.ms1, HB.bi, H.ClassName "bi-file-richtext" ] ]
+                      []
+                  ]
               ]
           ]
       , HH.div -- Editor container
@@ -298,6 +310,10 @@ editor docID = connect selectTranslator $ H.mkComponent
         H.liftEffect $ do
           Editor.redo ed
           Editor.focus ed
+
+    RenderHTML -> do
+      _ <- handleQuery (QueryEditor unit)
+      pure unit
 
     Save -> do
       state <- H.get
