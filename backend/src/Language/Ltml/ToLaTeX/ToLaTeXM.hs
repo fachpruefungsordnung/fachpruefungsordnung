@@ -18,7 +18,6 @@ import qualified Language.Ltml.ToLaTeX.GlobalState as LS
 import Language.Ltml.ToLaTeX.Format
 import Language.Ltml.AST.Document (Document(..), DocumentBody(..), DocumentHeader(..))
 import Language.Lsd.AST.Type.Document (DocumentFormat(..))
-import Data.List (intercalate)
 
 
 class ToLaTeXM a where
@@ -76,12 +75,11 @@ instance ToLaTeXM EnumItem where
 
     toLaTeXM = attachLabel Nothing
 
--- TODO: reimplement the labelling with a list to track the label of the enum.
 instance Labelable EnumItem where
 
     attachLabel mLabel (EnumItem tt) = do
         path <- LS.nextEnumPosition
-        LS.insertLabel mLabel (LT.pack $ intercalate "." $ foldr ((:) . show) [] path)
+        LS.insertLabel mLabel (getEnumIdentifier path)
         tt' <- LS.descendEnumTree $ mapM toLaTeXM tt
         pure $ Sequence tt'
 

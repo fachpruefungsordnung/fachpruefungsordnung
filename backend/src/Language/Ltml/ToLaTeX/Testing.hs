@@ -1,11 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Language.Ltml.ToLaTeX.TestAST
+
+module Language.Ltml.ToLaTeX.Testing
     (testThis,
      readText,
      runTest,
      superSectionWithNSubsections,
      hugeSuperSection,
-     parseInputfromtxt)
+     getTestSection)
 where
 
 import Text.Megaparsec ( empty, runParser )
@@ -13,12 +14,10 @@ import Language.Lsd.Example.Fpo (superSectionT)
 import Language.Ltml.Parser.Section (sectionP)
 import Data.Text (Text)
 import qualified Data.Text.IO as TIO
-import qualified Data.Text.Lazy.IO as TLIO
 import System.IO.Unsafe (unsafePerformIO)
 import Language.Ltml.ToLaTeX.Type
 import Language.Ltml.ToLaTeX.ToLaTeXM (ToLaTeXM(toLaTeXM))
 import Control.Monad.State (runState)
-import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
 import Language.Ltml.AST.Section (Section (Section), Heading (Heading))
 import Language.Lsd.AST.Type.Section (SectionFormat(SectionFormat))
 import Language.Lsd.AST.Format (FormatAtom(PlaceholderAtom, StringAtom), EnumStyle (Arabic), HeadingPlaceholderAtom (IdentifierPlaceholder, HeadingTextPlaceholder), FormatString (FormatString))
@@ -27,7 +26,9 @@ import Language.Ltml.AST.Paragraph (Paragraph(Paragraph))
 import Language.Lsd.AST.Type.Paragraph (ParagraphFormat(ParagraphFormat))
 import Language.Ltml.AST.Text (TextTree(Word, Space, Reference))
 import Language.Ltml.AST.Label (Label(Label))
-import Language.Ltml.ToLaTeX.GlobalState (GlobalState (GlobalState, labelToRef))
+import Language.Ltml.ToLaTeX (generatePDFFromSection)
+import qualified Data.ByteString.Lazy as BS
+import Language.Ltml.ToLaTeX.GlobalState (GlobalState (GlobalState))
 
 readText :: String -> Text
 readText filename = unsafePerformIO $ TIO.readFile filename
@@ -35,10 +36,11 @@ readText filename = unsafePerformIO $ TIO.readFile filename
 initialState :: GlobalState
 initialState = GlobalState 0 0 0 0 [0] False False mempty mempty
 
-parseInputfromtxt :: Node Section
-parseInputfromtxt = 
+getTestSection :: Node Section
+getTestSection = 
             either undefined id
-            $ runParser (sectionP superSectionT empty) "" (readText "./src/Language/Ltml/ToLaTeX/test.txt")
+            $ runParser (sectionP superSectionT empty) "" 
+                (readText "./src/Language/Ltml/ToLaTeX/Auxiliary/test.txt")
 
 testThis :: ToLaTeXM a => a -> (LaTeX, GlobalState)
 testThis a = runState (toLaTeXM a)
@@ -101,10 +103,14 @@ hugeSuperSection n = Section
                                 ])
                         (Right $ replicate n (superSectionWithNSubsections n))
 
-runTest :: ToLaTeXM a => a -> IO ()
-runTest x = do
-    let testThis' = testThis x
-        m = labelToRef (snd testThis')
-        l = fst testThis'
-    TLIO.writeFile "./src/Language/Ltml/ToLaTeX/test.tex" $ renderLaTeX m l
+
+
+runTest :: IO ()
+runTest = do
+    let txt = readText "./src/Language/Ltml/ToLaTeX/Auxiliary/test.txt"
+    eAction <- generatePDFFromSection txt
+    case eAction of
+        Left err -> error err
+        Right pdf -> BS.writeFile "./src/Language/Ltml/ToLaTeX/Auxiliary/test.pdf" pdf
+
 

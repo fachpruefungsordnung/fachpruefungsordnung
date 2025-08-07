@@ -5,7 +5,8 @@ module Language.Ltml.ToLaTeX.Format (
     formatHeading,
     formatParagraph,
     formatSection,
-    staticDocumentFormat
+    staticDocumentFormat,
+    getEnumIdentifier
 ) where
 import Language.Lsd.AST.Format 
 import Language.Ltml.ToLaTeX.Type 
@@ -70,3 +71,14 @@ staticDocumentFormat =
             enumStyle,
             setindent
         ]
+
+getEnumIdentifier :: [Int] -> LT.Text
+getEnumIdentifier [] = ""
+getEnumIdentifier path = 
+    let ident = last path in
+    case length path of
+        1 -> LT.pack $ show ident
+        2 -> LT.pack [chr (ident-1 `mod` 26 + 97)]
+        3 -> LT.pack $ replicate 2 $ chr (ident-1 `mod` 26 + 97)
+        _ -> "-"
+

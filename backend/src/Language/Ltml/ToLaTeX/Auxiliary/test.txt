@@ -35,7 +35,7 @@ Es müssen Wahlpflichtmodule im Umfang von insgesamt 90 LP erfolgreich abgeschlo
       # Ein oder zwei Masterprojekte oder eine Projektgruppe.
       # Höchstens ein Forschungsprojekt.
       # Der Gesamtumfang der Module gemäß den Buchstaben {:numb} bis {:nume} ist höchstens 25 LP.
-  # Außerfachlicher Wahlbereich im Umfang von 10 bis 15 LP: In diesem Bereich können
+  #{num2:} Außerfachlicher Wahlbereich im Umfang von 10 bis 15 LP: In diesem Bereich können
     Studierende Module aus dem Angebot der Christian-Albrechts-Universität zu Kiel
     wählen, welche nicht auch in einem anderen Bereich dieses Studiengangs belegt
     werden können. Sprachkurse, welche nicht über das Niveau der gymnasialen Oberstufe
