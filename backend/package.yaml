@@ -56,8 +56,10 @@ dependencies:
   - aeson
   - template-haskell
   - filepath
+  - directory
   - text
   - lucid2
+  - clay
   - password
   - jose
   - uuid
