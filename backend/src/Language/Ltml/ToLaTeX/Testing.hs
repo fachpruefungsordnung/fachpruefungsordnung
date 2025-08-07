@@ -29,7 +29,7 @@ import Language.Ltml.AST.Paragraph (Paragraph (Paragraph))
 import Language.Ltml.AST.Section (Heading (Heading), Section (Section))
 import Language.Ltml.AST.Text (TextTree (Reference, Space, Word))
 import Language.Ltml.Parser.Section (sectionP)
-import Language.Ltml.ToLaTeX (generatePDFFromSection)
+import Language.Ltml.ToLaTeX (generatePDFFromSuperSection)
 import Language.Ltml.ToLaTeX.GlobalState (GlobalState (GlobalState))
 import Language.Ltml.ToLaTeX.ToLaTeXM (ToLaTeXM (toLaTeXM))
 import Language.Ltml.ToLaTeX.Type
@@ -137,7 +137,7 @@ hugeSuperSection n =
 runTest :: IO ()
 runTest = do
     let txt = readText "./src/Language/Ltml/ToLaTeX/Auxiliary/test.txt"
-    eAction <- generatePDFFromSection txt
+    eAction <- generatePDFFromSuperSection txt
     case eAction of
         Left err -> error err
         Right pdf -> BS.writeFile "./src/Language/Ltml/ToLaTeX/Auxiliary/test.pdf" pdf

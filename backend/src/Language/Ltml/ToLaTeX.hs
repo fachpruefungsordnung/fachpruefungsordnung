@@ -1,5 +1,5 @@
 module Language.Ltml.ToLaTeX
-    ( generatePDFFromSection
+    ( generatePDFFromSuperSection
     --   generatePDFFromDocument
     ) where
 
@@ -76,8 +76,8 @@ generatePDFfromParsed parser render input =
 --         let (latexDoc, gs) = runState (toLaTeXM doc) initialGlobalState
 --          in renderLaTeX (labelToRef gs) latexDoc
 
-generatePDFFromSection :: Text -> IO (Either String BS.ByteString)
-generatePDFFromSection =
+generatePDFFromSuperSection :: Text -> IO (Either String BS.ByteString)
+generatePDFFromSuperSection =
     generatePDFfromParsed (sectionP superSectionT empty) sectionToText
   where
     sectionToText sec =

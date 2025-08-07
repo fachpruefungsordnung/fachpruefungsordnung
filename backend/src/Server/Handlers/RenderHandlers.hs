@@ -23,7 +23,7 @@ import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
 import Server.HandlerUtil
 import Prelude hiding (head, lines, unlines)
-import Language.Ltml.ToLaTeX (generatePDFFromSection)
+import Language.Ltml.ToLaTeX (generatePDFFromSuperSection)
 import Control.Monad.IO.Class (MonadIO(liftIO))
 
 -- | Return type for rendered documents
@@ -114,7 +114,7 @@ renderHandler _ _ _ = throwError errNotLoggedIn
 renderPDFHandler
     :: AuthResult Auth.Token -> Text -> Handler PDFByteString
 renderPDFHandler (Authenticated _) input = do
-    eAction <- liftIO $ generatePDFFromSection input
+    eAction <- liftIO $ generatePDFFromSuperSection input
     case eAction of
         Left err -> throwError err500 { errBody = BS.pack err }
         Right pdf -> return $ PDFByteString pdf
