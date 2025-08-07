@@ -151,88 +151,62 @@ editor docID = connect selectTranslator $ H.mkComponent
       ]
       [ HH.div -- Second toolbar
 
-          [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
-          [ HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title (translate (label :: _ "editor_textBold") state.translator)
-              , HE.onClick \_ -> Bold
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-bold" ] ] [] ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title (translate (label :: _ "editor_textItalic") state.translator)
-              , HE.onClick \_ -> Italic
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-italic" ] ] [] ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+          [ HP.classes [ HB.dFlex, HB.justifyContentBetween ] ]
+          [ HH.div
+              [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+              [ makeEditorToolbarButton
+                  (translate (label :: _ "editor_textBold") state.translator)
+                  Bold
+                  "bi-type-bold"
+              , makeEditorToolbarButton
+                  (translate (label :: _ "editor_textItalic") state.translator)
+                  Italic
+                  "bi-type-italic"
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_textUnderline") state.translator)
-              , HE.onClick \_ -> Underline
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-underline" ] ] [] ]
-          , HH.div
-              [ HP.classes [ HB.vr, HB.mx1 ]
-              , HP.style "height: 1.5rem"
-              ]
-              []
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  Underline
+                  "bi-type-underline"
+
+              , buttonDivisor
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_fontSizeUp") state.translator)
-              , HE.onClick \_ -> FontSizeUp
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-plus-square" ] ] [] ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  FontSizeUp
+                  "bi-plus-square"
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_fontSizeDown") state.translator)
-              , HE.onClick \_ -> FontSizeDown
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-dash-square" ] ] [] ]
-          , HH.div
-              [ HP.classes [ HB.vr, HB.mx1 ]
-              , HP.style "height: 1.5rem"
-              ]
-              []
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  FontSizeDown
+                  "bi-dash-square"
+
+              , buttonDivisor
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_undo") state.translator)
-              , HE.onClick \_ -> Undo
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-arrow-counterclockwise" ] ]
-                  []
-              ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  Undo
+                  "bi-arrow-counterclockwise"
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_redo") state.translator)
-              , HE.onClick \_ -> Redo
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-arrow-clockwise" ] ] [] ]
-          , HH.div
-              [ HP.classes [ HB.vr, HB.mx1 ]
-              , HP.style "height: 1.5rem"
-              ]
-              []
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  Redo
+                  "bi-arrow-clockwise"
+
+              , buttonDivisor
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_comment") state.translator)
-              , HE.onClick \_ -> Comment
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-chat-square-text" ] ]
-                  []
-              ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  Comment
+                  "bi-chat-square-text"
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_deleteComment") state.translator)
-              , HE.onClick \_ -> DeleteComment
+                  DeleteComment
+                  "bi-chat-square-text-fill"
+
               ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-chat-square-text-fill" ] ]
-                  []
+          , HH.div
+              [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+              [ HH.button
+                  [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+                  , HP.title
+                      (translate (label :: _ "editor_textBold") state.translator)
+                  , HE.onClick \_ -> Bold
+                  ]
+                  [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-bold" ] ] [] ]
               ]
           ]
       , HH.div -- Editor container
@@ -734,3 +708,23 @@ cursorInRange lms cursor =
       else
         cursorInRange ls cursor
     Nothing -> pure Nothing
+
+makeEditorToolbarButton
+  :: forall m. String -> Action -> String -> H.ComponentHTML Action () m
+makeEditorToolbarButton tooltip action biName = HH.button
+  [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+  , HP.title tooltip
+  , HE.onClick \_ -> action
+  ]
+  [ HH.i
+      [ HP.classes [ HB.bi, H.ClassName biName ]
+      ]
+      []
+  ]
+
+buttonDivisor :: forall m. H.ComponentHTML Action () m
+buttonDivisor = HH.div
+  [ HP.classes [ HB.vr, HB.mx1 ]
+  , HP.style "height: 1.5rem"
+  ]
+  []

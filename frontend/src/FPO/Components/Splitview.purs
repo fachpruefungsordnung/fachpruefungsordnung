@@ -185,8 +185,6 @@ splitview docID = H.mkComponent
       [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
       [ toolbarButton "[=]" ToggleSidebar
       , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
-      , toolbarButton "GET" GET
-      , toolbarButton "POST" POST
       , toolbarButton "All Comments" (ToggleCommentOverview true)
       , toolbarButton "Save" SaveSection
       , toolbarButton "Render HTML" RenderHTML
