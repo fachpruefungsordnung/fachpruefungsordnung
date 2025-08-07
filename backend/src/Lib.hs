@@ -82,7 +82,7 @@ someFunc :: IO ()
 someFunc = do
     Right connection <- getConnection
     Right _ <- migrate connection
-    -- Datenbank zumüllen :)
+    -- Datenbank zumüllen :))
     document <- testDocuments connection
     print document
     createTestDocument connection
