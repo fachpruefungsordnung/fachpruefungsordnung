@@ -3,7 +3,7 @@
 
 module Language.Ltml.ToLaTeX.Type (
     LaTeX (..),
-    text, 
+    text,
     bold, italic, underline,
     footnote,
     hypertarget, hyperlink,
@@ -77,16 +77,16 @@ footnote :: LaTeX -> LaTeX
 footnote = Command "footnote" [] . (:[])
 
 hypertarget :: Label -> LaTeX -> LaTeX
-hypertarget (Label l) latex = Command "hypertarget" [] [Text (LT.fromStrict l), latex] 
+hypertarget (Label l) latex = Command "hypertarget" [] [Text (LT.fromStrict l), latex]
 
 hyperlink :: Label -> LaTeX -> LaTeX
-hyperlink (Label l) latex = Command "hyperlink" [] [Text (LT.fromStrict l), latex] 
+hyperlink (Label l) latex = Command "hyperlink" [] [Text (LT.fromStrict l), latex]
 
 usepackage :: [LT.Text] -> LT.Text -> LaTeX
 usepackage opts package = Command "usepackage" opts [Text package]
 
 documentclass :: [LT.Text] -> LT.Text -> LaTeX
-documentclass opts name = Command "documentclass" opts [Text name]  
+documentclass opts name = Command "documentclass" opts [Text name]
 
 -------------------------------------------------------------------------------
 {-                             text structure                                -}
@@ -118,8 +118,16 @@ itemize items = Environment "itemize" [] (map (\i -> Command "item" [] [i]) item
 center :: [LaTeX] -> LaTeX
 center = Environment "center" []
 
+minipage :: [LT.Text] -> [LaTeX] -> LaTeX
+minipage = Environment "minipage"
+
 paragraph :: LaTeX -> LaTeX -> LaTeX
-paragraph identifier content = Environment "tabularx" [] [Raw "{\\linewidth}{@{}lX@{}}", Sequence [identifier, Raw " & ", content]]
+paragraph identifier content = Sequence $ [
+    minipage ["t"] [ Raw "{2em}", identifier ],
+    Raw "\\hspace{0.5em}",
+    minipage ["t"] [ Raw "{\\dimexpr\\linewidth-2em-0.5em\\relax}", content]
+
+  ]
 
 document :: LaTeX -> LaTeX
 document content = Environment "document" [] [content]
@@ -138,7 +146,7 @@ setfontArabic = Sequence [
                          ]
 
 enumStyle :: LaTeX
-enumStyle = Raw "\\setlist[enumerate,1]{label=\\arabic*., left=0pt}" 
+enumStyle = Raw "\\setlist[enumerate,1]{label=\\arabic*., left=0pt}"
          <> Raw "\\setlist[enumerate,2]{label=\\alph*., left=0.5em}"
          <> Raw "\\setlist[enumerate,3]{label=\\alph*\\alph*., left=1em}"
          <> Raw "\\setlist[enumerate,4]{label=-, left=1.5em}"

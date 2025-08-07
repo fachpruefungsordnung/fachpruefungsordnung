@@ -33,7 +33,7 @@ readText :: String -> Text
 readText filename = unsafePerformIO $ TIO.readFile filename
 
 initialState :: GlobalState
-initialState = GlobalState 0 0 0 0 False False mempty mempty
+initialState = GlobalState 0 0 0 0 [0] False False mempty mempty
 
 parseInputfromtxt = 
             either undefined id

@@ -66,6 +66,7 @@ staticDocumentFormat =
                         "hyperref",
             usepackage [] "enumitem",
             usepackage [] "tabularx",
+            usepackage ["T1"] "fontenc",
             enumStyle,
             setindent
         ]

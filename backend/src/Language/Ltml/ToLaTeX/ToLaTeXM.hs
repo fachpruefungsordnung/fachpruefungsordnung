@@ -18,6 +18,7 @@ import qualified Language.Ltml.ToLaTeX.GlobalState as LS
 import Language.Ltml.ToLaTeX.Format
 import Language.Ltml.AST.Document (Document(..), DocumentBody(..), DocumentHeader(..))
 import Language.Lsd.AST.Type.Document (DocumentFormat(..))
+import Data.List (intercalate)
 
 
 class ToLaTeXM a where
@@ -79,7 +80,9 @@ instance ToLaTeXM EnumItem where
 instance Labelable EnumItem where
 
     attachLabel mLabel (EnumItem tt) = do
-        tt' <- mapM toLaTeXM tt
+        path <- LS.nextEnumPosition
+        LS.insertLabel mLabel (LT.pack $ intercalate "." $ foldr ((:) . show) [] path)
+        tt' <- LS.descendEnumTree $ mapM toLaTeXM tt
         pure $ Sequence tt'
 
 instance ToLaTeXM SentenceStart where
@@ -109,12 +112,13 @@ instance ToLaTeXM Paragraph where
 
 instance Labelable Paragraph where
     attachLabel mLabel (Paragraph fmt content) = do
-        _ <- LS.nextParagraph
+        n <- LS.nextParagraph
         st <- get
-        _ <- LS.insertLabel mLabel ("§ "
-                                 <> LT.pack (show (LS.section st))
-                                 <> " Absatz "
-                                 <> LT.pack (show (LS.paragraph st)))
+        LS.insertLabel mLabel ("§ "
+                            <> LT.pack (show (LS.section st))
+                            <> " Absatz "
+                            <> LT.pack (show n))
+        modify (\s -> s { LS.enumPosition = [0] })
         content' <- mapM toLaTeXM content
         let anchor = maybe mempty (`hypertarget` mempty) mLabel
         pure $ anchor <>
@@ -144,8 +148,8 @@ instance Labelable Section where
             case nodes of
                 Left paragraphs -> do -- | this is a section
                     n <- LS.nextSection
-                    _ <- LS.insertLabel mLabel ("§ "
-                                             <> LT.pack (show n))
+                    LS.insertLabel mLabel ("§ "
+                                        <> LT.pack (show n))
                     modify (\s -> s { LS.identifier = formatSection fmt (LS.section s)
                                     , LS.onlyOneParagraph = length paragraphs == 1
                                     })
@@ -154,8 +158,8 @@ instance Labelable Section where
                     pure (children', center [headingDoc])
                 Right subsections -> do -- | this is a supersection
                     n <- LS.nextSupersection
-                    _ <- LS.insertLabel mLabel ("Abschnitt "
-                                             <> LT.pack (show n))
+                    LS.insertLabel mLabel ("Abschnitt "
+                                        <> LT.pack (show n))
                     children' <- mapM toLaTeXM subsections
                     modify (\s -> s { LS.isSupersection = True
                                     , LS.identifier = formatSection fmt (LS.supersection s)

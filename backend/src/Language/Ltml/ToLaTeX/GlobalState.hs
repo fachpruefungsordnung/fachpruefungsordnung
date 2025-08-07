@@ -5,7 +5,9 @@ module Language.Ltml.ToLaTeX.GlobalState (
   nextSection,
   nextParagraph,
   nextSentence,
-  insertLabel
+  insertLabel,
+  nextEnumPosition,
+  descendEnumTree
 ) where
 
 import Control.Monad.State
@@ -30,6 +32,7 @@ data GlobalState = GlobalState
   , section :: Int                  -- counter for sections
   , paragraph :: Int                -- counter for paragraphs within a section
   , sentence :: Int                 -- counter for sentences within a paragraph
+  , enumPosition :: [Int]           -- tracks the current position in an enum tree
   , onlyOneParagraph :: Bool        -- needed for sections with only one paragraphs
   , isSupersection :: Bool          -- needed for heading
   , identifier :: LaTeX             -- identifier for formatting
@@ -64,34 +67,63 @@ nextSentence = do
   put st { sentence = n }
   pure n
 
+-- Get the next label at the current depth
+nextEnumPosition :: State GlobalState [Int]
+nextEnumPosition = do
+  st <- get
+  let prefix = enumPosition st
+      depth = length prefix
+      newPrefix = init prefix ++ [prefix !! (depth - 1) + 1]
+  put $ st { enumPosition = newPrefix }
+  pure newPrefix
+
+-- Go one level deeper temporarily
+descendEnumTree :: State GlobalState a -> State GlobalState a
+descendEnumTree action = do
+  st <- get
+  let oldPath = enumPosition st
+  put $ st { enumPosition = enumPosition st ++ [0]}
+  result <- action
+  modify $ \s -> s { enumPosition = oldPath }
+  pure result
+
 insertLabel :: Maybe Label -> LT.Text -> State GlobalState ()
 insertLabel mLabel ident = do
   maybe (pure ()) (\l -> modify (\s -> s { labelToRef = insert l ident (labelToRef s) })) mLabel
 
-labelSupersection :: Supersection -> State GlobalState Supersection
-labelSupersection (Supersection _ children) = do
-  _ <- nextSupersection
-  st <- get
-  labeledChildren <- mapM labelSection children
-  pure $ Supersection [supersection st] labeledChildren
 
-labelSection :: Section -> State GlobalState Section
-labelSection (Section _ children) = do
-  _ <- nextSection
-  st <- get
-  labeledChildren <- mapM labelParagraph children
-  pure $ Section [supersection st, section st] labeledChildren
 
-labelParagraph :: Paragraph -> State GlobalState Paragraph
-labelParagraph (Paragraph _) = do
-  _ <- nextParagraph
-  st <- get
-  pure $ Paragraph [supersection st, section st, paragraph st] 
+
+
+
+
+
 
 
 
 
 ------------------------------- example for texting -------------------------------
+
+exampleLabelSuperSection :: Supersection -> State GlobalState Supersection
+exampleLabelSuperSection (Supersection _ children) = do
+  _ <- nextSupersection
+  st <- get
+  labeledChildren <- mapM exampleLabelSection children
+  pure $ Supersection [supersection st] labeledChildren
+
+exampleLabelSection :: Section -> State GlobalState Section
+exampleLabelSection (Section _ children) = do
+  _ <- nextSection
+  st <- get
+  labeledChildren <- mapM exampleLabelParagraph children
+  pure $ Section [supersection st, section st] labeledChildren
+
+exampleLabelParagraph :: Paragraph -> State GlobalState Paragraph
+exampleLabelParagraph (Paragraph _) = do
+  _ <- nextParagraph
+  st <- get
+  pure $ Paragraph [supersection st, section st, paragraph st] 
+
 exampleTree :: Supersection
 exampleTree = Supersection [] [
                                 Section [] [ Paragraph []
@@ -109,9 +141,31 @@ exampleTree = Supersection [] [
                               , Section [] []
                               ]
 
+
+data Tree = Empty | Node [Int] [Tree]
+  deriving Show
+
+-- Label the tree
+labelTree :: Tree -> State GlobalState Tree
+labelTree Empty = pure Empty
+labelTree (Node _ children) = do
+  lbl <- nextEnumPosition
+  labeledChildren <- descendEnumTree $ mapM labelTree children
+  pure $ Node lbl labeledChildren
+
+-- Example tree
+exampleTree' :: Tree
+exampleTree' =
+  Node [] [ Node [] []
+          , Node [] [ Node [] [] 
+                    , Node [] []
+                    ]
+          , Node [] [ Node [] [] ]
+          ]
+
 -- Run it
 main :: IO ()
 main = do
-  let initialState = GlobalState 0 0 0 0 False False mempty mempty 
-      labeled = evalState (labelSupersection exampleTree) initialState
+  let initialState = GlobalState 0 0 0 0 [0] False False mempty mempty 
+      labeled = evalState (labelTree exampleTree') initialState
   print labeled

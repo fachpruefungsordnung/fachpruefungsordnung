@@ -29,14 +29,12 @@ Es müssen Wahlpflichtmodule im Umfang von insgesamt 90 LP erfolgreich abgeschlo
         einem größeren Rahmen.
       #{nume:} Forschungsprojekte (MSc-WInf-FoPro, Mitarbeit in einer Arbeitsgruppe),
         jeweils im Umfang von bis zu 10 LP.
-Es müssen die folgenden Bedingungen bei den Modulen gemäß den Buchstaben {:numb}
-bis {:nume} eingehalten werden:
-  # 1
-      # a
-          # Ein oder zwei Masterseminare.
-          # Ein oder zwei Masterprojekte oder eine Projektgruppe.
-          # Höchstens ein Forschungsprojekt.
-          # Der Gesamtumfang der Module gemäß den Buchstaben {:numb} bis {:nume} ist höchstens 25 LP.
+    Es müssen die folgenden Bedingungen bei den Modulen gemäß den Buchstaben {:numb}
+    bis {:nume} eingehalten werden:
+      # Ein oder zwei Masterseminare.
+      # Ein oder zwei Masterprojekte oder eine Projektgruppe.
+      # Höchstens ein Forschungsprojekt.
+      # Der Gesamtumfang der Module gemäß den Buchstaben {:numb} bis {:nume} ist höchstens 25 LP.
   # Außerfachlicher Wahlbereich im Umfang von 10 bis 15 LP: In diesem Bereich können
     Studierende Module aus dem Angebot der Christian-Albrechts-Universität zu Kiel
     wählen, welche nicht auch in einem anderen Bereich dieses Studiengangs belegt
@@ -64,6 +62,7 @@ die Studiengangskoordinatorin oder der Studiengangskoordinator gehört.
 
 Bereits für einen Bachelorabschluss verwendete Wahlpflichtmodule können
 nicht erneut eingebracht werden
+
 § Studienaufbau
 
 Die Regelstudienzeit und das Studienvolumen betragen drei Jahre beziehungsweise
@@ -114,6 +113,7 @@ Bereichen zusammen:
           # VWL-EVWL: Einführung in die Volkswirtschaftslehre (10 LP)
           # VWLvwlMikro1-01a: Grundzüge der mikroökonomischen Theorie I (5 LP)
   # Bachelorarbeit, individuell oder im Abschlussprojekt, im Umfang von 12 LP gemäß § {:abschluss}.
+
 § Zugang zum Masterstudium
 
 Der Zugang zum Studiengang setzt voraus, dass die Bewerberin oder der Bewerber

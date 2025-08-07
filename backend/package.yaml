@@ -67,6 +67,8 @@ dependencies:
   - transformers
   - pretty-simple
   - pandoc-types
+  - process
+  - silently
 
 ghc-options:
   - -Wall
