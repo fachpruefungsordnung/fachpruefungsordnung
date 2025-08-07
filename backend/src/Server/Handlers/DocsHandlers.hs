@@ -155,7 +155,7 @@ type GetTreeRevision =
         :> Capture "documentID" DocumentID
         :> "tree"
         :> Capture "treeRevision" TreeRevisionSelector
-        :> Get '[JSON] (TreeRevision TextElement)
+        :> Get '[JSON] (Maybe (TreeRevision TextElement))
 
 type GetTreeRevisionFull =
     Auth AuthMethod Auth.Token
@@ -163,7 +163,7 @@ type GetTreeRevisionFull =
         :> "tree"
         :> Capture "treeRevision" TreeRevisionSelector
         :> "full"
-        :> Get '[JSON] (TreeRevision TextElementRevision)
+        :> Get '[JSON] (Maybe (TreeRevision TextElementRevision))
 
 type GetTextHistory =
     Auth AuthMethod Auth.Token
@@ -302,7 +302,7 @@ getTreeRevisionFullHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TreeRevisionSelector
-    -> Handler (TreeRevision TextElementRevision)
+    -> Handler (Maybe (TreeRevision TextElementRevision))
 getTreeRevisionFullHandler auth docID revision = do
     userID <- getUser auth
     withDB $
@@ -314,7 +314,7 @@ getTreeRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TreeRevisionSelector
-    -> Handler (TreeRevision TextElement)
+    -> Handler (Maybe (TreeRevision TextElement))
 getTreeRevisionHandler auth docID revision = do
     userID <- getUser auth
     withDB $ run $ Docs.getTreeRevision userID $ TreeRevisionRef docID revision

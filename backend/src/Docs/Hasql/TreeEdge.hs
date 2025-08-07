@@ -30,3 +30,11 @@ data TreeEdge = TreeEdge
     , title :: Text
     , child :: TreeEdgeChildRef
     }
+
+instance Hashable TreeEdge where
+    updateHash = flip updateHash'
+      where
+        updateHash' edge =
+            flip updateHash (position edge)
+                . flip updateHash (title edge)
+                . flip updateHash (child edge)
