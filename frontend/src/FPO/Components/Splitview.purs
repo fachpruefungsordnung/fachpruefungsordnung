@@ -216,7 +216,7 @@ splitview docID = H.mkComponent
         , HP.classes [ HB.dFlex, HB.overflowHidden ]
         , HP.style
             ( "height: calc(100vh - " <> show (navbarHeight + toolbarHeight) <>
-                "px); max-height: 100%; user-select: none"
+                "px); max-height: 100%;"
             )
         ]
         ( -- TOC Sidebar
@@ -442,7 +442,7 @@ splitview docID = H.mkComponent
               "flex: 1 1 "
                 <> show (state.previewRatio * 100.0)
                 <>
-                  "%; box-sizing: border-box; min-height: 0; overflow: hidden; min-width: 6ch; position: relative;"
+                  "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
           ]
           [ HH.div
               [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
