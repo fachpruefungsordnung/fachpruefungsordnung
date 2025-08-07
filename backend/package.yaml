@@ -68,7 +68,7 @@ dependencies:
   - pretty-simple
   - pandoc-types
   - process
-  - silently
+  - temporary
 
 ghc-options:
   - -Wall

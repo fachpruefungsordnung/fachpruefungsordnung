@@ -35,6 +35,7 @@ readText filename = unsafePerformIO $ TIO.readFile filename
 initialState :: GlobalState
 initialState = GlobalState 0 0 0 0 [0] False False mempty mempty
 
+parseInputfromtxt :: Node Section
 parseInputfromtxt = 
             either undefined id
             $ runParser (sectionP superSectionT empty) "" (readText "./src/Language/Ltml/ToLaTeX/test.txt")

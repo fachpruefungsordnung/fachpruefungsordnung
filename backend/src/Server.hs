@@ -33,13 +33,13 @@ import Servant.Auth.Server
 import Servant.OpenApi (HasOpenApi (toOpenApi))
 import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
-import Server.HTTPHeaders (PDF, PDFByteString (..))
 import Server.Handlers.AuthHandlers
 import Server.Handlers.DocsHandlers (DocsAPI, docsServer)
 import Server.Handlers.DocumentHandlers
 import Server.Handlers.GroupHandlers
 import Server.Handlers.RoleHandlers
 import Server.Handlers.UserHandlers
+import Server.Handlers.RenderHandlers
 import Prelude hiding (readFile)
 
 type DebugAPI =
@@ -61,6 +61,7 @@ type ProtectedAPI =
         :<|> RoleAPI
         :<|> DocumentAPI
         :<|> DocsAPI
+        :<|> RenderAPI
 
 type SwaggerAPI = "swagger.json" :> Get '[JSON] OpenApi
 
@@ -127,6 +128,7 @@ server cookieSett jwtSett =
                 :<|> roleServer
                 :<|> documentServer
                 :<|> docsServer
+                :<|> renderServer
              )
 
 documentedAPI :: Proxy DocumentedAPI
