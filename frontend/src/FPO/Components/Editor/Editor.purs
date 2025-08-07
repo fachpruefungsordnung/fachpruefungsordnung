@@ -208,32 +208,18 @@ editor docID = connect selectTranslator $ H.mkComponent
               ]
           , HH.div
               [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
-              [ makeEditorToolbarButton
-                  "" -- TODO editor_save einfügen
+              [ makeEditorToolbarButtonWithText
                   Save
                   "bi-floppy"
-              , HH.button
-                  [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.px2, HB.py0, HB.m0 ]
-                  , HP.title "Render HTML" -- TODO editor_render_html einfügen
-                  , HE.onClick \_ -> RenderHTML
-                  ]
-                  [ HH.small_
-                      [ HH.text "Render" ]
-                  , HH.i
-                      [ HP.classes [ HB.ms1, HB.bi, H.ClassName "bi-file-richtext" ] ]
-                      []
-                  ]
-              , HH.button
-                  [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.px2, HB.py0, HB.m0 ]
-                  , HP.title "Render HTML" -- TODO editor_render_html einfügen
-                  , HE.onClick \_ -> ShowAllComments
-                  ]
-                  [ HH.small_
-                      [ HH.text "All comments" ]
-                  , HH.i
-                      [ HP.classes [ HB.ms1, HB.bi, H.ClassName "bi-chat-square" ] ]
-                      []
-                  ]
+                  (translate (label :: _ "editor_save") state.translator)
+              , makeEditorToolbarButtonWithText
+                  RenderHTML
+                  "bi-file-richtext"
+                  (translate (label :: _ "editor_preview") state.translator)
+              , makeEditorToolbarButtonWithText
+                  ShowAllComments
+                  "bi-chat-square"
+                  (translate (label :: _ "editor_allComments") state.translator)
               ]
           ]
       , HH.div -- Editor container
@@ -757,6 +743,21 @@ makeEditorToolbarButton tooltip action biName = HH.button
   ]
   [ HH.i
       [ HP.classes [ HB.bi, H.ClassName biName ]
+      ]
+      []
+  ]
+
+-- Here, no tooltip is needed as the text is shown in the button
+makeEditorToolbarButtonWithText
+  :: forall m. Action -> String -> String -> H.ComponentHTML Action () m
+makeEditorToolbarButtonWithText action biName smallText = HH.button
+  [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
+  , HE.onClick \_ -> action
+  ]
+  [ HH.small_
+      [ HH.text smallText ]
+  , HH.i
+      [ HP.classes [ HB.ms1, HB.bi, H.ClassName biName ]
       ]
       []
   ]

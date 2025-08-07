@@ -123,11 +123,14 @@ type Labels =
       ::: "common_userName"
 
       -- | Editor Page
+      ::: "editor_allComments"
       ::: "editor_comment"
       ::: "editor_deleteComment"
       ::: "editor_fontSizeDown"
       ::: "editor_fontSizeUp"
+      ::: "editor_preview"
       ::: "editor_redo"
+      ::: "editor_save"
       ::: "editor_textBold"
       ::: "editor_textItalic"
       ::: "editor_textUnderline"
