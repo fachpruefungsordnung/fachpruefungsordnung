@@ -71,7 +71,7 @@ jobs:
         uses: freckle/stack-action@v5
         with:
           working-directory: backend
-          stack-build-arguments: --no-test --prefetch --force-dirty --reconfigure
+          stack-build-arguments: --no-test --fast
           test: false
           upgrade-stack: false
 
