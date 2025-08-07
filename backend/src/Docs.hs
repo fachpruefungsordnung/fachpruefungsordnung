@@ -64,7 +64,6 @@ import Docs.TextRevision
     , TextElementRevision (TextElementRevision)
     , TextRevisionHistory
     , TextRevisionRef (..)
-    , TextRevisionSelector (..)
     , newTextRevision
     )
 import qualified Docs.TextRevision as TextRevision
@@ -190,10 +189,10 @@ getTreeRevision
     :: (HasGetTreeRevision m)
     => UserID
     -> TreeRevisionRef
-    -> m (Result (TreeRevision TextElement))
+    -> m (Result (Maybe (TreeRevision TextElement)))
 getTreeRevision userID ref@(TreeRevisionRef docID _) = runExceptT $ do
     guardPermission Read docID userID
-    guardExistsTreeRevision ref
+    guardExistsTreeRevision True ref
     lift $ DB.getTreeRevision ref
 
 getTextHistory
@@ -236,14 +235,14 @@ getTreeWithLatestTexts
     :: (HasGetTreeRevision m, HasGetTextElementRevision m)
     => UserID
     -> TreeRevisionRef
-    -> m (Result (TreeRevision TextElementRevision))
+    -> m (Result (Maybe (TreeRevision TextElementRevision)))
 getTreeWithLatestTexts userID revision = runExceptT $ do
     guardPermission Read docID userID
     guardExistsDocument docID
-    guardExistsTreeRevision revision
-    lift $
-        DB.getTreeRevision revision
-            >>= TreeRevision.withTextRevisions getter'
+    guardExistsTreeRevision True revision
+    lift $ do
+        treeRevision <- DB.getTreeRevision revision
+        mapM (TreeRevision.withTextRevisions getter') treeRevision
   where
     (TreeRevisionRef docID _) = revision
     getter =
@@ -299,12 +298,18 @@ guardExistsDocument docID = do
 
 guardExistsTreeRevision
     :: (HasExistsTreeRevision m)
-    => TreeRevisionRef
+    => Bool
+    -- ^ wether or not to consider `Latest` to exist if no revision exists.
+    -> TreeRevisionRef
+    -- ^ reference to the revision
     -> ExceptT Error m ()
-guardExistsTreeRevision ref@(TreeRevisionRef docID _) = do
+guardExistsTreeRevision allowLatestNothing ref@(TreeRevisionRef docID selector) = do
     guardExistsDocument docID
     existsTreeRevision <- lift $ DB.existsTreeRevision ref
-    unless existsTreeRevision $
+    let considerExistant = case selector of
+            TreeRevision.Latest -> existsTreeRevision || allowLatestNothing
+            TreeRevision.Specific _ -> existsTreeRevision
+    unless considerExistant $
         throwError (TreeRevisionNotFound ref)
 
 guardExistsTextElement
@@ -328,7 +333,7 @@ guardExistsTextRevision allowLatestNothing ref@(TextRevisionRef elementRef selec
     guardExistsTextElement elementRef
     existsTextRevision <- lift $ DB.existsTextRevision ref
     let considerExistant = case selector of
-            Latest -> existsTextRevision || allowLatestNothing
-            Specific _ -> existsTextRevision
+            TextRevision.Latest -> existsTextRevision || allowLatestNothing
+            TextRevision.Specific _ -> existsTextRevision
     unless considerExistant $
         throwError (TextRevisionNotFound ref)

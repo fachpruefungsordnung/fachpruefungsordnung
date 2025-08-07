@@ -39,7 +39,7 @@ import Web.HttpApiData (FromHttpApiData (..))
 newtype Hash = Hash
     { unHash :: ByteString
     }
-    deriving (Show)
+    deriving (Show, Eq)
 
 instance ToJSON Hash where
     toJSON (Hash bs) = Aeson.String $ TE.decodeUtf8 $ encode bs

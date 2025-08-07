@@ -76,7 +76,7 @@ class (HasCheckPermission m, HasIsGroupAdmin m, HasIsSuperAdmin m) => HasGetDocu
     getDocumentsBy :: Maybe UserID -> Maybe GroupID -> m (Vector Document)
 
 class (HasCheckPermission m, HasExistsTreeRevision m) => HasGetTreeRevision m where
-    getTreeRevision :: TreeRevisionRef -> m (TreeRevision TextElement)
+    getTreeRevision :: TreeRevisionRef -> m (Maybe (TreeRevision TextElement))
 
 class
     (HasCheckPermission m, HasExistsTextRevision m) =>

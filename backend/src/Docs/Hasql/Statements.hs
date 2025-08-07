@@ -662,7 +662,8 @@ putTreeEdge =
                 , $4 :: bytea?
                 , $5 :: int4?
                 )
-            on conflict do nothing
+            on conflict (parent, position) do update
+            set title = EXCLUDED.title
         |]
 
 uncurryTreeEdgeChild
@@ -777,13 +778,13 @@ putTreeRevision =
         (unDocumentID docID, userID, unHash rootHash)
 
 getTreeRevision
-    :: Statement TreeRevisionRef (Hash, Node a -> TreeRevision a)
+    :: Statement TreeRevisionRef (Maybe (Hash, Node a -> TreeRevision a))
 getTreeRevision =
     lmap
         uncurryTreeRevisionRef
         $ rmap
-            uncurryTreeRevisionWithRoot
-            [singletonStatement|
+            (uncurryTreeRevisionWithRoot <$>)
+            [maybeStatement|
                 select
                     tr.id :: int4,
                     tr.creation_ts :: timestamptz,
