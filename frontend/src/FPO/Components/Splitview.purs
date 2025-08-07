@@ -173,23 +173,7 @@ splitview docID = H.mkComponent
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div_
-      [ renderToolbar, renderSplit state ]
-
-  renderToolbar :: H.ComponentHTML Action Slots m
-  renderToolbar =
-    -- First Toolbar
-    HH.div
-      [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
-      [ toolbarButton "[=]" ToggleSidebar
-      , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
-      , toolbarButton "All Comments" (ToggleCommentOverview true)
-      ]
-    where
-    toolbarButton label act = HH.button
-      [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-      , HE.onClick $ const act
-      ]
-      [ HH.text label ]
+      [ renderSplit state ]
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
   renderSplit state =
@@ -739,6 +723,8 @@ splitview docID = H.mkComponent
 
       Editor.SendingTOC tocEntry -> do
         H.tell _commentOverview unit (CommentOverview.ReceiveTOC tocEntry)
+
+      Editor.ShowAllCommentsOutput -> handleAction $ ToggleCommentOverview true
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of

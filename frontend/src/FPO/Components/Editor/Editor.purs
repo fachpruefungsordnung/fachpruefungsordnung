@@ -94,6 +94,7 @@ data Output
   | SavedSection Boolean String TOCEntry
   | SelectedCommentSection Int Int
   | SendingTOC TOCEntry
+  | ShowAllCommentsOutput
 
 data Action
   = Init
@@ -109,6 +110,7 @@ data Action
   | Redo
   | Save
   | RenderHTML
+  | ShowAllComments
   | Receive (Connected FPOTranslator Unit)
 
 -- We use a query to get the content of the editor
@@ -221,6 +223,17 @@ editor docID = connect selectTranslator $ H.mkComponent
                       [ HP.classes [ HB.ms1, HB.bi, H.ClassName "bi-file-richtext" ] ]
                       []
                   ]
+              , HH.button
+                  [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.px2, HB.py0, HB.m0 ]
+                  , HP.title "Render HTML" -- TODO editor_render_html einfügen
+                  , HE.onClick \_ -> ShowAllComments
+                  ]
+                  [ HH.small_
+                      [ HH.text "All comments" ]
+                  , HH.i
+                      [ HP.classes [ HB.ms1, HB.bi, H.ClassName "bi-chat-square" ] ]
+                      []
+                  ]
               ]
           ]
       , HH.div -- Editor container
@@ -314,6 +327,9 @@ editor docID = connect selectTranslator $ H.mkComponent
     RenderHTML -> do
       _ <- handleQuery (QueryEditor unit)
       pure unit
+
+    ShowAllComments -> do
+      H.raise ShowAllCommentsOutput
 
     Save -> do
       state <- H.get
