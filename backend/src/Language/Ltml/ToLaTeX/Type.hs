@@ -125,7 +125,7 @@ minipage = Environment "minipage"
 
 paragraph :: LaTeX -> LaTeX -> LaTeX
 paragraph identifier content =
-    Sequence $
+    Sequence
         [ minipage ["t"] [Raw "{2em}", identifier]
         , Raw "\\hspace{0.5em}"
         , minipage ["t"] [Raw "{\\dimexpr\\linewidth-2em-0.5em\\relax}", content]
