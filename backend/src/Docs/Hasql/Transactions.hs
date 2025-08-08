@@ -26,6 +26,7 @@ import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
+import Control.Monad (guard)
 import Docs.Document (DocumentID)
 import qualified Docs.Hasql.Statements as Statements
 import Docs.Hasql.TreeEdge (TreeEdge (TreeEdge), TreeEdgeChildRef (..))
@@ -38,7 +39,8 @@ import Docs.TextRevision
     , TextRevisionRef
     )
 import Docs.Tree (Edge (Edge), Node (Node), Tree (Leaf, Tree))
-import Docs.TreeRevision (TreeRevision)
+import Docs.TreeRevision (TreeRevision, TreeRevisionRef (TreeRevisionRef))
+import qualified Docs.TreeRevision as TreeRevision
 import DocumentManagement.Hash
     ( Hash (Hash)
     , Hashable (..)
@@ -81,8 +83,20 @@ createTreeRevision
     -> Transaction (TreeRevision TextElementID)
 createTreeRevision authorID docID rootNode = do
     rootHash <- putTree rootNode
-    revision <- statement (docID, authorID, rootHash) Statements.putTreeRevision
-    return $ revision rootNode
+    current <-
+        statement
+            (TreeRevisionRef docID TreeRevision.Latest)
+            Statements.getTreeRevision
+    let keepCurrent = current >>= guard . ((== rootHash) . fst) >> current <&> snd
+    case keepCurrent of
+        Just currentRevision ->
+            return $ currentRevision rootNode
+        Nothing -> do
+            revision <-
+                statement
+                    (docID, authorID, rootHash)
+                    Statements.putTreeRevision
+            return $ revision rootNode
 
 putTree :: Node TextElementID -> Transaction Hash
 putTree (Node metaData children) = do

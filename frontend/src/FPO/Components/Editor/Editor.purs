@@ -20,13 +20,17 @@ import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
+import Affjax (Error, Response, printError)
+import Data.Argonaut (Json)
 import Data.Array (catMaybes, filter, intercalate, uncons, (:))
+import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.Keybindings
@@ -51,26 +55,35 @@ import FPO.Types
   , markerToAnnotation
   , sortMarkers
   )
+import FPO.Util (prependIf)
+import Halogen (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, ref, style, title) as HP
+import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
+import Halogen.Subscription as HS
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element (toEventTarget)
 import Web.Event.EventTarget (addEventListener, eventListener)
-import Web.HTML.HTMLElement (toElement)
+import Web.HTML.HTMLElement (offsetWidth, toElement)
+import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
 type State = FPOState
   ( mEditor :: Maybe Types.Editor
   , mTocEntry :: Maybe TOCEntry
+  , title :: String
   , mContent :: Maybe Content
   , liveMarkers :: Array LiveMarker
   , fontSize :: Int
+  , resizeObserver :: Maybe RO.ResizeObserver
+  , resizeSubscription :: Maybe SubscriptionId
+  , showButtonText :: Boolean
   )
 
 -- For tracking the comment markers live
@@ -85,9 +98,11 @@ type LiveMarker =
 data Output
   = ClickedQuery (Array String)
   | DeletedComment TOCEntry (Array Int)
-  | SavedSection TOCEntry
+  -- SavedSection toBePosted title TOCEntry
+  | SavedSection Boolean String TOCEntry
   | SelectedCommentSection Int Int
   | SendingTOC TOCEntry
+  | ShowAllCommentsOutput
 
 data Action
   = Init
@@ -101,7 +116,12 @@ data Action
   | FontSizeDown
   | Undo
   | Redo
+  | Save
+  | RenderHTML
+  | ShowAllComments
   | Receive (Connected FPOTranslator Unit)
+  | HandleResize Number
+  | Finalize
 
 -- We use a query to get the content of the editor
 data Query a
@@ -110,7 +130,7 @@ data Query a
   -- save the current content and send it to splitview
   | SaveSection a
   -- receive the selected TOC and put its content into the editor
-  | ChangeSection TOCEntry a
+  | ChangeSection String TOCEntry a
   | SendCommentSections a
 
 editor
@@ -127,6 +147,7 @@ editor docID = connect selectTranslator $ H.mkComponent
       , handleAction = handleAction
       , handleQuery = handleQuery
       , receive = Just <<< Receive
+      , finalize = Just Finalize
       }
   }
   where
@@ -135,9 +156,13 @@ editor docID = connect selectTranslator $ H.mkComponent
     { translator: fromFpoTranslator context
     , mEditor: Nothing
     , liveMarkers: []
+    , title: ""
     , mTocEntry: Nothing
     , mContent: Nothing
     , fontSize: 12
+    , resizeObserver: Nothing
+    , resizeSubscription: Nothing
+    , showButtonText: true
     }
 
   render :: State -> H.ComponentHTML Action () m
@@ -148,88 +173,72 @@ editor docID = connect selectTranslator $ H.mkComponent
       ]
       [ HH.div -- Second toolbar
 
-          [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
-          [ HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title (translate (label :: _ "editor_textBold") state.translator)
-              , HE.onClick \_ -> Bold
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-bold" ] ] [] ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title (translate (label :: _ "editor_textItalic") state.translator)
-              , HE.onClick \_ -> Italic
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-italic" ] ] [] ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+          [ HP.classes [ HB.dFlex, HB.justifyContentBetween ] ]
+          [ HH.div
+              [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+              [ makeEditorToolbarButton
+                  (translate (label :: _ "editor_textBold") state.translator)
+                  Bold
+                  "bi-type-bold"
+              , makeEditorToolbarButton
+                  (translate (label :: _ "editor_textItalic") state.translator)
+                  Italic
+                  "bi-type-italic"
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_textUnderline") state.translator)
-              , HE.onClick \_ -> Underline
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-type-underline" ] ] [] ]
-          , HH.div
-              [ HP.classes [ HB.vr, HB.mx1 ]
-              , HP.style "height: 1.5rem"
-              ]
-              []
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  Underline
+                  "bi-type-underline"
+
+              , buttonDivisor
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_fontSizeUp") state.translator)
-              , HE.onClick \_ -> FontSizeUp
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-plus-square" ] ] [] ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  FontSizeUp
+                  "bi-plus-square"
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_fontSizeDown") state.translator)
-              , HE.onClick \_ -> FontSizeDown
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-dash-square" ] ] [] ]
-          , HH.div
-              [ HP.classes [ HB.vr, HB.mx1 ]
-              , HP.style "height: 1.5rem"
-              ]
-              []
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  FontSizeDown
+                  "bi-dash-square"
+
+              , buttonDivisor
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_undo") state.translator)
-              , HE.onClick \_ -> Undo
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-arrow-counterclockwise" ] ]
-                  []
-              ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  Undo
+                  "bi-arrow-counterclockwise"
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_redo") state.translator)
-              , HE.onClick \_ -> Redo
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-arrow-clockwise" ] ] [] ]
-          , HH.div
-              [ HP.classes [ HB.vr, HB.mx1 ]
-              , HP.style "height: 1.5rem"
-              ]
-              []
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  Redo
+                  "bi-arrow-clockwise"
+
+              , buttonDivisor
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_comment") state.translator)
-              , HE.onClick \_ -> Comment
-              ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-chat-square-text" ] ]
-                  []
-              ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
-              , HP.title
+                  Comment
+                  "bi-chat-square-text"
+              , makeEditorToolbarButton
                   (translate (label :: _ "editor_deleteComment") state.translator)
-              , HE.onClick \_ -> DeleteComment
+                  DeleteComment
+                  "bi-chat-square-text-fill"
+
               ]
-              [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-chat-square-text-fill" ] ]
-                  []
+          , HH.div
+              [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ]
+              , HP.style "min-width: 0;"
+              ]
+              [ makeEditorToolbarButtonWithText
+                  state.showButtonText
+                  Save
+                  "bi-floppy"
+                  (translate (label :: _ "editor_save") state.translator)
+              , makeEditorToolbarButtonWithText
+                  state.showButtonText
+                  RenderHTML
+                  "bi-file-richtext"
+                  (translate (label :: _ "editor_preview") state.translator)
+              , makeEditorToolbarButtonWithText
+                  state.showButtonText
+                  ShowAllComments
+                  "bi-chat-square"
+                  (translate (label :: _ "editor_allComments") state.translator)
               ]
           ]
       , HH.div -- Editor container
@@ -269,6 +278,24 @@ editor docID = connect selectTranslator $ H.mkComponent
 
           -- Add some example text
           Document.setValue "" document
+
+      -- Setup ResizeObserver for the container element
+      H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \element -> do
+        { emitter, listener } <- H.liftEffect HS.create
+
+        -- Subscribe to resize events and store subscription for cleanup
+        subscription <- H.subscribe emitter
+        H.modify_ _ { resizeSubscription = Just subscription }
+
+        let
+          callback _ _ = do
+            -- Get the current width directly from the element
+            width <- offsetWidth element
+            HS.notify listener (HandleResize width)
+
+        observer <- H.liftEffect $ RO.resizeObserver callback
+        H.liftEffect $ RO.observe (toElement element) {} observer
+        H.modify_ _ { resizeObserver = Just observer }
 
     Bold -> do
       H.gets _.mEditor >>= traverse_ \ed ->
@@ -320,6 +347,93 @@ editor docID = connect selectTranslator $ H.mkComponent
           Editor.redo ed
           Editor.focus ed
 
+    RenderHTML -> do
+      _ <- handleQuery (QueryEditor unit)
+      pure unit
+
+    ShowAllComments -> do
+      H.raise ShowAllCommentsOutput
+
+    Save -> do
+      state <- H.get
+
+      -- check, if there are any changes in the editor
+      -- If not, do not send anything to the server
+      hasUndoMgr <- H.gets _.mEditor >>= traverse \ed -> do
+        H.liftEffect do
+          session <- Editor.getSession ed
+          undoMgr <- Session.getUndoManager session
+          UndoMgr.hasUndo undoMgr
+
+      if (fromMaybe false hasUndoMgr) then do
+        -- Save the current content of the editor and send it to the server
+        case state.mContent of
+          Nothing -> pure unit
+          Just content -> do
+            allLines <- H.gets _.mEditor >>= traverse \ed -> do
+              H.liftEffect $ Editor.getSession ed
+                >>= Session.getDocument
+                >>= Document.getAllLines
+
+            -- Save the current content of the editor
+            let
+              oldTitle = state.title
+              contentLines = case allLines of
+                Just ls -> case uncons ls of
+                  Just { head, tail } ->
+                    { title: head, contentText: intercalate "\n" tail }
+                  Nothing -> { title: "", contentText: "" }
+                Nothing -> { title: "", contentText: "" }
+              title = contentLines.title
+              contentText = contentLines.contentText
+
+              -- place it in contentDto
+              newContent = ContentDto.setContentText contentText content
+
+              -- extract the current TOC entry
+              entry = case state.mTocEntry of
+                Nothing -> emptyTOCEntry
+                Just e -> e
+
+            -- Since the ids and postions in liveMarkers are changing constantly,
+            -- extract them now and store them
+            updatedMarkers <- H.liftEffect do
+              for entry.markers \m -> do
+                case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
+                  -- TODO Should we add other markers in liveMarkers such as errors?
+                  Nothing -> pure m
+                  Just lm -> do
+                    start <- Anchor.getPosition lm.startAnchor
+                    end <- Anchor.getPosition lm.endAnchor
+                    pure m
+                      { startRow = Types.getRow start
+                      , startCol = Types.getColumn start
+                      , endRow = Types.getRow end
+                      , endCol = Types.getColumn end
+                      }
+            -- update the markers in entry
+            let
+              newEntry = entry
+                { markers = updatedMarkers }
+              jsonContent = ContentDto.encodeContent newContent
+
+            -- send the new content as POST to the server
+            response <- H.liftAff $ Request.postJson
+              ("/docs/" <> show docID <> "/text/" <> show entry.id <> "/rev")
+              jsonContent
+            handleSaveSectionResponse response
+
+            H.modify_ \st -> st
+              { mTocEntry = Just newEntry
+              , title = title
+              , mContent = Just newContent
+              }
+            -- Update the tree to backend, when title was really changed
+            H.raise (SavedSection (oldTitle /= title) title newEntry)
+            pure unit
+      else
+        pure unit
+
     Comment -> do
       user <- H.liftAff getUser
       H.gets _.mEditor >>= traverse_ \ed -> do
@@ -367,6 +481,7 @@ editor docID = connect selectTranslator $ H.mkComponent
               newEntry =
                 { id: entry.id
                 , name: entry.name
+                , paraID: entry.paraID
                 , newMarkerNextID: entry.newMarkerNextID + 1
                 , markers: sortMarkers (newMarker : entry.markers)
                 }
@@ -375,7 +490,7 @@ editor docID = connect selectTranslator $ H.mkComponent
                 { mTocEntry = Just newEntry
                 , liveMarkers = newLiveMarkers
                 }
-            H.raise (SavedSection newEntry)
+            H.raise (SavedSection false state.title newEntry)
             H.raise
               (SelectedCommentSection entry.id newMarker.id)
           Nothing -> pure unit
@@ -418,12 +533,7 @@ editor docID = connect selectTranslator $ H.mkComponent
 
           -- extract markers from the current TOC entry
           tocEntry = case state.mTocEntry of
-            Nothing ->
-              { id: -1
-              , name: "No entry"
-              , newMarkerNextID: -1
-              , markers: []
-              }
+            Nothing -> emptyTOCEntry
             Just e -> e
           markers = tocEntry.markers
 
@@ -433,7 +543,29 @@ editor docID = connect selectTranslator $ H.mkComponent
             Just foundMarker -> H.raise
               (SelectedCommentSection tocEntry.id foundMarker.id)
 
-    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
+
+    HandleResize width -> do
+      -- Decides whether to show button text based on the width.
+      -- Because german labels are longer, we need to adjust the cutoff
+      -- threshold dynamically. Pretty sure this is not the best solution,
+      -- but it works.
+
+      lang <- liftEffect $ Store.loadLanguage
+      let cutoff = if lang == Just "de-DE" then 573.0 else 520.0
+
+      H.modify_ _ { showButtonText = width >= cutoff }
+
+    Finalize -> do
+      state <- H.get
+      -- Cleanup observer and subscription
+      H.liftEffect $ case state.resizeObserver of
+        Just obs -> RO.disconnect obs
+        Nothing -> pure unit
+      case state.resizeSubscription of
+        Just subscription -> H.unsubscribe subscription
+        Nothing -> pure unit
 
   handleQuery
     :: forall slots a
@@ -441,8 +573,8 @@ editor docID = connect selectTranslator $ H.mkComponent
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
 
-    ChangeSection entry a -> do
-      H.modify_ \state -> state { mTocEntry = Just entry }
+    ChangeSection title entry a -> do
+      H.modify_ \state -> state { mTocEntry = Just entry, title = title }
 
       -- Put the content of the section into the editor and update markers
       H.gets _.mEditor >>= traverse_ \ed -> do
@@ -467,7 +599,8 @@ editor docID = connect selectTranslator $ H.mkComponent
           document <- Session.getDocument session
 
           -- Set the content of the editor
-          Document.setValue (ContentDto.getContentText content) document
+          Document.setValue (title <> "\n" <> ContentDto.getContentText content)
+            document
 
           -- Reset Undo history
           undoMgr <- Session.getUndoManager session
@@ -497,62 +630,8 @@ editor docID = connect selectTranslator $ H.mkComponent
       pure (Just a)
 
     SaveSection a -> do
-      state <- H.get
-      case state.mContent of
-        Nothing -> pure (Just a)
-        Just content -> do
-          allLines <- H.gets _.mEditor >>= traverse \ed -> do
-            H.liftEffect $ Editor.getSession ed
-              >>= Session.getDocument
-              >>= Document.getAllLines
-
-          -- Save the current content of the editor
-          let
-            contentText = case allLines of
-              Just ls -> intercalate "\n" ls
-              Nothing -> ""
-
-            -- place it in content
-            newContent = ContentDto.setContentText contentText content
-
-            -- extract the current TOC entry
-            entry = case state.mTocEntry of
-              Nothing -> emptyTOCEntry
-              Just e -> e
-
-          -- Since the ids and postions in liveMarkers are changing constantly,
-          -- extract them now and store them
-          updatedMarkers <- H.liftEffect do
-            for entry.markers \m -> do
-              case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
-                -- TODO Should we add other markers in liveMarkers such as errors?
-                Nothing -> pure m
-                Just lm -> do
-                  start <- Anchor.getPosition lm.startAnchor
-                  end <- Anchor.getPosition lm.endAnchor
-                  pure m
-                    { startRow = Types.getRow start
-                    , startCol = Types.getColumn start
-                    , endRow = Types.getRow end
-                    , endCol = Types.getColumn end
-                    }
-          -- update the markers in entry
-          let
-            newEntry = entry
-              { markers = updatedMarkers }
-            jsonContent = ContentDto.encodeContent newContent
-
-          -- send the new content as POST to the server
-          _ <- H.liftAff $ Request.postJson
-            ("/docs/" <> show docID <> "/text/" <> show entry.id <> "/rev")
-            jsonContent
-
-          H.modify_ \st -> st
-            { mTocEntry = Just newEntry
-            , mContent = Just newContent
-            }
-          H.raise (SavedSection newEntry)
-          pure (Just a)
+      handleAction Save
+      pure (Just a)
 
     -- Because Session does not provide a way to get all lines directly,
     -- we need to take another indirect route to get the lines.
@@ -713,3 +792,54 @@ cursorInRange lms cursor =
       else
         cursorInRange ls cursor
     Nothing -> pure Nothing
+
+makeEditorToolbarButton
+  :: forall m. String -> Action -> String -> H.ComponentHTML Action () m
+makeEditorToolbarButton tooltip action biName = HH.button
+  [ HP.classes [ HB.btn, HB.p0, HB.m0 ]
+  , HP.title tooltip
+  , HE.onClick \_ -> action
+  ]
+  [ HH.i
+      [ HP.classes [ HB.bi, H.ClassName biName ]
+      ]
+      []
+  ]
+
+-- Here, no tooltip is needed as the text is shown in the button
+makeEditorToolbarButtonWithText
+  :: forall m. Boolean -> Action -> String -> String -> H.ComponentHTML Action () m
+makeEditorToolbarButtonWithText asText action biName smallText = HH.button
+  ( prependIf (not asText) (HP.title smallText)
+      [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
+      , HP.style "white-space: nowrap;"
+      , HE.onClick \_ -> action
+      ]
+  )
+  ( prependIf asText
+      (HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text smallText ])
+      [ HH.i
+          [ HP.classes [ HB.bi, H.ClassName biName ]
+          ]
+          []
+      ]
+  )
+
+buttonDivisor :: forall m. H.ComponentHTML Action () m
+buttonDivisor = HH.div
+  [ HP.classes [ HB.vr, HB.mx1 ] ]
+  []
+
+-- TODO make this better
+handleSaveSectionResponse
+  :: forall m slots
+   . MonadAff m
+  => Either Error (Response Json)
+  -> H.HalogenM State Action slots Output m Unit
+handleSaveSectionResponse response = do
+  case response of
+    Left err ->
+      H.liftEffect $ do
+        log $ "Error saving section: " <> printError err
+    Right _ ->
+      pure unit

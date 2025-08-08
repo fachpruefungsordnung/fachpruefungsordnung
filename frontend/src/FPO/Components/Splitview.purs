@@ -26,7 +26,7 @@ import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
-import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..), findRootTree)
+import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..))
 import FPO.Types
   ( CommentSection
   , TOCEntry
@@ -34,6 +34,8 @@ import FPO.Types
   , documentTreeToTOCTree
   , emptyTOCEntry
   , findTOCEntry
+  , findTitleTOCEntry
+  , replaceTOCEntry
   , timeStampsVersions
   , tocTreeToDocumentTree
   )
@@ -63,9 +65,6 @@ data Action
   | StartResize DragTarget MouseEvent
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
-  -- Toolbar buttons
-  | SaveSection
-  | RenderHTML
   -- Toggle buttons
   | ToggleComment
   | ToggleCommentOverview Boolean
@@ -77,7 +76,6 @@ data Action
   | HandleEditor Editor.Output
   | HandlePreview Preview.Output
   | HandleTOC TOC.Output
-  | ForceGET
   | GET
   | POST
 
@@ -175,28 +173,7 @@ splitview docID = H.mkComponent
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div_
-      [ renderToolbar, renderSplit state ]
-
-  renderToolbar :: H.ComponentHTML Action Slots m
-  renderToolbar =
-    -- First Toolbar
-    HH.div
-      [ HP.classes [ HB.bgDark, HB.overflowAuto, HB.dFlex, HB.flexRow ] ]
-      [ toolbarButton "[=]" ToggleSidebar
-      , HH.span [ HP.classes [ HB.textWhite, HB.px2 ] ] [ HH.text "Toolbar" ]
-      , toolbarButton "ForceGETP" ForceGET
-      , toolbarButton "GET" GET
-      , toolbarButton "POST" POST
-      , toolbarButton "All Comments" (ToggleCommentOverview true)
-      , toolbarButton "Save" SaveSection
-      , toolbarButton "Render HTML" RenderHTML
-      ]
-    where
-    toolbarButton label act = HH.button
-      [ HP.classes [ HB.btn, HB.btnSuccess, HB.btnSm ]
-      , HE.onClick $ const act
-      ]
-      [ HH.text label ]
+      [ renderSplit state ]
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
   renderSplit state =
@@ -490,18 +467,6 @@ splitview docID = H.mkComponent
         Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
         Right _ -> pure unit
     -- H.liftEffect $ Console.log "Successfully posted TOC to server"
-    ForceGET -> do
-      -- Forces a GET request to fetch the latest document tree of commit #1.
-      fetchedTree <- H.liftAff
-        $ Request.getFromJSONEndpoint DT.decodeDocument
-        $ "/docs/" <> show docID <> "/tree/latest"
-      let
-        tree = case fetchedTree of
-          Nothing -> Empty
-          Just t -> documentTreeToTOCTree t
-      H.modify_ \st -> do
-        st { tocEntries = tree }
-      H.tell _toc unit (TOC.ReceiveTOCs tree)
 
     GET -> do
       -- TODO: As of now, the editor page and splitview are parametrized by the document ID
@@ -523,14 +488,6 @@ splitview docID = H.mkComponent
       H.modify_ _ { tocEntries = finalTree }
       H.tell _toc unit (TOC.ReceiveTOCs finalTree)
     Init -> do
-      -- exampleTOCEntries <- createExampleTOCEntries
-      -- -- Comment it out for now, to let the other text show up first in editor
-      -- -- head has to be imported from Data.Array
-      -- -- Put first entry in editor
-      -- --   firstEntry = case head entries of
-      -- --     Nothing -> { id: -1, name: "No Entry", content: Just [ "" ] }
-      -- --     Just entry -> entry
-      -- -- H.tell _editor unit (Editor.ChangeSection firstEntry)
       let timeFormatter = head timeStampsVersions
       H.modify_ \st -> do
         st { mTimeFormatter = timeFormatter }
@@ -541,7 +498,7 @@ splitview docID = H.mkComponent
       -- Load the initial TOC entries into the editor
       -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
       -- or rather, we don't use commit anymore in the API
-      handleAction ForceGET
+      handleAction GET
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -619,14 +576,6 @@ splitview docID = H.mkComponent
               }
 
         _ -> pure unit
-
-    -- Toolbar button actions
-
-    SaveSection -> H.tell _editor unit Editor.SaveSection
-
-    RenderHTML -> do
-      H.tell _editor unit Editor.SaveSection
-      H.tell _editor unit Editor.QueryEditor
 
     -- Toggle actions
 
@@ -717,9 +666,12 @@ splitview docID = H.mkComponent
             state.tocEntries
           updateTOCEntry = fromMaybe
             emptyTOCEntry
-            (findRootTree (\e -> e.id == tocID) updatedTOCEntries)
+            (findTOCEntry tocID updatedTOCEntries)
+          title = fromMaybe
+            ""
+            (findTitleTOCEntry tocID updatedTOCEntries)
         H.modify_ \s -> s { tocEntries = updatedTOCEntries }
-        H.tell _editor unit (Editor.ChangeSection updateTOCEntry)
+        H.tell _editor unit (Editor.ChangeSection title updateTOCEntry)
 
     HandleCommentOverview output -> case output of
 
@@ -745,12 +697,13 @@ splitview docID = H.mkComponent
             }
         H.tell _comment unit (Comment.DeletedComment tocEntry.id deletedIDs)
 
-      Editor.SavedSection tocEntry ->
-        H.modify_ \st ->
-          st
-            { tocEntries =
-                map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
-            }
+      Editor.SavedSection toBePosted title tocEntry -> do
+        state <- H.get
+        let
+          newTOCTree = replaceTOCEntry tocEntry.id title tocEntry state.tocEntries
+        H.modify_ \st -> st { tocEntries = newTOCTree }
+        H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
+        when toBePosted (handleAction POST)
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get
@@ -770,18 +723,20 @@ splitview docID = H.mkComponent
 
       Editor.SendingTOC tocEntry -> do
         H.tell _commentOverview unit (CommentOverview.ReceiveTOC tocEntry)
+
+      Editor.ShowAllCommentsOutput -> handleAction $ ToggleCommentOverview true
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
 
-      TOC.ChangeSection selectedId -> do
+      TOC.ChangeSection title selectedId -> do
         H.tell _editor unit Editor.SaveSection
         state <- H.get
         let
           entry = case (findTOCEntry selectedId state.tocEntries) of
             Nothing -> emptyTOCEntry
             Just e -> e
-        H.tell _editor unit (Editor.ChangeSection entry)
+        H.tell _editor unit (Editor.ChangeSection title entry)
 
       TOC.AddNode path node -> do
         state <- H.get
@@ -798,7 +753,7 @@ splitview docID = H.mkComponent
 
 findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
 findCommentSection tocEntries tocID markerID = do
-  tocEntry <- findRootTree (\entry -> entry.id == tocID) tocEntries
+  tocEntry <- findTOCEntry tocID tocEntries
   marker <- find (\m -> m.id == markerID) tocEntry.markers
   marker.mCommentSection
 

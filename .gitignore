@@ -47,3 +47,6 @@ cabal.project.local~
 
 # Other
 .DS_Store
+
+# HTML and CSS Testfiles
+backend/src/Language/Ltml/HTML/Test

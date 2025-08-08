@@ -14,8 +14,8 @@ import Data.OpenApi
     , binarySchema
     , declareNamedSchema
     )
-import Data.Text (Text, lines, unlines)
-import Lucid
+import Data.Text (Text)
+import Language.Ltml.HTML.Pipeline (htmlPipeline)
 import Network.HTTP.Media.MediaType ((//))
 import Servant
 import Servant.Auth.Server
@@ -82,20 +82,6 @@ instance MimeRender Plain DocByteString where
 instance MimeRender HTML DocByteString where
     mimeRender _ (DocByteString bs) = bs
 
-renderHTML :: Text -> ByteString
-renderHTML input =
-    let (head, body) = case lines input of
-            [] -> ("", "")
-            (x : xs) -> (x, unlines xs)
-     in do
-            renderBS $
-                html_ $ do
-                    head_ $
-                        title_ "Render Result"
-                    body_ $ do
-                        h1_ (toHtml head)
-                        p_ (toHtml body)
-
 renderPlain :: Text -> ByteString
 renderPlain = encode
 
@@ -108,7 +94,8 @@ type RenderRoute format =
 -- | Generic renderHandler which takes a render function
 renderHandler
     :: (a -> ByteString) -> AuthResult Auth.Token -> a -> Handler DocByteString
-renderHandler renderFunc (Authenticated _) input = return $ DocByteString $ renderFunc input
+renderHandler renderFunc (Authenticated _) input = do
+    return $ DocByteString $ renderFunc input
 renderHandler _ _ _ = throwError errNotLoggedIn
 
 renderPDFHandler

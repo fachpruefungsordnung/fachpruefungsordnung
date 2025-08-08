@@ -118,11 +118,14 @@ createTreeRevision authorID docID rootNode =
 
 getTreeRevision
     :: TreeRevisionRef
-    -> Session (TreeRevision TextElement)
+    -> Session (Maybe (TreeRevision TextElement))
 getTreeRevision ref = do
-    (rootHash, treeRevision) <- getRevision
-    root <- getTree rootHash
-    return $ treeRevision root
+    revision <- getRevision
+    case revision of
+        Just (rootHash, treeRevision) -> do
+            root <- getTree rootHash
+            return $ Just $ treeRevision root
+        Nothing -> return Nothing
   where
     getRevision = statement ref Statements.getTreeRevision
 

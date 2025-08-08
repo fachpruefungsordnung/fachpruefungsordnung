@@ -10,7 +10,12 @@ import Data.List (List(..), (:))
 import Data.Maybe (Maybe)
 import FPO.Dto.DocumentDto.DocumentTree as DT
 import FPO.Dto.DocumentDto.NodeHeader as NH
-import FPO.Dto.DocumentDto.TreeDto (RootTree, findRootTree)
+import FPO.Dto.DocumentDto.TreeDto
+  ( RootTree
+  , findRootTree
+  , findTitleRootTree
+  , replaceNodeRootTree
+  )
 
 -- TODO We can also store different markers, such as errors. But do we want to?
 type AnnotatedMarker =
@@ -39,6 +44,8 @@ type Comment =
 type TOCEntry =
   { id :: Int
   , name :: String
+  -- paragraph ID (§id) for later
+  , paraID :: Int
   -- Is stored as 32bit Int = 2,147,483,647
   -- Schould not create so many markers, right?
   , newMarkerNextID :: Int
@@ -49,6 +56,7 @@ type TOCEntry =
 -- since it only uses id and name only
 type ShortendTOCEntry =
   { id :: Int
+  , paraID :: Int
   , name :: String
   }
 
@@ -59,12 +67,19 @@ emptyTOCEntry :: TOCEntry
 emptyTOCEntry =
   { id: -1
   , name: "Error"
+  , paraID: -1
   , newMarkerNextID: -1
   , markers: []
   }
 
 findTOCEntry :: Int -> TOCTree -> Maybe TOCEntry
-findTOCEntry tocID tocEntries = findRootTree (\e -> e.id == tocID) tocEntries
+findTOCEntry tocID = findRootTree (\e -> e.id == tocID)
+
+findTitleTOCEntry :: Int -> TOCTree -> Maybe String
+findTitleTOCEntry tocID = findTitleRootTree (\e -> e.id == tocID)
+
+replaceTOCEntry :: Int -> String -> TOCEntry -> TOCTree -> TOCTree
+replaceTOCEntry tocID = replaceNodeRootTree (\e -> e.id == tocID)
 
 findCommentSection :: Int -> Int -> TOCTree -> Maybe CommentSection
 findCommentSection tocID markerID tocEntries = do
@@ -84,7 +99,7 @@ markerToAnnotation m =
   }
 
 shortenTOC :: TOCEntry -> ShortendTOCEntry
-shortenTOC { id, name } = { id, name }
+shortenTOC { id, paraID, name } = { id, paraID, name }
 
 -- TODO create more timestamps versions and discuss, where to store this
 timeStampsVersions :: Array Formatter
@@ -145,6 +160,7 @@ nodeHeaderToTOCEntry :: NH.NodeHeader -> TOCEntry
 nodeHeaderToTOCEntry nh =
   { id: NH.getId nh
   , name: NH.getKind nh
+  , paraID: 0 -- implement it later
   , newMarkerNextID: 0
   , markers: []
   }

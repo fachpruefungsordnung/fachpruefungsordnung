@@ -21,6 +21,7 @@ package:
     - halogen
     - halogen-bootstrap5
     - halogen-store
+    - halogen-subscriptions
     - http-methods
     - integers
     - lists
@@ -44,6 +45,7 @@ package:
     - web-events
     - web-file
     - web-html
+    - web-resize-observer
     - web-storage
     - web-uievents
   test:

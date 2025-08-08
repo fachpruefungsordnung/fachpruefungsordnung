@@ -4,6 +4,8 @@ module FPO.Dto.DocumentDto.TreeDto
   , RootTree(..)
   , TreeHeader(..)
   , findRootTree
+  , findTitleRootTree
+  , replaceNodeRootTree
   ) where
 
 import Prelude
@@ -144,3 +146,57 @@ findTree predicate (Node { children }) =
     children
 findTree predicate (Leaf { node }) =
   if predicate node then Just node else Nothing
+
+-- find the title of the found node
+findTitleRootTree :: forall a. (a -> Boolean) -> RootTree a -> Maybe String
+findTitleRootTree _ Empty = Nothing
+findTitleRootTree predicate (RootTree { children }) =
+  foldr
+    (\(Edge child) acc -> acc <|> findTitleTree predicate child)
+    Nothing
+    children
+
+findTitleTree :: forall a. (a -> Boolean) -> Tree a -> Maybe String
+findTitleTree predicate (Node { children }) =
+  foldr
+    (\(Edge child) acc -> acc <|> findTitleTree predicate child)
+    Nothing
+    children
+findTitleTree predicate (Leaf { title, node }) =
+  if predicate node then Just title else Nothing
+
+replaceNodeRootTree
+  :: forall a
+   . (a -> Boolean)
+  -> String
+  -> a
+  -> RootTree a
+  -> RootTree a
+replaceNodeRootTree _ _ _ Empty = Empty
+replaceNodeRootTree predicate newTitle newNode (RootTree { children, header }) =
+  let
+    newChildren =
+      map (\(Edge child) -> Edge $ replaceNodeTree predicate newTitle newNode child)
+        children
+  in
+    RootTree { children: newChildren, header }
+
+replaceNodeTree
+  :: forall a
+   . (a -> Boolean)
+  -> String
+  -> a
+  -> Tree a
+  -> Tree a
+replaceNodeTree pred newTitle newNode (Leaf { title, node }) =
+  if pred node then
+    Leaf { title: newTitle, node: newNode }
+  else
+    Leaf { title, node }
+replaceNodeTree pred newTitle newNode (Node { title, children, header }) =
+  let
+    newChildren =
+      map (\(Edge child) -> Edge $ replaceNodeTree pred newTitle newNode child)
+        children
+  in
+    Node { title, children: newChildren, header }

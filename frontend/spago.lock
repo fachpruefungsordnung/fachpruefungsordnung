@@ -25,6 +25,7 @@
             "halogen",
             "halogen-bootstrap5",
             "halogen-store",
+            "halogen-subscriptions",
             "http-methods",
             "integers",
             "lists",
@@ -48,6 +49,7 @@
             "web-events",
             "web-file",
             "web-html",
+            "web-resize-observer",
             "web-storage",
             "web-uievents"
           ],
@@ -148,6 +150,7 @@
             "web-file",
             "web-html",
             "web-pointerevents",
+            "web-resize-observer",
             "web-storage",
             "web-touchevents",
             "web-uievents",
@@ -2010,6 +2013,23 @@
         "prelude",
         "web-dom",
         "web-uievents"
+      ]
+    },
+    "web-resize-observer": {
+      "type": "registry",
+      "version": "2.1.0",
+      "integrity": "sha256-xKJDpJdKB3L89ooASmQm/eAjzjSuKmkApT/kyJ5MyKw=",
+      "dependencies": [
+        "arrays",
+        "control",
+        "effect",
+        "either",
+        "foldable-traversable",
+        "foreign",
+        "prelude",
+        "record",
+        "transformers",
+        "web-dom"
       ]
     },
     "web-storage": {
