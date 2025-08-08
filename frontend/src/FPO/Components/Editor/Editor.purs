@@ -55,18 +55,23 @@ import FPO.Types
   , markerToAnnotation
   , sortMarkers
   )
+import FPO.Util (prependIf)
+import Halogen (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, ref, style, title) as HP
+import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
+import Halogen.Subscription as HS
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element (toEventTarget)
 import Web.Event.EventTarget (addEventListener, eventListener)
-import Web.HTML.HTMLElement (toElement)
+import Web.HTML.HTMLElement (offsetWidth, toElement)
+import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
 type State = FPOState
@@ -76,6 +81,9 @@ type State = FPOState
   , mContent :: Maybe Content
   , liveMarkers :: Array LiveMarker
   , fontSize :: Int
+  , resizeObserver :: Maybe RO.ResizeObserver
+  , resizeSubscription :: Maybe SubscriptionId
+  , showButtonText :: Boolean
   )
 
 -- For tracking the comment markers live
@@ -112,6 +120,8 @@ data Action
   | RenderHTML
   | ShowAllComments
   | Receive (Connected FPOTranslator Unit)
+  | HandleResize Number
+  | Finalize
 
 -- We use a query to get the content of the editor
 data Query a
@@ -137,6 +147,7 @@ editor docID = connect selectTranslator $ H.mkComponent
       , handleAction = handleAction
       , handleQuery = handleQuery
       , receive = Just <<< Receive
+      , finalize = Just Finalize
       }
   }
   where
@@ -149,6 +160,9 @@ editor docID = connect selectTranslator $ H.mkComponent
     , mTocEntry: Nothing
     , mContent: Nothing
     , fontSize: 12
+    , resizeObserver: Nothing
+    , resizeSubscription: Nothing
+    , showButtonText: true
     }
 
   render :: State -> H.ComponentHTML Action () m
@@ -207,16 +221,21 @@ editor docID = connect selectTranslator $ H.mkComponent
 
               ]
           , HH.div
-              [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+              [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ]
+              , HP.style "min-width: 0;"
+              ]
               [ makeEditorToolbarButtonWithText
+                  state.showButtonText
                   Save
                   "bi-floppy"
                   (translate (label :: _ "editor_save") state.translator)
               , makeEditorToolbarButtonWithText
+                  state.showButtonText
                   RenderHTML
                   "bi-file-richtext"
                   (translate (label :: _ "editor_preview") state.translator)
               , makeEditorToolbarButtonWithText
+                  state.showButtonText
                   ShowAllComments
                   "bi-chat-square"
                   (translate (label :: _ "editor_allComments") state.translator)
@@ -259,6 +278,24 @@ editor docID = connect selectTranslator $ H.mkComponent
 
           -- Add some example text
           Document.setValue "" document
+
+      -- Setup ResizeObserver for the container element
+      H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \element -> do
+        { emitter, listener } <- H.liftEffect HS.create
+
+        -- Subscribe to resize events and store subscription for cleanup
+        subscription <- H.subscribe emitter
+        H.modify_ _ { resizeSubscription = Just subscription }
+
+        let
+          callback _ _ = do
+            -- Get the current width directly from the element
+            width <- offsetWidth element
+            HS.notify listener (HandleResize width)
+
+        observer <- H.liftEffect $ RO.resizeObserver callback
+        H.liftEffect $ RO.observe (toElement element) {} observer
+        H.modify_ _ { resizeObserver = Just observer }
 
     Bold -> do
       H.gets _.mEditor >>= traverse_ \ed ->
@@ -506,7 +543,29 @@ editor docID = connect selectTranslator $ H.mkComponent
             Just foundMarker -> H.raise
               (SelectedCommentSection tocEntry.id foundMarker.id)
 
-    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
+
+    HandleResize width -> do
+      -- Decides whether to show button text based on the width.
+      -- Because german labels are longer, we need to adjust the cutoff
+      -- threshold dynamically. Pretty sure this is not the best solution,
+      -- but it works.
+
+      lang <- liftEffect $ Store.loadLanguage
+      let cutoff = if lang == Just "de-DE" then 573.0 else 520.0
+
+      H.modify_ _ { showButtonText = width >= cutoff }
+
+    Finalize -> do
+      state <- H.get
+      -- Cleanup observer and subscription
+      H.liftEffect $ case state.resizeObserver of
+        Just obs -> RO.disconnect obs
+        Nothing -> pure unit
+      case state.resizeSubscription of
+        Just subscription -> H.unsubscribe subscription
+        Nothing -> pure unit
 
   handleQuery
     :: forall slots a
@@ -749,24 +808,26 @@ makeEditorToolbarButton tooltip action biName = HH.button
 
 -- Here, no tooltip is needed as the text is shown in the button
 makeEditorToolbarButtonWithText
-  :: forall m. Action -> String -> String -> H.ComponentHTML Action () m
-makeEditorToolbarButtonWithText action biName smallText = HH.button
-  [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
-  , HE.onClick \_ -> action
-  ]
-  [ HH.small_
-      [ HH.text smallText ]
-  , HH.i
-      [ HP.classes [ HB.ms1, HB.bi, H.ClassName biName ]
+  :: forall m. Boolean -> Action -> String -> String -> H.ComponentHTML Action () m
+makeEditorToolbarButtonWithText asText action biName smallText = HH.button
+  ( prependIf (not asText) (HP.title smallText)
+      [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
+      , HP.style "white-space: nowrap;"
+      , HE.onClick \_ -> action
       ]
-      []
-  ]
+  )
+  ( prependIf asText
+      (HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text smallText ])
+      [ HH.i
+          [ HP.classes [ HB.bi, H.ClassName biName ]
+          ]
+          []
+      ]
+  )
 
 buttonDivisor :: forall m. H.ComponentHTML Action () m
 buttonDivisor = HH.div
-  [ HP.classes [ HB.vr, HB.mx1 ]
-  , HP.style "height: 1.5rem"
-  ]
+  [ HP.classes [ HB.vr, HB.mx1 ] ]
   []
 
 -- TODO make this better

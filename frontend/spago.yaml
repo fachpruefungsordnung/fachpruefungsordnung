@@ -44,6 +44,7 @@ package:
     - web-events
     - web-file
     - web-html
+    - web-resize-observer
     - web-storage
     - web-uievents
   test:
