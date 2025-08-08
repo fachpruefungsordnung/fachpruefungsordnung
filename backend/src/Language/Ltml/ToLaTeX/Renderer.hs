@@ -39,7 +39,9 @@ renderLaTeX m = B.toLazyText . go 0
             <> renderOpts opts
             <> "\n"
             <> mconcat
-                ( map ((B.fromLazyText (LT.replicate (n + 1) "\t") <>) . (<> "\n") . go (n + 1)) body
+                ( map
+                    ((B.fromLazyText (LT.replicate (n + 1) "\t") <>) . (<> "\n") . go (n + 1))
+                    body
                 )
             <> B.fromLazyText (LT.replicate n "\t")
             <> "\\end{"

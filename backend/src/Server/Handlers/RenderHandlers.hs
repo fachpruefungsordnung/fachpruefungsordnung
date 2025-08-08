@@ -3,8 +3,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Server.Handlers.RenderHandlers (RenderAPI, renderServer, PDF, PDFByteString(..)) where
+module Server.Handlers.RenderHandlers (RenderAPI, renderServer, PDF, PDFByteString (..)) where
 
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Aeson (encode)
 import Data.ByteString.Lazy (ByteString)
 import qualified Data.ByteString.Lazy.Char8 as BS (pack)
@@ -16,6 +17,7 @@ import Data.OpenApi
     )
 import Data.Text (Text)
 import Language.Ltml.HTML.Pipeline (htmlPipeline)
+import Language.Ltml.ToLaTeX (generatePDFFromSuperSection)
 import Network.HTTP.Media.MediaType ((//))
 import Servant
 import Servant.Auth.Server
@@ -23,8 +25,6 @@ import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
 import Server.HandlerUtil
 import Prelude hiding (head, lines, unlines)
-import Language.Ltml.ToLaTeX (generatePDFFromSuperSection)
-import Control.Monad.IO.Class (MonadIO(liftIO))
 
 -- | Return type for rendered documents
 newtype DocByteString = DocByteString ByteString
@@ -38,16 +38,15 @@ newtype PDFByteString = PDFByteString ByteString
 instance ToSchema PDFByteString where
     declareNamedSchema _ = pure $ NamedSchema (Just "PDF BinaryString") binarySchema
 
-
-
 -- | API type for all render formats
 type RenderAPI =
     "render"
         :> ( "html" :> RenderRoute HTML
-        :<|> "plain" :> RenderRoute Plain
-        :<|> "pdf" :> Auth AuthMethod Auth.Token
-                   :> ReqBody '[JSON] Text
-                   :> Post '[PDF] PDFByteString
+                :<|> "plain" :> RenderRoute Plain
+                :<|> "pdf"
+                    :> Auth AuthMethod Auth.Token
+                    :> ReqBody '[JSON] Text
+                    :> Post '[PDF] PDFByteString
            )
 
 renderServer :: Server RenderAPI
@@ -103,6 +102,6 @@ renderPDFHandler
 renderPDFHandler (Authenticated _) input = do
     eAction <- liftIO $ generatePDFFromSuperSection input
     case eAction of
-        Left err -> throwError err500 { errBody = BS.pack err }
+        Left err -> throwError err500 {errBody = BS.pack err}
         Right pdf -> return $ PDFByteString pdf
 renderPDFHandler _ _ = throwError errNotLoggedIn

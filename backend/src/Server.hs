@@ -37,9 +37,9 @@ import Server.Handlers.AuthHandlers
 import Server.Handlers.DocsHandlers (DocsAPI, docsServer)
 import Server.Handlers.DocumentHandlers
 import Server.Handlers.GroupHandlers
+import Server.Handlers.RenderHandlers
 import Server.Handlers.RoleHandlers
 import Server.Handlers.UserHandlers
-import Server.Handlers.RenderHandlers
 import Prelude hiding (readFile)
 
 type DebugAPI =
