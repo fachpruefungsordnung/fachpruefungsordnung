@@ -98,6 +98,7 @@ type LiveMarker =
 data Output
   = ClickedQuery (Array String)
   | DeletedComment TOCEntry (Array Int)
+  | PostPDF String
   -- SavedSection toBePosted title TOCEntry
   | SavedSection Boolean String TOCEntry
   | SelectedCommentSection Int Int
@@ -118,6 +119,7 @@ data Action
   | Redo
   | Save
   | RenderHTML
+  | PDF
   | ShowAllComments
   | Receive (Connected FPOTranslator Unit)
   | HandleResize Number
@@ -236,6 +238,11 @@ editor docID = connect selectTranslator $ H.mkComponent
                   (translate (label :: _ "editor_preview") state.translator)
               , makeEditorToolbarButtonWithText
                   state.showButtonText
+                  PDF
+                  "bi-file-richtext"
+                  (translate (label :: _ "editor_pdf") state.translator)
+              , makeEditorToolbarButtonWithText
+                  state.showButtonText
                   ShowAllComments
                   "bi-chat-square"
                   (translate (label :: _ "editor_allComments") state.translator)
@@ -350,6 +357,17 @@ editor docID = connect selectTranslator $ H.mkComponent
     RenderHTML -> do
       _ <- handleQuery (QueryEditor unit)
       pure unit
+    
+    PDF -> do
+      allLines <- H.gets _.mEditor >>= traverse \ed -> do
+        H.liftEffect $ Editor.getSession ed
+          >>= Session.getDocument
+          >>= Document.getAllLines
+      let 
+        content = case allLines of
+          Nothing -> ""
+          Just ls -> intercalate "\n" ls
+      H.raise (PostPDF content)
 
     ShowAllComments -> do
       H.raise ShowAllCommentsOutput
@@ -369,6 +387,7 @@ editor docID = connect selectTranslator $ H.mkComponent
         -- Save the current content of the editor and send it to the server
         case state.mContent of
           Nothing -> pure unit
+          -- only use content to get its parent
           Just content -> do
             allLines <- H.gets _.mEditor >>= traverse \ed -> do
               H.liftEffect $ Editor.getSession ed

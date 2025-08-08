@@ -51,6 +51,9 @@ import Web.HTML as Web.HTML
 import Web.HTML.Window as Web.HTML.Window
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 
+import Effect.Console (log)
+import Data.Argonaut.Encode (encodeJson)
+
 data DragTarget = ResizeLeft | ResizeRight
 
 derive instance eqDragTarget :: Eq DragTarget
@@ -454,6 +457,21 @@ splitview docID = H.mkComponent
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
 
+    Init -> do
+      let timeFormatter = head timeStampsVersions
+      H.modify_ \st -> do
+        st { mTimeFormatter = timeFormatter }
+      H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
+      H.tell _commentOverview unit
+        (CommentOverview.ReceiveTimeFormatter timeFormatter)
+      H.tell _toc unit (TOC.ReceiveTOCs Empty)
+      -- Load the initial TOC entries into the editor
+      -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
+      -- or rather, we don't use commit anymore in the API
+      handleAction GET
+
+    -- API Actions
+
     POST -> do
       state <- H.get
       let
@@ -487,18 +505,6 @@ splitview docID = H.mkComponent
 
       H.modify_ _ { tocEntries = finalTree }
       H.tell _toc unit (TOC.ReceiveTOCs finalTree)
-    Init -> do
-      let timeFormatter = head timeStampsVersions
-      H.modify_ \st -> do
-        st { mTimeFormatter = timeFormatter }
-      H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
-      H.tell _commentOverview unit
-        (CommentOverview.ReceiveTimeFormatter timeFormatter)
-      H.tell _toc unit (TOC.ReceiveTOCs Empty)
-      -- Load the initial TOC entries into the editor
-      -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
-      -- or rather, we don't use commit anymore in the API
-      handleAction GET
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -696,6 +702,13 @@ splitview docID = H.mkComponent
                 map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
             }
         H.tell _comment unit (Comment.DeletedComment tocEntry.id deletedIDs)
+
+      Editor.PostPDF content -> do
+        rep <- H.liftAff $
+          Request.postString "/documents/render/pdf" (encodeJson content)
+        case rep of
+          Left err -> H.liftEffect $ log $ Request.printError "pdf" err
+          Right out -> H.liftEffect $ log $ "PDF rendered successfully: " <> out.body
 
       Editor.SavedSection toBePosted title tocEntry -> do
         state <- H.get
