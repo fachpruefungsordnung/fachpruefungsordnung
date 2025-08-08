@@ -10,7 +10,7 @@ import Data.Text (Text)
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.IO as LTIO
 import Data.Void (Void)
-import Language.Lsd.Example.Fpo (superSectionT, sectionT)
+import Language.Lsd.Example.Fpo (sectionT, superSectionT)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX.Format (staticDocumentFormat)
 import Language.Ltml.ToLaTeX.GlobalState (GlobalState (GlobalState, labelToRef))

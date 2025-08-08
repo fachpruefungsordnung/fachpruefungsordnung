@@ -50,7 +50,8 @@ type RenderAPI =
            )
 
 renderServer :: Server RenderAPI
-renderServer = renderHandler htmlPipeline :<|> renderHandler renderPlain :<|> renderPDFHandler
+renderServer =
+    renderHandler htmlPipeline :<|> renderHandler renderPlain :<|> renderPDFHandler
 
 -- | Format type for HTML
 data HTML
