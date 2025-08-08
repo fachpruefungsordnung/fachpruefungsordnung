@@ -102,6 +102,6 @@ renderPDFHandler
 renderPDFHandler (Authenticated _) input = do
     eAction <- liftIO $ generatePDFFromSuperSection input
     case eAction of
-        Left err -> throwError err500 {errBody = BS.pack err}
+        Left err -> throwError err400 {errBody = BS.pack err}
         Right pdf -> return $ PDFByteString pdf
 renderPDFHandler _ _ = throwError errNotLoggedIn
