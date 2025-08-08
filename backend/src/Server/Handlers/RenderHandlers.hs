@@ -17,7 +17,7 @@ import Data.OpenApi
     )
 import Data.Text (Text)
 import Language.Ltml.HTML.Pipeline (htmlPipeline)
-import Language.Ltml.ToLaTeX (generatePDFFromSuperSection)
+import Language.Ltml.ToLaTeX (generatePDFFromSection)
 import Network.HTTP.Media.MediaType ((//))
 import Servant
 import Servant.Auth.Server
@@ -50,7 +50,7 @@ type RenderAPI =
            )
 
 renderServer :: Server RenderAPI
-renderServer = renderHandler renderHTML :<|> renderHandler renderPlain :<|> renderPDFHandler
+renderServer = renderHandler htmlPipeline :<|> renderHandler renderPlain :<|> renderPDFHandler
 
 -- | Format type for HTML
 data HTML
@@ -100,7 +100,7 @@ renderHandler _ _ _ = throwError errNotLoggedIn
 renderPDFHandler
     :: AuthResult Auth.Token -> Text -> Handler PDFByteString
 renderPDFHandler (Authenticated _) input = do
-    eAction <- liftIO $ generatePDFFromSuperSection input
+    eAction <- liftIO $ generatePDFFromSection input
     case eAction of
         Left err -> throwError err400 {errBody = BS.pack err}
         Right pdf -> return $ PDFByteString pdf

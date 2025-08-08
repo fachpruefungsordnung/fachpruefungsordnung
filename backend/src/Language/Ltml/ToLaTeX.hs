@@ -1,5 +1,6 @@
 module Language.Ltml.ToLaTeX
-    ( generatePDFFromSuperSection
+    ( generatePDFFromSection
+    , generatePDFFromSuperSection
     --   generatePDFFromDocument
     ) where
 
@@ -9,7 +10,7 @@ import Data.Text (Text)
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.IO as LTIO
 import Data.Void (Void)
-import Language.Lsd.Example.Fpo (superSectionT)
+import Language.Lsd.Example.Fpo (superSectionT, sectionT)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX.Format (staticDocumentFormat)
 import Language.Ltml.ToLaTeX.GlobalState (GlobalState (GlobalState, labelToRef))
@@ -84,7 +85,14 @@ generatePDFFromSuperSection =
         let (latexSection, gs) = runState (toLaTeXM sec) initialGlobalState
          in renderLaTeX (labelToRef gs) (staticDocumentFormat <> document latexSection)
 
--- -- | TODO: what to do with auxiliary files and multiple requests in case of asynchronicity
+generatePDFFromSection :: Text -> IO (Either String BS.ByteString)
+generatePDFFromSection =
+    generatePDFfromParsed (sectionP sectionT empty) sectionToText
+  where
+    sectionToText sec =
+        let (latexSection, gs) = runState (toLaTeXM sec) initialGlobalState
+         in renderLaTeX (labelToRef gs) (staticDocumentFormat <> document latexSection)
+
 -- mkPDF :: FilePath -> IO (Either String BS.ByteString)
 -- mkPDF filename = do
 --     let
