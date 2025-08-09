@@ -28,7 +28,9 @@ import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
+import Effect.Aff (Fiber, Milliseconds(..), delay, error, forkAff, killFiber)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class as EC
 import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
@@ -69,7 +71,12 @@ import Simple.I18n.Translator (label, translate)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element (toEventTarget)
 import Web.Event.Event (EventType(..), preventDefault)
-import Web.Event.EventTarget (EventListener, addEventListener, eventListener, removeEventListener)
+import Web.Event.EventTarget
+  ( EventListener
+  , addEventListener
+  , eventListener
+  , removeEventListener
+  )
 import Web.HTML (window)
 import Web.HTML.HTMLElement (offsetWidth, toElement)
 import Web.HTML.Window as Win
@@ -83,12 +90,16 @@ type State = FPOState
   , mContent :: Maybe Content
   , liveMarkers :: Array LiveMarker
   , fontSize :: Int
+  , mListener :: Maybe (HS.Listener Action)
   , resizeObserver :: Maybe RO.ResizeObserver
   , resizeSubscription :: Maybe SubscriptionId
   , showButtonText :: Boolean
   -- for saving when closing window
-  , dirtyRef :: Maybe (Ref Boolean)
-  , beforeUnload :: Maybe EventListener
+  , mDirtyRef :: Maybe (Ref Boolean)
+  , mBeforeUnload :: Maybe EventListener
+  -- for periodically saving the content
+  , mPendingDebounce :: Maybe (Fiber Unit) -- 2s-Timer
+  , mPendingMaxWait :: Maybe (Fiber Unit) -- 20s-Max-Timer
   )
 
 -- For tracking the comment markers live
@@ -126,6 +137,8 @@ data Action
   | ShowAllComments
   | Receive (Connected FPOTranslator Unit)
   | HandleResize Number
+  | AutoSaveTimer -- new change in editor -> reset timer
+  | AutoSave -- save now
   | Finalize
 
 -- We use a query to get the content of the editor
@@ -165,11 +178,14 @@ editor docID = connect selectTranslator $ H.mkComponent
     , mTocEntry: Nothing
     , mContent: Nothing
     , fontSize: 12
+    , mListener: Nothing
     , resizeObserver: Nothing
     , resizeSubscription: Nothing
     , showButtonText: true
-    , dirtyRef: Nothing
-    , beforeUnload: Nothing
+    , mDirtyRef: Nothing
+    , mBeforeUnload: Nothing
+    , mPendingDebounce: Nothing
+    , mPendingMaxWait: Nothing
     }
 
   render :: State -> H.ComponentHTML Action () m
@@ -262,6 +278,7 @@ editor docID = connect selectTranslator $ H.mkComponent
     Init -> do
       -- create subscription for later use
       { emitter, listener } <- H.liftEffect HS.create
+      H.modify_ _ { mListener = Just listener }
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
 
@@ -284,15 +301,16 @@ editor docID = connect selectTranslator $ H.mkComponent
       -- New Ref for keeping track, if the content in editor has changed
       -- since last save
       dref <- H.liftEffect $ Ref.new false
-      H.modify_ _ { dirtyRef = Just dref }
+      H.modify_ _ { mDirtyRef = Just dref }
 
       -- add and start Editor change listener
       H.gets _.mEditor >>= traverse_ \ed ->
-        H.liftEffect $ addChangeListenerWithRef ed dref
-      
+        H.liftEffect $ addChangeListenerWithRef ed dref listener
+
       win <- H.liftEffect window
-      let 
+      let
         winTarget = Win.toEventTarget win
+
         -- creating EventTypes
         beforeunload :: EventType
         beforeunload = EventType "beforeunload"
@@ -306,8 +324,8 @@ editor docID = connect selectTranslator $ H.mkComponent
           Just true -> do
             preventDefault ev
             HS.notify listener Save
-          _         -> pure unit
-      H.modify_ _ { beforeUnload = Just buL }
+          _ -> pure unit
+      H.modify_ _ { mBeforeUnload = Just buL }
       H.liftEffect $ addEventListener beforeunload buL false winTarget
 
       -- Setup ResizeObserver for the container element
@@ -461,8 +479,8 @@ editor docID = connect selectTranslator $ H.mkComponent
             -- Update the tree to backend, when title was really changed
             H.raise (SavedSection (oldTitle /= title) title newEntry)
 
-            -- dirtyRef := false
-            for_ state.dirtyRef \r -> H.liftEffect $ Ref.write false r
+            -- mDirtyRef := false
+            for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
             pure unit
       else
         pure unit
@@ -590,11 +608,62 @@ editor docID = connect selectTranslator $ H.mkComponent
 
       H.modify_ _ { showButtonText = width >= cutoff }
 
+    AutoSaveTimer -> do
+      state <- H.get
+      -- restart 2 sec timer after every new input
+      -- first kill the maybe running fiber (kinda like a thread)
+      for_ state.mPendingDebounce \f -> H.liftAff $ killFiber (error "debounce reset")
+        f
+      -- start a new fiber
+      dFib <- H.liftAff $ forkAff do
+        delay (Milliseconds 2000.0)
+        isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
+          Just r -> pure r
+          Nothing -> EC.liftEffect $ Ref.new false
+        case state.mListener of
+          Just listener -> do
+            -- since we are in Aff, we cannot use handleAction
+            when isDirty $ EC.liftEffect $ HS.notify listener AutoSave
+          Nothing -> pure unit
+      H.modify_ _ { mPendingDebounce = Just dFib }
+
+      -- This is a seperate 20 sec timer, which forces to save, in case of a long edit
+      -- does not reset with new input
+      case state.mPendingMaxWait of
+        -- timer already running
+        Just _ -> pure unit
+        -- no timer there
+        Nothing -> do
+          mFib <- H.liftAff $ forkAff do
+            delay (Milliseconds 20000.0)
+            isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
+              Just r -> pure r
+              Nothing -> EC.liftEffect $ Ref.new false
+            case state.mListener of
+              Just listener -> do
+                when isDirty $ EC.liftEffect $ HS.notify listener AutoSave
+              Nothing -> pure unit
+          H.modify_ _ { mPendingMaxWait = Just mFib }
+
+    AutoSave -> do
+      -- only save, if dirty
+      isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.mDirtyRef
+      when isDirty do
+        handleAction Save
+        -- after Save: dirty false + stop timer
+        mRef <- H.gets _.mDirtyRef
+        for_ mRef \r -> H.liftEffect $ Ref.write false r
+        st <- H.get
+        for_ st.mPendingDebounce (H.liftAff <<< killFiber (error "done"))
+        for_ st.mPendingMaxWait (H.liftAff <<< killFiber (error "done"))
+        H.modify_ _ { mPendingDebounce = Nothing, mPendingMaxWait = Nothing }
+
     Finalize -> do
       state <- H.get
       win <- H.liftEffect window
-      let 
+      let
         tgt = Win.toEventTarget win
+
         beforeunload :: EventType
         beforeunload = EventType "beforeunload"
       -- Cleanup observer and subscription
@@ -604,9 +673,11 @@ editor docID = connect selectTranslator $ H.mkComponent
       case state.resizeSubscription of
         Just subscription -> H.unsubscribe subscription
         Nothing -> pure unit
-      case state.beforeUnload of
+      case state.mBeforeUnload of
         Just l -> H.liftEffect $ removeEventListener beforeunload l false tgt
-        _      -> pure unit
+        _ -> pure unit
+      for_ state.mPendingDebounce (H.liftAff <<< killFiber (error "finalize"))
+      for_ state.mPendingMaxWait (H.liftAff <<< killFiber (error "finalize"))
 
   handleQuery
     :: forall slots a
@@ -620,7 +691,7 @@ editor docID = connect selectTranslator $ H.mkComponent
 
       -- Put the content of the section into the editor and update markers
       H.gets _.mEditor >>= traverse_ \ed -> do
-        
+
         -- Get the content from server here
         -- We need Aff for that and thus cannot go inside Eff
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
@@ -669,7 +740,7 @@ editor docID = connect selectTranslator $ H.mkComponent
           st { liveMarkers = newLiveMarkers }
       -- reset Ref, because loading new content is considered 
       -- changing the existing content, which would set the flag
-      for_ state.dirtyRef \r -> H.liftEffect $ Ref.write false r
+      for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
       pure (Just a)
 
     SaveSection a -> do
@@ -704,27 +775,33 @@ editor docID = connect selectTranslator $ H.mkComponent
 --   For now, it puts "  " in front of "#", if it is placed at the
 --   beginning of a line
 --  Update: it also detects, when content is changed and set dref flag
-addChangeListenerWithRef :: Types.Editor -> Ref Boolean -> Effect Unit
-addChangeListenerWithRef editor_ dref = do
+addChangeListenerWithRef
+  :: Types.Editor
+  -> Ref Boolean
+  -> HS.Listener Action
+  -> Effect Unit
+addChangeListenerWithRef editor_ dref listener = do
   session <- Editor.getSession editor_
   -- in order to prevent an ifinite loop with this listener
   guardRef <- Ref.new false
-  Session.onChange session \(Types.DocumentEvent { action, start, end: _, lines }) -> do
-    -- set dirty flag
-    Ref.write true dref
+  Session.onChange session \(Types.DocumentEvent { action, start, end: _, lines }) ->
+    do
+      -- set dirty flag
+      Ref.write true dref
+      HS.notify listener AutoSaveTimer
 
-    -- '#' → '  #' at beginning of a line with Reentrancy-Guard
-    let isInsert = (unsafeCoerce action :: String) == "insert"
-    when isInsert do
-      let sCol = Types.getColumn start
-      when (sCol == 0 && lines == ["#"]) do
-        busy <- Ref.read guardRef
-        when (not busy) do
-          Ref.write true guardRef
-          let sRow = Types.getRow start
-          range <- Range.create sRow sCol sRow (sCol + 1)
-          Session.replace range "  #" session
-          Ref.write false guardRef
+      -- '#' → '  #' at beginning of a line with Reentrancy-Guard
+      let isInsert = (unsafeCoerce action :: String) == "insert"
+      when isInsert do
+        let sCol = Types.getColumn start
+        when (sCol == 0 && lines == [ "#" ]) do
+          busy <- Ref.read guardRef
+          when (not busy) do
+            Ref.write true guardRef
+            let sRow = Types.getRow start
+            range <- Range.create sRow sCol sRow (sCol + 1)
+            Session.replace range "  #" session
+            Ref.write false guardRef
 
 -- | Helper function to find all indices of a substring in a string
 --   in reverse order.
