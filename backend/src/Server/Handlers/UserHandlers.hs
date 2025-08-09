@@ -231,7 +231,9 @@ patchUserHandler (Authenticated Auth.Token {..}) userID (Auth.UserUpdate {..}) =
                 case eUser of
                     Left _ -> throwError errDatabaseAccessFailed
                     Right Nothing -> patchUser conn
-                    Right _ -> throwError errEmailAlreadyUsed
+                    Right (Just user)
+                        | User.userID user == userID -> patchUser conn
+                        | otherwise -> throwError errEmailAlreadyUsed
         else
             throwError errSuperAdminOnly
   where
