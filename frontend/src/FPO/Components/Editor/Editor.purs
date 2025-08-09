@@ -5,7 +5,6 @@ module FPO.Components.Editor
   , State
   , LiveMarker
   , addAnnotation
-  , addChangeListener
   , editor
   , findAllIndicesOf
   ) where
@@ -69,8 +68,11 @@ import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element (toEventTarget)
-import Web.Event.EventTarget (addEventListener, eventListener)
+import Web.Event.Event (EventType(..), preventDefault)
+import Web.Event.EventTarget (EventListener, addEventListener, eventListener, removeEventListener)
+import Web.HTML (window)
 import Web.HTML.HTMLElement (offsetWidth, toElement)
+import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
@@ -84,6 +86,9 @@ type State = FPOState
   , resizeObserver :: Maybe RO.ResizeObserver
   , resizeSubscription :: Maybe SubscriptionId
   , showButtonText :: Boolean
+  -- for saving when closing window
+  , dirtyRef :: Maybe (Ref Boolean)
+  , beforeUnload :: Maybe EventListener
   )
 
 -- For tracking the comment markers live
@@ -163,6 +168,8 @@ editor docID = connect selectTranslator $ H.mkComponent
     , resizeObserver: Nothing
     , resizeSubscription: Nothing
     , showButtonText: true
+    , dirtyRef: Nothing
+    , beforeUnload: Nothing
     }
 
   render :: State -> H.ComponentHTML Action () m
@@ -253,35 +260,58 @@ editor docID = connect selectTranslator $ H.mkComponent
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
     Init -> do
-      state <- H.get
+      -- create subscription for later use
+      { emitter, listener } <- H.liftEffect HS.create
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
 
         H.modify_ _ { mEditor = Just editor_ }
+        fontSize <- H.gets _.fontSize
 
         H.liftEffect $ do
-          Editor.setFontSize (show state.fontSize <> "px") editor_
+          Editor.setFontSize (show fontSize <> "px") editor_
           eventListen <- eventListener (keyBinding editor_)
           container <- Editor.getContainer editor_
           addEventListener keydown eventListen true
             (toEventTarget $ toElement container)
           session <- Editor.getSession editor_
-          document <- Session.getDocument session
 
           -- Set the editor's theme and mode
           Editor.setTheme "ace/theme/github" editor_
           Session.setMode "ace/mode/custom_mode" session
           Editor.setEnableLiveAutocompletion true editor_
 
-          -- Add a change listener to the editor
-          addChangeListener editor_
+      -- New Ref for keeping track, if the content in editor has changed
+      -- since last save
+      dref <- H.liftEffect $ Ref.new false
+      H.modify_ _ { dirtyRef = Just dref }
 
-          -- Add some example text
-          Document.setValue "" document
+      -- add and start Editor change listener
+      H.gets _.mEditor >>= traverse_ \ed ->
+        H.liftEffect $ addChangeListenerWithRef ed dref
+      
+      win <- H.liftEffect window
+      let 
+        winTarget = Win.toEventTarget win
+        -- creating EventTypes
+        beforeunload :: EventType
+        beforeunload = EventType "beforeunload"
+
+      -- create eventListener for preventing the tab from closing
+      -- when content has not been saved (Not changing through Navbar)
+      buL <- H.liftEffect $ eventListener \ev -> do
+        readRef <- traverse Ref.read (Just dref) -- dref ist da; zur Not: Maybe-handling
+        case readRef of
+          -- Prevent the tab from closing in a certain way
+          Just true -> do
+            preventDefault ev
+            HS.notify listener Save
+          _         -> pure unit
+      H.modify_ _ { beforeUnload = Just buL }
+      H.liftEffect $ addEventListener beforeunload buL false winTarget
 
       -- Setup ResizeObserver for the container element
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \element -> do
-        { emitter, listener } <- H.liftEffect HS.create
 
         -- Subscribe to resize events and store subscription for cleanup
         subscription <- H.subscribe emitter
@@ -430,6 +460,9 @@ editor docID = connect selectTranslator $ H.mkComponent
               }
             -- Update the tree to backend, when title was really changed
             H.raise (SavedSection (oldTitle /= title) title newEntry)
+
+            -- dirtyRef := false
+            for_ state.dirtyRef \r -> H.liftEffect $ Ref.write false r
             pure unit
       else
         pure unit
@@ -559,6 +592,11 @@ editor docID = connect selectTranslator $ H.mkComponent
 
     Finalize -> do
       state <- H.get
+      win <- H.liftEffect window
+      let 
+        tgt = Win.toEventTarget win
+        beforeunload :: EventType
+        beforeunload = EventType "beforeunload"
       -- Cleanup observer and subscription
       H.liftEffect $ case state.resizeObserver of
         Just obs -> RO.disconnect obs
@@ -566,6 +604,9 @@ editor docID = connect selectTranslator $ H.mkComponent
       case state.resizeSubscription of
         Just subscription -> H.unsubscribe subscription
         Nothing -> pure unit
+      case state.beforeUnload of
+        Just l -> H.liftEffect $ removeEventListener beforeunload l false tgt
+        _      -> pure unit
 
   handleQuery
     :: forall slots a
@@ -575,11 +616,11 @@ editor docID = connect selectTranslator $ H.mkComponent
 
     ChangeSection title entry a -> do
       H.modify_ \state -> state { mTocEntry = Just entry, title = title }
+      state <- H.get
 
       -- Put the content of the section into the editor and update markers
       H.gets _.mEditor >>= traverse_ \ed -> do
-        state <- H.get
-
+        
         -- Get the content from server here
         -- We need Aff for that and thus cannot go inside Eff
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
@@ -626,7 +667,9 @@ editor docID = connect selectTranslator $ H.mkComponent
         -- Update state with new marker IDs
         H.modify_ \st ->
           st { liveMarkers = newLiveMarkers }
-
+      -- reset Ref, because loading new content is considered 
+      -- changing the existing content, which would set the flag
+      for_ state.dirtyRef \r -> H.liftEffect $ Ref.write false r
       pure (Just a)
 
     SaveSection a -> do
@@ -660,22 +703,28 @@ editor docID = connect selectTranslator $ H.mkComponent
 --   linting, code completion, etc.
 --   For now, it puts "  " in front of "#", if it is placed at the
 --   beginning of a line
-addChangeListener :: Types.Editor -> Effect Unit
-addChangeListener editor_ = do
+--  Update: it also detects, when content is changed and set dref flag
+addChangeListenerWithRef :: Types.Editor -> Ref Boolean -> Effect Unit
+addChangeListenerWithRef editor_ dref = do
   session <- Editor.getSession editor_
-  -- Setup change listener to react to changes in the editor
-  Session.onChange session \(Types.DocumentEvent { action, start, end: _, lines }) ->
-    do
-      -- Types.showDocumentEventType action does not work and using case of
-      -- data DocumentEventType = Insert | Remove does also not work
-      when ((unsafeCoerce action :: String) == "insert") do
-        let
-          sCol = Types.getColumn start
-        when (sCol == 0 && lines == [ "#" ]) do
-          let
-            sRow = Types.getRow start
+  -- in order to prevent an ifinite loop with this listener
+  guardRef <- Ref.new false
+  Session.onChange session \(Types.DocumentEvent { action, start, end: _, lines }) -> do
+    -- set dirty flag
+    Ref.write true dref
+
+    -- '#' → '  #' at beginning of a line with Reentrancy-Guard
+    let isInsert = (unsafeCoerce action :: String) == "insert"
+    when isInsert do
+      let sCol = Types.getColumn start
+      when (sCol == 0 && lines == ["#"]) do
+        busy <- Ref.read guardRef
+        when (not busy) do
+          Ref.write true guardRef
+          let sRow = Types.getRow start
           range <- Range.create sRow sCol sRow (sCol + 1)
           Session.replace range "  #" session
+          Ref.write false guardRef
 
 -- | Helper function to find all indices of a substring in a string
 --   in reverse order.
