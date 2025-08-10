@@ -88,6 +88,8 @@ instance ToHtmlM Heading where
     toHtmlM (Heading format textTree) = do
         headingTextHtml <- toHtmlM textTree
         readerState <- ask
+        -- TODO: replace h4 with custom css class. h4 may be styled from other
+        --       stylesheet and influence the document from outside
         return
             ( (h4_ <#> Class.Heading)
                 . headingFormat format (currentSectionIDHtml readerState)

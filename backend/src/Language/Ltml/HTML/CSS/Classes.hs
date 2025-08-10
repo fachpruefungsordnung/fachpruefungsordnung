@@ -51,6 +51,7 @@ classStyle :: Class -> Css
 classStyle Document =
     toClassSelector Document ? do
         fontFamily ["Arial"] [sansSerif]
+        lineHeight (unitless 1.5)
         marginLeft (em 2)
         marginRight (em 2)
 classStyle Section =
