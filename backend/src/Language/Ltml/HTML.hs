@@ -110,7 +110,7 @@ instance ToHtmlM (Node Paragraph) where
                     div_ [cssClass_ Class.Paragraph, mId_ mLabel]
                         -- \| If this is the only paragraph inside this section we drop the visible paragraphID
                         <$> let idHtml = if isSingleParagraph readerState then mempty else paragraphIDHtml
-                             in return (div_ <#> Class.ParagraphID $ idHtml) <> div_ <#> Class.ParagraphText
+                             in return (div_ <#> Class.ParagraphID $ idHtml) <> div_ <#> Class.TextContainer
                                     <$> childText
 
 instance
@@ -125,7 +125,7 @@ instance
             case lookup (unLabel label) $ labels globalState of
                 -- \| Label was not found in GlobalState and a red error is emitted
                 Nothing ->
-                    b_ <#> Class.FontRed $
+                    span_ <#> Class.InlineError $
                         toHtml (("Error: Label \"" <> unLabel label <> "\" not found!") :: Text)
                 Just labelHtml -> labelWrapperFunc globalState label labelHtml
         Styled style textTrees -> do
@@ -134,7 +134,7 @@ instance
         Enum enum -> toHtmlM enum
         Footnote _ ->
             returnNow $
-                b_ <#> Class.FontRed $
+                span_ <#> Class.InlineError $
                     toHtml ("Error: FootNotes not supported yet" :: Text)
 
 -- | Increment sentence counter and add Label to GlobalState, if there is one
@@ -176,7 +176,7 @@ instance ToHtmlM (Node EnumItem) where
         enumItemHtml <- toHtmlM textTrees
         -- \| Increment enumItemID for next enumItem
         modify (\s -> s {currentEnumItemID = enumItemID + 1})
-        return $ span_ [cssClass_ Class.EnumItem, mId_ mLabel] <$> enumItemHtml
+        return $ div_ [cssClass_ Class.TextContainer, mId_ mLabel] <$> enumItemHtml
 
 instance (ToHtmlM a) => ToHtmlM [a] where
     toHtmlM [] = returnNow mempty

@@ -30,14 +30,12 @@ data Class
       Paragraph
     | -- | Class for aligning a paragraph id div inside of a paragraph div
       ParagraphID
-    | -- | Class for aligning the text inside a paragraph
-      ParagraphText
-    | -- | Class for aligning and spacing an enum item inside an enumeration
-      EnumItem
+    | -- | Text container which spaces text with elements in it (e.g. enumerations)
+      TextContainer
     | -- | Underlining basic text
       Underlined
-    | -- | Font color red
-      FontRed
+    | -- | Class which inlines a red bold error text
+      InlineError
     | -- | Enum with 1., 2., 3., ...
       EnumNum
     | -- | Enum with a), b), c), ...
@@ -57,7 +55,10 @@ classStyle Document =
         marginRight (em 2)
 classStyle Section =
     toClassSelector Section ? do
-        display block
+        display flex
+        flexDirection column
+        -- \| gap between paragraphs
+        gap (em 1)
         marginTop (em 2)
 classStyle Heading =
     toClassSelector Heading ? do
@@ -67,13 +68,21 @@ classStyle Heading =
 classStyle Paragraph =
     toClassSelector Paragraph ? do
         display flex
-        marginTop (em 1)
-        marginBottom (em 1)
 classStyle ParagraphID = toClassSelector ParagraphID ? Flexbox.flex 0 0 (em 2)
-classStyle ParagraphText = toClassSelector ParagraphText ? textAlign justify
-classStyle EnumItem = mempty
+classStyle TextContainer =
+    toClassSelector TextContainer ? do
+        display flex
+        flexDirection column
+        -- \| gap between text and enumerations
+        gap (em 0.5)
+        textAlign justify
 classStyle Underlined = toClassSelector Underlined ? textDecoration underline
-classStyle FontRed = toClassSelector FontRed ? fontColor red
+classStyle InlineError =
+    toClassSelector InlineError ? do
+        -- \| inlines content in flex environment
+        display displayContents
+        fontColor red
+        fontWeight bold
 classStyle EnumNum =
     enumCounter
         (className EnumNum)
@@ -123,7 +132,12 @@ enumCounter enumClassName counterContent = do
         marginLeft (em 0)
         paddingLeft (em 0)
         marginTop (em 0)
-        marginBottom (em 0.5)
+        marginBottom (em 0)
+        -- \| enums items are also spaced via flex environment
+        display flex
+        flexDirection column
+        -- \| gap between two enum items
+        gap (em 0.5)
 
     -- TODO: fix to much vertical space if a paragraph ends with
     --       an ol (ol and paragraph bottom margins add up)
@@ -137,8 +151,10 @@ enumCounter enumClassName counterContent = do
         counterIncrement "item"
         display grid
         gridTemplateColumns [ch 3, fr 1]
+        -- \| gap between enum item id and enum text
         gap (em 0.5)
-        marginTop (em 0.5)
+        marginTop (em 0)
+        marginBottom (em 0)
 
     ol # byClass enumClassName |> li ? before & do
         counter counterContent

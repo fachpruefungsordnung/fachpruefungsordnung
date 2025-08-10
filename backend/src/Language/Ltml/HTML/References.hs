@@ -38,7 +38,7 @@ genReference ref = do
              in case mParagraphIDText of
                     Nothing ->
                         return $
-                            b_ <#> Class.FontRed $
+                            span_ <#> Class.InlineError $
                                 "Error: Labeled paragraph does not have any identifier!"
                     Just paragraphIDHtml -> do
                         return paragraphIDHtml
@@ -54,7 +54,7 @@ genReference ref = do
                         (Class.enumLevel (enumNestingLvl - 1))
                         (currentEnumItemID globalState)
 
--- TODO: define Trie Map in GlobalState to track label references
+-- TODO: Maybe? define Trie Map in GlobalState to track label references
 
 -- | If (Just label): generates reference String as Html and adds (Label, Html) pair to GlobalState;
 --   else: does nothing;

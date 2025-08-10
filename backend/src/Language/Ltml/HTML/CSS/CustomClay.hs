@@ -9,6 +9,7 @@ module Language.Ltml.HTML.CSS.CustomClay
     , counterReset
     , counterIncrement
     , alignRight
+    , displayContents
     , gap
     ) where
 
@@ -45,6 +46,9 @@ instance Semigroup Counter where
 
 alignRight :: TextAlign
 alignRight = other "right"
+
+displayContents :: Display
+displayContents = other "contents"
 
 -------------------------------------------------------------------------------
 
