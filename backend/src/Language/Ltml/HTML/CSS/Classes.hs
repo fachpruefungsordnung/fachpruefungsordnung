@@ -139,14 +139,6 @@ enumCounter enumClassName counterContent = do
         -- \| gap between two enum items
         gap (em 0.5)
 
-    -- TODO: fix to much vertical space if a paragraph ends with
-    --       an ol (ol and paragraph bottom margins add up)
-
-    -- This could fix it but if raw text follows the ol it does not work,
-    -- unless the text is wrapped in a span
-    -- toClassSelector ParagraphText |> ol # byClass enumClassName ? lastChild & do
-    --     marginBottom (em 0)
-
     ol # byClass enumClassName |> li ? do
         counterIncrement "item"
         display grid
