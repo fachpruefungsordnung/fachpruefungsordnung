@@ -96,7 +96,7 @@ type State = FPOState
   , showButtonText :: Boolean
   -- for saving when closing window
   , mDirtyRef :: Maybe (Ref Boolean)
-  , mBeforeUnload :: Maybe EventListener
+  , mBeforeUnloadL :: Maybe EventListener
   -- for periodically saving the content
   , mPendingDebounce :: Maybe (Fiber Unit) -- 2s-Timer
   , mPendingMaxWait :: Maybe (Fiber Unit) -- 20s-Max-Timer
@@ -183,7 +183,7 @@ editor docID = connect selectTranslator $ H.mkComponent
     , resizeSubscription: Nothing
     , showButtonText: true
     , mDirtyRef: Nothing
-    , mBeforeUnload: Nothing
+    , mBeforeUnloadL: Nothing
     , mPendingDebounce: Nothing
     , mPendingMaxWait: Nothing
     }
@@ -279,6 +279,9 @@ editor docID = connect selectTranslator $ H.mkComponent
       -- create subscription for later use
       { emitter, listener } <- H.liftEffect HS.create
       H.modify_ _ { mListener = Just listener }
+      -- Subscribe to resize events and store subscription for cleanup
+      subscription <- H.subscribe emitter
+      H.modify_ _ { resizeSubscription = Just subscription }
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
 
@@ -310,9 +313,7 @@ editor docID = connect selectTranslator $ H.mkComponent
       win <- H.liftEffect window
       let
         winTarget = Win.toEventTarget win
-
         -- creating EventTypes
-        beforeunload :: EventType
         beforeunload = EventType "beforeunload"
 
       -- create eventListener for preventing the tab from closing
@@ -325,15 +326,11 @@ editor docID = connect selectTranslator $ H.mkComponent
             preventDefault ev
             HS.notify listener Save
           _ -> pure unit
-      H.modify_ _ { mBeforeUnload = Just buL }
+      H.modify_ _ { mBeforeUnloadL = Just buL }
       H.liftEffect $ addEventListener beforeunload buL false winTarget
 
       -- Setup ResizeObserver for the container element
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \element -> do
-
-        -- Subscribe to resize events and store subscription for cleanup
-        subscription <- H.subscribe emitter
-        H.modify_ _ { resizeSubscription = Just subscription }
 
         let
           callback _ _ = do
@@ -663,8 +660,6 @@ editor docID = connect selectTranslator $ H.mkComponent
       win <- H.liftEffect window
       let
         tgt = Win.toEventTarget win
-
-        beforeunload :: EventType
         beforeunload = EventType "beforeunload"
       -- Cleanup observer and subscription
       H.liftEffect $ case state.resizeObserver of
@@ -673,7 +668,7 @@ editor docID = connect selectTranslator $ H.mkComponent
       case state.resizeSubscription of
         Just subscription -> H.unsubscribe subscription
         Nothing -> pure unit
-      case state.mBeforeUnload of
+      case state.mBeforeUnloadL of
         Just l -> H.liftEffect $ removeEventListener beforeunload l false tgt
         _ -> pure unit
       for_ state.mPendingDebounce (H.liftAff <<< killFiber (error "finalize"))
