@@ -276,7 +276,7 @@ getDocuments =
     rmap
         (uncurryDocument <$>)
         [vectorStatement|
-            SELECT
+            SELECT DISTINCT
                 d.id :: int4,
                 d.name :: text,
                 d."group" :: int4,
@@ -317,7 +317,7 @@ getDocumentsBy =
     rmap
         (uncurryDocument <$>)
         [vectorStatement|
-            SELECT
+            SELECT DISTINCT
                 d.id :: int4,
                 d.name :: text,
                 d."group" :: int4,
