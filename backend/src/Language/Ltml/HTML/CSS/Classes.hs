@@ -52,6 +52,7 @@ classStyle Document =
     toClassSelector Document ? do
         fontFamily ["Arial"] [sansSerif]
         lineHeight (unitless 1.5)
+        marginTop (em 2)
         marginLeft (em 2)
         marginRight (em 2)
 classStyle Section =
@@ -60,11 +61,11 @@ classStyle Section =
         flexDirection column
         -- \| gap between paragraphs
         gap (em 1)
-        marginTop (em 2)
 classStyle Heading =
     toClassSelector Heading ? do
         textAlign center
         fontWeight bold
+        marginTop (em 0)
         marginBottom (em 0)
 classStyle Paragraph =
     toClassSelector Paragraph ? do
