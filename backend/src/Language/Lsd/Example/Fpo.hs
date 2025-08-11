@@ -95,15 +95,16 @@ superSectionT :: SectionType
 superSectionT =
     SectionType
         (Keyword "=")
-        ( HeadingType
-            ( FormatString
-                [ StringAtom "Abschnitt "
-                , PlaceholderAtom IdentifierPlaceholder
-                , StringAtom " "
-                , PlaceholderAtom HeadingTextPlaceholder
-                ]
-            )
-            plainTextT
+        ( Just $
+            HeadingType
+                ( FormatString
+                    [ StringAtom "Abschnitt "
+                    , PlaceholderAtom IdentifierPlaceholder
+                    , StringAtom " "
+                    , PlaceholderAtom HeadingTextPlaceholder
+                    ]
+                )
+                plainTextT
         )
         ( SectionFormat
             (FormatString [PlaceholderAtom Arabic])
@@ -128,15 +129,16 @@ sectionT :: SectionType
 sectionT =
     SectionType
         (Keyword "§")
-        ( HeadingType
-            ( FormatString
-                [ StringAtom "§ "
-                , PlaceholderAtom IdentifierPlaceholder
-                , StringAtom "\n"
-                , PlaceholderAtom HeadingTextPlaceholder
-                ]
-            )
-            plainTextT
+        ( Just $
+            HeadingType
+                ( FormatString
+                    [ StringAtom "§ "
+                    , PlaceholderAtom IdentifierPlaceholder
+                    , StringAtom "\n"
+                    , PlaceholderAtom HeadingTextPlaceholder
+                    ]
+                )
+                plainTextT
         )
         ( SectionFormat
             (FormatString [PlaceholderAtom Arabic])

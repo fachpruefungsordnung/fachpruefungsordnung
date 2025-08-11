@@ -28,7 +28,7 @@ data SectionType
     = -- | Section type
       SectionType
         Keyword
-        HeadingType
+        (Maybe HeadingType)
         SectionFormat
         (Either ParagraphType (SimpleRegex SectionType))
         -- ^ children's type(s)
@@ -36,7 +36,7 @@ data SectionType
 data PreSectionType
     = PreSectionType
         Keyword
-        PreHeadingType
+        (Maybe PreHeadingType)
         SectionFormat
         (SimpleRegex TypeName)
 

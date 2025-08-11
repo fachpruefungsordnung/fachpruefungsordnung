@@ -14,7 +14,7 @@ data Section
     = -- | Section
       Section
         SectionFormat
-        Heading
+        (Maybe Heading)
         (Either [Node Paragraph] [Node Section])
         -- ^ children
     deriving (Show)
