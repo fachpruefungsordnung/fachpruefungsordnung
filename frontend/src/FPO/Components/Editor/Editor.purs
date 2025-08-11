@@ -1,9 +1,10 @@
 module FPO.Components.Editor
   ( Action(..)
+  , Input
+  , LiveMarker
   , Output(..)
   , Query(..)
   , State
-  , LiveMarker
   , addAnnotation
   , addChangeListener
   , editor
@@ -75,7 +76,8 @@ import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
 type State = FPOState
-  ( mEditor :: Maybe Types.Editor
+  ( docID :: DocumentID
+  , mEditor :: Maybe Types.Editor
   , mTocEntry :: Maybe TOCEntry
   , title :: String
   , mContent :: Maybe Content
@@ -94,6 +96,8 @@ type LiveMarker =
   , endAnchor :: Types.Anchor
   , ref :: Ref Int
   }
+
+type Input = DocumentID
 
 data Output
   = ClickedQuery (Array String)
@@ -119,7 +123,7 @@ data Action
   | Save
   | RenderHTML
   | ShowAllComments
-  | Receive (Connected FPOTranslator Unit)
+  | Receive (Connected FPOTranslator Input)
   | HandleResize Number
   | Finalize
 
@@ -137,9 +141,8 @@ editor
   :: forall m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => DocumentID
-  -> H.Component Query Unit Output m
-editor docID = connect selectTranslator $ H.mkComponent
+  => H.Component Query Input Output m
+editor = connect selectTranslator $ H.mkComponent
   { initialState
   , render
   , eval: H.mkEval H.defaultEval
@@ -151,8 +154,8 @@ editor docID = connect selectTranslator $ H.mkComponent
       }
   }
   where
-  initialState :: Connected FPOTranslator Unit -> State
-  initialState { context } =
+  initialState :: Connected FPOTranslator Input -> State
+  initialState { context, input } =
     { translator: fromFpoTranslator context
     , mEditor: Nothing
     , liveMarkers: []
@@ -163,6 +166,7 @@ editor docID = connect selectTranslator $ H.mkComponent
     , resizeObserver: Nothing
     , resizeSubscription: Nothing
     , showButtonText: true
+    , docID: input
     }
 
   render :: State -> H.ComponentHTML Action () m
@@ -419,7 +423,7 @@ editor docID = connect selectTranslator $ H.mkComponent
 
             -- send the new content as POST to the server
             response <- H.liftAff $ Request.postJson
-              ("/docs/" <> show docID <> "/text/" <> show entry.id <> "/rev")
+              ("/docs/" <> show state.docID <> "/text/" <> show entry.id <> "/rev")
               jsonContent
             handleSaveSectionResponse response
 
@@ -587,7 +591,9 @@ editor docID = connect selectTranslator $ H.mkComponent
         loadedContent <- H.liftAff $
           Request.getFromJSONEndpoint
             ContentDto.decodeContent
-            ("/docs/" <> show docID <> "/text/" <> show entry.id <> "/rev/latest")
+            ( "/docs/" <> show state.docID <> "/text/" <> show entry.id <>
+                "/rev/latest"
+            )
         let
           content = case loadedContent of
             Nothing -> ContentDto.failureContent

@@ -21,7 +21,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 
-type Input = Unit
+type Input = DH.DocumentID
 
 data Output
   = ChangeSection String Int
@@ -37,7 +37,8 @@ data Action
 data Query a = ReceiveTOCs (TOCTree) a
 
 type State =
-  { documentName :: String
+  { docID :: DH.DocumentID
+  , documentName :: String
   , tocEntries :: RootTree ShortendTOCEntry
   , mSelectedTocEntry :: Maybe Int
   , showAddMenu :: Array Int
@@ -47,14 +48,14 @@ tocview
   :: forall m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => DH.DocumentID
-  -> H.Component Query Input Output m
-tocview docID = H.mkComponent
-  { initialState: \_ ->
+  => H.Component Query Input Output m
+tocview = H.mkComponent
+  { initialState: \input ->
       { documentName: ""
       , tocEntries: Empty
       , mSelectedTocEntry: Nothing
       , showAddMenu: [ -1 ]
+      , docID: input
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -76,7 +77,8 @@ tocview docID = H.mkComponent
   handleAction = case _ of
 
     Init -> do
-      mDoc <- H.liftAff $ Request.getDocumentHeader docID
+      s <- H.get
+      mDoc <- H.liftAff $ Request.getDocumentHeader s.docID
       let
         docName = case mDoc of
           Nothing -> ""
@@ -98,10 +100,10 @@ tocview docID = H.mkComponent
           }
 
     CreateNewSubsection path -> do
-      H.modify_ \st ->
-        st { showAddMenu = [ -1 ] }
+      H.modify_ _ { showAddMenu = [ -1 ] }
+      s <- H.get
       gotRes <- H.liftAff $
-        Request.postJson ("/docs/" <> show docID <> "/text")
+        Request.postJson ("/docs/" <> show s.docID <> "/text")
           ( PostTextDto.encodePostTextDto
               (PostTextDto { identifier: 0, kind: "new Text" })
           )
