@@ -9,7 +9,8 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe, isJust)
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
-import FPO.Dto.UserDto (Role, UserID)
+import FPO.Dto.UserDto (UserID)
+import FPO.Dto.UserRoleDto as UR
 
 type GroupID = Int
 
@@ -46,12 +47,6 @@ newtype GroupDto = GroupDto
   , groupName :: String
   }
 
-demoteToGroupOverview :: GroupDto -> GroupOverview
-demoteToGroupOverview (GroupDto g) = GroupOverview
-  { groupOverviewName: g.groupName
-  , groupOverviewID: g.groupID
-  }
-
 getGroupName :: GroupDto -> String
 getGroupName (GroupDto g) = g.groupName
 
@@ -77,13 +72,13 @@ newtype GroupMemberDto = GroupMemberDto
   { userInfoEmail :: String
   , userInfoID :: UserID
   , userInfoName :: String
-  , userInfoRole :: Role
+  , userInfoRole :: UR.Role
   }
 
 getUserInfoName :: GroupMemberDto -> String
 getUserInfoName (GroupMemberDto m) = m.userInfoName
 
-getUserInfoRole :: GroupMemberDto -> Role
+getUserInfoRole :: GroupMemberDto -> UR.Role
 getUserInfoRole (GroupMemberDto m) = m.userInfoRole
 
 getUserInfoID :: GroupMemberDto -> UserID
@@ -95,3 +90,18 @@ derive newtype instance decodeJsonGroupMemberDto :: DecodeJson GroupMemberDto
 derive instance genericGroupMemberDto :: Generic GroupMemberDto _
 instance showGroupMemberDto :: Show GroupMemberDto where
   show = genericShow
+
+class ToGroupOverview a where
+  toGroupOverview :: a -> GroupOverview
+
+instance toGroupOverviewGroupDto :: ToGroupOverview GroupDto where
+  toGroupOverview (GroupDto g) = GroupOverview
+    { groupOverviewName: g.groupName
+    , groupOverviewID: g.groupID
+    }
+
+instance toGroupOverviewGroupOverview :: ToGroupOverview UR.FullUserRoleDto where
+  toGroupOverview r = GroupOverview
+    { groupOverviewName: UR.getGroupName r
+    , groupOverviewID: UR.getGroupID r
+    }

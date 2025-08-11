@@ -39,7 +39,8 @@ import FPO.Dto.GroupDto
   , getUserInfoRole
   , lookupUser
   )
-import FPO.Dto.UserDto (Role(..), UserID, isAdminOf, isUserSuperadmin)
+import FPO.Dto.UserDto (UserID, isAdminOf, isUserSuperadmin)
+import FPO.Dto.UserRoleDto (Role(..))
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn)
