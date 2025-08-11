@@ -8,7 +8,6 @@ module FPO.Component.Splitview where
 
 import Prelude
 
-import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Data.Array (find, head, snoc, uncons, updateAt, (!!))
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
@@ -56,7 +55,7 @@ data DragTarget = ResizeLeft | ResizeRight
 derive instance eqDragTarget :: Eq DragTarget
 
 type Output = Unit
-type Input = Unit
+type Input = DocumentID
 data Query a = UnitQuery a
 
 data Action
@@ -80,7 +79,8 @@ data Action
   | POST
 
 type State =
-  { mDragTarget :: Maybe DragTarget
+  { docID :: DocumentID
+  , mDragTarget :: Maybe DragTarget
 
   -- Store the width values as ratios of the total width
   -- TODO: Using the ratios to keep the ratio, when resizing the window
@@ -141,10 +141,9 @@ splitview
   :: forall query m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => DocumentID
-  -> H.Component query Input Output m
-splitview docID = H.mkComponent
-  { initialState: \_ ->
+  => H.Component query Input Output m
+splitview = H.mkComponent
+  { initialState: \docID ->
       { mDragTarget: Nothing
       , startMouseRatio: 0.0
       , startSidebarRatio: 0.0
@@ -163,6 +162,7 @@ splitview docID = H.mkComponent
       , previewShown: true
       , pdfWarningAvailable: false
       , pdfWarningIsShown: false
+      , docID: docID
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -212,7 +212,7 @@ splitview docID = H.mkComponent
                       , HP.style
                           "height: 100%; box-sizing: border-box; min-height: 0; overflow: hidden;"
                       ]
-                      [ HH.slot _editor unit (Editor.editor docID) unit HandleEditor ]
+                      [ HH.slot _editor unit Editor.editor state.docID HandleEditor ]
                   ]
               ]
             <>
@@ -258,7 +258,7 @@ splitview docID = H.mkComponent
             , HE.onClick \_ -> ToggleSidebar
             ]
             [ HH.text "×" ]
-        , HH.slot _toc unit (TOC.tocview docID) unit HandleTOC
+        , HH.slot _toc unit TOC.tocview state.docID HandleTOC
         ]
     -- Comment
     , HH.div
@@ -461,7 +461,7 @@ splitview docID = H.mkComponent
         encodedTree = DT.encodeDocumentTree tree
 
       rep <- H.liftAff $
-        Request.postJson ("/docs/" <> show docID <> "/tree") encodedTree
+        Request.postJson ("/docs/" <> show state.docID <> "/tree") encodedTree
       -- debugging logs in
       case rep of
         Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
@@ -469,21 +469,16 @@ splitview docID = H.mkComponent
     -- H.liftEffect $ Console.log "Successfully posted TOC to server"
 
     GET -> do
-      -- TODO: As of now, the editor page and splitview are parametrized by the document ID
-      --       as given by the route. We could also handle the docID as an input to the component,
-      --       instead, but parameters are more convenient and also there is no existence issue;
-      --       in other words, the editor cannot exist with no document ID.
-      --
-      --       Here, we can simply fetch the latest commit (head commit) of the document and
+      s <- H.get
+      -- TODO: Here, we can simply fetch the latest commit (head commit) of the document and
       --       write the content into the editor. Because requests like these are very common,
       --       we should think of a way to have a uniform and clean request handling system, especially
       --       regarding authentification and error handling. Right now, the editor page is simply empty
       --       if the document retrieval fails in any way.
-      finalTree <- fromMaybe Empty <$> runMaybeT do
-        fetchedTree <- MaybeT $ H.liftAff
-          $ Request.getFromJSONEndpoint DT.decodeDocument
-          $ "/docs/" <> show docID <> "/tree/latest"
-        pure $ documentTreeToTOCTree fetchedTree
+      maybeTree <- H.liftAff
+        $ Request.getFromJSONEndpoint DT.decodeDocument
+        $ "/docs/" <> show s.docID <> "/tree/latest"
+      let finalTree = fromMaybe Empty (documentTreeToTOCTree <$> maybeTree)
 
       H.modify_ _ { tocEntries = finalTree }
       H.tell _toc unit (TOC.ReceiveTOCs finalTree)
@@ -745,7 +740,7 @@ splitview docID = H.mkComponent
           docTree = tocTreeToDocumentTree newTree
           encodeTree = DT.encodeDocumentTree docTree
         _ <- H.liftAff $
-          Request.postJson ("/docs/" <> show docID <> "/tree") encodeTree
+          Request.postJson ("/docs/" <> show state.docID <> "/tree") encodeTree
         H.modify_ \st -> st { tocEntries = newTree }
         H.tell _toc unit (TOC.ReceiveTOCs newTree)
 

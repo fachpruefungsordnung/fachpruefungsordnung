@@ -17,11 +17,9 @@ import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Data.Argonaut (JsonDecodeError, decodeJson, encodeJson, fromString)
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode.Decoders (decodeArray)
-import Data.Array (catMaybes)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Data.Traversable (traverse)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff as Exn
@@ -36,17 +34,16 @@ import FPO.Dto.GroupDto
   , GroupDto
   , GroupID
   , GroupOverview
-  , demoteToGroupOverview
+  , toGroupOverview
   )
 import FPO.Dto.UserDto
   ( FullUserDto
-  , Role
   , UserID
-  , getUserRoleGroupID
-  , getUserRoles
+  , getAllAdminRoles
   , isAdminOf
   , isUserSuperadmin
   )
+import FPO.Dto.UserRoleDto (Role)
 import Foreign (renderForeignError)
 import Web.DOM.Document (Document)
 import Web.File.Blob (Blob)
@@ -126,24 +123,13 @@ getGroups = getFromJSONEndpoint (decodeArray decodeJson) "/groups"
 
 -- | Fetches all groups the user can access. For superadmins, this returns all groups.
 -- | For non-superadmins, it returns only the groups they are admin of.
--- |
--- | TODO: This should(?) fail if a nonempty subset of groups cannot be fetched!
--- | TODO: Lots of requests might be made, we should consider adding another
--- |       endpoint that returns all groups the user is admin of. This would
--- |       be more efficient. See issue #303.
 getUserGroups :: Aff (Maybe (Array GroupOverview))
 getUserGroups = do
   user <- getUser
   case user of
     Just u | isUserSuperadmin u -> getGroups
     Just u -> do
-      let groupIDs = map getUserRoleGroupID (getUserRoles u)
-      groups <- traverse
-        (\id -> getFromJSONEndpoint decodeJson ("/groups/" <> show id))
-        groupIDs
-      pure $ Just
-        $ map demoteToGroupOverview
-        $ catMaybes groups
+      pure $ Just $ map toGroupOverview $ getAllAdminRoles u
     Nothing -> pure Nothing
 
 -- | Fetches a specific group by its ID.
