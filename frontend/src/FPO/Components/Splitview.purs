@@ -8,7 +8,6 @@ module FPO.Component.Splitview where
 
 import Prelude
 
-import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
 import Data.Array (find, head, snoc, uncons, updateAt, (!!))
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
