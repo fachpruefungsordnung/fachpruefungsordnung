@@ -137,6 +137,8 @@ data Action
   | Undo
   | Redo
   | Save
+  -- Subsection of Save
+  | Upload TOCEntry String Content
   | RenderHTML
   | ShowAllComments
   | Receive (Connected FPOTranslator Input)
@@ -426,7 +428,6 @@ editor = connect selectTranslator $ H.mkComponent
 
             -- Save the current content of the editor
             let
-              oldTitle = state.title
               contentLines = case allLines of
                 Just ls -> case uncons ls of
                   Just { head, tail } ->
@@ -461,23 +462,54 @@ editor = connect selectTranslator $ H.mkComponent
                       , endCol = Types.getColumn end
                       }
             -- update the markers in entry
-            let
-              newEntry = entry
-                { markers = updatedMarkers }
-              jsonContent = ContentDto.encodeContent newContent
+            let newEntry = entry { markers = updatedMarkers }
+            handleAction $ Upload newEntry title newContent
+      else
+        pure unit
+    
+    Upload newEntry title newContent -> do
+      state <- H.get
+      let jsonContent = ContentDto.encodeContent newContent
 
-            -- send the new content as POST to the server
-            response <- H.liftAff $ Request.postJson
-              ("/docs/" <> show state.docID <> "/text/" <> show entry.id <> "/rev")
-              jsonContent
-            handleSaveSectionResponse response
+      -- send the new content as POST to the server
+      response <- H.liftAff $ Request.postJson
+        ("/docs/" <> show state.docID <> "/text/" <> show newEntry.id <> "/rev")
+        jsonContent
+      handleSaveSectionResponse response
 
-            let 
-              updatedContent = case response of
-                Left _ -> ContentDto.setContentParent 1 ContentDto.failureContent
-                Right res -> case ContentDto.extractNewParent newContent res.body of
-                  Left _ -> ContentDto.setContentParent 2 ContentDto.failureContent
-                  Right c -> c
+      case response of
+        Left _ -> do
+          loadedContent <- H.liftAff $
+            Request.getFromJSONEndpoint
+              ContentDto.decodeContent
+              ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id <>
+                  "/rev/latest"
+              )
+          case loadedContent of
+            Nothing -> pure unit
+            Just res -> 
+              handleAction $ 
+                Upload 
+                  newEntry 
+                  title 
+                  (ContentDto.setContentText (ContentDto.getContentText newContent) res)
+        Right res -> case ContentDto.extractNewParent newContent res.body of
+          Left _ -> do
+            loadedContent <- H.liftAff $
+              Request.getFromJSONEndpoint
+                ContentDto.decodeContent
+                ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id <>
+                    "/rev/latest"
+                )
+            case loadedContent of
+              Nothing -> pure unit
+              Just res' -> 
+                handleAction $ 
+                  Upload 
+                    newEntry 
+                    title 
+                    (ContentDto.setContentText (ContentDto.getContentText newContent) res')
+          Right updatedContent -> do
 
             H.modify_ \st -> st
               { mTocEntry = Just newEntry
@@ -485,13 +517,12 @@ editor = connect selectTranslator $ H.mkComponent
               , mContent = Just updatedContent
               }
             -- Update the tree to backend, when title was really changed
+            let oldTitle = state.title
             H.raise (SavedSection (oldTitle /= title) title newEntry)
 
             -- mDirtyRef := false
             for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
             pure unit
-      else
-        pure unit
 
     Comment -> do
       user <- H.liftAff getUser
