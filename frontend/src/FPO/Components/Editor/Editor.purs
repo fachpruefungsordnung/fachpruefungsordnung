@@ -139,6 +139,8 @@ data Action
   | Save
   -- Subsection of Save
   | Upload TOCEntry String Content
+  -- Subsection of Upload
+  | LostParentID TOCEntry String Content
   | RenderHTML
   | ShowAllComments
   | Receive (Connected FPOTranslator Input)
@@ -416,6 +418,7 @@ editor = connect selectTranslator $ H.mkComponent
           undoMgr <- Session.getUndoManager session
           UndoMgr.hasUndo undoMgr
 
+      -- only save, if there are changes detected by UndoManager
       if (fromMaybe false hasUndoMgr) then do
         -- Save the current content of the editor and send it to the server
         case state.mContent of
@@ -463,10 +466,14 @@ editor = connect selectTranslator $ H.mkComponent
                       }
             -- update the markers in entry
             let newEntry = entry { markers = updatedMarkers }
+
+            -- Try to upload
             handleAction $ Upload newEntry title newContent
-      else
+      else do
+        -- mDirtyRef := false
+        for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
         pure unit
-    
+
     Upload newEntry title newContent -> do
       state <- H.get
       let jsonContent = ContentDto.encodeContent newContent
@@ -477,40 +484,13 @@ editor = connect selectTranslator $ H.mkComponent
         jsonContent
       handleSaveSectionResponse response
 
+      -- handle errors in pos and decodeJson
       case response of
-        Left _ -> do
-          loadedContent <- H.liftAff $
-            Request.getFromJSONEndpoint
-              ContentDto.decodeContent
-              ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id <>
-                  "/rev/latest"
-              )
-          case loadedContent of
-            Nothing -> pure unit
-            Just res -> 
-              handleAction $ 
-                Upload 
-                  newEntry 
-                  title 
-                  (ContentDto.setContentText (ContentDto.getContentText newContent) res)
+        Left _ -> handleAction $ LostParentID newEntry title newContent
+        -- extract and insert new parentID into newContent
         Right res -> case ContentDto.extractNewParent newContent res.body of
-          Left _ -> do
-            loadedContent <- H.liftAff $
-              Request.getFromJSONEndpoint
-                ContentDto.decodeContent
-                ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id <>
-                    "/rev/latest"
-                )
-            case loadedContent of
-              Nothing -> pure unit
-              Just res' -> 
-                handleAction $ 
-                  Upload 
-                    newEntry 
-                    title 
-                    (ContentDto.setContentText (ContentDto.getContentText newContent) res')
+          Left _ -> handleAction $ LostParentID newEntry title newContent
           Right updatedContent -> do
-
             H.modify_ \st -> st
               { mTocEntry = Just newEntry
               , title = title
@@ -523,6 +503,22 @@ editor = connect selectTranslator $ H.mkComponent
             -- mDirtyRef := false
             for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
             pure unit
+
+    LostParentID newEntry title newContent -> do
+      docID <- H.gets _.docID
+      loadedContent <- H.liftAff $
+        Request.getFromJSONEndpoint
+          ContentDto.decodeContent
+          ("/docs/" <> show docID <> "/text/" <> show newEntry.id <> "/rev/latest")
+      case loadedContent of
+        -- TODO: Error handling
+        Nothing -> pure unit
+        Just res ->
+          handleAction $
+            Upload
+              newEntry
+              title
+              (ContentDto.setContentText (ContentDto.getContentText newContent) res)
 
     Comment -> do
       user <- H.liftAff getUser

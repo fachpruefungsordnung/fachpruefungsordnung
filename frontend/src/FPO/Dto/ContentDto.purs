@@ -47,7 +47,8 @@ setContentText :: String -> Content -> Content
 setContentText newText (Content { parent }) = Content { content: newText, parent }
 
 setContentParent :: Int -> Content -> Content
-setContentParent newParent (Content { content }) = Content { content, parent: newParent }
+setContentParent newParent (Content { content }) = Content
+  { content, parent: newParent }
 
 failureContent :: Content
 failureContent = Content { content: "Error decoding content", parent: -1 }
