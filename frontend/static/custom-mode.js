@@ -108,7 +108,7 @@
       { token: "markup.other", regex: /<[/\*_][^>]+?>/ },
 
       // --- Comments ---
-      { token: "comment", regex: /^\-\-.*$/ },              // -- single-line comment
+      { token: "comment", regex: /^\/\/.*$/ },              // -- single-line comment
       { token: "comment", regex: /\/\*/, next: "comment" }, // /* multiline start
 
       // --- Keywords ---
