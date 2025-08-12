@@ -297,7 +297,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     Node { title, children } ->
       let
         innerDivClasses =
-          [ HB.dFlex, HB.alignItemsCenter, HB.py2, HB.px2, HB.positionRelative ]
+          [ HB.dFlex, HB.alignItemsCenter, HB.py2, HB.positionRelative ]
         titleClasses =
           [ HB.textTruncate, HB.flexGrow1, HB.fwBold, HB.fs5 ]
       in
@@ -308,7 +308,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 [ HP.classes innerDivClasses ]
                 [ dragHandle
                 , HH.span
-                    [ HP.classes titleClasses ]
+                    [ HP.classes titleClasses
+                    , HP.style "align-self: stretch; flex-basis: 0;"
+                    ]
                     [ HH.text title ]
                 , renderButtonInterface menuPath path true
                 ]
@@ -335,7 +337,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
             ] <> dragProps
           )
         innerDivBaseClasses =
-          [ HB.dFlex, HB.alignItemsCenter, HB.py2, HB.px2, HB.positionRelative ]
+          [ HB.dFlex, HB.alignItemsCenter, HB.py2, HB.positionRelative ]
         innerDivProps =
           [ HP.classes innerDivBaseClasses
           , HP.style "cursor: pointer;"
@@ -351,6 +353,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 , HH.span
                     [ HP.classes
                         [ HB.textTruncate, HB.flexGrow1, HB.fwNormal, HB.fs6 ]
+                    , HP.style "align-self: stretch; flex-basis: 0;"
                     ]
                     [ HH.text title ]
                 , HH.div [ HP.classes [ HB.positionRelative ] ]
