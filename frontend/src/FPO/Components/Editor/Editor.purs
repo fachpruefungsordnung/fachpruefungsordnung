@@ -472,10 +472,17 @@ editor = connect selectTranslator $ H.mkComponent
               jsonContent
             handleSaveSectionResponse response
 
+            let 
+              updatedContent = case response of
+                Left _ -> ContentDto.setContentParent 1 ContentDto.failureContent
+                Right res -> case ContentDto.extractNewParent newContent res.body of
+                  Left _ -> ContentDto.setContentParent 2 ContentDto.failureContent
+                  Right c -> c
+
             H.modify_ \st -> st
               { mTocEntry = Just newEntry
               , title = title
-              , mContent = Just newContent
+              , mContent = Just updatedContent
               }
             -- Update the tree to backend, when title was really changed
             H.raise (SavedSection (oldTitle /= title) title newEntry)
