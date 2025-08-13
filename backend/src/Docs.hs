@@ -146,6 +146,8 @@ createTextElement userID docID kind = runExceptT $ do
 --   Updates the latest revision instead of creating a new one, if
 --      - the latest revision is created by the same author,
 --      - the latest revision is no older than a set threshold.
+--   In case of an update, the revision id is increased nevertheless to
+--   prevent lost update scenarios.
 createTextRevision
     :: (HasCreateTextRevision m, HasGetTextElementRevision m)
     => UserID
