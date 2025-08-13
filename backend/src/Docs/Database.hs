@@ -1,5 +1,6 @@
 module Docs.Database
-    ( HasCheckPermission (..)
+    ( HasNow (..)
+    , HasCheckPermission (..)
     , HasIsGroupAdmin (..)
     , HasIsSuperAdmin (..)
     , HasExistsDocument (..)
@@ -54,6 +55,9 @@ class (HasIsSuperAdmin m) => HasIsGroupAdmin m where
 class (Monad m) => HasIsSuperAdmin m where
     isSuperAdmin :: UserID -> m Bool
 
+class (Monad m) => HasNow m where
+    now :: m UTCTime
+
 -- exists
 
 class (Monad m) => HasExistsDocument m where
@@ -102,7 +106,11 @@ class (HasIsGroupAdmin m) => HasCreateDocument m where
 class (HasCheckPermission m, HasExistsDocument m) => HasCreateTextElement m where
     createTextElement :: DocumentID -> TextElementKind -> m TextElement
 
-class (HasCheckPermission m, HasExistsTextElement m) => HasCreateTextRevision m where
+class
+    (HasCheckPermission m, HasExistsTextElement m, HasNow m) =>
+    HasCreateTextRevision m
+    where
+    updateTextRevision :: TextRevisionID -> Text -> m TextRevision
     createTextRevision :: UserID -> TextElementRef -> Text -> m TextRevision
     getLatestTextRevisionID :: TextElementRef -> m (Maybe TextRevisionID)
 

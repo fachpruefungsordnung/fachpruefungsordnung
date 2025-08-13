@@ -3,12 +3,14 @@
 {-# LANGUAGE TupleSections #-}
 
 module Docs.Hasql.Statements
-    ( createDocument
+    ( now
+    , createDocument
     , getDocument
     , getDocuments
     , getDocumentsBy
     , createTextElement
     , getTextElement
+    , updateTextRevision
     , createTextRevision
     , getTextRevision
     , getLatestTextRevisionID
@@ -32,7 +34,7 @@ module Docs.Hasql.Statements
     ) where
 
 import Control.Applicative ((<|>))
-import Data.Bifunctor (bimap)
+import Data.Bifunctor (Bifunctor (first), bimap)
 import Data.ByteString (ByteString)
 import Data.Profunctor (lmap, rmap)
 import Data.Text (Text)
@@ -95,6 +97,12 @@ import qualified Docs.TreeRevision as TreeRevision
 import Docs.UserRef (UserRef (UserRef))
 import qualified Docs.UserRef as UserRef
 import DocumentManagement.Hash (Hash (..))
+
+now :: Statement () UTCTime
+now =
+    [singletonStatement|
+        SELECT now() :: timestamptz
+    |]
 
 existsDocument :: Statement DocumentID Bool
 existsDocument =
@@ -445,6 +453,39 @@ uncurryTextElementRevision
                                 }
                         }
                     <$> content
+
+updateTextRevision :: Statement (TextRevisionID, Text) TextRevision
+updateTextRevision =
+    lmap
+        (first unTextRevisionID)
+        $ rmap
+            uncurryTextRevision
+            [singletonStatement|
+                WITH updated AS (
+                    UPDATE
+                        doc_text_revisions
+                    SET
+                        id = nextval('doc_text_revision_seq'),
+                        creation_ts = now(),
+                        content = $2 :: text
+                    WHERE
+                        id = $1 :: int4
+                    RETURNING
+                        id :: int4,
+                        creation_ts :: timestamptz,
+                        author :: uuid,
+                        content :: text
+                )
+                SELECT
+                    updated.id :: int4,
+                    updated.creation_ts :: timestamptz,
+                    updated.author :: uuid,
+                    users.name :: text,
+                    updated.content :: text
+                FROM
+                    updated
+                    JOIN users on users.id = updated.author
+            |]
 
 createTextRevision :: Statement (TextElementID, UUID, Text) TextRevision
 createTextRevision =

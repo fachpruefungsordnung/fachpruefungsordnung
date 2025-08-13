@@ -109,6 +109,9 @@ instance HasIsGroupAdmin HasqlTransaction where
 instance HasIsSuperAdmin HasqlTransaction where
     isSuperAdmin = HasqlTransaction . UserTransactions.checkSuperadmin
 
+instance HasNow HasqlTransaction where
+    now = HasqlTransaction Transactions.now
+
 -- exists
 
 instance HasExistsDocument HasqlTransaction where
@@ -128,6 +131,7 @@ instance HasGetTextElementRevision HasqlTransaction where
 -- create
 
 instance HasCreateTextRevision HasqlTransaction where
+    updateTextRevision = (HasqlTransaction .) . Transactions.updateTextRevision
     createTextRevision = ((HasqlTransaction .) .) . Transactions.createTextRevision
     getLatestTextRevisionID = HasqlTransaction . Transactions.getLatestTextRevisionID
 

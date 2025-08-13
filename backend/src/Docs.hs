@@ -22,7 +22,7 @@ import Control.Monad.Trans.Class (lift)
 import Data.Foldable (find)
 import Data.Functor ((<&>))
 import Data.Text (Text)
-import Data.Time (UTCTime)
+import Data.Time (UTCTime, diffUTCTime)
 import Data.Vector (Vector)
 
 import UserManagement.DocumentPermission (Permission (..))
@@ -64,7 +64,6 @@ import Docs.TextRevision
     , TextElementRevision (TextElementRevision)
     , TextRevisionHistory
     , TextRevisionRef (..)
-    , newTextRevision
     )
 import qualified Docs.TextRevision as TextRevision
 import Docs.Tree (Node)
@@ -74,6 +73,7 @@ import Docs.TreeRevision
     , TreeRevisionRef (..)
     )
 import qualified Docs.TreeRevision as TreeRevision
+import qualified Docs.UserRef as UserRef
 import GHC.Int (Int32)
 
 data Error
@@ -91,6 +91,9 @@ type Limit = Int32
 
 defaultHistoryLimit :: Limit
 defaultHistoryLimit = 20
+
+squashRevisionsWithinMinutes :: Float
+squashRevisionsWithinMinutes = 15
 
 createDocument
     :: (HasCreateDocument m)
@@ -138,6 +141,11 @@ createTextElement userID docID kind = runExceptT $ do
     guardExistsDocument docID
     lift $ DB.createTextElement docID kind
 
+-- | Create a new 'TextRevision' in the Database.
+--
+--   Updates the latest revision instead of creating a new one, if
+--      - the latest revision is created by the same author,
+--      - the latest revision is no older than a set threshold.
 createTextRevision
     :: (HasCreateTextRevision m, HasGetTextElementRevision m)
     => UserID
@@ -151,12 +159,52 @@ createTextRevision userID revision = runExceptT $ do
     latestElementRevision <-
         lift $ DB.getTextElementRevision latestRevisionRef
     let latestRevision = latestElementRevision >>= TextRevision.revision
-    let createRevision = DB.createTextRevision userID ref
-    lift $
-        newTextRevision
+    let latestRevisionID =
             latestRevision
-            createRevision
-            revision
+                <&> TextRevision.identifier . TextRevision.header
+    let parentRevisionID = newTextRevisionParent revision
+    let createRevision =
+            DB.createTextRevision
+                userID
+                ref
+                (newTextRevisionContent revision)
+    lift $ do
+        now <- DB.now
+        case latestRevision of
+            -- first revision
+            Nothing -> createRevision <&> TextRevision.NoConflict
+            Just latest
+                -- content has not changed? -> return latest
+                | content latest == newTextRevisionContent revision ->
+                    return $ TextRevision.NoConflict latest
+                -- no conflict, and can update? -> update
+                | latestRevisionID == parentRevisionID && shouldUpdate now latest ->
+                    DB.updateTextRevision
+                        (identifier latest)
+                        (newTextRevisionContent revision)
+                        <&> TextRevision.NoConflict
+                -- no conflict, but can not update? -> create new
+                | latestRevisionID == parentRevisionID ->
+                    createRevision <&> TextRevision.NoConflict
+                -- conflict
+                | otherwise ->
+                    return $
+                        TextRevision.Conflict $
+                            identifier latest
+  where
+    header = TextRevision.header
+    identifier = TextRevision.identifier . header
+    content = TextRevision.content
+    timestamp = TextRevision.timestamp . header
+    author = TextRevision.author . header
+    authorID = UserRef.identifier . author
+    shouldUpdate tz latestRevision =
+        userID == authorID latestRevision && diff < squashRevisionsWithinMinutes
+      where
+        diff =
+            ((/ 60) . realToFrac)
+                . diffUTCTime tz
+                $ timestamp latestRevision
 
 getTextElementRevision
     :: (HasGetTextElementRevision m)

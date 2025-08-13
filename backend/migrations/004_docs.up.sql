@@ -12,8 +12,10 @@ CREATE TABLE IF NOT EXISTS doc_text_elements (
     document INTEGER REFERENCES docs (id)
 );
 
+CREATE SEQUENCE doc_text_revision_seq;
+
 CREATE TABLE IF NOT EXISTS doc_text_revisions (
-    id INTEGER PRIMARY KEY NOT NULL GENERATED ALWAYS AS IDENTITY,
+    id INTEGER PRIMARY KEY NOT NULL DEFAULT nextval('doc_text_revision_seq'),
     text_element INTEGER NOT NULL REFERENCES doc_text_elements (id),
     creation_ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     author UUID NOT NULL REFERENCES users (id),

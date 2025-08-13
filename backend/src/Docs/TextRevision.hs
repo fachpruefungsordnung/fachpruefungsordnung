@@ -13,11 +13,9 @@ module Docs.TextRevision
     , TextRevisionRef (..)
     , prettyPrintTextRevisionRef
     , textRevisionRef
-    , newTextRevision
     , specificTextRevision
     ) where
 
-import Data.Functor ((<&>))
 import Data.Proxy (Proxy (Proxy))
 import Data.Scientific (toBoundedInteger)
 import Data.Text (Text)
@@ -298,33 +296,3 @@ instance ToSchema ConflictStatus where
             mempty
                 & type_ ?~ OpenApiString
                 & enum_ ?~ [toJSON val]
-
--- | Returns a conflict, if the parent revision is not the latest revision.
--- | If the text element does not have any revision, but a parent revision is set,
--- | it is ignored.
-newTextRevision
-    :: (Monad m)
-    => Maybe TextRevision
-    -- ^ the latest revision for the text element (if any)
-    -> (Text -> m TextRevision)
-    -- ^ creates a new text revision in the database
-    -> NewTextRevision
-    -- ^ all data needed to create a new text revision
-    -> m ConflictStatus
-    -- ^ either the newly created text revision or a conflict
-newTextRevision latestRevision createRevision newRevision = do
-    let latestRevisionID = latestRevision <&> identifier . header
-    let parentRevisionID = newTextRevisionParent newRevision
-    case latestRevision of
-        Nothing -> createRevision' <&> NoConflict
-        Just latest
-            | content latest == newTextRevisionContent newRevision ->
-                return $ NoConflict latest
-            | latestRevisionID == parentRevisionID ->
-                createRevision' <&> NoConflict
-            | otherwise ->
-                return $ Conflict $ identifier $ header latest
-  where
-    createRevision' =
-        createRevision
-            (newTextRevisionContent newRevision)

@@ -1,8 +1,10 @@
 {-# LANGUAGE TupleSections #-}
 
 module Docs.Hasql.Transactions
-    ( getTextElementRevision
+    ( now
+    , getTextElementRevision
     , existsTextRevision
+    , updateTextRevision
     , createTextRevision
     , putTree
     , createTreeRevision
@@ -27,6 +29,7 @@ import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
 import Control.Monad (guard)
+import Data.Time (UTCTime)
 import Docs.Document (DocumentID)
 import qualified Docs.Hasql.Statements as Statements
 import Docs.Hasql.TreeEdge (TreeEdge (TreeEdge), TreeEdgeChildRef (..))
@@ -46,6 +49,9 @@ import DocumentManagement.Hash
     , Hashable (..)
     )
 
+now :: Transaction UTCTime
+now = statement () Statements.now
+
 getTextElementRevision
     :: TextRevisionRef
     -> Transaction (Maybe TextElementRevision)
@@ -62,6 +68,9 @@ existsTextElement = flip statement Statements.existsTextElement
 
 getLatestTextRevisionID :: TextElementRef -> Transaction (Maybe TextRevisionID)
 getLatestTextRevisionID = (`statement` Statements.getLatestTextRevisionID)
+
+updateTextRevision :: TextRevisionID -> Text -> Transaction TextRevision
+updateTextRevision = curry (`statement` Statements.updateTextRevision)
 
 createTextRevision
     :: UserID
