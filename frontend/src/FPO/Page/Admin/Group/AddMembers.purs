@@ -21,8 +21,8 @@ import FPO.Data.Request
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName, isUserInGroup)
-import FPO.Dto.UserDto (Role(..))
 import FPO.Dto.UserOverviewDto (getID)
+import FPO.Dto.UserRoleDto (Role(..))
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addError)

@@ -1,0 +1,90 @@
+/* Hide drag handles and add buttons by default, show on hover */
+.toc-drag-handle,
+.toc-add-wrapper {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* Show drag handles and add buttons on hover */
+.toc-item:hover .toc-drag-handle,
+.toc-item:hover .toc-add-wrapper {
+  opacity: 1;
+}
+
+/* Always show add button in header */
+.border-bottom .toc-add-wrapper {
+  opacity: 1;
+}
+
+/* Hover effects for toc items */
+.toc-item:hover {
+  background-color: var(--bs-gray-100) !important;
+}
+
+/* Drag handle cursor */
+.toc-drag-handle {
+  cursor: grab;
+  user-select: none;
+  font-size: 0.8rem;
+  width: 16px;
+}
+
+.toc-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Dropdown hover effects */
+.btn-link:hover {
+  background-color: var(--bs-gray-100) !important;
+  color: var(--bs-body-color) !important;
+}
+
+/* ********** Small TOC buttons ********** */
+
+.toc-button {
+  padding: 0.125rem 0.375rem;
+  font-size: 0.7rem;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: #6c757d;
+  transition: all 0.15s ease;
+}
+
+.toc-button:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.toc-button.btn-success:hover {
+  background: #d4edda;
+  color: #155724;
+}
+
+.toc-button.btn-danger:hover {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+/* ********** Drag and drop ********** */
+
+.toc-item.dragging {
+  opacity: 0.6;
+  transform: scale(0.98);
+  z-index: 1000;
+  background: #f8f9fa;
+}
+
+.drop-zone {
+  height: 2px;
+  margin: 0 0.75rem;
+  background: transparent;
+  border-radius: 1px;
+  transition: all 0.15s ease;
+}
+
+.drop-zone.active {
+  background: #0d6efd;
+  height: 2px;
+  margin: 0.25rem 0.75rem;
+}

@@ -2,19 +2,12 @@ module FPO.Dto.UserDto where
 
 import Prelude
 
-import Data.Argonaut
-  ( class DecodeJson
-  , class EncodeJson
-  , JsonDecodeError(..)
-  , decodeJson
-  , encodeJson
-  )
-import Data.Array (any)
-import Data.Either (Either(..))
+import Data.Argonaut (class DecodeJson, class EncodeJson)
+import Data.Array (any, filter)
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Data.Show.Generic (genericShow)
+import FPO.Dto.UserRoleDto as UR
 
 type UserID = String
 
@@ -25,7 +18,7 @@ newtype FullUserDto = FullUserDto
   , fullUserID :: UserID
   , fullUserIsSuperadmin :: Boolean
   , fullUserName :: String
-  , fullUserRoles :: Array FullUserRoleDto
+  , fullUserRoles :: Array UR.FullUserRoleDto
   }
 
 getUserEmail :: FullUserDto -> String
@@ -40,7 +33,7 @@ isUserSuperadmin (FullUserDto u) = u.fullUserIsSuperadmin
 -- | Checks if the user is admin of at least one group, or even a superadmin.
 isAdmin :: FullUserDto -> Boolean
 isAdmin (FullUserDto u) = u.fullUserIsSuperadmin || any
-  (\role -> getUserRole role == Admin)
+  (\role -> UR.getUserRole role == UR.Admin)
   u.fullUserRoles
 
 -- | Checks if the user is an admin of a specific group.
@@ -50,13 +43,18 @@ isAdmin (FullUserDto u) = u.fullUserIsSuperadmin || any
 -- | See `isUserSuperadmin` for checking if the user is a superadmin.
 isAdminOf :: FullUserDto -> Int -> Boolean
 isAdminOf (FullUserDto u) groupID =
-  any (\role -> getUserRoleGroupID role == groupID && getUserRole role == Admin)
+  any (\role -> UR.getGroupID role == groupID && UR.getUserRole role == UR.Admin)
     u.fullUserRoles
+
+-- | Returns all admin roles of the user.
+getAllAdminRoles :: FullUserDto -> Array UR.FullUserRoleDto
+getAllAdminRoles (FullUserDto u) =
+  filter (\role -> UR.getUserRole role == UR.Admin) u.fullUserRoles
 
 getUserName :: FullUserDto -> String
 getUserName (FullUserDto u) = u.fullUserName
 
-getUserRoles :: FullUserDto -> Array FullUserRoleDto
+getUserRoles :: FullUserDto -> Array UR.FullUserRoleDto
 getUserRoles (FullUserDto u) = u.fullUserRoles
 
 derive instance newtypeFullUserDto :: Newtype FullUserDto _
@@ -64,46 +62,4 @@ derive newtype instance encodeJsonFullUserDto :: EncodeJson FullUserDto
 derive newtype instance decodeJsonFullUserDto :: DecodeJson FullUserDto
 derive instance genericFullUserDto :: Generic FullUserDto _
 instance showFullUserDto :: Show FullUserDto where
-  show = genericShow
-
-newtype FullUserRoleDto = FullUserRoleDto
-  { groupID :: Int
-  , role :: Role
-  }
-
-getUserRoleGroupID :: FullUserRoleDto -> Int
-getUserRoleGroupID (FullUserRoleDto r) = r.groupID
-
-getUserRole :: FullUserRoleDto -> Role
-getUserRole (FullUserRoleDto r) = r.role
-
-derive instance newtypeFullUserRoleDto :: Newtype FullUserRoleDto _
-derive newtype instance encodeJsonFullUserRoleDto :: EncodeJson FullUserRoleDto
-derive newtype instance decodeJsonFullUserRoleDto :: DecodeJson FullUserRoleDto
-derive instance genericFullUserRoleDto :: Generic FullUserRoleDto _
-instance showFullUserRoleDto :: Show FullUserRoleDto where
-  show = genericShow
-
-data Role = Admin | Member
-
-instance encodeJsonRole :: EncodeJson Role where
-  encodeJson Admin = encodeJson "Admin"
-  encodeJson Member = encodeJson "Member"
-
-instance decodeJsonRole :: DecodeJson Role where
-  decodeJson json = do
-    str <- decodeJson json
-    case str of
-      "Admin" -> Right Admin
-      "Member" -> Right Member
-      _ -> Left $ UnexpectedValue json
-
-stringToRole :: String -> Maybe Role
-stringToRole "Admin" = Just Admin
-stringToRole "Member" = Just Member
-stringToRole _ = Nothing
-
-derive instance eqRole :: Eq Role
-derive instance genericRole :: Generic Role _
-instance showRole :: Show Role where
   show = genericShow

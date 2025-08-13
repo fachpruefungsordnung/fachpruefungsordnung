@@ -1,11 +1,11 @@
 module FPO.Components.Editor
   ( Action(..)
+  , Input
+  , LiveMarker
   , Output(..)
   , Query(..)
   , State
-  , LiveMarker
   , addAnnotation
-  , addChangeListener
   , editor
   , findAllIndicesOf
   ) where
@@ -29,7 +29,9 @@ import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
+import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class as EC
 import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
@@ -69,21 +71,40 @@ import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element (toEventTarget)
-import Web.Event.EventTarget (addEventListener, eventListener)
+import Web.Event.Event (EventType(..), preventDefault)
+import Web.Event.EventTarget
+  ( EventListener
+  , addEventListener
+  , eventListener
+  , removeEventListener
+  )
+import Web.HTML (window)
 import Web.HTML.HTMLElement (offsetWidth, toElement)
+import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
 type State = FPOState
-  ( mEditor :: Maybe Types.Editor
+  ( docID :: DocumentID
+  , mEditor :: Maybe Types.Editor
   , mTocEntry :: Maybe TOCEntry
   , title :: String
   , mContent :: Maybe Content
   , liveMarkers :: Array LiveMarker
   , fontSize :: Int
+  , mListener :: Maybe (HS.Listener Action)
   , resizeObserver :: Maybe RO.ResizeObserver
   , resizeSubscription :: Maybe SubscriptionId
   , showButtonText :: Boolean
+  -- for saving when closing window
+  , mDirtyRef :: Maybe (Ref Boolean)
+  , mBeforeUnloadL :: Maybe EventListener
+  -- saved icon
+  , showSavedIcon :: Boolean
+  , mSavedIconF :: Maybe H.ForkId
+  -- for periodically saving the content
+  , mPendingDebounceF :: Maybe H.ForkId -- 2s-Timer
+  , mPendingMaxWaitF :: Maybe H.ForkId -- 20s-Max-Timer
   )
 
 -- For tracking the comment markers live
@@ -94,6 +115,8 @@ type LiveMarker =
   , endAnchor :: Types.Anchor
   , ref :: Ref Int
   }
+
+type Input = DocumentID
 
 data Output
   = ClickedQuery (Array String)
@@ -118,10 +141,19 @@ data Action
   | Undo
   | Redo
   | Save
+  -- Subsection of Save
+  | Upload TOCEntry String Content
+  -- Subsection of Upload
+  | LostParentID TOCEntry String Content
+  | SavedIcon
+  -- new change in editor -> reset timer
+  | AutoSaveTimer
+  -- called by AutoSaveTimer subscription
+  | AutoSave
   | RenderHTML
   | PDF
   | ShowAllComments
-  | Receive (Connected FPOTranslator Unit)
+  | Receive (Connected FPOTranslator Input)
   | HandleResize Number
   | Finalize
 
@@ -139,9 +171,8 @@ editor
   :: forall m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => DocumentID
-  -> H.Component Query Unit Output m
-editor docID = connect selectTranslator $ H.mkComponent
+  => H.Component Query Input Output m
+editor = connect selectTranslator $ H.mkComponent
   { initialState
   , render
   , eval: H.mkEval H.defaultEval
@@ -153,18 +184,26 @@ editor docID = connect selectTranslator $ H.mkComponent
       }
   }
   where
-  initialState :: Connected FPOTranslator Unit -> State
-  initialState { context } =
-    { translator: fromFpoTranslator context
+  initialState :: Connected FPOTranslator Input -> State
+  initialState { context, input } =
+    { docID: input
+    , translator: fromFpoTranslator context
     , mEditor: Nothing
-    , liveMarkers: []
-    , title: ""
     , mTocEntry: Nothing
+    , title: ""
     , mContent: Nothing
+    , liveMarkers: []
     , fontSize: 12
+    , mListener: Nothing
     , resizeObserver: Nothing
     , resizeSubscription: Nothing
     , showButtonText: true
+    , mDirtyRef: Nothing
+    , mBeforeUnloadL: Nothing
+    , showSavedIcon: false
+    , mSavedIconF: Nothing
+    , mPendingDebounceF: Nothing
+    , mPendingMaxWaitF: Nothing
     }
 
   render :: State -> H.ComponentHTML Action () m
@@ -255,44 +294,77 @@ editor docID = connect selectTranslator $ H.mkComponent
           , HP.style "min-height: 0"
           ]
           []
+      -- Saved Icon
+      , if state.showSavedIcon then
+          HH.div
+            [ HP.classes [ HH.ClassName "save-toast" ]
+            , HP.style "position: absolute; right: .5rem; bottom: .5rem; z-index: 10;"
+            ]
+            [ HH.text $ (translate (label :: _ "editor_save") state.translator) <>
+                " 💾"
+            ]
+        else
+          HH.text ""
       ]
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
     Init -> do
-      state <- H.get
+      -- create subscription for later use
+      { emitter, listener } <- H.liftEffect HS.create
+      H.modify_ _ { mListener = Just listener }
+      -- Subscribe to resize events and store subscription for cleanup
+      subscription <- H.subscribe emitter
+      H.modify_ _ { resizeSubscription = Just subscription }
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
 
         H.modify_ _ { mEditor = Just editor_ }
+        fontSize <- H.gets _.fontSize
 
         H.liftEffect $ do
-          Editor.setFontSize (show state.fontSize <> "px") editor_
+          Editor.setFontSize (show fontSize <> "px") editor_
           eventListen <- eventListener (keyBinding editor_)
           container <- Editor.getContainer editor_
           addEventListener keydown eventListen true
             (toEventTarget $ toElement container)
           session <- Editor.getSession editor_
-          document <- Session.getDocument session
 
           -- Set the editor's theme and mode
           Editor.setTheme "ace/theme/github" editor_
           Session.setMode "ace/mode/custom_mode" session
           Editor.setEnableLiveAutocompletion true editor_
 
-          -- Add a change listener to the editor
-          addChangeListener editor_
+      -- New Ref for keeping track, if the content in editor has changed
+      -- since last save
+      dref <- H.liftEffect $ Ref.new false
+      H.modify_ _ { mDirtyRef = Just dref }
 
-          -- Add some example text
-          Document.setValue "" document
+      -- add and start Editor change listener
+      H.gets _.mEditor >>= traverse_ \ed ->
+        H.liftEffect $ addChangeListenerWithRef ed dref listener
+
+      win <- H.liftEffect window
+      let
+        winTarget = Win.toEventTarget win
+        -- creating EventTypes
+        beforeunload = EventType "beforeunload"
+
+      -- create eventListener for preventing the tab from closing
+      -- when content has not been saved (Not changing through Navbar)
+      buL <- H.liftEffect $ eventListener \ev -> do
+        readRef <- traverse Ref.read (Just dref) -- dref ist da; zur Not: Maybe-handling
+        case readRef of
+          -- Prevent the tab from closing in a certain way
+          Just true -> do
+            preventDefault ev
+            HS.notify listener Save
+          _ -> pure unit
+      H.modify_ _ { mBeforeUnloadL = Just buL }
+      H.liftEffect $ addEventListener beforeunload buL false winTarget
 
       -- Setup ResizeObserver for the container element
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \element -> do
-        { emitter, listener } <- H.liftEffect HS.create
-
-        -- Subscribe to resize events and store subscription for cleanup
-        subscription <- H.subscribe emitter
-        H.modify_ _ { resizeSubscription = Just subscription }
 
         let
           callback _ _ = do
@@ -372,86 +444,161 @@ editor docID = connect selectTranslator $ H.mkComponent
     ShowAllComments -> do
       H.raise ShowAllCommentsOutput
 
+    -- Save section
+
     Save -> do
       state <- H.get
+      -- Save the current content of the editor and send it to the server
+      case state.mContent of
+        Nothing -> pure unit
+        Just content -> do
+          allLines <- H.gets _.mEditor >>= traverse \ed -> do
+            H.liftEffect $ Editor.getSession ed
+              >>= Session.getDocument
+              >>= Document.getAllLines
 
-      -- check, if there are any changes in the editor
-      -- If not, do not send anything to the server
-      hasUndoMgr <- H.gets _.mEditor >>= traverse \ed -> do
-        H.liftEffect do
-          session <- Editor.getSession ed
-          undoMgr <- Session.getUndoManager session
-          UndoMgr.hasUndo undoMgr
+          -- Save the current content of the editor
+          let
+            contentLines =
+              fromMaybe { title: "", contentText: "" } do
+                { head, tail } <- uncons =<< allLines
+                pure { title: head, contentText: intercalate "\n" tail }
+            title = contentLines.title
+            contentText = contentLines.contentText
 
-      if (fromMaybe false hasUndoMgr) then do
-        -- Save the current content of the editor and send it to the server
-        case state.mContent of
-          Nothing -> pure unit
-          -- only use content to get its parent
-          Just content -> do
-            allLines <- H.gets _.mEditor >>= traverse \ed -> do
-              H.liftEffect $ Editor.getSession ed
-                >>= Session.getDocument
-                >>= Document.getAllLines
+            -- place it in contentDto
+            newContent = ContentDto.setContentText contentText content
 
-            -- Save the current content of the editor
-            let
-              oldTitle = state.title
-              contentLines = case allLines of
-                Just ls -> case uncons ls of
-                  Just { head, tail } ->
-                    { title: head, contentText: intercalate "\n" tail }
-                  Nothing -> { title: "", contentText: "" }
-                Nothing -> { title: "", contentText: "" }
-              title = contentLines.title
-              contentText = contentLines.contentText
+            -- extract the current TOC entry
+            entry = case state.mTocEntry of
+              Nothing -> emptyTOCEntry
+              Just e -> e
 
-              -- place it in contentDto
-              newContent = ContentDto.setContentText contentText content
+          -- Since the ids and postions in liveMarkers are changing constantly,
+          -- extract them now and store them
+          updatedMarkers <- H.liftEffect do
+            for entry.markers \m -> do
+              case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
+                -- TODO Should we add other markers in liveMarkers such as errors?
+                Nothing -> pure m
+                Just lm -> do
+                  start <- Anchor.getPosition lm.startAnchor
+                  end <- Anchor.getPosition lm.endAnchor
+                  pure m
+                    { startRow = Types.getRow start
+                    , startCol = Types.getColumn start
+                    , endRow = Types.getRow end
+                    , endCol = Types.getColumn end
+                    }
+          -- update the markers in entry
+          let newEntry = entry { markers = updatedMarkers }
 
-              -- extract the current TOC entry
-              entry = case state.mTocEntry of
-                Nothing -> emptyTOCEntry
-                Just e -> e
+          -- Try to upload
+          handleAction $ Upload newEntry title newContent
 
-            -- Since the ids and postions in liveMarkers are changing constantly,
-            -- extract them now and store them
-            updatedMarkers <- H.liftEffect do
-              for entry.markers \m -> do
-                case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
-                  -- TODO Should we add other markers in liveMarkers such as errors?
-                  Nothing -> pure m
-                  Just lm -> do
-                    start <- Anchor.getPosition lm.startAnchor
-                    end <- Anchor.getPosition lm.endAnchor
-                    pure m
-                      { startRow = Types.getRow start
-                      , startCol = Types.getColumn start
-                      , endRow = Types.getRow end
-                      , endCol = Types.getColumn end
-                      }
-            -- update the markers in entry
-            let
-              newEntry = entry
-                { markers = updatedMarkers }
-              jsonContent = ContentDto.encodeContent newContent
+    Upload newEntry title newContent -> do
+      state <- H.get
+      let jsonContent = ContentDto.encodeContent newContent
 
-            -- send the new content as POST to the server
-            response <- H.liftAff $ Request.postJson
-              ("/docs/" <> show docID <> "/text/" <> show entry.id <> "/rev")
-              jsonContent
-            handleSaveSectionResponse response
+      -- send the new content as POST to the server
+      response <- H.liftAff $ Request.postJson
+        ("/docs/" <> show state.docID <> "/text/" <> show newEntry.id <> "/rev")
+        jsonContent
+      handleSaveSectionResponse response
+
+      -- handle errors in pos and decodeJson
+      case response of
+        Left _ -> handleAction $ LostParentID newEntry title newContent
+        -- extract and insert new parentID into newContent
+        Right res -> case ContentDto.extractNewParent newContent res.body of
+          Left _ -> handleAction $ LostParentID newEntry title newContent
+          Right updatedContent -> do
+            -- Update the tree to backend, when title was really changed
+            let oldTitle = state.title
+            H.raise (SavedSection (oldTitle /= title) title newEntry)
 
             H.modify_ \st -> st
               { mTocEntry = Just newEntry
               , title = title
-              , mContent = Just newContent
+              , mContent = Just updatedContent
               }
-            -- Update the tree to backend, when title was really changed
-            H.raise (SavedSection (oldTitle /= title) title newEntry)
+
+            -- Show saved icon
+            handleAction SavedIcon
+
+            -- mDirtyRef := false
+            for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
             pure unit
-      else
-        pure unit
+
+    LostParentID newEntry title newContent -> do
+      docID <- H.gets _.docID
+      loadedContent <- H.liftAff $
+        Request.getFromJSONEndpoint
+          ContentDto.decodeContent
+          ("/docs/" <> show docID <> "/text/" <> show newEntry.id <> "/rev/latest")
+      case loadedContent of
+        -- TODO: Error handling
+        Nothing -> pure unit
+        Just res ->
+          handleAction $
+            Upload
+              newEntry
+              title
+              (ContentDto.setContentText (ContentDto.getContentText newContent) res)
+
+    SavedIcon -> do
+      state <- H.get
+      -- restart saved icon
+      for_ state.mSavedIconF H.kill
+      H.modify_ _ { showSavedIcon = true }
+      -- start new fiber
+      iFib <- H.fork do
+        H.liftAff $ delay (Milliseconds 1200.0)
+        H.modify_ _ { showSavedIcon = false, mSavedIconF = Nothing }
+      H.modify_ _ { mSavedIconF = Just iFib }
+
+    AutoSaveTimer -> do
+      state <- H.get
+      -- restart 2 sec timer after every new input
+      -- first kill the maybe running fiber (kinda like a thread)
+      for_ state.mPendingDebounceF H.kill
+
+      -- start a new fiber
+      dFib <- H.fork do
+        H.liftAff $ delay (Milliseconds 2000.0)
+        isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
+          Just r -> pure r
+          Nothing -> EC.liftEffect $ Ref.new false
+        when isDirty $ handleAction AutoSave
+      H.modify_ _ { mPendingDebounceF = Just dFib }
+
+      -- This is a seperate 20 sec timer, which forces to save, in case of a long edit
+      -- does not reset with new input
+      case state.mPendingMaxWaitF of
+        -- timer already running
+        Just _ -> pure unit
+        -- no timer there
+        Nothing -> do
+          mFib <- H.fork do
+            H.liftAff $ delay (Milliseconds 20000.0)
+            isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
+              Just r -> pure r
+              Nothing -> EC.liftEffect $ Ref.new false
+            when isDirty $ handleAction AutoSave
+          H.modify_ _ { mPendingMaxWaitF = Just mFib }
+
+    AutoSave -> do
+      -- only save, if dirty
+      isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.mDirtyRef
+      when isDirty do
+        handleAction Save
+        -- after Save: dirty false + stop timer
+        mRef <- H.gets _.mDirtyRef
+        for_ mRef \r -> H.liftEffect $ Ref.write false r
+        st <- H.get
+        for_ st.mPendingDebounceF H.kill
+        for_ st.mPendingMaxWaitF H.kill
+        H.modify_ _ { mPendingDebounceF = Nothing, mPendingMaxWaitF = Nothing }
 
     Comment -> do
       user <- H.liftAff getUser
@@ -578,6 +725,10 @@ editor docID = connect selectTranslator $ H.mkComponent
 
     Finalize -> do
       state <- H.get
+      win <- H.liftEffect window
+      let
+        tgt = Win.toEventTarget win
+        beforeunload = EventType "beforeunload"
       -- Cleanup observer and subscription
       H.liftEffect $ case state.resizeObserver of
         Just obs -> RO.disconnect obs
@@ -585,6 +736,11 @@ editor docID = connect selectTranslator $ H.mkComponent
       case state.resizeSubscription of
         Just subscription -> H.unsubscribe subscription
         Nothing -> pure unit
+      case state.mBeforeUnloadL of
+        Just l -> H.liftEffect $ removeEventListener beforeunload l false tgt
+        _ -> pure unit
+      for_ state.mPendingDebounceF H.kill
+      for_ state.mPendingMaxWaitF H.kill
 
   handleQuery
     :: forall slots a
@@ -594,10 +750,10 @@ editor docID = connect selectTranslator $ H.mkComponent
 
     ChangeSection title entry a -> do
       H.modify_ \state -> state { mTocEntry = Just entry, title = title }
+      state <- H.get
 
       -- Put the content of the section into the editor and update markers
       H.gets _.mEditor >>= traverse_ \ed -> do
-        state <- H.get
 
         -- Get the content from server here
         -- We need Aff for that and thus cannot go inside Eff
@@ -606,7 +762,9 @@ editor docID = connect selectTranslator $ H.mkComponent
         loadedContent <- H.liftAff $
           Request.getFromJSONEndpoint
             ContentDto.decodeContent
-            ("/docs/" <> show docID <> "/text/" <> show entry.id <> "/rev/latest")
+            ( "/docs/" <> show state.docID <> "/text/" <> show entry.id <>
+                "/rev/latest"
+            )
         let
           content = case loadedContent of
             Nothing -> ContentDto.failureContent
@@ -645,7 +803,9 @@ editor docID = connect selectTranslator $ H.mkComponent
         -- Update state with new marker IDs
         H.modify_ \st ->
           st { liveMarkers = newLiveMarkers }
-
+      -- reset Ref, because loading new content is considered 
+      -- changing the existing content, which would set the flag
+      for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
       pure (Just a)
 
     SaveSection a -> do
@@ -679,22 +839,34 @@ editor docID = connect selectTranslator $ H.mkComponent
 --   linting, code completion, etc.
 --   For now, it puts "  " in front of "#", if it is placed at the
 --   beginning of a line
-addChangeListener :: Types.Editor -> Effect Unit
-addChangeListener editor_ = do
+--  Update: it also detects, when content is changed and set dref flag
+addChangeListenerWithRef
+  :: Types.Editor
+  -> Ref Boolean
+  -> HS.Listener Action
+  -> Effect Unit
+addChangeListenerWithRef editor_ dref listener = do
   session <- Editor.getSession editor_
-  -- Setup change listener to react to changes in the editor
+  -- in order to prevent an ifinite loop with this listener
+  guardRef <- Ref.new false
   Session.onChange session \(Types.DocumentEvent { action, start, end: _, lines }) ->
     do
-      -- Types.showDocumentEventType action does not work and using case of
-      -- data DocumentEventType = Insert | Remove does also not work
-      when ((unsafeCoerce action :: String) == "insert") do
-        let
-          sCol = Types.getColumn start
+      -- set dirty flag
+      Ref.write true dref
+      HS.notify listener AutoSaveTimer
+
+      -- '#' → '  #' at beginning of a line with Reentrancy-Guard
+      let isInsert = (unsafeCoerce action :: String) == "insert"
+      when isInsert do
+        let sCol = Types.getColumn start
         when (sCol == 0 && lines == [ "#" ]) do
-          let
-            sRow = Types.getRow start
-          range <- Range.create sRow sCol sRow (sCol + 1)
-          Session.replace range "  #" session
+          busy <- Ref.read guardRef
+          when (not busy) do
+            Ref.write true guardRef
+            let sRow = Types.getRow start
+            range <- Range.create sRow sCol sRow (sCol + 1)
+            Session.replace range "  #" session
+            Ref.write false guardRef
 
 -- | Helper function to find all indices of a substring in a string
 --   in reverse order.

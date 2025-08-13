@@ -46,5 +46,17 @@ getContentText (Content { content }) = content
 setContentText :: String -> Content -> Content
 setContentText newText (Content { parent }) = Content { content: newText, parent }
 
+setContentParent :: Int -> Content -> Content
+setContentParent newParent (Content { content }) = Content
+  { content, parent: newParent }
+
 failureContent :: Content
 failureContent = Content { content: "Error decoding content", parent: -1 }
+
+extractNewParent :: Content -> Json -> Either JsonDecodeError Content
+extractNewParent (Content cont) json = do
+  obj <- decodeJson json
+  newRev <- obj .: "newRevision"
+  header <- newRev .: "header"
+  newPar <- header .: "identifier"
+  pure $ Content $ cont { parent = newPar }

@@ -18,9 +18,11 @@ import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(..))
 
+type Input = DocumentID
+
 data Action = HandleSplitview Splitview.Output
 
-type State = {}
+type State = { docID :: DocumentID }
 
 type Slots =
   ( splitview :: H.Slot Splitview.Query Splitview.Output Unit
@@ -29,22 +31,21 @@ type Slots =
 _splitview = Proxy :: Proxy "splitview"
 
 component
-  :: forall query input output m
+  :: forall query output m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => DocumentID
-  -> H.Component query input output m
-component docID =
+  => H.Component query Input output m
+component =
   H.mkComponent
-    { initialState: const {}
+    { initialState: \docId -> { docID: docId }
     , render
     , eval: H.mkEval H.defaultEval { handleAction = handleAction }
     }
   where
   render :: State -> H.ComponentHTML Action Slots m
-  render _ =
+  render state =
     HH.div [ HP.classes [ HB.flexGrow1, HB.p0, HB.overflowHidden ] ]
-      [ HH.slot _splitview unit (Splitview.splitview docID) unit HandleSplitview
+      [ HH.slot _splitview unit Splitview.splitview state.docID HandleSplitview
       ]
 
   handleAction :: MonadAff m => Action -> H.HalogenM State Action Slots output m Unit

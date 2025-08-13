@@ -8,8 +8,18 @@ module FPO.Component.Splitview where
 
 import Prelude
 
-import Control.Monad.Maybe.Trans (MaybeT(..), runMaybeT)
-import Data.Array (find, head, snoc, uncons, updateAt, (!!))
+import Data.Array
+  ( cons
+  , deleteAt
+  , find
+  , head
+  , insertAt
+  , null
+  , snoc
+  , uncons
+  , updateAt
+  , (!!)
+  )
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
@@ -59,7 +69,7 @@ data DragTarget = ResizeLeft | ResizeRight
 derive instance eqDragTarget :: Eq DragTarget
 
 type Output = Unit
-type Input = Unit
+type Input = DocumentID
 data Query a = UnitQuery a
 
 data Action
@@ -83,7 +93,8 @@ data Action
   | POST
 
 type State =
-  { mDragTarget :: Maybe DragTarget
+  { docID :: DocumentID
+  , mDragTarget :: Maybe DragTarget
 
   -- Store the width values as ratios of the total width
   -- TODO: Using the ratios to keep the ratio, when resizing the window
@@ -144,10 +155,9 @@ splitview
   :: forall query m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => DocumentID
-  -> H.Component query Input Output m
-splitview docID = H.mkComponent
-  { initialState: \_ ->
+  => H.Component query Input Output m
+splitview = H.mkComponent
+  { initialState: \docID ->
       { mDragTarget: Nothing
       , startMouseRatio: 0.0
       , startSidebarRatio: 0.0
@@ -166,6 +176,7 @@ splitview docID = H.mkComponent
       , previewShown: true
       , pdfWarningAvailable: false
       , pdfWarningIsShown: false
+      , docID: docID
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -215,7 +226,7 @@ splitview docID = H.mkComponent
                       , HP.style
                           "height: 100%; box-sizing: border-box; min-height: 0; overflow: hidden;"
                       ]
-                      [ HH.slot _editor unit (Editor.editor docID) unit HandleEditor ]
+                      [ HH.slot _editor unit Editor.editor state.docID HandleEditor ]
                   ]
               ]
             <>
@@ -244,25 +255,7 @@ splitview docID = H.mkComponent
                 else
                   "display: none;"
         ]
-        [ HH.button
-            [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
-            , HP.style
-                "position: absolute; \
-                \top: 0.5rem; \
-                \right: 0.5rem; \
-                \background-color: #fdecea; \
-                \color: #b71c1c; \
-                \padding: 0.2rem 0.4rem; \
-                \font-size: 0.75rem; \
-                \line-height: 1; \
-                \border: 1px solid #f5c6cb; \
-                \border-radius: 0.2rem; \
-                \z-index: 10;"
-            , HE.onClick \_ -> ToggleSidebar
-            ]
-            [ HH.text "×" ]
-        , HH.slot _toc unit (TOC.tocview docID) unit HandleTOC
-        ]
+        [ HH.slot _toc unit TOC.tocview state.docID HandleTOC ]
     -- Comment
     , HH.div
         [ HP.classes [ HB.overflowAuto, HB.p1 ]
@@ -479,7 +472,7 @@ splitview docID = H.mkComponent
         encodedTree = DT.encodeDocumentTree tree
 
       rep <- H.liftAff $
-        Request.postJson ("/docs/" <> show docID <> "/tree") encodedTree
+        Request.postJson ("/docs/" <> show state.docID <> "/tree") encodedTree
       -- debugging logs in
       case rep of
         Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
@@ -487,21 +480,16 @@ splitview docID = H.mkComponent
     -- H.liftEffect $ Console.log "Successfully posted TOC to server"
 
     GET -> do
-      -- TODO: As of now, the editor page and splitview are parametrized by the document ID
-      --       as given by the route. We could also handle the docID as an input to the component,
-      --       instead, but parameters are more convenient and also there is no existence issue;
-      --       in other words, the editor cannot exist with no document ID.
-      --
-      --       Here, we can simply fetch the latest commit (head commit) of the document and
+      s <- H.get
+      -- TODO: Here, we can simply fetch the latest commit (head commit) of the document and
       --       write the content into the editor. Because requests like these are very common,
       --       we should think of a way to have a uniform and clean request handling system, especially
       --       regarding authentification and error handling. Right now, the editor page is simply empty
       --       if the document retrieval fails in any way.
-      finalTree <- fromMaybe Empty <$> runMaybeT do
-        fetchedTree <- MaybeT $ H.liftAff
-          $ Request.getFromJSONEndpoint DT.decodeDocument
-          $ "/docs/" <> show docID <> "/tree/latest"
-        pure $ documentTreeToTOCTree fetchedTree
+      maybeTree <- H.liftAff
+        $ Request.getFromJSONEndpoint DT.decodeDocument
+        $ "/docs/" <> show s.docID <> "/tree/latest"
+      let finalTree = fromMaybe Empty (documentTreeToTOCTree <$> maybeTree)
 
       H.modify_ _ { tocEntries = finalTree }
       H.tell _toc unit (TOC.ReceiveTOCs finalTree)
@@ -758,11 +746,33 @@ splitview docID = H.mkComponent
           docTree = tocTreeToDocumentTree newTree
           encodeTree = DT.encodeDocumentTree docTree
         _ <- H.liftAff $
-          Request.postJson ("/docs/" <> show docID <> "/tree") encodeTree
+          Request.postJson ("/docs/" <> show state.docID <> "/tree") encodeTree
         H.modify_ \st -> st { tocEntries = newTree }
         H.tell _toc unit (TOC.ReceiveTOCs newTree)
 
-        pure unit
+      TOC.DeleteNode path -> do
+        -- TODO: Lots of code taken from `HandleTOC TOC.AddNode`, need to refactor! 
+        state <- H.get
+        let
+          newTree = deleteRootNode path state.tocEntries
+          docTree = tocTreeToDocumentTree newTree
+          encodeTree = DT.encodeDocumentTree docTree
+        _ <- H.liftAff $
+          Request.postJson ("/docs/" <> show state.docID <> "/tree") encodeTree
+        H.modify_ \st -> st { tocEntries = newTree }
+        H.tell _toc unit (TOC.ReceiveTOCs newTree)
+
+      TOC.ReorderItems { from, to } -> do
+        -- TODO: Lots of code taken from `HandleTOC TOC.AddNode`, need to refactor! 
+        state <- H.get
+        let
+          newTree = reorderTocEntries from to state.tocEntries
+          docTree = tocTreeToDocumentTree newTree
+          encodeTree = DT.encodeDocumentTree docTree
+        _ <- H.liftAff $
+          Request.postJson ("/docs/" <> show state.docID <> "/tree") encodeTree
+        H.modify_ \st -> st { tocEntries = newTree }
+        H.tell _toc unit (TOC.ReceiveTOCs newTree)
 
 findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
 findCommentSection tocEntries tocID markerID = do
@@ -823,3 +833,219 @@ addNode path entry (Edge (Node { title, children, header })) =
             Just res -> res
       in
         Edge (Node { title, children: newChildren', header })
+
+deleteRootNode
+  :: Array Int
+  -> TOCTree
+  -> TOCTree
+deleteRootNode _ Empty = Empty
+deleteRootNode [] _ = Empty
+deleteRootNode path (RootTree { children, header }) =
+  case uncons path of
+    Nothing ->
+      RootTree { children, header } -- no path, do nothing
+    Just { head, tail } ->
+      if null tail then
+        -- Delete the child at index `head`
+        case deleteAt head children of
+          Nothing -> RootTree { children, header }
+          Just newChildren -> RootTree { children: newChildren, header }
+      else
+        let
+          child =
+            fromMaybe
+              (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+              (children !! head)
+          newChildren =
+            case updateAt head (deleteNode tail child) children of
+              Nothing -> children
+              Just res -> res
+        in
+          RootTree { children: newChildren, header }
+
+deleteNode
+  :: Array Int
+  -> Edge TOCEntry
+  -> Edge TOCEntry
+deleteNode _ edge@(Edge (Leaf _)) =
+  edge -- Cannot delete deeper inside a leaf
+deleteNode [] e =
+  -- If path is empty, delete this node entirely is handled by parent
+  -- so this case should not normally be reached.
+  e
+deleteNode path (Edge (Node { title, children, header })) =
+  case uncons path of
+    Nothing ->
+      Edge (Node { title, children, header })
+    Just { head, tail } ->
+      if null tail then
+        case deleteAt head children of
+          Nothing -> Edge (Node { title, children, header })
+          Just newChildren -> Edge (Node { title, children: newChildren, header })
+      else
+        let
+          child =
+            fromMaybe
+              (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+              (children !! head)
+          newChildren' =
+            case updateAt head (deleteNode tail child) children of
+              Nothing -> children
+              Just res -> res
+        in
+          Edge (Node { title, children: newChildren', header })
+
+-- Reorder TOC entries by moving a node from `sourcePath` to `targetPath`.
+-- The node at sourcePath takes the place of the node at targetPath,
+-- and everything shifts accordingly.
+reorderTocEntries :: Array Int -> Array Int -> TOCTree -> TOCTree
+reorderTocEntries sourcePath targetPath tree
+  | sourcePath == targetPath = tree
+  | otherwise = case extractNodeAtPath sourcePath tree of
+      Nothing -> tree
+      Just extractedNode ->
+        let
+          treeWithoutSource = deleteRootNode sourcePath tree
+          adjustedTargetPath = adjustPathAfterDeletion sourcePath targetPath
+        in
+          insertNodeAtPosition adjustedTargetPath extractedNode treeWithoutSource
+
+-- Adjust target path after source deletion to account for index shifts
+adjustPathAfterDeletion :: Array Int -> Array Int -> Array Int
+adjustPathAfterDeletion sourcePath targetPath =
+  adjustPathRecursive sourcePath targetPath
+
+adjustPathRecursive :: Array Int -> Array Int -> Array Int
+adjustPathRecursive sourcePath targetPath =
+  case uncons sourcePath, uncons targetPath of
+    Just { head: srcHead, tail: srcTail }, Just { head: tgtHead, tail: tgtTail } ->
+      if null srcTail && null tgtTail then
+        -- Both are at the same level (siblings)
+        if tgtHead > srcHead then
+          -- Target is after source, so decrement target index since source was removed
+          [ tgtHead - 1 ]
+        else
+          -- Target is before or at source position, stays the same
+          targetPath
+      else if srcHead == tgtHead then
+        -- Same parent, continue recursively
+        cons tgtHead (adjustPathRecursive srcTail tgtTail)
+      else
+        -- Different branches at this level
+        if null srcTail then
+        -- Source is being deleted at this level
+        if tgtHead > srcHead then
+          cons (tgtHead - 1) tgtTail
+        else
+          targetPath
+      else
+        -- Source deletion is deeper, no adjustment needed
+        targetPath
+    _, _ -> targetPath
+
+-- Extract a node at a given path without deleting it
+extractNodeAtPath :: Array Int -> TOCTree -> Maybe (Tree TOCEntry)
+extractNodeAtPath _ Empty = Nothing
+extractNodeAtPath [] _ = Nothing -- Cannot extract root
+extractNodeAtPath path (RootTree { children }) =
+  case uncons path of
+    Nothing -> Nothing
+    Just { head, tail } ->
+      case children !! head of
+        Nothing -> Nothing
+        Just (Edge node) ->
+          if null tail then
+            Just node
+          else
+            extractNodeFromTree tail node
+
+extractNodeFromTree :: Array Int -> Tree TOCEntry -> Maybe (Tree TOCEntry)
+extractNodeFromTree _ (Leaf _) = Nothing -- Cannot go deeper in leaf
+extractNodeFromTree [] node = Just node
+extractNodeFromTree path (Node { children }) =
+  case uncons path of
+    Nothing -> Nothing
+    Just { head, tail } ->
+      case children !! head of
+        Nothing -> Nothing
+        Just (Edge node) ->
+          if null tail then
+            Just node
+          else
+            extractNodeFromTree tail node
+
+-- Insert node at the exact target position (pushing existing nodes down)
+insertNodeAtPosition :: Array Int -> Tree TOCEntry -> TOCTree -> TOCTree
+insertNodeAtPosition [] node tree =
+  -- Insert at root level (append to end)
+  case tree of
+    Empty -> RootTree
+      { children: [ Edge node ]
+      , header: { headerKind: "root", headerType: "root" }
+      }
+    RootTree { children, header } ->
+      RootTree { children: snoc children (Edge node), header }
+
+insertNodeAtPosition _ node Empty =
+  RootTree
+    { children: [ Edge node ]
+    , header: { headerKind: "root", headerType: "root" }
+    }
+
+insertNodeAtPosition path node (RootTree { children, header }) =
+  case uncons path of
+    Nothing -> RootTree { children: snoc children (Edge node), header }
+    Just { head, tail } ->
+      if null tail then
+        -- Insert exactly at position `head`, pushing existing elements down
+        case insertAt head (Edge node) children of
+          Nothing ->
+            -- If insertion fails (index out of bounds), append to end
+            RootTree { children: snoc children (Edge node), header }
+          Just result ->
+            RootTree { children: result, header }
+      else
+        -- Navigate deeper into the tree
+        case children !! head of
+          Nothing ->
+            -- Path doesn't exist, cannot insert deeper
+            RootTree { children, header }
+          Just childEdge ->
+            let
+              newChild = insertNodeIntoEdgeAtPosition tail node childEdge
+              newChildren = case updateAt head newChild children of
+                Nothing -> children
+                Just res -> res
+            in
+              RootTree { children: newChildren, header }
+
+insertNodeIntoEdgeAtPosition
+  :: Array Int -> Tree TOCEntry -> Edge TOCEntry -> Edge TOCEntry
+insertNodeIntoEdgeAtPosition _ _ edge@(Edge (Leaf _)) = edge -- Cannot insert into leaf
+insertNodeIntoEdgeAtPosition [] node (Edge (Node { title, children, header })) =
+  -- Insert at end of children
+  Edge (Node { title, children: snoc children (Edge node), header })
+insertNodeIntoEdgeAtPosition path node (Edge (Node { title, children, header })) =
+  case uncons path of
+    Nothing -> Edge (Node { title, children: snoc children (Edge node), header })
+    Just { head, tail } ->
+      if null tail then
+        -- Insert exactly at position `head`, pushing existing elements down
+        case insertAt head (Edge node) children of
+          Nothing ->
+            -- If insertion fails (index out of bounds), append to end
+            Edge (Node { title, children: snoc children (Edge node), header })
+          Just result ->
+            Edge (Node { title, children: result, header })
+      else
+        -- Navigate deeper
+        case children !! head of
+          Nothing -> Edge (Node { title, children, header })
+          Just childEdge ->
+            let
+              newChild = insertNodeIntoEdgeAtPosition tail node childEdge
+              newChildren = case updateAt head newChild children of
+                Nothing -> children
+                Just res -> res
+            in
+              Edge (Node { title, children: newChildren, header })
