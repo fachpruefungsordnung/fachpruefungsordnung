@@ -99,9 +99,12 @@ type State = FPOState
   -- for saving when closing window
   , mDirtyRef :: Maybe (Ref Boolean)
   , mBeforeUnloadL :: Maybe EventListener
+  -- saved icon
+  , showSavedIcon :: Boolean
+  , mSavedIconF :: Maybe H.ForkId
   -- for periodically saving the content
-  , mPendingDebounce :: Maybe (Fiber Unit) -- 2s-Timer
-  , mPendingMaxWait :: Maybe (Fiber Unit) -- 20s-Max-Timer
+  , mPendingDebounceF :: Maybe (Fiber Unit) -- 2s-Timer
+  , mPendingMaxWaitF :: Maybe (Fiber Unit) -- 20s-Max-Timer
   )
 
 -- For tracking the comment markers live
@@ -141,6 +144,7 @@ data Action
   | Upload TOCEntry String Content
   -- Subsection of Upload
   | LostParentID TOCEntry String Content
+  | SavedIcon
   -- new change in editor -> reset timer
   | AutoSaveTimer 
   -- called by AutoSaveTimer subscription
@@ -180,12 +184,13 @@ editor = connect selectTranslator $ H.mkComponent
   where
   initialState :: Connected FPOTranslator Input -> State
   initialState { context, input } =
-    { translator: fromFpoTranslator context
+    { docID: input
+    , translator: fromFpoTranslator context
     , mEditor: Nothing
-    , liveMarkers: []
-    , title: ""
     , mTocEntry: Nothing
+    , title: ""
     , mContent: Nothing
+    , liveMarkers: []
     , fontSize: 12
     , mListener: Nothing
     , resizeObserver: Nothing
@@ -193,9 +198,10 @@ editor = connect selectTranslator $ H.mkComponent
     , showButtonText: true
     , mDirtyRef: Nothing
     , mBeforeUnloadL: Nothing
-    , mPendingDebounce: Nothing
-    , mPendingMaxWait: Nothing
-    , docID: input
+    , showSavedIcon: false
+    , mSavedIconF: Nothing
+    , mPendingDebounceF: Nothing
+    , mPendingMaxWaitF: Nothing
     }
 
   render :: State -> H.ComponentHTML Action () m
@@ -281,6 +287,14 @@ editor = connect selectTranslator $ H.mkComponent
           , HP.style "min-height: 0"
           ]
           []
+      -- Saved Icon
+      , if state.showSavedIcon then
+          HH.div
+            [ HP.classes [ HH.ClassName "save-toast" ]
+            , HP.style "position: absolute; right: .5rem; bottom: .5rem; z-index: 10;" ]
+            [ HH.text $ (translate (label :: _ "editor_save") state.translator) <> " 💾" ]
+        else
+          HH.text ""
       ]
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
@@ -487,6 +501,9 @@ editor = connect selectTranslator $ H.mkComponent
             let oldTitle = state.title
             H.raise (SavedSection (oldTitle /= title) title newEntry)
 
+            -- Show saved icon
+            handleAction SavedIcon
+
             -- mDirtyRef := false
             for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
             pure unit
@@ -507,11 +524,22 @@ editor = connect selectTranslator $ H.mkComponent
               title
               (ContentDto.setContentText (ContentDto.getContentText newContent) res)
 
+    SavedIcon -> do
+      state <- H.get
+      -- restart saved icon
+      for_ state.mSavedIconF H.kill
+      H.modify_ _ { showSavedIcon = true }
+      -- start new fiber
+      iFib <- H.fork do
+        H.liftAff $ delay (Milliseconds 1200.0)
+        H.modify_ _ { showSavedIcon = false, mSavedIconF = Nothing }
+      H.modify_ _ { mSavedIconF = Just iFib }
+
     AutoSaveTimer -> do
       state <- H.get
       -- restart 2 sec timer after every new input
       -- first kill the maybe running fiber (kinda like a thread)
-      for_ state.mPendingDebounce \f -> H.liftAff $ killFiber (error "debounce reset")
+      for_ state.mPendingDebounceF \f -> H.liftAff $ killFiber (error "debounce reset")
         f
       -- start a new fiber
       dFib <- H.liftAff $ forkAff do
@@ -524,11 +552,11 @@ editor = connect selectTranslator $ H.mkComponent
             -- since we are in Aff, we cannot use handleAction
             when isDirty $ EC.liftEffect $ HS.notify listener AutoSave
           Nothing -> pure unit
-      H.modify_ _ { mPendingDebounce = Just dFib }
+      H.modify_ _ { mPendingDebounceF = Just dFib }
 
       -- This is a seperate 20 sec timer, which forces to save, in case of a long edit
       -- does not reset with new input
-      case state.mPendingMaxWait of
+      case state.mPendingMaxWaitF of
         -- timer already running
         Just _ -> pure unit
         -- no timer there
@@ -542,7 +570,7 @@ editor = connect selectTranslator $ H.mkComponent
               Just listener -> do
                 when isDirty $ EC.liftEffect $ HS.notify listener AutoSave
               Nothing -> pure unit
-          H.modify_ _ { mPendingMaxWait = Just mFib }
+          H.modify_ _ { mPendingMaxWaitF = Just mFib }
 
     AutoSave -> do
       -- only save, if dirty
@@ -553,9 +581,9 @@ editor = connect selectTranslator $ H.mkComponent
         mRef <- H.gets _.mDirtyRef
         for_ mRef \r -> H.liftEffect $ Ref.write false r
         st <- H.get
-        for_ st.mPendingDebounce (H.liftAff <<< killFiber (error "done"))
-        for_ st.mPendingMaxWait (H.liftAff <<< killFiber (error "done"))
-        H.modify_ _ { mPendingDebounce = Nothing, mPendingMaxWait = Nothing }
+        for_ st.mPendingDebounceF (H.liftAff <<< killFiber (error "done"))
+        for_ st.mPendingMaxWaitF (H.liftAff <<< killFiber (error "done"))
+        H.modify_ _ { mPendingDebounceF = Nothing, mPendingMaxWaitF = Nothing }
 
     Comment -> do
       user <- H.liftAff getUser
@@ -696,8 +724,8 @@ editor = connect selectTranslator $ H.mkComponent
       case state.mBeforeUnloadL of
         Just l -> H.liftEffect $ removeEventListener beforeunload l false tgt
         _ -> pure unit
-      for_ state.mPendingDebounce (H.liftAff <<< killFiber (error "finalize"))
-      for_ state.mPendingMaxWait (H.liftAff <<< killFiber (error "finalize"))
+      for_ state.mPendingDebounceF (H.liftAff <<< killFiber (error "finalize"))
+      for_ state.mPendingMaxWaitF (H.liftAff <<< killFiber (error "finalize"))
 
   handleQuery
     :: forall slots a
