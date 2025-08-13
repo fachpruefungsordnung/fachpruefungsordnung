@@ -146,9 +146,9 @@ data Action
   | LostParentID TOCEntry String Content
   | SavedIcon
   -- new change in editor -> reset timer
-  | AutoSaveTimer 
+  | AutoSaveTimer
   -- called by AutoSaveTimer subscription
-  | AutoSave 
+  | AutoSave
   | RenderHTML
   | ShowAllComments
   | Receive (Connected FPOTranslator Input)
@@ -291,8 +291,11 @@ editor = connect selectTranslator $ H.mkComponent
       , if state.showSavedIcon then
           HH.div
             [ HP.classes [ HH.ClassName "save-toast" ]
-            , HP.style "position: absolute; right: .5rem; bottom: .5rem; z-index: 10;" ]
-            [ HH.text $ (translate (label :: _ "editor_save") state.translator) <> " 💾" ]
+            , HP.style "position: absolute; right: .5rem; bottom: .5rem; z-index: 10;"
+            ]
+            [ HH.text $ (translate (label :: _ "editor_save") state.translator) <>
+                " 💾"
+            ]
         else
           HH.text ""
       ]
@@ -438,7 +441,7 @@ editor = connect selectTranslator $ H.mkComponent
 
           -- Save the current content of the editor
           let
-            contentLines = 
+            contentLines =
               fromMaybe { title: "", contentText: "" } do
                 { head, tail } <- uncons =<< allLines
                 pure { title: head, contentText: intercalate "\n" tail }
@@ -492,14 +495,15 @@ editor = connect selectTranslator $ H.mkComponent
         Right res -> case ContentDto.extractNewParent newContent res.body of
           Left _ -> handleAction $ LostParentID newEntry title newContent
           Right updatedContent -> do
+            -- Update the tree to backend, when title was really changed
+            let oldTitle = state.title
+            H.raise (SavedSection (oldTitle /= title) title newEntry)
+
             H.modify_ \st -> st
               { mTocEntry = Just newEntry
               , title = title
               , mContent = Just updatedContent
               }
-            -- Update the tree to backend, when title was really changed
-            let oldTitle = state.title
-            H.raise (SavedSection (oldTitle /= title) title newEntry)
 
             -- Show saved icon
             handleAction SavedIcon
