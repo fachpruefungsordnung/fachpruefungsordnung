@@ -195,9 +195,8 @@ splitview = H.mkComponent
     let
       navbarHeight :: Int
       navbarHeight = 56 -- px, height of the navbar
-
-      toolbarHeight :: Int
-      toolbarHeight = 31 -- px, height of the toolbar
+    -- toolbarHeight :: Int
+    -- toolbarHeight = 31 -- px, height of the toolbar
     in
       HH.div
         [ HE.onMouseMove HandleMouseMove
@@ -205,7 +204,7 @@ splitview = H.mkComponent
         , HE.onMouseLeave StopResize
         , HP.classes [ HB.dFlex, HB.overflowHidden ]
         , HP.style
-            ( "height: calc(100vh - " <> show (navbarHeight + toolbarHeight) <>
+            ( "height: calc(100vh - " <> show navbarHeight <>
                 "px); max-height: 100%;"
             )
         ]
