@@ -12,7 +12,7 @@ import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 
 import GHC.Generics (Generic)
-import GHC.Int (Int32)
+import GHC.Int (Int64)
 
 import Control.Lens ((&), (?~))
 import Data.Aeson (FromJSON (..), ToJSON (..))
@@ -31,7 +31,7 @@ import DocumentManagement.Hash (Hashable (..))
 
 -- | ID for a text element
 newtype TextElementID = TextElementID
-    { unTextElementID :: Int32
+    { unTextElementID :: Int64
     }
     deriving (Eq, Ord, Show)
 
@@ -45,7 +45,7 @@ instance FromJSON TextElementID where
     parseJSON = fmap TextElementID . parseJSON
 
 instance ToSchema TextElementID where
-    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int64)
 
 instance ToParamSchema TextElementID where
     toParamSchema _ =

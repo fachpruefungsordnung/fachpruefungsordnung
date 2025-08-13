@@ -41,7 +41,7 @@ createNode =
                 (kind)
             values
                 ($1 :: text)
-            returning id :: int4
+            returning id :: int8
         |]
 
 -- | statement to get a node kind by the corresponding 'NodeID'
@@ -55,7 +55,7 @@ getNodeKind =
             from
                 nodes
             where
-                id = $1 :: int4
+                id = $1 :: int8
         |]
 
 -- | statement to put a specific version of a document tree into the database
@@ -69,7 +69,7 @@ putVersion =
             insert into node_versions
                 (hash, node, content)
             values
-                ($1 :: bytea, $2 :: int4, $3 :: text?)
+                ($1 :: bytea, $2 :: int8, $3 :: text?)
             on conflict (hash) do nothing
         |]
 
@@ -85,7 +85,7 @@ getVersion =
             [singletonStatement|
                 select
                     hash :: bytea,
-                    node :: int4,
+                    node :: int8,
                     kind :: text,
                     content :: text?
                 from
@@ -106,7 +106,7 @@ putEdge =
             insert into trees
                 (parent, child, child_position, child_title)
             values
-                ($1 :: bytea, $2 :: bytea, $3 :: int4, $4 :: text)
+                ($1 :: bytea, $2 :: bytea, $3 :: int8, $4 :: text)
         |]
 
 -- | statement to obtain all child document node version by their parent's hash
@@ -124,7 +124,7 @@ getChildrenByParentHash =
                 select
                     child_title :: text,
                     hash :: bytea,
-                    node :: int4,
+                    node :: int8,
                     kind :: text,
                     content :: text?
                 from
@@ -155,20 +155,20 @@ createCommit =
                     $1 :: uuid,
                     $2 :: text?,
                     $3 :: bytea,
-                    $4 :: int4?,
+                    $4 :: int8?,
                     coalesce((
                         select height + 1
                         from commits
-                        where id = $4 :: int4?
+                        where id = $4 :: int8?
                     ), 0),
                     coalesce((
                         select root_commit
                         from commits
-                        where id = $4 :: int4?
-                    ), $4 :: int4?)
+                        where id = $4 :: int8?
+                    ), $4 :: int8?)
                 )
                 returning
-                    id :: int4, creation_ts :: timestamp
+                    id :: int8, creation_ts :: timestamp
             |]
 
 -- | register a parent-child relation between two commits
@@ -180,7 +180,7 @@ putCommitRel =
             insert into
                 commit_trees (parent, child)
             values
-                ($1 :: int4, $2 :: int4)
+                ($1 :: int8, $2 :: int8)
         |]
 
 -- | get the ids of all parents of a commit
@@ -191,11 +191,11 @@ getCommitParentIDs =
             unCommitID
             [vectorStatement|
                 select
-                    parent :: int4
+                    parent :: int8
                 from
                     commit_trees
                 where
-                    child = $1 :: int4
+                    child = $1 :: int8
             |]
 
 -- | statement to get a commit by its 'CommitID'
@@ -215,16 +215,16 @@ getCommit =
             (\(CommitID i) -> i)
             [singletonStatement|
                 select
-                    id :: int4,
+                    id :: int8,
                     creation_ts :: timestamp,
                     author :: uuid,
                     message :: text?,
                     root :: bytea,
-                    base :: int4?
+                    base :: int8?
                 from
                     commits
                 where
-                    id = $1 :: int4
+                    id = $1 :: int8
             |]
 
 getCommitsByRoot
@@ -249,16 +249,16 @@ getCommitsByRoot =
             unCommitID
             [vectorStatement|
                 select
-                    id :: int4,
+                    id :: int8,
                     creation_ts :: timestamp,
                     author :: uuid,
                     message :: text?,
                     root :: bytea,
-                    base :: int4?
+                    base :: int8?
                 from
                     commits
                 where
-                    id = $1 :: int4 or root_commit = $1 :: int4
+                    id = $1 :: int8 or root_commit = $1 :: int8
             |]
 
 -- | get commit node by commit id.
@@ -277,14 +277,14 @@ getCommitNode =
             unCommitID
             [singletonStatement|
                 select
-                    id :: int4,
-                    base :: int4?,
-                    height :: int4,
-                    root_commit :: int4?
+                    id :: int8,
+                    base :: int8?,
+                    height :: int8,
+                    root_commit :: int8?
                 from
                     commits
                 where
-                    id = $1 :: int4
+                    id = $1 :: int8
             |]
 
 -- | statement to create a node of a certain kind
@@ -296,8 +296,8 @@ createDocument =
             insert into documents
                 (name, group_id)
             values
-                ($1 :: text, $2 :: int4)
-            returning id :: int4, name :: text, group_id :: int4
+                ($1 :: text, $2 :: int8)
+            returning id :: int8, name :: text, group_id :: int8
         |]
 
 -- | statement to get a document by its corresponding 'DocumentID'
@@ -315,14 +315,14 @@ getDocument =
             unDocumentID
             [singletonStatement|
             select
-                id :: int4,
+                id :: int8,
                 name :: text,
-                group_id :: int4,
-                head :: int4?
+                group_id :: int8,
+                head :: int8?
             from
                 documents
             where
-                id = $1 :: int4
+                id = $1 :: int8
         |]
 
 -- | statement to put a specific version of a document tree into the database
@@ -335,7 +335,7 @@ setDocumentHead =
         [resultlessStatement|
             update documents
             set
-                head = $2 :: int4
+                head = $2 :: int8
             where
-                id = $1 :: int4
+                id = $1 :: int8
         |]

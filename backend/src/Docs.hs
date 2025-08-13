@@ -74,7 +74,7 @@ import Docs.TreeRevision
     )
 import qualified Docs.TreeRevision as TreeRevision
 import qualified Docs.UserRef as UserRef
-import GHC.Int (Int32)
+import GHC.Int (Int64)
 
 data Error
     = NoPermission DocumentID Permission
@@ -87,7 +87,7 @@ data Error
 
 type Result a = Either Error a
 
-type Limit = Int32
+type Limit = Int64
 
 defaultHistoryLimit :: Limit
 defaultHistoryLimit = 20

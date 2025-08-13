@@ -52,7 +52,7 @@ import Web.HttpApiData (FromHttpApiData (..))
 
 -- | represents the id of a `Node`
 newtype NodeID = NodeID
-    { unNodeID :: Int32
+    { unNodeID :: Int64
     }
     deriving (Show, Generic)
 
@@ -63,7 +63,7 @@ instance FromJSON NodeID where
     parseJSON = fmap NodeID . parseJSON
 
 instance ToSchema NodeID where
-    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int64)
 
 instance ToParamSchema NodeID where
     toParamSchema _ =
@@ -318,7 +318,7 @@ instance ToSchema Node
 data DataEdge = DataEdge
     { dataEdgeParent :: Hash
     , dataEdgeChild :: Hash
-    , dataEdgeChildPosition :: Int32
+    , dataEdgeChildPosition :: Int64
     , dataEdgeChildTitle :: Text
     }
 

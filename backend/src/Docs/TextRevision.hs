@@ -25,7 +25,7 @@ import Data.Time (UTCTime)
 import Text.Read (readMaybe)
 
 import GHC.Generics (Generic)
-import GHC.Int (Int32)
+import GHC.Int (Int64)
 
 import Control.Lens ((&), (.~), (?~))
 import Data.Aeson (FromJSON (..), ToJSON (..), (.:), (.=))
@@ -80,7 +80,7 @@ textRevisionRef = (TextRevisionRef .) . TextElementRef
 
 -- | ID for a text revision
 newtype TextRevisionID = TextRevisionID
-    { unTextRevisionID :: Int32
+    { unTextRevisionID :: Int64
     }
     deriving (Eq, Ord, Show)
 
@@ -91,7 +91,7 @@ instance FromJSON TextRevisionID where
     parseJSON = fmap TextRevisionID . parseJSON
 
 instance ToSchema TextRevisionID where
-    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int64)
 
 instance ToParamSchema TextRevisionID where
     toParamSchema _ =
@@ -120,12 +120,12 @@ instance FromJSON TextRevisionSelector where
                 else fail $ "Invalid string for TextRevisionSelector: " ++ Text.unpack t
         Aeson.Number n -> case toBoundedInteger n of
             Just i -> pure $ Specific $ TextRevisionID i
-            Nothing -> fail "Invalid number for Int32"
+            Nothing -> fail "Invalid number for Int64"
         _ -> fail "TextRevisionSelector must be either a string \"latest\" or an integer"
 
 instance ToSchema TextRevisionSelector where
     declareNamedSchema _ = do
-        intSchema <- declareSchemaRef (Proxy :: Proxy Int32)
+        intSchema <- declareSchemaRef (Proxy :: Proxy Int64)
         let latestSchema =
                 Inline $
                     mempty

@@ -6,7 +6,7 @@ import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
 import Data.Text (Text)
 import GHC.Generics (Generic)
-import GHC.Int (Int32)
+import GHC.Int (Int64)
 import qualified UserManagement.User as User
 
 -- | Represents all information about a single group
@@ -40,4 +40,4 @@ data GroupCreate = GroupCreate
 instance FromJSON GroupCreate
 instance ToSchema GroupCreate
 
-type GroupID = Int32
+type GroupID = Int64

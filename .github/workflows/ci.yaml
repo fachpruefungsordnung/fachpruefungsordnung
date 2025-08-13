@@ -152,11 +152,7 @@ jobs:
           # -> require-concurrent-index-creation <-
           # We perform migrations within a transaction. Postgres does not allow
           # concurrent index creation during transactions.
-          # -> prefer-bigin-over-int <-
-          # Currently, all ID types use int32. In the future, this should be
-          # changed, but it is too much work for now and other thins have
-          # higer prio.
-          exclude: "require-concurrent-index-creation,prefer-bigint-over-int"
+          exclude: "require-concurrent-index-creation"
           files: ${{ steps.modified-migrations.outputs.FILES }}
           pg-version: "17.0"
           version: "latest"

@@ -81,7 +81,7 @@ instance Hashable Hash where
 instance Hashable Int where
     updateHash = updateHashShow
 
-instance Hashable Int32 where
+instance Hashable Int64 where
     updateHash = updateHashShow
 
 instance (Hashable a) => Hashable [a] where

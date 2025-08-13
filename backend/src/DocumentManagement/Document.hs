@@ -28,13 +28,13 @@ import Data.Proxy (Proxy (..))
 import Data.Text (Text)
 import DocumentManagement.Commit (CommitID)
 import GHC.Generics (Generic)
-import GHC.Int (Int32)
+import GHC.Int (Int64)
 import UserManagement.Group (GroupID)
 import Web.HttpApiData (FromHttpApiData (..))
 
 -- | id type for documents
 newtype DocumentID = DocumentID
-    { unDocumentID :: Int32
+    { unDocumentID :: Int64
     }
     deriving (Show, Eq, Ord)
 
@@ -45,7 +45,7 @@ instance FromJSON DocumentID where
     parseJSON = fmap DocumentID . parseJSON
 
 instance ToSchema DocumentID where
-    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int64)
 
 instance ToParamSchema DocumentID where
     toParamSchema _ =
@@ -87,7 +87,7 @@ instance ToSchema Document where
     declareNamedSchema _ = do
         idSchema <- declareSchemaRef (Proxy :: Proxy DocumentID)
         nameSchema <- declareSchemaRef (Proxy :: Proxy Text)
-        groupIDSchema <- declareSchemaRef (Proxy :: Proxy Int32)
+        groupIDSchema <- declareSchemaRef (Proxy :: Proxy Int64)
         commitSchema <- declareSchemaRef (Proxy :: Proxy (Maybe CommitID))
         return $
             NamedSchema (Just "Document") $
