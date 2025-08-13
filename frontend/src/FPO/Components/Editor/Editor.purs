@@ -29,7 +29,7 @@ import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
-import Effect.Aff (Fiber, Milliseconds(..), delay, error, forkAff, killFiber)
+import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class as EC
 import Effect.Console (log)
@@ -103,8 +103,8 @@ type State = FPOState
   , showSavedIcon :: Boolean
   , mSavedIconF :: Maybe H.ForkId
   -- for periodically saving the content
-  , mPendingDebounceF :: Maybe (Fiber Unit) -- 2s-Timer
-  , mPendingMaxWaitF :: Maybe (Fiber Unit) -- 20s-Max-Timer
+  , mPendingDebounceF :: Maybe H.ForkId -- 2s-Timer
+  , mPendingMaxWaitF :: Maybe H.ForkId -- 20s-Max-Timer
   )
 
 -- For tracking the comment markers live
@@ -539,19 +539,15 @@ editor = connect selectTranslator $ H.mkComponent
       state <- H.get
       -- restart 2 sec timer after every new input
       -- first kill the maybe running fiber (kinda like a thread)
-      for_ state.mPendingDebounceF \f -> H.liftAff $ killFiber (error "debounce reset")
-        f
+      for_ state.mPendingDebounceF H.kill
+
       -- start a new fiber
-      dFib <- H.liftAff $ forkAff do
-        delay (Milliseconds 2000.0)
+      dFib <- H.fork do
+        H.liftAff $ delay (Milliseconds 2000.0)
         isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
           Just r -> pure r
           Nothing -> EC.liftEffect $ Ref.new false
-        case state.mListener of
-          Just listener -> do
-            -- since we are in Aff, we cannot use handleAction
-            when isDirty $ EC.liftEffect $ HS.notify listener AutoSave
-          Nothing -> pure unit
+        when isDirty $ handleAction AutoSave
       H.modify_ _ { mPendingDebounceF = Just dFib }
 
       -- This is a seperate 20 sec timer, which forces to save, in case of a long edit
@@ -561,15 +557,12 @@ editor = connect selectTranslator $ H.mkComponent
         Just _ -> pure unit
         -- no timer there
         Nothing -> do
-          mFib <- H.liftAff $ forkAff do
-            delay (Milliseconds 20000.0)
+          mFib <- H.fork do
+            H.liftAff $ delay (Milliseconds 20000.0)
             isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
               Just r -> pure r
               Nothing -> EC.liftEffect $ Ref.new false
-            case state.mListener of
-              Just listener -> do
-                when isDirty $ EC.liftEffect $ HS.notify listener AutoSave
-              Nothing -> pure unit
+            when isDirty $ handleAction AutoSave
           H.modify_ _ { mPendingMaxWaitF = Just mFib }
 
     AutoSave -> do
@@ -581,8 +574,8 @@ editor = connect selectTranslator $ H.mkComponent
         mRef <- H.gets _.mDirtyRef
         for_ mRef \r -> H.liftEffect $ Ref.write false r
         st <- H.get
-        for_ st.mPendingDebounceF (H.liftAff <<< killFiber (error "done"))
-        for_ st.mPendingMaxWaitF (H.liftAff <<< killFiber (error "done"))
+        for_ st.mPendingDebounceF H.kill
+        for_ st.mPendingMaxWaitF H.kill
         H.modify_ _ { mPendingDebounceF = Nothing, mPendingMaxWaitF = Nothing }
 
     Comment -> do
@@ -724,8 +717,8 @@ editor = connect selectTranslator $ H.mkComponent
       case state.mBeforeUnloadL of
         Just l -> H.liftEffect $ removeEventListener beforeunload l false tgt
         _ -> pure unit
-      for_ state.mPendingDebounceF (H.liftAff <<< killFiber (error "finalize"))
-      for_ state.mPendingMaxWaitF (H.liftAff <<< killFiber (error "finalize"))
+      for_ state.mPendingDebounceF H.kill
+      for_ state.mPendingMaxWaitF H.kill
 
   handleQuery
     :: forall slots a
