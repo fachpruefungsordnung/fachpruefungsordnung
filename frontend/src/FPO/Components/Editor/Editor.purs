@@ -141,12 +141,14 @@ data Action
   | Upload TOCEntry String Content
   -- Subsection of Upload
   | LostParentID TOCEntry String Content
+  -- new change in editor -> reset timer
+  | AutoSaveTimer 
+  -- called by AutoSaveTimer subscription
+  | AutoSave 
   | RenderHTML
   | ShowAllComments
   | Receive (Connected FPOTranslator Input)
   | HandleResize Number
-  | AutoSaveTimer -- new change in editor -> reset timer
-  | AutoSave -- save now
   | Finalize
 
 -- We use a query to get the content of the editor
@@ -407,72 +409,57 @@ editor = connect selectTranslator $ H.mkComponent
     ShowAllComments -> do
       H.raise ShowAllCommentsOutput
 
+    -- Save section
+
     Save -> do
       state <- H.get
+      -- Save the current content of the editor and send it to the server
+      case state.mContent of
+        Nothing -> pure unit
+        Just content -> do
+          allLines <- H.gets _.mEditor >>= traverse \ed -> do
+            H.liftEffect $ Editor.getSession ed
+              >>= Session.getDocument
+              >>= Document.getAllLines
 
-      -- check, if there are any changes in the editor
-      -- If not, do not send anything to the server
-      hasUndoMgr <- H.gets _.mEditor >>= traverse \ed -> do
-        H.liftEffect do
-          session <- Editor.getSession ed
-          undoMgr <- Session.getUndoManager session
-          UndoMgr.hasUndo undoMgr
+          -- Save the current content of the editor
+          let
+            contentLines = 
+              fromMaybe { title: "", contentText: "" } do
+                { head, tail } <- uncons =<< allLines
+                pure { title: head, contentText: intercalate "\n" tail }
+            title = contentLines.title
+            contentText = contentLines.contentText
 
-      -- only save, if there are changes detected by UndoManager
-      if (fromMaybe false hasUndoMgr) then do
-        -- Save the current content of the editor and send it to the server
-        case state.mContent of
-          Nothing -> pure unit
-          Just content -> do
-            allLines <- H.gets _.mEditor >>= traverse \ed -> do
-              H.liftEffect $ Editor.getSession ed
-                >>= Session.getDocument
-                >>= Document.getAllLines
+            -- place it in contentDto
+            newContent = ContentDto.setContentText contentText content
 
-            -- Save the current content of the editor
-            let
-              contentLines = case allLines of
-                Just ls -> case uncons ls of
-                  Just { head, tail } ->
-                    { title: head, contentText: intercalate "\n" tail }
-                  Nothing -> { title: "", contentText: "" }
-                Nothing -> { title: "", contentText: "" }
-              title = contentLines.title
-              contentText = contentLines.contentText
+            -- extract the current TOC entry
+            entry = case state.mTocEntry of
+              Nothing -> emptyTOCEntry
+              Just e -> e
 
-              -- place it in contentDto
-              newContent = ContentDto.setContentText contentText content
+          -- Since the ids and postions in liveMarkers are changing constantly,
+          -- extract them now and store them
+          updatedMarkers <- H.liftEffect do
+            for entry.markers \m -> do
+              case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
+                -- TODO Should we add other markers in liveMarkers such as errors?
+                Nothing -> pure m
+                Just lm -> do
+                  start <- Anchor.getPosition lm.startAnchor
+                  end <- Anchor.getPosition lm.endAnchor
+                  pure m
+                    { startRow = Types.getRow start
+                    , startCol = Types.getColumn start
+                    , endRow = Types.getRow end
+                    , endCol = Types.getColumn end
+                    }
+          -- update the markers in entry
+          let newEntry = entry { markers = updatedMarkers }
 
-              -- extract the current TOC entry
-              entry = case state.mTocEntry of
-                Nothing -> emptyTOCEntry
-                Just e -> e
-
-            -- Since the ids and postions in liveMarkers are changing constantly,
-            -- extract them now and store them
-            updatedMarkers <- H.liftEffect do
-              for entry.markers \m -> do
-                case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
-                  -- TODO Should we add other markers in liveMarkers such as errors?
-                  Nothing -> pure m
-                  Just lm -> do
-                    start <- Anchor.getPosition lm.startAnchor
-                    end <- Anchor.getPosition lm.endAnchor
-                    pure m
-                      { startRow = Types.getRow start
-                      , startCol = Types.getColumn start
-                      , endRow = Types.getRow end
-                      , endCol = Types.getColumn end
-                      }
-            -- update the markers in entry
-            let newEntry = entry { markers = updatedMarkers }
-
-            -- Try to upload
-            handleAction $ Upload newEntry title newContent
-      else do
-        -- mDirtyRef := false
-        for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
-        pure unit
+          -- Try to upload
+          handleAction $ Upload newEntry title newContent
 
     Upload newEntry title newContent -> do
       state <- H.get
@@ -519,6 +506,56 @@ editor = connect selectTranslator $ H.mkComponent
               newEntry
               title
               (ContentDto.setContentText (ContentDto.getContentText newContent) res)
+
+    AutoSaveTimer -> do
+      state <- H.get
+      -- restart 2 sec timer after every new input
+      -- first kill the maybe running fiber (kinda like a thread)
+      for_ state.mPendingDebounce \f -> H.liftAff $ killFiber (error "debounce reset")
+        f
+      -- start a new fiber
+      dFib <- H.liftAff $ forkAff do
+        delay (Milliseconds 2000.0)
+        isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
+          Just r -> pure r
+          Nothing -> EC.liftEffect $ Ref.new false
+        case state.mListener of
+          Just listener -> do
+            -- since we are in Aff, we cannot use handleAction
+            when isDirty $ EC.liftEffect $ HS.notify listener AutoSave
+          Nothing -> pure unit
+      H.modify_ _ { mPendingDebounce = Just dFib }
+
+      -- This is a seperate 20 sec timer, which forces to save, in case of a long edit
+      -- does not reset with new input
+      case state.mPendingMaxWait of
+        -- timer already running
+        Just _ -> pure unit
+        -- no timer there
+        Nothing -> do
+          mFib <- H.liftAff $ forkAff do
+            delay (Milliseconds 20000.0)
+            isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
+              Just r -> pure r
+              Nothing -> EC.liftEffect $ Ref.new false
+            case state.mListener of
+              Just listener -> do
+                when isDirty $ EC.liftEffect $ HS.notify listener AutoSave
+              Nothing -> pure unit
+          H.modify_ _ { mPendingMaxWait = Just mFib }
+
+    AutoSave -> do
+      -- only save, if dirty
+      isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.mDirtyRef
+      when isDirty do
+        handleAction Save
+        -- after Save: dirty false + stop timer
+        mRef <- H.gets _.mDirtyRef
+        for_ mRef \r -> H.liftEffect $ Ref.write false r
+        st <- H.get
+        for_ st.mPendingDebounce (H.liftAff <<< killFiber (error "done"))
+        for_ st.mPendingMaxWait (H.liftAff <<< killFiber (error "done"))
+        H.modify_ _ { mPendingDebounce = Nothing, mPendingMaxWait = Nothing }
 
     Comment -> do
       user <- H.liftAff getUser
@@ -642,56 +679,6 @@ editor = connect selectTranslator $ H.mkComponent
       let cutoff = if lang == Just "de-DE" then 573.0 else 520.0
 
       H.modify_ _ { showButtonText = width >= cutoff }
-
-    AutoSaveTimer -> do
-      state <- H.get
-      -- restart 2 sec timer after every new input
-      -- first kill the maybe running fiber (kinda like a thread)
-      for_ state.mPendingDebounce \f -> H.liftAff $ killFiber (error "debounce reset")
-        f
-      -- start a new fiber
-      dFib <- H.liftAff $ forkAff do
-        delay (Milliseconds 2000.0)
-        isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
-          Just r -> pure r
-          Nothing -> EC.liftEffect $ Ref.new false
-        case state.mListener of
-          Just listener -> do
-            -- since we are in Aff, we cannot use handleAction
-            when isDirty $ EC.liftEffect $ HS.notify listener AutoSave
-          Nothing -> pure unit
-      H.modify_ _ { mPendingDebounce = Just dFib }
-
-      -- This is a seperate 20 sec timer, which forces to save, in case of a long edit
-      -- does not reset with new input
-      case state.mPendingMaxWait of
-        -- timer already running
-        Just _ -> pure unit
-        -- no timer there
-        Nothing -> do
-          mFib <- H.liftAff $ forkAff do
-            delay (Milliseconds 20000.0)
-            isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
-              Just r -> pure r
-              Nothing -> EC.liftEffect $ Ref.new false
-            case state.mListener of
-              Just listener -> do
-                when isDirty $ EC.liftEffect $ HS.notify listener AutoSave
-              Nothing -> pure unit
-          H.modify_ _ { mPendingMaxWait = Just mFib }
-
-    AutoSave -> do
-      -- only save, if dirty
-      isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.mDirtyRef
-      when isDirty do
-        handleAction Save
-        -- after Save: dirty false + stop timer
-        mRef <- H.gets _.mDirtyRef
-        for_ mRef \r -> H.liftEffect $ Ref.write false r
-        st <- H.get
-        for_ st.mPendingDebounce (H.liftAff <<< killFiber (error "done"))
-        for_ st.mPendingMaxWait (H.liftAff <<< killFiber (error "done"))
-        H.modify_ _ { mPendingDebounce = Nothing, mPendingMaxWait = Nothing }
 
     Finalize -> do
       state <- H.get
