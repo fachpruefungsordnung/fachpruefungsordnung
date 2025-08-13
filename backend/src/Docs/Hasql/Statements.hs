@@ -981,6 +981,6 @@ isGroupAdmin =
             FROM
                 roles
             WHERE
-                user_id = $1 :: uuid AND group_id = $2 :: int AND role = 'admin'
+                user_id = $1 :: uuid AND group_id = $2 :: int8 AND role = 'admin'
         ) :: bool
     |]
