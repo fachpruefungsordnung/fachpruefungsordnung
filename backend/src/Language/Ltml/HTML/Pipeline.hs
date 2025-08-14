@@ -2,22 +2,24 @@
 
 module Language.Ltml.HTML.Pipeline (htmlPipeline) where
 
+import Clay (render)
 import Control.Applicative (empty)
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
+import Data.Text.Lazy (toStrict)
 import Language.Lsd.Example.Fpo (sectionT)
 import Language.Ltml.HTML (renderHtmlCss)
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.Parser.Section (sectionP)
 import Lucid
-import Text.Megaparsec (runParser)
+import Text.Megaparsec (errorBundlePretty, runParser)
 
 -- | Parse section and render HTML with inlined CSS
 htmlPipeline :: Text -> ByteString
 htmlPipeline input =
     case runParser (sectionP sectionT empty) "" input of
-        Left err -> renderBS $ errorHtml (show err)
+        Left err -> renderBS $ errorHtml (errorBundlePretty err)
         Right nodeSection ->
             let (body, css) = renderHtmlCss nodeSection
              in renderBS $ addInlineCssHeader css body
@@ -27,8 +29,8 @@ htmlPipeline input =
 -- | Takes error message and generates error html
 errorHtml :: String -> Html ()
 errorHtml err = doctypehtml_ $ do
-    -- head_ $
-    --     style_ (toStrict $ render (Class.classStyle Class.Document))
+    head_ $
+        style_ (toStrict $ render (Class.classStyle Class.Document))
     body_ $ do
         div_ <#> Class.Document $ do
             h3_ "Parsing failed!"
