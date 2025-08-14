@@ -179,11 +179,12 @@ instance ToHtmlM (Node EnumItem) where
         addMaybeLabelToState mLabel EnumItemRef
         -- \| Save current enum item id, if nested enumerations follow and reset it
         enumItemID <- gets currentEnumItemID
-        enumItemHtml <- toHtmlM textTrees
+        -- \| Render grouped raw text (without enums) to get correct flex spacing
+        enumItemHtml <- renderGroupedTextTree textTrees
         -- \| Increment enumItemID for next enumItem
         modify (\s -> s {currentEnumItemID = enumItemID + 1})
         return $
-            div_ [cssClass_ Class.TextContainer, mId_ mLabel] . div_ <$> enumItemHtml
+            div_ [cssClass_ Class.TextContainer, mId_ mLabel] <$> enumItemHtml
 
 instance (ToHtmlM a) => ToHtmlM [a] where
     toHtmlM [] = returnNow mempty

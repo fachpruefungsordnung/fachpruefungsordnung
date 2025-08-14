@@ -107,11 +107,9 @@ classStyle Enumeration =
             ol # byClass enumClassName |> li ? do
                 counterIncrement "item"
                 display grid
-                gridTemplateColumns [ch 3, fr 1]
-                -- TODO: Gap stays the same for 1. and aaa), instead the
-                --       size of the identifier should not be part of the gap
+                gridTemplateColumns [auto, fr 1]
                 -- \| gap between enum item id and enum text
-                gap (em 0.5)
+                gap (em 0.55)
                 marginTop (em 0)
                 marginBottom (em 0)
 
