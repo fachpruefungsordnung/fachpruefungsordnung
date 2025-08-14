@@ -293,7 +293,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
   rootTreeToHTML _ _ _ _ Empty = []
   rootTreeToHTML state docName menuPath mSelectedTocEntry (RootTree { children }) =
     [ HH.div
-        [ HP.classes [ HB.bgWhite ] ]
+        [ HP.classes [ HB.bgWhite, HB.shadow ] ]
         [ HH.div
             [ HP.classes [ HB.borderBottom, HB.ms1, HB.me2 ] ]
             [ HH.div
@@ -399,7 +399,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       let
         selectedClasses =
           if Just id == mSelectedTocEntry then
-            [ HB.bgPrimary, HH.ClassName "bg-opacity-10", HB.textPrimary ]
+            [ HH.ClassName "active" ]
           else []
         containerProps =
           ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <> selectedClasses

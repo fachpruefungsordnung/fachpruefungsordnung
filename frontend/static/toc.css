@@ -16,14 +16,19 @@
   opacity: 1;
 }
 
-/* Always show add button in header */
-.border-bottom .toc-add-wrapper {
-  opacity: 1;
-}
-
 /* Hover effects for toc items */
 .toc-item:hover {
   background-color: var(--bs-gray-100) !important;
+}
+
+.toc-item.active {
+  background-color: rgb(230, 240, 255) !important;
+  color: rgb(13, 110, 253) !important;
+}
+
+/* Always show add button in header */
+.border-bottom .toc-add-wrapper {
+  opacity: 1;
 }
 
 /* Drag handle cursor */
