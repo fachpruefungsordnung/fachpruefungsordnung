@@ -31,7 +31,7 @@ import System.Directory (removeDirectoryRecursive)
 import Text.Megaparsec (runParser)
 import Prelude hiding (Enum, Word, readFile)
 
-testDoc = readFile "src/Language/Ltml/HTML/Test/studienaufbau_master.txt"
+testDoc = readFile "src/Language/Ltml/HTML/Test/test.txt"
 
 parseTest :: IO ()
 parseTest = do

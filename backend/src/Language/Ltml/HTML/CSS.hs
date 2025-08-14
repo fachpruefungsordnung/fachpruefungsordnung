@@ -17,4 +17,4 @@ cssClasses = map classStyle [minBound .. maxBound]
 
 -- | Builds CSS Counters and produces final main stylesheet
 mainStylesheet :: EnumStyleMap -> Css
-mainStylesheet enumStyleMap = mconcat (buildCssCounters enumStyleMap : cssClasses)
+mainStylesheet enumStyleMap = mconcat cssClasses <> buildCssCounters enumStyleMap

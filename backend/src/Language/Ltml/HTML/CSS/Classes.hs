@@ -30,12 +30,16 @@ data Class
       ParagraphID
     | -- | Text container which spaces text with elements in it (e.g. enumerations)
       TextContainer
-    | -- | Underlining basic text
-      Underlined
-    | -- | Class which inlines a red bold error text
-      InlineError
     | -- | General class for all enumerations
       Enumeration
+    | -- | Underlined inlined basic text
+      Underlined
+    | -- | Bold inlined basic text
+      Bold
+    | -- | Italic inlined basic text
+      Italic
+    | -- | Class which inlines a red bold error text
+      InlineError
     deriving (Show, Eq, Enum, Bounded)
 
 -- | maps Class to its css style definition
@@ -47,6 +51,8 @@ classStyle Document =
         marginTop (em 2)
         marginLeft (em 2)
         marginRight (em 2)
+        -- \| make Document scrollable past its end
+        paddingBottom (em 10)
 classStyle Section =
     toClassSelector Section ? do
         display flex
@@ -70,11 +76,17 @@ classStyle TextContainer =
         -- \| gap between text and enumerations
         gap (em 0.5)
         textAlign justify
-classStyle Underlined = toClassSelector Underlined ? textDecoration underline
+classStyle Underlined = do
+    toClassSelector Underlined ? do
+        textDecoration underline
+classStyle Bold =
+    toClassSelector Bold ? do
+        fontWeight bold
+classStyle Italic =
+    toClassSelector Italic ? do
+        fontStyle italic
 classStyle InlineError =
     toClassSelector InlineError ? do
-        -- \| inlines content in flex environment
-        display displayContents
         fontColor red
         fontWeight bold
 classStyle Enumeration =
@@ -96,6 +108,8 @@ classStyle Enumeration =
                 counterIncrement "item"
                 display grid
                 gridTemplateColumns [ch 3, fr 1]
+                -- TODO: Gap stays the same for 1. and aaa), instead the
+                --       size of the identifier should not be part of the gap
                 -- \| gap between enum item id and enum text
                 gap (em 0.5)
                 marginTop (em 0)

@@ -103,7 +103,8 @@ instance ToHtmlM (Node Paragraph) where
          in do
                 childText <- local (\s -> s {currentParagraphIDHtml = paragraphIDHtml}) $ do
                     addMaybeLabelToState mLabel ParagraphRef
-                    toHtmlM textTrees
+                    -- \| Group raw text (without enums) into <div> for flex layout spacing
+                    renderGroupedTextTree textTrees
                 modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
                 -- \| Reset sentence id for next paragraph
                 modify (\s -> s {currentSentenceID = 0})
@@ -132,7 +133,6 @@ instance
                 Just labelHtml -> labelWrapperFunc globalState label labelHtml
         Styled style textTrees -> do
             textTreeHtml <- toHtmlM textTrees
-            -- TODO: Adds new Html tag which leads to newline in textContainers
             return $ toHtmlStyle style <$> textTreeHtml
         Enum enum -> toHtmlM enum
         Footnote _ ->
@@ -153,8 +153,8 @@ class ToHtmlStyle style where
     toHtmlStyle :: (Monad m) => style -> (HtmlT m a -> HtmlT m a)
 
 instance ToHtmlStyle FontStyle where
-    toHtmlStyle Bold = b_
-    toHtmlStyle Italics = i_
+    toHtmlStyle Bold = span_ <#> Class.Bold
+    toHtmlStyle Italics = span_ <#> Class.Italic
     toHtmlStyle Underlined = span_ <#> Class.Underlined
 
 instance ToHtmlM Enumeration where
@@ -182,7 +182,8 @@ instance ToHtmlM (Node EnumItem) where
         enumItemHtml <- toHtmlM textTrees
         -- \| Increment enumItemID for next enumItem
         modify (\s -> s {currentEnumItemID = enumItemID + 1})
-        return $ div_ [cssClass_ Class.TextContainer, mId_ mLabel] <$> enumItemHtml
+        return $
+            div_ [cssClass_ Class.TextContainer, mId_ mLabel] . div_ <$> enumItemHtml
 
 instance (ToHtmlM a) => ToHtmlM [a] where
     toHtmlM [] = returnNow mempty
@@ -202,3 +203,24 @@ instance ToHtmlM Void where
 --   no values of type Void
 instance ToHtmlStyle Void where
     toHtmlStyle = error "toHtmlStyle for Void was called!"
+
+-------------------------------------------------------------------------------
+
+-- | Extracts enums from list and packs raw text (without enums) into <div>;
+--   E.g. result: <div> raw text </div> <enum></enum> <div> reference </div>
+renderGroupedTextTree
+    :: (ToHtmlStyle style, ToHtmlM enum, ToHtmlM special)
+    => [TextTree style enum special]
+    -> HtmlReaderState
+renderGroupedTextTree [] = return $ Now mempty
+renderGroupedTextTree (enum@(Enum _) : ts) = do
+    enumHtml <- toHtmlM enum
+    followingHtml <- renderGroupedTextTree ts
+    return $ enumHtml <> followingHtml
+renderGroupedTextTree tts =
+    let (rawText, tts') = getNextRawTextTree tts
+     in do
+            rawTextHtml <- toHtmlM rawText
+            followingHtml <- renderGroupedTextTree tts'
+            -- \| Pack raw text without enums into <div>
+            return $ (div_ <$> rawTextHtml) <> followingHtml
