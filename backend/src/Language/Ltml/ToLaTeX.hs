@@ -13,7 +13,10 @@ import Data.Void (Void)
 import Language.Lsd.Example.Fpo (sectionT, superSectionT)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX.Format (staticDocumentFormat)
-import Language.Ltml.ToLaTeX.GlobalState (GlobalState (GlobalState, labelToRef))
+import Language.Ltml.ToLaTeX.GlobalState
+    ( GlobalState (GlobalState, labelToRef)
+    , emptyFormat
+    )
 import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
 import Language.Ltml.ToLaTeX.ToLaTeXM
 import Language.Ltml.ToLaTeX.Type (document)
@@ -35,6 +38,7 @@ initialGlobalState =
         0
         0
         [0]
+        emptyFormat
         False
         False
         mempty

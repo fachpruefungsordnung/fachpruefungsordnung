@@ -9,14 +9,19 @@ where
 
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword, TypeName)
-import Language.Lsd.AST.Format (HeadingFormat, IdentifierFormat)
+import Language.Lsd.AST.Format
+    ( HeadingFormat
+    , IdentifierFormat
+    , TocKeyFormat
+    )
 import Language.Lsd.AST.SimpleRegex (SimpleRegex)
 import Language.Lsd.AST.Type.Paragraph (ParagraphType)
 import Language.Lsd.AST.Type.Text (PreTextType, TextType)
 
-newtype SectionFormat
+data SectionFormat
     = SectionFormat
         IdentifierFormat
+        TocKeyFormat
     deriving (Show)
 
 data SectionType

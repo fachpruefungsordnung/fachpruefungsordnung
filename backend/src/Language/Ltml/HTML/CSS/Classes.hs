@@ -7,8 +7,7 @@ module Language.Ltml.HTML.CSS.Classes
     ( Class (..)
     , className
     , classStyle
-    , enumLevel
-    , enumIdentifier
+    , enumCounter
     ) where
 
 import Clay hiding (i)
@@ -17,7 +16,6 @@ import Data.Char (toLower)
 import Data.String (fromString)
 import Data.Text (Text, pack, unpack)
 import Language.Ltml.HTML.CSS.CustomClay
-import Language.Ltml.HTML.Util (intToLower)
 
 data Class
     = -- | Class for styling that should be applied to the whole document (HTML body)
@@ -36,14 +34,8 @@ data Class
       Underlined
     | -- | Class which inlines a red bold error text
       InlineError
-    | -- | Enum with 1., 2., 3., ...
-      EnumNum
-    | -- | Enum with a), b), c), ...
-      EnumCharPar
-    | -- | Enum with aa), bb), cc), ...
-      EnumCharCharPar
-    | -- | Enum for errors
-      EnumFail
+    | -- | General class for all enumerations
+      Enumeration
     deriving (Show, Eq, Enum, Bounded)
 
 -- | maps Class to its css style definition
@@ -85,19 +77,29 @@ classStyle InlineError =
         display displayContents
         fontColor red
         fontWeight bold
-classStyle EnumNum =
-    enumCounter
-        (className EnumNum)
-        (counterNum "item" <> stringCounter ". ")
-classStyle EnumCharPar =
-    enumCounter
-        (className EnumCharPar)
-        (counterChar "item" <> stringCounter ") ")
-classStyle EnumCharCharPar =
-    enumCounter
-        (className EnumCharCharPar)
-        (counterChar "item" <> counterChar "item" <> stringCounter ") ")
-classStyle EnumFail = enumCounter (className EnumFail) (stringCounter "x. ")
+classStyle Enumeration =
+    let enumClassName = className Enumeration
+     in do
+            ol # byClass enumClassName ? do
+                counterReset "item"
+                marginLeft (em 0)
+                paddingLeft (em 0)
+                marginTop (em 0)
+                marginBottom (em 0)
+                -- \| enums items are also spaced via flex environment
+                display flex
+                flexDirection column
+                -- \| gap between two enum items
+                gap (em 0.5)
+
+            ol # byClass enumClassName |> li ? do
+                counterIncrement "item"
+                display grid
+                gridTemplateColumns [ch 3, fr 1]
+                -- \| gap between enum item id and enum text
+                gap (em 0.5)
+                marginTop (em 0)
+                marginBottom (em 0)
 
 -- | Returns the html class name of given Class
 className :: Class -> Text
@@ -111,45 +113,12 @@ toClassSelector c = fromString ("." ++ unpack (className c))
 
 -------------------------------------------------------------------------------
 
--- | Example Enumertion Levels for an FPO
-enumLevel :: Int -> Class
-enumLevel i = case i of
-    0 -> EnumNum
-    1 -> EnumCharPar
-    2 -> EnumCharCharPar
-    _ -> EnumFail -- dont throw error but place placeholder symbol
-
 -- | Returns the enum item identifier based on its class and number
-enumIdentifier :: Class -> Int -> String
-enumIdentifier EnumNum n = show n
-enumIdentifier EnumCharPar n = intToLower n ++ ")"
-enumIdentifier EnumCharCharPar n = let charId = intToLower n in charId ++ charId ++ ")"
-enumIdentifier _ _ = "x."
+-- enumIdentifier :: Class -> Int -> String
 
--- | Builds CSS class with specfied counter for ordered lists
+-- | Builds CSS class with specfied counter for ordered list items
 enumCounter :: Text -> Counter -> Css
 enumCounter enumClassName counterContent = do
-    ol # byClass enumClassName ? do
-        counterReset "item"
-        marginLeft (em 0)
-        paddingLeft (em 0)
-        marginTop (em 0)
-        marginBottom (em 0)
-        -- \| enums items are also spaced via flex environment
-        display flex
-        flexDirection column
-        -- \| gap between two enum items
-        gap (em 0.5)
-
-    ol # byClass enumClassName |> li ? do
-        counterIncrement "item"
-        display grid
-        gridTemplateColumns [ch 3, fr 1]
-        -- \| gap between enum item id and enum text
-        gap (em 0.5)
-        marginTop (em 0)
-        marginBottom (em 0)
-
     ol # byClass enumClassName |> li ? before & do
         counter counterContent
         textAlign alignRight

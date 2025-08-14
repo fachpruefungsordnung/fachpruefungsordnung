@@ -58,6 +58,7 @@ dependencies:
   - filepath
   - directory
   - text
+  - dlist
   - lucid2
   - clay
   - password

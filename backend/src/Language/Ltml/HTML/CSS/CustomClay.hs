@@ -1,10 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Ltml.HTML.CSS.CustomClay
-    ( Counter (..)
+    ( renderStrict
+    , Counter (..)
     , counter
     , counterNum
     , counterChar
+    , counterCharCapital
     , stringCounter
     , counterReset
     , counterIncrement
@@ -15,6 +17,12 @@ module Language.Ltml.HTML.CSS.CustomClay
 
 import Clay hiding (a, b, s)
 import Data.Text (Text)
+import Data.Text.Lazy (toStrict)
+
+renderStrict :: Css -> Text
+renderStrict = toStrict . render
+
+-------------------------------------------------------------------------------
 
 counterReset :: Text -> Css
 counterReset t = "counter-reset" -: t
@@ -36,8 +44,14 @@ counterNum t = Counter $ "counter(" <> t <> ")"
 counterChar :: Text -> Counter
 counterChar t = Counter $ "counter(" <> t <> ", lower-alpha)"
 
+counterCharCapital :: Text -> Counter
+counterCharCapital t = Counter $ "counter(" <> t <> ", upper-alpha)"
+
 stringCounter :: Text -> Counter
 stringCounter t = Counter $ "\"" <> t <> "\""
+
+instance Monoid Counter where
+    mempty = Counter ""
 
 instance Semigroup Counter where
     Counter a <> Counter b = Counter (a <> b)

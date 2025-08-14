@@ -7,20 +7,22 @@
 
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 
-module Language.Ltml.HTML (ToHtmlM (..), renderHtml, docToHtml, sectionToHtml, aToHtml) where
+module Language.Ltml.HTML (ToHtmlM (..), renderHtml, docToHtml, sectionToHtml, aToHtml, renderHtmlCss) where
 
+import Clay (Css)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
 import Data.Void (Void)
+import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.Label
 import Language.Ltml.AST.Node
 import Language.Ltml.AST.Paragraph
 import Language.Ltml.AST.Section
 import Language.Ltml.AST.Text
-import Language.Ltml.HTML.CSS.Classes (enumLevel)
+import Language.Ltml.HTML.CSS (mainStylesheet)
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.HTML.Common
@@ -45,6 +47,11 @@ aToHtml a =
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
      in evalDelayed delayedHtml finalState
 
+renderHtmlCss :: (ToHtmlM a) => a -> (Html (), Css)
+renderHtmlCss a =
+    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
+     in (evalDelayed delayedHtml finalState, mainStylesheet (enumStyles finalState))
+
 -------------------------------------------------------------------------------
 
 class ToHtmlM a where
@@ -63,43 +70,38 @@ instance ToHtmlM Document where
 -- | This combined instances creates the sectionIDHtml before building the reference,
 --   which is needed for correct referencing
 instance ToHtmlM (Node Section) where
-    toHtmlM (Node mLabel (Section format heading children)) = do
+    toHtmlM (Node mLabel (Section sectionFormatS (Heading headingFormatS title) children)) = do
         globalState <- get
-        let sectionIDHtml = sectionFormat format (currentSectionID globalState)
+        titleHtml <- toHtmlM title
+        let (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (currentSectionID globalState)
+            headingHtml =
+                (div_ <#> Class.Heading) . headingFormat headingFormatS sectionIDHtml
+                    <$> titleHtml
          in do
-                sectionHtml <- local (\s -> s {currentSectionIDHtml = sectionIDHtml}) $ do
+                -- \| Add table of contents entry for section
+                htmlId <- addTocEntry sectionTocKeyHtml titleHtml mLabel
+                -- \| Build heading Html with sectionID
+                childrenHtml <- local (\s -> s {currentSectionIDHtml = sectionIDHtml}) $ do
                     addMaybeLabelToState mLabel SectionRef
-                    headingHtml <- toHtmlM heading
-                    childrenHtml <- case children of
+                    case children of
                         Right cs -> toHtmlM cs
                         -- \| In the Left case the children are paragraphs, so we set the needed flag for them
                         --   to decide if the should have a visible id
                         Left cs -> local (\s -> s {isSingleParagraph = length cs == 1}) $ toHtmlM cs
-                    return $ headingHtml <> childrenHtml
                 -- \| increment sectionID for next section
                 modify (\s -> s {currentSectionID = currentSectionID s + 1})
                 -- \| reset paragraphID for next section
                 modify (\s -> s {currentParagraphID = 1})
 
-                return $ div_ [cssClass_ Class.Section, mId_ mLabel] <$> sectionHtml
-
--- | Instance for Heading of a Section
-instance ToHtmlM Heading where
-    toHtmlM (Heading format textTree) = do
-        headingTextHtml <- toHtmlM textTree
-        readerState <- ask
-        return
-            ( (div_ <#> Class.Heading)
-                . headingFormat format (currentSectionIDHtml readerState)
-                <$> headingTextHtml
-            )
+                return $
+                    div_ [cssClass_ Class.Section, id_ htmlId] <$> (headingHtml <> childrenHtml)
 
 instance ToHtmlM (Node Paragraph) where
     toHtmlM (Node mLabel (Paragraph format textTrees)) = do
         globalState <- get
-        let (paragraphIDHtml, mParagraphIDRawHtml) = paragraphFormat format (currentParagraphID globalState)
+        let (paragraphIDHtml, paragraphKeyHtml) = paragraphFormat format (currentParagraphID globalState)
          in do
-                childText <- local (\s -> s {mCurrentParagraphIDHtml = mParagraphIDRawHtml}) $ do
+                childText <- local (\s -> s {currentParagraphIDHtml = paragraphIDHtml}) $ do
                     addMaybeLabelToState mLabel ParagraphRef
                     toHtmlM textTrees
                 modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
@@ -109,7 +111,7 @@ instance ToHtmlM (Node Paragraph) where
                 return $
                     div_ [cssClass_ Class.Paragraph, mId_ mLabel]
                         -- \| If this is the only paragraph inside this section we drop the visible paragraphID
-                        <$> let idHtml = if isSingleParagraph readerState then mempty else paragraphIDHtml
+                        <$> let idHtml = if isSingleParagraph readerState then mempty else paragraphKeyHtml
                              in return (div_ <#> Class.ParagraphID $ idHtml) <> div_ <#> Class.TextContainer
                                     <$> childText
 
@@ -130,6 +132,7 @@ instance
                 Just labelHtml -> labelWrapperFunc globalState label labelHtml
         Styled style textTrees -> do
             textTreeHtml <- toHtmlM textTrees
+            -- TODO: Adds new Html tag which leads to newline in textContainers
             return $ toHtmlStyle style <$> textTreeHtml
         Enum enum -> toHtmlM enum
         Footnote _ ->
@@ -155,18 +158,21 @@ instance ToHtmlStyle FontStyle where
     toHtmlStyle Underlined = span_ <#> Class.Underlined
 
 instance ToHtmlM Enumeration where
-    toHtmlM (Enumeration enumItems) = do
-        readerState <- ask
+    toHtmlM (Enumeration enumFormatS@(EnumFormat (EnumItemFormat idFormat _)) enumItems) = do
+        -- \| Build enum format and add it to global state for creating the css classes later
+        enumCounterClass <- enumFormat enumFormatS
         -- \| Reset enumItemID for this Enumeration
         modify (\s -> s {currentEnumItemID = 1})
+        -- \| Render enum items with correct id format
         nested <-
             mapM
-                (local (\s -> s {enumNestingLevel = enumNestingLevel s + 1}) . toHtmlM)
+                (local (\s -> s {currentEnumIDFormatString = idFormat}) . toHtmlM)
                 enumItems
         return $ do
             nestedHtml <- sequence nested
             let enumItemsHtml = foldr ((>>) . li_) (mempty :: Html ()) nestedHtml
-             in return $ ol_ <#> enumLevel (enumNestingLevel readerState) $ enumItemsHtml
+             in return $
+                    ol_ [cssClass_ Class.Enumeration, class_ enumCounterClass] enumItemsHtml
 
 instance ToHtmlM (Node EnumItem) where
     toHtmlM (Node mLabel (EnumItem textTrees)) = do

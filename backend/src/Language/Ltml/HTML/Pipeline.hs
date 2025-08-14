@@ -6,8 +6,7 @@ import Control.Applicative (empty)
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
 import Language.Lsd.Example.Fpo (sectionT)
-import Language.Ltml.HTML (aToHtml)
-import Language.Ltml.HTML.CSS (mainStylesheet)
+import Language.Ltml.HTML (renderHtmlCss)
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.Parser.Section (sectionP)
@@ -20,8 +19,8 @@ htmlPipeline input =
     case runParser (sectionP sectionT empty) "" input of
         Left err -> renderBS $ errorHtml (show err)
         Right nodeSection ->
-            let body = aToHtml nodeSection
-             in renderBS $ addInlineCssHeader mainStylesheet body
+            let (body, css) = renderHtmlCss nodeSection
+             in renderBS $ addInlineCssHeader css body
 
 -------------------------------------------------------------------------------
 

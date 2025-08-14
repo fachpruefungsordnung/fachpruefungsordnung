@@ -4,6 +4,7 @@ module Language.Ltml.ToLaTeX.Testing
     ( testThis
     , readText
     , runTest
+    , anotherTest
     , superSectionWithNSubsections
     , hugeSuperSection
     , getTestSection
@@ -19,6 +20,8 @@ import Language.Lsd.AST.Format
     , FormatAtom (PlaceholderAtom, StringAtom)
     , FormatString (FormatString)
     , HeadingPlaceholderAtom (HeadingTextPlaceholder, IdentifierPlaceholder)
+    , ParagraphKeyFormat (ParagraphKeyFormat)
+    , TocKeyFormat (TocKeyFormat)
     )
 import Language.Lsd.AST.Type.Paragraph (ParagraphFormat (ParagraphFormat))
 import Language.Lsd.AST.Type.Section (SectionFormat (SectionFormat))
@@ -30,7 +33,10 @@ import Language.Ltml.AST.Section (Heading (Heading), Section (Section))
 import Language.Ltml.AST.Text (TextTree (Reference, Space, Word))
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX (generatePDFFromSuperSection)
-import Language.Ltml.ToLaTeX.GlobalState (GlobalState (GlobalState))
+import Language.Ltml.ToLaTeX.GlobalState
+    ( GlobalState (GlobalState, toc)
+    , fromDList
+    )
 import Language.Ltml.ToLaTeX.ToLaTeXM (ToLaTeXM (toLaTeXM))
 import Language.Ltml.ToLaTeX.Type
 import System.IO.Unsafe (unsafePerformIO)
@@ -40,7 +46,18 @@ readText :: String -> Text
 readText filename = unsafePerformIO $ TIO.readFile filename
 
 initialState :: GlobalState
-initialState = GlobalState 0 0 0 0 [0] False False mempty mempty
+initialState =
+    GlobalState
+        0
+        0
+        0
+        0
+        [0]
+        (FormatString [])
+        False
+        False
+        mempty
+        mempty
 
 getTestSection :: Node Section
 getTestSection =
@@ -60,7 +77,10 @@ superSectionWithNSubsections :: Int -> Node Section
 superSectionWithNSubsections n =
     Node (Just $ Label "super") $
         Section
-            (SectionFormat (FormatString [PlaceholderAtom Arabic]))
+            ( SectionFormat
+                (FormatString [PlaceholderAtom Arabic])
+                (TocKeyFormat (FormatString []))
+            )
             ( Heading
                 ( FormatString
                     [ StringAtom "§ "
@@ -88,7 +108,10 @@ superSectionWithNSubsections n =
                     ( Node
                         Nothing
                         ( Paragraph
-                            (ParagraphFormat (FormatString [PlaceholderAtom Arabic]))
+                            ( ParagraphFormat
+                                (FormatString [PlaceholderAtom Arabic])
+                                (ParagraphKeyFormat (FormatString []))
+                            )
                             [ Word "This"
                             , Space
                             , Word "phrase"
@@ -110,7 +133,10 @@ superSectionWithNSubsections n =
 hugeSuperSection :: Int -> Section
 hugeSuperSection n =
     Section
-        (SectionFormat (FormatString [PlaceholderAtom Arabic]))
+        ( SectionFormat
+            (FormatString [PlaceholderAtom Arabic])
+            (TocKeyFormat (FormatString []))
+        )
         ( Heading
             ( FormatString
                 [ StringAtom "Supersection "
@@ -141,3 +167,8 @@ runTest = do
     case eAction of
         Left err -> error err
         Right pdf -> BS.writeFile "./src/Language/Ltml/ToLaTeX/Auxiliary/test.pdf" pdf
+
+anotherTest :: IO LaTeX
+anotherTest = do
+    let (_, st) = testThis getTestSection
+    return $ Sequence $ fromDList $ toc st

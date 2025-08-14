@@ -9,23 +9,34 @@ module Language.Ltml.ToLaTeX.GlobalState
     , insertLabel
     , nextEnumPosition
     , descendEnumTree
+    , emptyFormat
+    , DList (DList)
+    , fromDList
+    , toDList
     ) where
 
 import Control.Monad.State
 import Data.Map (Map, insert)
 import qualified Data.Text.Lazy as LT
+import Language.Lsd.AST.Format (FormatString (FormatString), IdentifierFormat)
 import Language.Ltml.AST.Label (Label)
 import Language.Ltml.ToLaTeX.Type (LaTeX)
 
--- example structure
-data Supersection = Supersection [Int] [Section]
-    deriving (Show)
+-- to build the table of contents we want to accumulate all headings in a list.
+-- this can be inefficient with normal lists, so we use a difference list
+newtype DList a = DList ([a] -> [a])
 
-data Section = Section [Int] [Paragraph]
-    deriving (Show)
+instance Semigroup (DList a) where
+    DList a <> DList b = DList (a . b)
 
-newtype Paragraph = Paragraph [Int]
-    deriving (Show)
+instance Monoid (DList a) where
+    mempty = DList id
+
+fromDList :: DList a -> [a]
+fromDList (DList xs) = xs []
+
+toDList :: [a] -> DList a
+toDList xs = DList (xs ++)
 
 -- State for labeling
 data GlobalState = GlobalState
@@ -34,12 +45,14 @@ data GlobalState = GlobalState
     , paragraph :: Int -- counter for paragraphs within a section
     , sentence :: Int -- counter for sentences within a paragraph
     , enumPosition :: [Int] -- tracks the current position in an enum tree
+    , enumIdentifier :: IdentifierFormat -- since the style of the identifier is defined
+    -- globally for one enumueration,
+    -- we need to pass it to the children
     , onlyOneParagraph :: Bool -- needed for sections with only one paragraphs
     , isSupersection :: Bool -- needed for heading
-    , identifier :: LaTeX -- identifier for formatting
     , labelToRef :: Map Label LT.Text -- map for labels
+    , toc :: DList LaTeX
     }
-    deriving (Show)
 
 nextSupersection :: State GlobalState Int
 nextSupersection = do
@@ -97,6 +110,15 @@ insertLabel mLabel ident = do
         mLabel
 
 ------------------------------- example for texting -------------------------------
+-- example structure
+data Supersection = Supersection [Int] [Section]
+    deriving (Show)
+
+data Section = Section [Int] [Paragraph]
+    deriving (Show)
+
+newtype Paragraph = Paragraph [Int]
+    deriving (Show)
 
 exampleLabelSuperSection :: Supersection -> State GlobalState Supersection
 exampleLabelSuperSection (Supersection _ children) = do
@@ -168,9 +190,12 @@ exampleTree' =
         , Node [] [Node [] []]
         ]
 
+emptyFormat :: IdentifierFormat
+emptyFormat = FormatString []
+
 -- Run it
 main :: IO ()
 main = do
-    let initialState = GlobalState 0 0 0 0 [0] False False mempty mempty
+    let initialState = GlobalState 0 0 0 0 [0] emptyFormat False False mempty mempty
         labeled = evalState (labelTree exampleTree') initialState
     print labeled

@@ -155,7 +155,7 @@ instance EnumP Void Void where
     enumP = const empty
 
 instance EnumP EnumType Enumeration where
-    enumP (EnumType kw tt) = Enumeration <$> someIndented enumItemP
+    enumP (EnumType kw fmt tt) = Enumeration fmt <$> someIndented enumItemP
       where
         enumItemP = uncurry Node . fmap EnumItem <$> hangingTextP' kw tt
 

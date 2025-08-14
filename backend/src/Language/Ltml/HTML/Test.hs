@@ -21,9 +21,10 @@ import Language.Lsd.AST.Type.Document (DocumentFormat (..))
 import Language.Ltml.AST.Document
     ( Document (..)
     , DocumentBody (..)
-    , DocumentHeader (..)
+    , DocumentTitle (..)
     )
 import Language.Ltml.HTML.CSS (writeCss)
+import Language.Ltml.HTML.CSS.Util (addHtmlHeader)
 import Language.Ltml.Pretty (prettyPrint)
 import Lucid (renderToFile)
 import System.Directory (removeDirectoryRecursive)
@@ -38,9 +39,13 @@ parseTest = do
     case runParser (sectionP sectionT empty) "" text of
         Left err -> error $ show err
         Right nodeSection -> do
-            renderToFile "src/Language/Ltml/HTML/Test/out.html" (sectionToHtml nodeSection)
-            writeCss "src/Language/Ltml/HTML/Test/out.css"
-            prettyPrint nodeSection
+            let (body, css) = renderHtmlCss nodeSection
+             in do
+                    renderToFile
+                        "src/Language/Ltml/HTML/Test/out.html"
+                        (addHtmlHeader "" "out.css" body)
+                    writeCss css "src/Language/Ltml/HTML/Test/out.css"
+                    prettyPrint nodeSection
 
 -------------------------------------------------------------------------------
 
@@ -55,7 +60,7 @@ exportTest =
                     exportDocument
                         ( Document
                             DocumentFormat
-                            DocumentHeader
+                            (DocumentTitle "Titel")
                             (DocumentBody [nodeSection, nodeSection])
                         )
                         testDir
@@ -68,7 +73,12 @@ replicateSection :: Node Section
 replicateSection =
     Node Nothing $
         Section
-            (SectionFormat (FormatString [PlaceholderAtom Arabic]))
+            ( SectionFormat
+                (FormatString [PlaceholderAtom Arabic])
+                ( TocKeyFormat $
+                    FormatString [StringAtom "§ ", PlaceholderAtom KeyIdentifierPlaceholder]
+                )
+            )
             ( Heading
                 (FormatString [StringAtom "§ ", PlaceholderAtom IdentifierPlaceholder])
                 []
@@ -79,6 +89,10 @@ replicateSection =
                     ( Paragraph
                         ( ParagraphFormat
                             (FormatString [PlaceholderAtom Arabic])
+                            ( ParagraphKeyFormat $
+                                FormatString
+                                    [StringAtom "(", PlaceholderAtom KeyIdentifierPlaceholder, StringAtom ")"]
+                            )
                         )
                         [ Special (SentenceStart Nothing)
                         , Word "This"
@@ -108,12 +122,18 @@ replicateSection =
 
 scalableSection :: Int -> IO ()
 scalableSection n = do
-    writeCss "src/Language/Ltml/HTML/Test/out.css"
+    -- TODO: has to build final css from rendering
+    -- writeCss "src/Language/Ltml/HTML/Test/out.css"
     renderToFile "src/Language/Ltml/HTML/Test/out.html" $
         sectionToHtml
             ( Node (Just (Label "main")) $
                 Section
-                    (SectionFormat (FormatString [PlaceholderAtom Arabic]))
+                    ( SectionFormat
+                        (FormatString [PlaceholderAtom Arabic])
+                        ( TocKeyFormat $
+                            FormatString [StringAtom "§ ", PlaceholderAtom KeyIdentifierPlaceholder]
+                        )
+                    )
                     ( Heading
                         (FormatString [StringAtom "Abschnitt ", PlaceholderAtom IdentifierPlaceholder])
                         []

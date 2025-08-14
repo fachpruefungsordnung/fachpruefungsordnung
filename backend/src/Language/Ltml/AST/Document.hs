@@ -1,10 +1,11 @@
 module Language.Ltml.AST.Document
     ( Document (..)
-    , DocumentHeader (..)
+    , DocumentTitle (..)
     , DocumentBody (..)
     )
 where
 
+import Data.Text (Text)
 import Language.Lsd.AST.Type.Document (DocumentFormat)
 import Language.Ltml.AST.Node (Node)
 import Language.Ltml.AST.Section (Section)
@@ -12,11 +13,11 @@ import Language.Ltml.AST.Section (Section)
 data Document
     = Document
         DocumentFormat
-        DocumentHeader
+        DocumentTitle
         DocumentBody
     deriving (Show)
 
-data DocumentHeader = DocumentHeader
+newtype DocumentTitle = DocumentTitle Text
     deriving (Show)
 
 newtype DocumentBody = DocumentBody [Node Section]

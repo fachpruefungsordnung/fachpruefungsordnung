@@ -1,31 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Ltml.ToLaTeX.Format
-    ( formatIdentifier
-    , formatHeading
-    , formatParagraph
-    , formatSection
+    ( formatHeading
+    , formatKey
     , staticDocumentFormat
-    , getEnumIdentifier
+    , getIdentifier
+    , getEnumStyle
     ) where
 
 import Data.Char (chr)
 import qualified Data.Text.Lazy as LT
 import Language.Lsd.AST.Format
-import Language.Lsd.AST.Type.Paragraph (ParagraphFormat (ParagraphFormat))
-import Language.Lsd.AST.Type.Section (SectionFormat (SectionFormat))
+import Language.Lsd.AST.Type.Enum
+    ( EnumFormat (EnumFormat)
+    , EnumItemFormat (EnumItemFormat)
+    )
 import Language.Ltml.ToLaTeX.Type
-
-formatIdentifier :: IdentifierFormat -> Int -> LaTeX
-formatIdentifier (FormatString []) _ = mempty
-formatIdentifier (FormatString (StringAtom s : rest)) i =
-    Text (LT.pack s) <> formatIdentifier (FormatString rest) i
-formatIdentifier (FormatString (PlaceholderAtom a : rest)) i =
-    (<> formatIdentifier (FormatString rest) i) $
-        case a of
-            Arabic -> Text (LT.pack $ show i)
-            AlphabeticLower -> Text (LT.pack [chr (i `mod` 27 + 96)])
-            AlphabeticUpper -> Text (LT.pack [chr (i `mod` 27 + 64)])
+import Prelude hiding (id)
 
 formatHeading :: HeadingFormat -> LaTeX -> LaTeX -> LaTeX
 formatHeading (FormatString []) _ _ = mempty
@@ -39,11 +30,12 @@ formatHeading (FormatString (PlaceholderAtom a : rest)) i latex =
         HeadingTextPlaceholder -> latex <> formatHeading (FormatString rest) i latex
         IdentifierPlaceholder -> i <> formatHeading (FormatString rest) i latex
 
-formatParagraph :: ParagraphFormat -> Int -> LaTeX
-formatParagraph (ParagraphFormat x) = formatIdentifier x
-
-formatSection :: SectionFormat -> Int -> LaTeX
-formatSection (SectionFormat x) = formatIdentifier x
+formatKey :: KeyFormat -> LaTeX -> LaTeX
+formatKey (FormatString []) _ = mempty
+formatKey (FormatString (StringAtom s : rest)) n =
+    Text (LT.pack s) <> formatKey (FormatString rest) n
+formatKey (FormatString (PlaceholderAtom KeyIdentifierPlaceholder : rest)) n =
+    n <> formatKey (FormatString rest) n
 
 staticDocumentFormat :: LaTeX
 staticDocumentFormat =
@@ -71,12 +63,36 @@ staticDocumentFormat =
         , setindent
         ]
 
-getEnumIdentifier :: [Int] -> LT.Text
-getEnumIdentifier [] = ""
-getEnumIdentifier path =
-    let ident = last path
-     in case length path of
-            1 -> LT.pack $ show ident
-            2 -> LT.pack [chr (ident - 1 `mod` 26 + 97)]
-            3 -> LT.pack $ replicate 2 $ chr (ident - 1 `mod` 26 + 97)
-            _ -> "-"
+getIdentifier :: IdentifierFormat -> Int -> LT.Text
+getIdentifier (FormatString []) _ = mempty
+getIdentifier (FormatString (StringAtom s : rest)) i =
+    LT.pack s <> getIdentifier (FormatString rest) i
+getIdentifier (FormatString (PlaceholderAtom a : rest)) i =
+    case a of
+        Arabic -> LT.pack (show i) <> getIdentifier (FormatString rest) i
+        AlphabeticLower -> LT.pack [chr ((i - 1) `mod` 27 + 97)] <> getIdentifier (FormatString rest) i
+        AlphabeticUpper -> LT.pack [chr ((i - 1) `mod` 27 + 65)] <> getIdentifier (FormatString rest) i
+
+getEnumStyle :: EnumFormat -> LT.Text
+getEnumStyle (EnumFormat (EnumItemFormat ident key)) = "label=" <> buildKey (getEnumIdentifier' ident) key
+  where
+    buildKey :: LT.Text -> EnumItemKeyFormat -> LT.Text
+    buildKey _ (EnumItemKeyFormat (FormatString [])) = mempty
+    buildKey id (EnumItemKeyFormat (FormatString (StringAtom s : rest))) =
+        LT.pack s <> buildKey id (EnumItemKeyFormat (FormatString rest))
+    buildKey
+        id
+        ( EnumItemKeyFormat
+                (FormatString (PlaceholderAtom KeyIdentifierPlaceholder : rest))
+            ) =
+            id <> buildKey id (EnumItemKeyFormat (FormatString rest))
+
+    getEnumIdentifier' :: IdentifierFormat -> LT.Text
+    getEnumIdentifier' (FormatString []) = mempty
+    getEnumIdentifier' (FormatString (StringAtom s : rest)) =
+        LT.pack s <> getEnumIdentifier' (FormatString rest)
+    getEnumIdentifier' (FormatString (PlaceholderAtom a : rest)) =
+        case a of
+            Arabic -> "\\arabic*" <> getEnumIdentifier' (FormatString rest)
+            AlphabeticLower -> "\\alph*" <> getEnumIdentifier' (FormatString rest)
+            AlphabeticUpper -> "\\Alph*" <> getEnumIdentifier' (FormatString rest)

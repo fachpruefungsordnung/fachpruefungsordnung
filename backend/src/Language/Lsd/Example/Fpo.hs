@@ -31,13 +31,22 @@ appendixT :: AppendixSectionType
 appendixT =
     AppendixSectionType
         ( AppendixSectionFormat
-            (FormatString [PlaceholderAtom Arabic])
-            ( FormatString
-                [ StringAtom "Anlage "
-                , PlaceholderAtom IdentifierPlaceholder
-                , StringAtom "\n"
-                , PlaceholderAtom HeadingTextPlaceholder
-                ]
+            (AppendixSectionTitle "Anlagen")
+            ( AppendixElementFormat
+                (FormatString [PlaceholderAtom Arabic])
+                ( TocKeyFormat $
+                    FormatString
+                        [ StringAtom "Anlage "
+                        , PlaceholderAtom KeyIdentifierPlaceholder
+                        ]
+                )
+                ( FormatString
+                    [ StringAtom "Anlage "
+                    , PlaceholderAtom IdentifierPlaceholder
+                    , StringAtom "\n"
+                    , PlaceholderAtom HeadingTextPlaceholder
+                    ]
+                )
             )
         )
         [] -- TODO
@@ -46,15 +55,24 @@ attachmentT :: AppendixSectionType
 attachmentT =
     AppendixSectionType
         ( AppendixSectionFormat
-            (FormatString [PlaceholderAtom Arabic])
-            ( FormatString
-                [ StringAtom "Anhang "
-                , PlaceholderAtom IdentifierPlaceholder
-                , StringAtom "\n"
-                , StringAtom "(nicht Bestandteil der Satzung)"
-                , StringAtom "\n"
-                , PlaceholderAtom HeadingTextPlaceholder
-                ]
+            (AppendixSectionTitle "Anhänge")
+            ( AppendixElementFormat
+                (FormatString [PlaceholderAtom Arabic])
+                ( TocKeyFormat $
+                    FormatString
+                        [ StringAtom "Anhang "
+                        , PlaceholderAtom KeyIdentifierPlaceholder
+                        ]
+                )
+                ( FormatString
+                    [ StringAtom "Anhang "
+                    , PlaceholderAtom IdentifierPlaceholder
+                    , StringAtom "\n"
+                    , StringAtom "(nicht Bestandteil der Satzung)"
+                    , StringAtom "\n"
+                    , PlaceholderAtom HeadingTextPlaceholder
+                    ]
+                )
             )
         )
         [] -- TODO
@@ -89,6 +107,12 @@ superSectionT =
         )
         ( SectionFormat
             (FormatString [PlaceholderAtom Arabic])
+            ( TocKeyFormat $
+                FormatString
+                    [ StringAtom "Abschnitt "
+                    , PlaceholderAtom KeyIdentifierPlaceholder
+                    ]
+            )
         )
         ( Right $
             SimpleRegex
@@ -116,14 +140,27 @@ sectionT =
         )
         ( SectionFormat
             (FormatString [PlaceholderAtom Arabic])
+            ( TocKeyFormat $
+                FormatString
+                    [ StringAtom "§ "
+                    , PlaceholderAtom KeyIdentifierPlaceholder
+                    ]
+            )
         )
         (Left paragraphT)
 
 paragraphT :: ParagraphType
 paragraphT =
     ParagraphType
-        ( ParagraphFormat $
-            FormatString [StringAtom "(", PlaceholderAtom Arabic, StringAtom ")"]
+        ( ParagraphFormat
+            (FormatString [PlaceholderAtom Arabic])
+            ( ParagraphKeyFormat $
+                FormatString
+                    [ StringAtom "("
+                    , PlaceholderAtom KeyIdentifierPlaceholder
+                    , StringAtom ")"
+                    ]
+            )
         )
         richTextT
 
@@ -131,13 +168,72 @@ plainTextT :: TextType Void
 plainTextT = TextType [] [footnoteT]
 
 richTextT :: TextType EnumType
-richTextT = TextType [enumT] [footnoteT]
+richTextT = richTextTF [regularEnumT, simpleEnumT]
+
+richTextTF :: [EnumType] -> TextType EnumType
+richTextTF enumTs = TextType enumTs [footnoteT]
 
 footnoteTextT :: TextType Void
 footnoteTextT = plainTextT
 
-enumT :: EnumType
-enumT = EnumType (Keyword "#") richTextT
+-- Enum rules:
+--  - Max. 4 levels of regular enums ("1. (a) (aa) (aaa)").
+--  - Simple enums ("-") may only occur as leafs.
+--    - I.e., they may not contain *any* sub-enums (including simple enums).
+
+maxRegularEnumDepth :: Int
+maxRegularEnumDepth = 3
+
+regularEnumT :: EnumType
+regularEnumT =
+    EnumType
+        (Keyword "#")
+        ( EnumFormat $
+            EnumItemFormat
+                (FormatString [PlaceholderAtom Arabic])
+                ( EnumItemKeyFormat $
+                    FormatString
+                        [ PlaceholderAtom KeyIdentifierPlaceholder
+                        , StringAtom "."
+                        ]
+                )
+        )
+        (richTextTF [enumTF 1, simpleEnumT])
+  where
+    enumTF :: Int -> EnumType
+    enumTF depth =
+        EnumType
+            (Keyword "#")
+            ( EnumFormat $
+                EnumItemFormat
+                    ( FormatString $
+                        replicate depth (PlaceholderAtom AlphabeticLower)
+                    )
+                    ( EnumItemKeyFormat $
+                        FormatString
+                            [ StringAtom "("
+                            , PlaceholderAtom KeyIdentifierPlaceholder
+                            , StringAtom ")"
+                            ]
+                    )
+            )
+            (richTextTF nextEnumTs)
+      where
+        nextEnumTs =
+            if depth < maxRegularEnumDepth
+                then [enumTF (depth + 1), simpleEnumT]
+                else [simpleEnumT]
+
+simpleEnumT :: EnumType
+simpleEnumT =
+    EnumType
+        (Keyword "-")
+        ( EnumFormat $
+            EnumItemFormat
+                (FormatString [PlaceholderAtom Arabic])
+                (EnumItemKeyFormat $ FormatString [StringAtom "-"])
+        )
+        (richTextTF [])
 
 footnoteT :: FootnoteType
 footnoteT = FootnoteType (Keyword "^") footnoteTextT

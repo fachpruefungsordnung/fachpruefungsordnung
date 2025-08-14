@@ -21,4 +21,5 @@ The header may contain the following nodes.
 
 ## Appendix section
 
-An appendix section contains a list of documents (appendices/attachments).
+An appendix section has a title and contains a list of documents
+(appendices/attachments).

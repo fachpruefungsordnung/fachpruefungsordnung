@@ -54,7 +54,7 @@ Es müssen Wahlpflichtmodule im Umfang von insgesamt 90 LP erfolgreich abgeschlo
     werden. Das Nebenfach wird auf dem Zeugnis ausgewiesen.
 
 Im Rahmen des Masterstudiums ist eine Masterarbeit im Umfang von 30 LP anzufertigen.
-Näheres regelt § {:par6}. Die Masterarbeit erfolgt in der Regel als Abschluss des Masterstudiums.
+Näheres regelt § {:par2}. Die Masterarbeit erfolgt in der Regel als Abschluss des Masterstudiums.
 
 Aktualisierungen der Wahlpflichtbereiche nimmt der Prüfungsausschuss vor;
 vor Einführung eines neuen Moduls werden die durchführenden Lehrpersonen und
@@ -63,7 +63,7 @@ die Studiengangskoordinatorin oder der Studiengangskoordinator gehört.
 Bereits für einen Bachelorabschluss verwendete Wahlpflichtmodule können
 nicht erneut eingebracht werden
 
-§ Studienaufbau
+§{par2:} Studienaufbau
 
 Die Regelstudienzeit und das Studienvolumen betragen drei Jahre beziehungsweise
 180 Leistungspunkte und circa 120 Semesterwochenstunden.

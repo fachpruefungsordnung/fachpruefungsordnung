@@ -7,11 +7,22 @@ where
 import Control.Monad.State (MonadState (get), State, modify)
 import qualified Data.Text.Lazy as LT
 import Data.Void (Void, absurd)
+import Language.Lsd.AST.Format
+    ( HeadingFormat
+    , ParagraphKeyFormat (ParagraphKeyFormat)
+    , TocKeyFormat (TocKeyFormat)
+    )
 import Language.Lsd.AST.Type.Document (DocumentFormat (..))
+import Language.Lsd.AST.Type.Enum
+    ( EnumFormat (..)
+    , EnumItemFormat (EnumItemFormat)
+    )
+import Language.Lsd.AST.Type.Paragraph (ParagraphFormat (ParagraphFormat))
+import Language.Lsd.AST.Type.Section (SectionFormat (SectionFormat))
 import Language.Ltml.AST.Document
     ( Document (..)
     , DocumentBody (..)
-    , DocumentHeader (..)
+    , DocumentTitle (..)
     )
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Node (Node (..))
@@ -72,17 +83,22 @@ instance
         pure $ (footnote . Sequence) tt'
 
 instance ToLaTeXM Enumeration where
-    toLaTeXM (Enumeration enumItems) = do
+    toLaTeXM (Enumeration fmt@(EnumFormat (EnumItemFormat ident _)) enumItems) = do
+        st <- get
+        let currentIdent = LS.enumIdentifier st
+        modify (\s -> s {LS.enumIdentifier = ident})
         enumItems' <- mapM toLaTeXM enumItems
-        pure $ enumerate enumItems'
+        modify (\s -> s {LS.enumIdentifier = currentIdent})
+        pure $ enumerate [getEnumStyle fmt] enumItems'
 
 instance ToLaTeXM EnumItem where
     toLaTeXM = attachLabel Nothing
 
 instance Labelable EnumItem where
     attachLabel mLabel (EnumItem tt) = do
+        st <- get
         path <- LS.nextEnumPosition
-        LS.insertLabel mLabel (getEnumIdentifier path)
+        LS.insertLabel mLabel (getIdentifier (LS.enumIdentifier st) (last path))
         tt' <- LS.descendEnumTree $ mapM toLaTeXM tt
         pure $ Sequence tt'
 
@@ -106,16 +122,11 @@ instance ToLaTeXM Paragraph where
     toLaTeXM = attachLabel Nothing
 
 instance Labelable Paragraph where
-    attachLabel mLabel (Paragraph fmt content) = do
+    attachLabel mLabel (Paragraph (ParagraphFormat ident (ParagraphKeyFormat keyident)) content) = do
         n <- LS.nextParagraph
         st <- get
-        LS.insertLabel
-            mLabel
-            ( "§ "
-                <> LT.pack (show (LS.section st))
-                <> " Absatz "
-                <> LT.pack (show n)
-            )
+        let identifier = getIdentifier ident n
+        LS.insertLabel mLabel identifier
         modify (\s -> s {LS.enumPosition = [0]})
         content' <- mapM toLaTeXM content
         let anchor = maybe mempty (`hypertarget` mempty) mLabel
@@ -124,67 +135,56 @@ instance Labelable Paragraph where
                 <> if LS.onlyOneParagraph st
                     then Sequence content' <> medskip
                     else
-                        paragraph (formatParagraph fmt (LS.paragraph st)) (Sequence content') <> medskip
+                        paragraph (formatKey keyident (Text identifier)) (Sequence content') <> medskip
 
 -------------------------------- Section -----------------------------------
-instance ToLaTeXM Heading where
-    toLaTeXM (Heading fmt tt) = do
-        tt' <- mapM toLaTeXM tt
-        st <- get
-        pure $
-            bold
-                ( formatHeading
-                    fmt
-                    (LS.identifier st)
-                    (Sequence tt')
-                )
+
+createHeading :: HeadingFormat -> LaTeX -> LaTeX -> State LS.GlobalState LaTeX
+createHeading fmt tt ident = do
+    pure $ bold $ formatHeading fmt ident tt
 
 instance ToLaTeXM Section where
     toLaTeXM = attachLabel Nothing
 
 instance Labelable Section where
-    attachLabel mLabel (Section fmt heading nodes) = do
-        (children, headingDoc) <-
-            case nodes of
-                Left paragraphs -> do
-                    -- \| this is a section
-                    n <- LS.nextSection
-                    LS.insertLabel
-                        mLabel
-                        ( "§ "
-                            <> LT.pack (show n)
-                        )
-                    modify
-                        ( \s ->
-                            s
-                                { LS.identifier = formatSection fmt (LS.section s)
-                                , LS.onlyOneParagraph = length paragraphs == 1
-                                }
-                        )
-                    headingDoc <- toLaTeXM heading
-                    children' <- mapM toLaTeXM paragraphs
-                    pure (children', center [headingDoc])
-                Right subsections -> do
-                    -- \| this is a supersection
-                    n <- LS.nextSupersection
-                    LS.insertLabel
-                        mLabel
-                        ( "Abschnitt "
-                            <> LT.pack (show n)
-                        )
-                    children' <- mapM toLaTeXM subsections
-                    modify
-                        ( \s ->
-                            s
-                                { LS.isSupersection = True
-                                , LS.identifier = formatSection fmt (LS.supersection s)
-                                }
-                        )
-                    headingDoc <- toLaTeXM heading
-                    modify (\s -> s {LS.isSupersection = False})
-                    pure (children', headingDoc <> linebreak)
-        let anchor = maybe headingDoc (`hypertarget` headingDoc) mLabel
-        pure $ anchor <> Sequence children
+    attachLabel mLabel (Section (SectionFormat ident (TocKeyFormat keyident)) (Heading fmt tt) nodes) = do
+        tt' <- mapM toLaTeXM tt
+        let headingText = Sequence tt'
+            buildHeading n = do
+                createHeading fmt headingText (Text $ getIdentifier ident n)
+            setLabel n = LS.insertLabel mLabel (LT.pack (show n))
+        case nodes of
+            Left paragraphs -> do
+                n <- LS.nextSection
+                setLabel n
+                modify
+                    ( \s ->
+                        s
+                            { LS.onlyOneParagraph = length paragraphs == 1
+                            , LS.toc =
+                                LS.toc s
+                                    <> LS.toDList
+                                        [ formatKey keyident (Text $ getIdentifier ident n)
+                                        , Text " "
+                                        , headingText
+                                        , linebreak
+                                        ]
+                            }
+                    )
+                headingDoc <- buildHeading n
+                children' <- mapM toLaTeXM paragraphs
+                let anchor = maybe (center [headingDoc]) (`hypertarget` center [headingDoc]) mLabel
+                pure $ anchor <> Sequence children'
+            Right subsections -> do
+                n <- LS.nextSupersection
+                setLabel n
+                modify (\s -> s {LS.isSupersection = True})
+                headingDoc <- buildHeading n
+                children' <- mapM toLaTeXM subsections
+                modify (\s -> s {LS.isSupersection = False})
+                let anchor =
+                        maybe (headingDoc <> linebreak) (`hypertarget` (headingDoc <> linebreak)) mLabel
+                pure $ anchor <> Sequence children'
 
 -------------------------------- Node -----------------------------------
 
@@ -194,6 +194,7 @@ instance (Labelable a) => ToLaTeXM (Node a) where
 -------------------------------- Document -----------------------------------
 
 instance ToLaTeXM Document where
-    toLaTeXM (Document DocumentFormat DocumentHeader (DocumentBody nodes)) = do
+    toLaTeXM (Document DocumentFormat (DocumentTitle t) (DocumentBody nodes)) = do
         nodes' <- mapM toLaTeXM nodes
-        pure $ staticDocumentFormat <> document (Sequence nodes')
+        pure $
+            staticDocumentFormat <> document (Sequence $ Text (LT.fromStrict t) : nodes')

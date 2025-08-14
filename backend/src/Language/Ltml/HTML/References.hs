@@ -1,13 +1,10 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Language.Ltml.HTML.References (ReferenceType (..), addMaybeLabelToState) where
 
 import Control.Monad.Reader
 import Control.Monad.State
 import Language.Ltml.AST.Label (Label (unLabel))
-import qualified Language.Ltml.HTML.CSS.Classes as Class
-import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.HTML.Common
+import Language.Ltml.HTML.FormatString (identifierFormat)
 import Lucid
 
 data ReferenceType
@@ -33,26 +30,14 @@ genReference ref = do
         SuperSectionRef ->
             return $ currentSuperSectionIDHtml readerState
         SectionRef -> return $ currentSectionIDHtml readerState
-        ParagraphRef ->
-            let mParagraphIDText = mCurrentParagraphIDHtml readerState
-             in case mParagraphIDText of
-                    Nothing ->
-                        return $
-                            span_ <#> Class.InlineError $
-                                "Error: Labeled paragraph does not have any identifier!"
-                    Just paragraphIDHtml -> do
-                        return paragraphIDHtml
+        ParagraphRef -> return $ currentParagraphIDHtml readerState
         SentenceRef -> gets (toHtml . show . currentSentenceID)
-        EnumItemRef -> do
-            globalState <- get
-            enumNestingLvl <- asks enumNestingLevel
-            -- \| Use the enumeration nesting level of the parent enumeration
-            --   (that this enum item lives in) by subtracting 1
-            return $
-                toHtml $
-                    Class.enumIdentifier
-                        (Class.enumLevel (enumNestingLvl - 1))
-                        (currentEnumItemID globalState)
+        EnumItemRef ->
+            -- \| Get current item number and enumeration FormatString from state and build corresponding reference
+            do
+                enumIDFormatString <- asks currentEnumIDFormatString
+                enumID <- gets currentEnumItemID
+                return $ identifierFormat enumIDFormatString enumID
 
 -- TODO: Maybe? define Trie Map in GlobalState to track label references
 

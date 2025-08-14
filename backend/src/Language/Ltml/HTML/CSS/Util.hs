@@ -5,6 +5,7 @@ module Language.Ltml.HTML.CSS.Util
     , cssClass_
     , addHtmlHeader
     , addInlineCssHeader
+    , buildCssCounters
     ) where
 
 import Clay (Css, render)
@@ -12,6 +13,8 @@ import Data.Text (pack)
 import Data.Text.Lazy (toStrict)
 import Language.Ltml.HTML.CSS.Classes (Class, className)
 import qualified Language.Ltml.HTML.CSS.Classes as Class
+import Language.Ltml.HTML.Common (EnumStyleMap)
+import Language.Ltml.HTML.FormatString (buildEnumCounter)
 import Lucid
 
 -- | Constructs HTML element with given Class
@@ -42,3 +45,12 @@ addInlineCssHeader css html =
         head_ $ do
             style_ (toStrict $ render css)
         body_ $ div_ <#> Class.Document $ html
+
+-------------------------------------------------------------------------------
+
+-- | Builds CSS classes from EnumFormats and class names
+buildCssCounters :: EnumStyleMap -> Css
+buildCssCounters [] = mempty
+buildCssCounters ((enumFormatS, cssClassName) : ps) =
+    Class.enumCounter cssClassName (buildEnumCounter enumFormatS)
+        <> buildCssCounters ps

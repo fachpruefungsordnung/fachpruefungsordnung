@@ -111,8 +111,8 @@ medskip = Raw "\n\\medskip\n"
 -------------------------------------------------------------------------------
 {-                              environments                                 -}
 
-enumerate :: [LaTeX] -> LaTeX
-enumerate items = Environment "enumerate" [] (map (\i -> Command "item" [] [i]) items)
+enumerate :: [LT.Text] -> [LaTeX] -> LaTeX
+enumerate opts items = Environment "enumerate" opts (map (\i -> Command "item" [] [i]) items)
 
 itemize :: [LaTeX] -> LaTeX
 itemize items = Environment "itemize" [] (map (\i -> Command "item" [] [i]) items)

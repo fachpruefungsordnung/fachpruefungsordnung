@@ -67,6 +67,6 @@ mId_ :: Maybe Label -> Attributes
 mId_ Nothing = mempty
 mId_ (Just label) = id_ $ unLabel label
 
--- | Converts Label into <a href = "#<label>"> for HTML jumping
+-- | Converts Label into <a href = "#<label>"> for jumping to a HTML id
 anchorLink :: Label -> Html () -> Html ()
 anchorLink label = a_ [href_ (cons '#' $ unLabel label)]

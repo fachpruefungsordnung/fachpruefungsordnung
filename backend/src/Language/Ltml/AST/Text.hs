@@ -17,6 +17,7 @@ where
 import Data.Text (Text)
 import Data.Text.FromWhitespace (FromWhitespace, fromWhitespace)
 import Data.Void (Void)
+import Language.Lsd.AST.Type.Enum (EnumFormat)
 import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Node (Node)
 
@@ -48,7 +49,7 @@ data FontStyle
     | Underlined
     deriving (Show)
 
-newtype Enumeration = Enumeration [Node EnumItem]
+data Enumeration = Enumeration EnumFormat [Node EnumItem]
     deriving (Show)
 
 newtype EnumItem = EnumItem [RichTextTree]
