@@ -149,6 +149,7 @@ jobs:
         uses: sbdchd/squawk-action@v2
         with:
           fail-on-violations: true
+          # -> require-concurrent-index-creation <-
           # We perform migrations within a transaction. Postgres does not allow
           # concurrent index creation during transactions.
           exclude: "require-concurrent-index-creation"

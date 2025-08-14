@@ -29,7 +29,7 @@ import Data.Time (UTCTime)
 import Text.Read (readMaybe)
 
 import GHC.Generics (Generic)
-import GHC.Int (Int32)
+import GHC.Int (Int64)
 
 import Control.Lens ((&), (.~), (?~))
 import Data.Aeson (FromJSON (..), ToJSON (..), (.:), (.=))
@@ -91,12 +91,12 @@ instance FromJSON TreeRevisionSelector where
                 else fail $ "Invalid string for TreeRevisionSelector: " ++ Text.unpack t
         Aeson.Number n -> case toBoundedInteger n of
             Just i -> pure $ Specific $ TreeRevisionID i
-            Nothing -> fail "Invalid number for Int32"
+            Nothing -> fail "Invalid number for Int64"
         _ -> fail "TreeRevisionSelector must be either a string \"latest\" or an integer"
 
 instance ToSchema TreeRevisionSelector where
     declareNamedSchema _ = do
-        intSchema <- declareSchemaRef (Proxy :: Proxy Int32)
+        intSchema <- declareSchemaRef (Proxy :: Proxy Int64)
         let latestSchema =
                 Inline $
                     mempty
@@ -134,7 +134,7 @@ specificTreeRevision (Specific id_) = Just id_
 
 -- | An ID for a tree revision.
 newtype TreeRevisionID = TreeRevisionID
-    { unTreeRevisionID :: Int32
+    { unTreeRevisionID :: Int64
     }
     deriving (Eq)
 
@@ -145,7 +145,7 @@ instance FromJSON TreeRevisionID where
     parseJSON = fmap TreeRevisionID . parseJSON
 
 instance ToSchema TreeRevisionID where
-    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int64)
 
 instance ToParamSchema TreeRevisionID where
     toParamSchema _ =

@@ -21,7 +21,7 @@ import Data.OpenApi (ToSchema)
 import Data.Text (Text, pack, unpack)
 import Data.UUID (UUID)
 import GHC.Generics (Generic)
-import GHC.Int (Int32)
+import GHC.Int (Int64)
 import Text.Read (readMaybe)
 
 type UserID = UUID
@@ -44,7 +44,7 @@ data UserCreate = UserCreate
     }
 
 -- | duplicate definition because of import cycle with UserManagement.Group :'(
-type GroupID = Int32
+type GroupID = Int64
 
 data FullUser = FullUser
     { fullUserID :: UserID

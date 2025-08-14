@@ -44,7 +44,7 @@ import Web.HttpApiData (FromHttpApiData (..))
 
 -- | represents the id of a commit
 newtype CommitID = CommitID
-    { unCommitID :: Int32
+    { unCommitID :: Int64
     }
     deriving (Show, Generic, Eq, Ord)
 
@@ -55,7 +55,7 @@ instance FromJSON CommitID where
     parseJSON = fmap CommitID . parseJSON
 
 instance ToSchema CommitID where
-    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int64)
 
 instance ToParamSchema CommitID where
     toParamSchema _ =
@@ -269,6 +269,6 @@ data CommitRel = CommitRel
 data CommitNode = CommitNode
     { commitNodeID :: CommitID
     , commitNodeBase :: Maybe CommitID
-    , commitNodeHeight :: Int32
+    , commitNodeHeight :: Int64
     , commitNodeRootCommit :: Maybe CommitID
     }

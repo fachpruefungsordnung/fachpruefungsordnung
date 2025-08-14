@@ -4,6 +4,7 @@ import Data.Function (($))
 import FPO.Translations.Common (deCommon, enCommon)
 import FPO.Translations.Components.Editor (deEditor, enEditor)
 import FPO.Translations.Components.Navbar (deNavbar, enNavbar)
+import FPO.Translations.Components.TOC (deTOC, enTOC)
 import FPO.Translations.Page.Admin.AddMembers (deAddMembersPage, enAddMembersPage)
 import FPO.Translations.Page.Admin.GroupMembers (deGroupMemberPage, enGroupMemberPage)
 import FPO.Translations.Page.Admin.GroupProjects
@@ -24,6 +25,7 @@ import Simple.I18n.Translation (Translation, fromRecord, toRecord)
 
 en :: Translation Labels
 en = fromRecord
+  $ merge (toRecord enTOC)
   $ merge (toRecord enAdminPanel)
   $ merge (toRecord enAdminGroupPage)
   $ merge (toRecord enAdminUserPage)
@@ -42,6 +44,7 @@ en = fromRecord
 
 de :: Translation Labels
 de = fromRecord
+  $ merge (toRecord deTOC)
   $ merge (toRecord deAdminPanel)
   $ merge (toRecord deAdminGroupPage)
   $ merge (toRecord deAdminUserPage)
@@ -195,6 +198,11 @@ type Labels =
       ::: "rp_PasswordConfirm"
       ::: "rp_PasswordNew"
       ::: "rp_RequestCode"
+
+      -- | Table of Contents (TOC)
+      ::: "toc_end_dropzone"
+      ::: "toc_paragraph"
+      ::: "toc_section"
 
       ::: SNil
   )

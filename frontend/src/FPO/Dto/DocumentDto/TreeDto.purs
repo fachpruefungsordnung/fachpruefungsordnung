@@ -1,10 +1,11 @@
 module FPO.Dto.DocumentDto.TreeDto
-  ( Tree(..)
-  , Edge(..)
+  ( Edge(..)
   , RootTree(..)
+  , Tree(..)
   , TreeHeader(..)
   , findRootTree
   , findTitleRootTree
+  , getEdgeTree
   , replaceNodeRootTree
   ) where
 
@@ -36,6 +37,9 @@ data Tree a
   | Leaf { title :: String, node :: a }
 
 data Edge a = Edge (Tree a)
+
+getEdgeTree :: forall a. Edge a -> Tree a
+getEdgeTree (Edge tree) = tree
 
 -- automatically derive instances for Functor
 

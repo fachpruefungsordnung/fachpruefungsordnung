@@ -26,7 +26,7 @@ import Data.UUID (toString)
 import Database (getConnection)
 import qualified DocumentManagement as DM
 import DocumentManagement.Commit
-import GHC.Int (Int32)
+import GHC.Int (Int64)
 import Network.Wai.Handler.Warp (run)
 import Servant
 import Servant.Auth.Server
@@ -43,7 +43,7 @@ import Server.Handlers.UserHandlers
 import Prelude hiding (readFile)
 
 type DebugAPI =
-    "commits" :> Capture "id" Int32 :> Get '[JSON] ExistingCommit
+    "commits" :> Capture "id" Int64 :> Get '[JSON] ExistingCommit
         :<|> "commits" :> ReqBody '[JSON] CreateCommit :> Post '[JSON] ExistingCommit
 
 type PublicAPI =
@@ -70,7 +70,7 @@ type DocumentedAPI = SwaggerAPI :<|> PublicAPI :<|> ProtectedAPI
 pingHandler :: Handler String
 pingHandler = return "pong"
 
-getCommitHandler :: Int32 -> Handler ExistingCommit
+getCommitHandler :: Int64 -> Handler ExistingCommit
 getCommitHandler id' = liftIO $ do
     Right connection <- getConnection
     Right commit <- DM.getCommit (CommitID id') $ DM.Context connection
@@ -83,7 +83,7 @@ postCommitHandler commit = liftIO $ do
     return newCommit
 
 debugAPIHandler
-    :: (Int32 -> Handler ExistingCommit)
+    :: (Int64 -> Handler ExistingCommit)
         :<|> (CreateCommit -> Handler ExistingCommit)
 debugAPIHandler = getCommitHandler :<|> postCommitHandler
 

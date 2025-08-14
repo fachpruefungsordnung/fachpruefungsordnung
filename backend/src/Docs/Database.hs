@@ -1,5 +1,6 @@
 module Docs.Database
-    ( HasCheckPermission (..)
+    ( HasNow (..)
+    , HasCheckPermission (..)
     , HasIsGroupAdmin (..)
     , HasIsSuperAdmin (..)
     , HasExistsDocument (..)
@@ -43,7 +44,7 @@ import Docs.TextRevision
     )
 import Docs.Tree (Node)
 import Docs.TreeRevision (TreeRevision, TreeRevisionHistory, TreeRevisionRef)
-import GHC.Int (Int32)
+import GHC.Int (Int64)
 
 class (HasIsSuperAdmin m) => HasCheckPermission m where
     checkDocumentPermission :: UserID -> DocumentID -> Permission -> m Bool
@@ -53,6 +54,9 @@ class (HasIsSuperAdmin m) => HasIsGroupAdmin m where
 
 class (Monad m) => HasIsSuperAdmin m where
     isSuperAdmin :: UserID -> m Bool
+
+class (Monad m) => HasNow m where
+    now :: m UTCTime
 
 -- exists
 
@@ -86,13 +90,13 @@ class
 
 class (HasCheckPermission m, HasExistsTextElement m) => HasGetTextHistory m where
     getTextHistory
-        :: TextElementRef -> Maybe UTCTime -> Int32 -> m TextRevisionHistory
+        :: TextElementRef -> Maybe UTCTime -> Int64 -> m TextRevisionHistory
 
 class (HasCheckPermission m, HasExistsDocument m) => HasGetTreeHistory m where
-    getTreeHistory :: DocumentID -> Maybe UTCTime -> Int32 -> m TreeRevisionHistory
+    getTreeHistory :: DocumentID -> Maybe UTCTime -> Int64 -> m TreeRevisionHistory
 
 class (HasCheckPermission m, HasExistsDocument m) => HasGetDocumentHistory m where
-    getDocumentHistory :: DocumentID -> Maybe UTCTime -> Int32 -> m DocumentHistory
+    getDocumentHistory :: DocumentID -> Maybe UTCTime -> Int64 -> m DocumentHistory
 
 -- create
 
@@ -102,7 +106,11 @@ class (HasIsGroupAdmin m) => HasCreateDocument m where
 class (HasCheckPermission m, HasExistsDocument m) => HasCreateTextElement m where
     createTextElement :: DocumentID -> TextElementKind -> m TextElement
 
-class (HasCheckPermission m, HasExistsTextElement m) => HasCreateTextRevision m where
+class
+    (HasCheckPermission m, HasExistsTextElement m, HasNow m) =>
+    HasCreateTextRevision m
+    where
+    updateTextRevision :: TextRevisionID -> Text -> m TextRevision
     createTextRevision :: UserID -> TextElementRef -> Text -> m TextRevision
     getLatestTextRevisionID :: TextElementRef -> m (Maybe TextRevisionID)
 

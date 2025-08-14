@@ -5,6 +5,11 @@
   transition: opacity 0.15s ease;
 }
 
+.toc-item {
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
 /* Show drag handles and add buttons on hover */
 .toc-item:hover .toc-drag-handle,
 .toc-item:hover .toc-add-wrapper {
@@ -43,12 +48,17 @@
 
 .toc-button {
   padding: 0.125rem 0.375rem;
-  font-size: 0.7rem;
+  font-size: 1.1rem;
   border-radius: 3px;
   border: none;
   background: transparent;
-  color: #6c757d;
+  color: #8995a1;
   transition: all 0.15s ease;
+  aspect-ratio: 1 / 1;
+  height: 1.3em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .toc-button:hover {
@@ -87,4 +97,61 @@
   background: #0d6efd;
   height: 2px;
   margin: 0.25rem 0.75rem;
+}
+
+.drop-zone.blocked {
+  background: #aaaaaa;
+  height: 2px;
+  margin: 0.25rem 0.75rem;
+}
+
+/* Drop zone at the end of sections */
+
+.drop-zone-end {
+  transition: height 0.2s ease, margin 0.2s ease;
+  position: relative;
+  height: 0;
+  overflow: hidden;
+  margin: 0 0.75rem;
+  border: none;
+}
+
+.drop-zone-end.preview {
+  height: 18px;
+  background-color: rgba(168, 214, 255, 0.1);
+  margin: 1px 0.75rem;
+  border: 1px dashed #c6e4ff;
+  border-radius: 3px;
+}
+
+.drop-zone-end.active {
+  height: 32px;
+  background-color: rgba(0, 123, 255, 0.1);
+  margin: 2px 0.75rem;
+  border: 1px dashed #007bff;
+  border-radius: 3px;
+}
+
+.drop-zone-end::after {
+  content: attr(data-drop-text);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 10px;
+  color: #6c757d;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.drop-zone-end.preview::after {
+  opacity: 1;
+  color: #4c94e0;
+}
+
+.drop-zone-end.active::after {
+  opacity: 1;
+  color: #007bff;
 }

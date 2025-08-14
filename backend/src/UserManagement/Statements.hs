@@ -108,7 +108,7 @@ checkGroupMembership =
       select exists (
         select 1
         from roles
-        where user_id = $1 :: uuid and group_id = $2 :: int4
+        where user_id = $1 :: uuid and group_id = $2 :: int8
       ) :: bool
     |]
 
@@ -123,7 +123,7 @@ getUserRoleInGroup =
         from users u
         join roles r on u.id = r.user_id
         join groups g on g.id = r.group_id
-        where u.id = $1 :: uuid and g.id = $2 :: int4
+        where u.id = $1 :: uuid and g.id = $2 :: int8
       |]
 
 getAllUsers :: Statement () [User.User]
@@ -142,7 +142,7 @@ getAllUserRoles =
         toList
         [vectorStatement|
 
-    select g.id :: int4, g.name :: text, r.role :: text
+    select g.id :: int8, g.name :: text, r.role :: text
     from users u
     join roles r on u.id = r.user_id
     join groups g on g.id = r.group_id
@@ -199,7 +199,7 @@ addGroup =
 
       insert into groups (name, description)
       values ($1 :: text, $2 :: text?)
-      returning id :: int4
+      returning id :: int8
     |]
 
 getGroupInfo :: Statement Group.GroupID Group.GroupCreate
@@ -208,7 +208,7 @@ getGroupInfo =
         <$> [singletonStatement|
         select name :: text, description :: text?
         from groups
-        where id = $1 :: int4
+        where id = $1 :: int8
     |]
 
 getAllGroupsOverview :: Statement () [Group.GroupOverview]
@@ -217,7 +217,7 @@ getAllGroupsOverview =
         <$> rmap
             toList
             [vectorStatement|
-        select id :: int4, name :: text
+        select id :: int8, name :: text
         from groups
     |]
 
@@ -225,7 +225,7 @@ deleteGroup :: Statement Group.GroupID ()
 deleteGroup =
     [resultlessStatement|
       delete from groups
-      where id = $1 :: int4
+      where id = $1 :: int8
     |]
 
 addRole :: Statement (User.UserID, Group.GroupID, Text) ()
@@ -233,7 +233,7 @@ addRole =
     [resultlessStatement|
 
       insert into roles (user_id, group_id, role)
-      values ($1 :: uuid, $2 :: int4, $3 :: text :: role)
+      values ($1 :: uuid, $2 :: int8, $3 :: text :: role)
     |]
 
 updateUserRoleInGroup :: Statement (User.UserID, Group.GroupID, Text) ()
@@ -241,18 +241,18 @@ updateUserRoleInGroup =
     [resultlessStatement|
       update roles
       set role = $3 :: text :: role
-      where user_id = $1 :: uuid and group_id = $2 :: int4
+      where user_id = $1 :: uuid and group_id = $2 :: int8
     |]
 
 removeUserFromGroup :: Statement (User.UserID, Group.GroupID) ()
 removeUserFromGroup =
     [resultlessStatement|
       delete from roles
-      where user_id = $1 :: uuid and group_id = $2 :: int4
+      where user_id = $1 :: uuid and group_id = $2 :: int8
     |]
 
 -- | get all Users that have any role in the given group
-getMembersOfGroup :: Statement Int32 [User.UserInfo]
+getMembersOfGroup :: Statement Int64 [User.UserInfo]
 getMembersOfGroup =
     rmap
         ( fmap
@@ -266,7 +266,7 @@ getMembersOfGroup =
     from users u
     join roles r on u.id = r.user_id
     join groups g on g.id = r.group_id
-    where g.id = $1 :: int4
+    where g.id = $1 :: int8
   |]
 
 addSuperadmin :: Statement User.UserID ()
@@ -306,7 +306,7 @@ checkGroupPermission =
                 select 1
                 from roles r
                 join documents d on d.group_id = r.group_id
-                where r.user_id = $1 :: uuid and d.id = $2 :: int4
+                where r.user_id = $1 :: uuid and d.id = $2 :: int8
             ) :: bool
         |]
 
@@ -331,7 +331,7 @@ getExternalPermission =
             [maybeStatement|
                 select permission :: text
                 from external_document_rights
-                where user_id = $1 :: uuid and document_id = $2 :: int4
+                where user_id = $1 :: uuid and document_id = $2 :: int8
             |]
 
 -- | get the group id of a given document. the maybe is only technical and should never be Nothing in practice.
@@ -340,9 +340,9 @@ getDocumentGroupID =
     lmap
         Document.unDocumentID
         [maybeStatement|
-            select group_id :: int4
+            select group_id :: int8
             from documents
-            where id = $1 :: int4
+            where id = $1 :: int8
         |]
 
 addExternalPermission
@@ -353,7 +353,7 @@ addExternalPermission =
         )
         [resultlessStatement|
             insert into external_document_rights (user_id, document_id, permission)
-            values ($1 :: uuid, $2 :: int4, $3 :: text :: permission)
+            values ($1 :: uuid, $2 :: int8, $3 :: text :: permission)
         |]
 
 updateExternalPermission
@@ -365,7 +365,7 @@ updateExternalPermission =
         [resultlessStatement|
             update external_document_rights
             set permission = $3 :: text :: permission
-            where user_id = $1 :: uuid and document_id = $2 :: int4
+            where user_id = $1 :: uuid and document_id = $2 :: int8
         |]
 
 deleteExternalPermission :: Statement (User.UserID, Document.DocumentID) ()
@@ -374,7 +374,7 @@ deleteExternalPermission =
         (second Document.unDocumentID)
         [resultlessStatement|
             delete from external_document_rights
-            where user_id = $1 :: uuid and document_id = $2 :: int4
+            where user_id = $1 :: uuid and document_id = $2 :: int8
         |]
 
 getAllExternalUsersOfDocument
@@ -387,7 +387,7 @@ getAllExternalUsersOfDocument =
             [vectorStatement|
                 select user_id :: uuid, permission :: text
                 from external_document_rights
-                where document_id = $1 :: int4
+                where document_id = $1 :: int8
             |]
 
 getAllVisibleDocuments :: Statement User.UserID [Document.Document]
@@ -405,19 +405,19 @@ getAllVisibleDocuments =
         )
         [vectorStatement|
       (select
-        d.id :: int4,
+        d.id :: int8,
         d.name :: text,
-        d.group_id :: int4,
-        d.head :: int4?
+        d.group_id :: int8,
+        d.head :: int8?
       from roles r
       join documents d on d.group_id = r.group_id
       where r.user_id = $1 :: uuid)
       union
       (select
-        d.id :: int4,
+        d.id :: int8,
         d.name :: text,
-        d.group_id :: int4,
-        d.head :: int4?
+        d.group_id :: int8,
+        d.head :: int8?
       from documents d
       join external_document_rights e on d.id = e.document_id
       where e.user_id = $1 :: uuid)
@@ -438,10 +438,10 @@ getAllDocumentsOfGroup =
         )
         [vectorStatement|
       select
-        id :: int4,
+        id :: int8,
         name :: text,
-        group_id :: int4,
-        head :: int4?
+        group_id :: int8,
+        head :: int8?
       from documents
-      where group_id = $1 :: int4
+      where group_id = $1 :: int8
     |]

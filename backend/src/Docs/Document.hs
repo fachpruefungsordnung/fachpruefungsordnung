@@ -10,7 +10,7 @@ import Data.Text (Text)
 import Data.Time (UTCTime)
 
 import GHC.Generics (Generic)
-import GHC.Int (Int32)
+import GHC.Int (Int64)
 
 import Web.HttpApiData (FromHttpApiData (..))
 
@@ -31,7 +31,7 @@ import Docs.UserRef (UserRef)
 
 -- | ID for a document
 newtype DocumentID = DocumentID
-    { unDocumentID :: Int32
+    { unDocumentID :: Int64
     }
     deriving (Eq, Show)
 
@@ -42,7 +42,7 @@ instance FromJSON DocumentID where
     parseJSON = fmap DocumentID . parseJSON
 
 instance ToSchema DocumentID where
-    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int32)
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int64)
 
 instance ToParamSchema DocumentID where
     toParamSchema _ =

@@ -63,7 +63,7 @@ FROM base AS final
 WORKDIR /home
 
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends texlive
+RUN apt-get install -y --no-install-recommends texlive texlive-latex-extra
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /build/bin/backend-exe /home/bin/backend-exe
