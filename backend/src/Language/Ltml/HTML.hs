@@ -75,7 +75,7 @@ instance ToHtmlM (Node Section) where
         titleHtml <- toHtmlM title
         let (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (currentSectionID globalState)
             headingHtml =
-                (div_ <#> Class.Heading) . headingFormat headingFormatS sectionIDHtml
+                (h2_ <#> Class.Heading) . headingFormat headingFormatS sectionIDHtml
                     <$> titleHtml
          in do
                 -- \| Add table of contents entry for section
@@ -94,7 +94,7 @@ instance ToHtmlM (Node Section) where
                 modify (\s -> s {currentParagraphID = 1})
 
                 return $
-                    div_ [cssClass_ Class.Section, id_ htmlId] <$> (headingHtml <> childrenHtml)
+                    section_ [cssClass_ Class.Section, id_ htmlId] <$> (headingHtml <> childrenHtml)
 
 instance ToHtmlM (Node Paragraph) where
     toHtmlM (Node mLabel (Paragraph format textTrees)) = do
@@ -213,7 +213,7 @@ renderGroupedTextTree
     :: (ToHtmlStyle style, ToHtmlM enum, ToHtmlM special)
     => [TextTree style enum special]
     -> HtmlReaderState
-renderGroupedTextTree [] = return $ Now mempty
+renderGroupedTextTree [] = returnNow mempty
 renderGroupedTextTree (enum@(Enum _) : ts) = do
     enumHtml <- toHtmlM enum
     followingHtml <- renderGroupedTextTree ts
