@@ -65,10 +65,20 @@ classStyle Heading =
         fontWeight bold
         marginTop (em 0)
         marginBottom (em 0)
+        fontSize (em 1)
 classStyle Paragraph =
     toClassSelector Paragraph ? do
         display flex
-classStyle ParagraphID = toClassSelector ParagraphID ? Flexbox.flex 0 0 (em 2)
+classStyle ParagraphID =
+    toClassSelector ParagraphID ? do
+        Flexbox.flex 0 0 auto
+        -- TODO: if some paragraph ids are larger than others (e.g. (1) and (42))
+        --       the larger paragraph will have a bigger indentation than the smaller one
+        --       Might be needed to make paragraphs <li> and section <ol> and apply a
+        --       custom css counter to each paragraph <li>
+        -- \| Gap between paragraph id and text
+        paddingRight (em 0.75)
+        userSelect none
 classStyle TextContainer =
     toClassSelector TextContainer ? do
         display flex
