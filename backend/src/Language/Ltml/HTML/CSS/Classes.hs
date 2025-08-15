@@ -76,6 +76,9 @@ classStyle ParagraphID =
         --       the larger paragraph will have a bigger indentation than the smaller one
         --       Might be needed to make paragraphs <li> and section <ol> and apply a
         --       custom css counter to each paragraph <li>
+        --       Actually the indentation of paragraphs should be the same across the whole Section
+        --       or Document even. Maybe it would be best to track the largest paragrapg id and then
+        --       scale all paragraphs to fit the largest one (let i = length maxid in flex 0 0 (em i))
         -- \| Gap between paragraph id and text
         paddingRight (em 0.75)
         userSelect none
