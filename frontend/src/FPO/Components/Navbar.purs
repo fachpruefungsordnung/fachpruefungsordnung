@@ -195,7 +195,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
           ( [ dropdownEntry
                 (translate (label :: _ "prof_profile") state.translator)
                 "person"
-                (Navigate (Profile { loginSuccessful: Nothing }))
+                (Navigate (Profile { loginSuccessful: Nothing, userId: Nothing }))
             ]
               <>
                 ( if isUserSuperadmin user then

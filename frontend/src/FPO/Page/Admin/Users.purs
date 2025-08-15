@@ -159,7 +159,16 @@ component =
           H.modify_ _ { error = Nothing, requestDeleteUser = Nothing }
           H.tell _userlist unit UserList.ReloadUsersQ
     CloseDeleteModal -> do H.modify_ _ { requestDeleteUser = Nothing }
-    GetUser _ -> navigate (Profile { loginSuccessful: Nothing })
+    GetUser userId -> do
+      maybeUser <- H.liftAff getUser
+      case maybeUser of
+        Nothing -> navigate Login
+        Just user -> navigate
+          ( Profile
+              { loginSuccessful: Nothing
+              , userId: if getUserID user == userId then Nothing else Just userId
+              }
+          )
     HandleFilter f -> do
       H.tell _userlist unit (UserList.HandleFilterQ f)
     HandleUserList (UserList.Loading _) -> do

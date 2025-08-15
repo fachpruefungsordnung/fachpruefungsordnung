@@ -245,7 +245,7 @@ splitview = H.mkComponent
         , HP.style $
             "flex: 0 0 " <> show (state.sidebarRatio * 100.0)
               <>
-                "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
+                "%; box-sizing: border-box; min-width: 6ch; background:rgb(233, 233, 235); position: relative;"
               <>
                 if
                   state.sidebarShown

@@ -8,7 +8,7 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(Nothing), fromMaybe)
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.GroupDto (GroupID)
-import Routing.Duplex (RouteDuplex', boolean, int, optional, root)
+import Routing.Duplex (RouteDuplex', boolean, int, optional, root, string)
 import Routing.Duplex.Generic (noArgs, sum)
 import Routing.Duplex.Generic.Syntax ((/), (?))
 
@@ -24,7 +24,7 @@ data Route
   | ViewGroupMembers { groupID :: GroupID }
   | GroupAddMembers { groupID :: GroupID }
   | Page404
-  | Profile { loginSuccessful :: Maybe Boolean }
+  | Profile { loginSuccessful :: Maybe Boolean, userId :: Maybe String }
 
 derive instance genericRoute :: Generic Route _
 derive instance eqRoute :: Eq Route
@@ -43,7 +43,8 @@ routeCodec = root $ sum
   , "ViewGroupMembers": "view-group-members" ? { groupID: int }
   , "GroupAddMembers": "group-add-members" ? { groupID: int }
   , "Page404": "404" / noArgs
-  , "Profile": "profile" ? { loginSuccessful: optional <<< boolean }
+  , "Profile": "profile" ?
+      { loginSuccessful: optional <<< boolean, userId: optional <<< string }
   }
 
 -- | Converts a route to a string representation.

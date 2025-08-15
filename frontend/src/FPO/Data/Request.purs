@@ -109,6 +109,9 @@ getFromJSONEndpoint decode url = do
 getUser :: Aff (Maybe FullUserDto)
 getUser = getFromJSONEndpoint decodeJson "/me"
 
+getUserWithId :: String -> Aff (Maybe FullUserDto)
+getUserWithId userId = getFromJSONEndpoint decodeJson ("/users/" <> userId)
+
 -- | Fetches the authorized user for a specific group.
 -- | Returns Nothing if the user is not existing or not authorized.
 getAuthorizedUser :: GroupID -> Aff (Maybe FullUserDto)
@@ -245,6 +248,22 @@ postDocument url body = do
 postBlob :: String -> Json -> Aff (Either Error (Response Blob))
 postBlob url body = do
   fpoRequest <- liftEffect $ defaultFpoRequest AXRF.blob ("/api" <> url) POST
+  let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
+
+-- | PATCH Requests -----------------------------------------------------
+
+-- | Makes a PATCH request with a JSON body and expects a String response.
+patchString :: String -> Json -> Aff (Either Error (Response String))
+patchString url body = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.string ("/api" <> url) PATCH
+  let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
+
+-- | Makes a PATCH request with a JSON body and expects a JSON response.
+patchJson :: String -> Json -> Aff (Either Error (Response Json))
+patchJson url body = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.json ("/api" <> url) PATCH
   let request' = fpoRequest { content = Just (RequestBody.json body) }
   liftAff $ request driver request'
 

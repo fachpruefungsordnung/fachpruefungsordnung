@@ -138,6 +138,8 @@ addTocEntry key title mLabel = do
 
 -------------------------------------------------------------------------------
 
+-- | Maps EnumFormat to css class name which implements the counter:
+--   Is used for reusing already existing classes, if the same EnumFormat occurs again
 type EnumStyleMap = [(EnumFormat, Text)]
 
 -------------------------------------------------------------------------------

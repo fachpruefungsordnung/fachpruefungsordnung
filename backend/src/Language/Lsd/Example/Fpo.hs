@@ -211,8 +211,7 @@ regularEnumT =
                     )
                     ( EnumItemKeyFormat $
                         FormatString
-                            [ StringAtom "("
-                            , PlaceholderAtom KeyIdentifierPlaceholder
+                            [ PlaceholderAtom KeyIdentifierPlaceholder
                             , StringAtom ")"
                             ]
                     )

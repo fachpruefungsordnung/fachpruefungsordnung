@@ -30,6 +30,9 @@ getUserID (FullUserDto u) = u.fullUserID
 isUserSuperadmin :: FullUserDto -> Boolean
 isUserSuperadmin (FullUserDto u) = u.fullUserIsSuperadmin
 
+getFullUserRoles :: FullUserDto -> Array UR.FullUserRoleDto
+getFullUserRoles (FullUserDto u) = u.fullUserRoles
+
 -- | Checks if the user is admin of at least one group, or even a superadmin.
 isAdmin :: FullUserDto -> Boolean
 isAdmin (FullUserDto u) = u.fullUserIsSuperadmin || any
@@ -62,4 +65,17 @@ derive newtype instance encodeJsonFullUserDto :: EncodeJson FullUserDto
 derive newtype instance decodeJsonFullUserDto :: DecodeJson FullUserDto
 derive instance genericFullUserDto :: Generic FullUserDto _
 instance showFullUserDto :: Show FullUserDto where
+  show = genericShow
+
+-- This is for the PATCH /users/:id endpoint
+newtype PatchUserDto = PatchUserDto
+  { newEmail :: String
+  , newName :: String
+  }
+
+derive instance newtypePatchUserDto :: Newtype PatchUserDto _
+derive newtype instance encodeJsonPatchUserDto :: EncodeJson PatchUserDto
+derive newtype instance decodeJsonPatchUserDto :: DecodeJson PatchUserDto
+derive instance genericPatchUserDto :: Generic PatchUserDto _
+instance showPatchUserDto :: Show PatchUserDto where
   show = genericShow

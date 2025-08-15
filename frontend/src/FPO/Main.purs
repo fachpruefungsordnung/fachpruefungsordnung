@@ -71,7 +71,9 @@ type State = { route :: Maybe Route }
 
 data Query a = NavigateQ Route a -- ^ Query to navigate to a new route.
 
-data Action = Initialize -- ^ Action to initialize the main component.
+data Action
+  = Initialize -- ^ Action to initialize the main component.
+  | HandleProfile Profile.Output
 
 _navbar = Proxy :: Proxy "navbar"
 _home = Proxy :: Proxy "home"
@@ -98,7 +100,7 @@ type Slots =
   , viewGroupMembers :: forall q. H.Slot q Void Unit
   , groupAddMembers :: forall q. H.Slot q Void Unit
   , page404 :: forall q. H.Slot q Void Unit
-  , profile :: forall q. H.Slot q Void Unit
+  , profile :: forall q. H.Slot q Profile.Output Unit
   )
 
 component
@@ -149,8 +151,10 @@ component =
             GroupAddMembers.component
             groupID
           Page404 -> HH.slot_ _page404 unit Page404.component unit
-          Profile { loginSuccessful } -> HH.slot_ _profile unit Profile.component
-            { loginSuccessfulBanner: loginSuccessful }
+          Profile { loginSuccessful, userId } -> HH.slot _profile unit
+            Profile.component
+            { loginSuccessfulBanner: loginSuccessful, userId: userId }
+            HandleProfile
     ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
@@ -158,6 +162,11 @@ component =
     Initialize -> do
       initialRoute <- hush <<< (RD.parse routeCodec) <$> liftEffect getHash
       navigate $ fromMaybe Home initialRoute
+    HandleProfile profileOutput -> case profileOutput of
+      Profile.ChangedUsername -> do
+        -- If the username was changed, we want to reload the user data
+        -- to ensure that the navbar displays the correct user information.
+        H.tell _navbar unit Navbar.RequestReloadUser
 
   handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Void m (Maybe a)
   handleQuery = case _ of

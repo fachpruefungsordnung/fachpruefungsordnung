@@ -1,0 +1,78 @@
+.card {
+    border: 0;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, .05);
+}
+
+.avatar {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: linear-gradient(145deg, #dee2e6, #f8f9fa);
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    color: #495057;
+}
+
+.unsaved-dot {
+    width: .6rem;
+    height: .6rem;
+    border-radius: 50%;
+    background: #4c3a03;
+    display: inline-block;
+}
+
+.input-icon {
+    position: absolute;
+    left: .75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    opacity: .6;
+}
+
+.input-with-icon {
+    padding-left: 2rem;
+}
+
+.fade-swap-enter {
+    opacity: 0;
+    transform: translateY(2px);
+}
+
+.fade-swap-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+    transition: all .2s ease;
+}
+
+.fade-swap-exit {
+    opacity: 1;
+}
+
+.fade-swap-exit-active {
+    opacity: 0;
+    transition: opacity .15s ease;
+}
+
+.strength-bar {
+    height: .4rem;
+    border-radius: .25rem;
+    background: #e9ecef;
+    overflow: hidden;
+}
+
+.strength-fill {
+    height: 100%;
+    width: 0%;
+    background: #dc3545;
+    transition: width .25s ease, background-color .25s ease;
+}
+
+.offcanvas-w {
+    width: 360px;
+}
+
+.sidebar-sticky {
+    position: sticky;
+    top: 1rem;
+}

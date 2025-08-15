@@ -152,7 +152,7 @@ component =
         updateStore $ Store.SetLoginRedirect Nothing
         navigate r
       Nothing -> do
-        navigate (Profile { loginSuccessful: Just true })
+        navigate (Profile { loginSuccessful: Just true, userId: Nothing })
 
   renderLoginForm :: forall w. State -> HH.HTML w Action
   renderLoginForm state =
