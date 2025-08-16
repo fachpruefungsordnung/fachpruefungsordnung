@@ -3,15 +3,17 @@
 
 module Language.Ltml.Parser.Footnote
     ( FootnoteParser
+    , unwrapFootnoteParser
     , footnoteP
     )
 where
 
 import Control.Applicative.Combinators (choice)
-import Control.Monad.Reader (ReaderT, ask)
-import Control.Monad.State (StateT, get, put)
+import Control.Monad.Reader (ReaderT, ask, runReaderT)
+import Control.Monad.State (StateT, get, put, runStateT)
 import Control.Monad.Trans.Class (lift)
 import Data.Map (Map)
+import qualified Data.Map as Map (empty)
 import Data.Map.Utils (insert')
 import Data.Text (unpack)
 import Language.Lsd.AST.Type.Footnote (FootnoteType (FootnoteType))
@@ -25,6 +27,12 @@ type FootnoteParser =
 
 instance ParserWrapper FootnoteParser where
     wrapParser = lift . lift
+
+unwrapFootnoteParser
+    :: [FootnoteType]
+    -> FootnoteParser a
+    -> Parser (a, Map Label Footnote)
+unwrapFootnoteParser ts p = runStateT (runReaderT p ts) Map.empty
 
 footnoteP :: FootnoteParser ()
 footnoteP =
