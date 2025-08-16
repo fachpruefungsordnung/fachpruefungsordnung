@@ -4,6 +4,7 @@ module Language.Ltml.ToLaTeX
     --   generatePDFFromDocument
     ) where
 
+import Control.Exception (bracket)
 import Control.Monad.State (runState)
 import qualified Data.ByteString.Lazy as BS
 import Data.Text (Text)
@@ -20,17 +21,16 @@ import Language.Ltml.ToLaTeX.GlobalState
 import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
 import Language.Ltml.ToLaTeX.ToLaTeXM
 import Language.Ltml.ToLaTeX.Type (document)
+import System.Directory (removeDirectoryRecursive)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
-import System.IO.Temp (withSystemTempDirectory, createTempDirectory)
+import System.IO.Temp (createTempDirectory, withSystemTempDirectory)
 import System.Process
     ( CreateProcess (cwd)
     , readCreateProcessWithExitCode
     , shell
     )
-import Text.Megaparsec (Parsec, errorBundlePretty, runParser, MonadParsec (eof))
-import Control.Exception (bracket)
-import System.Directory (removeDirectoryRecursive)
+import Text.Megaparsec (MonadParsec (eof), Parsec, errorBundlePretty, runParser)
 
 initialGlobalState :: GlobalState
 initialGlobalState =
@@ -47,7 +47,8 @@ initialGlobalState =
         mempty
 
 withTempIn :: FilePath -> String -> (FilePath -> IO a) -> IO a
-withTempIn parent template = bracket
+withTempIn parent template =
+    bracket
         (createTempDirectory parent template)
         removeDirectoryRecursive
 
