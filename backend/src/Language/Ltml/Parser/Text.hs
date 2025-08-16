@@ -9,7 +9,7 @@
 module Language.Ltml.Parser.Text
     ( ParagraphParser
     , textForestP
-    , hangingTextP'
+    , mlHangingTextP
     )
 where
 
@@ -126,7 +126,7 @@ hangingTextP
     -> m [TextTree style enum special]
 hangingTextP kw t = hangingBlock_ (keywordP kw) elementPF (childPF t)
 
-hangingTextP'
+mlHangingTextP
     :: ( ParserWrapper m
        , StyleP style
        , EnumP enumType enum
@@ -135,7 +135,7 @@ hangingTextP'
     => Keyword
     -> TextType enumType
     -> m (Maybe Label, [TextTree style enum special])
-hangingTextP' kw t = hangingBlock' (mlKeywordP kw) elementPF (childPF t)
+mlHangingTextP kw t = hangingBlock' (mlKeywordP kw) elementPF (childPF t)
 
 class StyleP style where
     styleP :: (MonadParser m) => m style
@@ -158,7 +158,7 @@ instance EnumP Void Void where
 instance EnumP EnumType Enumeration where
     enumP (EnumType kw fmt tt) = Enumeration fmt <$> someIndented enumItemP
       where
-        enumItemP = uncurry Node . fmap EnumItem <$> hangingTextP' kw tt
+        enumItemP = uncurry Node . fmap EnumItem <$> mlHangingTextP kw tt
 
 class SpecialP m special | special -> m where
     specialP :: m (MiElementConfig, Maybe special)
