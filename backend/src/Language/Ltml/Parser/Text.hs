@@ -89,9 +89,13 @@ elementPF p = fmap (maybeToList . fmap Special) <$> specialP <|> regularP
     regularP =
         fmap ((regularCfg,) . singleton) $
             Word <$> wordP (Proxy :: Proxy special)
-                <|> Reference <$ char '{' <* char ':' <*> labelP <* char '}'
+                <|> char '{' *> bracedP <* char '}'
                 <|> Styled <$ char '<' <*> styleP <*> p <* char '>'
       where
+        bracedP =
+            Reference <$ char ':' <*> labelP
+                <|> FootnoteRef <$ string "^:" <*> labelP
+
         regularCfg =
             MiElementConfig
                 { miecPermitEnd = True
