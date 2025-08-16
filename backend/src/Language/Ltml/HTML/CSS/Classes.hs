@@ -17,7 +17,7 @@ import Data.Char (toLower)
 import Data.String (fromString)
 import Data.Text (Text, pack, unpack)
 import qualified Data.Typography as Ltml
-import Data.Void (Void)
+import Data.Void (Void, absurd)
 import Language.Ltml.HTML.CSS.CustomClay
 
 data Class
@@ -138,7 +138,8 @@ classStyle Enumeration =
             ol # byClass enumClassName ? do
                 counterReset "item"
                 marginLeft (em 0)
-                paddingLeft (em 0)
+                -- \| Enum indentation
+                paddingLeft (em 1)
                 marginTop (em 0)
                 marginBottom (em 0)
                 -- \| enums items are also spaced via flex environment
@@ -201,4 +202,4 @@ instance ToCssClass Ltml.FontStyle where
 -- | ToCssClass instance that can never be called, because there are
 --   no values of type Void
 instance ToCssClass Void where
-    toCssClass = error "toCssClass for Void was called!"
+    toCssClass = absurd

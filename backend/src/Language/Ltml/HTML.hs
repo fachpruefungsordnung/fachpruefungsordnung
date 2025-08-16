@@ -14,7 +14,7 @@ import Control.Monad.Reader
 import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
-import Data.Void (Void)
+import Data.Void (Void, absurd)
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
 import Language.Ltml.AST.Document
@@ -193,6 +193,8 @@ instance
                 Just labelHtml -> labelWrapperFunc globalState label labelHtml
         Styled style textTrees -> do
             textTreeHtml <- toHtmlM textTrees
+            -- TODO: <ol> in <span> is illegal, check how <div> works without problems (newlines)
+            --       else: block rendering and use div for raw text and enums seperatly
             return $ (span_ <#> toCssClass style) <$> textTreeHtml
         Enum enum -> toHtmlM enum
         Footnote _ ->
@@ -254,7 +256,7 @@ instance (ToHtmlM a) => ToHtmlM [a] where
 -- | ToHtmlM instance that can never be called, because there are
 --   no values of type Void
 instance ToHtmlM Void where
-    toHtmlM = error "toHtmlM for Void was called!"
+    toHtmlM = absurd
 
 -------------------------------------------------------------------------------
 
