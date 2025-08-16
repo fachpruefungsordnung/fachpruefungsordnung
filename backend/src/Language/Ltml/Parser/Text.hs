@@ -9,6 +9,7 @@
 module Language.Ltml.Parser.Text
     ( ParagraphParser
     , textForestP
+    , lHangingTextP
     , mlHangingTextP
     )
 where
@@ -27,16 +28,12 @@ import Data.Typography (FontStyle (..))
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.Type.Enum (EnumType (EnumType))
-import Language.Lsd.AST.Type.Text
-    ( FootnoteType (FootnoteType)
-    , TextType (TextType)
-    )
+import Language.Lsd.AST.Type.Text (TextType (TextType))
 import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Node (Node (Node))
 import Language.Ltml.AST.Text
     ( EnumItem (EnumItem)
     , Enumeration (Enumeration)
-    , FootnoteTextTree
     , SentenceStart (SentenceStart)
     , TextTree (..)
     )
@@ -46,7 +43,7 @@ import Language.Ltml.Parser
     , ParserWrapper (wrapParser)
     , someIndented
     )
-import Language.Ltml.Parser.Keyword (keywordP, mlKeywordP)
+import Language.Ltml.Parser.Keyword (keywordP, lKeywordP, mlKeywordP)
 import Language.Ltml.Parser.Label (labelP, labelingP)
 import Language.Ltml.Parser.MiTree
     ( MiElementConfig (..)
@@ -107,14 +104,11 @@ childPF
      . (ParserWrapper m, EnumP enumType enum, SpecialP m special)
     => TextType enumType
     -> m (TextTree style enum special)
-childPF (TextType enumTypes footnoteTypes) =
+childPF (TextType enumTypes) =
     wrapParser (Enum <$> choice (fmap enumP enumTypes))
         <* postEnumP (Proxy :: Proxy special)
-        <|> wrapParser (Footnote <$> choice (fmap footnoteTextP footnoteTypes))
 
-footnoteTextP :: FootnoteType -> Parser [FootnoteTextTree]
-footnoteTextP (FootnoteType kw tt) = hangingTextP kw tt
-
+-- TODO: Unused.
 hangingTextP
     :: ( ParserWrapper m
        , StyleP style
@@ -125,6 +119,17 @@ hangingTextP
     -> TextType enumType
     -> m [TextTree style enum special]
 hangingTextP kw t = hangingBlock_ (keywordP kw) elementPF (childPF t)
+
+lHangingTextP
+    :: ( ParserWrapper m
+       , StyleP style
+       , EnumP enumType enum
+       , SpecialP m special
+       )
+    => Keyword
+    -> TextType enumType
+    -> m (Label, [TextTree style enum special])
+lHangingTextP kw t = hangingBlock' (lKeywordP kw) elementPF (childPF t)
 
 mlHangingTextP
     :: ( ParserWrapper m

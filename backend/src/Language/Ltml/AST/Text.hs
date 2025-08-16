@@ -28,7 +28,7 @@ data TextTree style enum special
     | Reference Label
     | Styled style [TextTree style enum special]
     | Enum enum
-    | Footnote [FootnoteTextTree]
+    | FootnoteRef Label
     deriving (Show)
 
 instance FromWhitespace [TextTree a b c] where

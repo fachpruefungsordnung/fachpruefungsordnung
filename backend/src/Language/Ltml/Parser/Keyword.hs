@@ -2,6 +2,7 @@
 
 module Language.Ltml.Parser.Keyword
     ( keywordP
+    , lKeywordP
     , mlKeywordP
     )
 where
@@ -16,6 +17,9 @@ import Text.Megaparsec.Char (string)
 
 keywordP :: (MonadParser m) => Keyword -> m ()
 keywordP (Keyword kw) = void $ string kw
+
+lKeywordP :: (MonadParser m) => Keyword -> m Label
+lKeywordP (Keyword kw) = string kw *> labelingP
 
 mlKeywordP :: (MonadParser m) => Keyword -> m (Maybe Label)
 mlKeywordP (Keyword kw) = string kw *> optional labelingP
