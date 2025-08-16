@@ -22,13 +22,15 @@ import Language.Ltml.ToLaTeX.ToLaTeXM
 import Language.Ltml.ToLaTeX.Type (document)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
-import System.IO.Temp (withSystemTempDirectory)
+import System.IO.Temp (withSystemTempDirectory, createTempDirectory)
 import System.Process
     ( CreateProcess (cwd)
     , readCreateProcessWithExitCode
     , shell
     )
-import Text.Megaparsec (Parsec, empty, errorBundlePretty, runParser)
+import Text.Megaparsec (Parsec, errorBundlePretty, runParser, MonadParsec (eof))
+import Control.Exception (bracket)
+import System.Directory (removeDirectoryRecursive)
 
 initialGlobalState :: GlobalState
 initialGlobalState =
@@ -43,6 +45,11 @@ initialGlobalState =
         False
         mempty
         mempty
+
+withTempIn :: FilePath -> String -> (FilePath -> IO a) -> IO a
+withTempIn parent template = bracket
+        (createTempDirectory parent template)
+        removeDirectoryRecursive
 
 generatePDFfromParsed
     :: Parsec Void Text a -> (a -> LT.Text) -> Text -> IO (Either String BS.ByteString)
@@ -83,7 +90,7 @@ generatePDFfromParsed parser render input =
 
 generatePDFFromSuperSection :: Text -> IO (Either String BS.ByteString)
 generatePDFFromSuperSection =
-    generatePDFfromParsed (sectionP superSectionT empty) sectionToText
+    generatePDFfromParsed (sectionP superSectionT eof) sectionToText
   where
     sectionToText sec =
         let (latexSection, gs) = runState (toLaTeXM sec) initialGlobalState
@@ -91,7 +98,7 @@ generatePDFFromSuperSection =
 
 generatePDFFromSection :: Text -> IO (Either String BS.ByteString)
 generatePDFFromSection =
-    generatePDFfromParsed (sectionP sectionT empty) sectionToText
+    generatePDFfromParsed (sectionP sectionT eof) sectionToText
   where
     sectionToText sec =
         let (latexSection, gs) = runState (toLaTeXM sec) initialGlobalState
