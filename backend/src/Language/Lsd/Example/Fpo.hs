@@ -5,6 +5,7 @@ module Language.Lsd.Example.Fpo
     , superSectionT
     , sectionT
     , paragraphT
+    , footnoteT
     )
 where
 
