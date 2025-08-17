@@ -8,11 +8,9 @@ module FPO.Page.Admin.Groups
 
 import Prelude
 
-import Affjax (Error)
-import Data.Argonaut.Decode.Decoders (decodeInt)
 import Data.Array (filter, find, length, replicate, slice, (:))
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
@@ -24,10 +22,8 @@ import FPO.Data.Request
   ( LoadState(..)
   , addGroup
   , deleteIgnore
-  , getStatusCode
   , getUser
   , getUserGroups
-  , printError
   )
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
@@ -43,13 +39,13 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addButton, addCard, addColumn, addError, addModal, emptyEntryGen)
 import FPO.UI.Style as Style
-import Halogen (liftAff, liftEffect)
+import Halogen (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore, updateStore)
+import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
@@ -159,18 +155,18 @@ component =
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
-      u <- liftAff $ getUser
-      when (fromMaybe true (not <$> isAdmin <$> u)) $
-        navigate Page404
+      userResult <- getUser
+      case userResult of
+        Left _ -> navigate Page404 -- Ignore error, redirect to 404
+        Right user ->
+          when (not $ isAdmin user) $ navigate Page404
 
-      g <- liftAff getUserGroups
-      case g of
-        Just gs -> do
-          H.modify_ _ { groups = Loaded gs }
+      groups <- getUserGroups
+      case groups of
+        Left _ -> pure unit -- TODO 
+        Right g -> do
+          H.modify_ _ { groups = Loaded g }
           handleAction Filter
-          pure unit
-        Nothing -> do
-          navigate Login
           pure unit
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -211,42 +207,30 @@ component =
         case s.groups of
           Loaded gs -> do
             setWaiting true
-            response <- handleAuthReq (Just AdminViewGroups) $ liftAff $ addGroup $
-              ( GroupCreate
-                  { groupCreateName: newGroupName
-                  , groupCreateDescription: s.groupDescriptionCreate
-                  }
-              )
+            response <- addGroup $ GroupCreate
+              { groupCreateName: newGroupName
+              , groupCreateDescription: s.groupDescriptionCreate
+              }
 
             case response of
               Left err -> do
                 H.modify_ _
-                  { error = Just $ printError
+                  { error = Just $
                       ( translate (label :: _ "admin_groups_errCreatingGroup")
                           s.translator
-                      )
-                      err
+                      ) <> show err
                   }
-              Right content -> do
-                case decodeInt content.body of
-                  Left err -> do
-                    H.modify_ _
-                      { error = Just $
-                          ( translate (label :: _ "admin_groups_errDecodingGroupId")
-                              s.translator
-                          ) <> ": " <> show err
-                      }
-                  Right newID -> do
-                    H.modify_ _
-                      { error = Nothing
-                      , groups = Loaded $
-                          GroupOverview
-                            { groupOverviewName: newGroupName
-                            , groupOverviewID: newID
-                            }
-                            : gs
-                      , groupNameCreate = ""
-                      }
+              Right newID ->
+                H.modify_ _
+                  { error = Nothing
+                  , groups = Loaded $
+                      GroupOverview
+                        { groupOverviewName: newGroupName
+                        , groupOverviewID: newID
+                        }
+                        : gs
+                  , groupNameCreate = ""
+                  }
             handleAction Filter
           Loading -> do
             H.modify_ _
@@ -289,32 +273,24 @@ component =
                 }
             Just gId -> do
               setWaiting true
-              res <- liftAff $ deleteIgnore $ "/groups/" <> show gId
+              res <- deleteIgnore $ "/groups/" <> show gId
               case res of
                 Left err -> do
                   H.modify_ _
-                    { error = Just $ printError
+                    { error = Just $
                         ( translate (label :: _ "admin_groups_errDeletingGroup")
                             s.translator
                         )
-                        err
+                          <> (show err)
                     }
-                Right status -> do
-                  if getStatusCode status /= 200 then
-                    H.modify_ _
-                      { error = Just $ translate
-                          (label :: _ "admin_groups_failedDeletingGroup")
-                          s.translator
-                      , requestDelete = Nothing
-                      }
-                  else do
-                    liftEffect $ log $ "Deleted group: " <> groupName
-                    H.modify_ _
-                      { error = Nothing
-                      , groups = Loaded $ filter
-                          (\g -> getGroupOverviewName g /= groupName)
-                          gs
-                      }
+                Right _ -> do
+                  liftEffect $ log $ "Deleted group: " <> groupName
+                  H.modify_ _
+                    { error = Nothing
+                    , groups = Loaded $ filter
+                        (\g -> getGroupOverviewName g /= groupName)
+                        gs
+                    }
               setWaiting false
           handleAction Filter
         Loading -> do
@@ -512,36 +488,3 @@ component =
               [ HH.text $ translate (label :: _ "common_create") state.translator ]
           ]
       ]
-
-  -- | Requests can fail because of missing credentials
-  -- | (e.g., if the user is not logged in). This helper
-  -- | function that wraps around these requests and handles
-  -- | authentication errors, e.g., by redirecting to the
-  -- | login page.
-  handleAuthReq
-    :: forall m' a
-     . MonadAff m'
-    => Navigate m'
-    => MonadStore Store.Action Store.Store m'
-    => Maybe Route
-    -> m' (Either Error a)
-    -> m' (Either Error a)
-  handleAuthReq mtarget request = do
-    result <- request
-    case result of
-      Right _ -> pure result
-      Left error ->
-        if isAuthenticationError error then do
-          updateStore $ Store.SetLoginRedirect mtarget
-          navigate Login
-          pure result
-        else pure result
-
-  -- Helper to detect auth errors.
-  -- This is not a robust solution, but it works for now
-  -- and (only) for JSON responses.
-  isAuthenticationError :: Error -> Boolean
-  isAuthenticationError err =
-    -- Just a simple and stupid check for common auth error messages.
-    contains (Pattern "Not allowe") (printError "" err)
---                   not a typo!

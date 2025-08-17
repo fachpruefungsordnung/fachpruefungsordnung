@@ -8,6 +8,8 @@ module Language.Ltml.HTML.Common
     , ReaderState (..)
     , initGlobalState
     , initReaderState
+    , incSectionID
+    , incSuperSectionID
     , ToC
     , addTocEntry
     , EnumStyleMap
@@ -65,13 +67,7 @@ data GlobalState = GlobalState
     }
 
 data ReaderState = ReaderState
-    { currentSuperSectionIDHtml :: Html ()
-    -- ^ Holds the actual Html identifier that should be displayed if the current super-section is referenced
-    , currentSectionIDHtml :: Html ()
-    -- ^ Holds the actual Html identifier that should be displayed if the current section is referenced
-    , currentParagraphIDHtml :: Html ()
-    -- ^ Holds the actual textual identifier that should be displayed if the current paragraph is referenced
-    , isSingleParagraph :: Bool
+    { isSingleParagraph :: Bool
     -- ^ Signals the child paragraph that it is the only child and thus should not have an visible identifier
     , currentEnumIDFormatString :: IdentifierFormat
     -- ^ Holds the FormatString that describes how the current enum item shoud be referenced
@@ -99,12 +95,19 @@ initGlobalState =
 initReaderState :: ReaderState
 initReaderState =
     ReaderState
-        { currentSuperSectionIDHtml = mempty
-        , currentSectionIDHtml = mempty
-        , currentParagraphIDHtml = mempty
-        , isSingleParagraph = False
+        { isSingleParagraph = False
         , currentEnumIDFormatString = FormatString []
         }
+
+-------------------------------------------------------------------------------
+
+-- | Increments currentSectionID in GlobalState
+incSectionID :: ReaderT r (State GlobalState) ()
+incSectionID = modify (\s -> s {currentSectionID = currentSectionID s + 1})
+
+-- | Increments currentSuperSectionID in GlobalState
+incSuperSectionID :: ReaderT r (State GlobalState) ()
+incSuperSectionID = modify (\s -> s {currentSuperSectionID = currentSuperSectionID s + 1})
 
 -------------------------------------------------------------------------------
 

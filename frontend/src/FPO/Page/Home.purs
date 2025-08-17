@@ -12,15 +12,15 @@ module FPO.Page.Home (component, adjustDateTime, formatRelativeTime) where
 
 import Prelude
 
-import Control.Monad.Maybe.Trans (MaybeT(..), lift, runMaybeT)
 import Data.Array (filter, length, null, replicate, slice)
 import Data.DateTime (DateTime, adjust, date, day, diff, month, year)
+import Data.Either (Either(..))
 import Data.Enum (fromEnum)
 import Data.Int (floor)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), contains, toLower)
 import Data.Time.Duration (class Duration, Seconds(..), negateDuration, toDuration)
-import Effect.Aff.Class (class MonadAff, liftAff)
+import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console (log)
 import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
@@ -125,18 +125,33 @@ component =
   handleAction = case _ of
     Initialize -> do
       store <- getStore
-      u <- liftAff getUser
+      userWithError <- getUser
       now <- liftEffect nowDateTime
       -- If the user is logged in, fetch their documents and convert them to projects.
-      void $ runMaybeT do
-        user <- MaybeT $ pure u
-        docs <- MaybeT $ liftAff $ getUserDocuments $ getUserID user
-        lift $ H.modify_ _
-          { user = u
-          , translator = fromFpoTranslator store.translator
-          , projects = docs
-          , currentTime = Just now
-          }
+      case userWithError of
+        Left _ -> do -- TODO correct error handling for this page
+          H.modify_ _
+            { user = Nothing
+            , translator = fromFpoTranslator store.translator
+            , currentTime = Just now
+            }
+        Right user -> do
+          docsResult <- getUserDocuments $ getUserID user
+          case docsResult of
+            Left _ -> do -- TODO correct error handling
+              H.modify_ _
+                { user = Just user
+                , translator = fromFpoTranslator store.translator
+                , projects = []
+                , currentTime = Just now
+                }
+            Right docs -> do
+              H.modify_ _
+                { user = Just user
+                , translator = fromFpoTranslator store.translator
+                , projects = docs
+                , currentTime = Just now
+                }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
       log $ "Routing to editor for project " <> (DH.getName project)

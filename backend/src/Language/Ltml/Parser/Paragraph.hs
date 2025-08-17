@@ -8,21 +8,18 @@ import Control.Monad.State (evalStateT)
 import Language.Lsd.AST.Type.Paragraph (ParagraphType (ParagraphType))
 import Language.Ltml.AST.Node (Node (Node))
 import Language.Ltml.AST.Paragraph (Paragraph (Paragraph))
-import Language.Ltml.Parser (Parser, nonIndented, sp)
-import Language.Ltml.Parser.Common.Lexeme (nLexeme)
+import Language.Ltml.Parser (Parser, nonIndented)
+import Language.Ltml.Parser.Common.Lexeme (nLexeme1)
 import Language.Ltml.Parser.Label (labelingP)
-import Language.Ltml.Parser.Text (textForestP)
-import Text.Megaparsec (notFollowedBy, try)
-import Text.Megaparsec.Char (char)
+import Language.Ltml.Parser.Text (ParagraphParser, textForestP)
+import Text.Megaparsec (try)
 
-paragraphP :: ParagraphType -> Parser () -> Parser (Node Paragraph)
-paragraphP (ParagraphType fmt tt) succStartP = do
-    -- Do not parse what should be a new section.
-    notFollowedBy $ try succStartP
-
-    -- TODO: Avoid `try`.
-    flip evalStateT True $ do
-        label <-
-            nonIndented . optional . try $
-                nLexeme (labelingP <* sp <* char '\n')
-        Node label . Paragraph fmt <$> nonIndented (textForestP tt)
+paragraphP :: ParagraphType -> Parser (Node Paragraph)
+paragraphP (ParagraphType fmt tt) =
+    Node
+        -- TODO: Avoid `try`.
+        <$> nonIndented (optional . try $ nLexeme1 labelingP)
+        <*> nonIndented (evalStateT bodyP True)
+  where
+    bodyP :: ParagraphParser Paragraph
+    bodyP = Paragraph fmt <$> textForestP tt

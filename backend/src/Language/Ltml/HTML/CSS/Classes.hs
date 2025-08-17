@@ -8,21 +8,26 @@ module Language.Ltml.HTML.CSS.Classes
     , className
     , classStyle
     , enumCounter
+    , ToCssClass (..)
     ) where
 
-import Clay hiding (i)
+import Clay hiding (i, size)
 import qualified Clay.Flexbox as Flexbox
 import Data.Char (toLower)
 import Data.String (fromString)
 import Data.Text (Text, pack, unpack)
+import qualified Data.Typography as Ltml
+import Data.Void (Void)
 import Language.Ltml.HTML.CSS.CustomClay
 
 data Class
     = -- | Class for styling that should be applied to the whole document (HTML body)
       Document
+    | -- | Class for styling and aligning document title <h1>
+      DocumentTitle
     | -- | Class for spacing and alignment of and inside of a section
       Section
-    | -- | Class for spacing and alignment of a heading (h4 / h5)
+    | -- | Class for spacing and alignment of a heading <h2>
       Heading
     | -- | Class for spacing and alignment of a paragraph div
       Paragraph
@@ -32,12 +37,24 @@ data Class
       TextContainer
     | -- | General class for all enumerations
       Enumeration
-    | -- | Underlined inlined basic text
-      Underlined
+    | -- | Class for containers which left align text
+      LeftAligned
+    | -- | Class for containers which centers text
+      Centered
+    | -- | Class for containers which right align text
+      RightAligned
+    | -- | Class for containers with a smaller font size
+      SmallFontSize
+    | -- | Class for containers with a standard/medium font size
+      MediumFontSize
+    | -- | Class for containers with a larger font size
+      LargeFontSize
     | -- | Bold inlined basic text
       Bold
     | -- | Italic inlined basic text
       Italic
+    | -- | Underlined inlined basic text
+      Underlined
     | -- | Class which inlines a red bold error text
       InlineError
     deriving (Show, Eq, Enum, Bounded)
@@ -53,6 +70,13 @@ classStyle Document =
         marginRight (em 2)
         -- \| make Document scrollable past its end
         paddingBottom (em 10)
+classStyle DocumentTitle =
+    toClassSelector DocumentTitle ? do
+        textAlign center
+        fontWeight bold
+        marginTop (em 0)
+        marginBottom (em 0)
+        fontSize (em 1.5)
 classStyle Section =
     toClassSelector Section ? do
         display flex
@@ -65,10 +89,23 @@ classStyle Heading =
         fontWeight bold
         marginTop (em 0)
         marginBottom (em 0)
+        fontSize (em 1)
 classStyle Paragraph =
     toClassSelector Paragraph ? do
         display flex
-classStyle ParagraphID = toClassSelector ParagraphID ? Flexbox.flex 0 0 (em 2)
+classStyle ParagraphID =
+    toClassSelector ParagraphID ? do
+        Flexbox.flex 0 0 auto
+        -- TODO: if some paragraph ids are larger than others (e.g. (1) and (42))
+        --       the larger paragraph will have a bigger indentation than the smaller one
+        --       Might be needed to make paragraphs <li> and section <ol> and apply a
+        --       custom css counter to each paragraph <li>
+        --       Actually the indentation of paragraphs should be the same across the whole Section
+        --       or Document even. Maybe it would be best to track the largest paragrapg id and then
+        --       scale all paragraphs to fit the largest one (let i = length maxid in flex 0 0 (em i))
+        -- \| Gap between paragraph id and text
+        paddingRight (em 0.75)
+        userSelect none
 classStyle TextContainer =
     toClassSelector TextContainer ? do
         display flex
@@ -76,15 +113,21 @@ classStyle TextContainer =
         -- \| gap between text and enumerations
         gap (em 0.5)
         textAlign justify
-classStyle Underlined = do
-    toClassSelector Underlined ? do
-        textDecoration underline
+classStyle LeftAligned = toClassSelector LeftAligned ? textAlign alignLeft
+classStyle Centered = toClassSelector Centered ? textAlign center
+classStyle RightAligned = toClassSelector RightAligned ? textAlign alignLeft
+classStyle SmallFontSize = toClassSelector SmallFontSize ? fontSize (em 0.75)
+classStyle MediumFontSize = toClassSelector MediumFontSize ? fontSize (em 1)
+classStyle LargeFontSize = toClassSelector LargeFontSize ? fontSize (em 1.25)
 classStyle Bold =
     toClassSelector Bold ? do
         fontWeight bold
 classStyle Italic =
     toClassSelector Italic ? do
         fontStyle italic
+classStyle Underlined = do
+    toClassSelector Underlined ? do
+        textDecoration underline
 classStyle InlineError =
     toClassSelector InlineError ? do
         fontColor red
@@ -125,9 +168,6 @@ toClassSelector c = fromString ("." ++ unpack (className c))
 
 -------------------------------------------------------------------------------
 
--- | Returns the enum item identifier based on its class and number
--- enumIdentifier :: Class -> Int -> String
-
 -- | Builds CSS class with specfied counter for ordered list items
 enumCounter :: Text -> Counter -> Css
 enumCounter enumClassName counterContent = do
@@ -136,3 +176,29 @@ enumCounter enumClassName counterContent = do
         textAlign alignRight
 
 -------------------------------------------------------------------------------
+
+class ToCssClass a where
+    toCssClass :: a -> Class
+
+instance ToCssClass Ltml.TextAlignment where
+    toCssClass align = case align of
+        Ltml.LeftAligned -> LeftAligned
+        Ltml.Centered -> Centered
+        Ltml.RightAligned -> RightAligned
+
+instance ToCssClass Ltml.FontSize where
+    toCssClass size = case size of
+        Ltml.SmallFontSize -> SmallFontSize
+        Ltml.MediumFontSize -> MediumFontSize
+        Ltml.LargeFontSize -> LargeFontSize
+
+instance ToCssClass Ltml.FontStyle where
+    toCssClass size = case size of
+        Ltml.Bold -> Bold
+        Ltml.Italics -> Italic
+        Ltml.Underlined -> Underlined
+
+-- | ToCssClass instance that can never be called, because there are
+--   no values of type Void
+instance ToCssClass Void where
+    toCssClass = error "toCssClass for Void was called!"

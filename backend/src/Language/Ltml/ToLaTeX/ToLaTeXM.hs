@@ -6,6 +6,7 @@ where
 
 import Control.Monad.State (MonadState (get), State, modify)
 import qualified Data.Text.Lazy as LT
+import Data.Typography
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Format
     ( HeadingFormat
@@ -19,6 +20,12 @@ import Language.Lsd.AST.Type.Enum
     )
 import Language.Lsd.AST.Type.Paragraph (ParagraphFormat (ParagraphFormat))
 import Language.Lsd.AST.Type.Section (SectionFormat (SectionFormat))
+import Language.Lsd.AST.Type.SimpleParagraph
+    ( SimpleParagraphFormat (SimpleParagraphFormat)
+    )
+import Language.Lsd.AST.Type.SimpleSection
+    ( SimpleSectionFormat (SimpleSectionFormat)
+    )
 import Language.Ltml.AST.Document
     ( Document (..)
     , DocumentBody (..)
@@ -27,7 +34,17 @@ import Language.Ltml.AST.Document
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.AST.Paragraph (Paragraph (..))
-import Language.Ltml.AST.Section (Heading (..), Section (..))
+import Language.Ltml.AST.Section
+    ( Heading (..)
+    , Section (..)
+    , SectionBody (InnerSectionBody, LeafSectionBody, SimpleLeafSectionBody)
+    )
+import Language.Ltml.AST.SimpleBlock
+    ( SimpleBlock (SimpleParagraphBlock, TableBlock)
+    )
+import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (SimpleParagraph))
+import Language.Ltml.AST.SimpleSection (SimpleSection (SimpleSection))
+import Language.Ltml.AST.Table (Table (Table))
 import Language.Ltml.AST.Text
 import Language.Ltml.ToLaTeX.Format
 import qualified Language.Ltml.ToLaTeX.GlobalState as LS
@@ -55,16 +72,11 @@ instance
     toLaTeXM (Reference l) = pure $ MissingRef l
     toLaTeXM (Styled style tt) = do
         tt' <- mapM toLaTeXM tt
-        pure $ applyFontStyle style tt'
+        pure $ applyFontStyle style (Sequence tt')
     toLaTeXM (Enum enum) = toLaTeXM enum
     toLaTeXM (Footnote tt) = do
         tt' <- mapM toLaTeXM tt
         pure $ (footnote . Sequence) tt'
-
-applyFontStyle :: FontStyle -> [LaTeX] -> LaTeX
-applyFontStyle Bold = bold . Sequence
-applyFontStyle Italics = italic . Sequence
-applyFontStyle Underlined = underline . Sequence
 
 instance
     ( ToLaTeXM enum
@@ -118,6 +130,14 @@ class (ToLaTeXM a) => Labelable a where
 
 -------------------------------- Paragraph -----------------------------------
 
+instance ToLaTeXM SimpleParagraph where
+    toLaTeXM (SimpleParagraph (SimpleParagraphFormat alignment fontsize) children) = do
+        children' <- mapM toLaTeXM children
+        pure $
+            applyTextAlignment alignment $
+                applyFontSize fontsize $
+                    Sequence children'
+
 instance ToLaTeXM Paragraph where
     toLaTeXM = attachLabel Nothing
 
@@ -137,7 +157,17 @@ instance Labelable Paragraph where
                     else
                         paragraph (formatKey keyident (Text identifier)) (Sequence content') <> medskip
 
+--------------------------------- Table ------------------------------------
+
+instance ToLaTeXM Table where
+    toLaTeXM Table = undefined -- TODO
+
 -------------------------------- Section -----------------------------------
+
+instance ToLaTeXM SimpleSection where
+    toLaTeXM (SimpleSection SimpleSectionFormat children) = do
+        children' <- mapM toLaTeXM children
+        pure $ Sequence children'
 
 createHeading :: HeadingFormat -> LaTeX -> LaTeX -> State LS.GlobalState LaTeX
 createHeading fmt tt ident = do
@@ -153,15 +183,13 @@ instance Labelable Section where
             buildHeading n = do
                 createHeading fmt headingText (Text $ getIdentifier ident n)
             setLabel n = LS.insertLabel mLabel (LT.pack (show n))
-        case nodes of
-            Left paragraphs -> do
-                n <- LS.nextSection
-                setLabel n
+
+            addTOCEntry :: Int -> State LS.GlobalState ()
+            addTOCEntry n =
                 modify
                     ( \s ->
                         s
-                            { LS.onlyOneParagraph = length paragraphs == 1
-                            , LS.toc =
+                            { LS.toc =
                                 LS.toc s
                                     <> LS.toDList
                                         [ formatKey keyident (Text $ getIdentifier ident n)
@@ -171,20 +199,36 @@ instance Labelable Section where
                                         ]
                             }
                     )
+        case nodes of
+            LeafSectionBody paragraphs -> do
+                n <- LS.nextSection
+                setLabel n
+                modify (\s -> s {LS.onlyOneParagraph = length paragraphs == 1})
+                addTOCEntry n
                 headingDoc <- buildHeading n
                 children' <- mapM toLaTeXM paragraphs
                 let anchor = maybe (center [headingDoc]) (`hypertarget` center [headingDoc]) mLabel
                 pure $ anchor <> Sequence children'
-            Right subsections -> do
+            InnerSectionBody subsections -> do
                 n <- LS.nextSupersection
                 setLabel n
                 modify (\s -> s {LS.isSupersection = True})
+                addTOCEntry n
                 headingDoc <- buildHeading n
                 children' <- mapM toLaTeXM subsections
                 modify (\s -> s {LS.isSupersection = False})
                 let anchor =
                         maybe (headingDoc <> linebreak) (`hypertarget` (headingDoc <> linebreak)) mLabel
                 pure $ anchor <> Sequence children'
+            SimpleLeafSectionBody simpleblocks -> do
+                children' <- mapM toLaTeXM simpleblocks
+                pure $ Sequence children'
+
+-------------------------------- Block ----------------------------------
+
+instance ToLaTeXM SimpleBlock where
+    toLaTeXM (SimpleParagraphBlock b) = toLaTeXM b
+    toLaTeXM (TableBlock b) = toLaTeXM b
 
 -------------------------------- Node -----------------------------------
 
@@ -194,7 +238,21 @@ instance (Labelable a) => ToLaTeXM (Node a) where
 -------------------------------- Document -----------------------------------
 
 instance ToLaTeXM Document where
-    toLaTeXM (Document DocumentFormat (DocumentTitle t) (DocumentBody nodes)) = do
-        nodes' <- mapM toLaTeXM nodes
+    toLaTeXM (Document DocumentFormat (DocumentTitle t) (DocumentBody intro content outro)) = do
+        intro' <- mapM toLaTeXM intro
+        content' <- case content of
+            LeafSectionBody paragraphs -> do
+                mapM toLaTeXM paragraphs
+            SimpleLeafSectionBody simpleblocks -> do
+                mapM toLaTeXM simpleblocks
+            InnerSectionBody sections -> do
+                mapM toLaTeXM sections
+        outro' <- mapM toLaTeXM outro
         pure $
-            staticDocumentFormat <> document (Sequence $ Text (LT.fromStrict t) : nodes')
+            staticDocumentFormat
+                <> document
+                    ( Text (LT.fromStrict t)
+                        <> Sequence intro'
+                        <> Sequence content'
+                        <> Sequence outro'
+                    )

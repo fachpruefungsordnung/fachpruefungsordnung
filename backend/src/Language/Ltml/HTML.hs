@@ -16,13 +16,19 @@ import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
 import Data.Void (Void)
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
+import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.Label
 import Language.Ltml.AST.Node
 import Language.Ltml.AST.Paragraph
 import Language.Ltml.AST.Section
+import Language.Ltml.AST.SimpleBlock (SimpleBlock (..))
+import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (..))
+import Language.Ltml.AST.SimpleSection (SimpleSection (..))
+import Language.Ltml.AST.Table (Table)
 import Language.Ltml.AST.Text
 import Language.Ltml.HTML.CSS (mainStylesheet)
+import Language.Ltml.HTML.CSS.Classes (ToCssClass (toCssClass))
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.HTML.Common
@@ -57,54 +63,72 @@ renderHtmlCss a =
 class ToHtmlM a where
     toHtmlM :: a -> HtmlReaderState
 
+-- | TODO: instance for document container
 instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
-    toHtmlM (Document format header body) = case body of
-        DocumentBody [] -> returnNow mempty
-        DocumentBody nodes -> toHtmlM nodes
-
--- TODO: distinguish sections and super-sections based on Left or Right children
---       superSectionID and superSectionIDHtml are already in States.
--- Will super-sections ever be parsed together? Or maybe we intialize the globalState with some superSectionID from the Document type
+    toHtmlM
+        ( Document
+                format
+                (DocumentTitle title)
+                (DocumentBody introSSections sectionBody outroSSections)
+            ) =
+            let titleHtml = h1_ <#> Class.DocumentTitle $ toHtml title
+             in do
+                    introHtml <- toHtmlM introSSections
+                    mainHtml <- toHtmlM sectionBody
+                    outroHtml <- toHtmlM outroSSections
+                    return $ Now titleHtml <> introHtml <> mainHtml <> outroHtml
 
 -- | This combined instances creates the sectionIDHtml before building the reference,
 --   which is needed for correct referencing
 instance ToHtmlM (Node Section) where
-    toHtmlM (Node mLabel (Section sectionFormatS (Heading headingFormatS title) children)) = do
+    toHtmlM (Node mLabel (Section sectionFormatS (Heading headingFormatS title) sectionBody)) = do
         globalState <- get
         titleHtml <- toHtmlM title
-        let (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (currentSectionID globalState)
+        let (sectionIDGetter, incrementSectionID) =
+                -- \| Check if we are inside a section or a super-section
+                if isSuper sectionBody
+                    then (currentSuperSectionID, incSuperSectionID)
+                    else (currentSectionID, incSectionID)
+            (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (sectionIDGetter globalState)
             headingHtml =
-                (div_ <#> Class.Heading) . headingFormat headingFormatS sectionIDHtml
+                (h2_ <#> Class.Heading) . headingFormat headingFormatS sectionIDHtml
                     <$> titleHtml
          in do
+                addMaybeLabelToState mLabel sectionIDHtml
                 -- \| Add table of contents entry for section
                 htmlId <- addTocEntry sectionTocKeyHtml titleHtml mLabel
                 -- \| Build heading Html with sectionID
-                childrenHtml <- local (\s -> s {currentSectionIDHtml = sectionIDHtml}) $ do
-                    addMaybeLabelToState mLabel SectionRef
-                    case children of
-                        Right cs -> toHtmlM cs
-                        -- \| In the Left case the children are paragraphs, so we set the needed flag for them
-                        --   to decide if the should have a visible id
-                        Left cs -> local (\s -> s {isSingleParagraph = length cs == 1}) $ toHtmlM cs
-                -- \| increment sectionID for next section
-                modify (\s -> s {currentSectionID = currentSectionID s + 1})
+                childrenHtml <- toHtmlM sectionBody
+                -- \| increment (super)SectionID for next section
+                incrementSectionID
                 -- \| reset paragraphID for next section
                 modify (\s -> s {currentParagraphID = 1})
 
                 return $
-                    div_ [cssClass_ Class.Section, id_ htmlId] <$> (headingHtml <> childrenHtml)
+                    section_ [cssClass_ Class.Section, id_ htmlId] <$> (headingHtml <> childrenHtml)
 
+instance ToHtmlM SectionBody where
+    toHtmlM sectionBody = case sectionBody of
+        -- \| Super Section
+        InnerSectionBody nodeSections -> toHtmlM nodeSections
+        -- \| Section
+        -- \| In this case the children are paragraphs, so we set the needed flag for them
+        --    to decide if the should have a visible id
+        LeafSectionBody nodeParagraphs ->
+            local (\s -> s {isSingleParagraph = length nodeParagraphs == 1}) $
+                toHtmlM nodeParagraphs
+        SimpleLeafSectionBody simpleBlocks -> toHtmlM simpleBlocks
+
+-- | Combined instance since the paragraphIDHtml has to be build before the reference is generated
 instance ToHtmlM (Node Paragraph) where
     toHtmlM (Node mLabel (Paragraph format textTrees)) = do
         globalState <- get
         let (paragraphIDHtml, paragraphKeyHtml) = paragraphFormat format (currentParagraphID globalState)
          in do
-                childText <- local (\s -> s {currentParagraphIDHtml = paragraphIDHtml}) $ do
-                    addMaybeLabelToState mLabel ParagraphRef
-                    -- \| Group raw text (without enums) into <div> for flex layout spacing
-                    renderGroupedTextTree textTrees
+                addMaybeLabelToState mLabel paragraphIDHtml
+                -- \| Group raw text (without enums) into <div> for flex layout spacing
+                childText <- renderGroupedTextTree textTrees
                 modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
                 -- \| Reset sentence id for next paragraph
                 modify (\s -> s {currentSentenceID = 0})
@@ -116,8 +140,44 @@ instance ToHtmlM (Node Paragraph) where
                              in return (div_ <#> Class.ParagraphID $ idHtml) <> div_ <#> Class.TextContainer
                                     <$> childText
 
+-------------------------------------------------------------------------------
+
+-- | Wrapper for block of SimpleParagraphs and table
+instance ToHtmlM SimpleBlock where
+    toHtmlM simpleBlock = case simpleBlock of
+        SimpleParagraphBlock simpleParagraph -> toHtmlM simpleParagraph
+        TableBlock table -> toHtmlM table
+
+-- | Section without Heading and Identifier
+instance ToHtmlM SimpleSection where
+    toHtmlM (SimpleSection sSectionFormat sParagraphs) = do
+        paragraphsHtml <- toHtmlM sParagraphs
+        return $ section_ <#> Class.Section <$> paragraphsHtml
+
+-- | Paragraph without identifier
+instance ToHtmlM SimpleParagraph where
+    toHtmlM (SimpleParagraph (SimpleParagraphFormat textAlign fontSize) textTrees) = do
+        childText <- toHtmlM textTrees
+        return $
+            div_
+                [ cssClass_ Class.TextContainer
+                , cssClass_ $ toCssClass textAlign
+                , cssClass_ $ toCssClass fontSize
+                ]
+                <$> childText
+
+-------------------------------------------------------------------------------
+
+instance ToHtmlM Table where
+    toHtmlM table =
+        returnNow $
+            span_ <#> Class.InlineError $
+                toHtml ("Error: Tables are not supported yet!" :: Text)
+
+-------------------------------------------------------------------------------
+
 instance
-    (ToHtmlStyle style, ToHtmlM enum, ToHtmlM special)
+    (ToCssClass style, ToHtmlM enum, ToHtmlM special)
     => ToHtmlM (TextTree style enum special)
     where
     toHtmlM textTree = case textTree of
@@ -133,7 +193,7 @@ instance
                 Just labelHtml -> labelWrapperFunc globalState label labelHtml
         Styled style textTrees -> do
             textTreeHtml <- toHtmlM textTrees
-            return $ toHtmlStyle style <$> textTreeHtml
+            return $ (span_ <#> toCssClass style) <$> textTreeHtml
         Enum enum -> toHtmlM enum
         Footnote _ ->
             returnNow $
@@ -144,18 +204,12 @@ instance
 instance ToHtmlM SentenceStart where
     toHtmlM (SentenceStart mLabel) = do
         modify (\s -> s {currentSentenceID = currentSentenceID s + 1})
-        addMaybeLabelToState mLabel SentenceRef
+        globalState <- get
+        -- \| Add Maybe Label with just the sentence number
+        addMaybeLabelToState mLabel (toHtml $ show (currentSentenceID globalState))
         case mLabel of
             Nothing -> returnNow mempty
             Just label -> returnNow $ span_ [id_ (unLabel label)] mempty
-
-class ToHtmlStyle style where
-    toHtmlStyle :: (Monad m) => style -> (HtmlT m a -> HtmlT m a)
-
-instance ToHtmlStyle FontStyle where
-    toHtmlStyle Bold = span_ <#> Class.Bold
-    toHtmlStyle Italics = span_ <#> Class.Italic
-    toHtmlStyle Underlined = span_ <#> Class.Underlined
 
 instance ToHtmlM Enumeration where
     toHtmlM (Enumeration enumFormatS@(EnumFormat (EnumItemFormat idFormat _)) enumItems) = do
@@ -176,9 +230,11 @@ instance ToHtmlM Enumeration where
 
 instance ToHtmlM (Node EnumItem) where
     toHtmlM (Node mLabel (EnumItem textTrees)) = do
-        addMaybeLabelToState mLabel EnumItemRef
         -- \| Save current enum item id, if nested enumerations follow and reset it
         enumItemID <- gets currentEnumItemID
+        -- \| Build reference with EnumFormat from ReaderState
+        enumItemRefHtml <- buildEnumItemRefHtml enumItemID
+        addMaybeLabelToState mLabel enumItemRefHtml
         -- \| Render grouped raw text (without enums) to get correct flex spacing
         enumItemHtml <- renderGroupedTextTree textTrees
         -- \| Increment enumItemID for next enumItem
@@ -200,20 +256,15 @@ instance (ToHtmlM a) => ToHtmlM [a] where
 instance ToHtmlM Void where
     toHtmlM = error "toHtmlM for Void was called!"
 
--- | ToHtmlStyle instance that can never be called, because there are
---   no values of type Void
-instance ToHtmlStyle Void where
-    toHtmlStyle = error "toHtmlStyle for Void was called!"
-
 -------------------------------------------------------------------------------
 
 -- | Extracts enums from list and packs raw text (without enums) into <div>;
 --   E.g. result: <div> raw text </div> <enum></enum> <div> reference </div>
 renderGroupedTextTree
-    :: (ToHtmlStyle style, ToHtmlM enum, ToHtmlM special)
+    :: (ToCssClass style, ToHtmlM enum, ToHtmlM special)
     => [TextTree style enum special]
     -> HtmlReaderState
-renderGroupedTextTree [] = return $ Now mempty
+renderGroupedTextTree [] = returnNow mempty
 renderGroupedTextTree (enum@(Enum _) : ts) = do
     enumHtml <- toHtmlM enum
     followingHtml <- renderGroupedTextTree ts

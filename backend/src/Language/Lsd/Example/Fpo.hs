@@ -81,11 +81,11 @@ mainDocT :: DocumentType
 mainDocT =
     DocumentType
         DocumentFormat
-        ( SimpleRegex
+        ( DocumentBodyType
             (Sequence [])
             ( Disjunction
-                [ Star $ Disjunction [sectionT]
-                , Star $ Disjunction [superSectionT]
+                [ InnerSectionBodyType (Star sectionT)
+                , InnerSectionBodyType (Star superSectionT)
                 ]
             )
             (Sequence [])
@@ -114,15 +114,7 @@ superSectionT =
                     ]
             )
         )
-        ( Right $
-            SimpleRegex
-                (Sequence [])
-                ( Disjunction
-                    [ Star $ Disjunction [sectionT]
-                    ]
-                )
-                (Sequence [])
-        )
+        (InnerSectionBodyType (Star sectionT))
 
 sectionT :: SectionType
 sectionT =
@@ -147,7 +139,7 @@ sectionT =
                     ]
             )
         )
-        (Left paragraphT)
+        (LeafSectionBodyType (Star paragraphT))
 
 paragraphT :: ParagraphType
 paragraphT =

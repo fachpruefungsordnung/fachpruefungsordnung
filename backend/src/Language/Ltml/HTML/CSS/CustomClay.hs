@@ -10,6 +10,7 @@ module Language.Ltml.HTML.CSS.CustomClay
     , stringCounter
     , counterReset
     , counterIncrement
+    , alignLeft
     , alignRight
     , displayContents
     , gap
@@ -57,6 +58,9 @@ instance Semigroup Counter where
     Counter a <> Counter b = Counter (a <> b)
 
 -------------------------------------------------------------------------------
+
+alignLeft :: TextAlign
+alignLeft = other "left"
 
 alignRight :: TextAlign
 alignRight = other "right"

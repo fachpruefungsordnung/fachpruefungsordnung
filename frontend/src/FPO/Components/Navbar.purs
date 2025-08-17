@@ -9,8 +9,9 @@ module FPO.Components.Navbar where
 
 import Prelude
 
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
-import Effect.Aff.Class (class MonadAff, liftAff)
+import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getIgnore, getUser)
 import FPO.Data.Route (Route(..))
@@ -146,7 +147,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
       }
   handleAction Logout = do
     -- Reset the cookies and reset the user state
-    _ <- H.liftAff $ getIgnore "/logout"
+    _ <- getIgnore "/logout"
     H.modify_ _ { user = Nothing }
     -- Simply navigate to the Login page indiscriminately
     navigate Login
@@ -157,8 +158,10 @@ navbar = connect (selectEq identity) $ H.mkComponent
     let translator = FPOTranslator $ getTranslatorForLanguage lang
     updateStore $ Store.SetTranslator translator
   handleAction ReloadUser = do
-    u <- liftAff getUser
-    H.modify_ _ { user = u }
+    userWithError <- getUser
+    case userWithError of
+      Left _ -> H.modify_ _ { user = Nothing } -- TODO error handling
+      Right user -> H.modify_ _ { user = Just user }
 
   handleQuery :: forall a. Query a -> H.HalogenM State Action () output m (Maybe a)
   handleQuery (RequestReloadUser a) = do

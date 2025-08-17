@@ -49,7 +49,7 @@ Sentences are generally terminated by a single period (`.`), exclamation mark
 Additionally, they are terminated by enumeration items (with the next sentence
 starting after the sequence of enumeration items).
 
-Sentence terminatation can be undone by inserting the continuation token `{>}`
+Sentence termination can be undone by inserting the continuation token `{>}`
 where otherwise a new sentence might start.
 This is meant for continuing a sentence after an enumeration, where it is to
 be inserted at the start of the first line after the enumeration.
@@ -65,12 +65,18 @@ However, sentences may be [labeled](./general/label.md) at their beginning
 label a sentence at the start of a paragraph (and best always), write the
 labeling on the same line as the start of the sentence.
 
-Further, sentences introduce a context w.r.t.
-[identifiers](./general/identifier.md);
-specifically, [enumeration](./enumeration.md) items are assigned to sentences,
-s.t. a sentence contains at most one enumeration, and an enumeration never
-spans multiple sentences.
-See also the [enumeration example](./enumeration.md#example).
+
+### Enumerations
+
+There should be at most one [enumeration](./enumeration.md) per sentence;
+otherwise, it is generally impossible to properly reference an enumeration
+item, for the enumeration item output [identifiers](./general/identifier.md)
+would generally be reused within the sentence.
+This is not enforced; i.e., it is the responsibility of the user.
+
+Note that adding multiple enumerations to a sentence requires either using
+continuation tokens (see above) or using enumerations of different types in
+direct succession.
 
 
 ## Example

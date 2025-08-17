@@ -4,10 +4,9 @@ module FPO.Page.Admin.Group.AddMembers (component) where
 
 import Prelude
 
-import Affjax (printError)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Effect.Aff.Class (class MonadAff, liftAff)
+import Effect.Aff.Class (class MonadAff)
 import FPO.Components.UI.UserFilter as Filter
 import FPO.Components.UI.UserList as UserList
 import FPO.Data.Navigate (class Navigate, navigate)
@@ -15,7 +14,6 @@ import FPO.Data.Request
   ( changeRole
   , getAuthorizedUser
   , getGroup
-  , getStatusCode
   , removeUser
   )
 import FPO.Data.Route (Route(..))
@@ -106,16 +104,19 @@ component =
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
-      s <- H.get
-      u <- H.liftAff $ getAuthorizedUser s.groupID
-      case u of
-        Nothing -> do
-          navigate Page404
-        Just _ -> do
-          handleAction ReloadGroup
-          -- User is either a superadmin or an admin of the group,
-          -- so we can proceed to load the group and user list.
-          H.tell _userlist unit UserList.ReloadUsersQ
+      state <- H.get
+      userWithError <- getAuthorizedUser state.groupID
+      case userWithError of
+        Left _ -> pure unit -- TODO error
+        Right maybeUser ->
+          case maybeUser of
+            Nothing -> do
+              navigate Page404
+            Just _ -> do
+              handleAction ReloadGroup
+              -- User is either a superadmin or an admin of the group,
+              -- so we can proceed to load the group and user list.
+              H.tell _userlist unit UserList.ReloadUsersQ
     Receive { context, input } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
 
@@ -133,48 +134,36 @@ component =
       s <- H.get
       case effect of
         EffectAddUser -> do
-          response <- liftAff $ changeRole s.groupID (getID userOverviewDto) Member
-          handleIgnoreResponse
-            ( \error -> H.modify_ _
-                { error = Just $
-                    translate (label :: _ "gmam_failedToAdd") s.translator <> ": " <>
-                      error
-                }
-            )
-            (handleAction ReloadGroup)
-            response
+          response <- changeRole s.groupID (getID userOverviewDto) Member
+          case response of
+            Left appError -> H.modify_ _
+              { error = Just $
+                  translate (label :: _ "gmam_failedToAdd") s.translator <> ": " <>
+                    (show appError)
+              }
+            Right _ -> handleAction ReloadGroup
         EffectRemoveUser -> do
-          response <- liftAff $ removeUser s.groupID (getID userOverviewDto)
-          handleIgnoreResponse
-            ( \error -> H.modify_ _
-                { error
-                    = Just $
-                    translate (label :: _ "gmam_failedToRemove") s.translator <> ": "
-                      <> error
-                }
-            )
-            (handleAction ReloadGroup)
-            response
+          response <- removeUser s.groupID (getID userOverviewDto)
+          case response of
+            Left appError -> H.modify_ _
+              { error
+                  = Just $
+                  translate (label :: _ "gmam_failedToRemove") s.translator <> ": "
+                    <> (show appError)
+              }
+            Right _ -> handleAction ReloadGroup
     ReloadGroup -> do
       s <- H.get
-      g <- liftAff $ getGroup s.groupID
+      g <- getGroup s.groupID
       case g of
-        Just group -> do
+        Right group -> do
           H.modify_ _
             { group = Just group
             }
-        Nothing -> do
+        Left _ -> do
           H.modify_ _
             { error = Just $ translate (label :: _ "gmam_groupNotFound") s.translator
             }
-    where
-    handleIgnoreResponse onError onSuccess response =
-      case response of
-        Left err -> onError $ printError err
-        Right status -> do
-          case getStatusCode status of
-            200 -> onSuccess
-            _ -> onError $ show status
 
   renderMemberManagement :: State -> GroupDto -> H.ComponentHTML Action Slots m
   renderMemberManagement state group =

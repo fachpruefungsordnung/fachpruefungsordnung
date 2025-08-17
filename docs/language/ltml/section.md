@@ -1,10 +1,8 @@
 # Sections
 
-Sections have an [unstyled-textual heading](#heading-text),
-and are composed of lower-level sections, [paragraphs](./paragraph.md),
-and/or *tables* (TODO).
+Sections have an [unstyled-textual heading](#heading-text) and a [body](#body).
 
-The heading and section children are separated by any number of linebreaks.
+The heading and body are separated by at least one linebreak.
 
 Sections are identified by [keywords](general/identifier.md#input-identifiers),
 which precede the heading.
@@ -23,6 +21,18 @@ Further, heading text is [headed](./text.md#keyword-headed-text) by the
 (possibly [labeled](./general/label.md)) section keyword
 (i.e., one level of indentation is implicitly added---noticeable with heading
 text that spans multiple lines).
+
+
+## Body
+
+The body is a fixed-type sequence of any of:
+
+* lower-level sections
+* [paragraphs](./paragraph.md)
+* [simple blocks](./simple-block.md)
+
+These body elements may be separated by any number of empty lines from each
+other.
 
 
 ## Example

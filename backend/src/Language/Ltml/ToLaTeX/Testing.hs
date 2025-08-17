@@ -29,7 +29,11 @@ import Language.Lsd.Example.Fpo (superSectionT)
 import Language.Ltml.AST.Label (Label (Label))
 import Language.Ltml.AST.Node (Node (Node))
 import Language.Ltml.AST.Paragraph (Paragraph (Paragraph))
-import Language.Ltml.AST.Section (Heading (Heading), Section (Section))
+import Language.Ltml.AST.Section
+    ( Heading (Heading)
+    , Section (Section)
+    , SectionBody (InnerSectionBody, LeafSectionBody)
+    )
 import Language.Ltml.AST.Text (TextTree (Reference, Space, Word))
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX (generatePDFFromSuperSection)
@@ -102,7 +106,7 @@ superSectionWithNSubsections n =
                 , Word "heading"
                 ]
             )
-            ( Left $
+            ( LeafSectionBody $
                 replicate
                     n
                     ( Node
@@ -158,7 +162,7 @@ hugeSuperSection n =
             , Word "heading"
             ]
         )
-        (Right $ replicate n (superSectionWithNSubsections n))
+        (InnerSectionBody $ replicate n (superSectionWithNSubsections n))
 
 runTest :: IO ()
 runTest = do

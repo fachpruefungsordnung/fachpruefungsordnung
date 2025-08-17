@@ -3,7 +3,6 @@
 module Language.Ltml.HTML.Pipeline (htmlPipeline) where
 
 import Clay (render)
-import Control.Applicative (empty)
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
 import Data.Text.Lazy (toStrict)
@@ -13,12 +12,12 @@ import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.Parser.Section (sectionP)
 import Lucid
-import Text.Megaparsec (errorBundlePretty, runParser)
+import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 
 -- | Parse section and render HTML with inlined CSS
 htmlPipeline :: Text -> ByteString
 htmlPipeline input =
-    case runParser (sectionP sectionT empty) "" input of
+    case runParser (sectionP sectionT eof) "" input of
         Left err -> renderBS $ errorHtml (errorBundlePretty err)
         Right nodeSection ->
             let (body, css) = renderHtmlCss nodeSection

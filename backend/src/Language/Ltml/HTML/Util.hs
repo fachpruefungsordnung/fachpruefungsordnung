@@ -11,11 +11,13 @@ module Language.Ltml.HTML.Util
     , mId_
     , anchorLink
     , getNextRawTextTree
+    , isSuper
     ) where
 
 import Data.Char (chr)
 import Data.Text (cons)
 import Language.Ltml.AST.Label (Label (..))
+import Language.Ltml.AST.Section (SectionBody (InnerSectionBody))
 import Language.Ltml.AST.Text (TextTree (..))
 import Lucid
 
@@ -86,3 +88,8 @@ getNextRawTextTree =
             Enum _ -> True
             _ -> False
         )
+
+-- | Is given section a super-section? (has sections as children)
+isSuper :: SectionBody -> Bool
+isSuper (InnerSectionBody _) = True
+isSuper _ = False

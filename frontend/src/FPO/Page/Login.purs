@@ -10,8 +10,6 @@ module FPO.Page.Login (component) where
 
 import Prelude
 
-import Affjax (printError)
-import Affjax.StatusCode (StatusCode(StatusCode))
 import Data.Argonaut.Encode.Class (encodeJson)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -125,20 +123,10 @@ component =
       H.liftEffect $ preventDefault event
       -- trying to do a login by calling the api at /api/login
       -- we show the error response that comes back from the backend
-      loginResponse <- H.liftAff $ Request.postString "/login" (encodeJson loginDto)
+      loginResponse <- Request.postString "/login" (encodeJson loginDto)
       case loginResponse of
-        Left err -> handleAction (EmitError (printError err))
-        Right { status, body } ->
-          case status of
-            -- only accepting 200s responses since those are the only ones that encode success in our case
-            -- at the same time updating the store of the application
-            -- TODO persisting the credentials in the browser storage
-            StatusCode 200 -> do
-              -- let name = takeWhile (_ /= '@') loginDto.loginEmail
-              -- updateStore $ Store.SetUser $ Just { userName: name, isAdmin: false }
-
-              handleLoginRedirect
-            StatusCode _ -> handleAction (EmitError body)
+        Left err -> handleAction (EmitError (show err))
+        Right _ -> handleLoginRedirect
       pure unit
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
 

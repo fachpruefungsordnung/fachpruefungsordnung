@@ -16,8 +16,6 @@ module FPO.Page.Admin.Group.DocOverview (component) where
 
 import Prelude
 
-import Affjax (printError)
-import Data.Argonaut (decodeJson)
 import Data.Array (filter, head, length, null, replicate, slice, (:))
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
@@ -50,7 +48,6 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn, addModal)
 import FPO.UI.Style as Style
-import Halogen (liftAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -430,30 +427,30 @@ component =
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
-      s <- H.get
-      u <- H.liftAff $ getAuthorizedUser s.groupID
-      when (isNothing u) $ do
-        navigate Page404
+      state <- H.get
+      user <- getAuthorizedUser state.groupID
+      case user of
+        Left _ -> pure unit
+        Right maybeUser ->
+          when (isNothing maybeUser) $ do
+            navigate Page404
 
       now <- H.liftEffect nowDateTime
       H.modify_ _
         { documents = []
         , currentTime = Just now
         }
-      documents <- liftAff
-        (getDocumentsQueryFromURL ("/docs?group=" <> show s.groupID))
+      documents <- getDocumentsQueryFromURL
+        ("/docs?group=" <> show state.groupID)
       case documents of
-        Just docs -> do
+        Right docs -> do
           H.modify_ _ { documents = DQ.getDocuments docs }
-        Nothing -> do
-          navigate Page404
+        Left _ -> pure unit -- TODO error handling
 
-      g <- liftAff $ getGroup s.groupID
+      g <- getGroup state.groupID
       case g of
-        Just group -> do
-          H.modify_ _ { group = Just group }
-        Nothing -> do
-          navigate Page404
+        Left _ -> pure unit
+        Right group -> H.modify_ _ { group = Just group }
       handleAction Filter
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -489,28 +486,23 @@ component =
 
         setModalWaiting true
 
-        createResponse <- liftAff (createNewDocument dto)
+        createResponse <- createNewDocument dto
         case createResponse of
-          Left err -> do
-            setModalError $ printError err
-          Right result -> do
-            case decodeJson result.body of
-              Left err -> do
-                setModalError $ "Error decoding response: " <> show err
-              Right h -> do
-                H.modify_ _ { modalState = NoModal, newDocumentName = "" }
-                log "Created Document"
-                now <- H.liftEffect nowDateTime
+          Left err -> setModalError $ show err
+          Right h -> do
+            H.modify_ _ { modalState = NoModal, newDocumentName = "" }
+            log "Created Document"
+            now <- H.liftEffect nowDateTime
 
-                H.modify_ \s' -> s'
-                  { documents = h : s'.documents
-                  , filteredDocuments = h : s'.filteredDocuments
-                  , currentTime = Just now
-                  }
+            H.modify_ \s' -> s'
+              { documents = h : s'.documents
+              , filteredDocuments = h : s'.filteredDocuments
+              , currentTime = Just now
+              }
 
-                -- Reset the page view
-                H.modify_ _ { documentNameFilter = "" }
-                H.tell _pagination unit $ P.SetPageQ 0
+            -- Reset the page view
+            H.modify_ _ { documentNameFilter = "" }
+            H.tell _pagination unit $ P.SetPageQ 0
 
         -- Either the document was created successfully and the modal is closed,
         -- or an error occurred and is currently displayed. The user can then
@@ -527,25 +519,24 @@ component =
     ChangeCreateDocumentName docName -> do
       H.modify_ _ { newDocumentName = docName }
     ConfirmDeleteDocument docID -> do
-      deleteResponse <- liftAff (deleteIgnore ("/documents/" <> show docID))
+      deleteResponse <- deleteIgnore ("/documents/" <> show docID)
       case deleteResponse of
         Left err -> do
           H.modify_ \s -> s
-            { error = Just (printError err)
-            }
+            { error = Just (show err) }
         Right _ -> do
           log "Deleted Document"
           s <- H.get
-          documents <- liftAff
-            (getDocumentsQueryFromURL ("/docs?group=" <> show s.groupID))
+          documents <- getDocumentsQueryFromURL
+            ("/docs?group=" <> show s.groupID)
           case documents of
-            Just docs -> do
+            Right docs -> do
               H.modify_ _
                 { error = Nothing
                 , documents = DQ.getDocuments docs
                 , modalState = NoModal
                 }
-            Nothing -> do
+            Left _ -> do -- TODO error handling
               log "No Document Found."
               handleAction DoNothing
       -- navigate Login

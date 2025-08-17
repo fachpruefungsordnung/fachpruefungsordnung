@@ -14,6 +14,7 @@ module Language.Ltml.ToLaTeX.Type
     , ref
     , paragraph
     , large
+    , small
     , medskip
     , usepackage
     , documentclass
@@ -21,6 +22,8 @@ module Language.Ltml.ToLaTeX.Type
     , enumerate
     , itemize
     , center
+    , flushleft
+    , flushright
     , document
     , setindent
     , setfontArabic
@@ -100,7 +103,10 @@ ref :: LT.LazyText -> LaTeX
 ref r = Command "ref" [] [Text r]
 
 large :: LaTeX -> LaTeX
-large content = Raw "{\\Large " <> content <> Raw "}"
+large content = Raw "{\\large " <> content <> Raw "}"
+
+small :: LaTeX -> LaTeX
+small content = Raw "{\\small " <> content <> Raw "}"
 
 linebreak :: LaTeX
 linebreak = Raw "\\\\"
@@ -119,6 +125,12 @@ itemize items = Environment "itemize" [] (map (\i -> Command "item" [] [i]) item
 
 center :: [LaTeX] -> LaTeX
 center = Environment "center" []
+
+flushleft :: [LaTeX] -> LaTeX
+flushleft = Environment "flushleft" []
+
+flushright :: [LaTeX] -> LaTeX
+flushright = Environment "flushright" []
 
 minipage :: [LT.Text] -> [LaTeX] -> LaTeX
 minipage = Environment "minipage"

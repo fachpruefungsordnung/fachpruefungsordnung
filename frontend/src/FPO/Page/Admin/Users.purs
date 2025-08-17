@@ -8,10 +8,9 @@ module FPO.Page.Admin.Users (component) where
 
 import Prelude
 
-import Affjax (printError)
 import Data.Argonaut (encodeJson)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.String (null)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
@@ -19,7 +18,7 @@ import FPO.Components.UI.UserFilter as Filter
 import FPO.Components.UI.UserList as UserList
 import FPO.Data.Email as Email
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (deleteIgnore, getUser, postJson)
+import FPO.Data.Request (deleteIgnore, getUser, postString)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.CreateUserDto
@@ -124,10 +123,12 @@ component =
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
-      u <- H.liftAff $ getUser
-      when (fromMaybe true (not <$> isUserSuperadmin <$> u)) $ navigate Page404
-
-      H.modify_ _ { userID = getUserID <$> u }
+      userResult <- getUser
+      case userResult of
+        Left _ -> pure unit -- TODO Ignore error, redirect to 404
+        Right user -> do
+          when (not $ isUserSuperadmin user) $ navigate Page404
+          H.modify_ _ { userID = Just $ getUserID user }
 
       H.tell _userlist unit UserList.ReloadUsersQ
     Receive { context } -> do
@@ -144,14 +145,14 @@ component =
     RequestDeleteUser userOverviewDto -> H.modify_ _
       { requestDeleteUser = Just userOverviewDto }
     PerformDeleteUser userId -> do
-      response <- H.liftAff $ deleteIgnore ("/users/" <> userId)
+      response <- deleteIgnore ("/users/" <> userId)
       case response of
         Left err -> do
           s <- H.get
           H.modify_ _
             { error = Just
                 ( translate (label :: _ "admin_users_failedToDeleteUser")
-                    s.translator <> ": " <> (printError err)
+                    s.translator <> ": " <> (show err)
                 )
             , requestDeleteUser = Nothing
             }
@@ -160,10 +161,10 @@ component =
           H.tell _userlist unit UserList.ReloadUsersQ
     CloseDeleteModal -> do H.modify_ _ { requestDeleteUser = Nothing }
     GetUser userId -> do
-      maybeUser <- H.liftAff getUser
-      case maybeUser of
-        Nothing -> navigate Login
-        Just user -> navigate
+      userResult <- getUser
+      case userResult of
+        Left _ -> pure unit -- Ignore error like in editor
+        Right user -> navigate
           ( Profile
               { loginSuccessful: Nothing
               , userId: if getUserID user == userId then Nothing else Just userId
@@ -183,14 +184,14 @@ component =
       H.modify_ _ { error = Just err }
     CreateUser -> do
       state <- H.get
-      response <- H.liftAff $ postJson "/register" (encodeJson state.createUserDto)
+      response <- postString "/register" (encodeJson state.createUserDto) -- could be a postIgnore
       case response of
         Left err -> do
           H.modify_ _
             { createUserError = Just $
                 ( translate (label :: _ "admin_users_failedToCreateUser")
                     state.translator
-                ) <> ": " <> printError err
+                ) <> ": " <> (show err)
             }
         Right _ -> do
           H.modify_ _

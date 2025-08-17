@@ -13,4 +13,9 @@ The header may contain the following nodes.
 
 ## Body
 
-The body is composed of [sections](section.md).
+The body is composed of:
+
+* an intro: a sequence of fixed-type [simple sections](./simple-section.md)
+* a main part: a [section body](./section.md#body)
+    * One may thus see a document as a fancy section.
+* an outro: a sequence of fixed-type [simple sections](./simple-section.md)

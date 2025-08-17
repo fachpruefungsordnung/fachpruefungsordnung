@@ -7,7 +7,8 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Language.Ltml.Parser.Text
-    ( textForestP
+    ( ParagraphParser
+    , textForestP
     , hangingTextP'
     )
 where
@@ -22,6 +23,7 @@ import Data.Maybe (maybeToList)
 import Data.Proxy (Proxy (Proxy))
 import Data.Text (Text)
 import qualified Data.Text as Text (singleton)
+import Data.Typography (FontStyle (..))
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.Type.Enum (EnumType (EnumType))
@@ -34,7 +36,6 @@ import Language.Ltml.AST.Node (Node (Node))
 import Language.Ltml.AST.Text
     ( EnumItem (EnumItem)
     , Enumeration (Enumeration)
-    , FontStyle (..)
     , FootnoteTextTree
     , SentenceStart (SentenceStart)
     , TextTree (..)
