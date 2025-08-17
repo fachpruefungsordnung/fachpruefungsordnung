@@ -84,6 +84,7 @@ import Server.DTOs.Documents
     , DocumentsQuery (DocumentsQuery)
     )
 import qualified Server.DTOs.Documents as Documents
+import Server.Handlers.RenderHandlers (RenderAPI, renderServer)
 import UserManagement.Group (GroupID)
 
 type DocsAPI =
@@ -100,6 +101,7 @@ type DocsAPI =
                 :<|> GetTextHistory
                 :<|> GetTreeHistory
                 :<|> GetDocumentHistory
+                :<|> RenderAPI
            )
 
 type PostDocument =
@@ -206,6 +208,7 @@ docsServer =
         :<|> getTextHistoryHandler
         :<|> getTreeHistoryHandler
         :<|> getDocumentHistoryHandler
+        :<|> renderServer
 
 postDocumentHandler
     :: AuthResult Auth.Token

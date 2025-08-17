@@ -501,7 +501,7 @@ postRenderHtml
   => String
   -> H.HalogenM st act slots msg m (Either AppError String)
 postRenderHtml content = do
-  result <- handleRequest' "/documents/render/html" (postRenderHtml' content)
+  result <- handleRequest' "/docs/render/html" (postRenderHtml' content)
   pure result
 
 -- | PUT-Requests ----------------------------------------------------------
@@ -562,7 +562,7 @@ postString' url body = do
 postRenderHtml' :: String -> Aff (Either Error (Response String))
 postRenderHtml' content = do
   fpoRequest <- liftEffect $ defaultFpoRequest AXRF.string
-    ("/api/documents/render/html")
+    ("/api/docs/render/html")
     POST
   let request' = fpoRequest { content = Just (RequestBody.json $ fromString content) }
   liftAff $ request driver request'
