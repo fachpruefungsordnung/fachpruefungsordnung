@@ -87,7 +87,7 @@ updateUserEmail :: User.UserID -> Text -> Session ()
 updateUserEmail uid email = statement (email, uid) Statements.updateUserEmail
 
 updateUserPWHash :: User.UserID -> Text -> Session ()
-updateUserPWHash uid pwhash = statement (pwhash, uid) Statements.updateUserName
+updateUserPWHash uid pwhash = statement (pwhash, uid) Statements.updateUserPWHash
 
 addGroup :: Text -> Maybe Text -> Session Group.GroupID
 addGroup group description = statement (group, description) Statements.addGroup
