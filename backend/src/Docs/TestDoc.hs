@@ -8,6 +8,7 @@ import Data.Maybe (fromMaybe)
 import Data.Text (pack)
 import Data.UUID (fromString)
 
+import qualified Data.Vector as Vector
 import Docs
 import qualified Docs.Document as Document
 import Docs.Hasql.Database (run, runTransaction)
@@ -62,7 +63,12 @@ createTestDocument db = do
                 ]
     _ <- withDB $ runTransaction $ createTreeRevision userID docID tree
     let textElementRef = TextElementRef docID . TextElement.identifier
-    let textRevision element = NewTextRevision (textElementRef element)
+    let textRevision element revisionID text =
+            NewTextRevision
+                (textElementRef element)
+                revisionID
+                text
+                Vector.empty
     let machText = (((withDB . runTransaction . createTextRevision userID) .) .) . textRevision
     eins <- machText paragraph1 Nothing "Das hier ist ein Abschnitt."
     let parent = case eins of

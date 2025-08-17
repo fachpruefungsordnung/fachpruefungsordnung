@@ -50,6 +50,8 @@ import Data.OpenApi
     )
 import Web.HttpApiData (FromHttpApiData (..))
 
+import Data.Vector (Vector)
+import Docs.Comment (CommentAnchor)
 import Docs.Document (DocumentID)
 import Docs.TextElement
     ( TextElement
@@ -181,6 +183,7 @@ data TextRevision
     = TextRevision
     { header :: TextRevisionHeader
     , content :: Text
+    , commentAchors :: Vector CommentAnchor
     }
     deriving (Generic)
 
@@ -240,6 +243,7 @@ data NewTextRevision = NewTextRevision
     { newTextRevisionElement :: TextElementRef
     , newTextRevisionParent :: Maybe TextRevisionID
     , newTextRevisionContent :: Text
+    , newTextRevisionCommentAnchors :: Vector CommentAnchor
     }
 
 -- | A conflict with another text revision.
