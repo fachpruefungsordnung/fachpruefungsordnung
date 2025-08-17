@@ -57,6 +57,8 @@ import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
 import qualified Data.Text as Text
+import Docs.Comment (Comment (Comment), CommentID (CommentID))
+import qualified Docs.Comment as Comment
 import Docs.Document (Document (Document), DocumentID (..))
 import qualified Docs.Document as Document
 import Docs.DocumentHistory (DocumentHistoryItem)
@@ -984,3 +986,52 @@ isGroupAdmin =
                 user_id = $1 :: uuid AND group_id = $2 :: int8 AND role = 'admin'
         ) :: bool
     |]
+
+-- comments
+
+uncurryComment :: (Int64, UUID, Text, UTCTime, Maybe UTCTime, Text) -> Comment
+uncurryComment (id_, authorID, authorName, timestamp, resolved, content) =
+    Comment
+        { Comment.identifier = CommentID id_
+        , Comment.author =
+            UserRef
+                { UserRef.identifier = authorID
+                , UserRef.name = authorName
+                }
+        , Comment.timestamp = timestamp
+        , Comment.status = maybe Comment.Open Comment.Resolved resolved
+        , Comment.content = content
+        }
+
+createComment :: Statement (UserID, TextElementID, Text) Comment
+createComment =
+    lmap
+        mapInput
+        $ rmap
+            uncurryComment
+            [singletonStatement|
+                WITH inserted AS (
+                    INSERT INTO doc_comments
+                        (author, text_element, content)
+                    VALUES
+                        ($1 :: UUID, $2 :: INT8, $3 :: TEXT)
+                    RETURNING
+                        id :: INT8,
+                        author :: UUID,
+                        creation_ts :: TIMESTAMPTZ,
+                        resolved_ts :: TIMESTAMPTZ?,
+                        content :: TEXT
+                )
+                SELECT
+                    inserted.id :: INT8,
+                    users.id :: UUID,
+                    users.name :: TEXT,
+                    inserted.creation_ts :: TIMESTAMPTZ,
+                    inserted.resolved_ts :: TIMESTAMPTZ?,
+                    inserted.content :: TEXT
+                FROM
+                    inserted
+                    LEFT JOIN users ON inserted.author = users.id
+            |]
+  where
+    mapInput (userID, textID, text) = (userID, unTextElementID textID, text)

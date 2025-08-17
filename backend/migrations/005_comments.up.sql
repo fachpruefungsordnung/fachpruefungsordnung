@@ -1,10 +1,9 @@
-CREATE TYPE commentstatus AS ENUM('open', 'resolved', 'closed');
-
 CREATE TABLE IF NOT EXISTS doc_comments (
     id BIGINT PRIMARY KEY NOT NULL GENERATED ALWAYS AS IDENTITY,
     text_element BIGINT NOT NULL REFERENCES doc_text_elements (id),
+    author BIGINT NOT NULL REFERENCES user(id),
     creation_ts TIMESTAMPTZ NOT NULL DEFAULT now(),
-    status commentstatus NOT NULL DEFAULT 'open',
+    resolved_ts TIMESTAMPTZ DEFAULT NULL,
     content TEXT NOT NULL
 );
 
