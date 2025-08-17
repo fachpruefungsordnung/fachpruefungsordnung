@@ -39,6 +39,7 @@ import UserManagement.User (UserID)
 
 import Docs.Document (Document, DocumentID)
 import Docs.DocumentHistory (DocumentHistory (..))
+import Docs.Hash (Hash)
 import qualified Docs.Hasql.Statements as Statements
 import qualified Docs.Hasql.Transactions as Transactions
 import Docs.Hasql.TreeEdge (TreeEdgeChild (..))
@@ -61,7 +62,6 @@ import Docs.TreeRevision
     , TreeRevisionHistory (TreeRevisionHistory)
     , TreeRevisionRef (..)
     )
-import DocumentManagement.Hash (Hash)
 import GHC.Int (Int64)
 
 existsDocument :: DocumentID -> Session Bool

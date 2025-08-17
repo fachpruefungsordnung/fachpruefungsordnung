@@ -34,8 +34,6 @@ module UserManagement.Statements
     , addExternalPermission
     , updateExternalPermission
     , deleteExternalPermission
-    , getAllVisibleDocuments
-    , getAllDocumentsOfGroup
     )
 where
 
@@ -45,8 +43,7 @@ import Data.Profunctor (lmap, rmap)
 import Data.Text
 import Data.Tuple.Curry (uncurryN)
 import Data.Vector
-import qualified DocumentManagement.Commit as Commit
-import qualified DocumentManagement.Document as Document
+import qualified Docs.Document as Document
 import GHC.Int
 import Hasql.Statement
 import Hasql.TH
@@ -389,59 +386,3 @@ getAllExternalUsersOfDocument =
                 from external_document_rights
                 where document_id = $1 :: int8
             |]
-
-getAllVisibleDocuments :: Statement User.UserID [Document.Document]
-getAllVisibleDocuments =
-    rmap
-        ( fmap
-            ( \(document, name, groupID, headCommit) ->
-                Document.Document
-                    (Document.DocumentID document)
-                    name
-                    groupID
-                    (Commit.CommitID <$> headCommit)
-            )
-            . toList
-        )
-        [vectorStatement|
-      (select
-        d.id :: int8,
-        d.name :: text,
-        d.group_id :: int8,
-        d.head :: int8?
-      from roles r
-      join documents d on d.group_id = r.group_id
-      where r.user_id = $1 :: uuid)
-      union
-      (select
-        d.id :: int8,
-        d.name :: text,
-        d.group_id :: int8,
-        d.head :: int8?
-      from documents d
-      join external_document_rights e on d.id = e.document_id
-      where e.user_id = $1 :: uuid)
-    |]
-
-getAllDocumentsOfGroup :: Statement Group.GroupID [Document.Document]
-getAllDocumentsOfGroup =
-    rmap
-        ( fmap
-            ( \(document, name, groupID, headCommit) ->
-                Document.Document
-                    (Document.DocumentID document)
-                    name
-                    groupID
-                    (Commit.CommitID <$> headCommit)
-            )
-            . toList
-        )
-        [vectorStatement|
-      select
-        id :: int8,
-        name :: text,
-        group_id :: int8,
-        head :: int8?
-      from documents
-      where group_id = $1 :: int8
-    |]

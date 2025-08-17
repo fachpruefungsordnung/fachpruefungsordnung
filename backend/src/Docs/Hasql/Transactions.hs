@@ -31,6 +31,10 @@ import UserManagement.User (UserID)
 import Control.Monad (guard)
 import Data.Time (UTCTime)
 import Docs.Document (DocumentID)
+import Docs.Hash
+    ( Hash (Hash)
+    , Hashable (..)
+    )
 import qualified Docs.Hasql.Statements as Statements
 import Docs.Hasql.TreeEdge (TreeEdge (TreeEdge), TreeEdgeChildRef (..))
 import qualified Docs.Hasql.TreeEdge as TreeEdge
@@ -44,10 +48,6 @@ import Docs.TextRevision
 import Docs.Tree (Edge (Edge), Node (Node), Tree (Leaf, Tree))
 import Docs.TreeRevision (TreeRevision, TreeRevisionRef (TreeRevisionRef))
 import qualified Docs.TreeRevision as TreeRevision
-import DocumentManagement.Hash
-    ( Hash (Hash)
-    , Hashable (..)
-    )
 
 now :: Transaction UTCTime
 now = statement () Statements.now

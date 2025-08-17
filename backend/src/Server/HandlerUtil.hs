@@ -25,7 +25,7 @@ module Server.HandlerUtil
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Database (getConnection)
-import DocumentManagement.Document (DocumentID)
+import Docs.Document (DocumentID)
 import Hasql.Connection (Connection)
 import Hasql.Session (run)
 import Servant

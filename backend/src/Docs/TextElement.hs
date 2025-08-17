@@ -27,7 +27,7 @@ import Data.OpenApi
 import Web.HttpApiData (FromHttpApiData (..))
 
 import Docs.Document (DocumentID (..))
-import DocumentManagement.Hash (Hashable (..))
+import Docs.Hash (Hashable (..))
 
 -- | ID for a text element
 newtype TextElementID = TextElementID

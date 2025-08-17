@@ -61,6 +61,7 @@ import Docs.Document (Document (Document), DocumentID (..))
 import qualified Docs.Document as Document
 import Docs.DocumentHistory (DocumentHistoryItem)
 import qualified Docs.DocumentHistory as DocumentHistory
+import Docs.Hash (Hash (..))
 import Docs.Hasql.TreeEdge
     ( TreeEdge
     , TreeEdgeChild (..)
@@ -96,7 +97,6 @@ import Docs.TreeRevision
 import qualified Docs.TreeRevision as TreeRevision
 import Docs.UserRef (UserRef (UserRef))
 import qualified Docs.UserRef as UserRef
-import DocumentManagement.Hash (Hash (..))
 
 now :: Statement () UTCTime
 now =
