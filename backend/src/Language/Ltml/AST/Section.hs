@@ -10,7 +10,7 @@ import Language.Lsd.AST.Type.Section (SectionFormat)
 import Language.Ltml.AST.Node (Node)
 import Language.Ltml.AST.Paragraph (Paragraph)
 import Language.Ltml.AST.SimpleBlock (SimpleBlock)
-import Language.Ltml.AST.Text (PlainTextTree)
+import Language.Ltml.AST.Text (HeadingTextTree)
 
 data Section
     = Section
@@ -22,7 +22,7 @@ data Section
 data Heading
     = Heading
         HeadingFormat
-        [PlainTextTree]
+        [HeadingTextTree]
     deriving (Show)
 
 data SectionBody

@@ -17,7 +17,7 @@ import Data.Char (toLower)
 import Data.String (fromString)
 import Data.Text (Text, pack, unpack)
 import qualified Data.Typography as Ltml
-import Data.Void (Void)
+import Data.Void (Void, absurd)
 import Language.Ltml.HTML.CSS.CustomClay
 
 data Class
@@ -37,6 +37,10 @@ data Class
       TextContainer
     | -- | General class for all enumerations
       Enumeration
+    | -- | Class for spacing and alignment of multiple footnotes
+      FootnoteContainer
+    | -- | Class for spacing and alignment of a single footnote
+      Footnote
     | -- | Class for containers which left align text
       LeftAligned
     | -- | Class for containers which centers text
@@ -101,8 +105,9 @@ classStyle ParagraphID =
         --       Might be needed to make paragraphs <li> and section <ol> and apply a
         --       custom css counter to each paragraph <li>
         --       Actually the indentation of paragraphs should be the same across the whole Section
-        --       or Document even. Maybe it would be best to track the largest paragrapg id and then
+        --       or Document even. Maybe it would be best to track the largest paragraph id and then
         --       scale all paragraphs to fit the largest one (let i = length maxid in flex 0 0 (em i))
+        -- Edit: Right now i dont like this idea; maybe just leave it as is
         -- \| Gap between paragraph id and text
         paddingRight (em 0.75)
         userSelect none
@@ -113,6 +118,14 @@ classStyle TextContainer =
         -- \| gap between text and enumerations
         gap (em 0.5)
         textAlign justify
+classStyle FootnoteContainer =
+    toClassSelector FootnoteContainer ? do
+        marginTop (em 1)
+classStyle Footnote =
+    toClassSelector Footnote ? do
+        display flex
+        -- \| Gap between footnote id and footnote text
+        gap (em 0.5)
 classStyle LeftAligned = toClassSelector LeftAligned ? textAlign alignLeft
 classStyle Centered = toClassSelector Centered ? textAlign center
 classStyle RightAligned = toClassSelector RightAligned ? textAlign alignLeft
@@ -138,7 +151,8 @@ classStyle Enumeration =
             ol # byClass enumClassName ? do
                 counterReset "item"
                 marginLeft (em 0)
-                paddingLeft (em 0)
+                -- \| Enum indentation
+                paddingLeft (em 1)
                 marginTop (em 0)
                 marginBottom (em 0)
                 -- \| enums items are also spaced via flex environment
@@ -201,4 +215,4 @@ instance ToCssClass Ltml.FontStyle where
 -- | ToCssClass instance that can never be called, because there are
 --   no values of type Void
 instance ToCssClass Void where
-    toCssClass = error "toCssClass for Void was called!"
+    toCssClass = absurd

@@ -13,11 +13,14 @@ import Clay (Css)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
-import Data.Text (Text)
-import Data.Void (Void)
+import qualified Data.Map as Map
+import qualified Data.Set as Set
+import Data.Text (Text, unpack)
+import Data.Void (Void, absurd)
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
 import Language.Ltml.AST.Document
+import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label
 import Language.Ltml.AST.Node
 import Language.Ltml.AST.Paragraph
@@ -36,7 +39,7 @@ import Language.Ltml.HTML.FormatString
 import Language.Ltml.HTML.References
 import Language.Ltml.HTML.Util
 import Lucid
-import Prelude hiding (id)
+import Prelude
 
 renderHtml :: Document -> ByteString
 renderHtml document = renderBS $ docToHtml document
@@ -53,10 +56,16 @@ aToHtml a =
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
      in evalDelayed delayedHtml finalState
 
-renderHtmlCss :: (ToHtmlM a) => a -> (Html (), Css)
-renderHtmlCss a =
-    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
-     in (evalDelayed delayedHtml finalState, mainStylesheet (enumStyles finalState))
+renderHtmlCss :: Node Section -> Map.Map Label Footnote -> (Html (), Css)
+renderHtmlCss section fnMap =
+    -- \| Render with given footnote context
+    let readerState = initReaderState {footnoteMap = fnMap}
+        (delayedHtml, finalState) = runState (runReaderT (toHtmlM section) readerState) initGlobalState
+        usedFootnotes =
+            map (\(label, (_, idHtml, _)) -> (label, idHtml)) $ usedFootnoteMap finalState
+        -- \| Add footnote labes for "normal" (non-footnote) references
+        finalState' = finalState {labels = usedFootnotes ++ labels finalState}
+     in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
 
 -------------------------------------------------------------------------------
 
@@ -71,9 +80,12 @@ instance ToHtmlM Document where
                 format
                 (DocumentTitle title)
                 (DocumentBody introSSections sectionBody outroSSections)
+                footNotes
             ) =
             let titleHtml = h1_ <#> Class.DocumentTitle $ toHtml title
-             in do
+             in local (\s -> s {footnoteMap = footNotes}) $ do
+                    -- \| Reset used footnotes (footnotes are document-scoped)
+                    modify (\s -> s {usedFootnoteMap = usedFootnoteMap initGlobalState})
                     introHtml <- toHtmlM introSSections
                     mainHtml <- toHtmlM sectionBody
                     outroHtml <- toHtmlM outroSSections
@@ -100,13 +112,20 @@ instance ToHtmlM (Node Section) where
                 htmlId <- addTocEntry sectionTocKeyHtml titleHtml mLabel
                 -- \| Build heading Html with sectionID
                 childrenHtml <- toHtmlM sectionBody
+                -- \| Also render footnotes in super-sections, since their heading
+                --    could contain footnoteRefs
+                childrensGlobalState <- get
+                footnotesHtml <- toHtmlM (locallyUsedFootnotes childrensGlobalState)
+                -- \| Reset locally used set to inital value
+                modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
                 -- \| increment (super)SectionID for next section
                 incrementSectionID
                 -- \| reset paragraphID for next section
                 modify (\s -> s {currentParagraphID = 1})
 
                 return $
-                    section_ [cssClass_ Class.Section, id_ htmlId] <$> (headingHtml <> childrenHtml)
+                    section_ [cssClass_ Class.Section, id_ htmlId]
+                        <$> (headingHtml <> childrenHtml <> footnotesHtml)
 
 instance ToHtmlM SectionBody where
     toHtmlM sectionBody = case sectionBody of
@@ -128,7 +147,7 @@ instance ToHtmlM (Node Paragraph) where
          in do
                 addMaybeLabelToState mLabel paragraphIDHtml
                 -- \| Group raw text (without enums) into <div> for flex layout spacing
-                childText <- renderGroupedTextTree textTrees
+                childText <- renderDivGrouped textTrees
                 modify (\s -> s {currentParagraphID = currentParagraphID s + 1})
                 -- \| Reset sentence id for next paragraph
                 modify (\s -> s {currentSentenceID = 0})
@@ -177,28 +196,26 @@ instance ToHtmlM Table where
 -------------------------------------------------------------------------------
 
 instance
-    (ToCssClass style, ToHtmlM enum, ToHtmlM special)
-    => ToHtmlM (TextTree style enum special)
+    (ToHtmlM fnref, ToCssClass style, ToHtmlM enum, ToHtmlM special)
+    => ToHtmlM (TextTree fnref style enum special)
     where
     toHtmlM textTree = case textTree of
         Word text -> returnNow $ toHtml text
         Space -> returnNow $ toHtml (" " :: Text)
         Special special -> toHtmlM special
         Reference label -> return $ Later $ \globalState ->
-            case lookup (unLabel label) $ labels globalState of
+            case lookup label $ labels globalState of
                 -- \| Label was not found in GlobalState and a red error is emitted
                 Nothing ->
                     span_ <#> Class.InlineError $
                         toHtml (("Error: Label \"" <> unLabel label <> "\" not found!") :: Text)
                 Just labelHtml -> labelWrapperFunc globalState label labelHtml
-        Styled style textTrees -> do
-            textTreeHtml <- toHtmlM textTrees
-            return $ (span_ <#> toCssClass style) <$> textTreeHtml
+        Styled style textTrees ->
+            let styleClass = toCssClass style
+             in -- \| Wrap raw text in <span> and enums in <div>
+                renderGroupedTextTree (span_ <#> styleClass) (div_ <#> styleClass) textTrees
         Enum enum -> toHtmlM enum
-        Footnote _ ->
-            returnNow $
-                span_ <#> Class.InlineError $
-                    toHtml ("Error: FootNotes not supported yet" :: Text)
+        FootnoteRef fnref -> toHtmlM fnref
 
 -- | Increment sentence counter and add Label to GlobalState, if there is one
 instance ToHtmlM SentenceStart where
@@ -235,12 +252,94 @@ instance ToHtmlM (Node EnumItem) where
         -- \| Build reference with EnumFormat from ReaderState
         enumItemRefHtml <- buildEnumItemRefHtml enumItemID
         addMaybeLabelToState mLabel enumItemRefHtml
-        -- \| Render grouped raw text (without enums) to get correct flex spacing
-        enumItemHtml <- renderGroupedTextTree textTrees
+        -- \| Render <div> grouped raw text (without enums) to get correct flex spacing
+        enumItemHtml <- renderDivGrouped textTrees
         -- \| Increment enumItemID for next enumItem
         modify (\s -> s {currentEnumItemID = enumItemID + 1})
         return $
             div_ [cssClass_ Class.TextContainer, mId_ mLabel] <$> enumItemHtml
+
+instance ToHtmlM FootnoteReference where
+    toHtmlM (FootnoteReference label) = do
+        usedFootnotes <- gets usedFootnoteMap
+        -- \| Check if footnote was already referenced (document-scoped)
+        let mFootnoteIdText = lookup label usedFootnotes
+        case mFootnoteIdText of
+            -- \| TODO: add anchor links to actual footnote text (in export version)
+            Just (footnoteID, footnoteIdHtml, _) -> createFootnoteRef footnoteIdHtml footnoteID label
+            Nothing -> do
+                -- \| Look for label in footnoteMap with unused footnotes
+                unusedFootnoteMap <- asks footnoteMap
+                case Map.lookup label unusedFootnoteMap of
+                    -- \| Footnote Label does not exist
+                    Nothing ->
+                        returnNow $ htmlError $ "Footnote Label \"" <> unLabel label <> "\" not found!"
+                    Just footnote -> do
+                        footnoteID <- gets currentFootnoteID
+                        let footnoteIdHtml = toHtml $ show footnoteID
+                        footnoteTextHtml <- toHtmlM footnote
+                        -- \| Add new used footnote with id and rendered (delayed) text
+                        modify
+                            ( \s ->
+                                s
+                                    { usedFootnoteMap =
+                                        (label, (footnoteID, footnoteIdHtml, footnoteTextHtml)) : usedFootnoteMap s
+                                    , currentFootnoteID = currentFootnoteID s + 1
+                                    }
+                            )
+                        createFootnoteRef footnoteIdHtml footnoteID label
+      where
+        -- \| Creates footnote reference html and adds footnote label to locally used footnotes
+        createFootnoteRef :: Html () -> Int -> Label -> HtmlReaderState
+        createFootnoteRef footHtml footId footLabel = do
+            modify
+                ( \s ->
+                    s
+                        { locallyUsedFootnotes =
+                            Set.insert (NumLabel (footId, footLabel)) (locallyUsedFootnotes s)
+                        }
+                )
+            returnNow $ sup_ footHtml
+
+instance ToHtmlM Footnote where
+    toHtmlM (Footnote format textTrees) = do
+        -- \| Grouped rendering is not necessary, since enums
+        --   are not allowed inside of footnotes
+        toHtmlM textTrees
+
+instance ToHtmlM FootnoteSet where
+    toHtmlM idLabelSet = do
+        -- \| Get ascending (by footnoteId) list of Labels (drop id)
+        let footnotes = map (snd . unNumLabel) $ Set.toAscList idLabelSet
+        globalFootnoteMap <- gets usedFootnoteMap
+        delayedFootnotesHtml <- mapM (toFootnoteHtml globalFootnoteMap) footnotes
+        return $ do
+            footnoteHtmls <- sequence delayedFootnotesHtml
+            -- \| If there are no footnotes, dont output empty <div>
+            if null footnoteHtmls
+                then return mempty
+                else do
+                    let combinedFootnotesHtml = mconcat footnoteHtmls
+                    -- \| Wrap all footnotes into one <div>
+                    return $ div_ <#> Class.FootnoteContainer $ combinedFootnotesHtml
+      where
+        -- \| Lookup footnote label and build single footnote html
+        toFootnoteHtml :: FootnoteMap -> Label -> HtmlReaderState
+        toFootnoteHtml idTextMap label =
+            case lookup label idTextMap of
+                -- \| This should never happen (hopefully)
+                Nothing ->
+                    error
+                        ( "footnote label \""
+                            <> unpack (unLabel label)
+                            <> "\" was used in current section, but never added to global used footnote map!"
+                        )
+                Just (_, idHtml, delayedTextHtml) ->
+                    -- \| <div> <sup>id</sup> <span>text</span> </div>
+                    return
+                        ( (div_ <#> Class.Footnote <$> (sup_ idHtml <>)) . span_
+                            <$> delayedTextHtml
+                        )
 
 instance (ToHtmlM a) => ToHtmlM [a] where
     toHtmlM [] = returnNow mempty
@@ -254,25 +353,43 @@ instance (ToHtmlM a) => ToHtmlM [a] where
 -- | ToHtmlM instance that can never be called, because there are
 --   no values of type Void
 instance ToHtmlM Void where
-    toHtmlM = error "toHtmlM for Void was called!"
+    toHtmlM = absurd
 
 -------------------------------------------------------------------------------
 
--- | Extracts enums from list and packs raw text (without enums) into <div>;
---   E.g. result: <div> raw text </div> <enum></enum> <div> reference </div>
-renderGroupedTextTree
-    :: (ToCssClass style, ToHtmlM enum, ToHtmlM special)
-    => [TextTree style enum special]
+-- | Groups raw text in <div> and leaves enums as they are
+renderDivGrouped
+    :: (ToHtmlM fnref, ToCssClass style, ToHtmlM enum, ToHtmlM special)
+    => [TextTree fnref style enum special]
     -> HtmlReaderState
-renderGroupedTextTree [] = returnNow mempty
-renderGroupedTextTree (enum@(Enum _) : ts) = do
+renderDivGrouped = renderGroupedTextTree div_ id
+
+-- | Extracts enums from list and wraps raw text (without enums) into textF_;
+--   enums are wrapped into enumF_;
+--   E.g. result: <span> raw text </span>
+--                <div> <enum></enum> </div>
+--                <span> raw reference </span>
+renderGroupedTextTree
+    :: (ToHtmlM fnref, ToCssClass style, ToHtmlM enum, ToHtmlM special)
+    => (Html () -> Html ())
+    -> (Html () -> Html ())
+    -> [TextTree fnref style enum special]
+    -> HtmlReaderState
+renderGroupedTextTree _ _ [] = returnNow mempty
+renderGroupedTextTree textF_ enumF_ (enum@(Enum _) : ts) = do
     enumHtml <- toHtmlM enum
-    followingHtml <- renderGroupedTextTree ts
-    return $ enumHtml <> followingHtml
-renderGroupedTextTree tts =
+    followingHtml <- renderGroupedTextTree textF_ enumF_ ts
+    -- \| Wrap enum into enumF_
+    return $ (enumF_ <$> enumHtml) <> followingHtml
+renderGroupedTextTree textF_ enumF_ tts =
     let (rawText, tts') = getNextRawTextTree tts
      in do
             rawTextHtml <- toHtmlM rawText
-            followingHtml <- renderGroupedTextTree tts'
-            -- \| Pack raw text without enums into <div>
-            return $ (div_ <$> rawTextHtml) <> followingHtml
+            followingHtml <- renderGroupedTextTree textF_ enumF_ tts'
+            -- \| Wrap raw text without enums into textF_
+            return $ (textF_ <$> rawTextHtml) <> followingHtml
+
+-------------------------------------------------------------------------------
+
+htmlError :: Text -> Html ()
+htmlError msg = span_ <#> Class.InlineError $ toHtml ("Error: " <> msg :: Text)

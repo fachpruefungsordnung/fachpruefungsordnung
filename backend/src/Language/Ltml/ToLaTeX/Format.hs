@@ -1,9 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Ltml.ToLaTeX.Format
-    ( applyFontStyle
-    , applyFontSize
-    , applyTextAlignment
+    ( Stylable (..)
     , emptyFormat
     , formatHeading
     , formatKey
@@ -15,27 +13,30 @@ module Language.Ltml.ToLaTeX.Format
 import Data.Char (chr)
 import qualified Data.Text.Lazy as LT
 import Data.Typography
+import Data.Void (Void, absurd)
 import Language.Lsd.AST.Format
-import Language.Lsd.AST.Type.Enum
-    ( EnumFormat (EnumFormat)
-    , EnumItemFormat (EnumItemFormat)
-    )
 import Language.Ltml.ToLaTeX.Type
 
-applyFontStyle :: FontStyle -> LaTeX -> LaTeX
-applyFontStyle Bold = bold
-applyFontStyle Italics = italic
-applyFontStyle Underlined = underline
+class Stylable a where
+    applyTextStyle :: a -> LaTeX -> LaTeX
 
-applyTextAlignment :: TextAlignment -> LaTeX -> LaTeX
-applyTextAlignment LeftAligned = flushleft . (: [])
-applyTextAlignment Centered = center . (: [])
-applyTextAlignment RightAligned = flushright . (: [])
+instance Stylable Void where
+    applyTextStyle = absurd
 
-applyFontSize :: FontSize -> LaTeX -> LaTeX
-applyFontSize SmallFontSize = small
-applyFontSize MediumFontSize = id
-applyFontSize LargeFontSize = large
+instance Stylable FontStyle where
+    applyTextStyle Bold = bold
+    applyTextStyle Italics = italic
+    applyTextStyle Underlined = underline
+
+instance Stylable TextAlignment where
+    applyTextStyle LeftAligned = flushleft . (: [])
+    applyTextStyle Centered = center . (: [])
+    applyTextStyle RightAligned = flushright . (: [])
+
+instance Stylable FontSize where
+    applyTextStyle SmallFontSize = small
+    applyTextStyle MediumFontSize = id
+    applyTextStyle LargeFontSize = large
 
 emptyFormat :: IdentifierFormat
 emptyFormat = FormatString []
@@ -81,8 +82,8 @@ staticDocumentFormat =
         , usepackage [] "enumitem"
         , usepackage [] "tabularx"
         , usepackage ["T1"] "fontenc"
-        , enumStyle
-        , setindent
+        -- , enumStyle
+        -- , setindent
         ]
 
 getIdentifier :: IdentifierFormat -> Int -> LT.Text
@@ -95,19 +96,17 @@ getIdentifier (FormatString (PlaceholderAtom a : rest)) i =
         AlphabeticLower -> LT.pack [chr ((i - 1) `mod` 27 + 97)] <> getIdentifier (FormatString rest) i
         AlphabeticUpper -> LT.pack [chr ((i - 1) `mod` 27 + 65)] <> getIdentifier (FormatString rest) i
 
-getEnumStyle :: EnumFormat -> LT.Text
-getEnumStyle (EnumFormat (EnumItemFormat ident key)) = "label=" <> buildKey (getEnumIdentifier' ident) key
+getEnumStyle :: IdentifierFormat -> KeyFormat -> LT.Text
+getEnumStyle ident key = "label=" <> buildKey (getEnumIdentifier' ident) key
   where
-    buildKey :: LT.Text -> EnumItemKeyFormat -> LT.Text
-    buildKey _ (EnumItemKeyFormat (FormatString [])) = mempty
-    buildKey i (EnumItemKeyFormat (FormatString (StringAtom s : rest))) =
-        LT.pack s <> buildKey i (EnumItemKeyFormat (FormatString rest))
+    buildKey :: LT.Text -> KeyFormat -> LT.Text
+    buildKey _ ((FormatString [])) = mempty
+    buildKey i ((FormatString (StringAtom s : rest))) =
+        LT.pack s <> buildKey i (FormatString rest)
     buildKey
         i
-        ( EnumItemKeyFormat
-                (FormatString (PlaceholderAtom KeyIdentifierPlaceholder : rest))
-            ) =
-            i <> buildKey i (EnumItemKeyFormat (FormatString rest))
+        ((FormatString (PlaceholderAtom KeyIdentifierPlaceholder : rest))) =
+            i <> buildKey i (FormatString rest)
 
     getEnumIdentifier' :: IdentifierFormat -> LT.Text
     getEnumIdentifier' (FormatString []) = mempty

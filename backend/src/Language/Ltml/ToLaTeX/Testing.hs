@@ -3,11 +3,11 @@
 module Language.Ltml.ToLaTeX.Testing
     ( testThis
     , readText
-    , runTest
-    , anotherTest
+    , runTestToPDF
+    , runTestToLaTeX
     , superSectionWithNSubsections
     , hugeSuperSection
-    , getTestSection
+    , tmp
     )
 where
 
@@ -15,6 +15,7 @@ import Control.Monad.State (runState)
 import qualified Data.ByteString.Lazy as BS
 import Data.Text (Text)
 import qualified Data.Text.IO as TIO
+import qualified Data.Text.Lazy.IO as LTIO
 import Language.Lsd.AST.Format
     ( EnumStyle (Arabic)
     , FormatAtom (PlaceholderAtom, StringAtom)
@@ -25,7 +26,7 @@ import Language.Lsd.AST.Format
     )
 import Language.Lsd.AST.Type.Paragraph (ParagraphFormat (ParagraphFormat))
 import Language.Lsd.AST.Type.Section (SectionFormat (SectionFormat))
-import Language.Lsd.Example.Fpo (superSectionT)
+import Language.Lsd.Example.Fpo (footnoteT, sectionT)
 import Language.Ltml.AST.Label (Label (Label))
 import Language.Ltml.AST.Node (Node (Node))
 import Language.Ltml.AST.Paragraph (Paragraph (Paragraph))
@@ -35,16 +36,20 @@ import Language.Ltml.AST.Section
     , SectionBody (InnerSectionBody, LeafSectionBody)
     )
 import Language.Ltml.AST.Text (TextTree (Reference, Space, Word))
+import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
 import Language.Ltml.Parser.Section (sectionP)
-import Language.Ltml.ToLaTeX (generatePDFFromSuperSection)
+import Language.Ltml.ToLaTeX (generatePDFFromSection)
+import Language.Ltml.ToLaTeX.Format (staticDocumentFormat)
 import Language.Ltml.ToLaTeX.GlobalState
-    ( GlobalState (GlobalState, toc)
-    , fromDList
+    ( GlobalState (GlobalState, labelToFootNote, labelToRef)
     )
+import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
 import Language.Ltml.ToLaTeX.ToLaTeXM (ToLaTeXM (toLaTeXM))
 import Language.Ltml.ToLaTeX.Type
 import System.IO.Unsafe (unsafePerformIO)
-import Text.Megaparsec (empty, runParser)
+import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
+
+import System.IO
 
 readText :: String -> Text
 readText filename = unsafePerformIO $ TIO.readFile filename
@@ -62,14 +67,8 @@ initialState =
         False
         mempty
         mempty
-
-getTestSection :: Node Section
-getTestSection =
-    either undefined id $
-        runParser
-            (sectionP superSectionT empty)
-            ""
-            (readText "./src/Language/Ltml/ToLaTeX/Auxiliary/test.txt")
+        0
+        mempty
 
 testThis :: (ToLaTeXM a) => a -> (LaTeX, GlobalState)
 testThis a =
@@ -164,15 +163,32 @@ hugeSuperSection n =
         )
         (InnerSectionBody $ replicate n (superSectionWithNSubsections n))
 
-runTest :: IO ()
-runTest = do
+runTestToPDF :: IO ()
+runTestToPDF = do
     let txt = readText "./src/Language/Ltml/ToLaTeX/Auxiliary/test.txt"
-    eAction <- generatePDFFromSuperSection txt
+    eAction <- generatePDFFromSection txt
     case eAction of
         Left err -> error err
         Right pdf -> BS.writeFile "./src/Language/Ltml/ToLaTeX/Auxiliary/test.pdf" pdf
 
-anotherTest :: IO LaTeX
-anotherTest = do
-    let (_, st) = testThis getTestSection
-    return $ Sequence $ fromDList $ toc st
+runTestToLaTeX :: IO String
+runTestToLaTeX = do
+    let input = readText "./src/Language/Ltml/ToLaTeX/Auxiliary/test.txt"
+    case runParser (unwrapFootnoteParser [footnoteT] (sectionP sectionT eof)) "" input of
+        Left err -> return (errorBundlePretty err)
+        Right parsedInput -> do
+            let texFile = "./src/Language/Ltml/ToLaTeX/Auxiliary/test.tex"
+            -- Write LaTeX source
+            LTIO.writeFile texFile (sectionToText parsedInput)
+            return "everything went well!"
+  where
+    sectionToText (sec, labelmap) =
+        let (latexSection, gs) = runState (toLaTeXM sec) $ initialState {labelToFootNote = labelmap}
+         in renderLaTeX (labelToRef gs) (staticDocumentFormat <> document latexSection)
+
+tmp :: IO ()
+tmp = do
+    h <- openFile "./src/Language/Ltml/ToLaTeX/Auxiliary/test.tex" ReadMode
+    hSetEncoding h utf8
+    contents <- hGetContents h
+    putStrLn contents

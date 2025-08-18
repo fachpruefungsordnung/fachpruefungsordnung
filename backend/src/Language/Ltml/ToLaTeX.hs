@@ -1,21 +1,21 @@
 module Language.Ltml.ToLaTeX
     ( generatePDFFromSection
-    , generatePDFFromSuperSection
     --   generatePDFFromDocument
     ) where
 
 import Control.Exception (bracket)
 import Control.Monad.State (runState)
-import qualified Data.ByteString.Lazy as BS
+import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
 import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.IO as LTIO
-import Data.Void (Void)
-import Language.Lsd.Example.Fpo (sectionT, superSectionT)
+import qualified Data.Text.Lazy.Encoding as TLE
+import Language.Lsd.Example.Fpo (footnoteT, sectionT)
+import Language.Ltml.Parser (Parser)
+import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX.Format (staticDocumentFormat)
 import Language.Ltml.ToLaTeX.GlobalState
-    ( GlobalState (GlobalState, labelToRef)
+    ( GlobalState (GlobalState, labelToFootNote, labelToRef)
     , emptyFormat
     )
 import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
@@ -30,7 +30,7 @@ import System.Process
     , readCreateProcessWithExitCode
     , shell
     )
-import Text.Megaparsec (MonadParsec (eof), Parsec, errorBundlePretty, runParser)
+import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 
 initialGlobalState :: GlobalState
 initialGlobalState =
@@ -45,6 +45,8 @@ initialGlobalState =
         False
         mempty
         mempty
+        0
+        mempty
 
 withTempIn :: FilePath -> String -> (FilePath -> IO a) -> IO a
 withTempIn parent template =
@@ -53,7 +55,7 @@ withTempIn parent template =
         removeDirectoryRecursive
 
 generatePDFfromParsed
-    :: Parsec Void Text a -> (a -> LT.Text) -> Text -> IO (Either String BS.ByteString)
+    :: Parser a -> (a -> LT.Text) -> Text -> IO (Either String BSL.ByteString)
 generatePDFfromParsed parser render input =
     case runParser parser "" input of
         Left err -> return $ Left (errorBundlePretty err)
@@ -64,7 +66,8 @@ generatePDFfromParsed parser render input =
                     cmd = "pdflatex -interaction=nonstopmode -halt-on-error input.tex"
 
                 -- Write LaTeX source
-                LTIO.writeFile texFile (render parsedInput)
+                -- LTIO.writeFile texFile (render parsedInput)
+                BSL.writeFile texFile (TLE.encodeUtf8 (render parsedInput))
 
                 -- Compile with pdflatex
                 (exitCode, stdout, _) <-
@@ -78,7 +81,7 @@ generatePDFfromParsed parser render input =
                         -- could be different on another system and thus maybe revert later
                         return $ Left cleanErr
                     ExitSuccess -> do
-                        pdf <- BS.readFile pdfFile
+                        pdf <- BSL.readFile pdfFile
                         return $ Right pdf
 
 -- generatePDFFromDocument :: Text -> IO (Either String BS.ByteString)
@@ -89,20 +92,14 @@ generatePDFfromParsed parser render input =
 --         let (latexDoc, gs) = runState (toLaTeXM doc) initialGlobalState
 --          in renderLaTeX (labelToRef gs) latexDoc
 
-generatePDFFromSuperSection :: Text -> IO (Either String BS.ByteString)
-generatePDFFromSuperSection =
-    generatePDFfromParsed (sectionP superSectionT eof) sectionToText
-  where
-    sectionToText sec =
-        let (latexSection, gs) = runState (toLaTeXM sec) initialGlobalState
-         in renderLaTeX (labelToRef gs) (staticDocumentFormat <> document latexSection)
-
-generatePDFFromSection :: Text -> IO (Either String BS.ByteString)
+generatePDFFromSection :: Text -> IO (Either String BSL.ByteString)
 generatePDFFromSection =
-    generatePDFfromParsed (sectionP sectionT eof) sectionToText
+    generatePDFfromParsed
+        (unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
+        sectionToText
   where
-    sectionToText sec =
-        let (latexSection, gs) = runState (toLaTeXM sec) initialGlobalState
+    sectionToText (sec, labelmap) =
+        let (latexSection, gs) = runState (toLaTeXM sec) $ initialGlobalState {labelToFootNote = labelmap}
          in renderLaTeX (labelToRef gs) (staticDocumentFormat <> document latexSection)
 
 -- mkPDF :: FilePath -> IO (Either String BS.ByteString)

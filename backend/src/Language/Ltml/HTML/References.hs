@@ -2,7 +2,7 @@ module Language.Ltml.HTML.References (addMaybeLabelToState, buildEnumItemRefHtml
 
 import Control.Monad.Reader
 import Control.Monad.State
-import Language.Ltml.AST.Label (Label (unLabel))
+import Language.Ltml.AST.Label (Label)
 import Language.Ltml.HTML.Common
 import Language.Ltml.HTML.FormatString (identifierFormat)
 import Lucid
@@ -15,7 +15,7 @@ addMaybeLabelToState
     :: Maybe Label -> Html () -> ReaderT ReaderState (State GlobalState) ()
 addMaybeLabelToState mLabel referenceHtml = case mLabel of
     Nothing -> return ()
-    Just label -> modify (\s -> s {labels = (unLabel label, referenceHtml) : labels s})
+    Just label -> modify (\s -> s {labels = (label, referenceHtml) : labels s})
 
 -- | Builds enum item reference using the EnumFormat from the ReaderState
 buildEnumItemRefHtml :: Int -> ReaderT ReaderState (State GlobalState) (Html ())

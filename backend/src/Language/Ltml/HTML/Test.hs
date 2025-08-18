@@ -7,6 +7,7 @@ import Language.Lsd.Example.Fpo
 import Language.Ltml.HTML
 import Language.Ltml.HTML.CSS (writeCss)
 import Language.Ltml.HTML.CSS.Util (addHtmlHeader)
+import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.Pretty (prettyPrint)
 import Lucid (renderToFile)
@@ -14,21 +15,25 @@ import System.Directory (removeDirectoryRecursive)
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 import Prelude hiding (Enum, Word, readFile)
 
-testDoc = readFile "src/Language/Ltml/HTML/Test/studienaufbau_master.txt"
+testDoc = readFile "src/Language/Ltml/HTML/Test/studienaufbau_bachelor.txt"
 
 parseTest :: IO ()
 parseTest = do
     text <- testDoc
-    case runParser (sectionP sectionT eof) "" text of
+    case runParser
+        (unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
+        ""
+        text of
         Left err -> error $ errorBundlePretty err
-        Right nodeSection -> do
-            let (body, css) = renderHtmlCss nodeSection
+        Right (nodeSection, footnoteMap) -> do
+            let (body, css) = renderHtmlCss nodeSection footnoteMap
              in do
                     renderToFile
                         "src/Language/Ltml/HTML/Test/out.html"
                         (addHtmlHeader "" "out.css" body)
                     writeCss css "src/Language/Ltml/HTML/Test/out.css"
-                    prettyPrint nodeSection
+
+-- prettyPrint nodeSection
 
 -------------------------------------------------------------------------------
 

@@ -1,31 +1,34 @@
 # Footnotes
 
-Footnotes may occur anywhere within [text](./text.md), and are written as
-[text children](./text.md#child-nodes), headed by a keyword that is specific
-to the footnote type.
+Footnotes are written as [keyword-headed text](./text.md#keyword-headed-text),
+without initial indentation, where the keyword depends on the footnote's type.
+
+Footnotes may be [referenced as footnotes](./text.md#footnote-references)
+within the same [document](./document), in which case they get inserted soon
+after their first footnote reference.
+
+Footnotes that are not referenced as such are ignored.
 
 
 ## Footnote text
 
-Footnote text permits [styling](./text.md#styling), but not enumerations.
-
-Note that footnotes within footnotes are permitted, because footnotes are
-permitted in any text.
+Footnote text permits [styling](./text.md#styling), but not footnote
+references or enumerations.
 
 
 ## Example
 
 ```
-Some text with
-  ^ a footnote
-and more text.
+Some text with a footnote{^:fn} and more text.
+
+^{fn:} The footnote.
 ```
 
 Example output (assuming footnote keyword `^`):
 
 ```
-Some text with¹ and more text.
+Some text with a footnote¹ and more text.
 
 ---
-¹ a footnote
+¹ The footnote.
 ```

@@ -9,7 +9,8 @@
 module Language.Ltml.Parser.Text
     ( ParagraphParser
     , textForestP
-    , hangingTextP'
+    , lHangingTextP
+    , mlHangingTextP
     )
 where
 
@@ -27,16 +28,13 @@ import Data.Typography (FontStyle (..))
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.Type.Enum (EnumType (EnumType))
-import Language.Lsd.AST.Type.Text
-    ( FootnoteType (FootnoteType)
-    , TextType (TextType)
-    )
+import Language.Lsd.AST.Type.Text (TextType (TextType))
 import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Node (Node (Node))
 import Language.Ltml.AST.Text
     ( EnumItem (EnumItem)
     , Enumeration (Enumeration)
-    , FootnoteTextTree
+    , FootnoteReference (FootnoteReference)
     , SentenceStart (SentenceStart)
     , TextTree (..)
     )
@@ -46,7 +44,7 @@ import Language.Ltml.Parser
     , ParserWrapper (wrapParser)
     , someIndented
     )
-import Language.Ltml.Parser.Keyword (keywordP, mlKeywordP)
+import Language.Ltml.Parser.Keyword (keywordP, lKeywordP, mlKeywordP)
 import Language.Ltml.Parser.Label (labelP, labelingP)
 import Language.Ltml.Parser.MiTree
     ( MiElementConfig (..)
@@ -73,28 +71,33 @@ instance ParserWrapper ParagraphParser where
 
 textForestP
     :: ( ParserWrapper m
+       , FootnoteRefP fnref
        , StyleP style
        , EnumP enumType enum
        , SpecialP m special
        )
     => TextType enumType
-    -> m [TextTree style enum special]
+    -> m [TextTree fnref style enum special]
 textForestP t = miForest elementPF (childPF t)
 
 elementPF
-    :: forall m style enum special
-     . (MonadParser m, StyleP style, SpecialP m special)
-    => m [TextTree style enum special]
-    -> m (MiElementConfig, [TextTree style enum special])
+    :: forall m fnref style enum special
+     . (MonadParser m, FootnoteRefP fnref, StyleP style, SpecialP m special)
+    => m [TextTree fnref style enum special]
+    -> m (MiElementConfig, [TextTree fnref style enum special])
 elementPF p = fmap (maybeToList . fmap Special) <$> specialP <|> regularP
   where
-    regularP :: m (MiElementConfig, [TextTree style enum special])
+    regularP :: m (MiElementConfig, [TextTree fnref style enum special])
     regularP =
         fmap ((regularCfg,) . singleton) $
             Word <$> wordP (Proxy :: Proxy special)
-                <|> Reference <$ char '{' <* char ':' <*> labelP <* char '}'
+                <|> char '{' *> bracedP <* char '}'
                 <|> Styled <$ char '<' <*> styleP <*> p <* char '>'
       where
+        bracedP =
+            Reference <$ char ':' <*> labelP
+                <|> FootnoteRef <$> footnoteRefP
+
         regularCfg =
             MiElementConfig
                 { miecPermitEnd = True
@@ -103,39 +106,50 @@ elementPF p = fmap (maybeToList . fmap Special) <$> specialP <|> regularP
                 }
 
 childPF
-    :: forall m style enumType enum special
+    :: forall m fnref style enumType enum special
      . (ParserWrapper m, EnumP enumType enum, SpecialP m special)
     => TextType enumType
-    -> m (TextTree style enum special)
-childPF (TextType enumTypes footnoteTypes) =
+    -> m (TextTree fnref style enum special)
+childPF (TextType enumTypes) =
     wrapParser (Enum <$> choice (fmap enumP enumTypes))
         <* postEnumP (Proxy :: Proxy special)
-        <|> wrapParser (Footnote <$> choice (fmap footnoteTextP footnoteTypes))
 
-footnoteTextP :: FootnoteType -> Parser [FootnoteTextTree]
-footnoteTextP (FootnoteType kw tt) = hangingTextP kw tt
-
+-- TODO: Unused.
 hangingTextP
     :: ( ParserWrapper m
+       , FootnoteRefP fnref
        , StyleP style
        , EnumP enumType enum
        , SpecialP m special
        )
     => Keyword
     -> TextType enumType
-    -> m [TextTree style enum special]
+    -> m [TextTree fnref style enum special]
 hangingTextP kw t = hangingBlock_ (keywordP kw) elementPF (childPF t)
 
-hangingTextP'
+lHangingTextP
     :: ( ParserWrapper m
+       , FootnoteRefP fnref
        , StyleP style
        , EnumP enumType enum
        , SpecialP m special
        )
     => Keyword
     -> TextType enumType
-    -> m (Maybe Label, [TextTree style enum special])
-hangingTextP' kw t = hangingBlock' (mlKeywordP kw) elementPF (childPF t)
+    -> m (Label, [TextTree fnref style enum special])
+lHangingTextP kw t = hangingBlock' (lKeywordP kw) elementPF (childPF t)
+
+mlHangingTextP
+    :: ( ParserWrapper m
+       , FootnoteRefP fnref
+       , StyleP style
+       , EnumP enumType enum
+       , SpecialP m special
+       )
+    => Keyword
+    -> TextType enumType
+    -> m (Maybe Label, [TextTree fnref style enum special])
+mlHangingTextP kw t = hangingBlock' (mlKeywordP kw) elementPF (childPF t)
 
 class StyleP style where
     styleP :: (MonadParser m) => m style
@@ -158,7 +172,7 @@ instance EnumP Void Void where
 instance EnumP EnumType Enumeration where
     enumP (EnumType kw fmt tt) = Enumeration fmt <$> someIndented enumItemP
       where
-        enumItemP = uncurry Node . fmap EnumItem <$> hangingTextP' kw tt
+        enumItemP = uncurry Node . fmap EnumItem <$> mlHangingTextP kw tt
 
 class SpecialP m special | special -> m where
     specialP :: m (MiElementConfig, Maybe special)
@@ -243,6 +257,15 @@ instance SpecialP ParagraphParser SentenceStart where
 
     -- An enumeration child ends a sentence.
     postEnumP _ = put True
+
+class FootnoteRefP fnref where
+    footnoteRefP :: (MonadParser m) => m fnref
+
+instance FootnoteRefP Void where
+    footnoteRefP = empty
+
+instance FootnoteRefP FootnoteReference where
+    footnoteRefP = FootnoteReference <$ string "^:" <*> labelP
 
 gWordP :: (MonadParser m) => (Char -> Bool) -> (Char -> Bool) -> m Text
 gWordP isValid isSpecial = mconcat <$> some (regularWordP <|> escapedCharP)

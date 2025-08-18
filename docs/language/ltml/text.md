@@ -1,8 +1,8 @@
 # Text
 
 Some nodes contain *text*, which may generally be [styled](#styling), and
-contain [references](#references), [enumerations](./enumeration.md), and
-[footnotes](./footnote.md).
+contain [references](#references), [footnote references](#footnote-references),
+and [enumerations](./enumeration.md).
 
 
 ## Text kinds
@@ -10,10 +10,10 @@ contain [references](#references), [enumerations](./enumeration.md), and
 There are several text kinds (e.g., paragraph text), which are determined by
 where text occurs, but do not depend on node types.
 
-The text kind determines whether styling and enumerations within text are
-permitted, each, and may further extend text.
+The text kind determines whether styling, footnote references, and
+enumerations within text are permitted, each, and may further extend text.
 
-References and footnotes are always permitted.
+References are always permitted.
 
 
 ## Line breaks & Whitespace
@@ -59,7 +59,6 @@ See [enumerations](./enumeration.md) for example input.
 * ```
   <*Styled text can
   span multiple lines,
-    ^ contain footnotes,
     # contain enumeration items,
   and continue afterwards---at the same indentation level.>
   ```
@@ -91,6 +90,25 @@ This is a reference to paragraph 1.
 ```
 
 
+## Footnote references
+
+* [Footnotes](./footnote.md) may generally be referenced within text, as
+  `{^:LABEL}`, where `LABEL` is the respective footnote's label.
+    * Note that the `^` character is fixed, and unrelated to the footnote
+      type's keyword (which is also commonly `^`).
+* A footnote reference is substituted by a correspondingly formatted output
+  [identifier](./general/identifier.md) in the output.
+* Footnote references have [document](./document.md) scope:
+    * Footnote references must reference footnotes defined in the same
+      document.
+    * Footnote output [identifiers](./general/identifier.md) are unique within
+      a document, but generally not over several documents.
+* A footnote may be referenced repeatedly.
+* Note that footnotes may also be referenced using ordinary references, in
+  which case they are not formatted as footnote references.
+* [Example](./footnote.md#example).
+
+
 ## Child nodes
 
 Text nodes (e.g., headings, sentences) generally permit in-line children.
@@ -101,15 +119,14 @@ Text children must be [indented](general/indentation.md) one level from the
 current context (text); that is, two levels from the textual node's keyword,
 if any.
 
-There are currently two kinds of text children,
-[enumeration](./enumeration.md) items and [footnotes](./footnote.md).
+There is currently one kind of text children, [enumeration](./enumeration.md)
+items.
 
 
 ### Example
 
 ```
 Everybody loves these fruits:
-  ^ Citation needed.
   # Apples, unless
       # unripe, or
       # not tasty
@@ -118,5 +135,4 @@ Everybody loves these fruits:
   # Oranges
 ```
 
-This example is to be read as containing a single footnote and a nested
-enumeration.
+This example is to be read as containing a single nested enumeration.

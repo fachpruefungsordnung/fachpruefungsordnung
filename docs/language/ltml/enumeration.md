@@ -7,7 +7,8 @@ each headed by a keyword that is specific to the enumeration type.
 
 ## Enumeration text
 
-Enumeration text permits [styling](./text.md#styling) and enumeration
+Enumeration text permits [styling](./text.md#styling),
+[footnote references](./text.md#footnote-references), and enumeration
 [text children](./text.md#child-nodes).
 
 
