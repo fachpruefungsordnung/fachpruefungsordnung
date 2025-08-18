@@ -694,11 +694,10 @@ splitview = H.mkComponent
         H.tell _comment unit (Comment.DeletedComment tocEntry.id deletedIDs)
 
       Editor.PostPDF content -> do
-        rep <- H.liftAff $
-          Request.postString "/documents/render/pdf" (encodeJson content)
-        case rep of
-          Left err -> H.liftEffect $ log $ Request.printError "pdf" err
-          Right out -> H.liftEffect $ log $ "PDF rendered successfully: " <> out.body
+        renderedPDF' <- Request.postRenderPDF content
+        case renderedPDF' of
+          Left _ -> pure unit -- Handle error
+          Right body -> H.liftEffect $ log $ "PDF rendered successfully: " <> body
 
       Editor.SavedSection toBePosted title tocEntry -> do
         state <- H.get
