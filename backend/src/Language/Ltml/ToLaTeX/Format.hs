@@ -82,6 +82,7 @@ staticDocumentFormat =
         , usepackage [] "enumitem"
         , usepackage [] "tabularx"
         , usepackage ["T1"] "fontenc"
+        , usepackage ["utf8"] "inputenc"
         -- , enumStyle
         -- , setindent
         ]
