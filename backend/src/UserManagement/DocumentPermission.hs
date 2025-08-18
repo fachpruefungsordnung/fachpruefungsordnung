@@ -14,7 +14,7 @@ module UserManagement.DocumentPermission
 import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
 import Data.Text (Text, pack, unpack)
-import DocumentManagement.Document as Document
+import Docs.Document as Document
 import GHC.Generics (Generic)
 import Text.Read (readMaybe)
 import UserManagement.User as User (UserID)

@@ -14,6 +14,9 @@ module Docs
     , getTreeHistory
     , getDocumentHistory
     , getTreeWithLatestTexts
+    , createComment
+    , getComments
+    , resolveComment
     ) where
 
 import Control.Monad (unless)
@@ -30,16 +33,21 @@ import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
 import Data.Maybe (fromMaybe)
+import Docs.Comment (Comment, CommentRef (CommentRef))
+import qualified Docs.Comment as Comment
 import Docs.Database
     ( HasCheckPermission
+    , HasCreateComment
     , HasCreateDocument
     , HasCreateTextElement
     , HasCreateTextRevision
     , HasCreateTreeRevision
+    , HasExistsComment
     , HasExistsDocument
     , HasExistsTextElement
     , HasExistsTextRevision
     , HasExistsTreeRevision
+    , HasGetComments
     , HasGetDocument
     , HasGetDocumentHistory
     , HasGetTextElementRevision
@@ -84,6 +92,7 @@ data Error
     | TextElementNotFound TextElementRef
     | TextRevisionNotFound TextRevisionRef
     | TreeRevisionNotFound TreeRevisionRef
+    | CommentNotFound CommentRef
 
 type Result a = Either Error a
 
@@ -149,7 +158,7 @@ createTextElement userID docID kind = runExceptT $ do
 --   In case of an update, the revision id is increased nevertheless to
 --   prevent lost update scenarios.
 createTextRevision
-    :: (HasCreateTextRevision m, HasGetTextElementRevision m)
+    :: (HasCreateTextRevision m, HasGetTextElementRevision m, HasExistsComment m)
     => UserID
     -> NewTextRevision
     -> m (Result ConflictStatus)
@@ -157,6 +166,9 @@ createTextRevision userID revision = runExceptT $ do
     let ref@(TextElementRef docID _) = newTextRevisionElement revision
     guardPermission Edit docID userID
     guardExistsTextElement ref
+    mapM_
+        guardExistsComment
+        (CommentRef ref . Comment.comment <$> newTextRevisionCommentAnchors revision)
     let latestRevisionRef = TextRevisionRef ref TextRevision.Latest
     latestElementRevision <-
         lift $ DB.getTextElementRevision latestRevisionRef
@@ -170,6 +182,7 @@ createTextRevision userID revision = runExceptT $ do
                 userID
                 ref
                 (newTextRevisionContent revision)
+                (newTextRevisionCommentAnchors revision)
     lift $ do
         now <- DB.now
         case latestRevision of
@@ -184,6 +197,7 @@ createTextRevision userID revision = runExceptT $ do
                     DB.updateTextRevision
                         (identifier latest)
                         (newTextRevisionContent revision)
+                        (newTextRevisionCommentAnchors revision)
                         <&> TextRevision.NoConflict
                 -- no conflict, but can not update? -> create new
                 | latestRevisionID == parentRevisionID ->
@@ -302,6 +316,37 @@ getTreeWithLatestTexts userID revision = runExceptT $ do
     getter' = (<&> (>>= elementRevisionToRevision)) . getter
     elementRevisionToRevision (TextElementRevision _ rev) = rev
 
+createComment
+    :: (HasCreateComment m)
+    => UserID
+    -> TextElementRef
+    -> Text
+    -> m (Result Comment)
+createComment userID ref@(TextElementRef docID textID) text = runExceptT $ do
+    guardPermission Comment docID userID
+    guardExistsTextElement ref
+    lift $ DB.createComment userID textID text
+
+getComments
+    :: (HasGetComments m)
+    => UserID
+    -> TextElementRef
+    -> m (Result (Vector Comment))
+getComments userID ref@(TextElementRef docID _) = runExceptT $ do
+    guardPermission Read docID userID
+    guardExistsTextElement ref
+    lift $ DB.getComments ref
+
+resolveComment
+    :: (HasCreateComment m)
+    => UserID
+    -> CommentRef
+    -> m (Result ())
+resolveComment userID ref@(CommentRef (TextElementRef docID _) commentID) = runExceptT $ do
+    guardPermission Comment docID userID
+    guardExistsComment ref
+    lift $ DB.resolveComment commentID
+
 -- guards
 
 guardPermission
@@ -387,3 +432,13 @@ guardExistsTextRevision allowLatestNothing ref@(TextRevisionRef elementRef selec
             TextRevision.Specific _ -> existsTextRevision
     unless considerExistant $
         throwError (TextRevisionNotFound ref)
+
+guardExistsComment
+    :: (HasExistsComment m)
+    => CommentRef
+    -> ExceptT Error m ()
+guardExistsComment ref@(CommentRef textRef _) = do
+    guardExistsTextElement textRef
+    existsComment <- lift $ DB.existsComment ref
+    unless existsComment $
+        throwError (CommentNotFound ref)

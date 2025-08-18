@@ -7,9 +7,9 @@ module Docs.Hasql.TreeEdge
 import Data.Text (Text)
 import GHC.Int (Int64)
 
+import Docs.Hash (Hash, Hashable (..))
 import Docs.TextElement (TextElement, TextElementID)
 import Docs.Tree (NodeHeader)
-import DocumentManagement.Hash (Hash, Hashable (..))
 
 data TreeEdgeChild
     = TreeEdgeToTextElement TextElement

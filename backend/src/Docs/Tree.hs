@@ -38,13 +38,13 @@ import Data.OpenApi
 
 import qualified Data.Text as Text
 import Data.Typeable (typeRep)
+import Docs.Hash (Hashable (..))
 import Docs.TextElement (TextElement, TextElementID)
 import qualified Docs.TextElement as TextElement
 import Docs.TextRevision
     ( TextElementRevision (TextElementRevision)
     , TextRevision
     )
-import DocumentManagement.Hash (Hashable (..))
 
 -- | Contains metdata for a tree node.
 data NodeHeader = NodeHeader

@@ -13,7 +13,6 @@ module Server.Handlers.GroupHandlers
     ) where
 
 import Control.Monad.IO.Class
-import qualified DocumentManagement.Document as Document
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 import Servant
@@ -40,10 +39,6 @@ type GroupAPI =
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "groupID" Group.GroupID
                     :> Delete '[JSON] NoContent
-                :<|> Auth AuthMethod Auth.Token
-                    :> Capture "groupID" Group.GroupID
-                    :> "documents"
-                    :> Get '[JSON] [Document.Document]
            )
 
 groupServer :: Server GroupAPI
@@ -52,7 +47,6 @@ groupServer =
         :<|> getAllGroupsHandler
         :<|> getGroupHandler
         :<|> deleteGroupHandler
-        :<|> getAllGroupDocumentsHandler
 
 createGroupHandler
     :: AuthResult Auth.Token -> Group.GroupCreate -> Handler Group.GroupID
@@ -127,17 +121,3 @@ deleteGroupHandler (Authenticated token) groupID = do
             Left _ -> throwError errDatabaseAccessFailed
             Right () -> return NoContent
 deleteGroupHandler _ _ = throwError errNotLoggedIn
-
-getAllGroupDocumentsHandler
-    :: AuthResult Auth.Token -> Group.GroupID -> Handler [Document.Document]
-getAllGroupDocumentsHandler (Authenticated token) groupID = do
-    conn <- tryGetDBConnection
-    ifSuperOrGroupMemberDo conn token groupID (getAllDocs conn)
-  where
-    getAllDocs :: Connection -> Handler [Document.Document]
-    getAllDocs conn = do
-        eList <- liftIO $ Session.run (Sessions.getAllDocumentsOfGroup groupID) conn
-        case eList of
-            Left _ -> throwError errDatabaseAccessFailed
-            Right list -> return list
-getAllGroupDocumentsHandler _ _ = throwError errNotLoggedIn
