@@ -3,18 +3,22 @@ module FPO.Components.Comment where
 import Prelude
 
 import Data.Array (elem, snoc, uncons)
+import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
+import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
+import FPO.Data.Store as Store
 import FPO.Dto.UserDto (getUserName)
 import FPO.Types (Comment, CommentSection)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 
 type Input = Unit
@@ -41,7 +45,12 @@ type State =
   , mTimeFormatter :: Maybe Formatter
   }
 
-commentview :: forall m. MonadAff m => H.Component Query Input Output m
+commentview
+  :: forall m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => H.Component Query Input Output m
 commentview = H.mkComponent
   { initialState: \_ ->
       { tocID: -1
@@ -181,17 +190,20 @@ commentview = H.mkComponent
       when (state.commentDraft /= "") $
         for_ state.mCommentSection \commentSection -> do
           now <- H.liftEffect nowDateTime
-          user <- H.liftAff getUser
-          let
-            author = maybe "Guest" getUserName user
-            comments = commentSection.comments
-            newComment =
-              { author: author, timestamp: now, content: state.commentDraft }
-            newCommentSection = commentSection
-              { comments = snoc comments newComment }
-          H.modify_ \st -> st
-            { mCommentSection = Just newCommentSection, commentDraft = "" }
-          H.raise (UpdateComment state.tocID state.markerID newCommentSection)
+          userWithError <- getUser
+          case userWithError of
+            Left _ -> pure unit -- TODO error handling 
+            Right user -> do
+              let
+                author = getUserName user
+                comments = commentSection.comments
+                newComment =
+                  { author: author, timestamp: now, content: state.commentDraft }
+                newCommentSection = commentSection
+                  { comments = snoc comments newComment }
+              H.modify_ \st -> st
+                { mCommentSection = Just newCommentSection, commentDraft = "" }
+              H.raise (UpdateComment state.tocID state.markerID newCommentSection)
 
   handleQuery
     :: forall slots a

@@ -11,6 +11,9 @@ Simple sections are identified by
 [keywords](general/identifier.md#input-identifiers), which occur on their own
 line, preceding the simple section's children.
 
+Additionally, a simple section may contain [footnotes](./footnote.md) in place
+of any simple paragraph, which are added to the encompassing document.
+
 
 ## Example
 

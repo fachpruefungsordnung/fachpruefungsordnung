@@ -11,7 +11,7 @@ module Language.Ltml.ToLaTeX.Type
     , hypertarget
     , hyperlink
     , label
-    , ref
+    , footref
     , paragraph
     , large
     , small
@@ -24,6 +24,7 @@ module Language.Ltml.ToLaTeX.Type
     , center
     , flushleft
     , flushright
+    , minipage
     , document
     , setindent
     , setfontArabic
@@ -93,14 +94,17 @@ usepackage opts package = Command "usepackage" opts [Text package]
 documentclass :: [LT.Text] -> LT.Text -> LaTeX
 documentclass opts name = Command "documentclass" opts [Text name]
 
+parbox :: [LT.Text] -> [LaTeX] -> LaTeX
+parbox = Command "parbox"
+
 -------------------------------------------------------------------------------
 {-                             text structure                                -}
 
-label :: LT.LazyText -> LaTeX
-label l = Command "label" [] [Text l]
+label :: LT.Text -> LaTeX
+label l = Raw $ "\\label{" <> l <> "}"
 
-ref :: LT.LazyText -> LaTeX
-ref r = Command "ref" [] [Text r]
+footref :: LT.Text -> LaTeX
+footref r = Raw $ "\\footref{" <> r <> "}"
 
 large :: LaTeX -> LaTeX
 large content = Raw "{\\large " <> content <> Raw "}"
@@ -113,6 +117,9 @@ linebreak = Raw "\\\\"
 
 medskip :: LaTeX
 medskip = Raw "\n\\medskip\n"
+
+hfill :: LaTeX
+hfill = Raw "\\hfill"
 
 -------------------------------------------------------------------------------
 {-                              environments                                 -}
@@ -138,9 +145,10 @@ minipage = Environment "minipage"
 paragraph :: LaTeX -> LaTeX -> LaTeX
 paragraph identifier content =
     Sequence
-        [ minipage ["t"] [Raw "{2em}", identifier]
-        , Raw "\\hspace{0.5em}"
-        , minipage ["t"] [Raw "{\\dimexpr\\linewidth-2em-0.5em\\relax}", content]
+        [ parbox ["t"] [Raw "2em", identifier]
+        , hfill
+        , parbox ["t"] [Raw "\\dimexpr\\linewidth-2em-0.5em\\relax", content]
+        , Raw "\n"
         ]
 
 document :: LaTeX -> LaTeX

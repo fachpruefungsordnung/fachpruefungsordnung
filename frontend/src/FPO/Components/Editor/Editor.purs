@@ -20,8 +20,6 @@ import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
-import Affjax (Error, Response, printError)
-import Data.Argonaut (Json)
 import Data.Array (catMaybes, filter, intercalate, uncons, (:))
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
@@ -32,7 +30,6 @@ import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class as EC
-import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.Keybindings
@@ -41,6 +38,7 @@ import FPO.Components.Editor.Keybindings
   , makeItalic
   , underscore
   )
+import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
@@ -168,6 +166,7 @@ data Query a
 editor
   :: forall m
    . MonadAff m
+  => Navigate m
   => MonadStore Store.Action Store.Store m
   => H.Component Query Input Output m
 editor = connect selectTranslator $ H.mkComponent
@@ -483,34 +482,31 @@ editor = connect selectTranslator $ H.mkComponent
       let jsonContent = ContentDto.encodeContent newContent
 
       -- send the new content as POST to the server
-      response <- H.liftAff $ Request.postJson
+      response <- Request.postJson (ContentDto.extractNewParent newContent)
         ("/docs/" <> show state.docID <> "/text/" <> show newEntry.id <> "/rev")
         jsonContent
-      handleSaveSectionResponse response
 
       -- handle errors in pos and decodeJson
       case response of
         Left _ -> handleAction $ LostParentID newEntry title newContent
         -- extract and insert new parentID into newContent
-        Right res -> case ContentDto.extractNewParent newContent res.body of
-          Left _ -> handleAction $ LostParentID newEntry title newContent
-          Right updatedContent -> do
-            -- Update the tree to backend, when title was really changed
-            let oldTitle = state.title
-            H.raise (SavedSection (oldTitle /= title) title newEntry)
+        Right updatedContent -> do
+          -- Update the tree to backend, when title was really changed
+          let oldTitle = state.title
+          H.raise (SavedSection (oldTitle /= title) title newEntry)
 
-            H.modify_ \st -> st
-              { mTocEntry = Just newEntry
-              , title = title
-              , mContent = Just updatedContent
-              }
+          H.modify_ \st -> st
+            { mTocEntry = Just newEntry
+            , title = title
+            , mContent = Just updatedContent
+            }
 
-            -- Show saved icon
-            handleAction SavedIcon
+          -- Show saved icon
+          handleAction SavedIcon
 
-            -- mDirtyRef := false
-            for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
-            pure unit
+          -- mDirtyRef := false
+          for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
+          pure unit
 
     LostParentID newEntry title newContent -> do
       docID <- H.gets _.docID
@@ -583,65 +579,68 @@ editor = connect selectTranslator $ H.mkComponent
         H.modify_ _ { mPendingDebounceF = Nothing, mPendingMaxWaitF = Nothing }
 
     Comment -> do
-      user <- H.liftAff getUser
-      H.gets _.mEditor >>= traverse_ \ed -> do
-        state <- H.get
-        session <- H.liftEffect $ Editor.getSession ed
-        range <- H.liftEffect $ Editor.getSelectionRange ed
-        start <- H.liftEffect $ Range.getStart range
-        end <- H.liftEffect $ Range.getEnd range
+      userWithError <- getUser
+      case userWithError of
+        Left _ -> pure unit -- TODO error handling 
+        Right user -> do
+          H.gets _.mEditor >>= traverse_ \ed -> do
+            state <- H.get
+            session <- H.liftEffect $ Editor.getSession ed
+            range <- H.liftEffect $ Editor.getSelectionRange ed
+            start <- H.liftEffect $ Range.getStart range
+            end <- H.liftEffect $ Range.getEnd range
 
-        let
-          sRow = Types.getRow start
-          sCol = Types.getColumn start
-          eRow = Types.getRow end
-          eCol = Types.getColumn end
-          userName = maybe "Guest" getUserName user
-          newMarkerID = case state.mTocEntry of
-            Nothing -> 0
-            Just tocEntry -> tocEntry.newMarkerNextID
-          newCommentSection =
-            { markerID: newMarkerID
-            , comments: []
-            , resolved: false
-            }
-          newMarker =
-            { id: newMarkerID
-            , type: "info"
-            , startRow: sRow
-            , startCol: sCol
-            , endRow: eRow
-            , endCol: eCol
-            , markerText: userName
-            , mCommentSection: Just newCommentSection
-            }
-
-        mLiveMarker <- H.liftEffect $ addAnchor newMarker session
-
-        let
-          newLiveMarkers = case mLiveMarker of
-            Nothing -> state.liveMarkers
-            Just lm -> lm : state.liveMarkers
-
-        case state.mTocEntry of
-          Just entry -> do
             let
-              newEntry =
-                { id: entry.id
-                , name: entry.name
-                , paraID: entry.paraID
-                , newMarkerNextID: entry.newMarkerNextID + 1
-                , markers: sortMarkers (newMarker : entry.markers)
+              sRow = Types.getRow start
+              sCol = Types.getColumn start
+              eRow = Types.getRow end
+              eCol = Types.getColumn end
+              userName = getUserName user
+              newMarkerID = case state.mTocEntry of
+                Nothing -> 0
+                Just tocEntry -> tocEntry.newMarkerNextID
+              newCommentSection =
+                { markerID: newMarkerID
+                , comments: []
+                , resolved: false
                 }
-            H.modify_ \st ->
-              st
-                { mTocEntry = Just newEntry
-                , liveMarkers = newLiveMarkers
+              newMarker =
+                { id: newMarkerID
+                , type: "info"
+                , startRow: sRow
+                , startCol: sCol
+                , endRow: eRow
+                , endCol: eCol
+                , markerText: userName
+                , mCommentSection: Just newCommentSection
                 }
-            H.raise (SavedSection false state.title newEntry)
-            H.raise
-              (SelectedCommentSection entry.id newMarker.id)
-          Nothing -> pure unit
+
+            mLiveMarker <- H.liftEffect $ addAnchor newMarker session
+
+            let
+              newLiveMarkers = case mLiveMarker of
+                Nothing -> state.liveMarkers
+                Just lm -> lm : state.liveMarkers
+
+            case state.mTocEntry of
+              Just entry -> do
+                let
+                  newEntry =
+                    { id: entry.id
+                    , name: entry.name
+                    , paraID: entry.paraID
+                    , newMarkerNextID: entry.newMarkerNextID + 1
+                    , markers: sortMarkers (newMarker : entry.markers)
+                    }
+                H.modify_ \st ->
+                  st
+                    { mTocEntry = Just newEntry
+                    , liveMarkers = newLiveMarkers
+                    }
+                H.raise (SavedSection false state.title newEntry)
+                H.raise
+                  (SelectedCommentSection entry.id newMarker.id)
+              Nothing -> pure unit
 
     DeleteComment -> do
       state <- H.get
@@ -1002,17 +1001,3 @@ buttonDivisor :: forall m. H.ComponentHTML Action () m
 buttonDivisor = HH.div
   [ HP.classes [ HB.vr, HB.mx1 ] ]
   []
-
--- TODO make this better
-handleSaveSectionResponse
-  :: forall m slots
-   . MonadAff m
-  => Either Error (Response Json)
-  -> H.HalogenM State Action slots Output m Unit
-handleSaveSectionResponse response = do
-  case response of
-    Left err ->
-      H.liftEffect $ do
-        log $ "Error saving section: " <> printError err
-    Right _ ->
-      pure unit

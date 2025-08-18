@@ -171,7 +171,7 @@ updateUserName =
     [resultlessStatement|
 
     update users
-    set pwhash = $1 :: text
+    set name = $1 :: text
     where id = $2 :: uuid
   |]
 

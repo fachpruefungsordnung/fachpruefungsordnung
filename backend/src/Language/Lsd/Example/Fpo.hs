@@ -5,6 +5,7 @@ module Language.Lsd.Example.Fpo
     , superSectionT
     , sectionT
     , paragraphT
+    , footnoteT
     )
 where
 
@@ -16,6 +17,7 @@ import Language.Lsd.AST.Type.AppendixSection
 import Language.Lsd.AST.Type.Document
 import Language.Lsd.AST.Type.DocumentContainer
 import Language.Lsd.AST.Type.Enum
+import Language.Lsd.AST.Type.Footnote
 import Language.Lsd.AST.Type.Paragraph
 import Language.Lsd.AST.Type.Section
 import Language.Lsd.AST.Type.Text
@@ -90,6 +92,7 @@ mainDocT =
             )
             (Sequence [])
         )
+        (Disjunction [footnoteT])
 
 superSectionT :: SectionType
 superSectionT =
@@ -157,13 +160,10 @@ paragraphT =
         richTextT
 
 plainTextT :: TextType Void
-plainTextT = TextType [] [footnoteT]
+plainTextT = TextType []
 
 richTextT :: TextType EnumType
-richTextT = richTextTF [regularEnumT, simpleEnumT]
-
-richTextTF :: [EnumType] -> TextType EnumType
-richTextTF enumTs = TextType enumTs [footnoteT]
+richTextT = TextType [regularEnumT, simpleEnumT]
 
 footnoteTextT :: TextType Void
 footnoteTextT = plainTextT
@@ -190,7 +190,7 @@ regularEnumT =
                         ]
                 )
         )
-        (richTextTF [enumTF 1, simpleEnumT])
+        (TextType [enumTF 1, simpleEnumT])
   where
     enumTF :: Int -> EnumType
     enumTF depth =
@@ -208,7 +208,7 @@ regularEnumT =
                             ]
                     )
             )
-            (richTextTF nextEnumTs)
+            (TextType nextEnumTs)
       where
         nextEnumTs =
             if depth < maxRegularEnumDepth
@@ -224,7 +224,8 @@ simpleEnumT =
                 (FormatString [PlaceholderAtom Arabic])
                 (EnumItemKeyFormat $ FormatString [StringAtom "-"])
         )
-        (richTextTF [])
+        (TextType [])
 
+-- TODO: Unused.
 footnoteT :: FootnoteType
-footnoteT = FootnoteType (Keyword "^") footnoteTextT
+footnoteT = FootnoteType (Keyword "^") SuperscriptFootnoteFormat footnoteTextT

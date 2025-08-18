@@ -80,8 +80,8 @@ anchorLink label = a_ [href_ (cons '#' $ unLabel label)]
 
 -- | Splits list into raw text part until next enumeration (raw is everything except enums)
 getNextRawTextTree
-    :: [TextTree style enum special]
-    -> ([TextTree style enum special], [TextTree style enum special])
+    :: [TextTree fnref style enum special]
+    -> ([TextTree fnref style enum special], [TextTree fnref style enum special])
 getNextRawTextTree =
     break
         ( \case

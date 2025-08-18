@@ -9,6 +9,7 @@ import Prelude
 
 import Effect.Aff.Class (class MonadAff)
 import FPO.Component.Splitview as Splitview
+import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import Halogen as H
@@ -33,6 +34,7 @@ _splitview = Proxy :: Proxy "splitview"
 component
   :: forall query output m
    . MonadAff m
+  => Navigate m
   => MonadStore Store.Action Store.Store m
   => H.Component query Input output m
 component =

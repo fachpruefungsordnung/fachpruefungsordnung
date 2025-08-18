@@ -34,6 +34,7 @@ import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC (Path)
 import FPO.Components.TOC as TOC
+import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
@@ -153,6 +154,7 @@ _toc = Proxy :: Proxy "toc"
 splitview
   :: forall query m
    . MonadAff m
+  => Navigate m
   => MonadStore Store.Action Store.Store m
   => H.Component query Input Output m
 splitview = H.mkComponent
@@ -454,10 +456,10 @@ splitview = H.mkComponent
         tree = tocTreeToDocumentTree state.tocEntries
         encodedTree = DT.encodeDocumentTree tree
 
-      rep <- H.liftAff $
-        Request.postJson ("/docs/" <> show state.docID <> "/tree") encodedTree
+      rep <- Request.postJson Right ("/docs/" <> show state.docID <> "/tree")
+        encodedTree
       -- debugging logs in
-      case rep of
+      case rep of -- TODO please handle the response
         Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
         Right _ -> pure unit
     -- H.liftEffect $ Console.log "Successfully posted TOC to server"
@@ -672,11 +674,10 @@ splitview = H.mkComponent
     HandleEditor output -> case output of
 
       Editor.ClickedQuery response -> do
-        renderedHtml' <- H.liftAff $ Request.postRenderHtml (joinWith "\n" response)
+        renderedHtml' <- Request.postRenderHtml (joinWith "\n" response)
         case renderedHtml' of
           Left _ -> pure unit -- Handle error
-          Right { body } -> do
-            H.modify_ \st -> st { renderedHtml = Just body }
+          Right body -> H.modify_ \st -> st { renderedHtml = Just body }
 
       Editor.DeletedComment tocEntry deletedIDs -> do
         H.modify_ \st ->
@@ -750,8 +751,9 @@ splitview = H.mkComponent
       let
         doctTree = tocTreeToDocumentTree newTree
         encodedTree = DT.encodeDocumentTree doctTree
-      _ <- H.liftAff $
-        Request.postJson ("/docs/" <> show state.docID <> "/tree") encodedTree
+      _ <- Request.postJson Right ("/docs/" <> show state.docID <> "/tree")
+        encodedTree
+      -- TODO auch hier mit potentiellen Fehlern umgehen
       H.modify_ \st -> st { tocEntries = newTree }
       H.tell _toc unit (TOC.ReceiveTOCs newTree)
 

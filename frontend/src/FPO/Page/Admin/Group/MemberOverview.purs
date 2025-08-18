@@ -13,7 +13,6 @@ module FPO.Page.Admin.Group.MemberOverview (component) where
 
 import Prelude
 
-import Affjax (printError)
 import Data.Array (filter, length, null, replicate, slice)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -25,7 +24,12 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (changeRole, deleteIgnore, getGroup, getStatusCode, getUser)
+import FPO.Data.Request
+  ( changeRole
+  , deleteIgnore
+  , getGroup
+  , getUser
+  )
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.GroupDto
@@ -45,7 +49,6 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn)
 import FPO.UI.Style as Style
-import Halogen (liftAff)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -368,16 +371,18 @@ component =
   handleAction = case _ of
     Initialize -> do
       s <- H.get
-      u <- liftAff $ getUser
-      -- Superadmins are considered admins of all groups. We could also change this
-      -- such that superadmins (notice that only they can create groups) are admins
-      -- of any group they created, and they can demote themselves to members (forever
-      -- losing the admin role, until someone else promotes them again). Not sure if
-      -- this is useful.
-      H.modify_ _
-        { isAdmin = fromMaybe false $
-            (\usr -> usr `isAdminOf` s.groupID || isUserSuperadmin usr) <$> u
-        }
+      userResult <- getUser
+      case userResult of
+        Left _ -> H.modify_ _ { isAdmin = false } -- Ignore error, set not admin
+        Right user -> do
+          -- Superadmins are considered admins of all groups. We could also change this
+          -- such that superadmins (notice that only they can create groups) are admins
+          -- of any group they created, and they can demote themselves to members (forever
+          -- losing the admin role, until someone else promotes them again). Not sure if
+          -- this is useful.
+          H.modify_ _
+            { isAdmin = user `isAdminOf` s.groupID || isUserSuperadmin user
+            }
       handleAction ReloadGroupMembers
       handleAction $ FilterForMember ""
     Receive { context } -> do
@@ -403,12 +408,12 @@ component =
         }
     ConfirmRemoveMember memberID -> do
       s <- H.get
-      deleteResponse <- liftAff
-        (deleteIgnore ("/roles/" <> show s.groupID <> "/" <> memberID))
+      deleteResponse <- deleteIgnore
+        ("/roles/" <> show s.groupID <> "/" <> memberID)
       case deleteResponse of
         Left err -> do
           H.modify_ _
-            { error = Just (printError err)
+            { error = Just (show err)
             , modalState = NoModal
             }
         Right _ -> do
@@ -427,17 +432,16 @@ component =
 
       H.tell _pagination unit $ P.SetPageQ 0
     ReloadGroupMembers -> do
-      s <- H.get
-      g <- liftAff $ getGroup s.groupID
-      case g of
-        Just group -> do
+      state <- H.get
+      groupWithError <- getGroup state.groupID
+      case groupWithError of
+        Left _ -> pure unit -- TODO 
+        Right group ->
           H.modify_ _
             { group = Just group
             , filteredMembers = getGroupMembers group
             , page = 0
             }
-        Nothing -> do
-          navigate Page404
     NavigateToDocuments -> do
       log "Routing to document overview"
       s <- H.get
@@ -452,24 +456,17 @@ component =
       if getUserInfoRole member == role then
         log "User already has this role, ignoring"
       else do
-        response <- liftAff $ changeRole s.groupID userID role
+        response <- changeRole s.groupID userID role
         case response of
           Left err -> do
             H.modify_ _
-              { error = Just (printError err)
+              { error = Just (show err)
               , modalState = NoModal
               }
-          Right status -> do
-            case getStatusCode status of
-              200 -> do
-                log "Changed user role successfully"
-                handleAction ReloadGroupMembers
-                handleAction (FilterForMember "")
-              _ -> do
-                H.modify_ _
-                  { error = Just $ "Failed to change role: " <> show status
-                  , modalState = NoModal
-                  }
+          Right _ -> do
+            log "Changed user role successfully"
+            handleAction ReloadGroupMembers
+            handleAction (FilterForMember "")
       handleAction ReloadGroupMembers
       handleAction (FilterForMember "")
     NavigateToUserAdder -> do

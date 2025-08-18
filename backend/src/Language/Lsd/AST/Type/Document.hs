@@ -9,6 +9,7 @@ where
 
 import Language.Lsd.AST.Common (TypeName)
 import Language.Lsd.AST.SimpleRegex (Disjunction, Sequence)
+import Language.Lsd.AST.Type.Footnote (FootnoteType, PreFootnoteType)
 import Language.Lsd.AST.Type.Section (PreSectionBodyType, SectionBodyType)
 import Language.Lsd.AST.Type.SimpleSection (SimpleSectionType)
 
@@ -19,11 +20,13 @@ data DocumentType
     = DocumentType
         DocumentFormat
         DocumentBodyType
+        (Disjunction FootnoteType)
 
 data PreDocumentType
     = PreDocumentType
         DocumentFormat
         PreDocumentBodyType
+        (Disjunction PreFootnoteType)
 
 data DocumentBodyType
     = -- | document body type

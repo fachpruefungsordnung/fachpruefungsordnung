@@ -1,18 +1,14 @@
 # Enumerations
 
-Enumerations are composed of a list of [textual](./text.md) items.
-Each enumeration item is written as a [text child](./text.md#child-nodes),
-headed by a keyword that is specific to the enumeration type.
-
-Note that items in an enumeration need not immediately succeed each other,
-they merely need to be within the same context (e.g., the same
-[sentence](./paragraph.md#sentences)).  See also the [example](#example)
-below.
+Enumerations are composed of a list of [textual](./text.md) items, which are
+written as a consecutive sequence of [text children](./text.md#child-nodes),
+each headed by a keyword that is specific to the enumeration type.
 
 
 ## Enumeration text
 
-Enumeration text permits [styling](./text.md#styling) and enumeration
+Enumeration text permits [styling](./text.md#styling),
+[footnote references](./text.md#footnote-references), and enumeration
 [text children](./text.md#child-nodes).
 
 
@@ -48,10 +44,8 @@ Some sentence with
       # sub-items
     and more text,
   #
-    and an item starting in a new line
-and the sentence continues
-  # with another item
-and finally ends.  Another sentence
+    and an item starting in a new line.
+Another sentence
   # has a single item.
 ```
 
@@ -67,9 +61,7 @@ Some sentence with
        1. with
        2. sub-items
      and more text,
-  5. and an item starting in a new line
-and the sentence continues
-  6. with another item
-and finally ends.  Another sentence
+  5. and an item starting in a new line.
+Another sentence
   1. has a single item.
 ```

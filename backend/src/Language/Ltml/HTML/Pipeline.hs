@@ -6,10 +6,11 @@ import Clay (render)
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
 import Data.Text.Lazy (toStrict)
-import Language.Lsd.Example.Fpo (sectionT)
+import Language.Lsd.Example.Fpo (footnoteT, sectionT)
 import Language.Ltml.HTML (renderHtmlCss)
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util
+import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
 import Language.Ltml.Parser.Section (sectionP)
 import Lucid
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
@@ -17,10 +18,10 @@ import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 -- | Parse section and render HTML with inlined CSS
 htmlPipeline :: Text -> ByteString
 htmlPipeline input =
-    case runParser (sectionP sectionT eof) "" input of
+    case runParser (unwrapFootnoteParser [footnoteT] (sectionP sectionT eof)) "" input of
         Left err -> renderBS $ errorHtml (errorBundlePretty err)
-        Right nodeSection ->
-            let (body, css) = renderHtmlCss nodeSection
+        Right (nodeSection, footnoteMap) ->
+            let (body, css) = renderHtmlCss nodeSection footnoteMap
              in renderBS $ addInlineCssHeader css body
 
 -------------------------------------------------------------------------------

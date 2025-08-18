@@ -19,33 +19,35 @@ import Language.Ltml.AST.Section
     , Section (Section)
     , SectionBody (..)
     )
-import Language.Ltml.Parser (Parser, nonIndented)
-import Language.Ltml.Parser.Common.Combinators (manyTillSucc)
+import Language.Ltml.Parser (Parser, nonIndented, wrapParser)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
+import Language.Ltml.Parser.Footnote (FootnoteParser)
+import Language.Ltml.Parser.Footnote.Combinators (manyWithFootnotesTillSucc)
 import Language.Ltml.Parser.Keyword (keywordP)
 import Language.Ltml.Parser.Paragraph (paragraphP)
 import Language.Ltml.Parser.SimpleBlock (simpleBlockP)
-import Language.Ltml.Parser.Text (hangingTextP')
+import Language.Ltml.Parser.Text (mlHangingTextP)
 import Text.Megaparsec (many)
 
-sectionP :: SectionType -> Parser () -> Parser (Node Section)
+sectionP :: SectionType -> Parser () -> FootnoteParser (Node Section)
 sectionP (SectionType kw headingT fmt bodyT) succStartP = do
-    (mLabel, heading) <- nonIndented $ headingP kw headingT
+    (mLabel, heading) <- wrapParser $ nonIndented $ headingP kw headingT
     body <- nonIndented $ bodyP bodyT
     return $ Node mLabel $ Section fmt heading body
   where
-    bodyP :: SectionBodyType -> Parser SectionBody
+    bodyP :: SectionBodyType -> FootnoteParser SectionBody
     bodyP (InnerSectionBodyType (Star t)) =
         InnerSectionBody <$> many (sectionP t (toStartP t <|> succStartP))
     bodyP (LeafSectionBodyType (Star t)) =
-        LeafSectionBody <$> manyTillSucc (nLexeme $ paragraphP t) succStartP
+        LeafSectionBody
+            <$> manyWithFootnotesTillSucc (paragraphP t) succStartP
     bodyP (SimpleLeafSectionBodyType (Star t)) =
         SimpleLeafSectionBody
-            <$> manyTillSucc (nLexeme $ simpleBlockP t) succStartP
+            <$> manyWithFootnotesTillSucc (simpleBlockP t) succStartP
 
 toStartP :: SectionType -> Parser ()
 toStartP (SectionType kw _ _ _) = void $ keywordP kw
 
 headingP :: Keyword -> HeadingType -> Parser (Maybe Label, Heading)
 headingP kw (HeadingType fmt tt) =
-    nLexeme $ fmap (Heading fmt) <$> hangingTextP' kw tt
+    nLexeme $ fmap (Heading fmt) <$> mlHangingTextP kw tt

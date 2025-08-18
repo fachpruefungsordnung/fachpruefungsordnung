@@ -12,8 +12,10 @@ module FPO.Data.Store
 
 import Prelude
 
-import Data.Maybe (Maybe)
+import Data.Array (deleteAt)
+import Data.Maybe (Maybe, fromMaybe)
 import Effect (Effect)
+import FPO.Data.AppError (AppError)
 import FPO.Data.Route (Route)
 import FPO.Translations.Translator (FPOTranslator)
 import Web.HTML (window)
@@ -26,6 +28,7 @@ type Store =
   , loginRedirect :: Maybe Route -- ^ The route to redirect to after login
   , translator :: FPOTranslator
   , language :: String
+  , errors :: Array AppError
   }
 
 data Action
@@ -33,6 +36,9 @@ data Action
   | SetLoginRedirect (Maybe Route) -- ^ Action to set the redirect route after login.
   | SetLanguage String
   | SetTranslator FPOTranslator
+  | AddError AppError
+  | RemoveError Int
+  | ClearErrors
 
 -- | Update the store based on the action.
 reduce :: Store -> Action -> Store
@@ -51,6 +57,10 @@ reduce store = case _ of
   SetLoginRedirect r -> store { loginRedirect = r }
   SetLanguage s -> store { language = s }
   SetTranslator t -> store { translator = t }
+  AddError error -> store { errors = store.errors <> [ error ] }
+  RemoveError index -> store
+    { errors = fromMaybe store.errors (deleteAt index store.errors) }
+  ClearErrors -> store { errors = [] }
 
 saveLanguage :: String -> Effect Unit
 saveLanguage lang = do
