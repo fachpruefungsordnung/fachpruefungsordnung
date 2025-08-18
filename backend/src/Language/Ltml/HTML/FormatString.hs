@@ -7,12 +7,18 @@ module Language.Ltml.HTML.FormatString
     , identifierFormat
     , enumFormat
     , buildEnumCounter
+    , appendixFormat
     ) where
 
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (State, gets, modify)
 import Data.Text (Text, pack)
 import Language.Lsd.AST.Format
+import Language.Lsd.AST.Type.AppendixSection
+    ( AppendixElementFormat (..)
+    , AppendixSectionFormat (..)
+    , AppendixSectionTitle (..)
+    )
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Lsd.AST.Type.Paragraph (ParagraphFormat (..))
 import Language.Lsd.AST.Type.Section (SectionFormat (..))
@@ -31,7 +37,7 @@ import Language.Ltml.HTML.Util
 import Lucid (Html, ToHtml (toHtml))
 import Prelude hiding (id)
 
--- | Builds Heading text based on given FormatString, id and text
+-- | Builds Heading Html based on given FormatString, id  and text html
 headingFormat :: HeadingFormat -> Html () -> Html () -> Html ()
 headingFormat (FormatString []) _ _ = mempty
 headingFormat (FormatString (a : as)) id text =
@@ -39,7 +45,7 @@ headingFormat (FormatString (a : as)) id text =
         -- \| replaces '\n' with <br>
         StringAtom s -> convertNewLine s
         PlaceholderAtom IdentifierPlaceholder -> id
-        PlaceholderAtom HeadingTextPlaceholder -> toHtml text
+        PlaceholderAtom HeadingTextPlaceholder -> text
         <> headingFormat (FormatString as) id text
 
 -- | Returns (ID Html, ToC Key Html) for a Section;
@@ -47,12 +53,13 @@ headingFormat (FormatString (a : as)) id text =
 sectionFormat :: SectionFormat -> Int -> (Html (), Html ())
 sectionFormat (SectionFormat idFormat (TocKeyFormat tocKeyFormat)) = idKeyFormat idFormat tocKeyFormat
 
--- | Returns (ID Html, Key Html) for a Paragraph;
+-- | Returns (ID Html, ToC Key Html) for a Paragraph;
 --   uses ID Html to build Paragraph Key Html
 paragraphFormat :: ParagraphFormat -> Int -> (Html (), Html ())
 paragraphFormat (ParagraphFormat idFormat (ParagraphKeyFormat paragraphKeyFormat)) = idKeyFormat idFormat paragraphKeyFormat
 
 -- | Builds key html based on identifier html and returns both
+--   as (ID Html, ToC Key Html)
 idKeyFormat :: IdentifierFormat -> KeyFormat -> Int -> (Html (), Html ())
 idKeyFormat idFormat keyFormatS i =
     let idHtml = identifierFormat idFormat i
@@ -138,3 +145,19 @@ keyFormatCounter (FormatString (a : as)) idCounter =
             PlaceholderAtom KeyIdentifierPlaceholder -> idCounter
         cs = keyFormatCounter (FormatString as) idCounter
      in c <> cs
+
+-------------------------------------------------------------------------------
+
+-- | Returns (Title Html, Heading Text Html, ToC Key Html) for an AppendixSection
+appendixFormat :: AppendixSectionFormat -> Int -> (Html (), Html (), Html ())
+appendixFormat
+    ( AppendixSectionFormat
+            (AppendixSectionTitle title)
+            (AppendixElementFormat idFormat (TocKeyFormat keyFormatS) headingFormatS)
+        )
+    i =
+        let titleHtml = toHtml title
+            idHtml = identifierFormat idFormat i
+            tocKeyHtml = keyFormat keyFormatS idHtml
+            headingHtml = headingFormat headingFormatS idHtml titleHtml
+         in (titleHtml, headingHtml, tocKeyHtml)

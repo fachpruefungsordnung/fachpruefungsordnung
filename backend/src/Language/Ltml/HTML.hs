@@ -19,7 +19,9 @@ import Data.Text (Text, unpack)
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
+import Language.Ltml.AST.AppendixSection (AppendixSection (..))
 import Language.Ltml.AST.Document
+import Language.Ltml.AST.DocumentContainer (DocumentContainer (..))
 import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label
 import Language.Ltml.AST.Node
@@ -72,7 +74,15 @@ renderHtmlCss section fnMap =
 class ToHtmlM a where
     toHtmlM :: a -> HtmlReaderState
 
--- | TODO: instance for document container
+instance ToHtmlM DocumentContainer where
+    toHtmlM (DocumentContainer format header doc appendices) = do
+        mainDocHtml <- toHtmlM doc
+        appendicesHtml <- toHtmlM appendices
+        return $ mainDocHtml <> appendicesHtml
+
+instance ToHtmlM (Node Document) where
+    toHtmlM = undefined
+
 instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
     toHtmlM
@@ -343,14 +353,27 @@ instance ToHtmlM FootnoteSet where
                             <$> delayedTextHtml
                         )
 
+-------------------------------------------------------------------------------
+
+instance ToHtmlM AppendixSection where
+    toHtmlM (AppendixSection format nodeDocuments) = do
+        appendixSectionID <- gets currentAppendixSectionID
+        let (titleHtml, headingTextHtml, tocHtml) = appendixFormat format appendixSectionID
+        -- \| Mangled ToC Entry as Html Id
+        htmlId <- addTocEntry tocHtml (Now titleHtml) Nothing
+        documentsHtml <- toHtmlM nodeDocuments
+        modify (\s -> s {currentAppendixSectionID = currentAppendixSectionID s + 1})
+        let headingHtml = h1_ <#> Class.DocumentTitle $ headingTextHtml
+        return ((div_ [id_ htmlId] <> (headingHtml <>)) . div_ <$> documentsHtml)
+
+-------------------------------------------------------------------------------
+
 instance (ToHtmlM a) => ToHtmlM [a] where
     toHtmlM [] = returnNow mempty
     toHtmlM (a : as) = do
         aHtml <- toHtmlM a
         asHtml <- toHtmlM as
         return (aHtml <> asHtml)
-
--------------------------------------------------------------------------------
 
 -- | ToHtmlM instance that can never be called, because there are
 --   no values of type Void
