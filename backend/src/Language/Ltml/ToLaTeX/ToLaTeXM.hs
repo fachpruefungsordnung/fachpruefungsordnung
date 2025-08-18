@@ -65,6 +65,7 @@ instance ToLaTeXM Void where
 
 instance
     ( Stylable style
+    , ToLaTeXM fnref
     , ToLaTeXM enum
     , ToLaTeXM special
     )
@@ -78,7 +79,7 @@ instance
         tt' <- mapM toLaTeXM tt
         pure $ applyTextStyle style (Sequence tt')
     toLaTeXM (Enum enum) = toLaTeXM enum
-    toLaTeXM fnref = toLaTeXM fnref
+    toLaTeXM (FootnoteRef fnref) = toLaTeXM fnref
 
 instance ToLaTeXM FootnoteReference where
     toLaTeXM (FootnoteReference l@(Label lt)) = do
