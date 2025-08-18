@@ -15,13 +15,13 @@ import System.Directory (removeDirectoryRecursive)
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 import Prelude hiding (Enum, Word, readFile)
 
-testDoc = readFile "src/Language/Ltml/HTML/Test/studienaufbau_bachelor.txt"
+testDoc = readFile "src/Language/Ltml/HTML/Test/test.txt"
 
 parseTest :: IO ()
 parseTest = do
     text <- testDoc
     case runParser
-        (unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
+        (unwrapFootnoteParser [footnoteT] (sectionP superSectionT eof))
         ""
         text of
         Left err -> error $ errorBundlePretty err

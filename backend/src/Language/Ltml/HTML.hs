@@ -97,11 +97,11 @@ instance ToHtmlM (Node Section) where
     toHtmlM (Node mLabel (Section sectionFormatS (Heading headingFormatS title) sectionBody)) = do
         globalState <- get
         titleHtml <- toHtmlM title
-        let (sectionIDGetter, incrementSectionID) =
+        let (sectionIDGetter, incrementSectionID, sectionCssClass) =
                 -- \| Check if we are inside a section or a super-section
                 if isSuper sectionBody
-                    then (currentSuperSectionID, incSuperSectionID)
-                    else (currentSectionID, incSectionID)
+                    then (currentSuperSectionID, incSuperSectionID, Class.SuperSection)
+                    else (currentSectionID, incSectionID, Class.Section)
             (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (sectionIDGetter globalState)
             headingHtml =
                 (h2_ <#> Class.Heading) . headingFormat headingFormatS sectionIDHtml
@@ -120,11 +120,9 @@ instance ToHtmlM (Node Section) where
                 modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
                 -- \| increment (super)SectionID for next section
                 incrementSectionID
-                -- \| reset paragraphID for next section
-                modify (\s -> s {currentParagraphID = 1})
 
                 return $
-                    section_ [cssClass_ Class.Section, id_ htmlId]
+                    section_ [cssClass_ sectionCssClass, id_ htmlId]
                         <$> (headingHtml <> childrenHtml <> footnotesHtml)
 
 instance ToHtmlM SectionBody where
@@ -134,9 +132,13 @@ instance ToHtmlM SectionBody where
         -- \| Section
         -- \| In this case the children are paragraphs, so we set the needed flag for them
         --    to decide if the should have a visible id
-        LeafSectionBody nodeParagraphs ->
-            local (\s -> s {isSingleParagraph = length nodeParagraphs == 1}) $
-                toHtmlM nodeParagraphs
+        LeafSectionBody nodeParagraphs -> do
+            paragraphsHtml <-
+                local (\s -> s {isSingleParagraph = length nodeParagraphs == 1}) $
+                    toHtmlM nodeParagraphs
+            -- \| reset paragraphID for next section
+            modify (\s -> s {currentParagraphID = 1})
+            return paragraphsHtml
         SimpleLeafSectionBody simpleBlocks -> toHtmlM simpleBlocks
 
 -- | Combined instance since the paragraphIDHtml has to be build before the reference is generated
@@ -321,7 +323,7 @@ instance ToHtmlM FootnoteSet where
                 else do
                     let combinedFootnotesHtml = mconcat footnoteHtmls
                     -- \| Wrap all footnotes into one <div>
-                    return $ div_ <#> Class.FootnoteContainer $ combinedFootnotesHtml
+                    return $ div_ <#> Class.FootnoteContainer $ hr_ [] <> combinedFootnotesHtml
       where
         -- \| Lookup footnote label and build single footnote html
         toFootnoteHtml :: FootnoteMap -> Label -> HtmlReaderState
@@ -337,7 +339,7 @@ instance ToHtmlM FootnoteSet where
                 Just (_, idHtml, delayedTextHtml) ->
                     -- \| <div> <sup>id</sup> <span>text</span> </div>
                     return
-                        ( (div_ <#> Class.Footnote <$> (sup_ idHtml <>)) . span_
+                        ( (div_ <#> Class.Footnote <$> ((sup_ <#> Class.FootnoteID) idHtml <>)) . span_
                             <$> delayedTextHtml
                         )
 
