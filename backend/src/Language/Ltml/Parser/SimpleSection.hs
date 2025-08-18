@@ -33,7 +33,7 @@ simpleSectionSequenceP
     -> FootnoteParser [SimpleSection]
 simpleSectionSequenceP (Sequence ts') succStartP = aux ts'
   where
-    aux [] = return []
+    aux [] = wrapParser $ [] <$ succStartP
     aux [t] = simpleSectionP t succStartP <:> aux []
     aux (t : ts@(t' : _)) = simpleSectionP t (toStartP t') <:> aux ts
 

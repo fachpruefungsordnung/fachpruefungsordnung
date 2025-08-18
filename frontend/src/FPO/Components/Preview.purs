@@ -2,14 +2,15 @@ module FPO.Components.Preview where
 
 import Prelude
 
-import Data.Maybe (Maybe(Just, Nothing))
+import Data.Maybe (Maybe(Just, Nothing), fromMaybe)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Button (Output) as Button
 import FPO.UI.HTML (setInnerHtml)
 import Halogen (RefLabel(..), getHTMLElementRef)
 import Halogen as H
-import Halogen.HTML (div, text) as HH
-import Halogen.HTML.Properties (ref)
+import Halogen.HTML (iframe) as HH
+import Halogen.HTML.Properties as HP
+import Web.HTML.Common (AttrName(..))
 
 type Output = Unit
 
@@ -43,8 +44,13 @@ preview = H.mkComponent
     { renderedHtml: renderedHtml }
 
   render :: State -> H.ComponentHTML Action Slots m
-  render _ =
-    HH.div [ ref (RefLabel "injectHtml") ] [ HH.text "No content rendered yet." ]
+  render state =
+    HH.iframe
+      [ (HP.attr (AttrName "sandbox") "")
+      , HP.srcDoc $ fromMaybe "No content rendered yet." state.renderedHtml
+      , HP.attr (AttrName "height") "100%"
+      , HP.attr (AttrName "width") "100%"
+      ]
 
   handleAction :: MonadAff m => Action -> H.HalogenM State Action Slots Unit m Unit
   handleAction = case _ of
@@ -65,19 +71,20 @@ preview = H.mkComponent
         Nothing -> pure unit
 
     Receive { renderedHtml } -> do
-      htmlElementRef <- getHTMLElementRef (RefLabel "injectHtml")
-      case htmlElementRef of
-        Just ref -> do
-          case renderedHtml of
-            Just htmlContent -> do
-              currentState <- H.get
-              if currentState.renderedHtml /= Just htmlContent then do
-                -- Update the state and set the inner HTML only if it has changed
-                -- otherwise, selecting text would trigger a re-render
-                H.modify_ \st -> st { renderedHtml = Just htmlContent }
-                H.liftEffect $ setInnerHtml ref htmlContent
-                pure unit
-              else
-                pure unit
-            Nothing -> pure unit
-        Nothing -> pure unit
+      H.modify_ _ { renderedHtml = renderedHtml }
+-- htmlElementRef <- getHTMLElementRef (RefLabel "injectHtml")
+-- case htmlElementRef of
+--   Just ref -> do
+--     case renderedHtml of
+--       Just htmlContent -> do
+--         currentState <- H.get
+--         if currentState.renderedHtml /= Just htmlContent then do
+--           -- Update the state and set the inner HTML only if it has changed
+--           -- otherwise, selecting text would trigger a re-render
+--           H.modify_ \st -> st { renderedHtml = Just htmlContent }
+--           H.liftEffect $ setInnerHtml ref htmlContent
+--           pure unit
+--         else
+--           pure unit
+--       Nothing -> pure unit
+--   Nothing -> pure unit
