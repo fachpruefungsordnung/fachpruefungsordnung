@@ -17,6 +17,9 @@ module Docs.Database
     , HasCreateTextElement (..)
     , HasCreateTextRevision (..)
     , HasCreateTreeRevision (..)
+    , HasGetComments (..)
+    , HasCreateComment (..)
+    , HasExistsComment (..)
     ) where
 
 import Data.Text (Text)
@@ -27,6 +30,7 @@ import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
+import Docs.Comment (Comment, CommentAnchor, CommentID, CommentRef)
 import Docs.Document (Document, DocumentID)
 import Docs.DocumentHistory (DocumentHistory)
 import Docs.TextElement
@@ -72,6 +76,9 @@ class (HasExistsTextElement m) => HasExistsTextRevision m where
 class (HasExistsDocument m) => HasExistsTreeRevision m where
     existsTreeRevision :: TreeRevisionRef -> m Bool
 
+class (HasExistsTextElement m) => HasExistsComment m where
+    existsComment :: CommentRef -> m Bool
+
 -- get
 
 class (HasCheckPermission m, HasIsGroupAdmin m, HasIsSuperAdmin m) => HasGetDocument m where
@@ -98,6 +105,12 @@ class (HasCheckPermission m, HasExistsDocument m) => HasGetTreeHistory m where
 class (HasCheckPermission m, HasExistsDocument m) => HasGetDocumentHistory m where
     getDocumentHistory :: DocumentID -> Maybe UTCTime -> Int64 -> m DocumentHistory
 
+class
+    (HasCheckPermission m, HasExistsDocument m, HasExistsTextElement m) =>
+    HasGetComments m
+    where
+    getComments :: TextElementRef -> m (Vector Comment)
+
 -- create
 
 class (HasIsGroupAdmin m) => HasCreateDocument m where
@@ -110,8 +123,10 @@ class
     (HasCheckPermission m, HasExistsTextElement m, HasNow m) =>
     HasCreateTextRevision m
     where
-    updateTextRevision :: TextRevisionID -> Text -> m TextRevision
-    createTextRevision :: UserID -> TextElementRef -> Text -> m TextRevision
+    updateTextRevision
+        :: TextRevisionID -> Text -> Vector CommentAnchor -> m TextRevision
+    createTextRevision
+        :: UserID -> TextElementRef -> Text -> Vector CommentAnchor -> m TextRevision
     getLatestTextRevisionID :: TextElementRef -> m (Maybe TextRevisionID)
 
 class (HasCheckPermission m, HasExistsDocument m) => HasCreateTreeRevision m where
@@ -121,3 +136,7 @@ class (HasCheckPermission m, HasExistsDocument m) => HasCreateTreeRevision m whe
         -> Node TextElementID
         -> m (TreeRevision TextElementID)
     existsTextElementInDocument :: DocumentID -> m (TextElementID -> Bool)
+
+class (HasCheckPermission m, HasExistsComment m) => HasCreateComment m where
+    createComment :: UserID -> TextElementID -> Text -> m Comment
+    resolveComment :: CommentID -> m ()

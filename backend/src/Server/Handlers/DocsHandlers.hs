@@ -73,6 +73,15 @@ import Docs.TreeRevision
     , prettyPrintTreeRevisionRef
     )
 
+import Docs.Comment
+    ( Comment
+    , CommentID
+    , CommentRef (CommentRef)
+    , prettyPrintCommentRef
+    )
+import Server.DTOs.Comments (Comments (Comments))
+import Server.DTOs.CreateComment (CreateComment)
+import qualified Server.DTOs.CreateComment as CreateComment
 import Server.DTOs.CreateDocument (CreateDocument)
 import qualified Server.DTOs.CreateDocument as CreateDocument
 import Server.DTOs.CreateTextElement (CreateTextElement)
@@ -84,6 +93,7 @@ import Server.DTOs.Documents
     , DocumentsQuery (DocumentsQuery)
     )
 import qualified Server.DTOs.Documents as Documents
+import Server.Handlers.RenderHandlers (RenderAPI, renderServer)
 import UserManagement.Group (GroupID)
 
 type DocsAPI =
@@ -100,6 +110,10 @@ type DocsAPI =
                 :<|> GetTextHistory
                 :<|> GetTreeHistory
                 :<|> GetDocumentHistory
+                :<|> PostComment
+                :<|> GetComments
+                :<|> ResolveComment
+                :<|> RenderAPI
            )
 
 type PostDocument =
@@ -192,6 +206,35 @@ type GetDocumentHistory =
         :> QueryParam "limit" Docs.Limit
         :> Get '[JSON] DocumentHistory
 
+type PostComment =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "comments"
+        :> ReqBody '[JSON] CreateComment
+        :> Post '[JSON] Comment
+
+type GetComments =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "comments"
+        :> Get '[JSON] Comments
+
+-- | jaja, das ist kein cleanes rest design,
+--   aber das ist mir langsam auch wirklich scheiß egal.
+type ResolveComment =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "comments"
+        :> Capture "commentID" CommentID
+        :> "resolve"
+        :> Post '[JSON] ()
+
 docsServer :: Server DocsAPI
 docsServer =
     {-    -} postDocumentHandler
@@ -206,6 +249,10 @@ docsServer =
         :<|> getTextHistoryHandler
         :<|> getTreeHistoryHandler
         :<|> getDocumentHistoryHandler
+        :<|> postCommentHandler
+        :<|> getCommentsHandler
+        :<|> resolveCommentHandler
+        :<|> renderServer
 
 postDocumentHandler
     :: AuthResult Auth.Token
@@ -275,6 +322,7 @@ postTextRevisionHandler auth docID textID revision = do
                     (TextElementRef docID textID)
                     (CreateTextRevision.parent revision)
                     (CreateTextRevision.content revision)
+                    (CreateTextRevision.commentAnchors revision)
 
 getTextElementRevisionHandler
     :: AuthResult Auth.Token
@@ -355,6 +403,48 @@ getDocumentHistoryHandler
 getDocumentHistoryHandler auth docID before limit = do
     userID <- getUser auth
     withDB $ run $ Docs.getDocumentHistory userID docID before limit
+
+postCommentHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> CreateComment
+    -> Handler Comment
+postCommentHandler auth docID textID comment = do
+    userID <- getUser auth
+    withDB $
+        runTransaction $
+            Docs.createComment
+                userID
+                (TextElementRef docID textID)
+                (CreateComment.text comment)
+
+getCommentsHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> Handler Comments
+getCommentsHandler auth docID textID = do
+    userID <- getUser auth
+    comments <-
+        withDB $
+            run $
+                Docs.getComments
+                    userID
+                    (TextElementRef docID textID)
+    return $ Comments comments
+
+resolveCommentHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> CommentID
+    -> Handler ()
+resolveCommentHandler auth docID textID commentID = do
+    userID <- getUser auth
+    withDB $
+        runTransaction $
+            Docs.resolveComment userID (CommentRef (TextElementRef docID textID) commentID)
 
 -- utililty
 
@@ -443,5 +533,13 @@ guardDocsResult (Left err) = throwError $ mapErr err
                 LBS.pack $
                     "TreeRevision "
                         ++ prettyPrintTreeRevisionRef ref
+                        ++ " not found!\n"
+            }
+    mapErr (Docs.CommentNotFound ref) =
+        err400
+            { errBody =
+                LBS.pack $
+                    "Comment "
+                        ++ prettyPrintCommentRef ref
                         ++ " not found!\n"
             }

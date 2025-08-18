@@ -81,6 +81,9 @@ instance HasGetTreeHistory HasqlSession where
 instance HasGetDocumentHistory HasqlSession where
     getDocumentHistory = ((HasqlSession .) .) . Sessions.getDocumentRevisionHistory
 
+instance HasGetComments HasqlSession where
+    getComments = HasqlSession . Sessions.getComments
+
 -- create
 
 instance HasCreateDocument HasqlSession where
@@ -123,6 +126,9 @@ instance HasExistsTextElement HasqlTransaction where
 instance HasExistsTextRevision HasqlTransaction where
     existsTextRevision = HasqlTransaction . Transactions.existsTextRevision
 
+instance HasExistsComment HasqlTransaction where
+    existsComment = HasqlTransaction . Transactions.existsComment
+
 -- get
 
 instance HasGetTextElementRevision HasqlTransaction where
@@ -131,11 +137,15 @@ instance HasGetTextElementRevision HasqlTransaction where
 -- create
 
 instance HasCreateTextRevision HasqlTransaction where
-    updateTextRevision = (HasqlTransaction .) . Transactions.updateTextRevision
-    createTextRevision = ((HasqlTransaction .) .) . Transactions.createTextRevision
+    updateTextRevision = ((HasqlTransaction .) .) . Transactions.updateTextRevision
+    createTextRevision = (((HasqlTransaction .) .) .) . Transactions.createTextRevision
     getLatestTextRevisionID = HasqlTransaction . Transactions.getLatestTextRevisionID
 
 instance HasCreateTreeRevision HasqlTransaction where
     createTreeRevision = ((HasqlTransaction .) .) . Transactions.createTreeRevision
     existsTextElementInDocument =
         HasqlTransaction . Transactions.isTextElementInDocument
+
+instance HasCreateComment HasqlTransaction where
+    createComment = ((HasqlTransaction .) .) . Transactions.createComment
+    resolveComment = HasqlTransaction . Transactions.resolveComment

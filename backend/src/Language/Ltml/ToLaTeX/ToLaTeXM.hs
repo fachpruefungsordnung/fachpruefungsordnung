@@ -68,7 +68,7 @@ instance
     , ToLaTeXM enum
     , ToLaTeXM special
     )
-    => ToLaTeXM (TextTree style enum special)
+    => ToLaTeXM (TextTree fnref style enum special)
     where
     toLaTeXM (Word t) = pure $ Text $ LT.fromStrict t
     toLaTeXM Space = pure $ Text $ LT.pack " "
@@ -78,7 +78,10 @@ instance
         tt' <- mapM toLaTeXM tt
         pure $ applyTextStyle style (Sequence tt')
     toLaTeXM (Enum enum) = toLaTeXM enum
-    toLaTeXM (FootnoteRef l@(Label lt)) = do
+    toLaTeXM fnref = toLaTeXM fnref
+
+instance ToLaTeXM FootnoteReference where
+    toLaTeXM (FootnoteReference l@(Label lt)) = do
         st <- get
         let mRef = Map.lookup l (LS.labelToRef st)
         case mRef of

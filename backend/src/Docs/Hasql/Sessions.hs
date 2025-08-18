@@ -18,6 +18,7 @@ module Docs.Hasql.Sessions
     , existsTreeRevision
     , hasPermission
     , isGroupAdmin
+    , getComments
     ) where
 
 import Data.Functor ((<&>))
@@ -37,8 +38,10 @@ import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
+import Docs.Comment (Comment, CommentAnchor)
 import Docs.Document (Document, DocumentID)
 import Docs.DocumentHistory (DocumentHistory (..))
+import Docs.Hash (Hash)
 import qualified Docs.Hasql.Statements as Statements
 import qualified Docs.Hasql.Transactions as Transactions
 import Docs.Hasql.TreeEdge (TreeEdgeChild (..))
@@ -46,7 +49,7 @@ import Docs.TextElement
     ( TextElement
     , TextElementID
     , TextElementKind
-    , TextElementRef
+    , TextElementRef (TextElementRef)
     )
 import Docs.TextRevision
     ( TextElementRevision
@@ -61,7 +64,6 @@ import Docs.TreeRevision
     , TreeRevisionHistory (TreeRevisionHistory)
     , TreeRevisionRef (..)
     )
-import DocumentManagement.Hash (Hash)
 import GHC.Int (Int64)
 
 existsDocument :: DocumentID -> Session Bool
@@ -96,14 +98,17 @@ createTextRevision
     :: UserID
     -> TextElementRef
     -> Text
+    -> Vector CommentAnchor
     -> Session TextRevision
 createTextRevision =
-    ((transaction Serializable Write .) .) . Transactions.createTextRevision
+    (((transaction Serializable Write .) .) .) . Transactions.createTextRevision
 
 getTextElementRevision
     :: TextRevisionRef
     -> Session (Maybe TextElementRevision)
-getTextElementRevision = flip statement Statements.getTextElementRevision
+getTextElementRevision ref = do
+    textElementRevision <- statement ref Statements.getTextElementRevision
+    textElementRevision $ flip statement Statements.getCommentAnchors
 
 createTreeRevision
     :: UserID
@@ -170,3 +175,7 @@ hasPermission userID docID perms =
 isGroupAdmin :: UserID -> GroupID -> Session Bool
 isGroupAdmin userID groupID =
     statement (userID, groupID) Statements.isGroupAdmin
+
+getComments :: TextElementRef -> Session (Vector Comment)
+getComments (TextElementRef docID textID) =
+    statement (docID, textID) Statements.getComments
