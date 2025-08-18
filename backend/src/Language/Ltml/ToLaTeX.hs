@@ -5,7 +5,6 @@ module Language.Ltml.ToLaTeX
 
 import Control.Exception (bracket)
 import Control.Monad.State (runState)
-import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
 import qualified Data.Text.Lazy as LT
@@ -56,7 +55,7 @@ withTempIn parent template =
         removeDirectoryRecursive
 
 generatePDFfromParsed
-    :: Parser a -> (a -> LT.Text) -> Text -> IO (Either String BS.ByteString)
+    :: Parser a -> (a -> LT.Text) -> Text -> IO (Either String BSL.ByteString)
 generatePDFfromParsed parser render input =
     case runParser parser "" input of
         Left err -> return $ Left (errorBundlePretty err)
@@ -82,7 +81,7 @@ generatePDFfromParsed parser render input =
                         -- could be different on another system and thus maybe revert later
                         return $ Left cleanErr
                     ExitSuccess -> do
-                        pdf <- BS.readFile pdfFile
+                        pdf <- BSL.readFile pdfFile
                         return $ Right pdf
 
 -- generatePDFFromDocument :: Text -> IO (Either String BS.ByteString)
@@ -93,7 +92,7 @@ generatePDFfromParsed parser render input =
 --         let (latexDoc, gs) = runState (toLaTeXM doc) initialGlobalState
 --          in renderLaTeX (labelToRef gs) latexDoc
 
-generatePDFFromSection :: Text -> IO (Either String BS.ByteString)
+generatePDFFromSection :: Text -> IO (Either String BSL.ByteString)
 generatePDFFromSection =
     generatePDFfromParsed
         (unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
