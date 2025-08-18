@@ -1,11 +1,12 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Server.Handlers.RenderHandlers (RenderAPI, renderServer, PDF, PDFByteString (..)) where
 
+import Control.Exception (Exception (displayException), SomeException, try)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Aeson (encode)
 import Data.ByteString.Lazy (ByteString)
@@ -26,7 +27,6 @@ import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
 import Server.HandlerUtil
 import Prelude hiding (head, lines, unlines)
-import Control.Exception (SomeException, Exception (displayException), try)
 
 -- | Return type for rendered documents
 newtype DocByteString = DocByteString ByteString
@@ -105,10 +105,10 @@ renderPDFHandler
 renderPDFHandler (Authenticated _) input = do
     result <- liftIO $ try $ generatePDFFromSection input
     case result of
-      Left (e :: SomeException) -> do
-        liftIO $ putStrLn ("*** Handler exception: " ++ displayException e)
-        throwError err500 { errBody = BS.pack "Internal Server Error" }
-      Right eAction -> case eAction of
-                        Left err -> throwError err400 {errBody = BS.pack err}
-                        Right pdf -> return $ PDFByteString pdf
+        Left (e :: SomeException) -> do
+            liftIO $ putStrLn ("*** Handler exception: " ++ displayException e)
+            throwError err500 {errBody = BS.pack "Internal Server Error"}
+        Right eAction -> case eAction of
+            Left err -> throwError err400 {errBody = BS.pack err}
+            Right pdf -> return $ PDFByteString pdf
 renderPDFHandler _ _ = throwError errNotLoggedIn
