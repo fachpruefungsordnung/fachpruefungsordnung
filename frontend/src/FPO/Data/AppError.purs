@@ -20,6 +20,9 @@ data AppError
   | AccessDeniedError
   | MethodNotAllowedError String String
 
+type ErrorId = Int
+type AppErrorWithId = { errorId :: ErrorId, error :: AppError }
+
 derive instance Eq AppError
 instance Show AppError where
   show = case _ of

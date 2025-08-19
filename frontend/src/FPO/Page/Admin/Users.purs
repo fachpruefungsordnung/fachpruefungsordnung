@@ -16,6 +16,7 @@ import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.UI.UserFilter as Filter
 import FPO.Components.UI.UserList as UserList
+import FPO.Data.AppError (AppError(..))
 import FPO.Data.Email as Email
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (deleteIgnore, getUser, postString)
@@ -40,7 +41,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
@@ -74,8 +75,6 @@ data Action
 type State = FPOState
   ( error :: Maybe String
   , createUserDto :: CreateUserDto
-  , createUserError :: Maybe String
-  , createUserSuccess :: Maybe String
   , requestDeleteUser :: Maybe UOD.UserOverviewDto
   -- | The ID of the user that is currently viewing the page.
   , userID :: Maybe UserID
@@ -104,8 +103,6 @@ component =
     { translator: fromFpoTranslator context
     , error: Nothing
     , createUserDto: CreateUserDto.empty
-    , createUserError: Nothing
-    , createUserSuccess: Nothing
     , requestDeleteUser: Nothing
     , userID: Nothing
     }
@@ -187,20 +184,18 @@ component =
       response <- postString "/register" (encodeJson state.createUserDto) -- could be a postIgnore
       case response of
         Left err -> do
-          H.modify_ _
-            { createUserError = Just $
-                ( translate (label :: _ "admin_users_failedToCreateUser")
-                    state.translator
-                ) <> ": " <> (show err)
-            }
+          updateStore $ Store.AddError $ ServerError
+            ( ( translate (label :: _ "admin_users_failedToCreateUser")
+                  state.translator
+              ) <> ": " <> (show err)
+            )
         Right _ -> do
+          updateStore $ Store.AddSuccess
+            ( translate (label :: _ "admin_users_successfullyCreatedUser")
+                state.translator
+            )
           H.modify_ _
-            { createUserError = Nothing
-            , createUserSuccess = Just
-                ( translate (label :: _ "admin_users_successfullyCreatedUser")
-                    state.translator
-                )
-            , createUserDto = CreateUserDto.empty
+            { createUserDto = CreateUserDto.empty
             }
           H.tell _userlist unit UserList.ReloadUsersQ
     HandleUserList (UserList.ButtonPressed userOverviewDto effect) -> do
@@ -291,16 +286,6 @@ component =
                   (const CreateUser)
               ]
           ]
-      , case state.createUserError of
-          Just err -> HH.div
-            [ HP.classes [ HB.alert, HB.alertDanger, HB.textCenter, HB.mt3 ] ]
-            [ HH.text err ]
-          Nothing -> HH.text ""
-      , case state.createUserSuccess of
-          Just err -> HH.div
-            [ HP.classes [ HB.alert, HB.alertSuccess, HB.textCenter, HB.mt3 ] ]
-            [ HH.text err ]
-          Nothing -> HH.text ""
       ]
 
 renderDeleteModal :: forall m. State -> HH.HTML m Action

@@ -3,8 +3,8 @@ module Language.Ltml.ToLaTeX
     --   generatePDFFromDocument
     ) where
 
-import Control.Exception (bracket)
 import Control.Monad.State (runState)
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
 import qualified Data.Text.Lazy as LT
@@ -21,15 +21,11 @@ import Language.Ltml.ToLaTeX.GlobalState
 import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
 import Language.Ltml.ToLaTeX.ToLaTeXM
 import Language.Ltml.ToLaTeX.Type (document)
-import System.Directory (removeDirectoryRecursive)
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
-import System.IO.Temp (createTempDirectory, withSystemTempDirectory)
+import System.IO (hClose)
+import System.IO.Temp (withSystemTempDirectory)
 import System.Process
-    ( CreateProcess (cwd)
-    , readCreateProcessWithExitCode
-    , shell
-    )
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 
 initialGlobalState :: GlobalState
@@ -48,11 +44,27 @@ initialGlobalState =
         0
         mempty
 
-withTempIn :: FilePath -> String -> (FilePath -> IO a) -> IO a
-withTempIn parent template =
-    bracket
-        (createTempDirectory parent template)
-        removeDirectoryRecursive
+-- withTempIn :: FilePath -> String -> (FilePath -> IO a) -> IO a
+-- withTempIn parent template =
+--     bracket
+--         (createTempDirectory parent template)
+--         removeDirectoryRecursive
+
+runLatex :: FilePath -> FilePath -> IO (ExitCode, BS.ByteString, BS.ByteString)
+runLatex texFile workDir = do
+    (Just hin, Just hout, Just herr, ph) <-
+        createProcess
+            (proc "pdflatex" ["-interaction=nonstopmode", "-halt-on-error", texFile])
+                { cwd = Just workDir
+                , std_in = CreatePipe
+                , std_out = CreatePipe
+                , std_err = CreatePipe
+                }
+    hClose hin
+    out <- BS.hGetContents hout
+    err <- BS.hGetContents herr
+    exitCode <- waitForProcess ph
+    return (exitCode, out, err)
 
 generatePDFfromParsed
     :: Parser a -> (a -> LT.Text) -> Text -> IO (Either String BSL.ByteString)
@@ -63,23 +75,20 @@ generatePDFfromParsed parser render input =
             withSystemTempDirectory "latex-temp" $ \tmpDir -> do
                 let texFile = tmpDir </> "input.tex"
                     pdfFile = tmpDir </> "input.pdf"
-                    cmd = "pdflatex -interaction=nonstopmode -halt-on-error input.tex"
+                -- cmd = "pdflatex -interaction=nonstopmode -halt-on-error input.tex"
 
                 -- Write LaTeX source
                 -- LTIO.writeFile texFile (render parsedInput)
                 BSL.writeFile texFile (TLE.encodeUtf8 (render parsedInput))
 
                 -- Compile with pdflatex
-                (exitCode, stdout, _) <-
-                    readCreateProcessWithExitCode
-                        (shell cmd) {cwd = Just tmpDir}
-                        ""
+                (exitCode, stdout, _) <- runLatex texFile tmpDir
 
                 case exitCode of
                     ExitFailure _ -> do
-                        let cleanErr = drop 3094 stdout -- omitting the preambel of the pdflatex output here.
+                        -- let cleanErr = drop 3094 stdout -- omitting the preambel of the pdflatex output here.
                         -- could be different on another system and thus maybe revert later
-                        return $ Left cleanErr
+                        return $ Left $ BS.unpack stdout
                     ExitSuccess -> do
                         pdf <- BSL.readFile pdfFile
                         return $ Right pdf

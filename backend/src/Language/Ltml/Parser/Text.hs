@@ -9,6 +9,7 @@
 module Language.Ltml.Parser.Text
     ( ParagraphParser
     , textForestP
+    , hangingTextP
     , lHangingTextP
     , mlHangingTextP
     )
@@ -27,6 +28,7 @@ import qualified Data.Text as Text (singleton)
 import Data.Typography (FontStyle (..))
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
+import Language.Lsd.AST.SimpleRegex (Disjunction (Disjunction))
 import Language.Lsd.AST.Type.Enum (EnumType (EnumType))
 import Language.Lsd.AST.Type.Text (TextType (TextType))
 import Language.Ltml.AST.Label (Label)
@@ -110,8 +112,8 @@ childPF
      . (ParserWrapper m, EnumP enumType enum, SpecialP m special)
     => TextType enumType
     -> m (TextTree fnref style enum special)
-childPF (TextType enumTypes) =
-    wrapParser (Enum <$> choice (fmap enumP enumTypes))
+childPF (TextType (Disjunction enumTypes)) =
+    wrapParser (Enum <$> choice (map enumP enumTypes))
         <* postEnumP (Proxy :: Proxy special)
 
 -- TODO: Unused.

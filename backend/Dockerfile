@@ -66,6 +66,9 @@ RUN apt-get update
 RUN apt-get install -y --no-install-recommends texlive texlive-latex-extra
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
+ENV LANG=de_DE.UTF-8
+ENV LC_ALL=de_DE.UTF-8
+
 COPY --from=build /build/bin/backend-exe /home/bin/backend-exe
 COPY migrations/ migrations/
 COPY static/ static/

@@ -6,7 +6,7 @@ where
 
 import Control.Applicative.Utils ((<:>))
 import Control.Monad (void)
-import Language.Lsd.AST.SimpleRegex (Sequence (Sequence))
+import Language.Lsd.AST.SimpleRegex (Sequence (Sequence), Star (Star))
 import Language.Lsd.AST.Type.SimpleSection
     ( SimpleSectionType (SimpleSectionType)
     )
@@ -22,7 +22,7 @@ simpleSectionP
     :: SimpleSectionType
     -> Parser ()
     -> FootnoteParser SimpleSection
-simpleSectionP (SimpleSectionType kw fmt childrenT) succStartP = do
+simpleSectionP (SimpleSectionType kw fmt (Star childrenT)) succStartP = do
     wrapParser $ nLexeme1 $ keywordP kw
     SimpleSection fmt
         <$> manyWithFootnotesTillSucc (simpleParagraphP childrenT) succStartP

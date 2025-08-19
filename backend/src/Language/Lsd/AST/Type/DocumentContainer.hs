@@ -6,6 +6,7 @@ module Language.Lsd.AST.Type.DocumentContainer
 where
 
 import Language.Lsd.AST.Common (TypeName)
+import Language.Lsd.AST.SimpleRegex (Sequence)
 import Language.Lsd.AST.Type.AppendixSection (AppendixSectionType)
 import Language.Lsd.AST.Type.Document (DocumentType)
 
@@ -16,10 +17,10 @@ data DocumentContainerType
     = DocumentContainerType
         DocumentContainerFormat
         DocumentType
-        [AppendixSectionType]
+        (Sequence AppendixSectionType)
 
 data PreDocumentContainerType
     = PreDocumentContainerType
         DocumentContainerFormat
         TypeName
-        [TypeName]
+        (Sequence TypeName)

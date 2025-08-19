@@ -8,15 +8,15 @@
 module Main where
 
 import Data.Either (hush)
+import Data.Function (const)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console (log)
 import FPO.AppM (runAppM)
-import FPO.Components.ErrorToasts as ErrorToasts
+import FPO.Components.AppToasts as AppToasts
 import FPO.Components.Navbar as Navbar
-import FPO.Data.AppError (AppError)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..), routeCodec, routeToString)
 import FPO.Data.Store (loadLanguage)
@@ -42,9 +42,7 @@ import Halogen as H
 import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import Halogen.Store.Select (Selector, selectEq)
 import Halogen.Themes.Bootstrap5 as HB
 import Halogen.VDom.Driver (runUI)
 import Prelude
@@ -70,13 +68,12 @@ import Type.Proxy (Proxy(..))
 --------------------------------------------------------------------------------
 -- Router and Main Page
 
-type State = { route :: Maybe Route, errors :: Array AppError }
+type State = { route :: Maybe Route }
 
 data Query a = NavigateQ Route a -- ^ Query to navigate to a new route.
 
 data Action
   = Initialize -- ^ Action to initialize the main component.
-  | Receive (Connected (Array AppError) Unit)
   | HandleProfile Profile.Output
 
 _navbar = Proxy :: Proxy "navbar"
@@ -91,7 +88,7 @@ _viewGroupMembers = Proxy :: Proxy "viewGroupMembers"
 _groupAddMembers = Proxy :: Proxy "groupAddMembers"
 _page404 = Proxy :: Proxy "page404"
 _profile = Proxy :: Proxy "profile"
-_errorToasts = Proxy :: Proxy "errorToasts"
+_appToasts = Proxy :: Proxy "appToasts"
 
 type Slots =
   ( home :: forall q. H.Slot q Void Unit
@@ -106,11 +103,8 @@ type Slots =
   , groupAddMembers :: forall q. H.Slot q Void Unit
   , page404 :: forall q. H.Slot q Void Unit
   , profile :: forall q. H.Slot q Profile.Output Unit
-  , errorToasts :: forall q. H.Slot q Void Unit
+  , appToasts :: forall q. H.Slot q Void Unit
   )
-
-selectAppErrors :: Selector Store.Store (Array AppError)
-selectAppErrors = selectEq _.errors
 
 component
   :: forall m
@@ -119,23 +113,16 @@ component
   => Navigate m
   => H.Component Query Unit Void m
 component =
-  connect selectAppErrors $ H.mkComponent
-    { initialState
+  H.mkComponent
+    { initialState: const { route: Nothing }
     , render
     , eval: H.mkEval H.defaultEval
         { handleAction = handleAction
         , initialize = Just Initialize
-        , receive = Just <<< Receive
         , handleQuery = handleQuery
         }
     }
   where
-  initialState :: forall input. Connected (Array AppError) input -> State
-  initialState { context } =
-    { route: Nothing
-    , errors: context
-    }
-
   render :: State -> H.ComponentHTML Action Slots m
   render state = HH.div
     [ HP.classes
@@ -148,7 +135,7 @@ component =
         ]
     ]
     [ HH.slot_ _navbar unit Navbar.navbar unit
-    , HH.slot_ _errorToasts unit ErrorToasts.component state.errors
+    , HH.slot_ _appToasts unit AppToasts.component unit
     , case state.route of
         Nothing -> HH.slot_ _page404 unit Page404.component unit
         Just p -> case p of
@@ -179,7 +166,6 @@ component =
     Initialize -> do
       initialRoute <- hush <<< (RD.parse routeCodec) <$> liftEffect getHash
       navigate $ fromMaybe Home initialRoute
-    Receive { context } -> H.modify_ _ { errors = context }
     HandleProfile profileOutput -> case profileOutput of
       Profile.ChangedUsername -> do
         -- If the username was changed, we want to reload the user data
@@ -231,7 +217,8 @@ main = HA.runHalogenAff do
       , loginRedirect: Nothing
       , translator: FPOTranslator translator
       , language: defaultLang
-      , errors: []
+      , toasts: []
+      , totalToasts: 0
       } :: Store.Store
   rootComponent <- runAppM initialStore component
   halogenIO <- runUI rootComponent unit body
