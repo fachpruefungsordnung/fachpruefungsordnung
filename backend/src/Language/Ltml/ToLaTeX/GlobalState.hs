@@ -1,8 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module Language.Ltml.ToLaTeX.GlobalState
     ( GlobalState (..)
+    , CounterState (..)
     , nextSupersection
     , nextSection
     , nextParagraph
@@ -13,12 +15,30 @@ module Language.Ltml.ToLaTeX.GlobalState
     , nextEnumPosition
     , descendEnumTree
     , addTOCEntry
-    , DList (DList)
-    , fromDList
-    , toDList
+    , counterState
+    , supersectionCTR
+    , sectionCTR
+    , paragraphCTR
+    , sentenceCTR
+    , footnoteCTR
+    , appendixCTR
+    , enumPosition
+    , enumIdentifier
+    , appendixFormat
+    , onlyOneParagraph
+    , isSupersection
+    , isAppendix
+    , labelToRef
+    , labelToFootNote
+    , toc
+    , initialGlobalState
+    , initialCounterState
     ) where
 
+import Control.Lens
+import Control.Monad (forM_)
 import Control.Monad.State
+import qualified Data.DList as DList
 import Data.Map (Map, insert)
 import qualified Data.Text.Lazy as LT
 import Language.Lsd.AST.Format (IdentifierFormat, KeyFormat)
@@ -33,234 +53,121 @@ import Language.Ltml.ToLaTeX.Format
     )
 import Language.Ltml.ToLaTeX.Type (LaTeX (Text), linebreak)
 
--- to build the table of contents we want to accumulate all headings in a list.
--- this can be inefficient with normal lists, so we use a difference list
-newtype DList a = DList ([a] -> [a])
-
-instance Semigroup (DList a) where
-    DList a <> DList b = DList (a . b)
-
-instance Monoid (DList a) where
-    mempty = DList id
-
-fromDList :: DList a -> [a]
-fromDList (DList xs) = xs []
-
-toDList :: [a] -> DList a
-toDList xs = DList (xs ++)
-
 -- State for labeling
 data GlobalState = GlobalState
     { {- Counters to keep track of the position in the document -}
-      supersectionCTR :: Int -- counter for supersections
-    , sectionCTR :: Int -- counter for sections
-    , paragraphCTR :: Int -- counter for paragraphs within a section
-    , sentenceCTR :: Int -- counter for sentences within a paragraph
-    , footnoteCTR :: Int -- counter for footnotes
-    , appendixCTR :: Int -- counter for appendix sections
-    {- Path for current enum position -}
-    , enumPosition :: [Int]
+      _counterState :: CounterState
+    , {- Path for current enum position -}
+      _enumPosition :: [Int]
     , {- since the style of the identifier is defined globally for an
-         enumeration or appendix we need to pass it to the children -}
-      enumIdentifier :: IdentifierFormat
-    , appendixFormat :: AppendixElementFormat
+         enumeration or appendix we need to pass it to the kids -}
+      _enumIdentifier :: IdentifierFormat
+    , _appendixFormat :: AppendixElementFormat
     , {- Flags for special cases -}
-      onlyOneParagraph :: Bool -- needed for sections with only one paragraphs
-    , isSupersection :: Bool -- needed for heading
-    , isAppendix :: Bool -- needed for appendix sections
+      _onlyOneParagraph :: Bool -- needed for sections with only one paragraphs
+    , _isSupersection :: Bool -- needed for heading
+    , _isAppendix :: Bool -- needed for appendix sections
     {- Maps for labels -}
-    , labelToRef :: Map Label LT.Text
-    , labelToFootNote :: Map Label Footnote
+    , _labelToRef :: Map Label LT.Text
+    , _labelToFootNote :: Map Label Footnote
     , {- functional list that builds the table of contents -}
-      toc :: DList LaTeX
+      _toc :: DList.DList LaTeX
     }
+    deriving (Show)
+
+data CounterState = CounterState
+    { _supersectionCTR :: Int
+    , _sectionCTR :: Int
+    , _paragraphCTR :: Int
+    , _sentenceCTR :: Int
+    , _footnoteCTR :: Int
+    , _appendixCTR :: Int
+    }
+    deriving (Show)
+
+makeLenses ''GlobalState
+makeLenses ''CounterState
 
 nextSupersection :: State GlobalState Int
 nextSupersection = do
-    st <- get
-    let n = supersectionCTR st + 1
-    put st {supersectionCTR = n}
-    pure n
+    counterState . supersectionCTR <+= 1
 
 nextSection :: State GlobalState Int
 nextSection = do
-    st <- get
-    let n = sectionCTR st + 1
-    put st {sectionCTR = n, paragraphCTR = 0}
-    pure n
+    counterState . sectionCTR <+= 1
 
 nextParagraph :: State GlobalState Int
 nextParagraph = do
-    st <- get
-    let n = paragraphCTR st + 1
-    put st {paragraphCTR = n, sentenceCTR = 0}
-    pure n
+    counterState . sentenceCTR .= 0
+    counterState . paragraphCTR <+= 1
 
 nextSentence :: State GlobalState Int
 nextSentence = do
-    st <- get
-    let n = sentenceCTR st + 1
-    put st {sentenceCTR = n}
-    pure n
+    counterState . sentenceCTR <+= 1
 
 nextFootnote :: State GlobalState Int
 nextFootnote = do
-    st <- get
-    let n = footnoteCTR st + 1
-    put st {footnoteCTR = n}
-    pure n
+    counterState . footnoteCTR <+= 1
 
 nextAppendix :: State GlobalState Int
 nextAppendix = do
-    st <- get
-    let n = appendixCTR st + 1
-    put st {appendixCTR = n}
-    pure n
+    counterState . appendixCTR <+= 1
 
 -- Get the next label at the current depth
 nextEnumPosition :: State GlobalState [Int]
 nextEnumPosition = do
-    st <- get
-    let prefix = enumPosition st
-        depth = length prefix
+    prefix <- use enumPosition
+    let depth = length prefix
         newPrefix = init prefix ++ [prefix !! (depth - 1) + 1]
-    put $ st {enumPosition = newPrefix}
+    enumPosition .= newPrefix
     pure newPrefix
 
 -- Go one level deeper temporarily
 descendEnumTree :: State GlobalState a -> State GlobalState a
 descendEnumTree action = do
-    st <- get
-    let oldPath = enumPosition st
-    put $ st {enumPosition = enumPosition st ++ [0]}
+    oldPath <- use enumPosition
+    enumPosition .= oldPath ++ [0]
     result <- action
-    modify $ \s -> s {enumPosition = oldPath}
+    enumPosition .= oldPath
     pure result
 
 insertRefLabel :: Maybe Label -> LT.Text -> State GlobalState ()
-insertRefLabel mLabel ident = do
-    maybe
-        (pure ())
-        (\l -> modify (\s -> s {labelToRef = insert l ident (labelToRef s)}))
-        mLabel
+insertRefLabel mLabel ident =
+    forM_ mLabel $ \l -> labelToRef %= insert l ident
 
 addTOCEntry
     :: Int -> KeyFormat -> IdentifierFormat -> LaTeX -> State GlobalState ()
 addTOCEntry n keyident ident headingText =
-    modify
-        ( \s ->
-            s
-                { toc =
-                    toc s
-                        <> toDList
-                            [ formatKey keyident (Text $ getIdentifier ident n)
-                            , Text " "
-                            , headingText
-                            , linebreak
-                            ]
-                }
-        )
+    toc
+        %= ( <>
+                DList.fromList
+                    [ formatKey keyident (Text $ getIdentifier ident n)
+                    , Text " "
+                    , headingText
+                    , linebreak
+                    ]
+           )
 
-------------------------------- example for texting -------------------------------
--- example structure
-data Supersection = Supersection [Int] [Section]
-    deriving (Show)
+initialGlobalState :: GlobalState
+initialGlobalState =
+    GlobalState
+        initialCounterState
+        [0]
+        emptyIdentifierFormat
+        emptyAppendixFormat
+        False
+        False
+        False
+        mempty
+        mempty
+        mempty
 
-data Section = Section [Int] [Paragraph]
-    deriving (Show)
-
-newtype Paragraph = Paragraph [Int]
-    deriving (Show)
-
-exampleLabelSuperSection :: Supersection -> State GlobalState Supersection
-exampleLabelSuperSection (Supersection _ children) = do
-    _ <- nextSupersection
-    st <- get
-    labeledChildren <- mapM exampleLabelSection children
-    pure $ Supersection [supersectionCTR st] labeledChildren
-
-exampleLabelSection :: Section -> State GlobalState Section
-exampleLabelSection (Section _ children) = do
-    _ <- nextSection
-    st <- get
-    labeledChildren <- mapM exampleLabelParagraph children
-    pure $ Section [supersectionCTR st, sectionCTR st] labeledChildren
-
-exampleLabelParagraph :: Paragraph -> State GlobalState Paragraph
-exampleLabelParagraph (Paragraph _) = do
-    _ <- nextParagraph
-    st <- get
-    pure $ Paragraph [supersectionCTR st, sectionCTR st, paragraphCTR st]
-
-exampleTree :: Supersection
-exampleTree =
-    Supersection
-        []
-        [ Section
-            []
-            [ Paragraph []
-            , Paragraph []
-            ]
-        , Section
-            []
-            [ Paragraph []
-            , Paragraph []
-            , Paragraph []
-            , Paragraph []
-            ]
-        , Section
-            []
-            [ Paragraph []
-            , Paragraph []
-            , Paragraph []
-            ]
-        , Section [] []
-        ]
-
-data Tree = Empty | Node [Int] [Tree]
-    deriving (Show)
-
--- Label the tree
-labelTree :: Tree -> State GlobalState Tree
-labelTree Empty = pure Empty
-labelTree (Node _ children) = do
-    lbl <- nextEnumPosition
-    labeledChildren <- descendEnumTree $ mapM labelTree children
-    pure $ Node lbl labeledChildren
-
--- Example tree
-exampleTree' :: Tree
-exampleTree' =
-    Node
-        []
-        [ Node [] []
-        , Node
-            []
-            [ Node [] []
-            , Node [] []
-            ]
-        , Node [] [Node [] []]
-        ]
-
--- Run it
-main :: IO ()
-main = do
-    let initialState =
-            GlobalState
-                0
-                0
-                0
-                0
-                0
-                0
-                [0]
-                emptyIdentifierFormat
-                emptyAppendixFormat
-                False
-                False
-                False
-                mempty
-                mempty
-                mempty
-        labeled = evalState (labelTree exampleTree') initialState
-    print labeled
+initialCounterState :: CounterState
+initialCounterState =
+    CounterState
+        0
+        0
+        0
+        0
+        0
+        0

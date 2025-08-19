@@ -13,13 +13,10 @@ import Language.Lsd.Example.Fpo (footnoteT, sectionT)
 import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
 import Language.Ltml.Parser.Section (sectionP)
-import Language.Ltml.ToLaTeX.Format
-    ( emptyAppendixFormat
-    , emptyIdentifierFormat
-    , staticDocumentFormat
-    )
+import Language.Ltml.ToLaTeX.Format (staticDocumentFormat)
 import Language.Ltml.ToLaTeX.GlobalState
-    ( GlobalState (GlobalState, labelToFootNote, labelToRef)
+    ( GlobalState (_labelToFootNote, _labelToRef)
+    , initialGlobalState
     )
 import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
 import Language.Ltml.ToLaTeX.ToLaTeXM
@@ -30,25 +27,6 @@ import System.IO (hClose)
 import System.IO.Temp (withSystemTempDirectory)
 import System.Process
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
-
-initialGlobalState :: GlobalState
-initialGlobalState =
-    GlobalState
-        0
-        0
-        0
-        0
-        0
-        0
-        [0]
-        emptyIdentifierFormat
-        emptyAppendixFormat
-        False
-        False
-        False
-        mempty
-        mempty
-        mempty
 
 -- withTempIn :: FilePath -> String -> (FilePath -> IO a) -> IO a
 -- withTempIn parent template =
@@ -114,8 +92,8 @@ generatePDFFromSection =
         sectionToText
   where
     sectionToText (sec, labelmap) =
-        let (latexSection, gs) = runState (toLaTeXM sec) $ initialGlobalState {labelToFootNote = labelmap}
-         in renderLaTeX (labelToRef gs) (staticDocumentFormat <> document latexSection)
+        let (latexSection, gs) = runState (toLaTeXM sec) $ initialGlobalState {_labelToFootNote = labelmap}
+         in renderLaTeX (_labelToRef gs) (staticDocumentFormat <> document latexSection)
 
 -- mkPDF :: FilePath -> IO (Either String BS.ByteString)
 -- mkPDF filename = do
