@@ -16,10 +16,9 @@ import Effect.Class.Console (log)
 import FPO.AppM (runAppM)
 import FPO.Components.ErrorToasts as ErrorToasts
 import FPO.Components.Navbar as Navbar
-import FPO.Data.AppError (AppError)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..), routeCodec, routeToString)
-import FPO.Data.Store (loadLanguage)
+import FPO.Data.Store (AppErrorWithId, loadLanguage)
 import FPO.Data.Store as Store
 import FPO.Page.Admin.Group.AddMembers as GroupAddMembers
 import FPO.Page.Admin.Group.DocOverview as ViewGroupDocuments
@@ -70,13 +69,13 @@ import Type.Proxy (Proxy(..))
 --------------------------------------------------------------------------------
 -- Router and Main Page
 
-type State = { route :: Maybe Route, errors :: Array AppError }
+type State = { route :: Maybe Route, errors :: Array AppErrorWithId }
 
 data Query a = NavigateQ Route a -- ^ Query to navigate to a new route.
 
 data Action
   = Initialize -- ^ Action to initialize the main component.
-  | Receive (Connected (Array AppError) Unit)
+  | Receive (Connected (Array AppErrorWithId) Unit)
   | HandleProfile Profile.Output
 
 _navbar = Proxy :: Proxy "navbar"
@@ -109,7 +108,7 @@ type Slots =
   , errorToasts :: forall q. H.Slot q Void Unit
   )
 
-selectAppErrors :: Selector Store.Store (Array AppError)
+selectAppErrors :: Selector Store.Store (Array AppErrorWithId)
 selectAppErrors = selectEq _.errors
 
 component
@@ -130,7 +129,7 @@ component =
         }
     }
   where
-  initialState :: forall input. Connected (Array AppError) input -> State
+  initialState :: forall input. Connected (Array AppErrorWithId) input -> State
   initialState { context } =
     { route: Nothing
     , errors: context
@@ -232,6 +231,7 @@ main = HA.runHalogenAff do
       , translator: FPOTranslator translator
       , language: defaultLang
       , errors: []
+      , totalErrors: 0
       } :: Store.Store
   rootComponent <- runAppM initialStore component
   halogenIO <- runUI rootComponent unit body

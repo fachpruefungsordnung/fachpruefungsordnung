@@ -17,6 +17,7 @@ module FPO.Data.Request
   , getIgnore
   , getJson
   , getString
+  , getTextElemHistory
   , getUserDocuments
   , getUserGroups
   , getUser
@@ -58,9 +59,10 @@ import FPO.Data.AppError (AppError(..), handleAppError, printAjaxError)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Store as Store
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto)
-import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader)
+import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.Query as DQ
+import FPO.Dto.DocumentDto.TextElement as TE
 import FPO.Dto.GroupDto
   ( GroupCreate
   , GroupDto
@@ -459,7 +461,7 @@ createNewDocument
   => MonadStore Store.Action Store.Store m
   => Navigate m
   => NewDocumentCreateDto
-  -> H.HalogenM st act slots msg m (Either AppError DocumentHeader)
+  -> H.HalogenM st act slots msg m (Either AppError DH.DocumentHeader)
 createNewDocument dto = postJson decodeJson "/docs" (encodeJson dto)
 
 getDocumentsQueryFromURL
@@ -470,6 +472,21 @@ getDocumentsQueryFromURL
   => String
   -> H.HalogenM st act slots msg m (Either AppError DQ.DocumentQuery)
 getDocumentsQueryFromURL url = getJson decodeJson url
+
+getTextElemHistory
+  :: DH.DocumentID
+  -> TE.TextElementID
+  -> DD.DocDate
+  -> Int
+  -> Aff (Maybe TE.FullTextElementHistory)
+getTextElemHistory dID tID date limit =
+  getFromJSONEndpoint
+    decodeJson
+    ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history?before="
+        <> DD.toStringFormat date
+        <> "&limit="
+        <> show limit
+    )
 
 getUserDocuments
   :: forall st act slots msg m

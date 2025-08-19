@@ -73,7 +73,9 @@
 }
 
 .animate-slide-in {
-  animation: slideInRight 0.3s ease-out;
+  animation: 
+    slideInRight 0.3s ease-out
+    slideOutRight 0.3s ease-out 5s;
 }
 
 .animate-slide-in .fpo-toast-progress-bar {
@@ -89,6 +91,15 @@
   to {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
   }
 }
 

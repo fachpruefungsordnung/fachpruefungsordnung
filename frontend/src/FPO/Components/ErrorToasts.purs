@@ -1,5 +1,5 @@
 module FPO.Components.ErrorToasts
-  ( ErrorAction(..)
+  ( ErrorAction
   , Input
   , Output
   , component
@@ -7,12 +7,13 @@ module FPO.Components.ErrorToasts
 
 import Prelude
 
-import Data.Array (length, mapWithIndex)
+import Data.Array (any, filter, length)
+import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..))
 import Data.Time.Duration (Milliseconds(..))
 import Effect.Aff (delay)
 import Effect.Aff.Class (class MonadAff)
-import FPO.Data.AppError (AppError)
+import FPO.Data.Store (AppErrorWithId, ErrorId)
 import FPO.Data.Store as Store
 import Halogen as H
 import Halogen.HTML as HH
@@ -20,9 +21,12 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore, updateStore)
 
-type State = Array AppError
+type State =
+  { errors :: Array AppErrorWithId
+  , totalToasts :: Int
+  }
 
-type Input = Array AppError
+type Input = Array AppErrorWithId
 
 type Output = Void
 
@@ -33,7 +37,7 @@ component
   => H.Component query Input Output m
 component =
   H.mkComponent
-    { initialState: \input -> input
+    { initialState
     , render
     , eval: H.mkEval $ H.defaultEval
         { handleAction = handleAction
@@ -42,9 +46,8 @@ component =
     }
 
 data ErrorAction
-  = HandleNewErrors (Array AppError)
-  | RemoveToast Int
-  | AutoRemoveToast Int
+  = HandleNewErrors (Array AppErrorWithId)
+  | RemoveToast ErrorId
 
 handleAction
   :: forall m
@@ -53,30 +56,41 @@ handleAction
   => ErrorAction
   -> H.HalogenM State ErrorAction () Output m Unit
 handleAction = case _ of
-  HandleNewErrors errors -> do
-    H.put errors
-    -- Auto-remove toasts after 5 seconds
-    void $ H.fork do
-      H.liftAff $ delay (Milliseconds 5000.0)
-      when (length errors > 0) do
-        handleAction $ AutoRemoveToast 0
+  HandleNewErrors newErrors -> do
+    state <- H.get
+    let previouslyUnknownErrors = getNewErrors state.errors newErrors
+    H.put { errors: newErrors, totalToasts: length previouslyUnknownErrors }
 
-  RemoveToast index -> do
-    updateStore $ Store.RemoveError index
+    traverse_
+      ( \error -> do
+          let errorId = error.errorId
+          -- Trigger the auto-remove action for each new error
+          H.fork $ do
+            H.liftAff $ delay (Milliseconds 5500.0)
+            handleAction $ RemoveToast errorId
+            pure unit
+      )
+      previouslyUnknownErrors
 
-  AutoRemoveToast index -> do
-    updateStore $ Store.RemoveError index
+  RemoveToast id -> do
+    state <- H.get
+    let updatedErrors = removeErrorWithId id state.errors
+    H.put state { errors = updatedErrors }
+    updateStore $ Store.SetErrors updatedErrors
 
-render :: forall m. Array AppError -> H.ComponentHTML ErrorAction () m
-render errors = do
+initialState :: Input -> State
+initialState errors = { errors: errors, totalToasts: length errors }
+
+render :: forall m. State -> H.ComponentHTML ErrorAction () m
+render state = do
   HH.div
     [ HP.class_ (HH.ClassName "fpo-toast-container")
     ]
-    [ HH.div_ (mapWithIndex renderToast errors)
+    [ HH.div_ (map renderToast state.errors)
     ]
 
-renderToast :: forall m. Int -> AppError -> H.ComponentHTML ErrorAction () m
-renderToast index error =
+renderToast :: forall m. AppErrorWithId -> H.ComponentHTML ErrorAction () m
+renderToast error =
   HH.div
     [ HP.classes
         [ HH.ClassName "fpo-toast"
@@ -90,10 +104,10 @@ renderToast index error =
         [ HH.span
             [ HP.class_ (HH.ClassName "fpo-toast-message")
             ]
-            [ HH.text (show error) ]
+            [ HH.text (show error.error) ]
         , HH.button
             [ HP.class_ (HH.ClassName "fpo-toast-close")
-            , HE.onClick \_ -> RemoveToast index
+            , HE.onClick \_ -> RemoveToast error.errorId
             ]
             [ HH.text "x" ]
         ]
@@ -102,8 +116,20 @@ renderToast index error =
         ]
         [ HH.div
             [ HP.class_ (HH.ClassName "fpo-toast-progress-bar")
-            , HP.attr (HH.AttrName "data-toast-id") (show index)
+            , HP.attr (HH.AttrName "data-toast-id") (show error.errorId)
             ]
             []
         ]
     ]
+
+doesNotContainElement :: Array AppErrorWithId -> AppErrorWithId -> Boolean
+doesNotContainElement errors element = not $ any
+  (\error -> error.errorId == element.errorId)
+  errors
+
+getNewErrors :: Array AppErrorWithId -> Array AppErrorWithId -> Array AppErrorWithId
+getNewErrors oldErrors newErrors' = filter (doesNotContainElement oldErrors)
+  newErrors'
+
+removeErrorWithId :: ErrorId -> Array AppErrorWithId -> Array AppErrorWithId
+removeErrorWithId id errors = filter (\error -> error.errorId /= id) errors

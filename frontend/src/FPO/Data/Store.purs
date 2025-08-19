@@ -8,12 +8,13 @@ module FPO.Data.Store
   , loadLanguage
   , reduce
   , saveLanguage
+  , AppErrorWithId(..)
+  , ErrorId
   ) where
 
 import Prelude
 
-import Data.Array (deleteAt)
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Maybe (Maybe)
 import Effect (Effect)
 import FPO.Data.AppError (AppError)
 import FPO.Data.Route (Route)
@@ -22,13 +23,17 @@ import Web.HTML (window)
 import Web.HTML.Window (localStorage)
 import Web.Storage.Storage (getItem, setItem) as LocalStorage
 
+type ErrorId = Int
+type AppErrorWithId = { errorId :: ErrorId, error :: AppError }
+
 -- | The Store type represents the global state of the application.
 type Store =
   { inputMail :: String -- ^ The email that was input in the login form (example state variable)
   , loginRedirect :: Maybe Route -- ^ The route to redirect to after login
   , translator :: FPOTranslator
   , language :: String
-  , errors :: Array AppError
+  , errors :: Array AppErrorWithId
+  , totalErrors :: Int
   }
 
 data Action
@@ -37,8 +42,7 @@ data Action
   | SetLanguage String
   | SetTranslator FPOTranslator
   | AddError AppError
-  | RemoveError Int
-  | ClearErrors
+  | SetErrors (Array AppErrorWithId)
 
 -- | Update the store based on the action.
 reduce :: Store -> Action -> Store
@@ -57,10 +61,11 @@ reduce store = case _ of
   SetLoginRedirect r -> store { loginRedirect = r }
   SetLanguage s -> store { language = s }
   SetTranslator t -> store { translator = t }
-  AddError error -> store { errors = store.errors <> [ error ] }
-  RemoveError index -> store
-    { errors = fromMaybe store.errors (deleteAt index store.errors) }
-  ClearErrors -> store { errors = [] }
+  AddError error -> store
+    { errors = store.errors <> [ { errorId: store.totalErrors + 1, error } ]
+    , totalErrors = store.totalErrors + 1
+    }
+  SetErrors errors -> store { errors = errors }
 
 saveLanguage :: String -> Effect Unit
 saveLanguage lang = do

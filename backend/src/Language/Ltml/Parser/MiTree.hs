@@ -91,7 +91,10 @@ miForestFrom
 miForestFrom elementPF childP lvl = go False
   where
     go :: Bool -> m [a]
-    go isBracketed = goE
+    go isBracketed = do
+        -- Permit and drop initial whitespace within brackets.
+        when isBracketed $ void $ sp >> optional (nli >> checkIndent lvl)
+        goE
       where
         -- `goX` vs. `goX'`:
         --  - The `goX` parsers must generally be used in-line; that is, not
@@ -103,9 +106,6 @@ miForestFrom elementPF childP lvl = go False
         -- Parse forest, headed by element.
         goE :: m [a]
         goE = do
-            -- Permit and drop initial whitespace within brackets.
-            when isBracketed $ void $ sp >> optional (nli >> checkIndent lvl)
-
             (cfg, e) <- elementPF (go True)
             s0 <- sp
 

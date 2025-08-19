@@ -14,6 +14,7 @@ import Language.Lsd.AST.Format
     , IdentifierFormat
     , TocKeyFormat
     )
+import Language.Lsd.AST.SimpleRegex (Disjunction, Star)
 import Language.Lsd.AST.Type.Document (DocumentType)
 
 data AppendixSectionFormat
@@ -35,9 +36,9 @@ data AppendixElementFormat
 data AppendixSectionType
     = AppendixSectionType
         AppendixSectionFormat
-        [DocumentType]
+        (Star (Disjunction DocumentType))
 
 data PreAppendixSectionType
     = PreAppendixSectionType
         AppendixSectionFormat
-        [TypeName]
+        (Star (Disjunction TypeName))

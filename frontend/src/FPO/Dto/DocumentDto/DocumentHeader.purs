@@ -4,6 +4,7 @@ module FPO.Dto.DocumentDto.DocumentHeader
   , getID
   , getLastEdited
   , getName
+  , User
   ) where
 
 import Data.Argonaut (class DecodeJson)

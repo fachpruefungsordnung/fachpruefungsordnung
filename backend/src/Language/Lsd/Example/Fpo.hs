@@ -27,7 +27,7 @@ fpoT =
     DocumentContainerType
         DocumentContainerFormat
         mainDocT
-        [appendixT, attachmentT]
+        (Sequence [appendixT, attachmentT])
 
 appendixT :: AppendixSectionType
 appendixT =
@@ -51,7 +51,7 @@ appendixT =
                 )
             )
         )
-        [] -- TODO
+        (Star $ Disjunction []) -- TODO
 
 attachmentT :: AppendixSectionType
 attachmentT =
@@ -77,7 +77,7 @@ attachmentT =
                 )
             )
         )
-        [] -- TODO
+        (Star $ Disjunction []) -- TODO
 
 mainDocT :: DocumentType
 mainDocT =
@@ -160,10 +160,10 @@ paragraphT =
         richTextT
 
 plainTextT :: TextType Void
-plainTextT = TextType []
+plainTextT = TextType (Disjunction [])
 
 richTextT :: TextType EnumType
-richTextT = TextType [regularEnumT, simpleEnumT]
+richTextT = TextType (Disjunction [regularEnumT, simpleEnumT])
 
 footnoteTextT :: TextType Void
 footnoteTextT = plainTextT
@@ -190,7 +190,7 @@ regularEnumT =
                         ]
                 )
         )
-        (TextType [enumTF 1, simpleEnumT])
+        (TextType (Disjunction [enumTF 1, simpleEnumT]))
   where
     enumTF :: Int -> EnumType
     enumTF depth =
@@ -208,7 +208,7 @@ regularEnumT =
                             ]
                     )
             )
-            (TextType nextEnumTs)
+            (TextType (Disjunction nextEnumTs))
       where
         nextEnumTs =
             if depth < maxRegularEnumDepth
@@ -224,7 +224,7 @@ simpleEnumT =
                 (FormatString [PlaceholderAtom Arabic])
                 (EnumItemKeyFormat $ FormatString [StringAtom "-"])
         )
-        (TextType [])
+        (TextType (Disjunction []))
 
 -- TODO: Unused.
 footnoteT :: FootnoteType
