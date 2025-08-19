@@ -718,7 +718,7 @@ splitview = H.mkComponent
         renderedHtml' <- Request.postRenderHtml (joinWith "\n" response)
         case renderedHtml' of
           Left _ -> pure unit -- Handle error
-          Right body -> H.modify_ \st -> st { renderedHtml = Just body }
+          Right body -> H.modify_ _ { renderedHtml = Just body }
 
       Editor.DeletedComment tocEntry deletedIDs -> do
         H.modify_ \st ->
@@ -732,14 +732,14 @@ splitview = H.mkComponent
         state <- H.get
         let
           newTOCTree = replaceTOCEntry tocEntry.id title tocEntry state.tocEntries
-        H.modify_ \st -> st { tocEntries = newTOCTree }
+        H.modify_ _ { tocEntries = newTOCTree }
         H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
         when toBePosted (handleAction POST)
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get
         if state.sidebarShown then
-          H.modify_ \st -> st { commentShown = true }
+          H.modify_ _ { commentShown = true }
         else
           H.modify_ \st -> st
             { sidebarRatio = st.lastExpandedSidebarRatio
@@ -755,7 +755,12 @@ splitview = H.mkComponent
       Editor.SendingTOC tocEntry -> do
         H.tell _commentOverview unit (CommentOverview.ReceiveTOC tocEntry)
 
-      Editor.ShowAllCommentsOutput -> handleAction $ ToggleCommentOverview true
+      Editor.RenamedNode newName path -> do
+        s <- H.get
+        updateTree $ changeNodeName path newName s.tocEntries
+
+      Editor.ShowAllCommentsOutput -> do
+        handleAction $ ToggleCommentOverview true
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
@@ -763,7 +768,7 @@ splitview = H.mkComponent
       TOC.ModifyVersion elementID mVID -> do
         handleAction (ModifyVersionMapping elementID mVID)
 
-      TOC.ChangeSection title selectedId -> do
+      TOC.ChangeToLeaf title selectedId -> do
         H.tell _editor unit Editor.SaveSection
         state <- H.get
         let
@@ -778,6 +783,12 @@ splitview = H.mkComponent
               Just elem -> elem.versionID
         -- handleAction (ModifyVersionMapping selectedID rev)
         H.tell _editor unit (Editor.ChangeSection title entry rev)
+
+      TOC.ChangeToNode path title -> do
+        H.tell _editor unit (Editor.ChangeToNode title path)
+
+      TOC.UpdateNodePosition path -> do
+        H.tell _editor unit (Editor.UpdateNodePosition path)
 
       TOC.AddNode path node -> do
         s <- H.get
