@@ -8,6 +8,7 @@ module FPO.Component.Splitview where
 
 import Prelude
 
+import Data.Argonaut (fromString)
 import Data.Array
   ( cons
   , deleteAt
@@ -66,23 +67,18 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
-import Web.Event.Event (EventType(..), stopPropagation)
-import Web.HTML as Web.HTML
-import Web.HTML.Window as Web.HTML.Window
-import Web.UIEvent.MouseEvent (MouseEvent, clientX)
-
-import Effect.Console (log)
-import Data.Argonaut (JsonDecodeError, decodeJson, encodeJson, fromString)
-import Affjax.RequestBody (json) as RequestBody
-import Web.File.Url (createObjectURL, revokeObjectURL )
-import Web.HTML (window)
-import Web.HTML.Window (document)
-import Web.HTML.HTMLDocument as HTMLDocument
 import Web.DOM.Document as Document
 import Web.DOM.Element as Element
 import Web.DOM.Node as Node
+import Web.Event.Event (EventType(..), stopPropagation)
+import Web.File.Url (createObjectURL, revokeObjectURL)
+import Web.HTML (window)
+import Web.HTML as Web.HTML
+import Web.HTML.HTMLDocument as HTMLDocument
 import Web.HTML.HTMLElement as HTMLElement
-import Web.HTML.HTMLAnchorElement as HTMLAnchorElement
+import Web.HTML.Window (document)
+import Web.HTML.Window as Web.HTML.Window
+import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 
 data DragTarget = ResizeLeft | ResizeRight
 
@@ -749,35 +745,40 @@ splitview = H.mkComponent
       Editor.PostPDF content -> do
         renderedPDF' <- Request.postBlob "/render/pdf" (fromString content)
         case renderedPDF' of
-          Left _ -> pure unit -- Handle error
+          Left _ -> pure unit
           Right body -> do
+            -- create blobl link
             url <- H.liftEffect $ createObjectURL body
-            H.liftEffect $ log url
-            H.modify_ \st -> st { testDownload = url }
-            let filename = "test"
+            -- Create an invisible link and click it to download PDF
             H.liftEffect $ do
-              win  <- window
+              -- get window stuff
+              win <- window
               hdoc <- document win
               let doc = HTMLDocument.toDocument hdoc
 
+              -- create link
               aEl <- Document.createElement "a" doc
               case HTMLElement.fromElement aEl of
-                Nothing     -> pure unit
-                Just aHtml  -> do
+                Nothing -> pure unit
+                Just aHtml -> do
                   Element.setAttribute "href" url aEl
-                  Element.setAttribute "download" filename aEl
+                  Element.setAttribute "download" "test.pdf" aEl
                   Element.setAttribute "target" "_self" aEl
+                  Element.setAttribute "rel" "noopener noreferrer" aEl
                   Element.setAttribute "style" "display:none" aEl
-
-                  mBody <- HTMLDocument.body hdoc           -- Effektvoll binden
+                  mBody <- HTMLDocument.body hdoc
                   case mBody of
-                    Nothing       -> pure unit
+                    Nothing -> pure unit
                     Just bodyHtml -> do
+                      -- click the link
                       let bodyEl = HTMLElement.toElement bodyHtml
-                      _ <- Node.appendChild (Element.toNode aEl) (Element.toNode bodyEl)
+                      _ <- Node.appendChild (Element.toNode aEl)
+                        (Element.toNode bodyEl)
                       HTMLElement.click aHtml
-                      _ <- Node.removeChild (Element.toNode aEl) (Element.toNode bodyEl)
+                      _ <- Node.removeChild (Element.toNode aEl)
+                        (Element.toNode bodyEl)
                       pure unit
+            -- deactivate the blob link
             H.liftEffect $ revokeObjectURL url
 
       Editor.SavedSection toBePosted title tocEntry -> do
