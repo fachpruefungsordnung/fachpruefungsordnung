@@ -72,7 +72,17 @@ import Web.HTML.Window as Web.HTML.Window
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 
 import Effect.Console (log)
-import Data.Argonaut.Encode (encodeJson)
+import Data.Argonaut (JsonDecodeError, decodeJson, encodeJson, fromString)
+import Affjax.RequestBody (json) as RequestBody
+import Web.File.Url (createObjectURL, revokeObjectURL )
+import Web.HTML (window)
+import Web.HTML.Window (document)
+import Web.HTML.HTMLDocument as HTMLDocument
+import Web.DOM.Document as Document
+import Web.DOM.Element as Element
+import Web.DOM.Node as Node
+import Web.HTML.HTMLElement as HTMLElement
+import Web.HTML.HTMLAnchorElement as HTMLAnchorElement
 
 data DragTarget = ResizeLeft | ResizeRight
 
@@ -131,6 +141,7 @@ type State =
   --   to the preview component.
   -- TODO: Which one to use?
   , renderedHtml :: Maybe String
+  , testDownload :: String
 
   -- Store tocEntries and send some parts to its children components
   , tocEntries :: TOCTree
@@ -184,6 +195,7 @@ splitview = H.mkComponent
       , lastExpandedSidebarRatio: 0.2
       , lastExpandedPreviewRatio: 0.4
       , renderedHtml: Nothing
+      , testDownload: ""
       , tocEntries: Empty
       , versionMapping: Empty
       , mTimeFormatter: Nothing
@@ -735,10 +747,38 @@ splitview = H.mkComponent
         H.tell _comment unit (Comment.DeletedComment tocEntry.id deletedIDs)
 
       Editor.PostPDF content -> do
-        renderedPDF' <- Request.postRenderPDF content
+        renderedPDF' <- Request.postBlob "/render/pdf" (fromString content)
         case renderedPDF' of
           Left _ -> pure unit -- Handle error
-          Right body -> H.liftEffect $ log $ "PDF rendered successfully: " <> body
+          Right body -> do
+            url <- H.liftEffect $ createObjectURL body
+            H.liftEffect $ log url
+            H.modify_ \st -> st { testDownload = url }
+            let filename = "test"
+            H.liftEffect $ do
+              win  <- window
+              hdoc <- document win
+              let doc = HTMLDocument.toDocument hdoc
+
+              aEl <- Document.createElement "a" doc
+              case HTMLElement.fromElement aEl of
+                Nothing     -> pure unit
+                Just aHtml  -> do
+                  Element.setAttribute "href" url aEl
+                  Element.setAttribute "download" filename aEl
+                  Element.setAttribute "target" "_self" aEl
+                  Element.setAttribute "style" "display:none" aEl
+
+                  mBody <- HTMLDocument.body hdoc           -- Effektvoll binden
+                  case mBody of
+                    Nothing       -> pure unit
+                    Just bodyHtml -> do
+                      let bodyEl = HTMLElement.toElement bodyHtml
+                      _ <- Node.appendChild (Element.toNode aEl) (Element.toNode bodyEl)
+                      HTMLElement.click aHtml
+                      _ <- Node.removeChild (Element.toNode aEl) (Element.toNode bodyEl)
+                      pure unit
+            H.liftEffect $ revokeObjectURL url
 
       Editor.SavedSection toBePosted title tocEntry -> do
         state <- H.get
