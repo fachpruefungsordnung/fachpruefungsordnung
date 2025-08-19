@@ -298,6 +298,7 @@ editor = connect selectTranslator $ H.mkComponent
                   "bi-file-richtext"
                   (translate (label :: _ "editor_preview") state.translator)
               , makeEditorToolbarButtonWithText
+                  true
                   state.showButtonText
                   PDF
                   "bi-filetype-pdf"
