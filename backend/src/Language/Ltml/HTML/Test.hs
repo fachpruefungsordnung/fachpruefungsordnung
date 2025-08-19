@@ -7,6 +7,7 @@ import Language.Lsd.Example.Fpo
 import Language.Ltml.HTML
 import Language.Ltml.HTML.CSS (writeCss)
 import Language.Ltml.HTML.CSS.Util (addHtmlHeader)
+import Language.Ltml.Parser.Common.Lexeme (nSc)
 import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.Pretty (prettyPrint)
@@ -15,13 +16,13 @@ import System.Directory (removeDirectoryRecursive)
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 import Prelude hiding (Enum, Word, readFile)
 
-testDoc = readFile "src/Language/Ltml/HTML/Test/studienaufbau_bachelor.txt"
+testDoc = readFile "src/Language/Ltml/HTML/Test/zugang_master.txt"
 
 parseTest :: IO ()
 parseTest = do
     text <- testDoc
     case runParser
-        (unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
+        (nSc *> unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
         ""
         text of
         Left err -> error $ errorBundlePretty err

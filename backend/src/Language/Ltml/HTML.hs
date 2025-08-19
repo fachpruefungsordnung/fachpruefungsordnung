@@ -99,6 +99,7 @@ instance ToHtmlM (Node Section) where
         titleHtml <- toHtmlM title
         let (sectionIDGetter, incrementSectionID) =
                 -- \| Check if we are inside a section or a super-section
+                -- TODO: Is [SimpleBlocks] counted as super-section? (i think yes)
                 if isSuper sectionBody
                     then (currentSuperSectionID, incSuperSectionID)
                     else (currentSectionID, incSectionID)

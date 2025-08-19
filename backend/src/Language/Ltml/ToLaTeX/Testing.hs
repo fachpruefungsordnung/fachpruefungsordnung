@@ -36,10 +36,15 @@ import Language.Ltml.AST.Section
     , SectionBody (InnerSectionBody, LeafSectionBody)
     )
 import Language.Ltml.AST.Text (TextTree (Reference, Space, Word))
+import Language.Ltml.Parser.Common.Lexeme (nSc)
 import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX (generatePDFFromSection)
-import Language.Ltml.ToLaTeX.Format (staticDocumentFormat)
+import Language.Ltml.ToLaTeX.Format
+    ( emptyAppendixFormat
+    , emptyIdentifierFormat
+    , staticDocumentFormat
+    )
 import Language.Ltml.ToLaTeX.GlobalState
     ( GlobalState (GlobalState, labelToFootNote, labelToRef)
     )
@@ -61,13 +66,16 @@ initialState =
         0
         0
         0
-        [0]
-        (FormatString [])
-        False
-        False
-        mempty
-        mempty
         0
+        0
+        [0]
+        emptyIdentifierFormat
+        emptyAppendixFormat
+        False
+        False
+        False
+        mempty
+        mempty
         mempty
 
 testThis :: (ToLaTeXM a) => a -> (LaTeX, GlobalState)
@@ -174,7 +182,10 @@ runTestToPDF = do
 runTestToLaTeX :: IO String
 runTestToLaTeX = do
     let input = readText "./src/Language/Ltml/ToLaTeX/Auxiliary/test.txt"
-    case runParser (unwrapFootnoteParser [footnoteT] (sectionP sectionT eof)) "" input of
+    case runParser
+        (nSc *> unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
+        ""
+        (input <> "\n") of
         Left err -> return (errorBundlePretty err)
         Right parsedInput -> do
             let texFile = "./src/Language/Ltml/ToLaTeX/Auxiliary/test.tex"
