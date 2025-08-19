@@ -20,10 +20,12 @@ References are always permitted.
 
 Text may be spread over several lines---maintaining indentation if any.
 Such input lines form a single logical line, joined by whitespace.
+Text is terminated by a final newline character.
 
-Any whitespace---either from a single linebreak as described above, or a
-non-empty sequence of ASCII spaces---is treated the same: as a word separator,
-which is generally rendered as a single space character.
+Any internal whitespace---either from a single linebreak as described above,
+or a non-empty sequence of ASCII spaces, but neither initial nor final---is
+treated the same: as a word separator, which is generally rendered as a single
+space character.
 In particular, it is impossible to encode a line break; lines are
 automatically broken in the output whenever an output line is full.
 

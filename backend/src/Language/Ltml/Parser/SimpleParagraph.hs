@@ -7,7 +7,8 @@ import Language.Lsd.AST.Type.SimpleParagraph
     ( SimpleParagraphType (SimpleParagraphType)
     )
 import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (SimpleParagraph))
-import Language.Ltml.Parser (Parser, nonIndented)
+import Language.Ltml.Parser (Parser)
+import Language.Ltml.Parser.Common.Indent (nonIndented)
 import Language.Ltml.Parser.Text (textForestP)
 
 simpleParagraphP :: SimpleParagraphType -> Parser SimpleParagraph

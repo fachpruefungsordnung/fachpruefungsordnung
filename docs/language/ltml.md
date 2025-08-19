@@ -33,3 +33,10 @@ See also:
 
 * Nodes can generally be [labeled](ltml/general/label.md), and
   [referenced](ltml/text.md#references) in text using those labels.
+
+
+## Comments
+
+LTML documents permit C-style line comments; that is, two forward slashes
+(`//`) generally cause text until the end of line to be ignored.
+This does not work within language constructs enclosed in curly brackets.

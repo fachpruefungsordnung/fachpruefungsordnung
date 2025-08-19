@@ -123,6 +123,7 @@ type Input = DocumentID
 data Output
   = ClickedQuery (Array String)
   | DeletedComment TOCEntry (Array Int)
+  | PostPDF String
   -- SavedSection toBePosted title TOCEntry
   | SavedSection Boolean String TOCEntry
   | RenamedNode String Path
@@ -153,6 +154,7 @@ data Action
   -- called by AutoSaveTimer subscription
   | AutoSave
   | RenderHTML
+  | PDF
   | ShowAllComments
   | Receive (Connected FPOTranslator Input)
   | HandleResize Number
@@ -295,6 +297,11 @@ editor = connect selectTranslator $ H.mkComponent
                   RenderHTML
                   "bi-file-richtext"
                   (translate (label :: _ "editor_preview") state.translator)
+              , makeEditorToolbarButtonWithText
+                  state.showButtonText
+                  PDF
+                  "bi-filetype-pdf"
+                  (translate (label :: _ "editor_pdf") state.translator)
               , makeEditorToolbarButtonWithText
                   fullFeatures
                   state.showButtonText
@@ -448,6 +455,17 @@ editor = connect selectTranslator $ H.mkComponent
       _ <- handleQuery (QueryEditor unit)
       pure unit
 
+    PDF -> do
+      allLines <- H.gets _.mEditor >>= traverse \ed -> do
+        H.liftEffect $ Editor.getSession ed
+          >>= Session.getDocument
+          >>= Document.getAllLines
+      let
+        content = case allLines of
+          Nothing -> ""
+          Just ls -> intercalate "\n" ls
+      H.raise (PostPDF content)
+
     ShowAllComments -> do
       H.raise ShowAllCommentsOutput
 
@@ -455,64 +473,57 @@ editor = connect selectTranslator $ H.mkComponent
 
     Save -> do
       state <- H.get
-      allLines <- H.gets _.mEditor >>= traverse \ed -> do
-        H.liftEffect $ Editor.getSession ed
-          >>= Session.getDocument
-          >>= Document.getAllLines
-      let
-        contentLines =
-          fromMaybe { title: "", contentText: "" } do
-            { head, tail } <- uncons =<< allLines
-            pure { title: head, contentText: intercalate "\n" tail }
+      isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
+        Just r -> pure r
+        Nothing -> EC.liftEffect $ Ref.new false
+      when isDirty $
+        -- Save the current content of the editor and send it to the server
+        case state.mContent of
+          Nothing -> pure unit
+          Just content -> do
+            allLines <- H.gets _.mEditor >>= traverse \ed -> do
+              H.liftEffect $ Editor.getSession ed
+                >>= Session.getDocument
+                >>= Document.getAllLines
 
-      case state.mTocEntry of
-        Nothing -> do
-          -- No leaf entity was selected, so if a nodePath is set,
-          -- we can emit an event to rename the node.
-          case state.mNodePath of
-            Nothing -> do
-              pure unit -- Nothing to do
-            Just path -> do
-              H.raise $ RenamedNode (contentLines.title) path
-        Just _ ->
-          case state.mContent of
-            Nothing -> do
-              pure unit
-            Just content -> do
-              -- Save the current content of the editor and send it to the server
-              let
-                title = contentLines.title
-                contentText = contentLines.contentText
+            -- Save the current content of the editor
+            let
+              contentLines =
+                fromMaybe { title: "", contentText: "" } do
+                  { head, tail } <- uncons =<< allLines
+                  pure { title: head, contentText: intercalate "\n" tail }
+              title = contentLines.title
+              contentText = contentLines.contentText
 
-                -- place it in contentDto
-                newContent = ContentDto.setContentText contentText content
+              -- place it in contentDto
+              newContent = ContentDto.setContentText contentText content
 
-                -- extract the current TOC entry
-                entry = case state.mTocEntry of
-                  Nothing -> emptyTOCEntry
-                  Just e -> e
+              -- extract the current TOC entry
+              entry = case state.mTocEntry of
+                Nothing -> emptyTOCEntry
+                Just e -> e
 
-              -- Since the ids and postions in liveMarkers are changing constantly,
-              -- extract them now and store them
-              updatedMarkers <- H.liftEffect do
-                for entry.markers \m -> do
-                  case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
-                    -- TODO Should we add other markers in liveMarkers such as errors?
-                    Nothing -> pure m
-                    Just lm -> do
-                      start <- Anchor.getPosition lm.startAnchor
-                      end <- Anchor.getPosition lm.endAnchor
-                      pure m
-                        { startRow = Types.getRow start
-                        , startCol = Types.getColumn start
-                        , endRow = Types.getRow end
-                        , endCol = Types.getColumn end
-                        }
-              -- update the markers in entry
-              let newEntry = entry { markers = updatedMarkers }
+            -- Since the ids and postions in liveMarkers are changing constantly,
+            -- extract them now and store them
+            updatedMarkers <- H.liftEffect do
+              for entry.markers \m -> do
+                case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
+                  -- TODO Should we add other markers in liveMarkers such as errors?
+                  Nothing -> pure m
+                  Just lm -> do
+                    start <- Anchor.getPosition lm.startAnchor
+                    end <- Anchor.getPosition lm.endAnchor
+                    pure m
+                      { startRow = Types.getRow start
+                      , startCol = Types.getColumn start
+                      , endRow = Types.getRow end
+                      , endCol = Types.getColumn end
+                      }
+            -- update the markers in entry
+            let newEntry = entry { markers = updatedMarkers }
 
-              -- Try to upload
-              handleAction $ Upload newEntry title newContent
+            -- Try to upload
+            handleAction $ Upload newEntry title newContent
 
     Upload newEntry title newContent -> do
       state <- H.get
@@ -802,6 +813,10 @@ editor = connect selectTranslator $ H.mkComponent
           Document.setValue (title <> "\n" <> ContentDto.getContentText content)
             document
 
+          -- reset Ref, because loading new content is considered 
+          -- changing the existing content, which would set the flag
+          for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
+
           -- Reset Undo history
           undoMgr <- Session.getUndoManager session
           UndoMgr.reset undoMgr
@@ -826,9 +841,6 @@ editor = connect selectTranslator $ H.mkComponent
         -- Update state with new marker IDs
         H.modify_ \st ->
           st { liveMarkers = newLiveMarkers }
-      -- reset Ref, because loading new content is considered 
-      -- changing the existing content, which would set the flag
-      for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
       pure (Just a)
 
     ChangeToNode title path a -> do

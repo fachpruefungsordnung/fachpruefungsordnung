@@ -10,6 +10,7 @@ import Language.Lsd.Example.Fpo (footnoteT, sectionT)
 import Language.Ltml.HTML (renderHtmlCss)
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util
+import Language.Ltml.Parser.Common.Lexeme (nSc)
 import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
 import Language.Ltml.Parser.Section (sectionP)
 import Lucid
@@ -18,7 +19,10 @@ import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 -- | Parse section and render HTML with inlined CSS
 htmlPipeline :: Text -> ByteString
 htmlPipeline input =
-    case runParser (unwrapFootnoteParser [footnoteT] (sectionP sectionT eof)) "" input of
+    case runParser
+        (nSc *> unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
+        ""
+        (input <> "\n") of
         Left err -> renderBS $ errorHtml (errorBundlePretty err)
         Right (nodeSection, footnoteMap) ->
             let (body, css) = renderHtmlCss nodeSection footnoteMap

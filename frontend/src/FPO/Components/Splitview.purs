@@ -8,6 +8,7 @@ module FPO.Component.Splitview where
 
 import Prelude
 
+import Data.Argonaut (fromString)
 import Data.Array
   ( cons
   , deleteAt
@@ -66,8 +67,16 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
+import Web.DOM.Document as Document
+import Web.DOM.Element as Element
+import Web.DOM.Node as Node
 import Web.Event.Event (EventType(..), stopPropagation)
+import Web.File.Url (createObjectURL, revokeObjectURL)
+import Web.HTML (window)
 import Web.HTML as Web.HTML
+import Web.HTML.HTMLDocument as HTMLDocument
+import Web.HTML.HTMLElement as HTMLElement
+import Web.HTML.Window (document)
 import Web.HTML.Window as Web.HTML.Window
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 
@@ -128,6 +137,7 @@ type State =
   --   to the preview component.
   -- TODO: Which one to use?
   , renderedHtml :: Maybe String
+  , testDownload :: String
 
   -- Store tocEntries and send some parts to its children components
   , tocEntries :: TOCTree
@@ -181,6 +191,7 @@ splitview = H.mkComponent
       , lastExpandedSidebarRatio: 0.2
       , lastExpandedPreviewRatio: 0.4
       , renderedHtml: Nothing
+      , testDownload: ""
       , tocEntries: Empty
       , versionMapping: Empty
       , mTimeFormatter: Nothing
@@ -464,6 +475,21 @@ splitview = H.mkComponent
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
 
+    Init -> do
+      let timeFormatter = head timeStampsVersions
+      H.modify_ \st -> do
+        st { mTimeFormatter = timeFormatter }
+      H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
+      H.tell _commentOverview unit
+        (CommentOverview.ReceiveTimeFormatter timeFormatter)
+      H.tell _toc unit (TOC.ReceiveTOCs Empty)
+      -- Load the initial TOC entries into the editor
+      -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
+      -- or rather, we don't use commit anymore in the API
+      handleAction GET
+
+    -- API Actions
+
     POST -> do
       state <- H.get
       let
@@ -498,18 +524,6 @@ splitview = H.mkComponent
         , versionMapping = vMapping
         }
       H.tell _toc unit (TOC.ReceiveTOCs finalTree)
-    Init -> do
-      let timeFormatter = head timeStampsVersions
-      H.modify_ \st -> do
-        st { mTimeFormatter = timeFormatter }
-      H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
-      H.tell _commentOverview unit
-        (CommentOverview.ReceiveTimeFormatter timeFormatter)
-      H.tell _toc unit (TOC.ReceiveTOCs Empty)
-      -- Load the initial TOC entries into the editor
-      -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
-      -- or rather, we don't use commit anymore in the API
-      handleAction GET
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -727,6 +741,45 @@ splitview = H.mkComponent
                 map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
             }
         H.tell _comment unit (Comment.DeletedComment tocEntry.id deletedIDs)
+
+      Editor.PostPDF content -> do
+        renderedPDF' <- Request.postBlob "/render/pdf" (fromString content)
+        case renderedPDF' of
+          Left _ -> pure unit
+          Right body -> do
+            -- create blobl link
+            url <- H.liftEffect $ createObjectURL body
+            -- Create an invisible link and click it to download PDF
+            H.liftEffect $ do
+              -- get window stuff
+              win <- window
+              hdoc <- document win
+              let doc = HTMLDocument.toDocument hdoc
+
+              -- create link
+              aEl <- Document.createElement "a" doc
+              case HTMLElement.fromElement aEl of
+                Nothing -> pure unit
+                Just aHtml -> do
+                  Element.setAttribute "href" url aEl
+                  Element.setAttribute "download" "test.pdf" aEl
+                  Element.setAttribute "target" "_self" aEl
+                  Element.setAttribute "rel" "noopener noreferrer" aEl
+                  Element.setAttribute "style" "display:none" aEl
+                  mBody <- HTMLDocument.body hdoc
+                  case mBody of
+                    Nothing -> pure unit
+                    Just bodyHtml -> do
+                      -- click the link
+                      let bodyEl = HTMLElement.toElement bodyHtml
+                      _ <- Node.appendChild (Element.toNode aEl)
+                        (Element.toNode bodyEl)
+                      HTMLElement.click aHtml
+                      _ <- Node.removeChild (Element.toNode aEl)
+                        (Element.toNode bodyEl)
+                      pure unit
+            -- deactivate the blob link
+            H.liftEffect $ revokeObjectURL url
 
       Editor.SavedSection toBePosted title tocEntry -> do
         state <- H.get

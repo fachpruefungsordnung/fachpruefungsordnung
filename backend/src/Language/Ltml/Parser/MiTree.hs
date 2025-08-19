@@ -10,8 +10,6 @@ module Language.Ltml.Parser.MiTree
     , hangingBlock
     , hangingBlock'
     , hangingBlock_
-    , sp
-    , sp1
     )
 where
 
@@ -21,15 +19,13 @@ import Control.Applicative.Utils ((<:>))
 import Control.Monad (void, when)
 import Data.Text (Text)
 import Data.Text.FromWhitespace (FromWhitespace, fromWhitespace)
-import Language.Ltml.Parser
-    ( MonadParser
-    , checkIndent
-    , eoi
+import Language.Ltml.Parser (MonadParser)
+import Language.Ltml.Parser.Common.Indent
+    ( checkIndent
     , nextIndentLevel
     , nli
-    , sp
-    , sp1
     )
+import Language.Ltml.Parser.Common.Lexeme (sp, sp1)
 import Text.Megaparsec (Pos)
 import qualified Text.Megaparsec.Char.Lexer as L (indentLevel)
 
@@ -47,7 +43,8 @@ data MiElementConfig = MiElementConfig
     --   case whitespace is always dropped).
     }
 
--- | Parse a list of mixed indentation trees (a forest).
+-- | Parse a list of mixed indentation trees (a forest), terminated by a
+--   newline (plus indentation).
 --
 --   In-line nodes are parsed by @'elementPF' p@, where @p@ is supplied as the
 --   parser for the children nodes.
@@ -70,7 +67,7 @@ data MiElementConfig = MiElementConfig
 --   itself--except at the very beginning, where it may expect that any
 --   indentation has been parsed and the indentation is correct.
 --   Further, 'childP' must only succeed after a final newline (plus
---   indentation) or EOF (see also 'eoi').
+--   indentation).
 --   Typically, 'childP' uses 'hangingBlock', which satisfies these
 --   requirements.
 miForest
@@ -101,7 +98,7 @@ miForestFrom elementPF childP lvl = go False
         --    at the start of a line.
         --    - Exception: `goE`, initially.
         --  - The `goX'` parsers must only be used at the start of a line
-        --    (after indentation; i.e., after `nli'`).
+        --    (after indentation; i.e., after `nli`).
 
         -- Parse forest, headed by element.
         goE :: m [a]
@@ -124,7 +121,7 @@ miForestFrom elementPF childP lvl = go False
                 goAny :: m [a]
                 goAny =
                     f mempty <$> goE
-                        <|> wEnd goEnd
+                        <|> whenAlt isBracketed (wEnd goEnd)
 
                 goAny' :: Text -> m [a]
                 goAny' s =
@@ -174,7 +171,7 @@ hangingBlock keywordP elementPF childP = do
     lvl' <- nextIndentLevel <$> L.indentLevel
     f <- keywordP
     void sp1 <|> void nli <* checkIndent lvl'
-    f <$> miForestFrom elementPF childP lvl' <* eoi lvl'
+    f <$> miForestFrom elementPF childP lvl'
 
 -- | Version of 'hangingBlock' where the keyword parser may yield any value,
 --   which is paired with the parsed mi-forest.

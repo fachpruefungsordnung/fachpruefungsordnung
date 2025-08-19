@@ -16,6 +16,7 @@ module Language.Ltml.ToLaTeX.Type
     , large
     , small
     , medskip
+    , resetFootnoteCTR
     , usepackage
     , documentclass
     , linebreak
@@ -120,6 +121,9 @@ medskip = Raw "\n\\medskip\n"
 
 hfill :: LaTeX
 hfill = Raw "\\hfill"
+
+resetFootnoteCTR :: LaTeX
+resetFootnoteCTR = Raw "\\setcounter{footnote}{0}"
 
 -------------------------------------------------------------------------------
 {-                              environments                                 -}

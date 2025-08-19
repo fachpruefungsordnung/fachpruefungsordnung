@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module Language.Ltml.ToLaTeX.GlobalState
@@ -7,10 +8,11 @@ module Language.Ltml.ToLaTeX.GlobalState
     , nextParagraph
     , nextSentence
     , nextFootnote
+    , nextAppendix
     , insertRefLabel
     , nextEnumPosition
     , descendEnumTree
-    , emptyFormat
+    , addTOCEntry
     , DList (DList)
     , fromDList
     , toDList
@@ -19,10 +21,17 @@ module Language.Ltml.ToLaTeX.GlobalState
 import Control.Monad.State
 import Data.Map (Map, insert)
 import qualified Data.Text.Lazy as LT
-import Language.Lsd.AST.Format (FormatString (FormatString), IdentifierFormat)
+import Language.Lsd.AST.Format (IdentifierFormat, KeyFormat)
+import Language.Lsd.AST.Type.AppendixSection (AppendixElementFormat)
 import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label)
-import Language.Ltml.ToLaTeX.Type (LaTeX)
+import Language.Ltml.ToLaTeX.Format
+    ( emptyAppendixFormat
+    , emptyIdentifierFormat
+    , formatKey
+    , getIdentifier
+    )
+import Language.Ltml.ToLaTeX.Type (LaTeX (Text), linebreak)
 
 -- to build the table of contents we want to accumulate all headings in a list.
 -- this can be inefficient with normal lists, so we use a difference list
@@ -42,20 +51,28 @@ toDList xs = DList (xs ++)
 
 -- State for labeling
 data GlobalState = GlobalState
-    { supersectionCTR :: Int -- counter for supersections
+    { {- Counters to keep track of the position in the document -}
+      supersectionCTR :: Int -- counter for supersections
     , sectionCTR :: Int -- counter for sections
     , paragraphCTR :: Int -- counter for paragraphs within a section
     , sentenceCTR :: Int -- counter for sentences within a paragraph
-    , enumPosition :: [Int] -- tracks the current position in an enum tree
-    , enumIdentifier :: IdentifierFormat -- since the style of the identifier is defined
-    -- globally for one enumueration,
-    -- we need to pass it to the children
-    , onlyOneParagraph :: Bool -- needed for sections with only one paragraphs
+    , footnoteCTR :: Int -- counter for footnotes
+    , appendixCTR :: Int -- counter for appendix sections
+    {- Path for current enum position -}
+    , enumPosition :: [Int]
+    , {- since the style of the identifier is defined globally for an
+         enumeration or appendix we need to pass it to the children -}
+      enumIdentifier :: IdentifierFormat
+    , appendixFormat :: AppendixElementFormat
+    , {- Flags for special cases -}
+      onlyOneParagraph :: Bool -- needed for sections with only one paragraphs
     , isSupersection :: Bool -- needed for heading
-    , labelToRef :: Map Label LT.Text -- map for ref labels
-    , labelToFootNote :: Map Label Footnote -- map for footnote labels
-    , footnoteCTR :: Int
-    , toc :: DList LaTeX
+    , isAppendix :: Bool -- needed for appendix sections
+    {- Maps for labels -}
+    , labelToRef :: Map Label LT.Text
+    , labelToFootNote :: Map Label Footnote
+    , {- functional list that builds the table of contents -}
+      toc :: DList LaTeX
     }
 
 nextSupersection :: State GlobalState Int
@@ -93,6 +110,13 @@ nextFootnote = do
     put st {footnoteCTR = n}
     pure n
 
+nextAppendix :: State GlobalState Int
+nextAppendix = do
+    st <- get
+    let n = appendixCTR st + 1
+    put st {appendixCTR = n}
+    pure n
+
 -- Get the next label at the current depth
 nextEnumPosition :: State GlobalState [Int]
 nextEnumPosition = do
@@ -119,6 +143,23 @@ insertRefLabel mLabel ident = do
         (pure ())
         (\l -> modify (\s -> s {labelToRef = insert l ident (labelToRef s)}))
         mLabel
+
+addTOCEntry
+    :: Int -> KeyFormat -> IdentifierFormat -> LaTeX -> State GlobalState ()
+addTOCEntry n keyident ident headingText =
+    modify
+        ( \s ->
+            s
+                { toc =
+                    toc s
+                        <> toDList
+                            [ formatKey keyident (Text $ getIdentifier ident n)
+                            , Text " "
+                            , headingText
+                            , linebreak
+                            ]
+                }
+        )
 
 ------------------------------- example for texting -------------------------------
 -- example structure
@@ -201,12 +242,25 @@ exampleTree' =
         , Node [] [Node [] []]
         ]
 
-emptyFormat :: IdentifierFormat
-emptyFormat = FormatString []
-
 -- Run it
 main :: IO ()
 main = do
-    let initialState = GlobalState 0 0 0 0 [0] emptyFormat False False mempty mempty 0 mempty
+    let initialState =
+            GlobalState
+                0
+                0
+                0
+                0
+                0
+                0
+                [0]
+                emptyIdentifierFormat
+                emptyAppendixFormat
+                False
+                False
+                False
+                mempty
+                mempty
+                mempty
         labeled = evalState (labelTree exampleTree') initialState
     print labeled
