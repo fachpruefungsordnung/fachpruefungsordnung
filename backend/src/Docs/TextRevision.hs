@@ -183,7 +183,7 @@ data TextRevision
     = TextRevision
     { header :: TextRevisionHeader
     , content :: Text
-    , commentAchors :: Vector CommentAnchor
+    , commentAnchors :: Vector CommentAnchor
     }
     deriving (Generic)
 

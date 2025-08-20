@@ -66,7 +66,8 @@ import UserManagement.User (UserID)
 import Data.Functor ((<&>))
 import qualified Data.Text as Text
 import Docs.Comment
-    ( Comment (Comment)
+    ( Anchor (Anchor)
+    , Comment (Comment)
     , CommentAnchor (CommentAnchor)
     , CommentID (CommentID, unCommentID)
     , CommentRef (CommentRef)
@@ -1134,12 +1135,14 @@ existsComment =
     mapInput (CommentRef (TextElementRef docID textID) commentID) =
         (unDocumentID docID, unTextElementID textID, unCommentID commentID)
 
-uncurryCommentAnchor :: (Int64, Int64, Int64) -> CommentAnchor
-uncurryCommentAnchor (comment, start, end) =
-    CommentAnchor
-        { Comment.comment = CommentID comment
-        , Comment.anchor = Comment.range start end
-        }
+uncurryCommentAnchor :: (Int64, Int64, Int64, Int64, Int64) -> CommentAnchor
+uncurryCommentAnchor (comment, start_col, start_row, end_col, end_row) =
+    let start = Anchor start_col start_row
+        end = Anchor end_col end_row
+     in CommentAnchor
+            { Comment.comment = CommentID comment
+            , Comment.anchor = Comment.range start end
+            }
 
 putCommentAnchor :: Statement (TextRevisionID, CommentAnchor) CommentAnchor
 putCommentAnchor =
@@ -1149,25 +1152,33 @@ putCommentAnchor =
             uncurryCommentAnchor
             [singletonStatement|
                 INSERT INTO doc_comment_anchors
-                    (revision, comment, span_start, span_end)
+                    (revision, comment, start_col, start_row, end_col, end_row)
                 VALUES
-                    ($1 :: INT8, $2 :: INT8, $3 :: INT8, $4 :: INT8)
+                    ($1 :: INT8, $2 :: INT8, $3 :: INT8, $4 :: INT8, $5 :: INT8, $6 :: INT8)
                 ON CONFLICT (comment, revision)
                 DO UPDATE SET
-                    span_start = EXCLUDED.span_start,
-                    span_end = EXLUDED.span_end
+                    start_col = EXCLUDED.start_col,
+                    start_row = EXCLUDED.start_col,
+                    end_col = EXCLUDED.end_col,
+                    end_row = EXCLUDED.end_row
                 RETURNING
                     comment :: INT8,
-                    span_start :: INT8,
-                    span_end :: INT8
+                    start_col :: INT8,
+                    start_row :: INT8,
+                    end_col :: INT8,
+                    end_row :: INT8
             |]
   where
     mapInput (revID, anchor) =
         let range = Comment.anchor anchor
+            start = Comment.start range
+            end = Comment.end range
          in ( unTextRevisionID revID
             , unCommentID $ Comment.comment anchor
-            , Comment.start range
-            , Comment.end range
+            , Comment.col start
+            , Comment.row start
+            , Comment.col end
+            , Comment.row end
             )
 
 getCommentAnchors :: Statement TextRevisionID (Vector CommentAnchor)
@@ -1178,8 +1189,10 @@ getCommentAnchors =
             [vectorStatement|
                 SELECT
                     comment :: INT8,
-                    span_start :: INT8,
-                    span_end :: INT8
+                    start_col :: INT8,
+                    start_row :: INT8,
+                    end_col :: INT8,
+                    end_row :: INT8
                 FROM
                     doc_comment_anchors
                 WHERE
