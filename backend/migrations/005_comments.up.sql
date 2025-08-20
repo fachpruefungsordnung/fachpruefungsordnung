@@ -10,8 +10,9 @@ CREATE TABLE IF NOT EXISTS doc_comments (
 CREATE TABLE IF NOT EXISTS doc_comment_anchors (
     comment BIGINT NOT NULL REFERENCES doc_comments (id),
     revision BIGINT NOT NULL REFERENCES doc_text_revisions (id),
-    span_start BIGINT NOT NULL,
-    span_end BIGINT NOT NULL,
-    PRIMARY KEY (comment, revision),
-    CHECK (span_start <= span_end)
+    start_col BIGINT NOT NULL,
+    start_row BIGINT NOT NULL,
+    end_col BIGINT NOT NULL,
+    end_row BIGINT NOT NULL,
+    PRIMARY KEY (comment, revision)
 );
