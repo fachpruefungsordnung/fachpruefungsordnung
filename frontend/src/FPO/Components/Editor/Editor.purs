@@ -83,6 +83,8 @@ import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
+import Effect.Console (log)
+
 type Path = Array Int
 
 type State = FPOState
@@ -815,6 +817,8 @@ editor = connect selectTranslator $ H.mkComponent
             Just res -> res
           content = getWrapperContent wrapper
           comments = getWrapperComments wrapper
+        
+        H.liftEffect $ log $ show wrapper
         H.modify_ \st -> st { mContent = Just content }
 
         newLiveMarkers <- H.liftEffect do

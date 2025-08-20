@@ -13,8 +13,10 @@ import FPO.Types (AnnotatedMarker)
 
 newtype CommentAnchor = CommentAnchor
   { id :: Int
-  , start :: Int
-  , end :: Int
+  , startCol :: Int
+  , startRow :: Int
+  , endCol :: Int
+  , endRow :: Int
   }
 
 newtype Content = Content
@@ -37,8 +39,19 @@ instance decodeJsonCommentAnchor :: DecodeJson CommentAnchor where
     comId <- obj .: "comment"
     anc <- obj .: "anchor"
     start <- anc .: "start"
+    sCol <- start .: "col"
+    sRow <- start .: "row"
     end <- anc .: "end"
-    pure $ CommentAnchor { id: comId, start: start, end: end }
+    eCol <- end .: "col"
+    eRow <- end .: "row"
+    pure $ 
+      CommentAnchor 
+        { id: comId
+        , startCol: sCol
+        , startRow: sRow
+        , endCol: eCol
+        , endRow: eRow 
+        }
 
 instance decodeJsonContent :: DecodeJson Content where
   decodeJson json = do
@@ -53,16 +66,23 @@ instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
     obj <- decodeJson json
     rev <- obj .: "revision"
     con <- decodeJson (fromObject rev)
-    coms <- rev .: "commentAchors"
+    coms <- rev .: "commentAnchors"
     coms' <- traverse (map CommentAnchor <<< decodeJson) coms
     pure $ Wrapper { content: con, comments: coms'}
 
 instance encodeJsonCommentAnchor :: EncodeJson CommentAnchor where
-  encodeJson (CommentAnchor {id, start, end}) =
+  encodeJson (CommentAnchor {id, startCol, startRow, endCol, endRow }) =
     encodeJson 
       { anchor: 
-        { start: start
-        , end: end} 
+        { start: 
+          { col: startCol
+          , row: startRow
+          }
+        , end: 
+          { col: endCol
+          , row: endRow
+          }
+        } 
         , comment: id
         }
 
@@ -82,8 +102,8 @@ instance encodeJsonContentWrapper :: EncodeJson ContentWrapper where
       }
 
 instance showCommentAnchor :: Show CommentAnchor where
-  show (CommentAnchor {id, start, end}) = 
-    "Comment { id: " <> show id <> ", start: " <> show start <> ", end: " <> show end <> " }"
+  show (CommentAnchor {id, startCol, startRow, endCol, endRow }) = 
+    "Comment { id: " <> show id <> ", startCol: " <> show startCol <> ", startRow: " <> show startRow <> ", endCol: " <> show endCol <> ", endRow: " <> show endRow <>" }"
 
 instance showContent :: Show Content where
   show (Content { content, parent }) = "Content { content: " <> content
@@ -136,13 +156,13 @@ extractNewParent (Content cont) json = do
 convertToAnnotetedMarker 
   :: CommentAnchor
   -> AnnotatedMarker
-convertToAnnotetedMarker (CommentAnchor {id, start, end}) =
+convertToAnnotetedMarker (CommentAnchor {id, startCol, startRow, endCol, endRow }) =
   { id: id
   , type: "info"
-  , startRow: start
-  , startCol: 0
-  , endRow: end
-  , endCol: 0
+  , startRow: startRow
+  , startCol: startCol
+  , endRow: endRow
+  , endCol: endCol
   , markerText: "tbc"
   , mCommentSection: Nothing
   } 
