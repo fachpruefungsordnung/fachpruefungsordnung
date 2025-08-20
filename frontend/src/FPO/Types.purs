@@ -46,18 +46,6 @@ type TOCEntry =
   , name :: String
   -- paragraph ID (§id) for later
   , paraID :: Int
-  -- Is stored as 32bit Int = 2,147,483,647
-  -- Schould not create so many markers, right?
-  , newMarkerNextID :: Int
-  , markers :: Array AnnotatedMarker
-  }
-
--- shortend version for TOC component to not update its content
--- since it only uses id and name only
-type ShortendTOCEntry =
-  { id :: Int
-  , paraID :: Int
-  , name :: String
   }
 
 type TOCTree = RootTree TOCEntry
@@ -68,8 +56,6 @@ emptyTOCEntry =
   { id: -1
   , name: "Error"
   , paraID: -1
-  , newMarkerNextID: -1
-  , markers: []
   }
 
 findTOCEntry :: Int -> TOCTree -> Maybe TOCEntry
@@ -81,12 +67,6 @@ findTitleTOCEntry tocID = findTitleRootTree (\e -> e.id == tocID)
 replaceTOCEntry :: Int -> String -> TOCEntry -> TOCTree -> TOCTree
 replaceTOCEntry tocID = replaceNodeRootTree (\e -> e.id == tocID)
 
-findCommentSection :: Int -> Int -> TOCTree -> Maybe CommentSection
-findCommentSection tocID markerID tocEntries = do
-  entry <- findTOCEntry tocID tocEntries
-  marker <- find (\m -> m.id == markerID) entry.markers
-  marker.mCommentSection
-
 sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker
 sortMarkers = sortBy (comparing _.startRow <> comparing _.startCol)
 
@@ -97,9 +77,6 @@ markerToAnnotation m =
   , text: m.markerText
   , type: m.type
   }
-
-shortenTOC :: TOCEntry -> ShortendTOCEntry
-shortenTOC { id, paraID, name } = { id, paraID, name }
 
 -- TODO create more timestamps versions and discuss, where to store this
 timeStampsVersions :: Array Formatter
@@ -161,8 +138,6 @@ nodeHeaderToTOCEntry nh =
   { id: NH.getId nh
   , name: NH.getKind nh
   , paraID: 0 -- implement it later
-  , newMarkerNextID: 0
-  , markers: []
   }
 
 tocEntryToNodeHeader :: TOCEntry -> NH.NodeHeader

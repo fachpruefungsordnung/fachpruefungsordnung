@@ -2,31 +2,88 @@ module FPO.Dto.ContentDto where
 
 import Prelude
 
-import Data.Argonaut (Json)
+import Data.Argonaut (Json, fromObject)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError, decodeJson, (.:))
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Either (Either)
+import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
+import Data.Traversable (traverse)
+import FPO.Types (AnnotatedMarker)
+
+newtype CommentAnchor = CommentAnchor
+  { id :: Int
+  , start :: Int
+  , end :: Int
+  }
 
 newtype Content = Content
   { content :: String
   , parent :: Int
   }
 
+newtype ContentWrapper = Wrapper
+  { content :: Content
+  , comments :: Array CommentAnchor
+  }
+
+derive instance newtypeCommentAnchor :: Newtype CommentAnchor _
 derive instance newtypeContent :: Newtype Content _
+derive instance newtypeContentWrapper :: Newtype ContentWrapper _
+
+instance decodeJsonCommentAnchor :: DecodeJson CommentAnchor where
+  decodeJson json = do
+    obj <- decodeJson json
+    comId <- obj .: "comment"
+    anc <- obj .: "anchor"
+    start <- anc .: "start"
+    end <- anc .: "end"
+    pure $ CommentAnchor { id: comId, start: start, end: end }
 
 instance decodeJsonContent :: DecodeJson Content where
   decodeJson json = do
     obj <- decodeJson json
-    rev <- obj .: "revision"
-    con <- rev .: "content"
-    header <- rev .: "header"
+    con <- obj .: "content"
+    header <- obj .: "header"
     id <- header .: "identifier"
     pure $ Content { content: con, parent: id }
 
+instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
+  decodeJson json = do
+    obj <- decodeJson json
+    rev <- obj .: "revision"
+    con <- decodeJson (fromObject rev)
+    coms <- rev .: "commentAchors"
+    coms' <- traverse (map CommentAnchor <<< decodeJson) coms
+    pure $ Wrapper { content: con, comments: coms'}
+
+instance encodeJsonCommentAnchor :: EncodeJson CommentAnchor where
+  encodeJson (CommentAnchor {id, start, end}) =
+    encodeJson 
+      { anchor: 
+        { start: start
+        , end: end} 
+        , comment: id
+        }
+
 instance encodeJsonContent :: EncodeJson Content where
   encodeJson (Content { content, parent }) =
-    encodeJson { content: content, parent: parent }
+    encodeJson 
+      { content: content
+      , parent: parent 
+      }
+
+instance encodeJsonContentWrapper :: EncodeJson ContentWrapper where
+  encodeJson (Wrapper { content: Content { content, parent }, comments }) =
+    encodeJson
+      { content: content
+      , parent: parent
+      , commentAnchors: map encodeJson comments
+      }
+
+instance showCommentAnchor :: Show CommentAnchor where
+  show (CommentAnchor {id, start, end}) = 
+    "Comment { id: " <> show id <> ", start: " <> show start <> ", end: " <> show end <> " }"
 
 instance showContent :: Show Content where
   show (Content { content, parent }) = "Content { content: " <> content
@@ -34,14 +91,26 @@ instance showContent :: Show Content where
     <> show parent
     <> " }"
 
+instance showContentWrapper :: Show ContentWrapper where
+  show (Wrapper { content, comments }) = "Content : { " <> show content <> ", " <> show comments <> " }"
+
 decodeContent :: Json -> Either JsonDecodeError Content
 decodeContent json = decodeJson json
+
+decodeContentWrapper :: Json -> Either JsonDecodeError ContentWrapper
+decodeContentWrapper json = decodeJson json
 
 encodeContent :: Content -> Json
 encodeContent content = encodeJson content
 
 getContentText :: Content -> String
 getContentText (Content { content }) = content
+
+getWrapperContent :: ContentWrapper -> Content
+getWrapperContent (Wrapper { content }) = content
+
+getWrapperComments :: ContentWrapper -> Array CommentAnchor
+getWrapperComments (Wrapper { comments }) = comments
 
 setContentText :: String -> Content -> Content
 setContentText newText (Content { parent }) = Content { content: newText, parent }
@@ -53,6 +122,9 @@ setContentParent newParent (Content { content }) = Content
 failureContent :: Content
 failureContent = Content { content: "Error decoding content", parent: -1 }
 
+failureContentWrapper :: ContentWrapper
+failureContentWrapper = Wrapper { content: failureContent, comments: [] }
+
 extractNewParent :: Content -> Json -> Either JsonDecodeError Content
 extractNewParent (Content cont) json = do
   obj <- decodeJson json
@@ -60,3 +132,17 @@ extractNewParent (Content cont) json = do
   header <- newRev .: "header"
   newPar <- header .: "identifier"
   pure $ Content $ cont { parent = newPar }
+
+convertToAnnotetedMarker 
+  :: CommentAnchor
+  -> AnnotatedMarker
+convertToAnnotetedMarker (CommentAnchor {id, start, end}) =
+  { id: id
+  , type: "info"
+  , startRow: start
+  , startCol: 0
+  , endRow: end
+  , endCol: 0
+  , markerText: "tbc"
+  , mCommentSection: Nothing
+  } 

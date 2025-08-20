@@ -28,7 +28,6 @@ import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -498,11 +497,7 @@ splitview = H.mkComponent
 
       rep <- Request.postJson Right ("/docs/" <> show state.docID <> "/tree")
         encodedTree
-      -- debugging logs in
-      case rep of -- TODO please handle the response
-        Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
-        Right _ -> pure unit
-    -- H.liftEffect $ Console.log "Successfully posted TOC to server"
+      pure unit
 
     GET -> do
       s <- H.get
@@ -680,51 +675,50 @@ splitview = H.mkComponent
         H.modify_ \st -> st { commentShown = false }
 
       -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
-      Comment.UpdateComment tocID markerID newCommentSection -> do
-        H.tell _editor unit Editor.SaveSection
-        state <- H.get
-        case
-          findRootTree (\e -> e.elementID == tocID && e.versionID /= Nothing)
-            state.versionMapping
-          of
-          Just _ -> do
-            let
-              updatedTOCEntries = map
-                ( \entry ->
-                    if entry.id /= tocID then entry
-                    else
-                      let
-                        newMarkers =
-                          ( map
-                              ( \marker ->
-                                  if marker.id /= markerID then marker
-                                  else marker
-                                    { mCommentSection = Just newCommentSection }
-                              )
-                              entry.markers
-                          )
-                      in
-                        entry { markers = newMarkers }
-                )
-                state.tocEntries
-              updateTOCEntry = fromMaybe
-                emptyTOCEntry
-                (findTOCEntry tocID updatedTOCEntries)
-              title = fromMaybe
-                ""
-                (findTitleTOCEntry tocID updatedTOCEntries)
-            H.modify_ \s -> s { tocEntries = updatedTOCEntries }
-            H.tell _editor unit (Editor.ChangeSection title updateTOCEntry Nothing)
-          Nothing -> do
-            H.liftEffect $ log
-              "unable to unpdate comment on outdated versions of elements"
+      Comment.UpdateComment markerID newCommentSection -> do
+        pure unit
+        -- H.tell _editor unit Editor.SaveSection
+        -- state <- H.get
+        -- case
+        --   findRootTree (\e -> e.elementID == tocID && e.versionID /= Nothing)
+        --     state.versionMapping
+        --   of
+        --   Just _ -> do
+        --     let
+        --       updatedTOCEntries = map
+        --         ( \entry ->
+        --             if entry.id /= tocID then entry
+        --             else
+        --               let
+        --                 newMarkers =
+        --                   ( map
+        --                       ( \marker ->
+        --                           if marker.id /= markerID then marker
+        --                           else marker
+        --                             { mCommentSection = Just newCommentSection }
+        --                       )
+        --                       entry.markers
+        --                   )
+        --               in
+        --                 entry { markers = newMarkers }
+        --         )
+        --         state.tocEntries
+        --       updateTOCEntry = fromMaybe
+        --         emptyTOCEntry
+        --         (findTOCEntry tocID updatedTOCEntries)
+        --       title = fromMaybe
+        --         ""
+        --         (findTitleTOCEntry tocID updatedTOCEntries)
+        --     H.modify_ \s -> s { tocEntries = updatedTOCEntries }
+        --     H.tell _editor unit (Editor.ChangeSection title updateTOCEntry Nothing)
+        --   Nothing -> do
 
     HandleCommentOverview output -> case output of
 
       CommentOverview.JumpToCommentSection tocID markerID commentSection -> do
         H.modify_ \st -> st { commentShown = true }
         H.tell _comment unit
-          (Comment.SelectedCommentSection tocID markerID commentSection)
+          (Comment.SelectedCommentSection markerID)
 
     HandleEditor output -> case output of
 
@@ -740,7 +734,7 @@ splitview = H.mkComponent
             { tocEntries =
                 map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
             }
-        H.tell _comment unit (Comment.DeletedComment tocEntry.id deletedIDs)
+        H.tell _comment unit (Comment.DeletedComment deletedIDs)
 
       Editor.PostPDF content -> do
         renderedPDF' <- Request.postBlob "/render/pdf" (fromString content)
@@ -799,11 +793,8 @@ splitview = H.mkComponent
             , sidebarShown = true
             , commentShown = true
             }
-        case (findCommentSection state.tocEntries tocID markerID) of
-          Nothing -> pure unit
-          Just commentSection -> do
-            H.tell _comment unit
-              (Comment.SelectedCommentSection tocID markerID commentSection)
+        H.tell _comment unit
+          (Comment.SelectedCommentSection markerID)
 
       Editor.SendingTOC tocEntry -> do
         H.tell _commentOverview unit (CommentOverview.ReceiveTOC tocEntry)
@@ -872,11 +863,11 @@ splitview = H.mkComponent
       H.modify_ \st -> st { tocEntries = newTree }
       H.tell _toc unit (TOC.ReceiveTOCs newTree)
 
-findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
-findCommentSection tocEntries tocID markerID = do
-  tocEntry <- findTOCEntry tocID tocEntries
-  marker <- find (\m -> m.id == markerID) tocEntry.markers
-  marker.mCommentSection
+-- findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
+-- findCommentSection tocEntries tocID markerID = do
+--   tocEntry <- findTOCEntry tocID tocEntries
+--   marker <- find (\m -> m.id == markerID) tocEntry.markers
+--   marker.mCommentSection
 
 {- ------------------ Tree traversal and mutation function ------------------ -}
 {- --------------------- TODO: Move to seperate module  --------------------- -}

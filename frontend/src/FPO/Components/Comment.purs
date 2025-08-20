@@ -25,7 +25,7 @@ type Input = Unit
 
 data Output
   = CloseCommentSection
-  | UpdateComment Int Int CommentSection
+  | UpdateComment Int CommentSection
 
 data Action
   = Init
@@ -33,13 +33,12 @@ data Action
   | SendComment
 
 data Query a
-  = DeletedComment Int (Array Int) a
+  = DeletedComment (Array Int) a
   | ReceiveTimeFormatter (Maybe Formatter) a
-  | SelectedCommentSection Int Int CommentSection a
+  | SelectedCommentSection Int a
 
 type State =
-  { tocID :: Int
-  , markerID :: Int
+  { markerID :: Int
   , mCommentSection :: Maybe CommentSection
   , commentDraft :: String
   , mTimeFormatter :: Maybe Formatter
@@ -53,8 +52,7 @@ commentview
   => H.Component Query Input Output m
 commentview = H.mkComponent
   { initialState: \_ ->
-      { tocID: -1
-      , markerID: -1
+      { markerID: -1
       , mCommentSection: Nothing
       , commentDraft: ""
       , mTimeFormatter: Nothing
@@ -203,7 +201,7 @@ commentview = H.mkComponent
                   { comments = snoc comments newComment }
               H.modify_ \st -> st
                 { mCommentSection = Just newCommentSection, commentDraft = "" }
-              H.raise (UpdateComment state.tocID state.markerID newCommentSection)
+              H.raise (UpdateComment state.markerID newCommentSection)
 
   handleQuery
     :: forall slots a
@@ -211,9 +209,9 @@ commentview = H.mkComponent
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
 
-    DeletedComment changedTocID deletedIDs a -> do
+    DeletedComment deletedIDs a -> do
       state <- H.get
-      when (changedTocID == state.tocID && elem state.markerID deletedIDs) $
+      when (elem state.markerID deletedIDs) $
         H.raise CloseCommentSection
       pure (Just a)
 
@@ -221,10 +219,15 @@ commentview = H.mkComponent
       H.modify_ \state -> state { mTimeFormatter = mTimeFormatter }
       pure (Just a)
 
-    SelectedCommentSection tocID markerID section a -> do
+    SelectedCommentSection markerID a -> do
+      let 
+        section =
+          { markerID: 0
+          , comments: []
+          , resolved: false
+          }
       H.modify_ \state -> state
-        { tocID = tocID
-        , markerID = markerID
+        { markerID = markerID
         , mCommentSection = Just section
         }
       pure (Just a)

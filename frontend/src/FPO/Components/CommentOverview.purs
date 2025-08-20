@@ -58,7 +58,7 @@ commentOverviewview = H.mkComponent
                   Just c -> Just
                     (renderFirstComment state.mTimeFormatter c tocEntry.id m.id cs)
             )
-            tocEntry.markers
+            [] --tocEntry.markers
         )
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit

@@ -34,7 +34,7 @@ import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
-import FPO.Types (ShortendTOCEntry, TOCEntry, TOCTree, shortenTOC)
+import FPO.Types (TOCEntry, TOCTree)
 import FPO.Util (isPrefixOf, prependIf)
 import Halogen as H
 import Halogen.HTML as HH
@@ -139,7 +139,7 @@ data Query a = ReceiveTOCs (TOCTree) a
 type State = FPOState
   ( docID :: DH.DocumentID
   , documentName :: String
-  , tocEntries :: RootTree ShortendTOCEntry
+  , tocEntries :: RootTree TOCEntry
   , mSelectedTocEntry :: Maybe SelectedEntity
   , now :: Maybe DateTime
   , showAddMenu :: Array Int
@@ -331,8 +331,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     { id: PostTextDto.getID dto
                     , name: "New Subsection"
                     , paraID: 0 -- to be implemented later
-                    , newMarkerNextID: 0
-                    , markers: []
                     }
                 }
           H.raise (AddNode path newEntry)
@@ -474,11 +472,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
     ReceiveTOCs entries a -> do
-      let
-        shortendEntries = map shortenTOC entries
       H.modify_ \state ->
         state
-          { tocEntries = shortendEntries }
+          { tocEntries = entries }
       pure (Just a)
 
   rootTreeToHTML
@@ -489,7 +485,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Array Int
     -> Maybe SelectedEntity
     -> Maybe DateTime
-    -> RootTree ShortendTOCEntry
+    -> RootTree TOCEntry
     -> Array (H.ComponentHTML Action slots m)
   rootTreeToHTML _ _ _ _ _ _ Empty = []
   rootTreeToHTML
@@ -536,7 +532,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Maybe SelectedEntity
     -> Array Int
     -> Maybe DateTime
-    -> Tree ShortendTOCEntry
+    -> Tree TOCEntry
     -> Array (H.ComponentHTML Action slots m)
   treeToHTML state menuPath historyPath level mSelectedTocEntry path now = case _ of
     Node { title, children } ->
