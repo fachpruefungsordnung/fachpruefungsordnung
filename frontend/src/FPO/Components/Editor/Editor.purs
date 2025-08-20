@@ -760,7 +760,7 @@ editor = connect selectTranslator $ H.mkComponent
       -- but it works.
 
       lang <- liftEffect $ Store.loadLanguage
-      let cutoff = if lang == Just "de-DE" then 573.0 else 520.0
+      let cutoff = if lang == Just "de-DE" then 690.0 else 592.0
 
       H.modify_ _ { showButtonText = width >= cutoff }
 
@@ -1064,7 +1064,10 @@ cursorInRange lms cursor =
 makeEditorToolbarButton
   :: forall m. Boolean -> String -> Action -> String -> H.ComponentHTML Action () m
 makeEditorToolbarButton enabled tooltip action biName = HH.button
-  [ HP.classes $ [ HB.btn, HB.p0, HB.m0, HB.border0 ]
+  [ HP.classes
+      ( prependIf (not enabled) HB.opacity25
+          [ HB.btn, HB.p0, HB.m0, HB.border0 ]
+      )
   , HP.title tooltip
   , HE.onClick \_ -> action
   , HP.enabled enabled
@@ -1086,7 +1089,10 @@ makeEditorToolbarButtonWithText
   -> H.ComponentHTML Action () m
 makeEditorToolbarButtonWithText enabled asText action biName smallText = HH.button
   ( prependIf (not asText) (HP.title smallText)
-      [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
+      [ HP.classes
+          ( prependIf (not enabled) HB.opacity25
+              [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
+          )
       , HP.style "white-space: nowrap;"
       , HE.onClick \_ -> action
       , HP.enabled enabled
