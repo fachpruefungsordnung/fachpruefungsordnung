@@ -2,7 +2,8 @@
 
 module Language.Ltml.ToLaTeX.Format
     ( Stylable (..)
-    , emptyFormat
+    , emptyIdentifierFormat
+    , emptyAppendixFormat
     , formatHeading
     , formatKey
     , staticDocumentFormat
@@ -15,6 +16,9 @@ import qualified Data.Text.Lazy as LT
 import Data.Typography
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Format
+import Language.Lsd.AST.Type.AppendixSection
+    ( AppendixElementFormat (AppendixElementFormat)
+    )
 import Language.Ltml.ToLaTeX.Type
 
 class Stylable a where
@@ -38,8 +42,21 @@ instance Stylable FontSize where
     applyTextStyle MediumFontSize = id
     applyTextStyle LargeFontSize = large
 
-emptyFormat :: IdentifierFormat
-emptyFormat = FormatString []
+emptyIdentifierFormat :: IdentifierFormat
+emptyIdentifierFormat = FormatString []
+
+emptyKeyFormat :: KeyFormat
+emptyKeyFormat = FormatString []
+
+emptyHeadingFormat :: HeadingFormat
+emptyHeadingFormat = FormatString []
+
+emptyTocKeyFormat :: TocKeyFormat
+emptyTocKeyFormat = TocKeyFormat emptyKeyFormat
+
+emptyAppendixFormat :: AppendixElementFormat
+emptyAppendixFormat =
+    AppendixElementFormat emptyIdentifierFormat emptyTocKeyFormat emptyHeadingFormat
 
 formatHeading :: HeadingFormat -> LaTeX -> LaTeX -> LaTeX
 formatHeading (FormatString []) _ _ = mempty
@@ -82,6 +99,7 @@ staticDocumentFormat =
         , usepackage [] "enumitem"
         , usepackage [] "tabularx"
         , usepackage ["T1"] "fontenc"
+        , usepackage ["utf8"] "inputenc"
         -- , enumStyle
         -- , setindent
         ]

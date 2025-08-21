@@ -36,45 +36,31 @@ import Language.Ltml.AST.Section
     , SectionBody (InnerSectionBody, LeafSectionBody)
     )
 import Language.Ltml.AST.Text (TextTree (Reference, Space, Word))
+import Language.Ltml.Parser.Common.Lexeme (nSc)
 import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX (generatePDFFromSection)
-import Language.Ltml.ToLaTeX.Format (staticDocumentFormat)
-import Language.Ltml.ToLaTeX.GlobalState
-    ( GlobalState (GlobalState, labelToFootNote, labelToRef)
-    )
 import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
 import Language.Ltml.ToLaTeX.ToLaTeXM (ToLaTeXM (toLaTeXM))
 import Language.Ltml.ToLaTeX.Type
 import System.IO.Unsafe (unsafePerformIO)
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 
+import Language.Ltml.ToLaTeX.Format (staticDocumentFormat)
+import Language.Ltml.ToLaTeX.GlobalState
+    ( GlobalState (_labelToFootNote, _labelToRef)
+    , initialGlobalState
+    )
 import System.IO
 
 readText :: String -> Text
 readText filename = unsafePerformIO $ TIO.readFile filename
 
-initialState :: GlobalState
-initialState =
-    GlobalState
-        0
-        0
-        0
-        0
-        [0]
-        (FormatString [])
-        False
-        False
-        mempty
-        mempty
-        0
-        mempty
-
 testThis :: (ToLaTeXM a) => a -> (LaTeX, GlobalState)
 testThis a =
     runState
         (toLaTeXM a)
-        initialState
+        initialGlobalState
 
 superSectionWithNSubsections :: Int -> Node Section
 superSectionWithNSubsections n =
@@ -174,7 +160,10 @@ runTestToPDF = do
 runTestToLaTeX :: IO String
 runTestToLaTeX = do
     let input = readText "./src/Language/Ltml/ToLaTeX/Auxiliary/test.txt"
-    case runParser (unwrapFootnoteParser [footnoteT] (sectionP sectionT eof)) "" input of
+    case runParser
+        (nSc *> unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
+        ""
+        (input <> "\n") of
         Left err -> return (errorBundlePretty err)
         Right parsedInput -> do
             let texFile = "./src/Language/Ltml/ToLaTeX/Auxiliary/test.tex"
@@ -183,8 +172,8 @@ runTestToLaTeX = do
             return "everything went well!"
   where
     sectionToText (sec, labelmap) =
-        let (latexSection, gs) = runState (toLaTeXM sec) $ initialState {labelToFootNote = labelmap}
-         in renderLaTeX (labelToRef gs) (staticDocumentFormat <> document latexSection)
+        let (latexSection, gs) = runState (toLaTeXM sec) $ initialGlobalState {_labelToFootNote = labelmap}
+         in renderLaTeX (_labelToRef gs) (staticDocumentFormat <> document latexSection)
 
 tmp :: IO ()
 tmp = do

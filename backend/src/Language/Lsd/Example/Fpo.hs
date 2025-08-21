@@ -9,6 +9,7 @@ module Language.Lsd.Example.Fpo
     )
 where
 
+import Data.Typography
 import Data.Void (Void)
 import Language.Lsd.AST.Common
 import Language.Lsd.AST.Format
@@ -20,6 +21,10 @@ import Language.Lsd.AST.Type.Enum
 import Language.Lsd.AST.Type.Footnote
 import Language.Lsd.AST.Type.Paragraph
 import Language.Lsd.AST.Type.Section
+import Language.Lsd.AST.Type.SimpleBlock
+import Language.Lsd.AST.Type.SimpleParagraph
+import Language.Lsd.AST.Type.SimpleSection
+import Language.Lsd.AST.Type.Table
 import Language.Lsd.AST.Type.Text
 
 fpoT :: DocumentContainerType
@@ -27,7 +32,7 @@ fpoT =
     DocumentContainerType
         DocumentContainerFormat
         mainDocT
-        [appendixT, attachmentT]
+        (Sequence [appendixT, attachmentT])
 
 appendixT :: AppendixSectionType
 appendixT =
@@ -51,7 +56,7 @@ appendixT =
                 )
             )
         )
-        [] -- TODO
+        (Star $ Disjunction [simpleDocT])
 
 attachmentT :: AppendixSectionType
 attachmentT =
@@ -70,29 +75,82 @@ attachmentT =
                     [ StringAtom "Anhang "
                     , PlaceholderAtom IdentifierPlaceholder
                     , StringAtom "\n"
-                    , StringAtom "(nicht Bestandteil der Satzung)"
-                    , StringAtom "\n"
                     , PlaceholderAtom HeadingTextPlaceholder
                     ]
                 )
             )
         )
-        [] -- TODO
+        (Star $ Disjunction [simpleDocT])
 
 mainDocT :: DocumentType
 mainDocT =
     DocumentType
         DocumentFormat
         ( DocumentBodyType
-            (Sequence [])
+            ( Sequence
+                [ dateSSecT
+                , publLogSSecT
+                , introSSecT
+                ]
+            )
             ( Disjunction
                 [ InnerSectionBodyType (Star sectionT)
                 , InnerSectionBodyType (Star superSectionT)
                 ]
             )
+            ( Sequence
+                [ extroSSecT
+                , legalLogSSecT
+                ]
+            )
+        )
+        (Disjunction [footnoteT])
+
+simpleDocT :: DocumentType
+simpleDocT =
+    DocumentType
+        DocumentFormat
+        ( DocumentBodyType
+            (Sequence [])
+            (Disjunction [SimpleLeafSectionBodyType (Star simpleBlockT)])
             (Sequence [])
         )
         (Disjunction [footnoteT])
+
+dateSSecT :: SimpleSectionType
+dateSSecT =
+    SimpleSectionType
+        (Keyword "[date]")
+        SimpleSectionFormat
+        (Star (simpleParagraphTF Centered LargeFontSize))
+
+publLogSSecT :: SimpleSectionType
+publLogSSecT =
+    SimpleSectionType
+        (Keyword "[publ_log]")
+        SimpleSectionFormat
+        (Star (simpleParagraphTF LeftAligned SmallFontSize))
+
+introSSecT :: SimpleSectionType
+introSSecT =
+    SimpleSectionType
+        (Keyword "[intro]")
+        SimpleSectionFormat
+        (Star simpleParagraphT)
+
+extroSSecT :: SimpleSectionType
+extroSSecT =
+    SimpleSectionType
+        (Keyword "[extro]")
+        SimpleSectionFormat
+        (Star simpleParagraphT)
+
+legalLogSSecT :: SimpleSectionType
+legalLogSSecT =
+    SimpleSectionType
+        (Keyword "[legal_log]")
+        SimpleSectionFormat
+        (Star simpleParagraphT)
 
 superSectionT :: SectionType
 superSectionT =
@@ -159,11 +217,29 @@ paragraphT =
         )
         richTextT
 
+simpleBlockT :: SimpleBlockType
+simpleBlockT = SimpleBlockType simpleParagraphT (Disjunction [dummyTableT])
+
+simpleParagraphT :: SimpleParagraphType
+simpleParagraphT = simpleParagraphTF LeftAligned MediumFontSize
+
+simpleParagraphTF :: TextAlignment -> FontSize -> SimpleParagraphType
+simpleParagraphTF alignment fsize =
+    SimpleParagraphType
+        (SimpleParagraphFormat alignment fsize)
+        simpleTextT
+
+dummyTableT :: TableType
+dummyTableT = TableType (Keyword "[dummy_table]")
+
 plainTextT :: TextType Void
-plainTextT = TextType []
+plainTextT = TextType (Disjunction [])
 
 richTextT :: TextType EnumType
-richTextT = TextType [regularEnumT, simpleEnumT]
+richTextT = TextType (Disjunction [regularEnumT, simpleEnumT])
+
+simpleTextT :: TextType EnumType
+simpleTextT = TextType (Disjunction [])
 
 footnoteTextT :: TextType Void
 footnoteTextT = plainTextT
@@ -190,7 +266,7 @@ regularEnumT =
                         ]
                 )
         )
-        (TextType [enumTF 1, simpleEnumT])
+        (TextType (Disjunction [enumTF 1, simpleEnumT]))
   where
     enumTF :: Int -> EnumType
     enumTF depth =
@@ -208,7 +284,7 @@ regularEnumT =
                             ]
                     )
             )
-            (TextType nextEnumTs)
+            (TextType (Disjunction nextEnumTs))
       where
         nextEnumTs =
             if depth < maxRegularEnumDepth
@@ -224,8 +300,7 @@ simpleEnumT =
                 (FormatString [PlaceholderAtom Arabic])
                 (EnumItemKeyFormat $ FormatString [StringAtom "-"])
         )
-        (TextType [])
+        (TextType (Disjunction []))
 
--- TODO: Unused.
 footnoteT :: FootnoteType
 footnoteT = FootnoteType (Keyword "^") SuperscriptFootnoteFormat footnoteTextT

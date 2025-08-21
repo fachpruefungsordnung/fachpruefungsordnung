@@ -9,6 +9,7 @@
 module Language.Ltml.Parser.Text
     ( ParagraphParser
     , textForestP
+    , hangingTextP
     , lHangingTextP
     , mlHangingTextP
     )
@@ -27,6 +28,7 @@ import qualified Data.Text as Text (singleton)
 import Data.Typography (FontStyle (..))
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
+import Language.Lsd.AST.SimpleRegex (Disjunction (Disjunction))
 import Language.Lsd.AST.Type.Enum (EnumType (EnumType))
 import Language.Lsd.AST.Type.Text (TextType (TextType))
 import Language.Ltml.AST.Label (Label)
@@ -42,8 +44,9 @@ import Language.Ltml.Parser
     ( MonadParser
     , Parser
     , ParserWrapper (wrapParser)
-    , someIndented
     )
+import Language.Ltml.Parser.Common.Indent (someIndented)
+import Language.Ltml.Parser.Common.Lexeme (isLineCommentPrefixFirstChar)
 import Language.Ltml.Parser.Keyword (keywordP, lKeywordP, mlKeywordP)
 import Language.Ltml.Parser.Label (labelP, labelingP)
 import Language.Ltml.Parser.MiTree
@@ -110,8 +113,8 @@ childPF
      . (ParserWrapper m, EnumP enumType enum, SpecialP m special)
     => TextType enumType
     -> m (TextTree fnref style enum special)
-childPF (TextType enumTypes) =
-    wrapParser (Enum <$> choice (fmap enumP enumTypes))
+childPF (TextType (Disjunction enumTypes)) =
+    wrapParser (Enum <$> choice (map enumP enumTypes))
         <* postEnumP (Proxy :: Proxy special)
 
 -- TODO: Unused.
@@ -182,7 +185,7 @@ class SpecialP m special | special -> m where
 instance SpecialP Parser Void where
     specialP = empty
 
-    wordP _ = gWordP isWordChar isWordSpecialChar
+    wordP _ = gWordP isWordChar isWordSemiSpecialChar isWordSpecialChar
 
     postEnumP _ = pure ()
 
@@ -200,13 +203,13 @@ instance SpecialP ParagraphParser SentenceStart where
         --    - are impossible before text children and at a paragraph's end
         --      anyways (unless on their own (empty) line, see below), and
         --    - could also be appropriately restricted by ensuring they are
-        --      not followed by `>`, `\n`, or EOF.
+        --      not followed by `>` or `\n`.
+        --      - (Note that `miForest` does not permit EOF line ends.)
         --
         -- Further, unlabeled SSTs must not occur as only element of an input
         -- line (for that input line would be empty).
         --  - We prohibit this by checking for a succeeding newline character.
-        --  - The EOF case is already covered by
-        --    `specialCfg { miecPermitEnd = False }`.
+        --  - (Again, note that `miForest` does not permit EOF line ends.)
         --
         -- Otherwise, labeled SSTs may occur whenever the state permits,
         -- while unlabeled SSTs are not permitted before an opening styling
@@ -250,7 +253,8 @@ instance SpecialP ParagraphParser SentenceStart where
     wordP _ = sentenceWordP <|> sentenceEndP
       where
         sentenceWordP :: ParagraphParser Text
-        sentenceWordP = gWordP isWordChar isSentenceSpecialChar
+        sentenceWordP =
+            gWordP isWordChar isWordSemiSpecialChar isSentenceSpecialChar
 
         sentenceEndP :: ParagraphParser Text
         sentenceEndP = Text.singleton <$> satisfy isSentenceEndChar <* put True
@@ -267,14 +271,34 @@ instance FootnoteRefP Void where
 instance FootnoteRefP FootnoteReference where
     footnoteRefP = FootnoteReference <$ string "^:" <*> labelP
 
-gWordP :: (MonadParser m) => (Char -> Bool) -> (Char -> Bool) -> m Text
-gWordP isValid isSpecial = mconcat <$> some (regularWordP <|> escapedCharP)
+-- | Construct a word parser.
+--
+--   The first predicate determines valid characters, the second semi-special
+--   characters, and the third special characters.
+--
+--   Only valid characters are permitted in a word.
+--
+--   All valid characters may be escaped.
+--   Special characters must be escaped.
+--
+--   Semi-special characters, if unescaped, form a full word.
+gWordP
+    :: (MonadParser m)
+    => (Char -> Bool)
+    -> (Char -> Bool)
+    -> (Char -> Bool)
+    -> m Text
+gWordP isValid isSemiSpecial isSpecial =
+    mconcat <$> some (regularWordP <|> escapedCharP) <|> semiSpecialCharP
   where
     regularWordP :: (MonadParser m) => m Text
     regularWordP = takeWhile1P Nothing isRegular
       where
         isRegular :: Char -> Bool
-        isRegular c = isValid c && not (isSpecial c)
+        isRegular c = isValid c && not (isSemiSpecial c || isSpecial c)
+
+    semiSpecialCharP :: (MonadParser m) => m Text
+    semiSpecialCharP = Text.singleton <$> satisfy isSemiSpecial
 
     escapedCharP :: (MonadParser m) => m Text
     escapedCharP = Text.singleton <$ char '\\' <*> satisfy isValid
@@ -283,6 +307,9 @@ gWordP isValid isSpecial = mconcat <$> some (regularWordP <|> escapedCharP)
 isWordChar :: Char -> Bool
 isWordChar ' ' = False
 isWordChar c = not $ Char.isControl c
+
+isWordSemiSpecialChar :: Char -> Bool
+isWordSemiSpecialChar = isLineCommentPrefixFirstChar
 
 isWordSpecialChar :: Char -> Bool
 isWordSpecialChar '\\' = True

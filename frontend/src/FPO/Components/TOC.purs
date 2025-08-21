@@ -1,21 +1,37 @@
 module FPO.Components.TOC where
 
-import Prelude
-
-import Data.Array (concat, last, length, mapWithIndex, snoc, unsnoc)
+import Data.Array
+  ( concat
+  , cons
+  , drop
+  , last
+  , length
+  , mapWithIndex
+  , snoc
+  , take
+  , uncons
+  , unsnoc
+  )
+import Data.DateTime (DateTime)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String.Regex (regex, replace)
 import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class (liftEffect)
+import Effect.Console (log)
+import Effect.Now (nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
-import FPO.Data.Request (getDocumentHeader, postJson)
+import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postJson)
 import FPO.Data.Store as Store
+import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.TextElement as TE
 import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..))
 import FPO.Dto.PostTextDto (PostTextDto(..))
 import FPO.Dto.PostTextDto as PostTextDto
+import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
 import FPO.Types (ShortendTOCEntry, TOCEntry, TOCTree, shortenTOC)
@@ -28,37 +44,86 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
+import Prelude
+  ( class Eq
+  , Unit
+  , bind
+  , const
+  , discard
+  , identity
+  , map
+  , negate
+  , not
+  , pure
+  , show
+  , unit
+  , when
+  , ($)
+  , (&&)
+  , (+)
+  , (-)
+  , (/=)
+  , (<)
+  , (<<<)
+  , (<>)
+  , (==)
+  , (>)
+  , (||)
+  )
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
 import Web.HTML.Event.DragEvent (DragEvent, toEvent)
-import Web.UIEvent.KeyboardEvent as KE
 
 type Input = DH.DocumentID
 
+type Version = { identifier :: Int, timestamp :: DD.DocDate }
+
 data Output
-  = ChangeSection String Int
+  -- | Opens the editor for some leaf node, that is, a subsection or paragraph.
+  = ChangeToLeaf String Int
+  -- | Opens the editor for some given node title. Used to rename sections.
+  | ChangeToNode Path String
+  -- | Used to tell the editor to update the path of the selected node
+  --   during title renaming.
+  | UpdateNodePosition Path
   | AddNode Path (Tree TOCEntry)
   | DeleteNode Path
   | ReorderItems { from :: Path, to :: Path }
+  | ModifyVersion Int (Maybe Int)
   | RenameNode { path :: Path, newName :: String }
 
 type Path = Array Int
 
+type EntityToDelete = { path :: Path, kind :: EntityKind, title :: String }
+
+-- | Leafs can be identified by their ID, while nodes must unfortunately
+--   be identified by their path. Because the path can change after drag and drop,
+--   we need to update the path accordingly, and might have to tell the editor to
+--   account for the path change. This approach is far from ideal, but it is the
+--   best we can do with the current architecture.
+data SelectedEntity
+  = SelLeaf Int
+  | SelNode Path String
+
+derive instance eqSelectedEntity :: Eq SelectedEntity
+
 data Action
   = Init
+  | Both Action Action
   | Receive (Connected Store.Store Input)
   | DoNothing
-  | JumpToSection String Int
+  | JumpToLeafSection Int String
+  | JumpToNodeSection Path String
   | ToggleAddMenu Path
+  | ToggleHistoryMenu (Array Int) Int
+  | ToggleHistorySubmenu Int
   | CreateNewSubsection Path
   | CreateNewSection Path
-  -- | Section renaming
-  | StartRenameSection String Path
-  | RenameSection String
-  | ApplyRenameSection
-  | CancelRenameSection
+  | OpenVersion Int Int
+  | CompareVersion Int Int
+  | UpdateVersions DateTime Int
   -- | Section deletion
-  | RequestDeleteSection { path :: Path, kind :: EntityKind, title :: String }
+  | RequestDeleteSection EntityToDelete
   | CancelDeleteSection
   | ConfirmDeleteSection Path
   -- | Drag and Drop
@@ -71,17 +136,18 @@ data EntityKind = Section | Paragraph
 
 data Query a = ReceiveTOCs (TOCTree) a
 
-type RenameState = { title :: String, path :: Path }
-
 type State = FPOState
   ( docID :: DH.DocumentID
   , documentName :: String
   , tocEntries :: RootTree ShortendTOCEntry
-  , mSelectedTocEntry :: Maybe Int
+  , mSelectedTocEntry :: Maybe SelectedEntity
+  , now :: Maybe DateTime
   , showAddMenu :: Array Int
+  , showHistoryMenu :: Array Int
+  , showHistorySubmenu :: Int
+  , versions :: Array Version
   , dragState :: Maybe { draggedId :: Path, hoveredId :: Path }
-  , requestDelete :: Maybe { path :: Path, kind :: EntityKind, title :: String }
-  , renameSection :: Maybe RenameState
+  , requestDelete :: Maybe EntityToDelete
   )
 
 tocview
@@ -95,12 +161,15 @@ tocview = connect (selectEq identity) $ H.mkComponent
       { documentName: ""
       , tocEntries: Empty
       , mSelectedTocEntry: Nothing
+      , now: Nothing
       , showAddMenu: [ -1 ]
+      , showHistoryMenu: [ -1 ]
+      , showHistorySubmenu: -1
+      , versions: []
       , docID: input
       , dragState: Nothing
       , requestDelete: Nothing
       , translator: fromFpoTranslator store.translator
-      , renameSection: Nothing
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -117,8 +186,13 @@ tocview = connect (selectEq identity) $ H.mkComponent
     HH.div_ $
       renderDeleteModal
         <>
-          ( rootTreeToHTML state state.documentName state.showAddMenu
+          ( rootTreeToHTML
+              state
+              state.documentName
+              state.showAddMenu
+              state.showHistoryMenu
               state.mSelectedTocEntry
+              state.now
               state.tocEntries
           )
     where
@@ -143,21 +217,73 @@ tocview = connect (selectEq identity) $ H.mkComponent
   handleAction = case _ of
     Init -> do
       s <- H.get
+      now <- liftEffect nowDateTime
       mDoc <- getDocumentHeader s.docID
+
       let
         docName = case mDoc of
           Left _ -> "" -- TODO error handling
           Right doc -> DH.getName doc
       H.modify_ \st -> do
-        st { documentName = docName }
+        st
+          { documentName = docName
+          , now = Just now
+          }
+
+    Both act1 act2 -> do
+      handleAction act1
+      handleAction act2
+
+    UpdateVersions ts elementID -> do
+      s <- H.get
+      history <- H.liftAff $ getTextElemHistory s.docID elementID (DD.DocDate ts) 5
+      case history of
+        Nothing -> do liftEffect $ log "unable to load textElements"
+        Just h -> do
+          let
+            newVersions = map
+              ( \hEntry ->
+                  { identifier: TE.getHistoryElementID hEntry
+                  , timestamp: TE.getHistoryElementTimestamp hEntry
+                  }
+              )
+              (TE.getTEHsFromFTEH h)
+          H.modify_ _ { versions = newVersions }
+
+    {- UpdateVersions ts elementID -> do
+    s <- H.get
+    history <- H.liftAff $ Request.getTextElemHistory s.docID elementID (DD.DocDate ts) 5
+    case history of
+      Nothing -> do liftEffect $ log "unable to load textElements"
+      Just h -> do
+        let
+          newVersions = map 
+            (\hEntry -> {identifier: TE.getHistoryElementID hEntry, timestamp: TE.getHistoryElementTimestamp hEntry})
+            (TE.getTEHsFromFTEH h)
+        H.modify_ _ { versions = newVersions} -}
+
+    OpenVersion elementID vID -> do
+      H.raise (ModifyVersion elementID (Just vID))
+
+    CompareVersion elementID vID -> do
+      liftEffect $ log $
+        "should not be here yet. to appease error checker without removing soon to be needed stuff:"
+          <> (show elementID)
+          <> (show vID)
+      pure unit
 
     DoNothing -> do
       pure unit
 
-    JumpToSection title id -> do
+    JumpToLeafSection id title -> do
       H.modify_ \state ->
-        state { mSelectedTocEntry = Just id }
-      H.raise (ChangeSection title id)
+        state { mSelectedTocEntry = Just $ SelLeaf id }
+      H.raise (ChangeToLeaf title id)
+
+    JumpToNodeSection path title -> do
+      H.modify_ \state ->
+        state { mSelectedTocEntry = Just $ SelNode path title }
+      H.raise (ChangeToNode path title)
 
     ToggleAddMenu path -> do
       H.modify_ \state ->
@@ -166,6 +292,25 @@ tocview = connect (selectEq identity) $ H.mkComponent
               if state.showAddMenu == [ -1 ] || state.showAddMenu /= path then path
               else [ -1 ]
           }
+
+    ToggleHistoryMenu path elementID -> do
+      now <- liftEffect nowDateTime
+      handleAction (UpdateVersions now elementID)
+      H.modify_ \state ->
+        state
+          { now = Just now
+          , showHistoryMenu =
+              if state.showHistoryMenu == [ -1 ] || state.showHistoryMenu /= path then
+                path
+              else [ -1 ]
+          }
+
+    ToggleHistorySubmenu vID -> do
+      H.modify_ \state -> state
+        { showHistorySubmenu =
+            if state.showHistorySubmenu /= vID then vID
+            else -1
+        }
 
     CreateNewSubsection path -> do
       H.modify_ _ { showAddMenu = [ -1 ] }
@@ -213,31 +358,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
       H.raise (DeleteNode path)
       H.modify_ _ { requestDelete = Nothing }
 
-    StartRenameSection title path -> do
-      H.modify_ _ { renameSection = Just { title, path } }
-
-    RenameSection name -> do
-      H.modify_ \state ->
-        case state.renameSection of
-          Just { path } ->
-            state { renameSection = Just { title: name, path } }
-          Nothing -> state
-
-    ApplyRenameSection -> do
-      s <- H.get
-      case s.renameSection of
-        Just { title, path } -> do
-          -- let newTocEntries = changeNodeName path title s.tocEntries
-          -- TODO raise action to update structure
-          -- H.modify_ _ { tocEntries = newTocEntries, renameSection = Nothing }
-          H.raise (RenameNode { path, newName: title })
-        Nothing -> do
-          pure unit -- liftEffect $ log "ApplyRenameSection: No renameSection found"
-      H.modify_ _ { renameSection = Nothing }
-
-    CancelRenameSection -> do
-      H.modify_ _ { renameSection = Nothing }
-
     StartDrag id -> do
       H.modify_ _ { dragState = Just { draggedId: id, hoveredId: id } }
 
@@ -257,9 +377,91 @@ tocview = connect (selectEq identity) $ H.mkComponent
             -- If the dragged item is a prefix of the target, we do not allow dropping.
             pure unit
           else do
+            case state.mSelectedTocEntry of
+              Just (SelLeaf _) -> do
+                -- If we have a leaf selected, we don't need to update anything as
+                -- the identifier is unique and can always be used to find the leaf,
+                -- no matter where it moves in the TOC.
+                pure unit
+              Just (SelNode path title) -> do
+                -- If we have a node selected, we might need to update the path
+                -- to keep it in sync with the TOC structure, and tell the editor
+                -- where exactly the section is now.
+                let newPath = adjustPathAfterMove path draggedId
+                when (newPath /= path) $ do
+                  H.modify_ \s ->
+                    s { mSelectedTocEntry = Just (SelNode newPath title) }
+                  H.raise (UpdateNodePosition newPath)
+              Nothing -> pure unit
+
             H.raise (ReorderItems { from: draggedId, to: targetId })
           handleAction ClearDropZones
         Nothing -> pure unit
+      where
+      -- Adjust the path after a move operation.
+      -- This is needed as the whole TOC structure might change when moving any element
+      -- from any position to another. If a section is selected (which is only identified by its path),
+      -- and we move some entities (for example, the section itself, or an entity before, etc.),
+      -- we need to adjust the path accordingly to keep it up-to-date with the editor.
+      --
+      -- Because we really only want to allow these sections at top-level in the future (no nested sections),
+      -- we could simplify the logic a bunch, but for now we keep it as is, given that it seems to be reliable
+      -- (hopefully ^^).
+      adjustPathAfterMove :: Path -> Path -> Path
+      adjustPathAfterMove oldPath draggedId
+        | oldPath == draggedId = adjustTargetForSelfMove draggedId -- Moving the selected entity itself
+        | isPrefixOf draggedId oldPath =
+            let
+              adjustedTarget = adjustTargetForSelfMove draggedId
+              remainingPath = drop (length draggedId) oldPath
+            in
+              adjustedTarget <> remainingPath -- Moving a parent of selected
+      adjustPathAfterMove oldPath draggedId = adjustForSiblingMove oldPath draggedId
+
+      -- When moving an element to a new position, account for its own removal.
+      adjustTargetForSelfMove :: Path -> Path
+      adjustTargetForSelfMove draggedId =
+        -- Only adjust if they share the same immediate parent
+        if
+          length draggedId == length targetId &&
+            take (length draggedId - 1) draggedId == take (length targetId - 1)
+              targetId then
+          case
+            uncons (drop (length targetId - 1) draggedId),
+            uncons (drop (length targetId - 1) targetId)
+            of
+            Just { head: d }, Just { head: t } ->
+              let
+                adjustedTarget = if d < t then t - 1 else t
+                prefix = take (length targetId - 1) targetId
+              in
+                prefix <> [ adjustedTarget ]
+            _, _ -> targetId
+        else targetId
+
+      -- Adjust for moves that don't affect the path structure, just indices.
+      adjustForSiblingMove :: Path -> Path -> Path
+      adjustForSiblingMove oldPath draggedId =
+        go oldPath draggedId targetId
+        where
+        go :: Path -> Path -> Path -> Path
+        go oldRest draggedRest targetRest =
+          case uncons oldRest, uncons draggedRest, uncons targetRest of
+            Just { head: o, tail: os },
+            Just { head: d, tail: ds },
+            Just { head: t, tail: ts }
+              | d == t -> cons o (go os ds ts) -- No actual move
+            Just { head: o, tail: os },
+            Just { head: d, tail: ds },
+            Just { head: t, tail: ts } ->
+              -- Index adjustment for sibling moves
+              let
+                afterRemoval = if o > d then o - 1 else o
+                afterInsertion =
+                  if afterRemoval > t then afterRemoval + 1 else afterRemoval
+              in
+                cons afterInsertion (go os ds ts)
+            _, _, _ -> oldRest
 
     Receive { context: store } -> do
       H.modify_ _
@@ -284,11 +486,20 @@ tocview = connect (selectEq identity) $ H.mkComponent
      . State
     -> String
     -> Array Int
-    -> Maybe Int
+    -> Array Int
+    -> Maybe SelectedEntity
+    -> Maybe DateTime
     -> RootTree ShortendTOCEntry
     -> Array (H.ComponentHTML Action slots m)
-  rootTreeToHTML _ _ _ _ Empty = []
-  rootTreeToHTML state docName menuPath mSelectedTocEntry (RootTree { children }) =
+  rootTreeToHTML _ _ _ _ _ _ Empty = []
+  rootTreeToHTML
+    state
+    docName
+    menuPath
+    historyPath
+    mSelectedTocEntry
+    now
+    (RootTree { children }) =
     [ HH.div
         [ HP.classes [ HB.bgWhite, HB.shadow ] ]
         [ HH.div
@@ -300,14 +511,16 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 [ HH.span
                     [ HP.classes [ HB.fwSemibold, HB.textTruncate, HB.fs4, HB.p2 ] ]
                     [ HH.text docName ]
-                , renderButtonInterface menuPath [] false Section docName
+                , renderSectionButtonInterface menuPath [] false Section docName
                 ]
             ]
         , HH.div
             [ HP.classes [ HH.ClassName "toc-list" ] ]
             ( concat $ mapWithIndex
                 ( \ix (Edge child) ->
-                    treeToHTML state menuPath 1 mSelectedTocEntry [ ix ] child
+                    treeToHTML state menuPath historyPath 1 mSelectedTocEntry [ ix ]
+                      now
+                      child
                 )
                 children
             )
@@ -318,46 +531,60 @@ tocview = connect (selectEq identity) $ H.mkComponent
     :: forall slots
      . State
     -> Array Int
-    -> Int
-    -> Maybe Int
     -> Array Int
+    -> Int
+    -> Maybe SelectedEntity
+    -> Array Int
+    -> Maybe DateTime
     -> Tree ShortendTOCEntry
     -> Array (H.ComponentHTML Action slots m)
-  treeToHTML state menuPath level mSelectedTocEntry path = case _ of
+  treeToHTML state menuPath historyPath level mSelectedTocEntry path now = case _ of
     Node { title, children } ->
       let
+        selectedClasses =
+          if selectedNodeHasPath path then
+            [ HH.ClassName "active" ]
+          else []
         innerDivClasses =
           [ HB.dFlex, HB.alignItemsCenter, HB.py1, HB.positionRelative ]
         titleClasses =
           [ HB.textTruncate, HB.flexGrow1, HB.fwBold, HB.fs5 ]
       in
         [ HH.div
-            ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] ] <> dragProps
-                isRenaming
+            ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <>
+                  selectedClasses
+              ]
+                <>
+                  dragProps true
+                <>
+                  [ HP.style "cursor: pointer;" ]
             )
             [ addDropZone state path
             , HH.div
                 [ HP.classes innerDivClasses ]
                 [ dragHandle
-                , case state.renameSection of
-                    Just rs | rs.path == path ->
-                      renderInput rs
-                    _ ->
-                      HH.span
-                        [ HP.classes titleClasses
-                        , HP.style "align-self: stretch; flex-basis: 0;"
-                        , HE.onDoubleClick $ const $ StartRenameSection title path
-                        ]
-                        [ HH.text title ]
-                , renderButtonInterface menuPath path true Section title
+                , HH.span
+                    ( [ HP.classes titleClasses
+                      , HP.style "align-self: stretch; flex-basis: 0;"
+                      , HP.title title
+                      ] <>
+                        ( if level > 0 then
+                            [ HE.onClick \_ -> JumpToNodeSection path title ]
+                          else []
+                        )
+                    )
+                    [ HH.text title ]
+                , renderSectionButtonInterface menuPath path true Section title
                 ]
             ]
         ]
           <> concat
             ( mapWithIndex
                 ( \ix (Edge child) ->
-                    treeToHTML state menuPath (level + 1) mSelectedTocEntry
+                    treeToHTML state menuPath historyPath (level + 1)
+                      mSelectedTocEntry
                       (path <> [ ix ])
+                      now
                       child
                 )
                 children
@@ -368,39 +595,20 @@ tocview = connect (selectEq identity) $ H.mkComponent
             -- i.e., it has its own path.
             [ addEndDropZone state (snoc path (length children)) level ]
       where
-      -- Render input field (editing mode)
-      renderInput :: RenameState -> H.ComponentHTML Action slots m
-      renderInput rs =
-        HH.input
-          [ HP.type_ HP.InputText
-          , HP.value rs.title
-          , HP.classes
-              [ HH.ClassName "text-input"
-              , HH.ClassName "fw-bold"
-              , HH.ClassName "fs-5"
-              , HH.ClassName "text-truncate"
-              , HH.ClassName "flex-grow-1"
-              ]
-          , HP.style "min-width: 0; align-self: stretch; flex-basis: 0;"
-          , HE.onValueInput RenameSection
-          , HE.onBlur $ const ApplyRenameSection
-          , HE.onFocusOut $ const ApplyRenameSection
-          , HE.onKeyDown \e -> case KE.key e of
-              "Enter" -> ApplyRenameSection
-              "Escape" -> CancelRenameSection
-              _ -> DoNothing
-          , HP.autofocus true
-          ]
+      selectedNodeHasPath :: Array Int -> Boolean
+      selectedNodeHasPath p = case mSelectedTocEntry of
+        Just (SelNode selectedPath _) -> selectedPath == p
+        _ -> false
 
     Leaf { title, node: { id, paraID: _, name: _ } } ->
       let
         selectedClasses =
-          if Just id == mSelectedTocEntry then
+          if Just (SelLeaf id) == mSelectedTocEntry then
             [ HH.ClassName "active" ]
           else []
         containerProps =
           ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <> selectedClasses
-            , HP.title ("Jump to section " <> title)
+            , HP.title ("Jump to section " <> prettyTitle title)
             ] <> dragProps true
           )
         innerDivBaseClasses =
@@ -409,7 +617,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
           [ HP.classes innerDivBaseClasses
           , HP.style "cursor: pointer;"
           ] <>
-            (if level > 0 then [ HE.onClick \_ -> JumpToSection title id ] else [])
+            ( if level > 0 then [ HE.onClick \_ -> JumpToLeafSection id title ]
+              else []
+            )
       in
         [ HH.div
             containerProps
@@ -423,20 +633,15 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     , HP.style "align-self: stretch; flex-basis: 0;"
                     ]
                     [ HH.text $ prettyTitle title ]
-                , HH.div [ HP.classes [ HB.positionRelative ] ]
-                    [ deleteSectionButton path Paragraph (prettyTitle title)
-                    ]
+                , renderParagraphButtonInterface historyPath path state.versions
+                    state.showHistorySubmenu
+                    now
+                    title
+                    id
                 ]
             ]
         ]
     where
-    -- If the title is of shape "§{<label>:} Name", change it to "§ Name".
-    prettyTitle :: String -> String
-    prettyTitle title =
-      case regex "§\\{[^}]+:\\}\\s*" noFlags of
-        Left _err -> title -- fallback - if regex fails, just return the input
-        Right pattern -> replace pattern "§ " title
-
     dragProps draggable =
       [ HP.draggable draggable
       , HE.onDragStart $ const $ StartDrag path
@@ -452,10 +657,12 @@ tocview = connect (selectEq identity) $ H.mkComponent
       ]
       [ HH.text "⋮⋮" ]
 
-    isRenaming =
-      case state.renameSection of
-        Just { path: renamingPath } -> renamingPath /= path
-        Nothing -> true
+  -- If the title is of shape "§{<label>:} Name", change it to "§ Name".
+  prettyTitle :: String -> String
+  prettyTitle title =
+    case regex "§\\{[^}]+:\\}\\s*" noFlags of
+      Left _err -> title -- fallback - if regex fails, just return the input
+      Right pattern -> replace pattern "§ " title
 
   -- Helper to check if the current path is the active dropzone.
   -- This is used to highlight the dropzone when dragging an item.
@@ -578,8 +785,140 @@ tocview = connect (selectEq identity) $ H.mkComponent
       ]
       [ HH.text "-" ]
 
+  -- Creates a history button for a paragraph.
+  historyButton
+    :: forall slots
+     . Path
+    -> Int
+    -> H.ComponentHTML Action slots m
+  historyButton path elementID = HH.button
+    [ HP.classes
+        [ HB.btn
+        , HB.btnSecondary
+        , HH.ClassName "toc-button"
+        , HH.ClassName "toc-add-wrapper"
+        , H.ClassName "bi bi-clock-history"
+        ]
+    , HE.onClick $ const $ ToggleHistoryMenu path elementID
+    ]
+    []
+
+  renderParagraphButtonInterface
+    :: forall slots
+     . Path
+    -> Path
+    -> Array Version
+    -> Int
+    -> Maybe DateTime
+    -> String
+    -> Int
+    -> H.ComponentHTML Action slots m
+  renderParagraphButtonInterface
+    historyPath
+    path
+    versions
+    showHistorySubmenu
+    now
+    title
+    elementID =
+    HH.div
+      [ HP.classes [ HB.positionRelative ] ] $
+      [ historyButton path elementID
+      , deleteSectionButton path Paragraph (prettyTitle title)
+      ]
+        <>
+          [ if historyPath == path then
+              HH.div
+                [ HP.classes
+                    [ HB.positionAbsolute
+                    , HB.bgWhite
+                    , HB.border
+                    , HB.rounded
+                    , HB.shadowSm
+                    , HB.py1
+                    ]
+                , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
+                ]
+                versionHistoryMenu
+            else
+              HH.text ""
+          ]
+    where
+    -- this is a placeholder that only allows to look at the 5 last versions
+    versionHistoryMenu =
+      map
+        (\v -> addVersionButton v)
+        versions
+
+    addVersionButton version =
+      HH.button
+        [ HP.classes
+            [ HB.btn
+            , HB.btnLink
+            , HB.textStart
+            , HB.textDecorationNone
+            , HB.w100
+            , HB.border0
+            , HB.textBody
+            , HB.dFlex
+            , HB.alignItemsCenter
+            ]
+        , HE.onClick \_ -> ToggleHistorySubmenu version.identifier
+        ] $
+        [ HH.div [ HP.classes [ H.ClassName "bi bi-clock-history", HB.fs5, HB.me1 ] ]
+            []
+        , HH.div [ HP.classes [ HB.fs6 ] ]
+            [ HH.text
+                ( (formatRelativeTime now (DD.docDateToDateTime version.timestamp))
+                    <> " "
+                    <> (show version.identifier)
+                )
+            ]
+        ]
+          <>
+            [ if showHistorySubmenu == version.identifier then
+                HH.div
+                  [ HP.classes
+                      [ HB.positionAbsolute
+                      , HB.bgWhite
+                      , HB.border
+                      , HB.rounded
+                      , HB.shadowSm
+                      , HB.py1
+                      ]
+                  , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
+                  ]
+                  [ versionHistorySubmenuButton "view Version" OpenVersion version
+                  , versionHistorySubmenuButton "Compare to Current Version"
+                      CompareVersion
+                      version
+                  ]
+              else
+                HH.text ""
+            ]
+
+    versionHistorySubmenuButton t act version =
+      HH.button
+        [ HP.classes
+            [ HB.btn
+            , HB.btnLink
+            , HB.textStart
+            , HB.textDecorationNone
+            , HB.w100
+            , HB.border0
+            , HB.textBody
+            , HB.dFlex
+            , HB.alignItemsCenter
+            ]
+        , HE.onClick \_ -> Both (act elementID version.identifier)
+            (ToggleHistoryMenu path elementID)
+        ]
+        [ HH.div [ HP.classes [ HB.fs6 ] ]
+            [ HH.text t ]
+        ]
+
   -- Helper to render add button with dropdown, and optional delete button.
-  renderButtonInterface
+  renderSectionButtonInterface
     :: forall slots
      . Array Int
     -> Array Int
@@ -587,7 +926,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> EntityKind
     -> String
     -> H.ComponentHTML Action slots m
-  renderButtonInterface menuPath currentPath renderDeleteBtn kind title =
+  renderSectionButtonInterface menuPath currentPath renderDeleteBtn kind title =
     HH.div
       [ HP.classes [ HB.positionRelative ] ] $
       [ HH.button
@@ -606,7 +945,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
             else []
           )
         <>
-          -- Dropdown menu (only visible when path matches)
           [ if menuPath == currentPath then
               HH.div
                 [ HP.classes

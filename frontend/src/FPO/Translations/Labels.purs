@@ -133,6 +133,7 @@ type Labels =
       ::: "editor_deleteComment"
       ::: "editor_fontSizeDown"
       ::: "editor_fontSizeUp"
+      ::: "editor_pdf"
       ::: "editor_preview"
       ::: "editor_redo"
       ::: "editor_save"

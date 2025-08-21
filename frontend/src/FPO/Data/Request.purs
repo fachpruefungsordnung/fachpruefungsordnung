@@ -17,6 +17,7 @@ module FPO.Data.Request
   , getIgnore
   , getJson
   , getString
+  , getTextElemHistory
   , getUserDocuments
   , getUserGroups
   , getUser
@@ -27,6 +28,7 @@ module FPO.Data.Request
   , postDocument
   , postJson
   , postRenderHtml
+  , postRenderPDF
   , postString
   , putIgnore
   , putJson
@@ -58,9 +60,10 @@ import FPO.Data.AppError (AppError(..), handleAppError, printAjaxError)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Store as Store
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto)
-import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader)
+import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.Query as DQ
+import FPO.Dto.DocumentDto.TextElement as TE
 import FPO.Dto.GroupDto
   ( GroupCreate
   , GroupDto
@@ -459,7 +462,7 @@ createNewDocument
   => MonadStore Store.Action Store.Store m
   => Navigate m
   => NewDocumentCreateDto
-  -> H.HalogenM st act slots msg m (Either AppError DocumentHeader)
+  -> H.HalogenM st act slots msg m (Either AppError DH.DocumentHeader)
 createNewDocument dto = postJson decodeJson "/docs" (encodeJson dto)
 
 getDocumentsQueryFromURL
@@ -470,6 +473,21 @@ getDocumentsQueryFromURL
   => String
   -> H.HalogenM st act slots msg m (Either AppError DQ.DocumentQuery)
 getDocumentsQueryFromURL url = getJson decodeJson url
+
+getTextElemHistory
+  :: DH.DocumentID
+  -> TE.TextElementID
+  -> DD.DocDate
+  -> Int
+  -> Aff (Maybe TE.FullTextElementHistory)
+getTextElemHistory dID tID date limit =
+  getFromJSONEndpoint
+    decodeJson
+    ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history?before="
+        <> DD.toStringFormat date
+        <> "&limit="
+        <> show limit
+    )
 
 getUserDocuments
   :: forall st act slots msg m
@@ -492,6 +510,17 @@ addGroup
   => GroupCreate
   -> H.HalogenM st act slots msg m (Either AppError GroupID)
 addGroup group = postJson decodeJson "/groups" (encodeJson group)
+
+postRenderPDF
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => String
+  -> H.HalogenM st act slots msg m (Either AppError String)
+postRenderPDF content = do
+  result <- handleRequest' "/render/pdf" (postRenderPDF' content)
+  pure result
 
 postRenderHtml
   :: forall st act slots msg m
@@ -556,6 +585,15 @@ postString' :: String -> Json -> Aff (Either Error (Response String))
 postString' url body = do
   fpoRequest <- liftEffect $ defaultFpoRequest AXRF.string ("/api" <> url) POST
   let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
+
+-- | Makes a POST request to render the content of a paragraph with a String body and expects a String response.
+postRenderPDF' :: String -> Aff (Either Error (Response String))
+postRenderPDF' content = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.string
+    ("/api/render/pdf")
+    POST
+  let request' = fpoRequest { content = Just (RequestBody.json $ fromString content) }
   liftAff $ request driver request'
 
 -- | Makes a POST request to render the content of a paragraph with a String body and expects a String response.

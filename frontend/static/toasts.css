@@ -1,84 +1,22 @@
-.fpo-toast-container {
-  position: fixed;
-  top: 80px;
-  right: 20px;
-  z-index: 9999;
-  max-width: 400px;
-  pointer-events: none;
-}
-
-.fpo-toast {
-  background: #f8d7da;
-  border: 1px solid #f5c6cb;
-  border-radius: 6px;
-  color: #721c24;
-  margin-bottom: 10px;
-  padding: 12px 16px 0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  min-width: 300px;
-  pointer-events: auto;
-  opacity: 1;
-  display: block;
-  position: relative;
-  overflow: hidden;
-}
-
-.fpo-toast-error {
-  background: #f8d7da;
-  border-color: #f5c6cb;
-  color: #721c24;
-}
-
-.fpo-toast-content {
-  padding-bottom: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.fpo-toast-message {
-  flex: 1;
-  margin-right: 12px;
-}
-
-.fpo-toast-close {
-  background: none;
-  border: none;
-  color: #721c24;
-  cursor: pointer;
-  font-size: 20px;
-  font-weight: bold;
-  width: 20px;
-  height: 20px;
-}
-
-.fpo-toast-close:hover {
-  opacity: 0.7;
-}
-
-.fpo-toast-progress {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: rgba(114, 28, 36, 0.2);
-}
-
-.fpo-toast-progress-bar {
-  height: 100%;
-  background: #721c24;
+/* Custom animations for toast progress bar */
+.fpo-progress-animate {
   width: 100%;
   animation: shrinkProgress 5s linear forwards;
+  animation-delay: 0.3s;
 }
 
+/* Toast slide-in animation */
 .animate-slide-in {
   animation: slideInRight 0.3s ease-out;
 }
 
-.animate-slide-in .fpo-toast-progress-bar {
-  animation: shrinkProgress 5s linear forwards;
-  animation-delay: 0.3s; /* Start after slide-in completes */
+.toast-container {
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  min-width: 300px;
 }
 
 @keyframes slideInRight {

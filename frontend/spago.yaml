@@ -38,6 +38,7 @@ package:
     - safe-coerce
     - simple-i18n
     - strings
+    - stringutils
     - transformers
     - tuples
     - unsafe-coerce

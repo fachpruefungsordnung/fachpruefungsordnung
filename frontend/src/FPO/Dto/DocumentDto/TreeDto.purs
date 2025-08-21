@@ -7,6 +7,7 @@ module FPO.Dto.DocumentDto.TreeDto
   , findTitleRootTree
   , getEdgeTree
   , replaceNodeRootTree
+  , modifyNodeRootTree
   ) where
 
 import Prelude
@@ -169,6 +170,42 @@ findTitleTree predicate (Node { children }) =
 findTitleTree predicate (Leaf { title, node }) =
   if predicate node then Just title else Nothing
 
+modifyNodeRootTree
+  :: forall a
+   . (a -> Boolean)
+  -> (String -> String)
+  -> (a -> a)
+  -> RootTree a
+  -> RootTree a
+modifyNodeRootTree _ _ _ Empty = Empty
+modifyNodeRootTree predicate newTitle newNode (RootTree { children, header }) =
+  let
+    newChildren =
+      map (\(Edge child) -> Edge $ modifyNodeTree predicate newTitle newNode child)
+        children
+  in
+    RootTree { children: newChildren, header }
+
+modifyNodeTree
+  :: forall a
+   . (a -> Boolean)
+  -> (String -> String)
+  -> (a -> a)
+  -> Tree a
+  -> Tree a
+modifyNodeTree pred newTitle newNode (Leaf { title, node }) =
+  if pred node then
+    Leaf { title: (newTitle title), node: (newNode node) }
+  else
+    Leaf { title, node }
+modifyNodeTree pred newTitle newNode (Node { title, children, header }) =
+  let
+    newChildren =
+      map (\(Edge child) -> Edge $ modifyNodeTree pred newTitle newNode child)
+        children
+  in
+    Node { title, children: newChildren, header }
+
 replaceNodeRootTree
   :: forall a
    . (a -> Boolean)
@@ -176,31 +213,6 @@ replaceNodeRootTree
   -> a
   -> RootTree a
   -> RootTree a
-replaceNodeRootTree _ _ _ Empty = Empty
-replaceNodeRootTree predicate newTitle newNode (RootTree { children, header }) =
-  let
-    newChildren =
-      map (\(Edge child) -> Edge $ replaceNodeTree predicate newTitle newNode child)
-        children
-  in
-    RootTree { children: newChildren, header }
+replaceNodeRootTree predicate newTitle newNode tree =
+  modifyNodeRootTree predicate (const newTitle) (const newNode) tree
 
-replaceNodeTree
-  :: forall a
-   . (a -> Boolean)
-  -> String
-  -> a
-  -> Tree a
-  -> Tree a
-replaceNodeTree pred newTitle newNode (Leaf { title, node }) =
-  if pred node then
-    Leaf { title: newTitle, node: newNode }
-  else
-    Leaf { title, node }
-replaceNodeTree pred newTitle newNode (Node { title, children, header }) =
-  let
-    newChildren =
-      map (\(Edge child) -> Edge $ replaceNodeTree pred newTitle newNode child)
-        children
-  in
-    Node { title, children: newChildren, header }

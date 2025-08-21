@@ -8,6 +8,7 @@ module FPO.Component.Splitview where
 
 import Prelude
 
+import Data.Argonaut (fromString)
 import Data.Array
   ( cons
   , deleteAt
@@ -27,6 +28,7 @@ import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -39,7 +41,13 @@ import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
-import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..))
+import FPO.Dto.DocumentDto.TreeDto
+  ( Edge(..)
+  , RootTree(..)
+  , Tree(..)
+  , findRootTree
+  , modifyNodeRootTree
+  )
 import FPO.Types
   ( CommentSection
   , TOCEntry
@@ -59,8 +67,16 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
+import Web.DOM.Document as Document
+import Web.DOM.Element as Element
+import Web.DOM.Node as Node
 import Web.Event.Event (EventType(..), stopPropagation)
+import Web.File.Url (createObjectURL, revokeObjectURL)
+import Web.HTML (window)
 import Web.HTML as Web.HTML
+import Web.HTML.HTMLDocument as HTMLDocument
+import Web.HTML.HTMLElement as HTMLElement
+import Web.HTML.Window (document)
 import Web.HTML.Window as Web.HTML.Window
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 
@@ -91,6 +107,7 @@ data Action
   | HandleTOC TOC.Output
   | GET
   | POST
+  | ModifyVersionMapping Int (Maybe Int)
 
 type State =
   { docID :: DocumentID
@@ -120,9 +137,13 @@ type State =
   --   to the preview component.
   -- TODO: Which one to use?
   , renderedHtml :: Maybe String
+  , testDownload :: String
 
   -- Store tocEntries and send some parts to its children components
   , tocEntries :: TOCTree
+
+  -- store for each element which version should be shown Nothing means the most recent version should be shown
+  , versionMapping :: (RootTree ElemVersion)
 
   -- How the timestamp has to be formatted
   , mTimeFormatter :: Maybe Formatter
@@ -136,6 +157,8 @@ type State =
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
   }
+
+type ElemVersion = { elementID :: Int, versionID :: Maybe Int }
 
 type Slots =
   ( comment :: H.Slot Comment.Query Comment.Output Unit
@@ -168,7 +191,9 @@ splitview = H.mkComponent
       , lastExpandedSidebarRatio: 0.2
       , lastExpandedPreviewRatio: 0.4
       , renderedHtml: Nothing
+      , testDownload: ""
       , tocEntries: Empty
+      , versionMapping: Empty
       , mTimeFormatter: Nothing
       , sidebarShown: true
       , tocShown: true
@@ -450,6 +475,21 @@ splitview = H.mkComponent
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
 
+    Init -> do
+      let timeFormatter = head timeStampsVersions
+      H.modify_ \st -> do
+        st { mTimeFormatter = timeFormatter }
+      H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
+      H.tell _commentOverview unit
+        (CommentOverview.ReceiveTimeFormatter timeFormatter)
+      H.tell _toc unit (TOC.ReceiveTOCs Empty)
+      -- Load the initial TOC entries into the editor
+      -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
+      -- or rather, we don't use commit anymore in the API
+      handleAction GET
+
+    -- API Actions
+
     POST -> do
       state <- H.get
       let
@@ -474,22 +514,16 @@ splitview = H.mkComponent
       maybeTree <- H.liftAff
         $ Request.getFromJSONEndpoint DT.decodeDocument
         $ "/docs/" <> show s.docID <> "/tree/latest"
-      let finalTree = fromMaybe Empty (documentTreeToTOCTree <$> maybeTree)
-
-      H.modify_ _ { tocEntries = finalTree }
+      let
+        finalTree = fromMaybe Empty (documentTreeToTOCTree <$> maybeTree)
+        vMapping = map
+          (\elem -> { elementID: elem.id, versionID: Nothing })
+          finalTree
+      H.modify_ _
+        { tocEntries = finalTree
+        , versionMapping = vMapping
+        }
       H.tell _toc unit (TOC.ReceiveTOCs finalTree)
-    Init -> do
-      let timeFormatter = head timeStampsVersions
-      H.modify_ \st -> do
-        st { mTimeFormatter = timeFormatter }
-      H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
-      H.tell _commentOverview unit
-        (CommentOverview.ReceiveTimeFormatter timeFormatter)
-      H.tell _toc unit (TOC.ReceiveTOCs Empty)
-      -- Load the initial TOC entries into the editor
-      -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
-      -- or rather, we don't use commit anymore in the API
-      handleAction GET
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -627,6 +661,17 @@ splitview = H.mkComponent
           , previewShown = true
           }
 
+    ModifyVersionMapping tocID vID -> do
+      state <- H.get
+      let
+        newVersionMapping =
+          modifyNodeRootTree
+            (\v -> v.elementID == tocID)
+            (\string -> string)
+            (\v -> { elementID: v.elementID, versionID: vID })
+            state.versionMapping
+      H.modify_ _ { versionMapping = newVersionMapping }
+
     -- Query handler
 
     HandleComment output -> case output of
@@ -634,35 +679,45 @@ splitview = H.mkComponent
       Comment.CloseCommentSection -> do
         H.modify_ \st -> st { commentShown = false }
 
+      -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
       Comment.UpdateComment tocID markerID newCommentSection -> do
         H.tell _editor unit Editor.SaveSection
         state <- H.get
-        let
-          updatedTOCEntries = map
-            ( \entry ->
-                if entry.id /= tocID then entry
-                else
-                  let
-                    newMarkers =
-                      ( map
-                          ( \marker ->
-                              if marker.id /= markerID then marker
-                              else marker { mCommentSection = Just newCommentSection }
+        case
+          findRootTree (\e -> e.elementID == tocID && e.versionID /= Nothing)
+            state.versionMapping
+          of
+          Just _ -> do
+            let
+              updatedTOCEntries = map
+                ( \entry ->
+                    if entry.id /= tocID then entry
+                    else
+                      let
+                        newMarkers =
+                          ( map
+                              ( \marker ->
+                                  if marker.id /= markerID then marker
+                                  else marker
+                                    { mCommentSection = Just newCommentSection }
+                              )
+                              entry.markers
                           )
-                          entry.markers
-                      )
-                  in
-                    entry { markers = newMarkers }
-            )
-            state.tocEntries
-          updateTOCEntry = fromMaybe
-            emptyTOCEntry
-            (findTOCEntry tocID updatedTOCEntries)
-          title = fromMaybe
-            ""
-            (findTitleTOCEntry tocID updatedTOCEntries)
-        H.modify_ \s -> s { tocEntries = updatedTOCEntries }
-        H.tell _editor unit (Editor.ChangeSection title updateTOCEntry)
+                      in
+                        entry { markers = newMarkers }
+                )
+                state.tocEntries
+              updateTOCEntry = fromMaybe
+                emptyTOCEntry
+                (findTOCEntry tocID updatedTOCEntries)
+              title = fromMaybe
+                ""
+                (findTitleTOCEntry tocID updatedTOCEntries)
+            H.modify_ \s -> s { tocEntries = updatedTOCEntries }
+            H.tell _editor unit (Editor.ChangeSection title updateTOCEntry Nothing)
+          Nothing -> do
+            H.liftEffect $ log
+              "unable to unpdate comment on outdated versions of elements"
 
     HandleCommentOverview output -> case output of
 
@@ -677,7 +732,7 @@ splitview = H.mkComponent
         renderedHtml' <- Request.postRenderHtml (joinWith "\n" response)
         case renderedHtml' of
           Left _ -> pure unit -- Handle error
-          Right body -> H.modify_ \st -> st { renderedHtml = Just body }
+          Right body -> H.modify_ _ { renderedHtml = Just body }
 
       Editor.DeletedComment tocEntry deletedIDs -> do
         H.modify_ \st ->
@@ -687,18 +742,57 @@ splitview = H.mkComponent
             }
         H.tell _comment unit (Comment.DeletedComment tocEntry.id deletedIDs)
 
+      Editor.PostPDF content -> do
+        renderedPDF' <- Request.postBlob "/render/pdf" (fromString content)
+        case renderedPDF' of
+          Left _ -> pure unit
+          Right body -> do
+            -- create blobl link
+            url <- H.liftEffect $ createObjectURL body
+            -- Create an invisible link and click it to download PDF
+            H.liftEffect $ do
+              -- get window stuff
+              win <- window
+              hdoc <- document win
+              let doc = HTMLDocument.toDocument hdoc
+
+              -- create link
+              aEl <- Document.createElement "a" doc
+              case HTMLElement.fromElement aEl of
+                Nothing -> pure unit
+                Just aHtml -> do
+                  Element.setAttribute "href" url aEl
+                  Element.setAttribute "download" "test.pdf" aEl
+                  Element.setAttribute "target" "_self" aEl
+                  Element.setAttribute "rel" "noopener noreferrer" aEl
+                  Element.setAttribute "style" "display:none" aEl
+                  mBody <- HTMLDocument.body hdoc
+                  case mBody of
+                    Nothing -> pure unit
+                    Just bodyHtml -> do
+                      -- click the link
+                      let bodyEl = HTMLElement.toElement bodyHtml
+                      _ <- Node.appendChild (Element.toNode aEl)
+                        (Element.toNode bodyEl)
+                      HTMLElement.click aHtml
+                      _ <- Node.removeChild (Element.toNode aEl)
+                        (Element.toNode bodyEl)
+                      pure unit
+            -- deactivate the blob link
+            H.liftEffect $ revokeObjectURL url
+
       Editor.SavedSection toBePosted title tocEntry -> do
         state <- H.get
         let
           newTOCTree = replaceTOCEntry tocEntry.id title tocEntry state.tocEntries
-        H.modify_ \st -> st { tocEntries = newTOCTree }
+        H.modify_ _ { tocEntries = newTOCTree }
         H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
         when toBePosted (handleAction POST)
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get
         if state.sidebarShown then
-          H.modify_ \st -> st { commentShown = true }
+          H.modify_ _ { commentShown = true }
         else
           H.modify_ \st -> st
             { sidebarRatio = st.lastExpandedSidebarRatio
@@ -714,19 +808,40 @@ splitview = H.mkComponent
       Editor.SendingTOC tocEntry -> do
         H.tell _commentOverview unit (CommentOverview.ReceiveTOC tocEntry)
 
-      Editor.ShowAllCommentsOutput -> handleAction $ ToggleCommentOverview true
+      Editor.RenamedNode newName path -> do
+        s <- H.get
+        updateTree $ changeNodeName path newName s.tocEntries
+
+      Editor.ShowAllCommentsOutput -> do
+        handleAction $ ToggleCommentOverview true
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
 
-      TOC.ChangeSection title selectedId -> do
+      TOC.ModifyVersion elementID mVID -> do
+        handleAction (ModifyVersionMapping elementID mVID)
+
+      TOC.ChangeToLeaf title selectedId -> do
         H.tell _editor unit Editor.SaveSection
         state <- H.get
         let
           entry = case (findTOCEntry selectedId state.tocEntries) of
             Nothing -> emptyTOCEntry
             Just e -> e
-        H.tell _editor unit (Editor.ChangeSection title entry)
+          rev =
+            case
+              findRootTree (\e -> e.elementID == selectedId) state.versionMapping
+              of
+              Nothing -> Nothing
+              Just elem -> elem.versionID
+        -- handleAction (ModifyVersionMapping selectedID rev)
+        H.tell _editor unit (Editor.ChangeSection title entry rev)
+
+      TOC.ChangeToNode path title -> do
+        H.tell _editor unit (Editor.ChangeToNode title path)
+
+      TOC.UpdateNodePosition path -> do
+        H.tell _editor unit (Editor.UpdateNodePosition path)
 
       TOC.AddNode path node -> do
         s <- H.get

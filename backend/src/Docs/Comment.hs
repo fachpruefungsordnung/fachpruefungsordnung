@@ -7,6 +7,7 @@ module Docs.Comment
     , CommentRef (..)
     , CommentAnchor (..)
     , Range (start, end)
+    , Anchor (Anchor, row, col)
     , range
     , prettyPrintCommentRef
     ) where
@@ -102,9 +103,26 @@ instance FromJSON CommentAnchor
 
 instance ToSchema CommentAnchor
 
+data Anchor = Anchor
+    { col :: Int64
+    , row :: Int64
+    }
+    deriving (Generic, Eq)
+
+instance ToJSON Anchor
+
+instance FromJSON Anchor
+
+instance ToSchema Anchor
+
+instance Ord Anchor where
+    compare a b = case compare (row a) (row b) of
+        EQ -> compare (col a) (col b)
+        ordering -> ordering
+
 data Range = Range
-    { start :: Int64
-    , end :: Int64
+    { start :: Anchor
+    , end :: Anchor
     }
     deriving (Generic)
 
@@ -114,7 +132,7 @@ instance FromJSON Range
 
 instance ToSchema Range
 
-range :: Int64 -> Int64 -> Range
+range :: Anchor -> Anchor -> Range
 range a b
     | a <= b = Range a b
     | otherwise = Range b a

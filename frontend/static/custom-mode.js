@@ -95,6 +95,16 @@
   function CustomHighlightRules() {
   this.$rules = {
     start: [
+      // Order of rules is important
+
+      // --- Comments ---
+      // special case of //*
+      { token: "comment", regex: /\/\/\*/, next: "comment" },
+      // special case of // ... /* 
+      { token: "comment", regex: /\/\/(?=.*\/\*)(.*?)(?=\/\*)/ },
+      { token: "comment", regex: /\/\*/, next: "comment" }, // /* multiline start
+      { token: "comment", regex: /\/\/.*$/ },               // -- single-line comment
+
       // --- Headings ---
       { token: "markup.heading.1", regex: /^# .+/ },
       { token: "markup.heading.2", regex: /^## .+/ },
@@ -107,17 +117,13 @@
       // Optional: fallback for any other style tag
       { token: "markup.other", regex: /<[/\*_][^>]+?>/ },
 
-      // --- Comments ---
-      { token: "comment", regex: /^\/\/.*$/ },              // -- single-line comment
-      { token: "comment", regex: /\/\*/, next: "comment" }, // /* multiline start
-
       // --- Keywords ---
       { token: "keyword", regex: /\b(TODO|FIXME|NOTE)\b/ }  // TODO, FIXME, NOTE
     ],
 
     comment: [
-      { token: "comment", regex: /\*\//, next: "start" },
-      { token: "comment", regex: /.*/ }
+      { token: "comment", regex: /.*?\*\//, next: "start" }, 
+      { token: "comment", regex: /.*/ } 
     ]
   };
     this.normalizeRules();

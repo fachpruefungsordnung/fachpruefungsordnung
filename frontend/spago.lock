@@ -42,6 +42,7 @@
             "safe-coerce",
             "simple-i18n",
             "strings",
+            "stringutils",
             "transformers",
             "tuples",
             "unsafe-coerce",
@@ -134,6 +135,7 @@
             "simple-i18n",
             "st",
             "strings",
+            "stringutils",
             "tailrec",
             "transformers",
             "tuples",
@@ -1841,6 +1843,19 @@
         "tuples",
         "unfoldable",
         "unsafe-coerce"
+      ]
+    },
+    "stringutils": {
+      "type": "registry",
+      "version": "0.0.12",
+      "integrity": "sha256-t63QWBlp49U0nRqUcFryKflSJsNKGTQAHKjn24/+ooI=",
+      "dependencies": [
+        "arrays",
+        "integers",
+        "maybe",
+        "partial",
+        "prelude",
+        "strings"
       ]
     },
     "tailrec": {

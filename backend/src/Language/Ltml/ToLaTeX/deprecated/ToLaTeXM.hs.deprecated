@@ -4,8 +4,7 @@
 module Language.Ltml.ToLaTeX.ToLaTeXM (ToLaTeXM (..))
 where
 
-import Control.Lens hiding (enum)
-import Control.Monad.State (State, modify)
+import Control.Monad.State (MonadState (get), State, modify)
 import qualified Data.Map as Map
 import qualified Data.Text.Lazy as LT
 import Data.Void (Void, absurd)
@@ -104,13 +103,14 @@ instance
 
 instance ToLaTeXM FootnoteReference where
     toLaTeXM (FootnoteReference l@(Label lt)) = do
-        labelToRef <- use LS.labelToRef
-        case Map.lookup l labelToRef of
+        st <- get
+        let mRef = Map.lookup l (LS.labelToRef st)
+        case mRef of
             Nothing -> do
                 n <- LS.nextFootnote
                 LS.insertRefLabel (Just l) (LT.pack $ show n)
-                labelToFootNote <- use LS.labelToFootNote
-                case Map.lookup l labelToFootNote of
+                let mFootnote = Map.lookup l (LS.labelToFootNote st)
+                case mFootnote of
                     Nothing -> pure mempty -- TODO: maybe throw error here?
                     Just (Footnote _ tt) -> do
                         tt' <- mapM toLaTeXM tt
@@ -127,10 +127,11 @@ instance ToLaTeXM Enumeration where
                 (EnumFormat (EnumItemFormat ident (EnumItemKeyFormat key)))
                 enumItems
             ) = do
-            currentIdent <- use LS.enumIdentifier
-            LS.enumIdentifier .= ident
+            st <- get
+            let currentIdent = LS.enumIdentifier st
+            modify (\s -> s {LS.enumIdentifier = ident})
             enumItems' <- mapM toLaTeXM enumItems
-            LS.enumIdentifier .= currentIdent
+            modify (\s -> s {LS.enumIdentifier = currentIdent})
             pure $ enumerate [getEnumStyle ident key] enumItems'
 
 instance ToLaTeXM EnumItem where
@@ -138,9 +139,9 @@ instance ToLaTeXM EnumItem where
 
 instance Labelable EnumItem where
     attachLabel mLabel (EnumItem tt) = do
+        st <- get
         path <- LS.nextEnumPosition
-        ident <- use LS.enumIdentifier
-        LS.insertRefLabel mLabel (getIdentifier ident (last path))
+        LS.insertRefLabel mLabel (getIdentifier (LS.enumIdentifier st) (last path))
         tt' <- LS.descendEnumTree $ mapM toLaTeXM tt
         let anchor = maybe mempty (`hypertarget` mempty) mLabel
         pure $ anchor <> Sequence tt'
@@ -159,12 +160,12 @@ instance ToLaTeXM Label where
 -------------------------------- Paragraph -----------------------------------
 
 instance ToLaTeXM SimpleParagraph where
-    toLaTeXM (SimpleParagraph (SimpleParagraphFormat alignment fontsize) content) = do
-        content' <- mapM toLaTeXM content
+    toLaTeXM (SimpleParagraph (SimpleParagraphFormat alignment fontsize) children) = do
+        children' <- mapM toLaTeXM children
         pure $
             applyTextStyle alignment $
                 applyTextStyle fontsize $
-                    Sequence content'
+                    Sequence children'
 
 instance ToLaTeXM Paragraph where
     toLaTeXM = attachLabel Nothing
@@ -172,16 +173,16 @@ instance ToLaTeXM Paragraph where
 instance Labelable Paragraph where
     attachLabel mLabel (Paragraph (ParagraphFormat ident (ParagraphKeyFormat key)) content) = do
         n <- LS.nextParagraph
+        st <- get
         let identifier = getIdentifier ident n
         LS.insertRefLabel mLabel identifier
-        LS.enumPosition .= [0]
+        modify (\s -> s {LS.enumPosition = [0]})
         content' <- mapM toLaTeXM content
         let anchor = maybe mempty (`hypertarget` mempty) mLabel
-        b <- use LS.onlyOneParagraph
         pure $
             anchor
-                <> if b
-                    then Sequence content'
+                <> if LS.onlyOneParagraph st
+                    then Sequence content' <> medskip
                     else
                         enumerate
                             [ LT.pack $ "start=" <> show n
@@ -197,9 +198,9 @@ instance ToLaTeXM Table where
 -------------------------------- Section -----------------------------------
 
 instance ToLaTeXM SimpleSection where
-    toLaTeXM (SimpleSection SimpleSectionFormat content) = do
-        content' <- mapM toLaTeXM content
-        pure $ Sequence content'
+    toLaTeXM (SimpleSection SimpleSectionFormat children) = do
+        children' <- mapM toLaTeXM children
+        pure $ Sequence children'
 
 createHeading :: HeadingFormat -> LaTeX -> LaTeX -> State LS.GlobalState LaTeX
 createHeading fmt tt ident = do
@@ -222,30 +223,38 @@ instance Labelable Section where
                     LeafSectionBody paragraphs -> do
                         n <- LS.nextSection
                         setLabel n
-                        LS.onlyOneParagraph .= (length paragraphs == 1)
+                        modify (\s -> s {LS.onlyOneParagraph = length paragraphs == 1})
                         LS.addTOCEntry n keyident ident headingText
                         headingDoc <- buildHeading n
-                        content' <- mapM toLaTeXM paragraphs
+                        children' <- mapM toLaTeXM paragraphs
                         let anchor = maybe (center [headingDoc]) (`hypertarget` center [headingDoc]) mLabel
-                        pure $ anchor <> Sequence content'
+                        pure $ anchor <> Sequence children'
                     InnerSectionBody subsections -> do
                         n <- LS.nextSupersection
                         setLabel n
-                        modify $
-                            (LS.isSupersection .~ True)
-                                . (LS.counterState . LS.supersectionCTR .~ 0)
+                        modify
+                            ( \s ->
+                                s
+                                    { LS.isSupersection = True
+                                    , LS.supersectionCTR = 0
+                                    }
+                            )
                         LS.addTOCEntry n keyident ident headingText
                         headingDoc <- buildHeading n
-                        content' <- mapM toLaTeXM subsections
-                        modify $
-                            (LS.isSupersection .~ False)
-                                . (LS.counterState . LS.supersectionCTR .~ n)
+                        children' <- mapM toLaTeXM subsections
+                        modify
+                            ( \s ->
+                                s
+                                    { LS.isSupersection = False
+                                    , LS.supersectionCTR = n
+                                    }
+                            )
                         let anchor =
                                 maybe (headingDoc <> linebreak) (`hypertarget` (headingDoc <> linebreak)) mLabel
-                        pure $ anchor <> Sequence content'
+                        pure $ anchor <> Sequence children'
                     SimpleLeafSectionBody simpleblocks -> do
-                        content' <- mapM toLaTeXM simpleblocks
-                        pure $ Sequence content'
+                        children' <- mapM toLaTeXM simpleblocks
+                        pure $ Sequence children'
 
 -------------------------------- Block ----------------------------------
 
@@ -267,23 +276,27 @@ instance Labelable Document where
                 (DocumentBody intro content outro)
                 footnotemap
             ) = do
-            headingText <- do
-                b <- use LS.isAppendix
-                if b
+            st <- get
+            headingText <-
+                if LS.isAppendix st
                     then do
                         n <- LS.nextAppendix
-                        AppendixElementFormat ident (TocKeyFormat key) fmt <- use LS.appendixFormat
-                        let iText = getIdentifier ident n
+                        let AppendixElementFormat ident (TocKeyFormat key) fmt = LS.appendixFormat st
+                            iText = getIdentifier ident n
                         LS.insertRefLabel mLabel iText
                         LS.addTOCEntry n key ident (Text $ LT.fromStrict t)
                         createHeading fmt (Text $ LT.fromStrict t) (Text iText)
                     else do pure $ Text (LT.fromStrict t)
-            modify $
-                (LS.labelToFootNote .~ footnotemap)
-                    . (LS.counterState . LS.supersectionCTR .~ 0)
-                    . (LS.counterState . LS.sectionCTR .~ 0)
-                    . (LS.counterState . LS.paragraphCTR .~ 0)
-                    . (LS.counterState . LS.sentenceCTR .~ 0)
+            modify
+                ( \s ->
+                    s
+                        { LS.labelToFootNote = footnotemap
+                        , LS.supersectionCTR = 0
+                        , LS.sectionCTR = 0
+                        , LS.paragraphCTR = 0
+                        , LS.sentenceCTR = 0
+                        }
+                )
             intro' <- mapM toLaTeXM intro
             content' <- case content of
                 LeafSectionBody paragraphs -> do
@@ -308,12 +321,16 @@ instance ToLaTeXM AppendixSection where
                     )
                 nodes
             ) = do
-            modify $
-                (LS.counterState . LS.appendixCTR .~ 0)
-                    . (LS.isAppendix .~ True)
-                    . (LS.appendixFormat .~ elementFmt)
+            modify
+                ( \s ->
+                    s
+                        { LS.appendixCTR = 0
+                        , LS.isAppendix = True
+                        , LS.appendixFormat = elementFmt
+                        }
+                )
             nodes' <- mapM toLaTeXM nodes
-            LS.isAppendix .= False
+            modify (\s -> s {LS.isAppendix = False})
             pure $
                 Text (LT.fromStrict t)
                     <> Sequence nodes'

@@ -4,17 +4,67 @@ import Prelude
 
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson)
 import Data.Date (canonicalDate)
-import Data.DateTime (DateTime(..))
+import Data.DateTime
+  ( DateTime(..)
+  , date
+  , day
+  , hour
+  , millisecond
+  , minute
+  , month
+  , second
+  , time
+  , year
+  )
 import Data.Either (Either(..))
-import Data.Enum (class BoundedEnum, toEnum)
+import Data.Enum (class BoundedEnum, fromEnum, toEnum)
 import Data.Int (fromString)
 import Data.Maybe (Maybe(..))
+import Data.String.CodePoints (length)
+import Data.String.Utils (repeat)
 import Data.Time (Time(..))
 import Data.Tuple (fst)
 import Parsing (ParserT, fail, runParserT)
 import Parsing.String (anyTill, char, rest)
 
 newtype DocDate = DocDate DateTime
+
+-- Date format example: "2025-08-14T17:24:55.895359Z"
+toStringFormat :: DocDate -> String
+toStringFormat docDate =
+  (show $ fromEnum yearComponent) <> "-"
+    <>
+      (fillToTwo $ show $ fromEnum monthComponent)
+    <> "-"
+    <>
+      (fillToTwo $ show $ fromEnum dayComponent)
+    <> "T"
+    <>
+      (fillToTwo $ show $ fromEnum hourComponent)
+    <> ":"
+    <>
+      (fillToTwo $ show $ fromEnum minuteComponent)
+    <> ":"
+    <>
+      (fillToTwo $ show $ fromEnum secondComponent)
+    <> "."
+    <>
+      (fillMilli $ show $ fromEnum millisecondComponent)
+    <> "999Z"
+  where
+  dateComponent = date (docDateToDateTime docDate)
+  timeComponent = time (docDateToDateTime docDate)
+  yearComponent = year dateComponent
+  monthComponent = month dateComponent
+  dayComponent = day dateComponent
+  hourComponent = hour timeComponent
+  minuteComponent = minute timeComponent
+  secondComponent = second timeComponent
+  millisecondComponent = millisecond timeComponent
+  fillToTwo num = if (length num < 2) then ("0" <> num) else num
+  fillMilli num = case repeat (3 - length num) "9" of
+    Nothing -> "999999"
+    Just res -> num <> res
 
 docDateToDateTime :: DocDate -> DateTime
 docDateToDateTime (DocDate date) = date
@@ -54,3 +104,4 @@ instance decodeJsonDateTime :: DecodeJson DocDate where
 
 derive newtype instance eqDocDate :: Eq DocDate
 derive newtype instance ordDocDate :: Ord DocDate
+derive newtype instance showDocDate :: Show DocDate
