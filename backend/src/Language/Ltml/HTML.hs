@@ -81,7 +81,8 @@ instance ToHtmlM DocumentContainer where
         return $ mainDocHtml <> appendicesHtml
 
 instance ToHtmlM (Node Document) where
-    toHtmlM = undefined
+    -- \| TODO: Render with context: Am i inside of an appendix?
+    toHtmlM (Node mLabel doc) = undefined
 
 instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
