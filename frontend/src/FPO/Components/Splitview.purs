@@ -884,7 +884,6 @@ splitview = H.mkComponent
               H.liftAff $ delay (Milliseconds 1000.0)
               H.liftEffect $ revokeObjectURL url
             pure unit
-            --H.liftEffect $ revokeObjectURL url
 
       Editor.SavedSection toBePosted title tocEntry -> do
         state <- H.get
