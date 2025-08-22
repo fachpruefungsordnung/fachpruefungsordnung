@@ -27,6 +27,7 @@ import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
+import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
@@ -69,7 +70,6 @@ import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
 import Web.DOM.Document as Document
 import Web.DOM.Element as Element
-import Web.DOM.Node as Node
 import Web.Event.Event (EventType(..), stopPropagation)
 import Web.File.Url (createObjectURL, revokeObjectURL)
 import Web.HTML (window)
@@ -747,6 +747,7 @@ splitview = H.mkComponent
         case renderedPDF' of
           Left _ -> pure unit
           Right body -> do
+            --H.liftEffect $ log body
             -- create blobl link
             url <- H.liftEffect $ createObjectURL body
             -- Create an invisible link and click it to download PDF
@@ -763,23 +764,13 @@ splitview = H.mkComponent
                 Just aHtml -> do
                   Element.setAttribute "href" url aEl
                   Element.setAttribute "download" "test.pdf" aEl
-                  Element.setAttribute "target" "_self" aEl
-                  Element.setAttribute "rel" "noopener noreferrer" aEl
-                  Element.setAttribute "style" "display:none" aEl
-                  mBody <- HTMLDocument.body hdoc
-                  case mBody of
-                    Nothing -> pure unit
-                    Just bodyHtml -> do
-                      -- click the link
-                      let bodyEl = HTMLElement.toElement bodyHtml
-                      _ <- Node.appendChild (Element.toNode aEl)
-                        (Element.toNode bodyEl)
-                      HTMLElement.click aHtml
-                      _ <- Node.removeChild (Element.toNode aEl)
-                        (Element.toNode bodyEl)
-                      pure unit
-            -- deactivate the blob link
-            H.liftEffect $ revokeObjectURL url
+                  HTMLElement.click aHtml
+            -- deactivate the blob link after 1 sec
+            _ <- H.fork do
+              H.liftAff $ delay (Milliseconds 1000.0)
+              H.liftEffect $ revokeObjectURL url
+            pure unit
+            --H.liftEffect $ revokeObjectURL url
 
       Editor.SavedSection toBePosted title tocEntry -> do
         state <- H.get
