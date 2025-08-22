@@ -19,7 +19,9 @@ import Data.Text (Text, unpack)
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
+import Language.Ltml.AST.AppendixSection (AppendixSection (..))
 import Language.Ltml.AST.Document
+import Language.Ltml.AST.DocumentContainer (DocumentContainer (..))
 import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label
 import Language.Ltml.AST.Node
@@ -72,7 +74,16 @@ renderHtmlCss section fnMap =
 class ToHtmlM a where
     toHtmlM :: a -> HtmlReaderState
 
--- | TODO: instance for document container
+instance ToHtmlM DocumentContainer where
+    toHtmlM (DocumentContainer format header doc appendices) = do
+        mainDocHtml <- toHtmlM doc
+        appendicesHtml <- toHtmlM appendices
+        return $ mainDocHtml <> appendicesHtml
+
+instance ToHtmlM (Node Document) where
+    -- \| TODO: Render with context: Am i inside of an appendix?
+    toHtmlM (Node mLabel doc) = undefined
+
 instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
     toHtmlM
@@ -97,12 +108,12 @@ instance ToHtmlM (Node Section) where
     toHtmlM (Node mLabel (Section sectionFormatS (Heading headingFormatS title) sectionBody)) = do
         globalState <- get
         titleHtml <- toHtmlM title
-        let (sectionIDGetter, incrementSectionID) =
+        let (sectionIDGetter, incrementSectionID, sectionCssClass) =
                 -- \| Check if we are inside a section or a super-section
                 -- TODO: Is [SimpleBlocks] counted as super-section? (i think yes)
                 if isSuper sectionBody
-                    then (currentSuperSectionID, incSuperSectionID)
-                    else (currentSectionID, incSectionID)
+                    then (currentSuperSectionID, incSuperSectionID, Class.SuperSection)
+                    else (currentSectionID, incSectionID, Class.Section)
             (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (sectionIDGetter globalState)
             headingHtml =
                 (h2_ <#> Class.Heading) . headingFormat headingFormatS sectionIDHtml
@@ -121,11 +132,9 @@ instance ToHtmlM (Node Section) where
                 modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
                 -- \| increment (super)SectionID for next section
                 incrementSectionID
-                -- \| reset paragraphID for next section
-                modify (\s -> s {currentParagraphID = 1})
 
                 return $
-                    section_ [cssClass_ Class.Section, id_ htmlId]
+                    section_ [cssClass_ sectionCssClass, id_ htmlId]
                         <$> (headingHtml <> childrenHtml <> footnotesHtml)
 
 instance ToHtmlM SectionBody where
@@ -135,9 +144,13 @@ instance ToHtmlM SectionBody where
         -- \| Section
         -- \| In this case the children are paragraphs, so we set the needed flag for them
         --    to decide if the should have a visible id
-        LeafSectionBody nodeParagraphs ->
-            local (\s -> s {isSingleParagraph = length nodeParagraphs == 1}) $
-                toHtmlM nodeParagraphs
+        LeafSectionBody nodeParagraphs -> do
+            paragraphsHtml <-
+                local (\s -> s {isSingleParagraph = length nodeParagraphs == 1}) $
+                    toHtmlM nodeParagraphs
+            -- \| reset paragraphID for next section
+            modify (\s -> s {currentParagraphID = 1})
+            return paragraphsHtml
         SimpleLeafSectionBody simpleBlocks -> toHtmlM simpleBlocks
 
 -- | Combined instance since the paragraphIDHtml has to be build before the reference is generated
@@ -322,7 +335,7 @@ instance ToHtmlM FootnoteSet where
                 else do
                     let combinedFootnotesHtml = mconcat footnoteHtmls
                     -- \| Wrap all footnotes into one <div>
-                    return $ div_ <#> Class.FootnoteContainer $ combinedFootnotesHtml
+                    return $ div_ <#> Class.FootnoteContainer $ hr_ [] <> combinedFootnotesHtml
       where
         -- \| Lookup footnote label and build single footnote html
         toFootnoteHtml :: FootnoteMap -> Label -> HtmlReaderState
@@ -338,9 +351,24 @@ instance ToHtmlM FootnoteSet where
                 Just (_, idHtml, delayedTextHtml) ->
                     -- \| <div> <sup>id</sup> <span>text</span> </div>
                     return
-                        ( (div_ <#> Class.Footnote <$> (sup_ idHtml <>)) . span_
+                        ( (div_ <#> Class.Footnote <$> ((sup_ <#> Class.FootnoteID) idHtml <>)) . span_
                             <$> delayedTextHtml
                         )
+
+-------------------------------------------------------------------------------
+
+instance ToHtmlM AppendixSection where
+    toHtmlM (AppendixSection format nodeDocuments) = do
+        appendixSectionID <- gets currentAppendixSectionID
+        let (titleHtml, headingTextHtml, tocHtml) = appendixFormat format appendixSectionID
+        -- \| Mangled ToC Entry as Html Id
+        htmlId <- addTocEntry tocHtml (Now titleHtml) Nothing
+        documentsHtml <- toHtmlM nodeDocuments
+        modify (\s -> s {currentAppendixSectionID = currentAppendixSectionID s + 1})
+        let headingHtml = h1_ <#> Class.DocumentTitle $ headingTextHtml
+        return ((div_ [id_ htmlId] <> (headingHtml <>)) . div_ <$> documentsHtml)
+
+-------------------------------------------------------------------------------
 
 instance (ToHtmlM a) => ToHtmlM [a] where
     toHtmlM [] = returnNow mempty
@@ -348,8 +376,6 @@ instance (ToHtmlM a) => ToHtmlM [a] where
         aHtml <- toHtmlM a
         asHtml <- toHtmlM as
         return (aHtml <> asHtml)
-
--------------------------------------------------------------------------------
 
 -- | ToHtmlM instance that can never be called, because there are
 --   no values of type Void

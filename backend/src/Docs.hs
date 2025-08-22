@@ -104,6 +104,9 @@ defaultHistoryLimit = 20
 squashRevisionsWithinMinutes :: Float
 squashRevisionsWithinMinutes = 15
 
+enableSquashing :: Bool
+enableSquashing = False
+
 createDocument
     :: (HasCreateDocument m)
     => UserID
@@ -192,7 +195,7 @@ createTextRevision userID revision = runExceptT $ do
                 -- content has not changed? -> return latest
                 | content latest == newTextRevisionContent revision ->
                     return $ TextRevision.NoConflict latest
-                -- no conflict, and can update? -> update
+                -- no conflict, and can update? -> update (squash)
                 | latestRevisionID == parentRevisionID && shouldUpdate now latest ->
                     DB.updateTextRevision
                         (identifier latest)
@@ -215,7 +218,9 @@ createTextRevision userID revision = runExceptT $ do
     author = TextRevision.author . header
     authorID = UserRef.identifier . author
     shouldUpdate tz latestRevision =
-        userID == authorID latestRevision && diff < squashRevisionsWithinMinutes
+        enableSquashing
+            && userID == authorID latestRevision
+            && diff < squashRevisionsWithinMinutes
       where
         diff =
             ((/ 60) . realToFrac)

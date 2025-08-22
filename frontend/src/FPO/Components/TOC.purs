@@ -90,6 +90,7 @@ data Output
   | DeleteNode Path
   | ReorderItems { from :: Path, to :: Path }
   | ModifyVersion Int (Maybe Int)
+  | CompareTo Int Int
   | RenameNode { path :: Path, newName :: String }
 
 type Path = Array Int
@@ -266,11 +267,12 @@ tocview = connect (selectEq identity) $ H.mkComponent
       H.raise (ModifyVersion elementID (Just vID))
 
     CompareVersion elementID vID -> do
-      liftEffect $ log $
-        "should not be here yet. to appease error checker without removing soon to be needed stuff:"
-          <> (show elementID)
-          <> (show vID)
-      pure unit
+      H.raise (CompareTo elementID vID)
+    {-       liftEffect $ log $
+      "should not be here yet. to appease error checker without removing soon to be needed stuff:"
+        <> (show elementID)
+        <> (show vID)
+    pure unit -}
 
     DoNothing -> do
       pure unit

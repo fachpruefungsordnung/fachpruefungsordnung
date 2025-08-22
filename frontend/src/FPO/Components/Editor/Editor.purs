@@ -1,5 +1,6 @@
 module FPO.Components.Editor
   ( Action(..)
+  , ElementData
   , Input
   , LiveMarker
   , Output(..)
@@ -31,6 +32,7 @@ import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class as EC
+-- import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.Keybindings
@@ -85,6 +87,8 @@ import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
 type Path = Array Int
 
+type ElementData = Maybe { tocEntry :: TOCEntry, revID :: Int, title :: String }
+
 type State = FPOState
   ( docID :: DocumentID
   , mEditor :: Maybe Types.Editor
@@ -107,6 +111,11 @@ type State = FPOState
   -- for periodically saving the content
   , mPendingDebounceF :: Maybe H.ForkId -- 2s-Timer
   , mPendingMaxWaitF :: Maybe H.ForkId -- 20s-Max-Timer
+  -- note: this value is only used for initialisation and won't necessarily stay up to date
+  -- it stores the needed input for the Init action. Receive did not work, as the page
+  -- get's rendered over and over, meaning receive get's triggered over and over and the
+  -- number of requests to the backend would be ridiculous
+  , compareToElement :: ElementData
   )
 
 -- For tracking the comment markers live
@@ -118,7 +127,7 @@ type LiveMarker =
   , ref :: Ref Int
   }
 
-type Input = DocumentID
+type Input = { docID :: DocumentID, elementData :: ElementData }
 
 data Output
   = ClickedQuery (Array String)
@@ -134,6 +143,7 @@ data Output
 data Action
   = Init
   | Comment
+  | ChangeToSection String TOCEntry (Maybe Int)
   | DeleteComment
   | SelectComment
   | Bold
@@ -176,6 +186,8 @@ data Query a
   | UpdateNodePosition Path a
   | SendCommentSections a
 
+-- | UpdateCompareToElement ElementData a
+
 editor
   :: forall m
    . MonadAff m
@@ -196,7 +208,7 @@ editor = connect selectTranslator $ H.mkComponent
   where
   initialState :: Connected FPOTranslator Input -> State
   initialState { context, input } =
-    { docID: input
+    { docID: input.docID
     , translator: fromFpoTranslator context
     , mEditor: Nothing
     , mTocEntry: Nothing
@@ -215,6 +227,7 @@ editor = connect selectTranslator $ H.mkComponent
     , mSavedIconF: Nothing
     , mPendingDebounceF: Nothing
     , mPendingMaxWaitF: Nothing
+    , compareToElement: input.elementData
     }
 
   render :: State -> H.ComponentHTML Action () m
@@ -401,6 +414,15 @@ editor = connect selectTranslator $ H.mkComponent
         observer <- H.liftEffect $ RO.resizeObserver callback
         H.liftEffect $ RO.observe (toElement element) {} observer
         H.modify_ _ { resizeObserver = Just observer }
+      compareTo <- H.gets _.compareToElement
+      case compareTo of
+        Nothing
+        -> pure unit
+        Just { tocEntry: tocEntry, revID: revID, title: title }
+        -> handleAction (ChangeToSection title tocEntry (Just revID))
+
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
 
     Bold -> do
       H.gets _.mEditor >>= traverse_ \ed ->
@@ -750,9 +772,6 @@ editor = connect selectTranslator $ H.mkComponent
             Just foundMarker -> H.raise
               (SelectedCommentSection tocEntry.id foundMarker.id)
 
-    Receive { context } -> do
-      H.modify_ _ { translator = fromFpoTranslator context }
-
     HandleResize width -> do
       -- Decides whether to show button text based on the width.
       -- Because german labels are longer, we need to adjust the cutoff
@@ -783,13 +802,7 @@ editor = connect selectTranslator $ H.mkComponent
       for_ state.mPendingDebounceF H.kill
       for_ state.mPendingMaxWaitF H.kill
 
-  handleQuery
-    :: forall slots a
-     . Query a
-    -> H.HalogenM State Action slots Output m (Maybe a)
-  handleQuery = case _ of
-
-    ChangeSection title entry rev a -> do
+    ChangeToSection title entry rev -> do
       H.modify_ \state -> state { mTocEntry = Just entry, title = title }
       state <- H.get
 
@@ -853,6 +866,15 @@ editor = connect selectTranslator $ H.mkComponent
         -- Update state with new marker IDs
         H.modify_ \st ->
           st { liveMarkers = newLiveMarkers }
+
+  handleQuery
+    :: forall slots a
+     . Query a
+    -> H.HalogenM State Action slots Output m (Maybe a)
+  handleQuery = case _ of
+
+    ChangeSection title entry rev a -> do
+      handleAction (ChangeToSection title entry rev)
       pure (Just a)
 
     ChangeToNode title path a -> do

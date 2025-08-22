@@ -86,11 +86,15 @@ derive instance eqDragTarget :: Eq DragTarget
 
 type Output = Unit
 type Input = DocumentID
+
+type ElementData = Editor.ElementData
+
 data Query a = UnitQuery a
 
 data Action
   = Init
   -- Resizing Actions
+  | SetComparison Int Int
   | StartResize DragTarget MouseEvent
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
@@ -108,6 +112,7 @@ data Action
   | GET
   | POST
   | ModifyVersionMapping Int (Maybe Int)
+  | UpdateCompareToElement ElementData
 
 type State =
   { docID :: DocumentID
@@ -156,6 +161,7 @@ type State =
   , previewShown :: Boolean
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
+  , compareToElement :: ElementData
   }
 
 type ElemVersion = { elementID :: Int, versionID :: Maybe Int }
@@ -163,7 +169,7 @@ type ElemVersion = { elementID :: Int, versionID :: Maybe Int }
 type Slots =
   ( comment :: H.Slot Comment.Query Comment.Output Unit
   , commentOverview :: H.Slot CommentOverview.Query CommentOverview.Output Unit
-  , editor :: H.Slot Editor.Query Editor.Output Unit
+  , editor :: H.Slot Editor.Query Editor.Output Int
   , preview :: H.Slot Preview.Query Preview.Output Unit
   , toc :: H.Slot TOC.Query TOC.Output Unit
   )
@@ -203,6 +209,7 @@ splitview = H.mkComponent
       , pdfWarningAvailable: false
       , pdfWarningIsShown: false
       , docID: docID
+      , compareToElement: Nothing
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -251,12 +258,19 @@ splitview = H.mkComponent
                       , HP.style
                           "height: 100%; box-sizing: border-box; min-height: 0; overflow: hidden;"
                       ]
-                      [ HH.slot _editor unit Editor.editor state.docID HandleEditor ]
+                      [ HH.slot _editor 0 Editor.editor
+                          { docID: state.docID, elementData: Nothing }
+                          HandleEditor
+                      ]
                   ]
               ]
             <>
               -- Preview Sectioin
-              renderPreview state
+              case state.compareToElement of
+                Nothing
+                -> renderPreview state
+                Just _
+                -> renderSecondEditor state
         )
 
   -- Render both TOC and Comment but make them visable depending of the flags
@@ -395,6 +409,42 @@ splitview = H.mkComponent
         ]
     ]
 
+  rightResizer :: State -> H.ComponentHTML Action Slots m
+  rightResizer state =
+    HH.div
+      [ HE.onMouseDown (StartResize ResizeRight)
+      , HP.style
+          "width: 8px; \
+          \cursor: col-resize; \
+          \background:rgba(0, 0, 0, 0.3); \
+          \display: flex; \
+          \align-items: center; \
+          \justify-content: center; \
+          \position: relative;"
+      ]
+      [ HH.button
+          [ HP.style
+              "background:rgba(255, 255, 255, 0.8); \
+              \border: 0.2px solid #aaa; \
+              \padding: 0.1rem 0.1rem; \
+              \font-size: 8px; \
+              \font-weight: bold; \
+              \line-height: 1; \
+              \color:rgba(0, 0, 0, 0.7); \
+              \border-radius: 3px; \
+              \cursor: pointer; \
+              \height: 40px; \
+              \width: 8px;"
+          -- To prevent the resizer event under the button
+          , HE.handler' (EventType "mousedown") \ev ->
+              unsafePerformEffect do
+                stopPropagation ev
+                pure Nothing -- Do not trigger the mouse down event under the button
+          , HE.onClick \_ -> TogglePreview
+          ]
+          [ HH.text if state.previewShown then "⟩" else "⟨" ]
+      ]
+
   renderPreview :: State -> Array (H.ComponentHTML Action Slots m)
   renderPreview state =
     [ -- Right Resizer
@@ -470,6 +520,47 @@ splitview = H.mkComponent
           ]
       else
         HH.text ""
+    ]
+
+  renderSecondEditor :: State -> Array (H.ComponentHTML Action Slots m)
+  renderSecondEditor state =
+    [ -- Right Resizer
+      rightResizer state
+    ,
+      -- Preview
+      HH.div
+        [ HP.classes [ HB.dFlex, HB.flexColumn ]
+        , HP.style $
+            "flex: 1 1 "
+              <> show (state.previewRatio * 100.0)
+              <>
+                "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
+        ]
+        [ HH.div
+            [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
+            , HP.style "padding-right: 0.5rem;"
+            ]
+            [ HH.button
+                [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+                , HP.style
+                    "position: absolute; \
+                    \top: 0.5rem; \
+                    \right: 0.5rem; \
+                    \background-color: #fdecea; \
+                    \color: #b71c1c; \
+                    \padding: 0.2rem 0.4rem; \
+                    \font-size: 0.75rem; \
+                    \line-height: 1; \
+                    \border: 1px solid #f5c6cb; \
+                    \border-radius: 0.2rem; \
+                    \z-index: 10;"
+                , HE.onClick \_ -> TogglePreview
+                ]
+                [ HH.text "×" ]
+            ]
+        , HH.slot_ _editor 1 Editor.editor
+            { docID: state.docID, elementData: state.compareToElement }
+        ]
     ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
@@ -604,11 +695,18 @@ splitview = H.mkComponent
 
     -- Toggle actions
 
+    UpdateCompareToElement elemData -> do
+      H.modify_ _ { compareToElement = elemData }
+      case elemData of
+        Nothing -> pure unit
+        Just eData -> H.tell _editor 1
+          (Editor.ChangeSection eData.title eData.tocEntry (Just eData.revID))
+
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
     ToggleCommentOverview shown ->
       if shown then do
-        H.tell _editor unit Editor.SendCommentSections
+        H.tell _editor 0 Editor.SendCommentSections
         H.modify_ \st -> st { commentShown = false, commentOverviewShown = shown }
       else
         H.modify_ \st -> st { commentOverviewShown = shown }
@@ -672,6 +770,22 @@ splitview = H.mkComponent
             state.versionMapping
       H.modify_ _ { versionMapping = newVersionMapping }
 
+    SetComparison elementID vID -> do
+      state <- H.get
+      let
+        tocEntry = fromMaybe
+          emptyTOCEntry
+          (findTOCEntry elementID state.tocEntries)
+        title = fromMaybe
+          ""
+          (findTitleTOCEntry elementID state.tocEntries)
+      H.modify_ _
+        { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } }
+      handleAction
+        ( UpdateCompareToElement
+            (Just { tocEntry: tocEntry, revID: vID, title: title })
+        )
+
     -- Query handler
 
     HandleComment output -> case output of
@@ -681,7 +795,7 @@ splitview = H.mkComponent
 
       -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
       Comment.UpdateComment tocID markerID newCommentSection -> do
-        H.tell _editor unit Editor.SaveSection
+        H.tell _editor 0 Editor.SaveSection
         state <- H.get
         case
           findRootTree (\e -> e.elementID == tocID && e.versionID /= Nothing)
@@ -714,7 +828,7 @@ splitview = H.mkComponent
                 ""
                 (findTitleTOCEntry tocID updatedTOCEntries)
             H.modify_ \s -> s { tocEntries = updatedTOCEntries }
-            H.tell _editor unit (Editor.ChangeSection title updateTOCEntry Nothing)
+            H.tell _editor 0 (Editor.ChangeSection title updateTOCEntry Nothing)
           Nothing -> do
             H.liftEffect $ log
               "unable to unpdate comment on outdated versions of elements"
@@ -812,8 +926,11 @@ splitview = H.mkComponent
       TOC.ModifyVersion elementID mVID -> do
         handleAction (ModifyVersionMapping elementID mVID)
 
+      TOC.CompareTo elementID vID -> do
+        handleAction (SetComparison elementID vID)
+
       TOC.ChangeToLeaf title selectedId -> do
-        H.tell _editor unit Editor.SaveSection
+        H.tell _editor 0 Editor.SaveSection
         state <- H.get
         let
           entry = case (findTOCEntry selectedId state.tocEntries) of
@@ -826,13 +943,13 @@ splitview = H.mkComponent
               Nothing -> Nothing
               Just elem -> elem.versionID
         -- handleAction (ModifyVersionMapping selectedID rev)
-        H.tell _editor unit (Editor.ChangeSection title entry rev)
+        H.tell _editor 0 (Editor.ChangeSection title entry rev)
 
       TOC.ChangeToNode path title -> do
-        H.tell _editor unit (Editor.ChangeToNode title path)
+        H.tell _editor 0 (Editor.ChangeToNode title path)
 
       TOC.UpdateNodePosition path -> do
-        H.tell _editor unit (Editor.UpdateNodePosition path)
+        H.tell _editor 0 (Editor.UpdateNodePosition path)
 
       TOC.AddNode path node -> do
         s <- H.get
