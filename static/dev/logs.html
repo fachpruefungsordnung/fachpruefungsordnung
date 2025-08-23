@@ -1,0 +1,207 @@
+<!-- Danke ChatGPT xD -->
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Logs Viewer</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        background: #f5f5f5;
+        margin: 0;
+        padding: 0;
+      }
+      header {
+        background: #222;
+        color: white;
+        padding: 1em;
+        text-align: center;
+      }
+      #login,
+      #logs {
+        max-width: 800px;
+        margin: 2em auto;
+        background: white;
+        border-radius: 8px;
+        padding: 2em;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      }
+      .hidden {
+        display: none;
+      }
+
+      /* Login */
+      #login input {
+        display: block;
+        width: 100%;
+        padding: 0.6em;
+        margin-bottom: 1em;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        font-size: 1em;
+      }
+      #login button {
+        padding: 0.8em 1.2em;
+        border: none;
+        background: #007acc;
+        color: white;
+        border-radius: 6px;
+        font-size: 1em;
+        cursor: pointer;
+      }
+      #login button:hover {
+        background: #005fa3;
+      }
+
+      /* Logs */
+      .log-entry {
+        border-left: 6px solid;
+        margin-bottom: 1em;
+        padding: 0.8em 1em;
+        border-radius: 4px;
+        background: #fafafa;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .severity-Info {
+        border-color: #007acc;
+      }
+      .severity-Warning {
+        border-color: #ff9800;
+        background: #fff3e0;
+      }
+      .severity-Error {
+        border-color: #f44336;
+        background: #ffebee;
+      }
+      .timestamp {
+        font-size: 0.8em;
+        color: #555;
+        margin-bottom: 0.3em;
+      }
+      .scope {
+        font-size: 0.8em;
+        font-style: italic;
+        color: #777;
+      }
+      .content {
+        margin-top: 0.5em;
+        font-family: monospace;
+        white-space: pre;
+        background: #f5f5f5;
+        padding: 0.5em;
+        border-radius: 4px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <header><h1>Logs Viewer</h1></header>
+
+    <div id="login">
+      <h2>Login</h2>
+      <input type="email" id="email" placeholder="Email" />
+      <input type="password" id="password" placeholder="Passwort" />
+      <button id="loginBtn">Login</button>
+      <p id="loginError" style="color: red"></p>
+    </div>
+
+    <div id="logs" class="hidden">
+      <h2>Logs</h2>
+      <div id="logList"></div>
+    </div>
+
+    <script>
+      let xsrfToken = "";
+      const apiBase = "/api";
+      let refreshInterval = null;
+
+      async function login(email, password) {
+        const payload = {
+          loginEmail: email,
+          loginPassword: password,
+        };
+        const res = await fetch(apiBase + "/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          credentials: "include", // sorgt dafür, dass Cookies gespeichert werden
+        });
+        if (!res.ok) throw new Error("Login failed");
+
+        // XSRF Token aus Response-Header lesen
+        xsrfToken = res.headers.get("X-XSRF-TOKEN") || "";
+      }
+
+      function getCookie(name) {
+        const match = document.cookie.match(
+          new RegExp("(^| )" + name + "=([^;]+)"),
+        );
+        return match ? decodeURIComponent(match[2]) : null;
+      }
+
+      async function loadLogs() {
+        const xsrfToken = getCookie("XSRF-TOKEN"); // direkt aus Cookie holen
+        const res = await fetch(apiBase + "/logs", {
+          headers: {
+            Accept: "application/json",
+            "X-XSRF-TOKEN": xsrfToken || "",
+          },
+          credentials: "include",
+        });
+        const data = await res.json();
+        renderLogs(data.messages);
+      }
+
+      function renderLogs(messages) {
+        const list = document.getElementById("logList");
+        list.innerHTML = "";
+        messages.forEach((msg) => {
+          const div = document.createElement("div");
+          div.className = "log-entry severity-" + msg.severity;
+
+          const ts = document.createElement("div");
+          ts.className = "timestamp";
+          ts.textContent = new Date(msg.timestamp).toLocaleString();
+          div.appendChild(ts);
+
+          const scope = document.createElement("div");
+          scope.className = "scope";
+          const source =
+            msg.source?.tag === "User"
+              ? `User: ${msg.source?.contents?.name || ""}`
+              : msg.source?.tag;
+          scope.textContent = `[${msg.scope}] ${source || ""}`;
+          div.appendChild(scope);
+
+          const content = document.createElement("div");
+          content.className = "content";
+          try {
+            content.textContent = JSON.stringify(msg.content, null, 2);
+          } catch {
+            content.textContent = msg.content;
+          }
+          div.appendChild(content);
+
+          list.appendChild(div);
+        });
+      }
+
+      document
+        .getElementById("loginBtn")
+        .addEventListener("click", async () => {
+          const email = document.getElementById("email").value;
+          const pw = document.getElementById("password").value;
+          try {
+            await login(email, pw);
+            document.getElementById("login").classList.add("hidden");
+            document.getElementById("logs").classList.remove("hidden");
+            loadLogs();
+            refreshInterval = setInterval(loadLogs, 5000);
+          } catch (e) {
+            document.getElementById("loginError").textContent = e.message;
+          }
+        });
+    </script>
+  </body>
+</html>

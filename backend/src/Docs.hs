@@ -93,7 +93,7 @@ import qualified Docs.TreeRevision as TreeRevision
 import qualified Docs.UserRef as UserRef
 import GHC.Generics (Generic)
 import GHC.Int (Int64)
-import Logging.Logs (LogMessage, Severity (Info))
+import Logging.Logs (LogMessage, Severity (Warning))
 import Logging.Scope (Scope)
 import qualified Logging.Scope as Scope
 
@@ -133,8 +133,8 @@ logged userID scope result = do
     value <- result
     case value of
         Left err -> do
-            _ <- DB.logMessage Info (Just userID) scope err
-            --                 ^~~~ all of these errors are user errors
+            _ <- DB.logMessage Warning (Just userID) scope err
+            --                 ^~~~~~~ all of these errors are user errors
             return $ Left err
         Right val -> return $ Right val
 
