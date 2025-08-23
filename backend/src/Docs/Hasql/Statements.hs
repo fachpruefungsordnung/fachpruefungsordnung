@@ -1328,7 +1328,7 @@ getLogs =
                 logs.content :: JSONB
             FROM
                 logs
-                LEFT JOIN users ON inserted.user = users.id
+                LEFT JOIN users ON logs.user = users.id
             WHERE
                 logs."timestamp" < COALESCE($1 :: TIMESTAMPTZ?, now())
             ORDER BY
