@@ -135,8 +135,8 @@ logged userID scope result = do
         Left err -> do
             _ <- DB.logMessage Info (Just userID) scope err
             --                 ^~~~ all of these errors are user errors
-            result
-        Right _ -> result
+            return $ Left err
+        Right val -> return $ Right val
 
 logMessage
     :: (HasLogMessage m, ToJSON v)
