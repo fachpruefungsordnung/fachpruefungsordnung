@@ -149,3 +149,4 @@ instance HasCreateTreeRevision HasqlTransaction where
 instance HasCreateComment HasqlTransaction where
     createComment = ((HasqlTransaction .) .) . Transactions.createComment
     resolveComment = HasqlTransaction . Transactions.resolveComment
+    createReply = ((HasqlTransaction .) .) . Transactions.createReply

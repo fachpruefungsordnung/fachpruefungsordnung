@@ -33,6 +33,8 @@ module Docs.Hasql.Statements
     , isGroupAdmin
     , createComment
     , getComments
+    , createReply
+    , getReplies
     , putCommentAnchor
     , getCommentAnchors
     , deleteCommentAnchorsExcept
@@ -65,12 +67,14 @@ import UserManagement.User (UserID)
 
 import Data.Functor ((<&>))
 import qualified Data.Text as Text
+import qualified Data.Vector as Vector
 import Docs.Comment
     ( Anchor (Anchor)
     , Comment (Comment)
     , CommentAnchor (CommentAnchor)
     , CommentID (CommentID, unCommentID)
     , CommentRef (CommentRef)
+    , Message (Message)
     )
 import qualified Docs.Comment as Comment
 import Docs.Document (Document (Document), DocumentID (..))
@@ -1031,18 +1035,27 @@ isGroupAdmin =
 
 -- comments
 
-uncurryComment :: (Int64, UUID, Text, UTCTime, Maybe UTCTime, Text) -> Comment
-uncurryComment (id_, authorID, authorName, timestamp, resolved, content) =
-    Comment
-        { Comment.identifier = CommentID id_
-        , Comment.author =
+uncurryMessage :: (UUID, Text, UTCTime, Text) -> Message
+uncurryMessage (authorID, authorName, timestamp, content) =
+    Message
+        { Comment.author =
             UserRef
                 { UserRef.identifier = authorID
                 , UserRef.name = authorName
                 }
         , Comment.timestamp = timestamp
-        , Comment.status = maybe Comment.Open Comment.Resolved resolved
         , Comment.content = content
+        }
+
+uncurryComment
+    :: (Int64, UUID, Text, UTCTime, Maybe UTCTime, Text)
+    -> Comment
+uncurryComment (id_, authorID, authorName, timestamp, resolved, content) =
+    Comment
+        { Comment.identifier = CommentID id_
+        , Comment.status = maybe Comment.Open Comment.Resolved resolved
+        , Comment.message = uncurryMessage (authorID, authorName, timestamp, content)
+        , Comment.replies = Vector.empty
         }
 
 createComment :: Statement (UserID, TextElementID, Text) Comment
@@ -1092,7 +1105,7 @@ getComments =
                     comments.resolved_ts :: TIMESTAMPTZ?,
                     comments.content :: TEXT
                 FROM
-                    comments
+                    doc_comments comments
                     LEFT JOIN users ON comments.author = users.id
                     LEFT JOIN doc_text_elements
                         ON comments.text_element = doc_text_elements.id
@@ -1100,6 +1113,64 @@ getComments =
                     comments.text_element = $1 :: INT8
                     AND doc_text_elements.document = $2 :: INT8
             |]
+
+createReply :: Statement (UserID, CommentID, Text) Message
+createReply =
+    lmap mapInput $
+        rmap
+            uncurryMessage
+            [singletonStatement|
+                WITH inserted AS (
+                    INSERT INTO doc_comment_replies
+                        (author, comment, content)
+                    VALUES
+                        ($1 :: UUID, $2 :: INT8, $3 :: TEXT)
+                    RETURNING
+                        author :: UUID,
+                        creation_ts :: TIMESTAMPTZ,
+                        content :: TEXT
+                )
+                SELECT
+                    users.id :: UUID,
+                    users.name :: TEXT,
+                    inserted.creation_ts :: TIMESTAMPTZ,
+                    inserted.content :: TEXT
+                FROM
+                    inserted
+                    LEFT JOIN users ON inserted.author = users.id
+            |]
+  where
+    mapInput (userID, commentID, content) =
+        ( userID
+        , unCommentID commentID
+        , content
+        )
+
+getReplies :: Statement CommentRef (Vector Message)
+getReplies =
+    lmap curryCommentRef $
+        rmap
+            (uncurryMessage <$>)
+            [vectorStatement|
+                SELECT
+                    users.id :: UUID,
+                    users.name :: TEXT,
+                    replies.creation_ts :: TIMESTAMPTZ,
+                    replies.content :: TEXT
+                FROM
+                    doc_comment_replies replies
+                    LEFT JOIN users ON replies.author = users.id
+                    LEFT JOIN doc_comments comments ON replies.comment = doc_comments.id
+                    LEFT JOIN doc_text_elements text_elements ON comments.text_element = doc_text_elements.id
+                WHERE
+                    text_elements.document = $1 :: INT8
+                    AND comments.text_element = $2 :: INT8
+                    AND replies.comment = $3 :: INT8
+            |]
+
+curryCommentRef :: CommentRef -> (Int64, Int64, Int64)
+curryCommentRef (CommentRef (TextElementRef docID textID) commentID) =
+    (unDocumentID docID, unTextElementID textID, unCommentID commentID)
 
 resolveComment :: Statement CommentID ()
 resolveComment =

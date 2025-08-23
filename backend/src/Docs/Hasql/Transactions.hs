@@ -17,6 +17,7 @@ module Docs.Hasql.Transactions
     , createComment
     , existsComment
     , resolveComment
+    , createReply
     ) where
 
 import qualified Crypto.Hash.SHA1 as SHA1
@@ -34,7 +35,7 @@ import UserManagement.User (UserID)
 import Control.Monad (guard)
 import Data.Time (UTCTime)
 import Data.Vector (Vector)
-import Docs.Comment (Comment, CommentAnchor, CommentID, CommentRef)
+import Docs.Comment (Comment, CommentAnchor, CommentID, CommentRef, Message)
 import qualified Docs.Comment as Comment
 import Docs.Document (DocumentID)
 import Docs.Hash
@@ -178,3 +179,6 @@ existsComment =
 resolveComment :: CommentID -> Transaction ()
 resolveComment =
     flip statement Statements.resolveComment
+
+createReply :: UserID -> CommentID -> Text -> Transaction Message
+createReply userID commentID = (`statement` Statements.createReply) . (userID,commentID,)

@@ -77,6 +77,7 @@ import Docs.Comment
     ( Comment
     , CommentID
     , CommentRef (CommentRef)
+    , Message
     , prettyPrintCommentRef
     )
 import Server.DTOs.Comments (Comments (Comments))
@@ -84,6 +85,8 @@ import Server.DTOs.CreateComment (CreateComment)
 import qualified Server.DTOs.CreateComment as CreateComment
 import Server.DTOs.CreateDocument (CreateDocument)
 import qualified Server.DTOs.CreateDocument as CreateDocument
+import Server.DTOs.CreateReply (CreateReply)
+import qualified Server.DTOs.CreateReply as CreateReply
 import Server.DTOs.CreateTextElement (CreateTextElement)
 import qualified Server.DTOs.CreateTextElement as CreateTextElement
 import Server.DTOs.CreateTextRevision (CreateTextRevision)
@@ -113,6 +116,7 @@ type DocsAPI =
                 :<|> PostComment
                 :<|> GetComments
                 :<|> ResolveComment
+                :<|> PostReply
                 :<|> RenderAPI
            )
 
@@ -235,6 +239,17 @@ type ResolveComment =
         :> "resolve"
         :> Post '[JSON] ()
 
+type PostReply =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "comments"
+        :> Capture "commentID" CommentID
+        :> "replies"
+        :> ReqBody '[JSON] CreateReply
+        :> Post '[JSON] Message
+
 docsServer :: Server DocsAPI
 docsServer =
     {-    -} postDocumentHandler
@@ -252,6 +267,7 @@ docsServer =
         :<|> postCommentHandler
         :<|> getCommentsHandler
         :<|> resolveCommentHandler
+        :<|> createReplyHandler
         :<|> renderServer
 
 postDocumentHandler
@@ -445,6 +461,23 @@ resolveCommentHandler auth docID textID commentID = do
     withDB $
         runTransaction $
             Docs.resolveComment userID (CommentRef (TextElementRef docID textID) commentID)
+
+createReplyHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> CommentID
+    -> CreateReply
+    -> Handler Message
+createReplyHandler auth docID textID commentID bodyDTO = do
+    userID <- getUser auth
+    withDB
+        $ runTransaction
+        $ Docs.createReply
+            userID
+            (CommentRef (TextElementRef docID textID) commentID)
+        $ CreateReply.text
+            bodyDTO
 
 -- utililty
 

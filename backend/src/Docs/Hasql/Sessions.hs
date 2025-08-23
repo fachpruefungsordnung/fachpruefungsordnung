@@ -38,7 +38,8 @@ import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
-import Docs.Comment (Comment, CommentAnchor)
+import Docs.Comment (Comment, CommentAnchor, CommentRef (CommentRef), Message)
+import qualified Docs.Comment as Comment
 import Docs.Document (Document, DocumentID)
 import Docs.DocumentHistory (DocumentHistory (..))
 import Docs.Hash (Hash)
@@ -177,5 +178,13 @@ isGroupAdmin userID groupID =
     statement (userID, groupID) Statements.isGroupAdmin
 
 getComments :: TextElementRef -> Session (Vector Comment)
-getComments (TextElementRef docID textID) =
-    statement (docID, textID) Statements.getComments
+getComments textRef@(TextElementRef docID textID) = do
+    comments <- statement (docID, textID) Statements.getComments
+    mapM mapper comments
+  where
+    mapper :: Comment -> Session Comment
+    mapper comment = do
+        replies <- getReplies $ CommentRef textRef $ Comment.identifier comment
+        return $ comment {Comment.replies = replies}
+    getReplies :: CommentRef -> Session (Vector Message)
+    getReplies = flip statement Statements.getReplies

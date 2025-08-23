@@ -17,6 +17,7 @@ module Docs
     , createComment
     , getComments
     , resolveComment
+    , createReply
     ) where
 
 import Control.Monad (unless)
@@ -33,7 +34,7 @@ import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
 import Data.Maybe (fromMaybe)
-import Docs.Comment (Comment, CommentRef (CommentRef))
+import Docs.Comment (Comment, CommentRef (CommentRef), Message)
 import qualified Docs.Comment as Comment
 import Docs.Database
     ( HasCheckPermission
@@ -351,6 +352,17 @@ resolveComment userID ref@(CommentRef (TextElementRef docID _) commentID) = runE
     guardPermission Comment docID userID
     guardExistsComment ref
     lift $ DB.resolveComment commentID
+
+createReply
+    :: (HasCreateComment m)
+    => UserID
+    -> CommentRef
+    -> Text
+    -> m (Result Message)
+createReply userID ref@(CommentRef (TextElementRef docID _) commentID) content = runExceptT $ do
+    guardPermission Comment docID userID
+    guardExistsComment ref
+    lift $ DB.createReply userID commentID content
 
 -- guards
 

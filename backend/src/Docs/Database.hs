@@ -30,7 +30,7 @@ import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
-import Docs.Comment (Comment, CommentAnchor, CommentID, CommentRef)
+import Docs.Comment (Comment, CommentAnchor, CommentID, CommentRef, Message)
 import Docs.Document (Document, DocumentID)
 import Docs.DocumentHistory (DocumentHistory)
 import Docs.TextElement
@@ -140,3 +140,4 @@ class (HasCheckPermission m, HasExistsDocument m) => HasCreateTreeRevision m whe
 class (HasCheckPermission m, HasExistsComment m) => HasCreateComment m where
     createComment :: UserID -> TextElementID -> Text -> m Comment
     resolveComment :: CommentID -> m ()
+    createReply :: UserID -> CommentID -> Text -> m Message
