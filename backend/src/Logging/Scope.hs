@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Logging.Scope
@@ -17,20 +16,24 @@ module Logging.Scope
 
 import Data.Text (Text)
 
-import Data.Aeson (FromJSON, ToJSON)
+import Data.Aeson (FromJSON (parseJSON), ToJSON)
+import Data.Aeson.Types (ToJSON (toJSON))
 import Data.OpenApi (ToSchema)
-import GHC.Generics (Generic)
+import Data.OpenApi.Schema (ToSchema (declareNamedSchema))
+import Data.Proxy (Proxy (Proxy))
 
 newtype Scope = Scope
     { unScope :: Text
     }
-    deriving (Generic)
 
-instance ToJSON Scope
+instance ToJSON Scope where
+    toJSON = toJSON . unScope
 
-instance FromJSON Scope
+instance FromJSON Scope where
+    parseJSON = fmap Scope . parseJSON
 
-instance ToSchema Scope
+instance ToSchema Scope where
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Text)
 
 server :: Scope
 server = Scope "server"
