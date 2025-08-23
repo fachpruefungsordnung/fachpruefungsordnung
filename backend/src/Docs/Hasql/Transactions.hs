@@ -18,23 +18,25 @@ module Docs.Hasql.Transactions
     , existsComment
     , resolveComment
     , createReply
+    , logMessage
     ) where
 
 import qualified Crypto.Hash.SHA1 as SHA1
 import Hasql.Transaction (Transaction, statement)
 
+import Control.Monad (guard)
 import Data.Functor ((<&>))
 import qualified Data.Set as Set
 import Data.Text (Text)
+import Data.Time (UTCTime)
+import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 
 import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
-import Control.Monad (guard)
-import Data.Time (UTCTime)
-import Data.Vector (Vector)
+import Data.Aeson (ToJSON)
 import Docs.Comment (Comment, CommentAnchor, CommentID, CommentRef, Message)
 import qualified Docs.Comment as Comment
 import Docs.Document (DocumentID)
@@ -55,6 +57,7 @@ import Docs.TextRevision
 import Docs.Tree (Edge (Edge), Node (Node), Tree (Leaf, Tree))
 import Docs.TreeRevision (TreeRevision, TreeRevisionRef (TreeRevisionRef))
 import qualified Docs.TreeRevision as TreeRevision
+import Logging.Logs (LogMessage, Scope, Severity)
 
 now :: Transaction UTCTime
 now = statement () Statements.now
@@ -182,3 +185,18 @@ resolveComment =
 
 createReply :: UserID -> CommentID -> Text -> Transaction Message
 createReply userID commentID = (`statement` Statements.createReply) . (userID,commentID,)
+
+logMessage
+    :: (ToJSON v)
+    => Severity
+    -- ^ severity of the log message
+    -> Maybe UserID
+    -- ^ source user
+    -> Scope
+    -- ^ scope (e.g, "docs.text.revision")
+    -> v
+    -- ^ content (json)
+    -> Transaction LogMessage
+    -- ^ created log message
+logMessage severity source scope content =
+    statement (severity, source, scope, content) Statements.logMessage

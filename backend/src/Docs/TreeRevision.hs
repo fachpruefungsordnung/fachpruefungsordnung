@@ -66,6 +66,13 @@ data TreeRevisionRef
     = TreeRevisionRef
         DocumentID
         TreeRevisionSelector
+    deriving (Generic)
+
+instance ToJSON TreeRevisionRef
+
+instance FromJSON TreeRevisionRef
+
+instance ToSchema TreeRevisionRef
 
 prettyPrintTreeRevisionRef :: TreeRevisionRef -> String
 prettyPrintTreeRevisionRef (TreeRevisionRef treeElementRef selector) =

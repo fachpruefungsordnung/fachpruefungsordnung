@@ -10,6 +10,8 @@
 module Server.Handlers.DocsHandlers
     ( DocsAPI
     , docsServer
+    , getUser
+    , withDB
     ) where
 
 import Data.Time (UTCTime)
@@ -535,6 +537,12 @@ guardDocsResult (Left err) = throwError $ mapErr err
                     "You are not an admin in group "
                         ++ show groupID
                         ++ "!\n"
+            }
+    mapErr Docs.SuperAdminOnly =
+        err403
+            { errBody =
+                LBS.pack
+                    "This feature is only for super admins!\n"
             }
     mapErr (Docs.DocumentNotFound docID) =
         err400

@@ -35,6 +35,13 @@ import GHC.Int (Int64)
 import Servant (FromHttpApiData (parseUrlPiece))
 
 data CommentRef = CommentRef TextElementRef CommentID
+    deriving (Generic)
+
+instance ToJSON CommentRef
+
+instance FromJSON CommentRef
+
+instance ToSchema CommentRef
 
 prettyPrintCommentRef :: CommentRef -> String
 prettyPrintCommentRef (CommentRef textElementRef id_) =

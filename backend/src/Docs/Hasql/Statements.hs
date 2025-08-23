@@ -40,6 +40,8 @@ module Docs.Hasql.Statements
     , deleteCommentAnchorsExcept
     , resolveComment
     , existsComment
+    , getLogs
+    , logMessage
     ) where
 
 import Control.Applicative ((<|>))
@@ -65,6 +67,8 @@ import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
+import Data.Aeson (ToJSON (toJSON))
+import qualified Data.Aeson as Aeson
 import Data.Functor ((<&>))
 import qualified Data.Text as Text
 import qualified Data.Vector as Vector
@@ -117,6 +121,9 @@ import Docs.TreeRevision
 import qualified Docs.TreeRevision as TreeRevision
 import Docs.UserRef (UserRef (UserRef))
 import qualified Docs.UserRef as UserRef
+import Logging.Logs (LogMessage (LogMessage), Severity (..), Source (..))
+import qualified Logging.Logs as Logs
+import Logging.Scope (Scope (Scope, unScope))
 
 now :: Statement () UTCTime
 now =
@@ -1281,3 +1288,95 @@ deleteCommentAnchorsExcept =
                 revision = $1 :: INT8
                 AND (cardinality($2 :: INT8[]) = 0 OR comment <> ALL($2 :: INT8[]))
         |]
+
+uncurryLogMessage
+    :: (UUID, Text, UTCTime, Maybe UUID, Maybe Text, Text, Aeson.Value)
+    -> LogMessage
+uncurryLogMessage (identifier, severity, timestamp, userID, userName, scope, content) =
+    LogMessage
+        { Logs.identifier = identifier
+        , Logs.severity = case severity of
+            "info" -> Info
+            "warning" -> Warning
+            "error" -> Error
+            _ -> undefined -- should be unreachable
+        , Logs.timestamp = timestamp
+        , Logs.source = maybe System User $ do
+            id_ <- userID
+            name <- userName
+            return
+                UserRef
+                    { UserRef.identifier = id_
+                    , UserRef.name = name
+                    }
+        , Logs.scope = Scope scope
+        , Logs.content = content
+        }
+
+getLogs :: Statement (Maybe UTCTime, Int64) (Vector LogMessage)
+getLogs =
+    rmap
+        (uncurryLogMessage <$>)
+        [vectorStatement|
+            SELECT
+                logs.id :: UUID,
+                logs.severity :: TEXT,
+                logs."timestamp" :: TIMESTAMPTZ,
+                users.id :: UUID?,
+                users.name :: TEXT?,
+                logs.scope :: Text,
+                logs.content :: JSONB
+            FROM
+                logs
+                LEFT JOIN users ON inserted.user = users.id
+            WHERE
+                logs."timestamp" < COALESCE($1 :: TIMESTAMPTZ?, now())
+            ORDER BY
+                logs."timestamp" DESC
+            LIMIT
+                $2 :: INT8
+        |]
+
+logMessage
+    :: (ToJSON v)
+    => Statement (Severity, Maybe UserID, Scope, v) LogMessage
+logMessage =
+    lmap mapInput $
+        rmap
+            uncurryLogMessage
+            [singletonStatement|
+            WITH inserted AS (
+                INSERT INTO logs
+                    (severity, "user", scope, content)
+                VALUES
+                    ($1 :: TEXT :: severity, $2 :: UUID?, $3 :: TEXT, $4 :: JSONB)
+                RETURNING
+                    id :: UUID,
+                    "severity" :: TEXT,
+                    "timestamp" :: TIMESTAMPTZ,
+                    "user" :: UUID?,
+                    scope :: Text,
+                    content :: JSONB
+            )
+            SELECT
+                inserted.id :: UUID,
+                inserted.severity :: TEXT,
+                inserted."timestamp" :: TIMESTAMPTZ,
+                users.id :: UUID?,
+                users.name :: TEXT?,
+                inserted.scope :: TEXT,
+                inserted.content :: JSONB
+            FROM
+                inserted
+                LEFT JOIN users ON inserted.user = users.id
+        |]
+  where
+    mapInput (severity, source, scope, content) =
+        ( case severity of
+            Info -> "info"
+            Warning -> "warning"
+            Error -> "error"
+        , source
+        , unScope scope
+        , toJSON content
+        )
