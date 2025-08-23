@@ -66,7 +66,7 @@ type DocumentedAPI = SwaggerAPI :<|> PublicAPI :<|> ProtectedAPI
 
 type LogsAPI =
     Auth AuthMethod Auth.Token
-        :> "/logs"
+        :> "logs"
         :> QueryParam "before" UTCTime
         :> QueryParam "limit" Int64
         :> Get '[JSON] Logs
