@@ -42,12 +42,14 @@ import Server.Handlers.GroupHandlers
 import Server.Handlers.RenderHandlers
 import Server.Handlers.RoleHandlers
 import Server.Handlers.UserHandlers
+import Server.Handlers.PasswordResetHandlers
 import Prelude hiding (readFile)
 
 type PublicAPI =
     "ping" :> Get '[JSON] String
         :<|> "document" :> Get '[PDF] PDFByteString
         :<|> AuthAPI
+        :<|> PasswordResetAPI
 
 type ProtectedAPI =
     Auth AuthMethod Auth.Token
@@ -123,6 +125,7 @@ server cookieSett jwtSett =
         :<|> ( pingHandler
                 :<|> documentHandler
                 :<|> authServer cookieSett jwtSett
+                :<|> passwordResetServer
              )
         :<|> ( protectedHandler
                 :<|> userServer

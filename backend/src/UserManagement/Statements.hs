@@ -34,6 +34,10 @@ module UserManagement.Statements
     , addExternalPermission
     , updateExternalPermission
     , deleteExternalPermission
+    , createPasswordResetToken
+    , getPasswordResetToken
+    , markPasswordResetTokenUsed
+    , cleanupExpiredTokens
     )
 where
 
@@ -41,7 +45,9 @@ import Data.Bifunctor (Bifunctor (second))
 import Data.Maybe (listToMaybe)
 import Data.Profunctor (lmap, rmap)
 import Data.Text
+import Data.Time (UTCTime)
 import Data.Tuple.Curry (uncurryN)
+import Data.UUID (UUID)
 import Data.Vector
 import qualified Docs.Document as Document
 import GHC.Int
@@ -373,6 +379,48 @@ deleteExternalPermission =
             delete from external_document_rights
             where user_id = $1 :: uuid and document_id = $2 :: int8
         |]
+
+createPasswordResetToken :: Statement (User.UserID, Text, UTCTime) UUID
+createPasswordResetToken =
+    [singletonStatement|
+        insert into password_reset_tokens (user_id, token_hash, expires_at)
+        values ($1 :: uuid, $2 :: text, $3 :: timestamptz)
+        returning id :: uuid
+    |]
+
+getPasswordResetToken
+    :: Statement
+        Text
+        (Maybe (UUID, User.UserID, Text, UTCTime, UTCTime, Maybe UTCTime))
+getPasswordResetToken =
+    [maybeStatement|
+        select
+            id :: uuid,
+            user_id :: uuid,
+            token_hash :: text,
+            expires_at :: timestamptz,
+            created_at :: timestamptz,
+            used_at :: timestamptz?
+        from password_reset_tokens
+        where token_hash = $1 :: text
+            and expires_at > now()
+            and used_at is null
+    |]
+
+markPasswordResetTokenUsed :: Statement Text ()
+markPasswordResetTokenUsed =
+    [resultlessStatement|
+        update password_reset_tokens
+        set used_at = now()
+        where token_hash = $1 :: text
+    |]
+
+cleanupExpiredTokens :: Statement () ()
+cleanupExpiredTokens =
+    [resultlessStatement|
+        delete from password_reset_tokens
+        where expires_at < now() - interval '24 hours'
+    |]
 
 getAllExternalUsersOfDocument
     :: Statement Document.DocumentID [(User.UserID, Maybe Permission.Permission)]

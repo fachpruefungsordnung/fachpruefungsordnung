@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Mail (testMail) where
+module Mail (testMail, Mail(..), MailSettings(..), sendMailTo, sendMailTo') where
 
 import Data.Functor ((<&>))
 import Data.Text (Text)
