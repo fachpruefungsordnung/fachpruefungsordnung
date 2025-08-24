@@ -136,50 +136,50 @@ getGroupOfDocument conn docID = do
 
 -- Specific errors
 errDatabaseConnectionFailed :: ServerError
-errDatabaseConnectionFailed = err500 {errBody = "\"Connection to database failed!\"\n"}
+errDatabaseConnectionFailed = err500 {errBody = "Connection to database failed!"}
 
 errDatabaseAccessFailed :: ServerError
-errDatabaseAccessFailed = err500 {errBody = "\"Database access failed!\"\n"}
+errDatabaseAccessFailed = err500 {errBody = "Database access failed!"}
 
 errFailedToSetRole :: ServerError
-errFailedToSetRole = err500 {errBody = "\"Failed to set role in Database!\"\n"}
+errFailedToSetRole = err500 {errBody = "Failed to set role in Database!"}
 
 errNoMemberOfThisGroup :: ServerError
 errNoMemberOfThisGroup =
     err403
-        { errBody = "\"You have to be Member of the group to perform this action!\"\n"
+        { errBody = "You have to be Member of the group to perform this action!"
         }
 
 errNoAdminOfThisGroup :: ServerError
 errNoAdminOfThisGroup =
     err403
-        { errBody = "\"You have to be Admin of the group to perform this action!\"\n"
+        { errBody = "You have to be Admin of the group to perform this action!"
         }
 
 errNoAdminInAnyGroup :: ServerError
-errNoAdminInAnyGroup = err403 {errBody = "\"You have to be an Admin to perform this action!\"\n"}
+errNoAdminInAnyGroup = err403 {errBody = "You have to be an Admin to perform this action!"}
 
 errSuperAdminOnly :: ServerError
 errSuperAdminOnly =
-    err403 {errBody = "\"You have to be Superadmin to perform this action!\"\n"}
+    err403 {errBody = "You have to be Superadmin to perform this action!"}
 
 errNotLoggedIn :: ServerError
 errNotLoggedIn =
     err401
-        { errBody = "\"Not allowed! You need to be logged in to perform this action.\"\n"
+        { errBody = "Not allowed! You need to be logged in to perform this action."
         }
 
 errUserCreationFailed :: ServerError
-errUserCreationFailed = err500 {errBody = "\"User creation failed!\"\n"}
+errUserCreationFailed = err500 {errBody = "User creation failed!"}
 
 errUserNotFound :: ServerError
-errUserNotFound = err404 {errBody = "\"User not member of this group.\"\n"}
+errUserNotFound = err404 {errBody = "User not member of this group."}
 
 errEmailAlreadyUsed :: ServerError
-errEmailAlreadyUsed = err409 {errBody = "\"Email is already in use.\"\n"}
+errEmailAlreadyUsed = err409 {errBody = "Email is already in use."}
 
 errDocumentDoesNotExist :: ServerError
-errDocumentDoesNotExist = err404 {errBody = "\"Document not found.\"\n"}
+errDocumentDoesNotExist = err404 {errBody = "Document not found."}
 
 errNoPermission :: ServerError
-errNoPermission = err403 {errBody = "\"Insufficient permission to perform this action.\"\n"}
+errNoPermission = err403 {errBody = "Insufficient permission to perform this action."}

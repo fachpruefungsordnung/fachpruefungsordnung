@@ -13,12 +13,17 @@ module Server.Handlers.PasswordResetHandlers
     , confirmPasswordResetHandler
     ) where
 
+import Control.Monad (unless, when)
+import Control.Monad.Except (runExceptT)
 import Control.Monad.IO.Class (liftIO)
+import Data.Functor ((<&>))
+import Data.Maybe (isJust)
 import Data.Password.Argon2
     ( PasswordHash (unPasswordHash)
     , hashPassword
     , mkPassword
     )
+import qualified Data.Text as Text
 import Data.Time (getCurrentTime)
 import qualified Hasql.Session as Session
 import Servant
@@ -26,6 +31,7 @@ import Server.Auth.PasswordReset
 import Server.Auth.PasswordResetUtil (getTokenExpirationTime)
 import qualified Server.Auth.PasswordResetUtil as Util
 import Server.HandlerUtil
+import System.Environment (getEnv)
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 
@@ -57,8 +63,8 @@ requestPasswordResetHandler PasswordResetRequest {..} = do
 
             case eTokenId of
                 Right _ -> do
-                    -- Create reset URL (you might want to make this configurable)
-                    let resetUrl = Util.createResetUrl "https://batailley.informatik.uni-kiel.de" token
+                    baseUrl <- liftIO $ getEnv "SERVER_HOST" <&> Text.pack
+                    let resetUrl = Util.createResetUrl baseUrl token
 
                     -- Send email
                     liftIO $
@@ -75,53 +81,53 @@ requestPasswordResetHandler PasswordResetRequest {..} = do
             return NoContent
         Left _ -> throwError errDatabaseAccessFailed
 
--- | Handler for password reset confirmation
 confirmPasswordResetHandler :: PasswordResetConfirm -> Handler NoContent
-confirmPasswordResetHandler PasswordResetConfirm {..} = do
-    -- Validate token format
-    if not (Util.validateTokenFormat resetConfirmToken)
-        then throwError $ err400 {errBody = "Invalid token format"}
-        else do
-            conn <- tryGetDBConnection
-            let tokenHash = Util.hashToken resetConfirmToken
+confirmPasswordResetHandler PasswordResetConfirm {..} =
+    do
+        unless (Util.validateTokenFormat resetConfirmToken) $
+            throwError $
+                err400 {errBody = "Invalid token format"}
 
-            -- Look up token in database
-            eToken <- liftIO $ Session.run (Sessions.getPasswordResetToken tokenHash) conn
-            case eToken of
-                Right (Just (_, userId, _, expiresAt, _, usedAt)) -> do
-                    -- Check if token is already used
-                    case usedAt of
-                        Just _ -> throwError $ err400 {errBody = "Token has already been used"}
-                        Nothing -> do
-                            -- Check if token is expired (redundant with DB query, but good for clarity)
-                            now <- liftIO getCurrentTime
-                            if now > expiresAt
-                                then throwError $ err400 {errBody = "Token has expired"}
-                                else do
-                                    -- Hash new password
-                                    hashedPassword <- liftIO $ hashPassword (mkPassword resetConfirmNewPassword)
+        conn <- tryGetDBConnection
+        let tokenHash = Util.hashToken resetConfirmToken
 
-                                    -- Update user's password
-                                    eUpdateResult <-
-                                        liftIO $
-                                            Session.run
-                                                (Sessions.updateUserPWHash userId (unPasswordHash hashedPassword))
-                                                conn
+        runExceptT $
+            do
+                -- Look up token
+                eToken <- liftIO $ Session.run (Sessions.getPasswordResetToken tokenHash) conn
+                (_, userId, _, expiresAt, _, usedAt) <- case eToken of
+                    Right (Just t) -> pure t
+                    Right Nothing -> throwError $ err400 {errBody = "Invalid or expired token"}
+                    Left _ -> throwError errDatabaseAccessFailed
 
-                                    case eUpdateResult of
-                                        Right _ -> do
-                                            -- Mark token as used
-                                            _ <-
-                                                liftIO $
-                                                    Session.run
-                                                        (Sessions.markPasswordResetTokenUsed tokenHash)
-                                                        conn
+                -- Check if already used
+                when (isJust usedAt) $
+                    throwError $
+                        err400 {errBody = "Token has already been used"}
 
-                                            -- Clean up expired tokens (best effort, don't fail if it doesn't work)
-                                            _ <- liftIO $ Session.run Sessions.cleanupExpiredTokens conn
+                -- Check expiration
+                now <- liftIO getCurrentTime
+                when (now > expiresAt) $
+                    throwError $
+                        err400 {errBody = "Token has expired"}
 
-                                            return NoContent
-                                        Left _ -> throwError errDatabaseAccessFailed
-                Right Nothing ->
-                    throwError $ err400 {errBody = "Invalid or expired token"}
-                Left _ -> throwError errDatabaseAccessFailed
+                -- Hash new password
+                hashedPassword <- liftIO $ hashPassword (mkPassword resetConfirmNewPassword)
+
+                -- Update password
+                eUpdate <-
+                    liftIO $
+                        Session.run
+                            (Sessions.updateUserPWHash userId (unPasswordHash hashedPassword))
+                            conn
+                case eUpdate of
+                    Right _ -> pure ()
+                    Left _ -> throwError errDatabaseAccessFailed
+
+                -- Mark token as used (ignore failures here)
+                _ <- liftIO $ Session.run (Sessions.markPasswordResetTokenUsed tokenHash) conn
+                -- Cleanup expired tokens (best effort)
+                _ <- liftIO $ Session.run Sessions.cleanupExpiredTokens conn
+
+                pure NoContent
+        >>= either throwError pure
