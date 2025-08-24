@@ -39,10 +39,10 @@ import qualified Server.DTOs.Logs as Logs
 import Server.Handlers.AuthHandlers
 import Server.Handlers.DocsHandlers (DocsAPI, docsServer, getUser, withDB)
 import Server.Handlers.GroupHandlers
+import Server.Handlers.PasswordResetHandlers
 import Server.Handlers.RenderHandlers
 import Server.Handlers.RoleHandlers
 import Server.Handlers.UserHandlers
-import Server.Handlers.PasswordResetHandlers
 import Prelude hiding (readFile)
 
 type PublicAPI =
