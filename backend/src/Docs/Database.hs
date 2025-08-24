@@ -22,6 +22,7 @@ module Docs.Database
     , HasExistsComment (..)
     , HasGetLogs (..)
     , HasLogMessage (..)
+    , HasGetRevisionKey (..)
     ) where
 
 import Data.Text (Text)
@@ -36,6 +37,7 @@ import Data.Aeson (ToJSON)
 import Docs.Comment (Comment, CommentAnchor, CommentID, CommentRef, Message)
 import Docs.Document (Document, DocumentID)
 import Docs.DocumentHistory (DocumentHistory)
+import Docs.Revision (RevisionKey, RevisionRef)
 import Docs.TextElement
     ( TextElement
     , TextElementID
@@ -123,6 +125,9 @@ class (HasIsSuperAdmin m) => HasGetLogs m where
         -- ^ limit
         -> m (Vector LogMessage)
         -- ^ log messages
+
+class (HasExistsDocument m) => HasGetRevisionKey m where
+    getRevisionKey :: RevisionRef -> m (Maybe RevisionKey)
 
 -- create
 

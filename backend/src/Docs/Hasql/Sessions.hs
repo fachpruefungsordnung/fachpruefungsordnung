@@ -50,7 +50,7 @@ import Docs.Hash (Hash)
 import qualified Docs.Hasql.Statements as Statements
 import qualified Docs.Hasql.Transactions as Transactions
 import Docs.Hasql.TreeEdge (TreeEdgeChild (..))
-import Docs.Revision (RevisionID, RevisionKey)
+import Docs.Revision (RevisionKey, RevisionRef (RevisionRef))
 import Docs.TextElement
     ( TextElement
     , TextElementID
@@ -219,5 +219,6 @@ getLogs
     -- ^ log messages
 getLogs = curry (`statement` Statements.getLogs)
 
-getRevisionKey :: DocumentID -> RevisionID -> Session (Maybe RevisionKey)
-getRevisionKey = curry (`statement` Statements.getRevisionKey)
+getRevisionKey :: RevisionRef -> Session (Maybe RevisionKey)
+getRevisionKey (RevisionRef docID revID) =
+    statement (docID, revID) Statements.getRevisionKey

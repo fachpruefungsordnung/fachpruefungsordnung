@@ -11,12 +11,15 @@ module Docs
     , createTextElement
     , createTextRevision
     , getTextElementRevision
+    , getDocumentRevisionText
     , getTreeRevision
+    , getDocumentRevisionTree
     , createTreeRevision
     , getTextHistory
     , getTreeHistory
     , getDocumentHistory
     , getTreeWithLatestTexts
+    , getDocumentRevision
     , createComment
     , getComments
     , resolveComment
@@ -24,7 +27,7 @@ module Docs
     , getLogs
     ) where
 
-import Control.Monad (unless)
+import Control.Monad (join, unless)
 import Control.Monad.Except (ExceptT, runExceptT, throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (find)
@@ -58,6 +61,7 @@ import Docs.Database
     , HasGetDocument
     , HasGetDocumentHistory
     , HasGetLogs
+    , HasGetRevisionKey
     , HasGetTextElementRevision
     , HasGetTextHistory
     , HasGetTreeHistory
@@ -69,6 +73,13 @@ import Docs.Database
 import qualified Docs.Database as DB
 import Docs.Document (Document, DocumentID)
 import Docs.DocumentHistory (DocumentHistory)
+import Docs.FullDocument (FullDocument (FullDocument))
+import qualified Docs.FullDocument as FullDocument
+import Docs.Revision
+    ( RevisionRef (RevisionRef)
+    , textRevisionRefFor
+    , treeRevisionRefFor
+    )
 import Docs.TextElement
     ( TextElement
     , TextElementID
@@ -103,6 +114,7 @@ data Error
     | NoPermissionInGroup GroupID
     | SuperAdminOnly
     | DocumentNotFound DocumentID
+    | RevisionNotFound RevisionRef
     | TextElementNotFound TextElementRef
     | TextRevisionNotFound TextRevisionRef
     | TreeRevisionNotFound TreeRevisionRef
@@ -295,6 +307,23 @@ getTextElementRevision userID ref = logged userID Scope.docsTextRevision $
         guardExistsTextRevision True ref
         lift $ DB.getTextElementRevision ref
 
+getDocumentRevisionText
+    :: (HasGetTextElementRevision m, HasGetRevisionKey m, HasLogMessage m)
+    => UserID
+    -> RevisionRef
+    -> TextElementID
+    -> m (Result (Maybe TextElementRevision))
+getDocumentRevisionText userID ref@(RevisionRef docID _) textID =
+    logged userID Scope.docsTextRevision $ runExceptT $ do
+        guardPermission Read docID userID
+        guardExistsDocument docID
+        lift $ do
+            key <- DB.getRevisionKey ref
+            let textRef = TextElementRef docID textID
+            result <-
+                mapM (DB.getTextElementRevision . textRevisionRefFor textRef) key
+            return $ join result
+
 createTreeRevision
     :: (HasCreateTreeRevision m, HasLogMessage m)
     => UserID
@@ -317,11 +346,27 @@ getTreeRevision
     => UserID
     -> TreeRevisionRef
     -> m (Result (Maybe (TreeRevision TextElement)))
-getTreeRevision userID ref@(TreeRevisionRef docID _) = logged userID Scope.docsTreeRevision $
-    runExceptT $ do
-        guardPermission Read docID userID
-        guardExistsTreeRevision True ref
-        lift $ DB.getTreeRevision ref
+getTreeRevision userID ref@(TreeRevisionRef docID _) =
+    logged userID Scope.docsTreeRevision $
+        runExceptT $ do
+            guardPermission Read docID userID
+            guardExistsTreeRevision True ref
+            lift $ DB.getTreeRevision ref
+
+getDocumentRevisionTree
+    :: (HasGetTreeRevision m, HasGetRevisionKey m, HasLogMessage m)
+    => UserID
+    -> RevisionRef
+    -> m (Result (Maybe (TreeRevision TextElement)))
+getDocumentRevisionTree userID ref@(RevisionRef docID _) =
+    logged userID Scope.docsTreeRevision $
+        runExceptT $ do
+            guardPermission Read docID userID
+            guardExistsDocument docID
+            lift $ do
+                key <- DB.getRevisionKey ref
+                result <- mapM (DB.getTreeRevision . treeRevisionRefFor docID) key
+                return $ join result
 
 getTextHistory
     :: (HasGetTextHistory m, HasLogMessage m)
@@ -380,6 +425,46 @@ getTreeWithLatestTexts userID revision = logged userID Scope.docs $ runExceptT $
         DB.getTextElementRevision
             . (`TextRevisionRef` TextRevision.Latest)
             . TextElementRef docID
+    getter' = (<&> (>>= elementRevisionToRevision)) . getter
+    elementRevisionToRevision (TextElementRevision _ rev) = rev
+
+getDocumentRevision
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       )
+    => UserID
+    -> RevisionRef
+    -> m (Result FullDocument)
+getDocumentRevision userID ref@(RevisionRef docID _) =
+    logged userID Scope.docs $ runExceptT $ do
+        guardPermission Read docID userID
+        guardExistsDocument docID
+        maybeDocument <- lift $ DB.getDocument docID
+        document <- maybe (throwError $ DocumentNotFound docID) pure maybeDocument
+        lift $ do
+            key <- DB.getRevisionKey ref
+            result <- mapM (DB.getTreeRevision . treeRevisionRefFor docID) key
+            let tree = join result
+            body <- mapM (TreeRevision.withTextRevisions getter') tree
+            return
+                FullDocument
+                    { FullDocument.header = document
+                    , FullDocument.body = body
+                    }
+  where
+    getter textID = do
+        key <- DB.getRevisionKey ref
+        result <-
+            mapM
+                ( DB.getTextElementRevision
+                    . textRevisionRefFor
+                        (TextElementRef docID textID)
+                )
+                key
+        return $ join result
     getter' = (<&> (>>= elementRevisionToRevision)) . getter
     elementRevisionToRevision (TextElementRevision _ rev) = rev
 
