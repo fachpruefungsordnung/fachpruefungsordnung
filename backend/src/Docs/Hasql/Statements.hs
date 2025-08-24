@@ -910,7 +910,7 @@ getTreeRevision =
                 where
                     tr.document = $1 :: int8
                     and ($2 :: int8? is null or tr.id = $2 :: int8?)
-                    and ($3 :: timestamptz? is null or ts.creation_ts <= $3 :: timestamptz?)
+                    and ($3 :: timestamptz? is null or tr.creation_ts <= $3 :: timestamptz?)
                 order by
                     tr.creation_ts desc
                 limit 1
