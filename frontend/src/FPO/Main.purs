@@ -37,6 +37,7 @@ import FPO.Translations.Translator
   , detectBrowserLanguage
   , getTranslatorForLanguage
   )
+import FPO.UI.Style as Style
 import Halogen (liftEffect)
 import Halogen as H
 import Halogen.Aff as HA
@@ -132,6 +133,7 @@ component =
         , HB.p0
         , HB.overflowYAuto
         , HB.overflowXHidden
+        , Style.disableScrollbar
         ]
     ]
     [ HH.slot_ _navbar unit Navbar.navbar unit
