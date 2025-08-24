@@ -16,6 +16,7 @@ module Docs.TreeRevision
     , withTextRevisions
     , newTreeRevision
     , specificTreeRevision
+    , latestTreeRevisionAsOf
     ) where
 
 import Control.Monad (unless)
@@ -36,7 +37,8 @@ import Data.Aeson (FromJSON (..), ToJSON (..), (.:), (.=))
 import qualified Data.Aeson as Aeson
 import qualified Data.HashMap.Strict.InsOrd as InsOrd
 import Data.OpenApi
-    ( NamedSchema (..)
+    ( HasFormat (format)
+    , NamedSchema (..)
     , OpenApiType (..)
     , Referenced (Inline)
     , ToParamSchema (..)
@@ -61,6 +63,7 @@ import Docs.TextRevision (TextElementRevision, TextRevision)
 import Docs.Tree (Node)
 import qualified Docs.Tree as Tree
 import Docs.UserRef (UserRef)
+import Parse (parseFlexibleTime)
 
 data TreeRevisionRef
     = TreeRevisionRef
@@ -79,23 +82,24 @@ prettyPrintTreeRevisionRef (TreeRevisionRef treeElementRef selector) =
     show (unDocumentID treeElementRef) ++ prettyPrintSelector selector
   where
     prettyPrintSelector Latest = "latest"
+    prettyPrintSelector (LatestAsOf ts) = show ts
     prettyPrintSelector (Specific revID) = show $ unTreeRevisionID revID
 
 -- | Selector for a tree revision.
 data TreeRevisionSelector
     = Latest
+    | LatestAsOf UTCTime
     | Specific TreeRevisionID
 
 instance ToJSON TreeRevisionSelector where
     toJSON Latest = toJSON ("latest" :: Text)
+    toJSON (LatestAsOf ts) = toJSON ts
     toJSON (Specific id_) = toJSON id_
 
 instance FromJSON TreeRevisionSelector where
     parseJSON v = case v of
-        Aeson.String t ->
-            if t == "latest"
-                then pure Latest
-                else fail $ "Invalid string for TreeRevisionSelector: " ++ Text.unpack t
+        Aeson.String "latest" -> pure Latest
+        Aeson.String _ -> LatestAsOf <$> parseJSON v -- TODO: parseFlexibleTime?
         Aeson.Number n -> case toBoundedInteger n of
             Just i -> pure $ Specific $ TreeRevisionID i
             Nothing -> fail "Invalid number for Int64"
@@ -104,6 +108,7 @@ instance FromJSON TreeRevisionSelector where
 instance ToSchema TreeRevisionSelector where
     declareNamedSchema _ = do
         intSchema <- declareSchemaRef (Proxy :: Proxy Int64)
+        timestampSchema <- declareSchemaRef (Proxy :: Proxy UTCTime)
         let latestSchema =
                 Inline $
                     mempty
@@ -111,7 +116,7 @@ instance ToSchema TreeRevisionSelector where
                         & enum_ ?~ ["latest"]
         return $
             NamedSchema (Just "TreeRevisionSelector") $
-                mempty & oneOf ?~ [latestSchema, intSchema]
+                mempty & oneOf ?~ [latestSchema, intSchema, timestampSchema]
 
 instance ToParamSchema TreeRevisionSelector where
     toParamSchema _ =
@@ -123,6 +128,10 @@ instance ToParamSchema TreeRevisionSelector where
                             & enum_ ?~ ["latest"]
                    , Inline $
                         mempty
+                            & type_ ?~ OpenApiString
+                            & format ?~ "date-time"
+                   , Inline $
+                        mempty
                             & type_ ?~ OpenApiInteger
                             & minimum_ ?~ 0
                             & exclusiveMinimum ?~ False
@@ -131,13 +140,21 @@ instance ToParamSchema TreeRevisionSelector where
 instance FromHttpApiData TreeRevisionSelector where
     parseUrlPiece txt
         | Text.toLower txt == "latest" = Right Latest
-        | otherwise = case readMaybe (Text.unpack txt) of
-            Just i -> Right $ Specific $ TreeRevisionID i
-            Nothing -> Left $ "Invalid TreeRevisionSelector: " <> txt
+        | otherwise =
+            case readMaybe (Text.unpack txt) of
+                Just i -> Right $ Specific $ TreeRevisionID i
+                Nothing ->
+                    case parseFlexibleTime (Text.unpack txt) of
+                        Just ts -> Right $ LatestAsOf ts
+                        Nothing -> Left $ "Invalid TreeRevisionSelector: " <> txt
 
 specificTreeRevision :: TreeRevisionSelector -> Maybe TreeRevisionID
-specificTreeRevision Latest = Nothing
 specificTreeRevision (Specific id_) = Just id_
+specificTreeRevision _ = Nothing
+
+latestTreeRevisionAsOf :: TreeRevisionSelector -> Maybe UTCTime
+latestTreeRevisionAsOf (LatestAsOf ts) = Just ts
+latestTreeRevisionAsOf _ = Nothing
 
 -- | An ID for a tree revision.
 newtype TreeRevisionID = TreeRevisionID

@@ -493,8 +493,8 @@ guardExistsTreeRevision allowLatestNothing ref@(TreeRevisionRef docID selector) 
     guardExistsDocument docID
     existsTreeRevision <- lift $ DB.existsTreeRevision ref
     let considerExistant = case selector of
-            TreeRevision.Latest -> existsTreeRevision || allowLatestNothing
             TreeRevision.Specific _ -> existsTreeRevision
+            _ -> existsTreeRevision || allowLatestNothing
     unless considerExistant $
         throwError (TreeRevisionNotFound ref)
 
@@ -519,8 +519,8 @@ guardExistsTextRevision allowLatestNothing ref@(TextRevisionRef elementRef selec
     guardExistsTextElement elementRef
     existsTextRevision <- lift $ DB.existsTextRevision ref
     let considerExistant = case selector of
-            TextRevision.Latest -> existsTextRevision || allowLatestNothing
             TextRevision.Specific _ -> existsTextRevision
+            _ -> existsTextRevision || allowLatestNothing
     unless considerExistant $
         throwError (TextRevisionNotFound ref)
 

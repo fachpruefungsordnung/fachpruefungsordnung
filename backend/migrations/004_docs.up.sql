@@ -12,10 +12,10 @@ CREATE TABLE IF NOT EXISTS doc_text_elements (
     document BIGINT REFERENCES docs (id)
 );
 
-CREATE SEQUENCE doc_text_revision_seq;
+CREATE SEQUENCE doc_revision_seq;
 
 CREATE TABLE IF NOT EXISTS doc_text_revisions (
-    id BIGINT PRIMARY KEY NOT NULL DEFAULT nextval('doc_text_revision_seq'),
+    id BIGINT PRIMARY KEY NOT NULL DEFAULT nextval('doc_revision_seq'),
     text_element BIGINT NOT NULL REFERENCES doc_text_elements (id),
     creation_ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     author UUID NOT NULL REFERENCES users (id),
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS doc_tree_edges (
 );
 
 CREATE TABLE IF NOT EXISTS doc_tree_revisions (
-    id BIGINT PRIMARY KEY NOT NULL GENERATED ALWAYS AS IDENTITY,
+    id BIGINT PRIMARY KEY NOT NULL DEFAULT nextval('doc_revision_seq'),
     document BIGINT NOT NULL REFERENCES docs (id),
     creation_ts TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     author UUID NOT NULL REFERENCES users (id),

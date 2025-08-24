@@ -42,6 +42,7 @@ module Docs.Hasql.Statements
     , existsComment
     , getLogs
     , logMessage
+    , getRevisionKey
     ) where
 
 import Control.Applicative ((<|>))
@@ -92,6 +93,8 @@ import Docs.Hasql.TreeEdge
     , TreeEdgeChildRef (..)
     )
 import qualified Docs.Hasql.TreeEdge as TreeEdge
+import Docs.Revision (RevisionID (unRevisionID), RevisionKey (RevisionKey))
+import qualified Docs.Revision as Revision
 import Docs.TextElement
     ( TextElement (TextElement)
     , TextElementID (..)
@@ -106,6 +109,7 @@ import Docs.TextRevision
     , TextRevisionID (..)
     , TextRevisionRef (..)
     , TextRevisionSelector (..)
+    , latestTextRevisionAsOf
     , specificTextRevision
     )
 import qualified Docs.TextRevision as TextRevision
@@ -116,6 +120,7 @@ import Docs.TreeRevision
     , TreeRevisionHeader (TreeRevisionHeader)
     , TreeRevisionID (..)
     , TreeRevisionRef (..)
+    , latestTreeRevisionAsOf
     , specificTreeRevision
     )
 import qualified Docs.TreeRevision as TreeRevision
@@ -159,6 +164,7 @@ existsTreeRevision =
                 WHERE
                     document = $1 :: int8
                     AND ($2 :: int8? IS NULL OR id = $2 :: int8?)
+                    AND ($3 :: timestamptz? IS NULL OR creation_ts <= $3 :: timestamptz?)
             ) :: bool
         |]
 
@@ -193,6 +199,7 @@ existsTextRevision =
                     te.document = $1 :: int8
                     AND tr.text_element = $2 :: int8
                     AND ($3 :: int8? IS NULL OR tr.id = $3 :: int8?)
+                    AND ($4 :: timestamptz? IS NULL OR tr.creation_ts <= $4 :: timestamptz?)
             ) :: bool
         |]
 
@@ -574,7 +581,7 @@ getTextRevision
         ((TextRevisionID -> m (Vector CommentAnchor)) -> m (Maybe TextRevision))
 getTextRevision =
     lmap
-        (bimap unTextElementID ((unTextRevisionID <$>) . specificTextRevision))
+        mapInput
         $ rmap
             (\row f -> mapM (`uncurryTextRevision` f) row)
             [maybeStatement|
@@ -590,10 +597,17 @@ getTextRevision =
                 where
                     tr.text_element = $1 :: int8
                     and ($2 :: int8? is null or tr.id = $2 :: int8?)
+                    and ($3 :: timestamptz? is null or tr.creation_ts <= $3 :: timestamptz?)
                 order by
                     tr.creation_ts desc
                 limit 1
             |]
+  where
+    mapInput (textID, selector) =
+        ( unTextElementID textID
+        , unTextRevisionID <$> specificTextRevision selector
+        , latestTextRevisionAsOf selector
+        )
 
 getTextRevisionHistory
     :: Statement (TextElementRef, Maybe UTCTime, Int64) (Vector TextRevisionHeader)
@@ -676,16 +690,19 @@ getTextElementRevision =
                     te.document = $1 :: int8
                     and te.id = $2 :: int8
                     and ($3 :: int8? is null or tr.id = $3 :: int8?)
+                    and ($4 :: timestamptz? is null or tr.creation_ts <= $4 :: timestamptz?)
                 order by
                     tr.creation_ts desc
                 limit 1
             |]
 
-uncurryTextRevisionRef :: TextRevisionRef -> (Int64, Int64, Maybe Int64)
+uncurryTextRevisionRef
+    :: TextRevisionRef -> (Int64, Int64, Maybe Int64, Maybe UTCTime)
 uncurryTextRevisionRef (TextRevisionRef (TextElementRef docID textID) revision) =
     ( unDocumentID docID
     , unTextElementID textID
     , unTextRevisionID <$> specificTextRevision revision
+    , latestTextRevisionAsOf revision
     )
 
 getTreeNode :: Statement Hash NodeHeader
@@ -893,14 +910,18 @@ getTreeRevision =
                 where
                     tr.document = $1 :: int8
                     and ($2 :: int8? is null or tr.id = $2 :: int8?)
+                    and ($3 :: timestamptz? is null or ts.creation_ts <= $3 :: timestamptz?)
                 order by
                     tr.creation_ts desc
                 limit 1
             |]
 
-uncurryTreeRevisionRef :: TreeRevisionRef -> (Int64, Maybe Int64)
+uncurryTreeRevisionRef :: TreeRevisionRef -> (Int64, Maybe Int64, Maybe UTCTime)
 uncurryTreeRevisionRef (TreeRevisionRef docID selector) =
-    (unDocumentID docID, unTreeRevisionID <$> specificTreeRevision selector)
+    ( unDocumentID docID
+    , unTreeRevisionID <$> specificTreeRevision selector
+    , latestTreeRevisionAsOf selector
+    )
 
 getTreeRevisionHistory
     :: Statement (DocumentID, Maybe UTCTime, Int64) (Vector TreeRevisionHeader)
@@ -998,6 +1019,45 @@ getDocumentRevisionHistory =
             |]
   where
     mapInput (docID, time, limit) = (unDocumentID docID, time, limit)
+
+uncurryRevisionKey :: (UTCTime, Int64, Maybe Int64, Int64) -> RevisionKey
+uncurryRevisionKey (timestamp, docID, maybeTextID, revID) =
+    RevisionKey
+        { Revision.timestamp = timestamp
+        , Revision.revision = maybe tree text maybeTextID
+        }
+  where
+    tree =
+        Revision.Tree $
+            TreeRevisionRef (DocumentID docID) $
+                TreeRevision.Specific $
+                    TreeRevisionID revID
+    text textID =
+        Revision.Text $
+            TextRevisionRef (TextElementRef (DocumentID docID) (TextElementID textID)) $
+                TextRevision.Specific $
+                    TextRevisionID revID
+
+getRevisionKey
+    :: Statement
+        (DocumentID, RevisionID)
+        (Maybe RevisionKey)
+getRevisionKey =
+    lmap (bimap unDocumentID unRevisionID) $
+        rmap
+            (uncurryRevisionKey <$>)
+            [maybeStatement|
+                SELECT
+                    creation_ts :: TIMESTAMPTZ,
+                    document :: int8,
+                    text_element :: int8?,
+                    id :: int8
+                FROM
+                    doc_revisions
+                WHERE
+                    document = $1 :: int8
+                    AND id = $2 :: int8
+        |]
 
 -- Natürlich schreibe ich dir einen Kommentar, der sagt, dass hier das UserManagement beginnt!
 

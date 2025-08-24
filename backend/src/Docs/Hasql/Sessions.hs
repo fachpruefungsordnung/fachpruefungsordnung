@@ -21,6 +21,7 @@ module Docs.Hasql.Sessions
     , getComments
     , logMessage
     , getLogs
+    , getRevisionKey
     ) where
 
 import Data.Functor ((<&>))
@@ -49,6 +50,7 @@ import Docs.Hash (Hash)
 import qualified Docs.Hasql.Statements as Statements
 import qualified Docs.Hasql.Transactions as Transactions
 import Docs.Hasql.TreeEdge (TreeEdgeChild (..))
+import Docs.Revision (RevisionID, RevisionKey)
 import Docs.TextElement
     ( TextElement
     , TextElementID
@@ -216,3 +218,6 @@ getLogs
     -> Session (Vector LogMessage)
     -- ^ log messages
 getLogs = curry (`statement` Statements.getLogs)
+
+getRevisionKey :: DocumentID -> RevisionID -> Session (Maybe RevisionKey)
+getRevisionKey = curry (`statement` Statements.getRevisionKey)
