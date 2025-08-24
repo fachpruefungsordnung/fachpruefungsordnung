@@ -198,7 +198,9 @@ component =
   renderProjectsOverview :: State -> H.ComponentHTML Action Slots m
   renderProjectsOverview state = HH.div
     [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1, HB.p0, HB.overflowHidden ] ]
-    [ HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
+    [ HH.h1 [ HP.classes [ HB.textCenter, HB.mt5 ] ]
+        [ HH.text $ translate (label :: _ "common_home") state.translator ]
+    , HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
         [ addCard
             (translate (label :: _ "home_yourProjects") state.translator)
             [ HP.classes [ HB.colSm11, HB.colMd9, HB.colLg7 ] ]
