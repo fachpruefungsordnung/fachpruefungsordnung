@@ -65,6 +65,13 @@ data TextRevisionRef
     = TextRevisionRef
         TextElementRef
         TextRevisionSelector
+    deriving (Generic)
+
+instance ToJSON TextRevisionRef
+
+instance FromJSON TextRevisionRef
+
+instance ToSchema TextRevisionRef
 
 prettyPrintTextRevisionRef :: TextRevisionRef -> String
 prettyPrintTextRevisionRef (TextRevisionRef textElementRef selector) =

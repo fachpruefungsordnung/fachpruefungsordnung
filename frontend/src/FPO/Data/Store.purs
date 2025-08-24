@@ -1,11 +1,12 @@
 -- | This module defines the Store type and the actions that can be performed on it.
 -- | Using the Store type, we can manage the state of the application and store various
--- | information such as account information, user data, and other relevant local data.
+-- | pieces of information that need to be accessed across different components (/globally).
 
 module FPO.Data.Store
   ( Action(..)
   , Store
   , loadLanguage
+  , preventErrorHandlingLocally
   , reduce
   , saveLanguage
   ) where
@@ -18,6 +19,7 @@ import FPO.Data.AppError (AppError)
 import FPO.Data.AppToast (AppToast(..), AppToastWithId)
 import FPO.Data.Route (Route)
 import FPO.Translations.Translator (FPOTranslator)
+import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Web.HTML (window)
 import Web.HTML.Window (localStorage)
 import Web.Storage.Storage (getItem, setItem) as LocalStorage
@@ -26,15 +28,18 @@ import Web.Storage.Storage (getItem, setItem) as LocalStorage
 type Store =
   { inputMail :: String -- ^ The email that was input in the login form (example state variable)
   , loginRedirect :: Maybe Route -- ^ The route to redirect to after login
+  , currentRoute :: Maybe Route
   , translator :: FPOTranslator
   , language :: String
   , toasts :: Array AppToastWithId
   , totalToasts :: Int
+  , handleRequestError :: Boolean
   }
 
 data Action
   = SetMail String -- ^ Action to set the user's email.
   | SetLoginRedirect (Maybe Route) -- ^ Action to set the redirect route after login.
+  | SetCurrentRoute (Maybe Route) -- ^ Action to set the current route.
   | SetLanguage String
   | SetTranslator FPOTranslator
   | AddError AppError
@@ -42,6 +47,23 @@ data Action
   | AddSuccess String
   | AddInfo String
   | SetToasts (Array AppToastWithId)
+  | SetHandleRequestError Boolean
+
+-- | Temporarily disables error handling in the store while executing the given action.
+-- | This can be used to prevent automatic navigation as well as emission of error toasts
+-- | on errors for specific operations.
+preventErrorHandlingLocally
+  :: forall a m
+   . MonadStore Action Store m
+  => m a
+  -> m a
+preventErrorHandlingLocally action = do
+  store <- getStore
+  let originalSetting = store.handleRequestError
+  updateStore $ SetHandleRequestError false
+  result <- action
+  updateStore $ SetHandleRequestError originalSetting
+  pure result
 
 -- | Update the store based on the action.
 reduce :: Store -> Action -> Store
@@ -58,6 +80,7 @@ reduce store = case _ of
   --       when navigating to a different page (in general) and care must be taken regarding
   --       (re)setting the redirect route.
   SetLoginRedirect r -> store { loginRedirect = r }
+  SetCurrentRoute r -> store { currentRoute = r }
   SetLanguage s -> store { language = s }
   SetTranslator t -> store { translator = t }
   AddSuccess msg ->
@@ -80,6 +103,7 @@ reduce store = case _ of
     , totalToasts = store.totalToasts + 1
     }
   SetToasts toasts -> store { toasts = toasts }
+  SetHandleRequestError b -> store { handleRequestError = b }
 
 saveLanguage :: String -> Effect Unit
 saveLanguage lang = do

@@ -1,16 +1,7 @@
 -- | Overview of Documents belonging to Group
 
 -- Things to change in this file:
---   [x] always loading for group 1 (see initialize and ConfirmDeleteDocument)
---   [x] No connection to Backend yet
---   [ ] button for member overview not functional yet
---   [ ] many things same as in Home.purs or PageGroups.purs. Need to relocate reusable code fragments.
 --   [ ] archive column should have checkboxes
---   [ ] move the creation modal to a separate file / component, and perhaps even to a separate page.
-
--- To change: The project/document structure between pages isn't standardized.
---            This must be changed. For now, the toDocument function translates as needed and makes up
---            missing data.
 
 module FPO.Page.Admin.Group.DocOverview (component) where
 
@@ -196,10 +187,14 @@ component =
 
   renderDocumentListView :: State -> H.ComponentHTML Action Slots m
   renderDocumentListView state =
-    HH.div [ HP.classes [ HB.row ] ]
-      [ renderSideButtons state
-      , renderDocumentsOverview state
-      ]
+    case state.group of
+      Nothing -> HH.div [ HP.classes [ HB.my3, HB.textCenter ] ]
+        [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
+      Just _ ->
+        HH.div [ HP.classes [ HB.row ] ]
+          [ renderSideButtons state
+          , renderDocumentsOverview state
+          ]
 
   -- Renders the overview of projects for the user.
   renderDocumentsOverview :: State -> H.ComponentHTML Action Slots m
@@ -214,15 +209,13 @@ component =
   renderDocumentOverview state =
     HH.div [ HP.classes [ HB.container ] ]
       [ HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-          [ HH.div [ HP.classes [ HB.col6 ] ]
-              [ addColumn
-                  state.documentNameFilter
-                  ""
-                  (translate (label :: _ "gp_searchProjects") state.translator)
-                  "bi-search"
-                  HP.InputText
-                  ChangeFilterDocumentName
-              ]
+          [ addColumn
+              state.documentNameFilter
+              ""
+              (translate (label :: _ "gp_searchProjects") state.translator)
+              "bi-search"
+              HP.InputText
+              ChangeFilterDocumentName
           , HH.div [ HP.classes [ HB.col12 ] ]
               [ renderDocumentList docs state ]
           , HH.slot _pagination unit P.component ps SetPage
@@ -435,22 +428,21 @@ component =
           when (isNothing maybeUser) $ do
             navigate Page404
 
-      now <- H.liftEffect nowDateTime
-      H.modify_ _
-        { documents = []
-        , currentTime = Just now
-        }
-      documents <- getDocumentsQueryFromURL
-        ("/docs?group=" <> show state.groupID)
-      case documents of
-        Right docs -> do
-          H.modify_ _ { documents = DQ.getDocuments docs }
-        Left _ -> pure unit -- TODO error handling
-
       g <- getGroup state.groupID
       case g of
         Left _ -> pure unit
-        Right group -> H.modify_ _ { group = Just group }
+        Right group -> do
+          documents <- getDocumentsQueryFromURL
+            ("/docs?group=" <> show state.groupID)
+          case documents of
+            Right docs -> do
+              now <- H.liftEffect nowDateTime
+              H.modify_ _
+                { group = Just group
+                , documents = DQ.getDocuments docs
+                , currentTime = Just now
+                }
+            Left _ -> pure unit -- TODO error handling
       handleAction Filter
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -557,12 +549,12 @@ component =
         "Title" ->
           TH.sortByF
             order
-            (\a b -> compare (DH.getName a) (DH.getName b))
+            (comparing DH.getName)
             state.documents
         "Last Updated" ->
           TH.sortByF
             (TH.toggleSorting order) -- The newest project should be first.
-            (\a b -> compare (DH.getLastEdited a) (DH.getLastEdited b))
+            (comparing DH.getLastEdited)
             state.documents
         _ -> state.documents -- Ignore other columns.
 

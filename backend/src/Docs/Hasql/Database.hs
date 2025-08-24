@@ -24,6 +24,8 @@ import qualified UserManagement.Transactions as UserTransactions
 
 import qualified Docs.Hasql.Sessions as Sessions
 import qualified Docs.Hasql.Transactions as Transactions
+import Logging.Logs (Severity (..))
+import qualified Logging.Scope as Scope
 
 newtype HasqlSession a
     = HasqlSession
@@ -32,7 +34,21 @@ newtype HasqlSession a
     deriving (Functor, Applicative, Monad)
 
 run :: HasqlSession a -> Connection -> IO (Either SessionError a)
-run = Session.run . unHasqlSession
+run session conn = do
+    result <- runUnlogged session conn
+    case result of
+        Left err -> do
+            -- If something went wrong here, its fucked up anyway :)
+            -- We could cache the result and insert it into the db as soon as the
+            -- problem is solved, but i think this is currently not required.
+            Right _ <-
+                flip runUnlogged conn $
+                    logMessage Error Nothing Scope.database $
+                        show err
+            return result
+        Right _ -> return result
+  where
+    runUnlogged = Session.run . unHasqlSession
 
 -- access rights
 
@@ -84,6 +100,9 @@ instance HasGetDocumentHistory HasqlSession where
 instance HasGetComments HasqlSession where
     getComments = HasqlSession . Sessions.getComments
 
+instance HasGetLogs HasqlSession where
+    getLogs = (HasqlSession .) . Sessions.getLogs
+
 -- create
 
 instance HasCreateDocument HasqlSession where
@@ -92,6 +111,9 @@ instance HasCreateDocument HasqlSession where
 instance HasCreateTextElement HasqlSession where
     createTextElement = (HasqlSession .) . Sessions.createTextElement
 
+instance HasLogMessage HasqlSession where
+    logMessage = (((HasqlSession .) .) .) . Sessions.logMessage
+
 newtype HasqlTransaction a
     = HasqlTransaction
     { unHasqlTransaction :: Transaction a
@@ -99,7 +121,23 @@ newtype HasqlTransaction a
     deriving (Functor, Applicative, Monad)
 
 runTransaction :: HasqlTransaction a -> Connection -> IO (Either SessionError a)
-runTransaction = (Session.run . transaction Serializable Write) . unHasqlTransaction
+runTransaction tx conn = do
+    result <- runUnlogged tx conn
+    case result of
+        Left err -> do
+            -- If something went wrong here, its fucked up anyway :)
+            -- We could cache the result and insert it into the db as soon as the
+            -- problem is solved, but i think this is currently not required.
+            Right _ <-
+                flip runUnlogged conn $
+                    logMessage Error Nothing Scope.database $
+                        show err
+            return result
+        Right _ -> return result
+  where
+    runUnlogged =
+        (Session.run . transaction Serializable Write)
+            . unHasqlTransaction
 
 -- access rights
 
@@ -149,3 +187,7 @@ instance HasCreateTreeRevision HasqlTransaction where
 instance HasCreateComment HasqlTransaction where
     createComment = ((HasqlTransaction .) .) . Transactions.createComment
     resolveComment = HasqlTransaction . Transactions.resolveComment
+    createReply = ((HasqlTransaction .) .) . Transactions.createReply
+
+instance HasLogMessage HasqlTransaction where
+    logMessage = (((HasqlTransaction .) .) .) . Transactions.logMessage

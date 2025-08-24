@@ -199,15 +199,13 @@ component =
   renderMemberOverview state =
     HH.div [ HP.classes [ HB.container ] ]
       [ HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-          [ HH.div [ HP.classes [ HB.col6 ] ]
-              [ addColumn
-                  state.memberNameFilter
-                  ""
-                  (translate (label :: _ "gm_searchMembers") state.translator)
-                  "bi-search"
-                  HP.InputText
-                  FilterForMember
-              ]
+          [ addColumn
+              state.memberNameFilter
+              ""
+              (translate (label :: _ "gm_searchMembers") state.translator)
+              "bi-search"
+              HP.InputText
+              FilterForMember
           , HH.div [ HP.classes [ HB.col12 ] ]
               [ renderMemberList docs state ]
           , HH.slot _pagination unit P.component ps SetPage

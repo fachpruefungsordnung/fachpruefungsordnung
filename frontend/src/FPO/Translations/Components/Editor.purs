@@ -14,6 +14,7 @@ type EditorLabels =
       ::: "editor_fontSizeUp"
       ::: "editor_pdf"
       ::: "editor_preview"
+      ::: "editor_readonly"
       ::: "editor_redo"
       ::: "editor_save"
       ::: "editor_textBold"
@@ -32,6 +33,8 @@ enEditor = fromRecord
   , editor_fontSizeUp: "Font size up"
   , editor_pdf: "Export PDF"
   , editor_preview: "Preview"
+  , editor_readonly:
+      "This view is readonly, because the content is not the latest version."
   , editor_redo: "Redo (Ctrl+Shift+Z)"
   , editor_save: "Save"
   , editor_textBold: "Bold text (Ctrl+B)"
@@ -49,6 +52,8 @@ deEditor = fromRecord
   , editor_fontSizeUp: "Schrift vergrößern"
   , editor_pdf: "PDF exportieren"
   , editor_preview: "Vorschau"
+  , editor_readonly:
+      "Diese Ansicht ist schreibgeschützt, da der Inhalt nicht die neueste Version ist."
   , editor_redo: "Vor (Strg+Umschalt+Z)"
   , editor_save: "Speichern"
   , editor_textBold: "Text fett (Strg+B)"

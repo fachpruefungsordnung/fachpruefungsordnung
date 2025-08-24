@@ -90,10 +90,6 @@ navbar = connect (selectEq identity) $ H.mkComponent
                           (translate (label :: _ "common_home") state.translator)
                           Home
                       ]
-                  -- TODO: This doesn't make sense anymore and should be removed.
-                  --       We keep this for convenience for now.
-                  , HH.li [ HP.classes [ HB.navItem ] ]
-                      [ navButton "Editor" (Editor { docID: 1 }) ]
                   ]
                     <>
                       ( if (maybe false isUserSuperadmin state.user) then
@@ -158,7 +154,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
     let translator = FPOTranslator $ getTranslatorForLanguage lang
     updateStore $ Store.SetTranslator translator
   handleAction ReloadUser = do
-    userWithError <- getUser
+    userWithError <- Store.preventErrorHandlingLocally getUser
     case userWithError of
       Left _ -> H.modify_ _ { user = Nothing } -- TODO error handling
       Right user -> H.modify_ _ { user = Just user }

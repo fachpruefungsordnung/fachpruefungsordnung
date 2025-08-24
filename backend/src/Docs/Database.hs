@@ -20,6 +20,8 @@ module Docs.Database
     , HasGetComments (..)
     , HasCreateComment (..)
     , HasExistsComment (..)
+    , HasGetLogs (..)
+    , HasLogMessage (..)
     ) where
 
 import Data.Text (Text)
@@ -30,7 +32,8 @@ import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
-import Docs.Comment (Comment, CommentAnchor, CommentID, CommentRef)
+import Data.Aeson (ToJSON)
+import Docs.Comment (Comment, CommentAnchor, CommentID, CommentRef, Message)
 import Docs.Document (Document, DocumentID)
 import Docs.DocumentHistory (DocumentHistory)
 import Docs.TextElement
@@ -49,6 +52,7 @@ import Docs.TextRevision
 import Docs.Tree (Node)
 import Docs.TreeRevision (TreeRevision, TreeRevisionHistory, TreeRevisionRef)
 import GHC.Int (Int64)
+import Logging.Logs (LogMessage, Scope, Severity)
 
 class (HasIsSuperAdmin m) => HasCheckPermission m where
     checkDocumentPermission :: UserID -> DocumentID -> Permission -> m Bool
@@ -111,6 +115,15 @@ class
     where
     getComments :: TextElementRef -> m (Vector Comment)
 
+class (HasIsSuperAdmin m) => HasGetLogs m where
+    getLogs
+        :: Maybe UTCTime
+        -- ^ offset
+        -> Int64
+        -- ^ limit
+        -> m (Vector LogMessage)
+        -- ^ log messages
+
 -- create
 
 class (HasIsGroupAdmin m) => HasCreateDocument m where
@@ -140,3 +153,13 @@ class (HasCheckPermission m, HasExistsDocument m) => HasCreateTreeRevision m whe
 class (HasCheckPermission m, HasExistsComment m) => HasCreateComment m where
     createComment :: UserID -> TextElementID -> Text -> m Comment
     resolveComment :: CommentID -> m ()
+    createReply :: UserID -> CommentID -> Text -> m Message
+
+class (Monad m) => HasLogMessage m where
+    logMessage
+        :: (ToJSON v)
+        => Severity
+        -> Maybe UserID
+        -> Scope
+        -> v
+        -> m LogMessage

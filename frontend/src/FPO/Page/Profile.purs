@@ -18,7 +18,6 @@ import Data.String (length, take, toUpper)
 import Data.String.Regex (regex, split)
 import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import FPO.Data.AppError (AppError)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser, getUserWithId, patchString)
@@ -669,5 +668,4 @@ handleAppError
   => AppError
   -> H.HalogenM State act slots msg m Unit
 handleAppError appError = do
-  H.liftEffect $ log (show appError)
   updateStore $ Store.AddError appError

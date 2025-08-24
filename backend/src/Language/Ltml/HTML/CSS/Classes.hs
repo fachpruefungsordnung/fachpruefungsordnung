@@ -25,6 +25,8 @@ data Class
       Document
     | -- | Class for styling and aligning document title <h1>
       DocumentTitle
+    | -- | Class for spacing and alignment of and inside of a super-section
+      SuperSection
     | -- | Class for spacing and alignment of and inside of a section
       Section
     | -- | Class for spacing and alignment of a heading <h2>
@@ -41,6 +43,8 @@ data Class
       FootnoteContainer
     | -- | Class for spacing and alignment of a single footnote
       Footnote
+    | -- | Class for <sup> element when rendering footnotes (not refs)
+      FootnoteID
     | -- | Class for containers which left align text
       LeftAligned
     | -- | Class for containers which centers text
@@ -81,6 +85,12 @@ classStyle DocumentTitle =
         marginTop (em 0)
         marginBottom (em 0)
         fontSize (em 1.5)
+classStyle SuperSection =
+    toClassSelector SuperSection ? do
+        display flex
+        flexDirection column
+        -- \| gap between sections
+        gap (em 3)
 classStyle Section =
     toClassSelector Section ? do
         display flex
@@ -126,6 +136,9 @@ classStyle Footnote =
         display flex
         -- \| Gap between footnote id and footnote text
         gap (em 0.5)
+classStyle FootnoteID =
+    toClassSelector FootnoteID ? do
+        userSelect none
 classStyle LeftAligned = toClassSelector LeftAligned ? textAlign alignLeft
 classStyle Centered = toClassSelector Centered ? textAlign center
 classStyle RightAligned = toClassSelector RightAligned ? textAlign alignLeft

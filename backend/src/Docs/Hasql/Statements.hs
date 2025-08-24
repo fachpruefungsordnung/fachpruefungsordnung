@@ -33,11 +33,15 @@ module Docs.Hasql.Statements
     , isGroupAdmin
     , createComment
     , getComments
+    , createReply
+    , getReplies
     , putCommentAnchor
     , getCommentAnchors
     , deleteCommentAnchorsExcept
     , resolveComment
     , existsComment
+    , getLogs
+    , logMessage
     ) where
 
 import Control.Applicative ((<|>))
@@ -63,14 +67,18 @@ import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
+import Data.Aeson (ToJSON (toJSON))
+import qualified Data.Aeson as Aeson
 import Data.Functor ((<&>))
 import qualified Data.Text as Text
+import qualified Data.Vector as Vector
 import Docs.Comment
     ( Anchor (Anchor)
     , Comment (Comment)
     , CommentAnchor (CommentAnchor)
     , CommentID (CommentID, unCommentID)
     , CommentRef (CommentRef)
+    , Message (Message)
     )
 import qualified Docs.Comment as Comment
 import Docs.Document (Document (Document), DocumentID (..))
@@ -113,6 +121,9 @@ import Docs.TreeRevision
 import qualified Docs.TreeRevision as TreeRevision
 import Docs.UserRef (UserRef (UserRef))
 import qualified Docs.UserRef as UserRef
+import Logging.Logs (LogMessage (LogMessage), Severity (..), Source (..))
+import qualified Logging.Logs as Logs
+import Logging.Scope (Scope (Scope, unScope))
 
 now :: Statement () UTCTime
 now =
@@ -1031,18 +1042,27 @@ isGroupAdmin =
 
 -- comments
 
-uncurryComment :: (Int64, UUID, Text, UTCTime, Maybe UTCTime, Text) -> Comment
-uncurryComment (id_, authorID, authorName, timestamp, resolved, content) =
-    Comment
-        { Comment.identifier = CommentID id_
-        , Comment.author =
+uncurryMessage :: (UUID, Text, UTCTime, Text) -> Message
+uncurryMessage (authorID, authorName, timestamp, content) =
+    Message
+        { Comment.author =
             UserRef
                 { UserRef.identifier = authorID
                 , UserRef.name = authorName
                 }
         , Comment.timestamp = timestamp
-        , Comment.status = maybe Comment.Open Comment.Resolved resolved
         , Comment.content = content
+        }
+
+uncurryComment
+    :: (Int64, UUID, Text, UTCTime, Maybe UTCTime, Text)
+    -> Comment
+uncurryComment (id_, authorID, authorName, timestamp, resolved, content) =
+    Comment
+        { Comment.identifier = CommentID id_
+        , Comment.status = maybe Comment.Open Comment.Resolved resolved
+        , Comment.message = uncurryMessage (authorID, authorName, timestamp, content)
+        , Comment.replies = Vector.empty
         }
 
 createComment :: Statement (UserID, TextElementID, Text) Comment
@@ -1092,7 +1112,7 @@ getComments =
                     comments.resolved_ts :: TIMESTAMPTZ?,
                     comments.content :: TEXT
                 FROM
-                    comments
+                    doc_comments comments
                     LEFT JOIN users ON comments.author = users.id
                     LEFT JOIN doc_text_elements
                         ON comments.text_element = doc_text_elements.id
@@ -1100,6 +1120,64 @@ getComments =
                     comments.text_element = $1 :: INT8
                     AND doc_text_elements.document = $2 :: INT8
             |]
+
+createReply :: Statement (UserID, CommentID, Text) Message
+createReply =
+    lmap mapInput $
+        rmap
+            uncurryMessage
+            [singletonStatement|
+                WITH inserted AS (
+                    INSERT INTO doc_comment_replies
+                        (author, comment, content)
+                    VALUES
+                        ($1 :: UUID, $2 :: INT8, $3 :: TEXT)
+                    RETURNING
+                        author :: UUID,
+                        creation_ts :: TIMESTAMPTZ,
+                        content :: TEXT
+                )
+                SELECT
+                    users.id :: UUID,
+                    users.name :: TEXT,
+                    inserted.creation_ts :: TIMESTAMPTZ,
+                    inserted.content :: TEXT
+                FROM
+                    inserted
+                    LEFT JOIN users ON inserted.author = users.id
+            |]
+  where
+    mapInput (userID, commentID, content) =
+        ( userID
+        , unCommentID commentID
+        , content
+        )
+
+getReplies :: Statement CommentRef (Vector Message)
+getReplies =
+    lmap curryCommentRef $
+        rmap
+            (uncurryMessage <$>)
+            [vectorStatement|
+                SELECT
+                    users.id :: UUID,
+                    users.name :: TEXT,
+                    replies.creation_ts :: TIMESTAMPTZ,
+                    replies.content :: TEXT
+                FROM
+                    doc_comment_replies replies
+                    LEFT JOIN users ON replies.author = users.id
+                    LEFT JOIN doc_comments comments ON replies.comment = doc_comments.id
+                    LEFT JOIN doc_text_elements text_elements ON comments.text_element = doc_text_elements.id
+                WHERE
+                    text_elements.document = $1 :: INT8
+                    AND comments.text_element = $2 :: INT8
+                    AND replies.comment = $3 :: INT8
+            |]
+
+curryCommentRef :: CommentRef -> (Int64, Int64, Int64)
+curryCommentRef (CommentRef (TextElementRef docID textID) commentID) =
+    (unDocumentID docID, unTextElementID textID, unCommentID commentID)
 
 resolveComment :: Statement CommentID ()
 resolveComment =
@@ -1210,3 +1288,95 @@ deleteCommentAnchorsExcept =
                 revision = $1 :: INT8
                 AND (cardinality($2 :: INT8[]) = 0 OR comment <> ALL($2 :: INT8[]))
         |]
+
+uncurryLogMessage
+    :: (UUID, Text, UTCTime, Maybe UUID, Maybe Text, Text, Aeson.Value)
+    -> LogMessage
+uncurryLogMessage (identifier, severity, timestamp, userID, userName, scope, content) =
+    LogMessage
+        { Logs.identifier = identifier
+        , Logs.severity = case severity of
+            "info" -> Info
+            "warning" -> Warning
+            "error" -> Error
+            _ -> undefined -- should be unreachable
+        , Logs.timestamp = timestamp
+        , Logs.source = maybe System User $ do
+            id_ <- userID
+            name <- userName
+            return
+                UserRef
+                    { UserRef.identifier = id_
+                    , UserRef.name = name
+                    }
+        , Logs.scope = Scope scope
+        , Logs.content = content
+        }
+
+getLogs :: Statement (Maybe UTCTime, Int64) (Vector LogMessage)
+getLogs =
+    rmap
+        (uncurryLogMessage <$>)
+        [vectorStatement|
+            SELECT
+                logs.id :: UUID,
+                logs.severity :: TEXT,
+                logs."timestamp" :: TIMESTAMPTZ,
+                users.id :: UUID?,
+                users.name :: TEXT?,
+                logs.scope :: Text,
+                logs.content :: JSONB
+            FROM
+                logs
+                LEFT JOIN users ON logs.user = users.id
+            WHERE
+                logs."timestamp" < COALESCE($1 :: TIMESTAMPTZ?, now())
+            ORDER BY
+                logs."timestamp" DESC
+            LIMIT
+                $2 :: INT8
+        |]
+
+logMessage
+    :: (ToJSON v)
+    => Statement (Severity, Maybe UserID, Scope, v) LogMessage
+logMessage =
+    lmap mapInput $
+        rmap
+            uncurryLogMessage
+            [singletonStatement|
+            WITH inserted AS (
+                INSERT INTO logs
+                    (severity, "user", scope, content)
+                VALUES
+                    ($1 :: TEXT :: severity, $2 :: UUID?, $3 :: TEXT, $4 :: JSONB)
+                RETURNING
+                    id :: UUID,
+                    "severity" :: TEXT,
+                    "timestamp" :: TIMESTAMPTZ,
+                    "user" :: UUID?,
+                    scope :: Text,
+                    content :: JSONB
+            )
+            SELECT
+                inserted.id :: UUID,
+                inserted.severity :: TEXT,
+                inserted."timestamp" :: TIMESTAMPTZ,
+                users.id :: UUID?,
+                users.name :: TEXT?,
+                inserted.scope :: TEXT,
+                inserted.content :: JSONB
+            FROM
+                inserted
+                LEFT JOIN users ON inserted.user = users.id
+        |]
+  where
+    mapInput (severity, source, scope, content) =
+        ( case severity of
+            Info -> "info"
+            Warning -> "warning"
+            Error -> "error"
+        , source
+        , unScope scope
+        , toJSON content
+        )

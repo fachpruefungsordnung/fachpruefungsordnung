@@ -4,16 +4,14 @@ import Prelude
 
 import Affjax (Error(..))
 import Effect.Aff (message)
-import Effect.Aff.Class (class MonadAff)
-import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Route (Route(..))
+import FPO.Translations.Labels (Labels)
 import Foreign (renderForeignError)
-import Halogen as H
+import Simple.I18n.Translator (Translator, label, translate)
 
 -- Add this after your imports
 data AppError
   = NetworkError String
-  | AuthError
+  | AuthError String
   | NotFoundError String
   | ServerError String
   | DataError String
@@ -27,7 +25,7 @@ derive instance Eq AppError
 instance Show AppError where
   show = case _ of
     NetworkError msg -> "NetworkError: " <> msg
-    AuthError -> "AuthError"
+    AuthError msg -> "AuthError: " <> msg
     NotFoundError resource -> "NotFoundError: " <> resource
     ServerError msg -> "ServerError: " <> msg
     DataError msg -> "DataError: " <> msg
@@ -36,22 +34,6 @@ instance Show AppError where
       <> " (method: "
       <> method
       <> ")"
-
--- Helper function to handle app errors
-handleAppError
-  :: forall st act slots msg m
-   . MonadAff m
-  => Navigate m
-  => AppError
-  -> H.HalogenM st act slots msg m Unit
-handleAppError = case _ of
-  NetworkError _ -> pure unit -- Let component handle this
-  AuthError -> navigate Login
-  NotFoundError _ -> navigate Page404
-  ServerError _ -> pure unit -- Let component handle this
-  DataError _ -> pure unit -- Let component handle this
-  AccessDeniedError -> pure unit -- Let component handle this
-  MethodNotAllowedError _ _ -> pure unit -- Let component handle this
 
 -- | Prints an error message based on the type of error.
 -- | The error message is prefixed with the provided string.
@@ -67,3 +49,18 @@ printAjaxError str = case _ of
     str <> ": request failed"
   XHROtherError err ->
     str <> ": " <> message err
+
+showToastError :: AppError -> Translator Labels -> String
+showToastError err translator = case err of
+  NetworkError msg -> (translate (label :: _ "error_networkError") translator) <> msg
+  AuthError msg -> (translate (label :: _ "error_authError") translator) <> msg
+  NotFoundError resource -> (translate (label :: _ "error_notFoundError") translator)
+    <> resource
+  ServerError msg -> (translate (label :: _ "error_serverError") translator) <> msg
+  DataError msg -> (translate (label :: _ "error_dataError") translator) <> msg
+  AccessDeniedError -> translate (label :: _ "error_accessDeniedError") translator
+  MethodNotAllowedError resource method ->
+    (translate (label :: _ "error_methodNotAllowedError") translator) <> resource
+      <> " (method: "
+      <> method
+      <> ")"

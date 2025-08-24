@@ -1,5 +1,6 @@
 module FPO.Components.Editor
   ( Action(..)
+  , ElementData
   , Input
   , LiveMarker
   , Output(..)
@@ -87,6 +88,8 @@ import Effect.Console (log)
 
 type Path = Array Int
 
+type ElementData = Maybe { tocEntry :: TOCEntry, revID :: Int, title :: String }
+
 type State = FPOState
   ( docID :: DocumentID
   , mEditor :: Maybe Types.Editor
@@ -100,6 +103,7 @@ type State = FPOState
   , resizeObserver :: Maybe RO.ResizeObserver
   , resizeSubscription :: Maybe SubscriptionId
   , showButtonText :: Boolean
+  , showButtons :: Boolean
   -- for saving when closing window
   , mDirtyRef :: Maybe (Ref Boolean)
   , mBeforeUnloadL :: Maybe EventListener
@@ -109,6 +113,13 @@ type State = FPOState
   -- for periodically saving the content
   , mPendingDebounceF :: Maybe H.ForkId -- 2s-Timer
   , mPendingMaxWaitF :: Maybe H.ForkId -- 20s-Max-Timer
+  -- note: this value is only used for initialisation and won't necessarily stay up to date
+  -- it stores the needed input for the Init action. Receive did not work, as the page
+  -- get's rendered over and over, meaning receive get's triggered over and over and the
+  -- number of requests to the backend would be ridiculous
+  , compareToElement :: ElementData
+
+  , isEditorReadonly :: Boolean
   )
 
 -- For tracking the comment markers live
@@ -120,7 +131,7 @@ type LiveMarker =
   , ref :: Ref Int
   }
 
-type Input = DocumentID
+type Input = { docID :: DocumentID, elementData :: ElementData }
 
 data Output
   = ClickedQuery (Array String)
@@ -136,6 +147,7 @@ data Output
 data Action
   = Init
   | Comment
+  | ChangeToSection String TOCEntry (Maybe Int)
   | DeleteComment
   | SelectComment
   | Bold
@@ -178,6 +190,8 @@ data Query a
   | UpdateNodePosition Path a
   | SendCommentSections a
 
+-- | UpdateCompareToElement ElementData a
+
 editor
   :: forall m
    . MonadAff m
@@ -198,7 +212,7 @@ editor = connect selectTranslator $ H.mkComponent
   where
   initialState :: Connected FPOTranslator Input -> State
   initialState { context, input } =
-    { docID: input
+    { docID: input.docID
     , translator: fromFpoTranslator context
     , mEditor: Nothing
     , mTocEntry: Nothing
@@ -211,12 +225,15 @@ editor = connect selectTranslator $ H.mkComponent
     , resizeObserver: Nothing
     , resizeSubscription: Nothing
     , showButtonText: true
+    , showButtons: true
     , mDirtyRef: Nothing
     , mBeforeUnloadL: Nothing
     , showSavedIcon: false
     , mSavedIconF: Nothing
     , mPendingDebounceF: Nothing
     , mPendingMaxWaitF: Nothing
+    , compareToElement: input.elementData
+    , isEditorReadonly: false
     }
 
   render :: State -> H.ComponentHTML Action () m
@@ -225,101 +242,151 @@ editor = connect selectTranslator $ H.mkComponent
       [ HE.onClick $ const SelectComment
       , HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ]
       ]
-      [ HH.div -- Second toolbar
-
+      [ HH.div
+          -- toolbar
           [ HP.classes [ HB.dFlex, HB.justifyContentBetween ] ]
-          [ HH.div
-              [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
-              [ makeEditorToolbarButton
-                  true
-                  (translate (label :: _ "editor_textBold") state.translator)
-                  Bold
-                  "bi-type-bold"
-              , makeEditorToolbarButton
-                  true
-                  (translate (label :: _ "editor_textItalic") state.translator)
-                  Italic
-                  "bi-type-italic"
-              , makeEditorToolbarButton
-                  true
-                  (translate (label :: _ "editor_textUnderline") state.translator)
-                  Underline
-                  "bi-type-underline"
+          if (not state.showButtons) then
+            -- keep the toolbar even though there is not space, so that the screen doesnt pop higher
+            [ HH.div
+                [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+                [ HH.div
+                    [ HP.style
+                        "visibility: hidden; height: 1.5rem; min-height: 1.5rem;"
+                    ]
+                    []
+                ]
+            ]
+          else
+            [ HH.div
+                [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+                [ makeEditorToolbarButton
+                    true
+                    (translate (label :: _ "editor_textBold") state.translator)
+                    Bold
+                    "bi-type-bold"
+                , makeEditorToolbarButton
+                    true
+                    (translate (label :: _ "editor_textItalic") state.translator)
+                    Italic
+                    "bi-type-italic"
+                , makeEditorToolbarButton
+                    true
+                    (translate (label :: _ "editor_textUnderline") state.translator)
+                    Underline
+                    "bi-type-underline"
 
-              , buttonDivisor
-              , makeEditorToolbarButton
-                  true
-                  (translate (label :: _ "editor_fontSizeUp") state.translator)
-                  FontSizeUp
-                  "bi-plus-square"
-              , makeEditorToolbarButton
-                  true
-                  (translate (label :: _ "editor_fontSizeDown") state.translator)
-                  FontSizeDown
-                  "bi-dash-square"
+                , buttonDivisor
+                , makeEditorToolbarButton
+                    true
+                    (translate (label :: _ "editor_fontSizeUp") state.translator)
+                    FontSizeUp
+                    "bi-plus-square"
+                , makeEditorToolbarButton
+                    true
+                    (translate (label :: _ "editor_fontSizeDown") state.translator)
+                    FontSizeDown
+                    "bi-dash-square"
 
-              , buttonDivisor
-              , makeEditorToolbarButton
-                  true
-                  (translate (label :: _ "editor_undo") state.translator)
-                  Undo
-                  "bi-arrow-counterclockwise"
-              , makeEditorToolbarButton
-                  true
-                  (translate (label :: _ "editor_redo") state.translator)
-                  Redo
-                  "bi-arrow-clockwise"
+                , buttonDivisor
+                , makeEditorToolbarButton
+                    true
+                    (translate (label :: _ "editor_undo") state.translator)
+                    Undo
+                    "bi-arrow-counterclockwise"
+                , makeEditorToolbarButton
+                    true
+                    (translate (label :: _ "editor_redo") state.translator)
+                    Redo
+                    "bi-arrow-clockwise"
 
-              , buttonDivisor
-              , makeEditorToolbarButton
-                  fullFeatures
-                  (translate (label :: _ "editor_comment") state.translator)
-                  Comment
-                  "bi-chat-square-text"
-              , makeEditorToolbarButton
-                  fullFeatures
-                  (translate (label :: _ "editor_deleteComment") state.translator)
-                  DeleteComment
-                  "bi-chat-square-text-fill"
+                , buttonDivisor
+                , makeEditorToolbarButton
+                    fullFeatures
+                    (translate (label :: _ "editor_comment") state.translator)
+                    Comment
+                    "bi-chat-square-text"
+                , makeEditorToolbarButton
+                    fullFeatures
+                    (translate (label :: _ "editor_deleteComment") state.translator)
+                    DeleteComment
+                    "bi-chat-square-text-fill"
 
-              ]
-          , HH.div
-              [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ]
-              , HP.style "min-width: 0;"
-              ]
-              [ makeEditorToolbarButtonWithText
-                  true
-                  state.showButtonText
-                  Save
-                  "bi-floppy"
-                  (translate (label :: _ "editor_save") state.translator)
-              , makeEditorToolbarButtonWithText
-                  true
-                  state.showButtonText
-                  RenderHTML
-                  "bi-file-richtext"
-                  (translate (label :: _ "editor_preview") state.translator)
-              , makeEditorToolbarButtonWithText
-                  true
-                  state.showButtonText
-                  PDF
-                  "bi-filetype-pdf"
-                  (translate (label :: _ "editor_pdf") state.translator)
-              , makeEditorToolbarButtonWithText
-                  fullFeatures
-                  state.showButtonText
-                  ShowAllComments
-                  "bi-chat-square"
-                  (translate (label :: _ "editor_allComments") state.translator)
-              ]
-          ]
+                ]
+            , HH.div
+                [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ]
+                , HP.style "min-width: 0;"
+                ]
+                [ makeEditorToolbarButtonWithText
+                    true
+                    state.showButtonText
+                    Save
+                    "bi-floppy"
+                    (translate (label :: _ "editor_save") state.translator)
+                , makeEditorToolbarButtonWithText
+                    true
+                    state.showButtonText
+                    RenderHTML
+                    "bi-file-richtext"
+                    (translate (label :: _ "editor_preview") state.translator)
+                , makeEditorToolbarButtonWithText
+                    true
+                    state.showButtonText
+                    PDF
+                    "bi-filetype-pdf"
+                    (translate (label :: _ "editor_pdf") state.translator)
+                , makeEditorToolbarButtonWithText
+                    fullFeatures
+                    state.showButtonText
+                    ShowAllComments
+                    "bi-chat-square"
+                    (translate (label :: _ "editor_allComments") state.translator)
+                ]
+            ]
       , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
           , HP.classes [ HB.flexGrow1 ]
           , HP.style "min-height: 0"
           ]
-          []
+          [ -- Add overlay when readonly
+            if state.isEditorReadonly then
+              HH.div
+                [ HP.classes
+                    [ HB.positionAbsolute
+                    , HB.top0
+                    , HB.start0
+                    , HB.w100
+                    , HB.h100
+                    , HB.dFlex
+                    , HB.justifyContentCenter
+                    , HB.alignItemsEnd
+                    , HB.peNone
+                    ]
+                , HP.style
+                    "background: rgba(0,0,0,0.1); z-index: 20; padding-bottom: 1.5rem;"
+                ]
+                [ HH.div
+                    [ HP.classes
+                        [ HB.bgLight
+                        , HB.border
+                        , HB.rounded
+                        , HB.px3
+                        , HB.py2
+                        , HB.shadow
+                        ]
+                    , HP.style "pointer-events: auto;"
+                    ]
+                    [ HH.i
+                        [ HP.classes [ HB.bi, H.ClassName "bi-lock-fill", HB.me2 ] ]
+                        []
+                    , HH.text
+                        (translate (label :: _ "editor_readonly") state.translator)
+                    ]
+                ]
+            else
+              HH.text ""
+
+          ]
       -- Saved Icon
       , if state.showSavedIcon then
           HH.div
@@ -362,6 +429,7 @@ editor = connect selectTranslator $ H.mkComponent
           Editor.setTheme "ace/theme/github" editor_
           Session.setMode "ace/mode/custom_mode" session
           Editor.setEnableLiveAutocompletion true editor_
+          Editor.setReadOnly true editor_
 
       -- New Ref for keeping track, if the content in editor has changed
       -- since last save
@@ -403,24 +471,39 @@ editor = connect selectTranslator $ H.mkComponent
         observer <- H.liftEffect $ RO.resizeObserver callback
         H.liftEffect $ RO.observe (toElement element) {} observer
         H.modify_ _ { resizeObserver = Just observer }
+      compareTo <- H.gets _.compareToElement
+      case compareTo of
+        Nothing
+        -> pure unit
+        Just { tocEntry: tocEntry, revID: revID, title: title }
+        -> handleAction (ChangeToSection title tocEntry (Just revID))
+
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
 
     Bold -> do
-      H.gets _.mEditor >>= traverse_ \ed ->
-        H.liftEffect $ do
-          makeBold ed
-          Editor.focus ed
+      state <- H.get
+      when (not state.isEditorReadonly) $ do
+        H.gets _.mEditor >>= traverse_ \ed ->
+          H.liftEffect $ do
+            makeBold ed
+            Editor.focus ed
 
     Italic -> do
-      H.gets _.mEditor >>= traverse_ \ed ->
-        H.liftEffect $ do
-          makeItalic ed
-          Editor.focus ed
+      state <- H.get
+      when (not state.isEditorReadonly) $ do
+        H.gets _.mEditor >>= traverse_ \ed ->
+          H.liftEffect $ do
+            makeItalic ed
+            Editor.focus ed
 
     Underline -> do
-      H.gets _.mEditor >>= traverse_ \ed ->
-        H.liftEffect $ do
-          underscore ed
-          Editor.focus ed
+      state <- H.get
+      when (not state.isEditorReadonly) $ do
+        H.gets _.mEditor >>= traverse_ \ed ->
+          H.liftEffect $ do
+            underscore ed
+            Editor.focus ed
 
     FontSizeUp -> do
       H.gets _.mEditor >>= traverse_ \ed -> do
@@ -443,16 +526,20 @@ editor = connect selectTranslator $ H.mkComponent
           Editor.focus ed
 
     Undo -> do
-      H.gets _.mEditor >>= traverse_ \ed -> do
-        H.liftEffect $ do
-          Editor.undo ed
-          Editor.focus ed
+      state <- H.get
+      when (not state.isEditorReadonly) $ do
+        H.gets _.mEditor >>= traverse_ \ed -> do
+          H.liftEffect $ do
+            Editor.undo ed
+            Editor.focus ed
 
     Redo -> do
-      H.gets _.mEditor >>= traverse_ \ed -> do
-        H.liftEffect $ do
-          Editor.redo ed
-          Editor.focus ed
+      state <- H.get
+      when (not state.isEditorReadonly) $ do
+        H.gets _.mEditor >>= traverse_ \ed -> do
+          H.liftEffect $ do
+            Editor.redo ed
+            Editor.focus ed
 
     RenderHTML -> do
       _ <- handleQuery (QueryEditor unit)
@@ -476,46 +563,47 @@ editor = connect selectTranslator $ H.mkComponent
 
     Save -> do
       state <- H.get
-      isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
-        Just r -> pure r
-        Nothing -> EC.liftEffect $ Ref.new false
-      when isDirty $ do
-        allLines <- H.gets _.mEditor >>= traverse \ed -> do
-          H.liftEffect $ Editor.getSession ed
-            >>= Session.getDocument
-            >>= Document.getAllLines
+      when (not state.isEditorReadonly) $ do
+        isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
+          Just r -> pure r
+          Nothing -> EC.liftEffect $ Ref.new false
+        when isDirty $ do
+          allLines <- H.gets _.mEditor >>= traverse \ed -> do
+            H.liftEffect $ Editor.getSession ed
+              >>= Session.getDocument
+              >>= Document.getAllLines
 
-        let
-          contentLines =
-            fromMaybe { title: "", contentText: "" } do
-              { head, tail } <- uncons =<< allLines
-              pure { title: head, contentText: intercalate "\n" tail }
+          let
+            contentLines =
+              fromMaybe { title: "", contentText: "" } do
+                { head, tail } <- uncons =<< allLines
+                pure { title: head, contentText: intercalate "\n" tail }
 
-        case state.mTocEntry of
-          Nothing -> do
-            -- No leaf entity was selected, so if a nodePath is set,
-            -- we can emit an event to rename the node.
-            case state.mNodePath of
-              Nothing -> do
-                pure unit -- Nothing to do
-              Just path -> do
-                H.raise $ RenamedNode (contentLines.title) path
-          Just _ ->
-            case state.mContent of
-              Nothing -> pure unit
-              Just content -> do
-                -- Save the current content of the editor and send it to the server
-                let
-                  title = contentLines.title
-                  contentText = contentLines.contentText
+          case state.mTocEntry of
+            Nothing -> do
+              -- No leaf entity was selected, so if a nodePath is set,
+              -- we can emit an event to rename the node.
+              case state.mNodePath of
+                Nothing -> do
+                  pure unit -- Nothing to do
+                Just path -> do
+                  H.raise $ RenamedNode (contentLines.title) path
+            Just _ ->
+              case state.mContent of
+                Nothing -> pure unit
+                Just content -> do
+                  -- Save the current content of the editor and send it to the server
+                  let
+                    title = contentLines.title
+                    contentText = contentLines.contentText
 
-                  -- place it in contentDto
-                  newContent = ContentDto.setContentText contentText content
+                    -- place it in contentDto
+                    newContent = ContentDto.setContentText contentText content
 
-                  -- extract the current TOC entry
-                  entry = case state.mTocEntry of
-                    Nothing -> emptyTOCEntry
-                    Just e -> e
+                    -- extract the current TOC entry
+                    entry = case state.mTocEntry of
+                      Nothing -> emptyTOCEntry
+                      Just e -> e
 
                 -- Since the ids and postions in liveMarkers are changing constantly,
                 -- extract them now and store them
@@ -750,9 +838,6 @@ editor = connect selectTranslator $ H.mkComponent
         --     Just foundMarker -> H.raise
         --       (SelectedCommentSection tocEntry.id foundMarker.id)
 
-    Receive { context } -> do
-      H.modify_ _ { translator = fromFpoTranslator context }
-
     HandleResize width -> do
       -- Decides whether to show button text based on the width.
       -- Because german labels are longer, we need to adjust the cutoff
@@ -760,9 +845,11 @@ editor = connect selectTranslator $ H.mkComponent
       -- but it works.
 
       lang <- liftEffect $ Store.loadLanguage
-      let cutoff = if lang == Just "de-DE" then 573.0 else 520.0
+      let cutoff = if lang == Just "de-DE" then 690.0 else 592.0
+      let noButtonsCutoff = 350.0
 
-      H.modify_ _ { showButtonText = width >= cutoff }
+      H.modify_ _
+        { showButtonText = width >= cutoff, showButtons = width >= noButtonsCutoff }
 
     Finalize -> do
       state <- H.get
@@ -783,13 +870,7 @@ editor = connect selectTranslator $ H.mkComponent
       for_ state.mPendingDebounceF H.kill
       for_ state.mPendingMaxWaitF H.kill
 
-  handleQuery
-    :: forall slots a
-     . Query a
-    -> H.HalogenM State Action slots Output m (Maybe a)
-  handleQuery = case _ of
-
-    ChangeSection title entry rev a -> do
+    ChangeToSection title entry rev -> do
       H.modify_ \state -> state { mTocEntry = Just entry, title = title }
       state <- H.get
 
@@ -819,7 +900,8 @@ editor = connect selectTranslator $ H.mkComponent
           comments = getWrapperComments wrapper
         
         H.liftEffect $ log $ show wrapper
-        H.modify_ \st -> st { mContent = Just content }
+        H.modify_ \st -> st
+          { mContent = Just content, isEditorReadonly = version /= "latest" }
 
         newLiveMarkers <- H.liftEffect do
           session <- Editor.getSession ed
@@ -853,6 +935,15 @@ editor = connect selectTranslator $ H.mkComponent
         -- Update state with new marker IDs
         H.modify_ \st ->
           st { liveMarkers = [] } --newLiveMarkers }
+
+  handleQuery
+    :: forall slots a
+     . Query a
+    -> H.HalogenM State Action slots Output m (Maybe a)
+  handleQuery = case _ of
+
+    ChangeSection title entry rev a -> do
+      handleAction (ChangeToSection title entry rev)
       pure (Just a)
 
     ChangeToNode title path a -> do
@@ -1064,7 +1155,10 @@ cursorInRange lms cursor =
 makeEditorToolbarButton
   :: forall m. Boolean -> String -> Action -> String -> H.ComponentHTML Action () m
 makeEditorToolbarButton enabled tooltip action biName = HH.button
-  [ HP.classes $ [ HB.btn, HB.p0, HB.m0, HB.border0 ]
+  [ HP.classes
+      ( prependIf (not enabled) HB.opacity25
+          [ HB.btn, HB.p0, HB.m0, HB.border0 ]
+      )
   , HP.title tooltip
   , HE.onClick \_ -> action
   , HP.enabled enabled
@@ -1086,7 +1180,10 @@ makeEditorToolbarButtonWithText
   -> H.ComponentHTML Action () m
 makeEditorToolbarButtonWithText enabled asText action biName smallText = HH.button
   ( prependIf (not asText) (HP.title smallText)
-      [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
+      [ HP.classes
+          ( prependIf (not enabled) HB.opacity25
+              [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
+          )
       , HP.style "white-space: nowrap;"
       , HE.onClick \_ -> action
       , HP.enabled enabled

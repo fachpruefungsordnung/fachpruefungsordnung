@@ -1,0 +1,14 @@
+.hero-bg {
+  background: linear-gradient(
+    180deg, 
+    #f8f9fa 0%, 
+    #91b0e9 30%,
+    #91b0e9 60%,
+    #c8d2e2 90%
+  );
+  min-height: 100vh;
+}
+
+.slanted-bottom {
+  clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%);
+}

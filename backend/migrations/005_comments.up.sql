@@ -1,9 +1,17 @@
 CREATE TABLE IF NOT EXISTS doc_comments (
     id BIGINT PRIMARY KEY NOT NULL GENERATED ALWAYS AS IDENTITY,
     text_element BIGINT NOT NULL REFERENCES doc_text_elements (id),
+    resolved_ts TIMESTAMPTZ DEFAULT NULL,
     author UUID NOT NULL REFERENCES users (id),
     creation_ts TIMESTAMPTZ NOT NULL DEFAULT now(),
-    resolved_ts TIMESTAMPTZ DEFAULT NULL,
+    content TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS doc_comment_replies (
+    id BIGINT PRIMARY KEY NOT NULL GENERATED ALWAYS AS IDENTITY,
+    comment BIGINT NOT NULL REFERENCES doc_comments (id),
+    author UUID NOT NULL REFERENCES users (id),
+    creation_ts TIMESTAMPTZ NOT NULL DEFAULT now(),
     content TEXT NOT NULL
 );
 

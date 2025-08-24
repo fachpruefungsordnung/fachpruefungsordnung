@@ -27,6 +27,7 @@ import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
+import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
@@ -36,6 +37,7 @@ import FPO.Components.Preview as Preview
 import FPO.Components.TOC (Path)
 import FPO.Components.TOC as TOC
 import FPO.Data.Navigate (class Navigate)
+import FPO.Data.Request (LoadState(..))
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
@@ -68,7 +70,6 @@ import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(Proxy))
 import Web.DOM.Document as Document
 import Web.DOM.Element as Element
-import Web.DOM.Node as Node
 import Web.Event.Event (EventType(..), stopPropagation)
 import Web.File.Url (createObjectURL, revokeObjectURL)
 import Web.HTML (window)
@@ -85,11 +86,15 @@ derive instance eqDragTarget :: Eq DragTarget
 
 type Output = Unit
 type Input = DocumentID
+
+type ElementData = Editor.ElementData
+
 data Query a = UnitQuery a
 
 data Action
   = Init
   -- Resizing Actions
+  | SetComparison Int Int
   | StartResize DragTarget MouseEvent
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
@@ -107,6 +112,7 @@ data Action
   | GET
   | POST
   | ModifyVersionMapping Int (Maybe Int)
+  | UpdateCompareToElement ElementData
 
 type State =
   { docID :: DocumentID
@@ -135,7 +141,7 @@ type State =
   -- 2. Throuth QueryEditor of the Editor, where the editor collects its content and sends it
   --   to the preview component.
   -- TODO: Which one to use?
-  , renderedHtml :: Maybe String
+  , renderedHtml :: Maybe (LoadState String)
   , testDownload :: String
 
   -- Store tocEntries and send some parts to its children components
@@ -155,6 +161,7 @@ type State =
   , previewShown :: Boolean
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
+  , compareToElement :: ElementData
   }
 
 type ElemVersion = { elementID :: Int, versionID :: Maybe Int }
@@ -162,7 +169,7 @@ type ElemVersion = { elementID :: Int, versionID :: Maybe Int }
 type Slots =
   ( comment :: H.Slot Comment.Query Comment.Output Unit
   , commentOverview :: H.Slot CommentOverview.Query CommentOverview.Output Unit
-  , editor :: H.Slot Editor.Query Editor.Output Unit
+  , editor :: H.Slot Editor.Query Editor.Output Int
   , preview :: H.Slot Preview.Query Preview.Output Unit
   , toc :: H.Slot TOC.Query TOC.Output Unit
   )
@@ -202,6 +209,7 @@ splitview = H.mkComponent
       , pdfWarningAvailable: false
       , pdfWarningIsShown: false
       , docID: docID
+      , compareToElement: Nothing
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -250,12 +258,19 @@ splitview = H.mkComponent
                       , HP.style
                           "height: 100%; box-sizing: border-box; min-height: 0; overflow: hidden;"
                       ]
-                      [ HH.slot _editor unit Editor.editor state.docID HandleEditor ]
+                      [ HH.slot _editor 0 Editor.editor
+                          { docID: state.docID, elementData: Nothing }
+                          HandleEditor
+                      ]
                   ]
               ]
             <>
-              -- Preview Sectioin
-              renderPreview state
+              -- Preview Section
+              case state.compareToElement of
+                Nothing
+                -> renderPreview state
+                Just _
+                -> renderSecondEditor state
         )
 
   -- Render both TOC and Comment but make them visable depending of the flags
@@ -309,7 +324,7 @@ splitview = H.mkComponent
                 \z-index: 10;"
             , HE.onClick \_ -> ToggleComment
             ]
-            [ HH.text "×" ]
+            [ HH.text "x" ]
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -349,7 +364,7 @@ splitview = H.mkComponent
                 \z-index: 10;"
             , HE.onClick \_ -> ToggleCommentOverview false
             ]
-            [ HH.text "×" ]
+            [ HH.text "x" ]
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -393,6 +408,42 @@ splitview = H.mkComponent
             [ HH.text if state.sidebarShown then "⟨" else "⟩" ]
         ]
     ]
+
+  rightResizer :: State -> H.ComponentHTML Action Slots m
+  rightResizer state =
+    HH.div
+      [ HE.onMouseDown (StartResize ResizeRight)
+      , HP.style
+          "width: 8px; \
+          \cursor: col-resize; \
+          \background:rgba(0, 0, 0, 0.3); \
+          \display: flex; \
+          \align-items: center; \
+          \justify-content: center; \
+          \position: relative;"
+      ]
+      [ HH.button
+          [ HP.style
+              "background:rgba(255, 255, 255, 0.8); \
+              \border: 0.2px solid #aaa; \
+              \padding: 0.1rem 0.1rem; \
+              \font-size: 8px; \
+              \font-weight: bold; \
+              \line-height: 1; \
+              \color:rgba(0, 0, 0, 0.7); \
+              \border-radius: 3px; \
+              \cursor: pointer; \
+              \height: 40px; \
+              \width: 8px;"
+          -- To prevent the resizer event under the button
+          , HE.handler' (EventType "mousedown") \ev ->
+              unsafePerformEffect do
+                stopPropagation ev
+                pure Nothing -- Do not trigger the mouse down event under the button
+          , HE.onClick \_ -> TogglePreview
+          ]
+          [ HH.text if state.previewShown then "⟩" else "⟨" ]
+      ]
 
   renderPreview :: State -> Array (H.ComponentHTML Action Slots m)
   renderPreview state =
@@ -461,14 +512,57 @@ splitview = H.mkComponent
                       \z-index: 10;"
                   , HE.onClick \_ -> TogglePreview
                   ]
-                  [ HH.text "×" ]
+                  [ HH.text "x" ]
               ]
           , HH.slot _preview unit Preview.preview
-              { renderedHtml: state.renderedHtml }
+              { renderedHtml: state.renderedHtml
+              , isDragging: state.mDragTarget /= Nothing
+              }
               HandlePreview
           ]
       else
         HH.text ""
+    ]
+
+  renderSecondEditor :: State -> Array (H.ComponentHTML Action Slots m)
+  renderSecondEditor state =
+    [ -- Right Resizer
+      rightResizer state
+    ,
+      -- Preview
+      HH.div
+        [ HP.classes [ HB.dFlex, HB.flexColumn ]
+        , HP.style $
+            "flex: 1 1 "
+              <> show (state.previewRatio * 100.0)
+              <>
+                "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
+        ]
+        [ HH.div
+            [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
+            , HP.style "padding-right: 0.5rem;"
+            ]
+            [ HH.button
+                [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+                , HP.style
+                    "position: absolute; \
+                    \top: 0.5rem; \
+                    \right: 0.5rem; \
+                    \background-color: #fdecea; \
+                    \color: #b71c1c; \
+                    \padding: 0.2rem 0.4rem; \
+                    \font-size: 0.75rem; \
+                    \line-height: 1; \
+                    \border: 1px solid #f5c6cb; \
+                    \border-radius: 0.2rem; \
+                    \z-index: 10;"
+                , HE.onClick \_ -> TogglePreview
+                ]
+                [ HH.text "×" ]
+            ]
+        , HH.slot_ _editor 1 Editor.editor
+            { docID: state.docID, elementData: state.compareToElement }
+        ]
     ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
@@ -541,7 +635,7 @@ splitview = H.mkComponent
       handleAction $ HandleMouseMove mouse
 
     -- Stop resizing, when mouse is released (is detected by browser)
-    StopResize _ ->
+    StopResize _ -> do
       H.modify_ \st -> st { mDragTarget = Nothing }
 
     -- While mouse is hold down, resizer move to position of mouse
@@ -587,7 +681,7 @@ splitview = H.mkComponent
             maxPreview = 1.0 - s - minRatio
             newPreview = clamp minRatio maxPreview rawPreview
 
-          when (newPreview >= minRatio && newPreview <= maxPreview) do
+          when (rawPreview >= minRatio && rawPreview <= maxPreview) do
             H.modify_ \st -> st
               { previewRatio = newPreview
               , lastExpandedPreviewRatio =
@@ -599,11 +693,18 @@ splitview = H.mkComponent
 
     -- Toggle actions
 
+    UpdateCompareToElement elemData -> do
+      H.modify_ _ { compareToElement = elemData }
+      case elemData of
+        Nothing -> pure unit
+        Just eData -> H.tell _editor 1
+          (Editor.ChangeSection eData.title eData.tocEntry (Just eData.revID))
+
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
     ToggleCommentOverview shown ->
       if shown then do
-        H.tell _editor unit Editor.SendCommentSections
+        H.tell _editor 0 Editor.SendCommentSections
         H.modify_ \st -> st { commentShown = false, commentOverviewShown = shown }
       else
         H.modify_ \st -> st { commentOverviewShown = shown }
@@ -640,14 +741,18 @@ splitview = H.mkComponent
         resizerWidth = 16.0
         resizerRatio = resizerWidth / w
       -- close preview
-      if state.previewShown then do
-        let
-          oldPreviewRatio = state.previewRatio
-        H.modify_ \st -> st
-          { previewRatio = resizerRatio
-          , lastExpandedPreviewRatio = oldPreviewRatio
-          , previewShown = false
-          }
+      if state.previewShown then
+        -- just hide the compare to element if it is shown
+        if state.compareToElement /= Nothing then
+          H.modify_ _ { compareToElement = Nothing }
+        else do
+          let
+            oldPreviewRatio = state.previewRatio
+          H.modify_ \st -> st
+            { previewRatio = resizerRatio
+            , lastExpandedPreviewRatio = oldPreviewRatio
+            , previewShown = false
+            }
       -- open preview
       else do
         -- restore the last expanded middle ratio, when toggling preview back on
@@ -667,6 +772,22 @@ splitview = H.mkComponent
             state.versionMapping
       H.modify_ _ { versionMapping = newVersionMapping }
 
+    SetComparison elementID vID -> do
+      state <- H.get
+      let
+        tocEntry = fromMaybe
+          emptyTOCEntry
+          (findTOCEntry elementID state.tocEntries)
+        title = fromMaybe
+          ""
+          (findTitleTOCEntry elementID state.tocEntries)
+      H.modify_ _
+        { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } }
+      handleAction
+        ( UpdateCompareToElement
+            (Just { tocEntry: tocEntry, revID: vID, title: title })
+        )
+
     -- Query handler
 
     HandleComment output -> case output of
@@ -675,43 +796,44 @@ splitview = H.mkComponent
         H.modify_ \st -> st { commentShown = false }
 
       -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
-      Comment.UpdateComment markerID newCommentSection -> do
-        pure unit
-        -- H.tell _editor unit Editor.SaveSection
-        -- state <- H.get
-        -- case
-        --   findRootTree (\e -> e.elementID == tocID && e.versionID /= Nothing)
-        --     state.versionMapping
-        --   of
-        --   Just _ -> do
-        --     let
-        --       updatedTOCEntries = map
-        --         ( \entry ->
-        --             if entry.id /= tocID then entry
-        --             else
-        --               let
-        --                 newMarkers =
-        --                   ( map
-        --                       ( \marker ->
-        --                           if marker.id /= markerID then marker
-        --                           else marker
-        --                             { mCommentSection = Just newCommentSection }
-        --                       )
-        --                       entry.markers
-        --                   )
-        --               in
-        --                 entry { markers = newMarkers }
-        --         )
-        --         state.tocEntries
-        --       updateTOCEntry = fromMaybe
-        --         emptyTOCEntry
-        --         (findTOCEntry tocID updatedTOCEntries)
-        --       title = fromMaybe
-        --         ""
-        --         (findTitleTOCEntry tocID updatedTOCEntries)
-        --     H.modify_ \s -> s { tocEntries = updatedTOCEntries }
-        --     H.tell _editor unit (Editor.ChangeSection title updateTOCEntry Nothing)
-        --   Nothing -> do
+      Comment.UpdateComment tocID markerID newCommentSection -> do
+        H.tell _editor 0 Editor.SaveSection
+        state <- H.get
+        case
+          findRootTree (\e -> e.elementID == tocID && e.versionID /= Nothing)
+            state.versionMapping
+          of
+          Just _ -> do
+            let
+              updatedTOCEntries = map
+                ( \entry ->
+                    if entry.id /= tocID then entry
+                    else
+                      let
+                        newMarkers =
+                          ( map
+                              ( \marker ->
+                                  if marker.id /= markerID then marker
+                                  else marker
+                                    { mCommentSection = Just newCommentSection }
+                              )
+                              entry.markers
+                          )
+                      in
+                        entry { markers = newMarkers }
+                )
+                state.tocEntries
+              updateTOCEntry = fromMaybe
+                emptyTOCEntry
+                (findTOCEntry tocID updatedTOCEntries)
+              title = fromMaybe
+                ""
+                (findTitleTOCEntry tocID updatedTOCEntries)
+            H.modify_ \s -> s { tocEntries = updatedTOCEntries }
+            H.tell _editor 0 (Editor.ChangeSection title updateTOCEntry Nothing)
+          Nothing -> do
+            H.liftEffect $ log
+              "unable to unpdate comment on outdated versions of elements"
 
     HandleCommentOverview output -> case output of
 
@@ -723,10 +845,11 @@ splitview = H.mkComponent
     HandleEditor output -> case output of
 
       Editor.ClickedQuery response -> do
+        H.modify_ _ { renderedHtml = Just Loading }
         renderedHtml' <- Request.postRenderHtml (joinWith "\n" response)
         case renderedHtml' of
           Left _ -> pure unit -- Handle error
-          Right body -> H.modify_ _ { renderedHtml = Just body }
+          Right body -> H.modify_ _ { renderedHtml = Just (Loaded body) }
 
       Editor.DeletedComment tocEntry deletedIDs -> do
         H.modify_ \st ->
@@ -741,6 +864,7 @@ splitview = H.mkComponent
         case renderedPDF' of
           Left _ -> pure unit
           Right body -> do
+            --H.liftEffect $ log body
             -- create blobl link
             url <- H.liftEffect $ createObjectURL body
             -- Create an invisible link and click it to download PDF
@@ -757,23 +881,12 @@ splitview = H.mkComponent
                 Just aHtml -> do
                   Element.setAttribute "href" url aEl
                   Element.setAttribute "download" "test.pdf" aEl
-                  Element.setAttribute "target" "_self" aEl
-                  Element.setAttribute "rel" "noopener noreferrer" aEl
-                  Element.setAttribute "style" "display:none" aEl
-                  mBody <- HTMLDocument.body hdoc
-                  case mBody of
-                    Nothing -> pure unit
-                    Just bodyHtml -> do
-                      -- click the link
-                      let bodyEl = HTMLElement.toElement bodyHtml
-                      _ <- Node.appendChild (Element.toNode aEl)
-                        (Element.toNode bodyEl)
-                      HTMLElement.click aHtml
-                      _ <- Node.removeChild (Element.toNode aEl)
-                        (Element.toNode bodyEl)
-                      pure unit
-            -- deactivate the blob link
-            H.liftEffect $ revokeObjectURL url
+                  HTMLElement.click aHtml
+            -- deactivate the blob link after 1 sec
+            _ <- H.fork do
+              H.liftAff $ delay (Milliseconds 1000.0)
+              H.liftEffect $ revokeObjectURL url
+            pure unit
 
       Editor.SavedSection toBePosted title tocEntry -> do
         state <- H.get
@@ -812,8 +925,11 @@ splitview = H.mkComponent
       TOC.ModifyVersion elementID mVID -> do
         handleAction (ModifyVersionMapping elementID mVID)
 
+      TOC.CompareTo elementID vID -> do
+        handleAction (SetComparison elementID vID)
+
       TOC.ChangeToLeaf title selectedId -> do
-        H.tell _editor unit Editor.SaveSection
+        H.tell _editor 0 Editor.SaveSection
         state <- H.get
         let
           entry = case (findTOCEntry selectedId state.tocEntries) of
@@ -826,13 +942,13 @@ splitview = H.mkComponent
               Nothing -> Nothing
               Just elem -> elem.versionID
         -- handleAction (ModifyVersionMapping selectedID rev)
-        H.tell _editor unit (Editor.ChangeSection title entry rev)
+        H.tell _editor 0 (Editor.ChangeSection title entry rev)
 
       TOC.ChangeToNode path title -> do
-        H.tell _editor unit (Editor.ChangeToNode title path)
+        H.tell _editor 0 (Editor.ChangeToNode title path)
 
       TOC.UpdateNodePosition path -> do
-        H.tell _editor unit (Editor.UpdateNodePosition path)
+        H.tell _editor 0 (Editor.UpdateNodePosition path)
 
       TOC.AddNode path node -> do
         s <- H.get

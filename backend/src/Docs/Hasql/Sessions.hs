@@ -19,6 +19,8 @@ module Docs.Hasql.Sessions
     , hasPermission
     , isGroupAdmin
     , getComments
+    , logMessage
+    , getLogs
     ) where
 
 import Data.Functor ((<&>))
@@ -38,7 +40,9 @@ import UserManagement.DocumentPermission (Permission)
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
-import Docs.Comment (Comment, CommentAnchor)
+import Data.Aeson (ToJSON)
+import Docs.Comment (Comment, CommentAnchor, CommentRef (CommentRef), Message)
+import qualified Docs.Comment as Comment
 import Docs.Document (Document, DocumentID)
 import Docs.DocumentHistory (DocumentHistory (..))
 import Docs.Hash (Hash)
@@ -65,6 +69,7 @@ import Docs.TreeRevision
     , TreeRevisionRef (..)
     )
 import GHC.Int (Int64)
+import Logging.Logs (LogMessage, Scope, Severity)
 
 existsDocument :: DocumentID -> Session Bool
 existsDocument = flip statement Statements.existsDocument
@@ -177,5 +182,37 @@ isGroupAdmin userID groupID =
     statement (userID, groupID) Statements.isGroupAdmin
 
 getComments :: TextElementRef -> Session (Vector Comment)
-getComments (TextElementRef docID textID) =
-    statement (docID, textID) Statements.getComments
+getComments textRef@(TextElementRef docID textID) = do
+    comments <- statement (docID, textID) Statements.getComments
+    mapM mapper comments
+  where
+    mapper :: Comment -> Session Comment
+    mapper comment = do
+        replies <- getReplies $ CommentRef textRef $ Comment.identifier comment
+        return $ comment {Comment.replies = replies}
+    getReplies :: CommentRef -> Session (Vector Message)
+    getReplies = flip statement Statements.getReplies
+
+logMessage
+    :: (ToJSON v)
+    => Severity
+    -- ^ severity of the log message
+    -> Maybe UserID
+    -- ^ source user
+    -> Scope
+    -- ^ scope (e.g, "docs.text.revision")
+    -> v
+    -- ^ content (json)
+    -> Session LogMessage
+    -- ^ created log message
+logMessage severity source scope content =
+    statement (severity, source, scope, content) Statements.logMessage
+
+getLogs
+    :: Maybe UTCTime
+    -- ^ offset
+    -> Int64
+    -- ^ limit
+    -> Session (Vector LogMessage)
+    -- ^ log messages
+getLogs = curry (`statement` Statements.getLogs)

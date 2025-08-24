@@ -4,6 +4,7 @@ module Docs.Comment
     ( CommentID (..)
     , Status (..)
     , Comment (..)
+    , Message (..)
     , CommentRef (..)
     , CommentAnchor (..)
     , Range (start, end)
@@ -26,6 +27,7 @@ import Data.OpenApi.Lens (HasType (..))
 import Data.Proxy (Proxy (Proxy))
 import Data.Text (Text)
 import Data.Time (UTCTime)
+import Data.Vector (Vector)
 import Docs.TextElement (TextElementRef, prettyPrintTextElementRef)
 import Docs.UserRef (UserRef)
 import GHC.Generics (Generic)
@@ -33,6 +35,13 @@ import GHC.Int (Int64)
 import Servant (FromHttpApiData (parseUrlPiece))
 
 data CommentRef = CommentRef TextElementRef CommentID
+    deriving (Generic)
+
+instance ToJSON CommentRef
+
+instance FromJSON CommentRef
+
+instance ToSchema CommentRef
 
 prettyPrintCommentRef :: CommentRef -> String
 prettyPrintCommentRef (CommentRef textElementRef id_) =
@@ -78,10 +87,9 @@ instance ToSchema Status
 
 data Comment = Comment
     { identifier :: CommentID
-    , author :: UserRef
-    , timestamp :: UTCTime
     , status :: Status
-    , content :: Text
+    , message :: Message
+    , replies :: Vector Message
     }
     deriving (Generic)
 
@@ -90,6 +98,19 @@ instance ToJSON Comment
 instance FromJSON Comment
 
 instance ToSchema Comment
+
+data Message = Message
+    { author :: UserRef
+    , timestamp :: UTCTime
+    , content :: Text
+    }
+    deriving (Generic)
+
+instance ToJSON Message
+
+instance FromJSON Message
+
+instance ToSchema Message
 
 data CommentAnchor = CommentAnchor
     { comment :: CommentID

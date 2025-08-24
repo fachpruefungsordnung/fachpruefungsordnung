@@ -40,6 +40,12 @@ class Client:
         else:
             print(f"Error: {response.status_code}")
 
+    def logs(self, offset:str|None=None, limit:int|None=None) -> str:
+        return self.get_json(with_query("logs",
+            before=offset,
+            limit=limit
+        ))
+
     def documents(self, user_id: int|None=None, group_id: int|None=None) -> str:
         return self.get_json(with_query(
             f"docs",
@@ -118,4 +124,5 @@ if __name__ == "__main__":
     # print(client.document_tree_full(1, "latest"))
     # print(client.document_history(1, limit=5))
     # print(client.document_text_revision(1, 1, "latest"))
-    print(client.documents(group_id=1))
+    # print(client.documents(group_id=1))
+    print(client.logs())

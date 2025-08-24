@@ -4,11 +4,12 @@ module FPO.Data.Route where
 
 import Prelude hiding ((/))
 
+import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(Nothing), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.GroupDto (GroupID)
-import Routing.Duplex (RouteDuplex', boolean, int, optional, root, string)
+import Routing.Duplex (RouteDuplex', boolean, int, optional, parse, root, string)
 import Routing.Duplex.Generic (noArgs, sum)
 import Routing.Duplex.Generic.Syntax ((/), (?))
 
@@ -29,6 +30,8 @@ data Route
 derive instance genericRoute :: Generic Route _
 derive instance eqRoute :: Eq Route
 derive instance ordRoute :: Ord Route
+instance showRoute :: Show Route where
+  show = routeToString
 
 -- | The codec for the routes. It defines how to parse and serialize the routes.
 routeCodec :: RouteDuplex' Route
@@ -65,3 +68,8 @@ routeToString = case _ of
     ( if loginSuccessful == Nothing then ""
       else " (loginSuccessful: " <> (show $ fromMaybe false loginSuccessful) <> ")"
     )
+
+urlToRoute :: String -> Maybe Route
+urlToRoute url = case parse routeCodec url of
+  Left _ -> Nothing
+  Right route -> Just route

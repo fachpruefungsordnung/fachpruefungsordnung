@@ -2,8 +2,10 @@ module FPO.Data.AppToast where
 
 import Prelude
 
-import FPO.Data.AppError (AppError)
+import FPO.Data.AppError (AppError, showToastError)
+import FPO.Translations.Labels (Labels)
 import Halogen.HTML as HH
+import Simple.I18n.Translator (Translator)
 
 type ToastId = Int
 data AppToast
@@ -28,3 +30,10 @@ classForToast = case _ of
   Error _ -> HH.ClassName "fpo-toast-error"
   Warning _ -> HH.ClassName "fpo-toast-warning"
   Info _ -> HH.ClassName "fpo-toast-info"
+
+showToastText :: AppToast -> Translator Labels -> String
+showToastText toast translator = case toast of
+  Success msg -> msg
+  Error err -> showToastError err translator
+  Warning msg -> msg
+  Info msg -> msg
