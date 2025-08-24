@@ -93,7 +93,13 @@ import Docs.Hasql.TreeEdge
     , TreeEdgeChildRef (..)
     )
 import qualified Docs.Hasql.TreeEdge as TreeEdge
-import Docs.Revision (RevisionID (unRevisionID), RevisionKey (RevisionKey))
+import Docs.Revision
+    ( RevisionID (unRevisionID)
+    , RevisionKey (RevisionKey)
+    , RevisionSelector
+    , latestRevisionAsOf
+    , specificRevision
+    )
 import qualified Docs.Revision as Revision
 import Docs.TextElement
     ( TextElement (TextElement)
@@ -1040,10 +1046,10 @@ uncurryRevisionKey (timestamp, docID, maybeTextID, revID) =
 
 getRevisionKey
     :: Statement
-        (DocumentID, RevisionID)
+        (DocumentID, RevisionSelector)
         (Maybe RevisionKey)
 getRevisionKey =
-    lmap (bimap unDocumentID unRevisionID) $
+    lmap mapInput $
         rmap
             (uncurryRevisionKey <$>)
             [maybeStatement|
@@ -1056,8 +1062,18 @@ getRevisionKey =
                     doc_revisions
                 WHERE
                     document = $1 :: int8
-                    AND id = $2 :: int8
+                    AND ($2 :: int8? IS NULL OR id = $2 :: int8?)
+                    AND ($3 :: timestamptz? IS NULL OR creation_ts <= $3 :: timestamptz?)
+                ORDER BY
+                    creation_ts DESC
+                LIMIT 1
         |]
+  where
+    mapInput (docID, selector) =
+        ( unDocumentID docID
+        , unRevisionID <$> specificRevision selector
+        , latestRevisionAsOf selector
+        )
 
 -- Natürlich schreibe ich dir einen Kommentar, der sagt, dass hier das UserManagement beginnt!
 

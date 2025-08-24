@@ -84,8 +84,8 @@ import Docs.Comment
     )
 import Docs.FullDocument (FullDocument)
 import Docs.Revision
-    ( RevisionID
-    , RevisionRef (RevisionRef)
+    ( RevisionRef (RevisionRef)
+    , RevisionSelector
     , prettyPrintRevisionRef
     )
 import Server.DTOs.Comments (Comments (Comments))
@@ -265,14 +265,14 @@ type GetDocumentRevision =
     Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> "rev"
-        :> Capture "revisionID" RevisionID
+        :> Capture "revision" RevisionSelector
         :> Get '[JSON] FullDocument
 
 type GetDocumentRevisionTree =
     Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> "rev"
-        :> Capture "revisionID" RevisionID
+        :> Capture "revision" RevisionSelector
         :> "tree"
         :> Get '[JSON] (Maybe (TreeRevision TextElement))
 
@@ -280,7 +280,7 @@ type GetDocumentRevisionText =
     Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> "rev"
-        :> Capture "revisionID" RevisionID
+        :> Capture "revision" RevisionSelector
         :> "text"
         :> Capture "textElementID" TextElementID
         :> Get '[JSON] (Maybe TextElementRevision)
@@ -520,34 +520,34 @@ createReplyHandler auth docID textID commentID bodyDTO = do
 getDocumentRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
-    -> RevisionID
+    -> RevisionSelector
     -> Handler FullDocument
-getDocumentRevisionHandler auth docID revID = do
+getDocumentRevisionHandler auth docID rev = do
     userID <- getUser auth
-    withDB $ run $ Docs.getDocumentRevision userID (RevisionRef docID revID)
+    withDB $ run $ Docs.getDocumentRevision userID (RevisionRef docID rev)
 
 getDocumentRevisionTreeHandler
     :: AuthResult Auth.Token
     -> DocumentID
-    -> RevisionID
+    -> RevisionSelector
     -> Handler (Maybe (TreeRevision TextElement))
-getDocumentRevisionTreeHandler auth docID revID = do
+getDocumentRevisionTreeHandler auth docID rev = do
     userID <- getUser auth
-    withDB $ run $ Docs.getDocumentRevisionTree userID (RevisionRef docID revID)
+    withDB $ run $ Docs.getDocumentRevisionTree userID (RevisionRef docID rev)
 
 getDocumentRevisionTextHandler
     :: AuthResult Auth.Token
     -> DocumentID
-    -> RevisionID
+    -> RevisionSelector
     -> TextElementID
     -> Handler (Maybe TextElementRevision)
-getDocumentRevisionTextHandler auth docID revID textID = do
+getDocumentRevisionTextHandler auth docID rev textID = do
     userID <- getUser auth
     withDB $
         run $
             Docs.getDocumentRevisionText
                 userID
-                (RevisionRef docID revID)
+                (RevisionRef docID rev)
                 textID
 
 -- utililty

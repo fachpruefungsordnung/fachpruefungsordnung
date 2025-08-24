@@ -177,7 +177,7 @@ instance FromHttpApiData TextRevisionSelector where
                 Nothing ->
                     case parseFlexibleTime (Text.unpack txt) of
                         Just ts -> Right $ LatestAsOf ts
-                        Nothing -> Left $ "Invalid TreeRevisionSelector: " <> txt
+                        Nothing -> Left $ "Invalid TextRevisionSelector: " <> txt
 
 specificTextRevision :: TextRevisionSelector -> Maybe TextRevisionID
 specificTextRevision (Specific id_) = Just id_
