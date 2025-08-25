@@ -7,6 +7,7 @@ import Control.Applicative ((<|>))
 import Control.Monad (void)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Star (Star))
+import Language.Lsd.AST.Type (unwrapNT)
 import Language.Lsd.AST.Type.Section
     ( HeadingType (HeadingType)
     , SectionBodyType (..)
@@ -38,13 +39,17 @@ sectionP (SectionType kw headingT fmt bodyT) succStartP = do
   where
     bodyP :: SectionBodyType -> FootnoteParser SectionBody
     bodyP (InnerSectionBodyType (Star t)) =
-        InnerSectionBody <$> many (sectionP t (toStartP t <|> succStartP))
+        InnerSectionBody <$> many (sectionP t' (toStartP t' <|> succStartP))
+      where
+        t' = unwrapNT t
     bodyP (LeafSectionBodyType (Star t)) =
         LeafSectionBody
-            <$> manyWithFootnotesTillSucc (paragraphP t) succStartP
+            <$> manyWithFootnotesTillSucc (paragraphP $ unwrapNT t) succStartP
     bodyP (SimpleLeafSectionBodyType (Star t)) =
         SimpleLeafSectionBody
-            <$> manyWithFootnotesTillSucc (simpleBlockP t) succStartP
+            <$> manyWithFootnotesTillSucc
+                (simpleBlockP $ unwrapNT t)
+                succStartP
 
 toStartP :: SectionType -> Parser ()
 toStartP (SectionType kw _ _ _) = void $ keywordP kw

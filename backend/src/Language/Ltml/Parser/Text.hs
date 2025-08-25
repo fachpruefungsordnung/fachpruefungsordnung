@@ -29,6 +29,7 @@ import Data.Typography (FontStyle (..))
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Disjunction (Disjunction))
+import Language.Lsd.AST.Type (unwrapNT)
 import Language.Lsd.AST.Type.Enum (EnumType (EnumType))
 import Language.Lsd.AST.Type.Text (TextType (TextType))
 import Language.Ltml.AST.Label (Label)
@@ -125,7 +126,7 @@ childPF
     => TextType enumType
     -> m (TextTree lbrk fnref style enum special)
 childPF (TextType (Disjunction enumTypes)) =
-    wrapParser (Enum <$> choice (map enumP enumTypes))
+    wrapParser (Enum <$> choice (map (enumP . unwrapNT) enumTypes))
         <* postEnumP (Proxy :: Proxy special)
 
 -- TODO: Unused.

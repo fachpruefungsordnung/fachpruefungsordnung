@@ -3,18 +3,17 @@ module Language.Lsd.AST.Type.AppendixSection
     , AppendixSectionTitle (..)
     , AppendixElementFormat (..)
     , AppendixSectionType (..)
-    , PreAppendixSectionType (..)
     )
 where
 
 import Data.Text (Text)
-import Language.Lsd.AST.Common (TypeName)
 import Language.Lsd.AST.Format
     ( IdentifierFormat
     , InnerHeadingFormat
     , TocKeyFormat
     )
 import Language.Lsd.AST.SimpleRegex (Disjunction, Star)
+import Language.Lsd.AST.Type (NamedType)
 import Language.Lsd.AST.Type.Document (DocumentType)
 
 data AppendixSectionFormat
@@ -38,9 +37,4 @@ data AppendixElementFormat
 data AppendixSectionType
     = AppendixSectionType
         AppendixSectionFormat
-        (Star (Disjunction DocumentType))
-
-data PreAppendixSectionType
-    = PreAppendixSectionType
-        AppendixSectionFormat
-        (Star (Disjunction TypeName))
+        (Star (Disjunction (NamedType DocumentType)))
