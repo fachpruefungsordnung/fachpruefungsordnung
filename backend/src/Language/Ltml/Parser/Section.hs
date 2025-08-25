@@ -20,6 +20,7 @@ import Language.Ltml.AST.Section
     , Section (Section)
     , SectionBody (..)
     )
+import Language.Ltml.Common (Flagged (Flagged))
 import Language.Ltml.Parser (Parser, wrapParser)
 import Language.Ltml.Parser.Common.Indent (nonIndented)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
@@ -35,11 +36,13 @@ sectionP :: SectionType -> Parser () -> FootnoteParser (Node Section)
 sectionP (SectionType kw headingT fmt bodyT) succStartP = do
     (mLabel, heading) <- wrapParser $ nonIndented $ headingP kw headingT
     body <- nonIndented $ bodyP bodyT
-    return $ Node mLabel $ Section fmt heading body
+    return $ Node mLabel $ Section fmt (Flagged False heading) body
   where
     bodyP :: SectionBodyType -> FootnoteParser SectionBody
     bodyP (InnerSectionBodyType (Star t)) =
-        InnerSectionBody <$> many (sectionP t' (toStartP t' <|> succStartP))
+        InnerSectionBody
+            <$> many
+                (Flagged False <$> sectionP t' (toStartP t' <|> succStartP))
       where
         t' = unwrapNT t
     bodyP (LeafSectionBodyType (Star t)) =

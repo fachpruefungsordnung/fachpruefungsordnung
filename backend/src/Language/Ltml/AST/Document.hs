@@ -12,11 +12,12 @@ import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Section (SectionBody)
 import Language.Ltml.AST.SimpleSection (SimpleSection)
 import Language.Ltml.AST.Text (HeadingTextTree)
+import Language.Ltml.Common (Flagged)
 
 data Document
     = Document
         DocumentFormat
-        DocumentHeading
+        (Flagged DocumentHeading)
         DocumentBody
         (Map Label Footnote)
     deriving (Show)
@@ -32,10 +33,10 @@ newtype DocumentHeading = DocumentHeading [HeadingTextTree]
 data DocumentBody
     = -- | document body
       DocumentBody
-        [SimpleSection]
+        (Flagged [SimpleSection])
         -- ^ intro
-        SectionBody
+        (Flagged SectionBody)
         -- ^ main
-        [SimpleSection]
+        (Flagged [SimpleSection])
         -- ^ outro
     deriving (Show)

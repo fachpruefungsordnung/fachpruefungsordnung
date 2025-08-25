@@ -11,11 +11,12 @@ import Language.Ltml.AST.Node (Node)
 import Language.Ltml.AST.Paragraph (Paragraph)
 import Language.Ltml.AST.SimpleBlock (SimpleBlock)
 import Language.Ltml.AST.Text (HeadingTextTree)
+import Language.Ltml.Common (Flagged)
 
 data Section
     = Section
         SectionFormat
-        Heading
+        (Flagged Heading)
         SectionBody
     deriving (Show)
 
@@ -26,7 +27,7 @@ data Heading
     deriving (Show)
 
 data SectionBody
-    = InnerSectionBody [Node Section]
+    = InnerSectionBody [Flagged (Node Section)]
     | LeafSectionBody [Node Paragraph]
     | SimpleLeafSectionBody [SimpleBlock]
     deriving (Show)
