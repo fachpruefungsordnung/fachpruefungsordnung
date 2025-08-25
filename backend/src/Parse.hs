@@ -1,8 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Parse (parseFlexibleTime) where
+module Parse
+    ( parseFlexibleTime
+    , nonEmptyString
+    , nonEmptyText
+    ) where
 
 import Control.Applicative ((<|>))
+import Data.Text (Text)
 import Data.Time (UTCTime)
 import Data.Time.Format (defaultTimeLocale, parseTimeM)
 
@@ -20,3 +25,11 @@ parseFlexibleTime s =
             (\fmt acc -> acc <|> parseTimeM True defaultTimeLocale fmt s)
             Nothing
             fmts
+
+nonEmptyString :: String -> Maybe String
+nonEmptyString "" = Nothing
+nonEmptyString x = Just x
+
+nonEmptyText :: Text -> Maybe Text
+nonEmptyText "" = Nothing
+nonEmptyText x = Just x
