@@ -7,6 +7,7 @@ module Language.Ltml.AST.Text
     , FootnoteTextTree
     , RichTextTree
     , ParagraphTextTree
+    , HardLineBreak (..)
     , Enumeration (..)
     , EnumItem (..)
     , SentenceStart (..)
@@ -22,28 +23,39 @@ import Language.Lsd.AST.Type.Enum (EnumFormat)
 import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Node (Node)
 
-data TextTree fnref style enum special
+data TextTree lbrk fnref style enum special
     = Word Text
     | Space
+    | NonBreakingSpace
+    | LineBreak lbrk
     | Special special
     | Reference Label
-    | Styled style [TextTree fnref style enum special]
+    | Styled style [TextTree lbrk fnref style enum special]
     | Enum enum
     | FootnoteRef fnref
     deriving (Show)
 
-instance FromWhitespace [TextTree a b c d] where
+instance FromWhitespace [TextTree a b c d e] where
     fromWhitespace "" = []
     fromWhitespace _ = [Space]
 
-type HeadingTextTree = TextTree FootnoteReference Void Void Void
+type HeadingTextTree = TextTree Void FootnoteReference Void Void Void
 
-type FootnoteTextTree = TextTree Void FontStyle Void Void
+type FootnoteTextTree = TextTree HardLineBreak Void FontStyle Void Void
 
-type RichTextTree = TextTree FootnoteReference FontStyle Enumeration Void
+type RichTextTree =
+    TextTree HardLineBreak FootnoteReference FontStyle Enumeration Void
 
 type ParagraphTextTree =
-    TextTree FootnoteReference FontStyle Enumeration SentenceStart
+    TextTree
+        HardLineBreak
+        FootnoteReference
+        FontStyle
+        Enumeration
+        SentenceStart
+
+data HardLineBreak = HardLineBreak
+    deriving (Show)
 
 data Enumeration = Enumeration EnumFormat [Node EnumItem]
     deriving (Show)

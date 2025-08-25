@@ -14,6 +14,7 @@ module Docs.TextRevision
     , prettyPrintTextRevisionRef
     , textRevisionRef
     , specificTextRevision
+    , latestTextRevisionAsOf
     ) where
 
 import Data.Proxy (Proxy (Proxy))
@@ -33,7 +34,8 @@ import qualified Data.Aeson as Aeson
 import Data.Aeson.Types (Parser)
 import qualified Data.HashMap.Strict.InsOrd as InsOrd
 import Data.OpenApi
-    ( NamedSchema (..)
+    ( HasFormat (format)
+    , NamedSchema (..)
     , OpenApiType (..)
     , Referenced (Inline)
     , Schema (..)
@@ -60,6 +62,7 @@ import Docs.TextElement
     , prettyPrintTextElementRef
     )
 import Docs.UserRef (UserRef)
+import Parse (parseFlexibleTime)
 
 data TextRevisionRef
     = TextRevisionRef
@@ -78,6 +81,7 @@ prettyPrintTextRevisionRef (TextRevisionRef textElementRef selector) =
     prettyPrintTextElementRef textElementRef ++ prettyPrintSelector selector
   where
     prettyPrintSelector Latest = "latest"
+    prettyPrintSelector (LatestAsOf ts) = show ts
     prettyPrintSelector (Specific revID) = show $ unTextRevisionID revID
 
 textRevisionRef
@@ -115,18 +119,18 @@ instance FromHttpApiData TextRevisionID where
 -- | Selector for a text revision
 data TextRevisionSelector
     = Latest
+    | LatestAsOf UTCTime
     | Specific TextRevisionID
 
 instance ToJSON TextRevisionSelector where
     toJSON Latest = toJSON ("latest" :: Text)
+    toJSON (LatestAsOf ts) = toJSON ts
     toJSON (Specific id_) = toJSON id_
 
 instance FromJSON TextRevisionSelector where
     parseJSON v = case v of
-        Aeson.String t ->
-            if t == "latest"
-                then pure Latest
-                else fail $ "Invalid string for TextRevisionSelector: " ++ Text.unpack t
+        Aeson.String "latest" -> pure Latest
+        Aeson.String _ -> LatestAsOf <$> parseJSON v -- TODO: parseFlexibleTime?
         Aeson.Number n -> case toBoundedInteger n of
             Just i -> pure $ Specific $ TextRevisionID i
             Nothing -> fail "Invalid number for Int64"
@@ -135,6 +139,7 @@ instance FromJSON TextRevisionSelector where
 instance ToSchema TextRevisionSelector where
     declareNamedSchema _ = do
         intSchema <- declareSchemaRef (Proxy :: Proxy Int64)
+        timestampSchema <- declareSchemaRef (Proxy :: Proxy UTCTime)
         let latestSchema =
                 Inline $
                     mempty
@@ -142,7 +147,7 @@ instance ToSchema TextRevisionSelector where
                         & enum_ ?~ ["latest"]
         return $
             NamedSchema (Just "TextRevisionSelector") $
-                mempty & oneOf ?~ [latestSchema, intSchema]
+                mempty & oneOf ?~ [latestSchema, intSchema, timestampSchema]
 
 instance ToParamSchema TextRevisionSelector where
     toParamSchema _ =
@@ -154,6 +159,10 @@ instance ToParamSchema TextRevisionSelector where
                             & enum_ ?~ ["latest"]
                    , Inline $
                         mempty
+                            & type_ ?~ OpenApiString
+                            & format ?~ "date-time"
+                   , Inline $
+                        mempty
                             & type_ ?~ OpenApiInteger
                             & minimum_ ?~ 0
                             & exclusiveMinimum ?~ False
@@ -162,13 +171,21 @@ instance ToParamSchema TextRevisionSelector where
 instance FromHttpApiData TextRevisionSelector where
     parseUrlPiece txt
         | Text.toLower txt == "latest" = Right Latest
-        | otherwise = case readMaybe (Text.unpack txt) of
-            Just i -> Right $ Specific $ TextRevisionID i
-            Nothing -> Left $ "Invalid TextRevisionSelector: " <> txt
+        | otherwise =
+            case readMaybe (Text.unpack txt) of
+                Just i -> Right $ Specific $ TextRevisionID i
+                Nothing ->
+                    case parseFlexibleTime (Text.unpack txt) of
+                        Just ts -> Right $ LatestAsOf ts
+                        Nothing -> Left $ "Invalid TextRevisionSelector: " <> txt
 
 specificTextRevision :: TextRevisionSelector -> Maybe TextRevisionID
-specificTextRevision Latest = Nothing
 specificTextRevision (Specific id_) = Just id_
+specificTextRevision _ = Nothing
+
+latestTextRevisionAsOf :: TextRevisionSelector -> Maybe UTCTime
+latestTextRevisionAsOf (LatestAsOf ts) = Just ts
+latestTextRevisionAsOf _ = Nothing
 
 -- | Header of a text revision.
 --   Contains metadata for a text revision.

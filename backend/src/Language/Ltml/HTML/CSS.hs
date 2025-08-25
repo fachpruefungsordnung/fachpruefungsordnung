@@ -4,8 +4,8 @@ import Clay hiding (map)
 
 import Data.Text.Lazy.IO (writeFile)
 import Language.Ltml.HTML.CSS.Classes
-import Language.Ltml.HTML.CSS.Util (buildCssCounters)
 import Language.Ltml.HTML.Common (EnumStyleMap)
+import Language.Ltml.HTML.FormatString (buildCssCounters)
 import Prelude hiding (writeFile)
 
 writeCss :: Css -> FilePath -> IO ()

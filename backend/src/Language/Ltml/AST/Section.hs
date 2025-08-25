@@ -5,7 +5,7 @@ module Language.Ltml.AST.Section
     )
 where
 
-import Language.Lsd.AST.Format (HeadingFormat)
+import Language.Lsd.AST.Format (InnerHeadingFormat)
 import Language.Lsd.AST.Type.Section (SectionFormat)
 import Language.Ltml.AST.Node (Node)
 import Language.Ltml.AST.Paragraph (Paragraph)
@@ -21,7 +21,7 @@ data Section
 
 data Heading
     = Heading
-        HeadingFormat
+        InnerHeadingFormat
         [HeadingTextTree]
     deriving (Show)
 

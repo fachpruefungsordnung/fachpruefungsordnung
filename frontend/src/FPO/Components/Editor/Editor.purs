@@ -413,6 +413,7 @@ editor = connect selectTranslator $ H.mkComponent
   handleAction = case _ of
     Init -> do
       -- create subscription for later use
+      state <- H.get
       { emitter, listener } <- H.liftEffect HS.create
       H.modify_ _ { mListener = Just listener }
       -- Subscribe to resize events and store subscription for cleanup
@@ -436,7 +437,7 @@ editor = connect selectTranslator $ H.mkComponent
           Editor.setTheme "ace/theme/github" editor_
           Session.setMode "ace/mode/custom_mode" session
           Editor.setEnableLiveAutocompletion true editor_
-          Editor.setReadOnly true editor_
+          Editor.setReadOnly state.isEditorReadonly editor_
 
       -- New Ref for keeping track, if the content in editor has changed
       -- since last save
@@ -932,6 +933,7 @@ editor = connect selectTranslator $ H.mkComponent
           -- Set the content of the editor
           Document.setValue (title <> "\n" <> ContentDto.getContentText content)
             document
+          Editor.setReadOnly (version /= "latest") ed
 
           -- reset Ref, because loading new content is considered 
           -- changing the existing content, which would set the flag

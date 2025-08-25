@@ -10,7 +10,19 @@ INSERT INTO
 VALUES
     (
         '7f59659a-9a46-4ba0-a911-09698107a6ea',
-        'test',
+        'Merlin',
+        'stu235271@mail.uni-kiel.de',
+        '$argon2id$v=19$m=65536,t=2,p=1$07P6YJS1ZkVWh7aA5nBB4A$nhMV4SKqiZp8KqMvKnU1kPwAApPLkrOHcDXUdNA+2eQ'
+    ),
+    (
+        '7f59659a-9a46-4ba0-a911-09698107a4ea',
+        'Reverend Father Prince James',
+        'stu235273@mail.uni-kiel.de',
+        '$argon2id$v=19$m=65536,t=2,p=1$07P6YJS1ZkVWh7aA5nBB4A$nhMV4SKqiZp8KqMvKnU1kPwAApPLkrOHcDXUdNA+2eQ'
+    ),
+    (
+        '7f59659a-9a46-4ba0-a911-09698107a5ea',
+        'Test User',
         'test@test.com',
         '$argon2id$v=19$m=65536,t=2,p=1$07P6YJS1ZkVWh7aA5nBB4A$nhMV4SKqiZp8KqMvKnU1kPwAApPLkrOHcDXUdNA+2eQ'
     );
@@ -47,6 +59,16 @@ VALUES
         '7f59659a-9a46-4ba0-a911-09698107a6ea',
         1,
         'admin'
+    ),
+    (
+        '7f59659a-9a46-4ba0-a911-09698107a4ea',
+        1,
+        'admin'
+    ),
+    (
+        '7f59659a-9a46-4ba0-a911-09698107a5ea',
+        1,
+        'admin'
     );
 
 CREATE TABLE IF NOT EXISTS superadmins (
@@ -58,4 +80,6 @@ CREATE TABLE IF NOT EXISTS superadmins (
 INSERT INTO
     superadmins (user_id)
 VALUES
-    ('7f59659a-9a46-4ba0-a911-09698107a6ea');
+    ('7f59659a-9a46-4ba0-a911-09698107a6ea'),
+    ('7f59659a-9a46-4ba0-a911-09698107a4ea'),
+    ('7f59659a-9a46-4ba0-a911-09698107a5ea');

@@ -24,6 +24,9 @@ dependencies:
   - base >= 4.7 && < 5
   - insert-ordered-containers
   - scientific
+  - smtp-mail
+  - mime-mail
+  - network
   - tuple
   - lens
   - profunctors

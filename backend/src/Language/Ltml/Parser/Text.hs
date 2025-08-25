@@ -37,6 +37,7 @@ import Language.Ltml.AST.Text
     ( EnumItem (EnumItem)
     , Enumeration (Enumeration)
     , FootnoteReference (FootnoteReference)
+    , HardLineBreak (HardLineBreak)
     , SentenceStart (SentenceStart)
     , TextTree (..)
     )
@@ -74,45 +75,55 @@ instance ParserWrapper ParagraphParser where
 
 textForestP
     :: ( ParserWrapper m
+       , LineBreakP lbrk
        , FootnoteRefP fnref
        , StyleP style
        , EnumP enumType enum
        , SpecialP m special
        )
     => TextType enumType
-    -> m [TextTree fnref style enum special]
+    -> m [TextTree lbrk fnref style enum special]
 textForestP t = miForest elementPF (childPF t)
 
 elementPF
-    :: forall m fnref style enum special
-     . (MonadParser m, FootnoteRefP fnref, StyleP style, SpecialP m special)
-    => m [TextTree fnref style enum special]
-    -> m (MiElementConfig, [TextTree fnref style enum special])
-elementPF p = fmap (maybeToList . fmap Special) <$> specialP <|> regularP
+    :: forall m lbrk fnref style enum special
+     . ( MonadParser m
+       , LineBreakP lbrk
+       , FootnoteRefP fnref
+       , StyleP style
+       , SpecialP m special
+       )
+    => m [TextTree lbrk fnref style enum special]
+    -> m (MiElementConfig, [TextTree lbrk fnref style enum special])
+elementPF p =
+    fmap (maybeToList . fmap Special) <$> specialP -- must come first
+        <|> rs (Word <$> wordP (Proxy :: Proxy special))
+        <|> rs (NonBreakingSpace <$ char '~')
+        <|> char '{' *> bracedP <* char '}'
+        <|> rs (Styled <$ char '<' <*> styleP <*> p <* char '>')
   where
-    regularP :: m (MiElementConfig, [TextTree fnref style enum special])
-    regularP =
-        fmap ((regularCfg,) . singleton) $
-            Word <$> wordP (Proxy :: Proxy special)
-                <|> char '{' *> bracedP <* char '}'
-                <|> Styled <$ char '<' <*> styleP <*> p <* char '>'
-      where
-        bracedP =
-            Reference <$ char ':' <*> labelP
-                <|> FootnoteRef <$> footnoteRefP
+    bracedP =
+        fmap (singleton . LineBreak) <$> bracedLineBreakP
+            <|> rs (Reference <$ char ':' <*> labelP)
+            <|> rs (FootnoteRef <$> footnoteRefP)
 
+    -- Note: Using this repeatedly instead of grouping by cfg is maybe less
+    --   efficient, but IMHO better readable.
+    rs = fmap ((regularCfg,) . singleton)
+      where
         regularCfg =
             MiElementConfig
                 { miecPermitEnd = True
                 , miecPermitChild = True
+                , miecRetainPrecedingWhitespace = True
                 , miecRetainTrailingWhitespace = True
                 }
 
 childPF
-    :: forall m fnref style enumType enum special
+    :: forall m lbrk fnref style enumType enum special
      . (ParserWrapper m, EnumP enumType enum, SpecialP m special)
     => TextType enumType
-    -> m (TextTree fnref style enum special)
+    -> m (TextTree lbrk fnref style enum special)
 childPF (TextType (Disjunction enumTypes)) =
     wrapParser (Enum <$> choice (map enumP enumTypes))
         <* postEnumP (Proxy :: Proxy special)
@@ -120,6 +131,7 @@ childPF (TextType (Disjunction enumTypes)) =
 -- TODO: Unused.
 hangingTextP
     :: ( ParserWrapper m
+       , LineBreakP lbrk
        , FootnoteRefP fnref
        , StyleP style
        , EnumP enumType enum
@@ -127,11 +139,12 @@ hangingTextP
        )
     => Keyword
     -> TextType enumType
-    -> m [TextTree fnref style enum special]
+    -> m [TextTree lbrk fnref style enum special]
 hangingTextP kw t = hangingBlock_ (keywordP kw) elementPF (childPF t)
 
 lHangingTextP
     :: ( ParserWrapper m
+       , LineBreakP lbrk
        , FootnoteRefP fnref
        , StyleP style
        , EnumP enumType enum
@@ -139,11 +152,12 @@ lHangingTextP
        )
     => Keyword
     -> TextType enumType
-    -> m (Label, [TextTree fnref style enum special])
+    -> m (Label, [TextTree lbrk fnref style enum special])
 lHangingTextP kw t = hangingBlock' (lKeywordP kw) elementPF (childPF t)
 
 mlHangingTextP
     :: ( ParserWrapper m
+       , LineBreakP lbrk
        , FootnoteRefP fnref
        , StyleP style
        , EnumP enumType enum
@@ -151,8 +165,25 @@ mlHangingTextP
        )
     => Keyword
     -> TextType enumType
-    -> m (Maybe Label, [TextTree fnref style enum special])
+    -> m (Maybe Label, [TextTree lbrk fnref style enum special])
 mlHangingTextP kw t = hangingBlock' (mlKeywordP kw) elementPF (childPF t)
+
+class LineBreakP lbrk where
+    bracedLineBreakP :: (MonadParser m) => m (MiElementConfig, lbrk)
+
+instance LineBreakP Void where
+    bracedLineBreakP = empty
+
+instance LineBreakP HardLineBreak where
+    bracedLineBreakP = (cfg, HardLineBreak) <$ string "nl"
+      where
+        cfg =
+            MiElementConfig
+                { miecPermitEnd = True
+                , miecPermitChild = True
+                , miecRetainPrecedingWhitespace = False
+                , miecRetainTrailingWhitespace = False
+                }
 
 class StyleP style where
     styleP :: (MonadParser m) => m style
@@ -222,6 +253,7 @@ instance SpecialP ParagraphParser SentenceStart where
             MiElementConfig
                 { miecPermitEnd = False
                 , miecPermitChild = False
+                , miecRetainPrecedingWhitespace = True
                 , miecRetainTrailingWhitespace = False
                 }
 
@@ -317,6 +349,7 @@ isWordSpecialChar '{' = True
 isWordSpecialChar '}' = True
 isWordSpecialChar '<' = True
 isWordSpecialChar '>' = True
+isWordSpecialChar '~' = True
 isWordSpecialChar _ = False
 
 isSentenceEndChar :: Char -> Bool

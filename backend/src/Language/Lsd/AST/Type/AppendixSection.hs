@@ -10,8 +10,8 @@ where
 import Data.Text (Text)
 import Language.Lsd.AST.Common (TypeName)
 import Language.Lsd.AST.Format
-    ( HeadingFormat
-    , IdentifierFormat
+    ( IdentifierFormat
+    , InnerHeadingFormat
     , TocKeyFormat
     )
 import Language.Lsd.AST.SimpleRegex (Disjunction, Star)
@@ -23,6 +23,8 @@ data AppendixSectionFormat
         AppendixElementFormat
     deriving (Show)
 
+-- | Title of an appendix section.
+--   This is not a heading; it only occurs in the TOC, if any.
 newtype AppendixSectionTitle = AppendixSectionTitle Text
     deriving (Show)
 
@@ -30,7 +32,7 @@ data AppendixElementFormat
     = AppendixElementFormat
         IdentifierFormat
         TocKeyFormat
-        HeadingFormat
+        InnerHeadingFormat
     deriving (Show)
 
 data AppendixSectionType

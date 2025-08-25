@@ -31,11 +31,17 @@ module UserManagement.Sessions
     , addExternalPermission
     , updateExternalPermission
     , deleteExternalPermission
+    , createPasswordResetToken
+    , getPasswordResetToken
+    , markPasswordResetTokenUsed
+    , cleanupExpiredTokens
     )
 where
 
 import qualified Data.Bifunctor (second)
 import Data.Text (Text)
+import Data.Time (UTCTime)
+import Data.UUID (UUID)
 import qualified Docs.Document as Document
 import Hasql.Session (Session, statement)
 import qualified UserManagement.DocumentPermission as Permission
@@ -158,3 +164,19 @@ updateExternalPermission uid did perm =
 
 deleteExternalPermission :: User.UserID -> Document.DocumentID -> Session ()
 deleteExternalPermission uid did = statement (uid, did) Statements.deleteExternalPermission
+
+-- Password Reset Functions
+
+createPasswordResetToken :: User.UserID -> Text -> UTCTime -> Session UUID
+createPasswordResetToken uid tokenHash expiresAt = statement (uid, tokenHash, expiresAt) Statements.createPasswordResetToken
+
+getPasswordResetToken
+    :: Text
+    -> Session (Maybe (UUID, User.UserID, Text, UTCTime, UTCTime, Maybe UTCTime))
+getPasswordResetToken tokenHash = statement tokenHash Statements.getPasswordResetToken
+
+markPasswordResetTokenUsed :: Text -> Session ()
+markPasswordResetTokenUsed tokenHash = statement tokenHash Statements.markPasswordResetTokenUsed
+
+cleanupExpiredTokens :: Session ()
+cleanupExpiredTokens = statement () Statements.cleanupExpiredTokens

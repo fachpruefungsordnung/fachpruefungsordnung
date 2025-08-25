@@ -36,6 +36,9 @@ data MiElementConfig = MiElementConfig
     --   (or else require a succeeding element).
     , miecPermitChild :: Bool
     -- ^ Whether to permit a child to succeed this element.
+    , miecRetainPrecedingWhitespace :: Bool
+    -- ^ whether to retain (or else drop) whitespace between the preceding and
+    --   this element (if any).
     , miecRetainTrailingWhitespace :: Bool
     -- ^ Whether to retain (or else drop) whitespace between this and
     --   the subsequent element (if any).
@@ -85,13 +88,14 @@ miForestFrom
     -> m a
     -> Pos
     -> m [a]
-miForestFrom elementPF childP lvl = go False
+miForestFrom elementPF childP lvl = go False mempty
   where
-    go :: Bool -> m [a]
-    go isBracketed = do
+    go :: Bool -> Text -> m [a]
+    go isBracketed initialPrecWS = do
         -- Permit and drop initial whitespace within brackets.
-        when isBracketed $ void $ sp >> optional (nli >> checkIndent lvl)
-        goE
+        if isBracketed
+            then sp >> optional (nli >> checkIndent lvl) >> goE mempty
+            else goE initialPrecWS
       where
         -- `goX` vs. `goX'`:
         --  - The `goX` parsers must generally be used in-line; that is, not
@@ -101,16 +105,23 @@ miForestFrom elementPF childP lvl = go False
         --    (after indentation; i.e., after `nli`).
 
         -- Parse forest, headed by element.
-        goE :: m [a]
-        goE = do
-            (cfg, e) <- elementPF (go True)
+        goE :: Text -> m [a]
+        goE precWS = do
+            (cfg, e) <- elementPF (go True mempty)
+
+            let precWS' :: [a]
+                precWS' =
+                    if miecRetainPrecedingWhitespace cfg
+                        then fromWhitespace precWS
+                        else []
+
             s0 <- sp
 
-            let f :: Text -> [a] -> [a]
+            let f :: Text -> Text
                 f =
                     if miecRetainTrailingWhitespace cfg
-                        then \s1 -> (fromWhitespace (s0 <> s1) ++)
-                        else const id
+                        then (s0 <>)
+                        else id
 
                 wC :: m [a] -> m [a]
                 wC = whenAlt $ miecPermitChild cfg
@@ -120,24 +131,25 @@ miForestFrom elementPF childP lvl = go False
 
                 goAny :: m [a]
                 goAny =
-                    f mempty <$> goE
+                    goE (f mempty)
                         <|> whenAlt isBracketed (wEnd goEnd)
 
                 goAny' :: Text -> m [a]
                 goAny' s =
-                    f s <$> goE'
+                    goE' (f s)
                         <|> wC goC'
                         <|> wEnd goEnd'
 
             es <- (nli >>= goAny') <|> goAny
-            return $ e ++ es
 
-        goE' :: m [a]
-        goE' = checkIndent lvl *> goE
+            return $ precWS' ++ e ++ es
+
+        goE' :: Text -> m [a]
+        goE' s = checkIndent lvl *> goE s
 
         -- Parse forest, headed by child; at start of an input line.
         goC' :: m [a]
-        goC' = checkIndent lvl' *> childP <:> (goE' <|> goC' <|> goEnd')
+        goC' = checkIndent lvl' *> childP <:> (goE' mempty <|> goC' <|> goEnd')
           where
             lvl' = nextIndentLevel lvl
 

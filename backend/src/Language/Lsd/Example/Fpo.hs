@@ -30,9 +30,62 @@ import Language.Lsd.AST.Type.Text
 fpoT :: DocumentContainerType
 fpoT =
     DocumentContainerType
-        DocumentContainerFormat
+        (DocumentContainerFormat headerFormat footerFormat headingFormat)
         mainDocT
         (Sequence [appendixT, attachmentT])
+  where
+    headingFormat =
+        HeadingFormat
+            (Typography Centered LargeFontSize [Bold])
+            (FormatString [PlaceholderAtom HeadingTextPlaceholder])
+
+    headerFormat =
+        HeaderFooterFormat
+            [ HeaderFooterItemFormat
+                MediumFontSize
+                [Bold]
+                ( FormatString
+                    [ PlaceholderAtom HeaderFooterSuperTitleAtom
+                    , StringAtom "\n"
+                    ]
+                )
+            , HeaderFooterItemFormat
+                MediumFontSize
+                []
+                (FormatString [PlaceholderAtom HeaderFooterTitleAtom])
+            ]
+            []
+            [ HeaderFooterItemFormat
+                SmallFontSize
+                []
+                ( FormatString
+                    [StringAtom "(Keine amtliche Bekanntmachung)"]
+                )
+            ]
+
+    footerFormat =
+        HeaderFooterFormat
+            [ HeaderFooterItemFormat
+                SmallFontSize
+                []
+                ( FormatString
+                    [ StringAtom "Stand: "
+                    , PlaceholderAtom HeaderFooterDateAtom
+                    ]
+                )
+            ]
+            []
+            [ HeaderFooterItemFormat
+                SmallFontSize
+                []
+                ( FormatString
+                    [ StringAtom "Seite "
+                    , PlaceholderAtom HeaderFooterCurPageNumAtom
+                    , StringAtom " / "
+                    , PlaceholderAtom HeaderFooterLastPageNumAtom
+                    ]
+                )
+            ]
 
 appendixT :: AppendixSectionType
 appendixT =
@@ -47,12 +100,15 @@ appendixT =
                         , PlaceholderAtom KeyIdentifierPlaceholder
                         ]
                 )
-                ( FormatString
-                    [ StringAtom "Anlage "
-                    , PlaceholderAtom IdentifierPlaceholder
-                    , StringAtom "\n"
-                    , PlaceholderAtom HeadingTextPlaceholder
-                    ]
+                ( HeadingFormat
+                    (Typography LeftAligned LargeFontSize [Bold])
+                    ( FormatString
+                        [ StringAtom "Anlage "
+                        , PlaceholderAtom IdentifierPlaceholder
+                        , StringAtom "\n"
+                        , PlaceholderAtom HeadingTextPlaceholder
+                        ]
+                    )
                 )
             )
         )
@@ -71,12 +127,15 @@ attachmentT =
                         , PlaceholderAtom KeyIdentifierPlaceholder
                         ]
                 )
-                ( FormatString
-                    [ StringAtom "Anhang "
-                    , PlaceholderAtom IdentifierPlaceholder
-                    , StringAtom "\n"
-                    , PlaceholderAtom HeadingTextPlaceholder
-                    ]
+                ( HeadingFormat
+                    (Typography LeftAligned LargeFontSize [Bold])
+                    ( FormatString
+                        [ StringAtom "Anhang "
+                        , PlaceholderAtom IdentifierPlaceholder
+                        , StringAtom "\n"
+                        , PlaceholderAtom HeadingTextPlaceholder
+                        ]
+                    )
                 )
             )
         )
@@ -85,7 +144,7 @@ attachmentT =
 mainDocT :: DocumentType
 mainDocT =
     DocumentType
-        DocumentFormat
+        DocumentFormat {docHasTableOfContents = True}
         ( DocumentBodyType
             ( Sequence
                 [ dateSSecT
@@ -109,7 +168,7 @@ mainDocT =
 simpleDocT :: DocumentType
 simpleDocT =
     DocumentType
-        DocumentFormat
+        DocumentFormat {docHasTableOfContents = False}
         ( DocumentBodyType
             (Sequence [])
             (Disjunction [SimpleLeafSectionBodyType (Star simpleBlockT)])
@@ -121,35 +180,35 @@ dateSSecT :: SimpleSectionType
 dateSSecT =
     SimpleSectionType
         (Keyword "[date]")
-        SimpleSectionFormat
+        SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
         (Star (simpleParagraphTF Centered LargeFontSize))
 
 publLogSSecT :: SimpleSectionType
 publLogSSecT =
     SimpleSectionType
         (Keyword "[publ_log]")
-        SimpleSectionFormat
+        SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
         (Star (simpleParagraphTF LeftAligned SmallFontSize))
 
 introSSecT :: SimpleSectionType
 introSSecT =
     SimpleSectionType
         (Keyword "[intro]")
-        SimpleSectionFormat
+        SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
         (Star simpleParagraphT)
 
 extroSSecT :: SimpleSectionType
 extroSSecT =
     SimpleSectionType
         (Keyword "[extro]")
-        SimpleSectionFormat
+        SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
         (Star simpleParagraphT)
 
 legalLogSSecT :: SimpleSectionType
 legalLogSSecT =
     SimpleSectionType
         (Keyword "[legal_log]")
-        SimpleSectionFormat
+        SimpleSectionFormat {ssHasPrecedingHorizontalBar = True}
         (Star simpleParagraphT)
 
 superSectionT :: SectionType
@@ -157,12 +216,15 @@ superSectionT =
     SectionType
         (Keyword "=")
         ( HeadingType
-            ( FormatString
-                [ StringAtom "Abschnitt "
-                , PlaceholderAtom IdentifierPlaceholder
-                , StringAtom " "
-                , PlaceholderAtom HeadingTextPlaceholder
-                ]
+            ( HeadingFormat
+                (Typography LeftAligned MediumFontSize [Bold])
+                ( FormatString
+                    [ StringAtom "Abschnitt "
+                    , PlaceholderAtom IdentifierPlaceholder
+                    , StringAtom " "
+                    , PlaceholderAtom HeadingTextPlaceholder
+                    ]
+                )
             )
             plainTextT
         )
@@ -182,12 +244,15 @@ sectionT =
     SectionType
         (Keyword "§")
         ( HeadingType
-            ( FormatString
-                [ StringAtom "§ "
-                , PlaceholderAtom IdentifierPlaceholder
-                , StringAtom "\n"
-                , PlaceholderAtom HeadingTextPlaceholder
-                ]
+            ( HeadingFormat
+                (Typography Centered MediumFontSize [Bold])
+                ( FormatString
+                    [ StringAtom "§ "
+                    , PlaceholderAtom IdentifierPlaceholder
+                    , StringAtom "\n"
+                    , PlaceholderAtom HeadingTextPlaceholder
+                    ]
+                )
             )
             plainTextT
         )
@@ -226,7 +291,7 @@ simpleParagraphT = simpleParagraphTF LeftAligned MediumFontSize
 simpleParagraphTF :: TextAlignment -> FontSize -> SimpleParagraphType
 simpleParagraphTF alignment fsize =
     SimpleParagraphType
-        (SimpleParagraphFormat alignment fsize)
+        (SimpleParagraphFormat $ Typography alignment fsize [])
         simpleTextT
 
 dummyTableT :: TableType

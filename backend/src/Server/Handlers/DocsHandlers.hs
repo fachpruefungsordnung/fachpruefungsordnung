@@ -82,6 +82,12 @@ import Docs.Comment
     , Message
     , prettyPrintCommentRef
     )
+import Docs.FullDocument (FullDocument)
+import Docs.Revision
+    ( RevisionRef (RevisionRef)
+    , RevisionSelector
+    , prettyPrintRevisionRef
+    )
 import Server.DTOs.Comments (Comments (Comments))
 import Server.DTOs.CreateComment (CreateComment)
 import qualified Server.DTOs.CreateComment as CreateComment
@@ -119,6 +125,9 @@ type DocsAPI =
                 :<|> GetComments
                 :<|> ResolveComment
                 :<|> PostReply
+                :<|> GetDocumentRevision
+                :<|> GetDocumentRevisionTree
+                :<|> GetDocumentRevisionText
                 :<|> RenderAPI
            )
 
@@ -252,6 +261,30 @@ type PostReply =
         :> ReqBody '[JSON] CreateReply
         :> Post '[JSON] Message
 
+type GetDocumentRevision =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "rev"
+        :> Capture "revision" RevisionSelector
+        :> Get '[JSON] FullDocument
+
+type GetDocumentRevisionTree =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "rev"
+        :> Capture "revision" RevisionSelector
+        :> "tree"
+        :> Get '[JSON] (Maybe (TreeRevision TextElement))
+
+type GetDocumentRevisionText =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "rev"
+        :> Capture "revision" RevisionSelector
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> Get '[JSON] (Maybe TextElementRevision)
+
 docsServer :: Server DocsAPI
 docsServer =
     {-    -} postDocumentHandler
@@ -270,6 +303,9 @@ docsServer =
         :<|> getCommentsHandler
         :<|> resolveCommentHandler
         :<|> createReplyHandler
+        :<|> getDocumentRevisionHandler
+        :<|> getDocumentRevisionTreeHandler
+        :<|> getDocumentRevisionTextHandler
         :<|> renderServer
 
 postDocumentHandler
@@ -481,6 +517,39 @@ createReplyHandler auth docID textID commentID bodyDTO = do
         $ CreateReply.text
             bodyDTO
 
+getDocumentRevisionHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> RevisionSelector
+    -> Handler FullDocument
+getDocumentRevisionHandler auth docID rev = do
+    userID <- getUser auth
+    withDB $ run $ Docs.getDocumentRevision userID (RevisionRef docID rev)
+
+getDocumentRevisionTreeHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> RevisionSelector
+    -> Handler (Maybe (TreeRevision TextElement))
+getDocumentRevisionTreeHandler auth docID rev = do
+    userID <- getUser auth
+    withDB $ run $ Docs.getDocumentRevisionTree userID (RevisionRef docID rev)
+
+getDocumentRevisionTextHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> RevisionSelector
+    -> TextElementID
+    -> Handler (Maybe TextElementRevision)
+getDocumentRevisionTextHandler auth docID rev textID = do
+    userID <- getUser auth
+    withDB $
+        run $
+            Docs.getDocumentRevisionText
+                userID
+                (RevisionRef docID rev)
+                textID
+
 -- utililty
 
 getUser :: AuthResult Auth.Token -> Handler UserID
@@ -558,6 +627,14 @@ guardDocsResult (Left err) = throwError $ mapErr err
                 LBS.pack $
                     "TextElement "
                         ++ prettyPrintTextElementRef ref
+                        ++ " not found!\n"
+            }
+    mapErr (Docs.RevisionNotFound ref) =
+        err400
+            { errBody =
+                LBS.pack $
+                    "TextRevision "
+                        ++ prettyPrintRevisionRef ref
                         ++ " not found!\n"
             }
     mapErr (Docs.TextRevisionNotFound ref) =

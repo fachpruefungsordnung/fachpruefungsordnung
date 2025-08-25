@@ -103,6 +103,9 @@ instance HasGetComments HasqlSession where
 instance HasGetLogs HasqlSession where
     getLogs = (HasqlSession .) . Sessions.getLogs
 
+instance HasGetRevisionKey HasqlSession where
+    getRevisionKey = HasqlSession . Sessions.getRevisionKey
+
 -- create
 
 instance HasCreateDocument HasqlSession where

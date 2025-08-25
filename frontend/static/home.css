@@ -12,3 +12,12 @@
 .slanted-bottom {
   clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%);
 }
+
+/* Remove scroll indicator */
+.disable-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;  /* IE and Edge */
+}
+.disable-scrollbar::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}

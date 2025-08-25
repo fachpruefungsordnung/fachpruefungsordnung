@@ -7,9 +7,18 @@
 
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 
-module Language.Ltml.HTML (ToHtmlM (..), renderHtml, docToHtml, sectionToHtml, aToHtml, renderHtmlCss) where
+module Language.Ltml.HTML
+    ( ToHtmlM (..)
+    , renderHtml
+    , docToHtml
+    , sectionToHtml
+    , aToHtml
+    , renderSectionHtmlCss
+    , renderHtmlCss
+    ) where
 
 import Clay (Css)
+import Control.Monad (zipWithM)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
@@ -17,15 +26,25 @@ import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (Text, unpack)
 import Data.Void (Void, absurd)
+import Language.Lsd.AST.Type.AppendixSection
+    ( AppendixElementFormat (..)
+    , AppendixSectionFormat (..)
+    , AppendixSectionTitle (..)
+    )
+import Language.Lsd.AST.Type.DocumentContainer (DocumentContainerFormat (..))
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
+import Language.Lsd.AST.Type.Footnote
+    ( FootnoteFormat (SuperscriptFootnoteFormat)
+    )
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
+import Language.Lsd.AST.Type.SimpleSection (SimpleSectionFormat (..))
 import Language.Ltml.AST.AppendixSection (AppendixSection (..))
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.DocumentContainer (DocumentContainer (..))
 import Language.Ltml.AST.Footnote (Footnote (..))
-import Language.Ltml.AST.Label
-import Language.Ltml.AST.Node
-import Language.Ltml.AST.Paragraph
+import Language.Ltml.AST.Label (Label (unLabel))
+import Language.Ltml.AST.Node (Node (..))
+import Language.Ltml.AST.Paragraph (Paragraph (..))
 import Language.Ltml.AST.Section
 import Language.Ltml.AST.SimpleBlock (SimpleBlock (..))
 import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (..))
@@ -41,7 +60,6 @@ import Language.Ltml.HTML.FormatString
 import Language.Ltml.HTML.References
 import Language.Ltml.HTML.Util
 import Lucid
-import Prelude
 
 renderHtml :: Document -> ByteString
 renderHtml document = renderBS $ docToHtml document
@@ -58,13 +76,21 @@ aToHtml a =
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
      in evalDelayed delayedHtml finalState
 
-renderHtmlCss :: Node Section -> Map.Map Label Footnote -> (Html (), Css)
-renderHtmlCss section fnMap =
+renderSectionHtmlCss :: Node Section -> Map.Map Label Footnote -> (Html (), Css)
+renderSectionHtmlCss section fnMap =
     -- \| Render with given footnote context
     let readerState = initReaderState {footnoteMap = fnMap}
         (delayedHtml, finalState) = runState (runReaderT (toHtmlM section) readerState) initGlobalState
-        usedFootnotes =
-            map (\(label, (_, idHtml, _)) -> (label, idHtml)) $ usedFootnoteMap finalState
+        usedFootnotes = convertLabelMap $ usedFootnoteMap finalState
+        -- \| Add footnote labes for "normal" (non-footnote) references
+        finalState' = finalState {labels = usedFootnotes ++ labels finalState}
+     in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
+
+renderHtmlCss :: DocumentContainer -> (Html (), Css)
+renderHtmlCss docContainer =
+    -- \| Render with given footnote context
+    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) initReaderState) initGlobalState
+        usedFootnotes = convertLabelMap $ usedFootnoteMap finalState
         -- \| Add footnote labes for "normal" (non-footnote) references
         finalState' = finalState {labels = usedFootnotes ++ labels finalState}
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
@@ -75,32 +101,75 @@ class ToHtmlM a where
     toHtmlM :: a -> HtmlReaderState
 
 instance ToHtmlM DocumentContainer where
-    toHtmlM (DocumentContainer format header doc appendices) = do
-        mainDocHtml <- toHtmlM doc
-        appendicesHtml <- toHtmlM appendices
-        return $ mainDocHtml <> appendicesHtml
+    -- TODO: ingore header since its only pdf stuff?
+    toHtmlM
+        ( DocumentContainer
+                (DocumentContainerFormat _ _ docHeadingFormat)
+                header
+                doc
+                appendices
+            ) = do
+            mainDocHtml <-
+                local (\s -> s {documentHeadingFormat = Left docHeadingFormat}) $ toHtmlM doc
+            appendicesHtml <- toHtmlM appendices
+            return $ mainDocHtml <> appendicesHtml
 
+-- | This instance is used for documents inside the appendix,
+--   since the main document does not have a label.
 instance ToHtmlM (Node Document) where
-    -- \| TODO: Render with context: Am i inside of an appendix?
-    toHtmlM (Node mLabel doc) = undefined
+    toHtmlM (Node mLabel doc) = local (\s -> s {appendixElementMLabel = mLabel}) $ toHtmlM doc
 
 instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
     toHtmlM
         ( Document
+                -- TODO: Check ToC Flag in format
                 format
-                (DocumentTitle title)
+                documentHeading
                 (DocumentBody introSSections sectionBody outroSSections)
                 footNotes
             ) =
-            let titleHtml = h1_ <#> Class.DocumentTitle $ toHtml title
-             in local (\s -> s {footnoteMap = footNotes}) $ do
-                    -- \| Reset used footnotes (footnotes are document-scoped)
-                    modify (\s -> s {usedFootnoteMap = usedFootnoteMap initGlobalState})
-                    introHtml <- toHtmlM introSSections
-                    mainHtml <- toHtmlM sectionBody
-                    outroHtml <- toHtmlM outroSSections
-                    return $ Now titleHtml <> introHtml <> mainHtml <> outroHtml
+            local (\s -> s {footnoteMap = footNotes}) $ do
+                modify
+                    ( \s ->
+                        s
+                            { -- \| Reset used footnotes (footnotes are document-scoped)
+                              usedFootnoteMap = usedFootnoteMap initGlobalState
+                            , -- \| Reset footnote counter for this document
+                              currentFootnoteID = currentFootnoteID initGlobalState
+                            , -- \| Reset Section counters for this document
+                              currentSectionID = currentSectionID initGlobalState
+                            , currentSuperSectionID = currentSuperSectionID initGlobalState
+                            }
+                    )
+                titleHtml <- toHtmlM documentHeading
+                introHtml <- toHtmlM introSSections
+                mainHtml <- toHtmlM sectionBody
+                outroHtml <- toHtmlM outroSSections
+                return $ div_ <$> (titleHtml <> introHtml <> mainHtml <> outroHtml)
+
+instance ToHtmlM DocumentHeading where
+    toHtmlM (DocumentHeading headingTextTree) = do
+        titleHtml <- toHtmlM headingTextTree
+        -- \| Get HeadingFormat from DocumentContainer or AppendixSection
+        headingFormatS <- asks documentHeadingFormat
+        -- \| Here we check if we are inside an appendix, since
+        --   the appendix heading format has an id and the main documents has not
+        (formattedTitle, mId) <- case headingFormatS of
+            Left headFormat ->
+                -- \| Main Document Heading without Id and without anchor link
+                return (headingFormat headFormat <$> titleHtml, Nothing)
+            Right headFormatId -> do
+                -- \| Heading for Appendix Element (with id and toc key)
+                docId <- asks currentAppendixElementID
+                idFormat <- asks appendixElementIdFormat
+                tocFormat <- asks appendixElementTocKeyFormat
+                let (headingHtml, tocHtml) = appendixFormat idFormat docId tocFormat headFormatId titleHtml
+                -- \| Check if current document has Label and build ToC entry
+                mLabel <- asks appendixElementMLabel
+                htmlId <- addTocEntry tocHtml headingHtml mLabel
+                return (headingHtml, Just htmlId)
+        return $ h1_ [cssClass_ Class.DocumentTitle, mTextId_ mId] <$> formattedTitle
 
 -- | This combined instances creates the sectionIDHtml before building the reference,
 --   which is needed for correct referencing
@@ -116,7 +185,7 @@ instance ToHtmlM (Node Section) where
                     else (currentSectionID, incSectionID, Class.Section)
             (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (sectionIDGetter globalState)
             headingHtml =
-                (h2_ <#> Class.Heading) . headingFormat headingFormatS sectionIDHtml
+                (h2_ <#> Class.Heading) . headingFormatId headingFormatS sectionIDHtml
                     <$> titleHtml
          in do
                 addMaybeLabelToState mLabel sectionIDHtml
@@ -183,20 +252,19 @@ instance ToHtmlM SimpleBlock where
 
 -- | Section without Heading and Identifier
 instance ToHtmlM SimpleSection where
-    toHtmlM (SimpleSection sSectionFormat sParagraphs) = do
+    toHtmlM (SimpleSection (SimpleSectionFormat hasVBar) sParagraphs) = do
+        -- \| Possibly add vertical bar at the beginning
+        let pre = if hasVBar then div_ $ hr_ [] else mempty
         paragraphsHtml <- toHtmlM sParagraphs
-        return $ section_ <#> Class.Section <$> paragraphsHtml
+        return $ (section_ <#> Class.Section) <$> Now pre <> paragraphsHtml
 
 -- | Paragraph without identifier
 instance ToHtmlM SimpleParagraph where
-    toHtmlM (SimpleParagraph (SimpleParagraphFormat textAlign fontSize) textTrees) = do
+    toHtmlM (SimpleParagraph (SimpleParagraphFormat typography) textTrees) = do
         childText <- toHtmlM textTrees
         return $
             div_
-                [ cssClass_ Class.TextContainer
-                , cssClass_ $ toCssClass textAlign
-                , cssClass_ $ toCssClass fontSize
-                ]
+                (cssClass_ Class.TextContainer : cssClasses_ (Class.toCssClasses typography))
                 <$> childText
 
 -------------------------------------------------------------------------------
@@ -211,11 +279,14 @@ instance ToHtmlM Table where
 
 instance
     (ToHtmlM fnref, ToCssClass style, ToHtmlM enum, ToHtmlM special)
-    => ToHtmlM (TextTree fnref style enum special)
+    => ToHtmlM (TextTree lnbrk fnref style enum special)
     where
     toHtmlM textTree = case textTree of
         Word text -> returnNow $ toHtml text
         Space -> returnNow $ toHtml (" " :: Text)
+        NonBreakingSpace -> returnNow $ toHtmlRaw ("&nbsp;" :: Text)
+        -- \| ignore value since type Void does not have any values
+        LineBreak _ -> returnNow $ br_ []
         Special special -> toHtmlM special
         Reference label -> return $ Later $ \globalState ->
             case lookup label $ labels globalState of
@@ -316,7 +387,7 @@ instance ToHtmlM FootnoteReference where
             returnNow $ sup_ footHtml
 
 instance ToHtmlM Footnote where
-    toHtmlM (Footnote format textTrees) = do
+    toHtmlM (Footnote SuperscriptFootnoteFormat textTrees) = do
         -- \| Grouped rendering is not necessary, since enums
         --   are not allowed inside of footnotes
         toHtmlM textTrees
@@ -358,15 +429,33 @@ instance ToHtmlM FootnoteSet where
 -------------------------------------------------------------------------------
 
 instance ToHtmlM AppendixSection where
-    toHtmlM (AppendixSection format nodeDocuments) = do
-        appendixSectionID <- gets currentAppendixSectionID
-        let (titleHtml, headingTextHtml, tocHtml) = appendixFormat format appendixSectionID
-        -- \| Mangled ToC Entry as Html Id
-        htmlId <- addTocEntry tocHtml (Now titleHtml) Nothing
-        documentsHtml <- toHtmlM nodeDocuments
-        modify (\s -> s {currentAppendixSectionID = currentAppendixSectionID s + 1})
-        let headingHtml = h1_ <#> Class.DocumentTitle $ headingTextHtml
-        return ((div_ [id_ htmlId] <> (headingHtml <>)) . div_ <$> documentsHtml)
+    toHtmlM
+        ( AppendixSection
+                ( AppendixSectionFormat
+                        (AppendixSectionTitle appendixSectionTitle)
+                        (AppendixElementFormat idFormat tocFormat headFormat)
+                    )
+                nodeDocuments
+            ) = do
+            -- \| Add Entry to ToC but without ID
+            htmlId <-
+                addTocEntry (mempty :: Html ()) (Now $ toHtml appendixSectionTitle) Nothing
+            -- \| Give each Document the corresponding appendix Id
+            let zipFunc i nDoc = local (\s -> s {currentAppendixElementID = i}) $ toHtmlM nDoc
+            documentHtmls <-
+                -- \| Set all necessary formats for appendix document headings
+                local
+                    ( \s ->
+                        s
+                            { appendixElementIdFormat = idFormat
+                            , appendixElementTocKeyFormat = tocFormat
+                            , documentHeadingFormat = Right headFormat
+                            }
+                    )
+                    $ zipWithM zipFunc [1 ..] nodeDocuments
+            -- \| Wrap all appendix documents into one <div>
+            return $
+                div_ [cssClass_ Class.AppendixSection, id_ htmlId] <$> mconcat documentHtmls
 
 -------------------------------------------------------------------------------
 
@@ -387,7 +476,7 @@ instance ToHtmlM Void where
 -- | Groups raw text in <div> and leaves enums as they are
 renderDivGrouped
     :: (ToHtmlM fnref, ToCssClass style, ToHtmlM enum, ToHtmlM special)
-    => [TextTree fnref style enum special]
+    => [TextTree lbrek fnref style enum special]
     -> HtmlReaderState
 renderDivGrouped = renderGroupedTextTree div_ id
 
@@ -400,7 +489,7 @@ renderGroupedTextTree
     :: (ToHtmlM fnref, ToCssClass style, ToHtmlM enum, ToHtmlM special)
     => (Html () -> Html ())
     -> (Html () -> Html ())
-    -> [TextTree fnref style enum special]
+    -> [TextTree lbrek fnref style enum special]
     -> HtmlReaderState
 renderGroupedTextTree _ _ [] = returnNow mempty
 renderGroupedTextTree textF_ enumF_ (enum@(Enum _) : ts) = do

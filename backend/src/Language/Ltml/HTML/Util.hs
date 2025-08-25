@@ -9,13 +9,14 @@ module Language.Ltml.HTML.Util
     , mapState
     , convertNewLine
     , mId_
+    , mTextId_
     , anchorLink
     , getNextRawTextTree
     , isSuper
     ) where
 
 import Data.Char (chr)
-import Data.Text (cons)
+import Data.Text (Text, cons)
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Section (SectionBody (InnerSectionBody))
 import Language.Ltml.AST.Text (TextTree (..))
@@ -72,6 +73,11 @@ mId_ :: Maybe Label -> Attributes
 mId_ Nothing = mempty
 mId_ (Just label) = id_ $ unLabel label
 
+-- | Adds Text as id, if it exists
+mTextId_ :: Maybe Text -> Attributes
+mTextId_ Nothing = mempty
+mTextId_ (Just text) = id_ text
+
 -- | Converts Label into <a href = "#<label>"> for jumping to a HTML id
 anchorLink :: Label -> Html () -> Html ()
 anchorLink label = a_ [href_ (cons '#' $ unLabel label)]
@@ -80,8 +86,10 @@ anchorLink label = a_ [href_ (cons '#' $ unLabel label)]
 
 -- | Splits list into raw text part until next enumeration (raw is everything except enums)
 getNextRawTextTree
-    :: [TextTree fnref style enum special]
-    -> ([TextTree fnref style enum special], [TextTree fnref style enum special])
+    :: [TextTree lbrk fnref style enum special]
+    -> ( [TextTree lbrk fnref style enum special]
+       , [TextTree lbrk fnref style enum special]
+       )
 getNextRawTextTree =
     break
         ( \case

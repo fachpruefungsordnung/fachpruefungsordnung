@@ -1,15 +1,19 @@
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Ltml.HTML.FormatString
     ( sectionFormat
+    , headingFormatId
     , headingFormat
     , paragraphFormat
     , identifierFormat
     , enumFormat
-    , buildEnumCounter
+    , buildCssCounters
     , appendixFormat
     ) where
 
+import Clay (Css)
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (State, gets, modify)
 import Data.Text (Text, pack)
@@ -22,6 +26,7 @@ import Language.Lsd.AST.Type.AppendixSection
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Lsd.AST.Type.Paragraph (ParagraphFormat (..))
 import Language.Lsd.AST.Type.Section (SectionFormat (..))
+import Language.Ltml.HTML.CSS.Classes (enumCounter, toCssClasses)
 import Language.Ltml.HTML.CSS.CustomClay
     ( Counter
     , counterChar
@@ -29,24 +34,40 @@ import Language.Ltml.HTML.CSS.CustomClay
     , counterNum
     , stringCounter
     )
+import Language.Ltml.HTML.CSS.Util (cssClasses_)
 import Language.Ltml.HTML.Common
-    ( GlobalState (..)
+    ( Delayed
+    , EnumStyleMap
+    , GlobalState (..)
     , ReaderState (..)
     )
 import Language.Ltml.HTML.Util
-import Lucid (Html, ToHtml (toHtml))
+import Lucid (Html, ToHtml (toHtml), span_)
 import Prelude hiding (id)
 
--- | Builds Heading Html based on given FormatString, id  and text html
-headingFormat :: HeadingFormat -> Html () -> Html () -> Html ()
-headingFormat (FormatString []) _ _ = mempty
-headingFormat (FormatString (a : as)) id text =
-    case a of
-        -- \| replaces '\n' with <br>
-        StringAtom s -> convertNewLine s
-        PlaceholderAtom IdentifierPlaceholder -> id
-        PlaceholderAtom HeadingTextPlaceholder -> text
-        <> headingFormat (FormatString as) id text
+-- | Builds Heading Html based on given Format and text html
+headingFormat :: HeadingFormat False -> Html () -> Html ()
+headingFormat format = headingFormatId format mempty
+
+-- | Builds Heading Html based on given Format, id  and text html
+headingFormatId :: HeadingFormat permitId -> Html () -> Html () -> Html ()
+headingFormatId (HeadingFormat typography formatS) idHtml textHtml =
+    -- \| <span> wrapper which gets all typography css classes
+    span_ (cssClasses_ $ toCssClasses typography) $
+        headingFormatString formatS idHtml textHtml
+  where
+    headingFormatString
+        :: FormatString (HeadingPlaceholderAtom permitId) -> Html () -> Html () -> Html ()
+    headingFormatString (FormatString []) _ _ = mempty
+    headingFormatString (FormatString (a : as)) id text =
+        case a of
+            -- \| replaces '\n' with <br>
+            StringAtom s -> convertNewLine s
+            PlaceholderAtom IdentifierPlaceholder -> id
+            PlaceholderAtom HeadingTextPlaceholder -> text
+            <> headingFormatString (FormatString as) id text
+
+-------------------------------------------------------------------------------
 
 -- | Returns (ID Html, ToC Key Html) for a Section;
 --   uses ID Html to build ToC Key Html
@@ -148,16 +169,25 @@ keyFormatCounter (FormatString (a : as)) idCounter =
 
 -------------------------------------------------------------------------------
 
--- | Returns (Title Html, Heading Text Html, ToC Key Html) for an AppendixSection
-appendixFormat :: AppendixSectionFormat -> Int -> (Html (), Html (), Html ())
+-- | Builds CSS classes from EnumFormats and class names
+buildCssCounters :: EnumStyleMap -> Css
+buildCssCounters [] = mempty
+buildCssCounters ((enumFormatS, cssClassName) : ps) =
+    enumCounter cssClassName (buildEnumCounter enumFormatS)
+        <> buildCssCounters ps
+
+-------------------------------------------------------------------------------
+
+-- | Builds (Heading Html, ToC Key Html) using the required formats, an Id and a title Html
 appendixFormat
-    ( AppendixSectionFormat
-            (AppendixSectionTitle title)
-            (AppendixElementFormat idFormat (TocKeyFormat keyFormatS) headingFormatS)
-        )
-    i =
-        let titleHtml = toHtml title
-            idHtml = identifierFormat idFormat i
-            tocKeyHtml = keyFormat keyFormatS idHtml
-            headingHtml = headingFormat headingFormatS idHtml titleHtml
-         in (titleHtml, headingHtml, tocKeyHtml)
+    :: IdentifierFormat
+    -> Int
+    -> TocKeyFormat
+    -> HeadingFormat True
+    -> Delayed (Html ())
+    -> (Delayed (Html ()), Html ())
+appendixFormat idFormatS i (TocKeyFormat keyFormatS) headingFormatS titleHtml =
+    let idHtml = identifierFormat idFormatS i
+        tocKeyHtml = keyFormat keyFormatS idHtml
+        headingHtml = headingFormatId headingFormatS idHtml <$> titleHtml
+     in (headingHtml, tocKeyHtml)

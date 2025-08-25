@@ -5,7 +5,7 @@ module Language.Lsd.AST.Type.SimpleParagraph
     )
 where
 
-import Data.Typography (FontSize, TextAlignment)
+import Data.Typography (Typography)
 import Language.Lsd.AST.Common (TypeName)
 import Language.Lsd.AST.Type.Enum (EnumType)
 import Language.Lsd.AST.Type.Text
@@ -13,10 +13,9 @@ import Language.Lsd.AST.Type.Text
     , TextType
     )
 
-data SimpleParagraphFormat
+newtype SimpleParagraphFormat
     = SimpleParagraphFormat
-        TextAlignment
-        FontSize
+        Typography
     deriving (Show)
 
 data SimpleParagraphType

@@ -1,9 +1,17 @@
 module Data.Typography
-    ( TextAlignment (..)
+    ( Typography (..)
+    , TextAlignment (..)
     , FontSize (..)
     , FontStyle (..)
     )
 where
+
+data Typography
+    = Typography
+        TextAlignment
+        FontSize
+        [FontStyle]
+    deriving (Show)
 
 data TextAlignment
     = LeftAligned

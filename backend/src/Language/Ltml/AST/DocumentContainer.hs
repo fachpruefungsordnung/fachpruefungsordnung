@@ -4,6 +4,7 @@ module Language.Ltml.AST.DocumentContainer
     )
 where
 
+import Data.Text (Text)
 import Language.Lsd.AST.Type.DocumentContainer (DocumentContainerFormat)
 import Language.Ltml.AST.AppendixSection (AppendixSection)
 import Language.Ltml.AST.Document (Document)
@@ -16,5 +17,11 @@ data DocumentContainer
         [AppendixSection]
     deriving (Show)
 
-data DocumentContainerHeader = DocumentContainerHeader
+data DocumentContainerHeader
+    = DocumentContainerHeader
+    { dchPdfTitle :: Text
+    , dchHeaderFooterSuperTitle :: Text
+    , dchHeaderFooterTitle :: Text
+    , dchHeaderFooterDate :: Text
+    }
     deriving (Show)

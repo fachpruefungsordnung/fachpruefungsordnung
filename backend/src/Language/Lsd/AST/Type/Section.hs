@@ -12,8 +12,8 @@ where
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword, TypeName)
 import Language.Lsd.AST.Format
-    ( HeadingFormat
-    , IdentifierFormat
+    ( IdentifierFormat
+    , InnerHeadingFormat
     , TocKeyFormat
     )
 import Language.Lsd.AST.SimpleRegex (Star)
@@ -43,12 +43,12 @@ data PreSectionType
 
 data HeadingType
     = HeadingType
-        HeadingFormat
+        InnerHeadingFormat
         (TextType Void)
 
 data PreHeadingType
     = PreHeadingType
-        HeadingFormat
+        InnerHeadingFormat
         (PreTextType Void)
 
 data SectionBodyType

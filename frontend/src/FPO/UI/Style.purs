@@ -33,3 +33,9 @@ cyanStyle = HP.classes
   , HB.textDark
   , responsiveButton
   ]
+
+-- | A class to disable scrollbars in a cross-browser compatible way.
+-- | This class can be applied to any scrollable container to hide
+-- | the scrollbar while still allowing scrolling functionality.
+disableScrollbar ∷ HH.ClassName
+disableScrollbar = HH.ClassName "disable-scrollbar"
