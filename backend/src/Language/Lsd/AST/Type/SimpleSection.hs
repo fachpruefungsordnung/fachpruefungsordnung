@@ -1,12 +1,12 @@
 module Language.Lsd.AST.Type.SimpleSection
     ( SimpleSectionFormat (..)
     , SimpleSectionType (..)
-    , PreSimpleSectionType (..)
     )
 where
 
-import Language.Lsd.AST.Common (Keyword, TypeName)
+import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Star)
+import Language.Lsd.AST.Type (NamedType)
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphType)
 
 newtype SimpleSectionFormat
@@ -19,10 +19,4 @@ data SimpleSectionType
     = SimpleSectionType
         Keyword
         SimpleSectionFormat
-        (Star SimpleParagraphType)
-
-data PreSimpleSectionType
-    = PreSimpleSectionType
-        Keyword
-        SimpleSectionFormat
-        (Star TypeName)
+        (Star (NamedType SimpleParagraphType))
