@@ -89,8 +89,8 @@ services:
     profiles:
       - development
 
-# volumes:
-#   database:
+volumes:
+  database:
 
 networks:
   backend:

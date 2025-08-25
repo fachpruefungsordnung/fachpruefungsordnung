@@ -251,28 +251,11 @@ tocview = connect (selectEq identity) $ H.mkComponent
               (TE.getTEHsFromFTEH h)
           H.modify_ _ { versions = newVersions }
 
-    {- UpdateVersions ts elementID -> do
-    s <- H.get
-    history <- H.liftAff $ Request.getTextElemHistory s.docID elementID (DD.DocDate ts) 5
-    case history of
-      Nothing -> do liftEffect $ log "unable to load textElements"
-      Just h -> do
-        let
-          newVersions = map 
-            (\hEntry -> {identifier: TE.getHistoryElementID hEntry, timestamp: TE.getHistoryElementTimestamp hEntry})
-            (TE.getTEHsFromFTEH h)
-        H.modify_ _ { versions = newVersions} -}
-
     OpenVersion elementID vID -> do
       H.raise (ModifyVersion elementID (Just vID))
 
     CompareVersion elementID vID -> do
       H.raise (CompareTo elementID vID)
-    {-       liftEffect $ log $
-      "should not be here yet. to appease error checker without removing soon to be needed stuff:"
-        <> (show elementID)
-        <> (show vID)
-    pure unit -}
 
     DoNothing -> do
       pure unit
@@ -849,51 +832,64 @@ tocview = connect (selectEq identity) $ H.mkComponent
         versions
 
     addVersionButton version =
-      HH.button
-        [ HP.classes
-            [ HB.btn
-            , HB.btnLink
-            , HB.textStart
-            , HB.textDecorationNone
-            , HB.w100
-            , HB.border0
-            , HB.textBody
-            , HB.dFlex
-            , HB.alignItemsCenter
-            ]
-        , HE.onClick \_ -> ToggleHistorySubmenu version.identifier
-        ] $
-        [ HH.div [ HP.classes [ H.ClassName "bi bi-clock-history", HB.fs5, HB.me1 ] ]
+      let
+        buttonStyle =
+          if showHistorySubmenu == version.identifier then
+            [ HH.ClassName "active" ]
+          else
             []
-        , HH.div [ HP.classes [ HB.fs6 ] ]
-            [ HH.text
-                ( (formatRelativeTime now (DD.docDateToDateTime version.timestamp))
-                    <> " "
-                    <> (show version.identifier)
-                )
-            ]
-        ]
-          <>
-            [ if showHistorySubmenu == version.identifier then
-                HH.div
-                  [ HP.classes
-                      [ HB.positionAbsolute
-                      , HB.bgWhite
-                      , HB.border
-                      , HB.rounded
-                      , HB.shadowSm
-                      , HB.py1
-                      ]
-                  , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
-                  ]
-                  [ versionHistorySubmenuButton "view Version" OpenVersion version
-                  , versionHistorySubmenuButton "Compare to Current Version"
-                      CompareVersion
-                      version
-                  ]
-              else
-                HH.text ""
-            ]
+      in
+        HH.button
+          [ HP.classes $
+              [ HB.btn
+              , HB.btnInfo
+              , HB.textStart
+              , HB.textDecorationNone
+              , HB.w100
+              , HB.border0
+              , HB.textBody
+              , HB.dFlex
+              , HB.alignItemsCenter
+              , HH.ClassName "toc-item"
+              -- , HH.ClassName "active"
+              ]
+                <>
+                  buttonStyle
+
+          , HE.onClick \_ -> ToggleHistorySubmenu version.identifier
+          ] $
+          [ HH.div
+              [ HP.classes [ H.ClassName "bi bi-clock-history", HB.fs5, HB.me1 ] ]
+              []
+          , HH.div [ HP.classes [ HB.fs6 ] ]
+              [ HH.text
+                  ( (formatRelativeTime now (DD.docDateToDateTime version.timestamp))
+                      <> " "
+                      <> (show version.identifier)
+                  )
+              ]
+          ]
+            <>
+              [ if showHistorySubmenu == version.identifier then
+                  HH.div
+                    [ HP.classes
+                        [ HB.positionAbsolute
+                        , HB.bgWhite
+                        , HB.border
+                        , HB.rounded
+                        , HB.shadowSm
+                        , HB.py1
+                        ]
+                    , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
+                    ]
+                    [ versionHistorySubmenuButton "view Version" OpenVersion version
+                    , versionHistorySubmenuButton "Compare to Current Version"
+                        CompareVersion
+                        version
+                    ]
+                else
+                  HH.text ""
+              ]
 
     versionHistorySubmenuButton t act version =
       HH.button

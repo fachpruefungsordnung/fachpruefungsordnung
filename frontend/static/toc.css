@@ -49,6 +49,28 @@
   color: var(--bs-body-color) !important;
 }
 
+/* ********** Buttons for Version History ********** */
+
+.toc-item.btn-info {
+  background-color: rgb(255, 255, 255) !important;
+  color: rgb(0, 0, 0) !important
+}
+
+.toc-item.btn-info:hover {
+  background-color: var(--bs-gray-100) !important;
+}
+
+.toc-item.btn-info.active {
+  background-color: rgb(230, 240, 255) !important;
+  color: rgb(13, 110, 253) !important;
+}
+
+.toc-item.btn-info.active:hover {
+  background-color: rgb(230, 240, 255) !important;
+  color: rgb(13, 110, 253) !important;
+}
+
+
 /* ********** Small TOC buttons ********** */
 
 .toc-button {

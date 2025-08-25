@@ -1244,7 +1244,7 @@ getReplies =
                     doc_comment_replies replies
                     LEFT JOIN users ON replies.author = users.id
                     LEFT JOIN doc_comments comments ON replies.comment = comments.id
-                    LEFT JOIN doc_text_elements text_elements ON comments.text_element = doc_text_elements.id
+                    LEFT JOIN doc_text_elements text_elements ON comments.text_element = text_elements.id
                 WHERE
                     text_elements.document = $1 :: INT8
                     AND comments.text_element = $2 :: INT8
