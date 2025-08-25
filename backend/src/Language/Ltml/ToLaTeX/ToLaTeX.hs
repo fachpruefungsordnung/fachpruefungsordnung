@@ -20,5 +20,10 @@ toLaTeX m (ISequence content) = Sequence $ map (toLaTeX m) content
 toLaTeX m (MissingRef l@(Label t)) =
     case Map.lookup l m of
         Nothing -> Braced $ Command "Large" [] [Text "??"]
-        Just ref -> Command "hyperlink" [] [ Text (LT.fromStrict t)
-                                           , Text ref ]
+        Just ref ->
+            Command
+                "hyperlink"
+                []
+                [ Text (LT.fromStrict t)
+                , Text ref
+                ]
