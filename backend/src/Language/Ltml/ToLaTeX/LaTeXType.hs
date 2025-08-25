@@ -1,5 +1,5 @@
-module Language.Ltml.ToLaTeX.LaTeXType (
-      LaTeX (..)
+module Language.Ltml.ToLaTeX.LaTeXType
+    ( LaTeX (..)
     ) where
 
 import qualified Data.Text.Lazy as LT

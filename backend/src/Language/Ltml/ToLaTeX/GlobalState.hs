@@ -75,8 +75,8 @@ import Language.Ltml.ToLaTeX.Format
     , getIdentifier
     , staticDocumentFormat
     )
-import Language.Ltml.ToLaTeX.Type
-    ( LaTeX (Sequence, Text)
+import Language.Ltml.ToLaTeX.PreLaTeXType
+    ( PreLaTeX (ISequence, IText)
     , fancyfoot
     , fancyhead
     , linebreak
@@ -97,10 +97,10 @@ data GlobalState = GlobalState
       _labelToRef :: Map Label LT.Text
     , _labelToFootNote :: Map Label Footnote
     , {- functional list that builds the table of contents -}
-      _toc :: DList.DList LaTeX
-    , _appendixHeaders :: DList.DList LaTeX
+      _toc :: DList.DList PreLaTeX
+    , _appendixHeaders :: DList.DList PreLaTeX
     , {- pre-document is used to store the header and footer of the document -}
-      _preDocument :: LaTeX
+      _preDocument :: PreLaTeX
     }
     deriving (Show)
 
@@ -197,26 +197,26 @@ insertRefLabel mLabel ident =
     forM_ mLabel $ \l -> labelToRef %= insert l ident
 
 addTOCEntry
-    :: Int -> KeyFormat -> IdentifierFormat -> LaTeX -> State GlobalState ()
+    :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState ()
 addTOCEntry n keyident ident headingText =
     toc
         %= ( <>
                 DList.fromList
-                    [ formatKey keyident (Text $ getIdentifier ident n)
-                    , Text " "
+                    [ formatKey keyident (IText $ getIdentifier ident n)
+                    , IText " "
                     , headingText
                     , linebreak
                     ]
            )
 
 addAppendixHeaderEntry
-    :: Int -> KeyFormat -> IdentifierFormat -> LaTeX -> State GlobalState ()
+    :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState ()
 addAppendixHeaderEntry n keyident ident headingText =
     appendixHeaders
         %= ( <>
                 DList.fromList
-                    [ formatKey keyident (Text $ getIdentifier ident n)
-                    , Text " "
+                    [ formatKey keyident (IText $ getIdentifier ident n)
+                    , IText " "
                     , headingText
                     , linebreak
                     ]
@@ -235,13 +235,13 @@ addHeaderFooter
     superTitle
     title
     date = do
-        let superTitle' = Text $ LT.fromStrict superTitle
-            title' = Text $ LT.fromStrict title
-            date' = Text $ LT.fromStrict date
-            assemble items = Sequence $ map (formatHeaderFooterItem superTitle' title' date') items
+        let superTitle' = IText $ LT.fromStrict superTitle
+            title' = IText $ LT.fromStrict title
+            date' = IText $ LT.fromStrict date
+            assemble items = ISequence $ map (formatHeaderFooterItem superTitle' title' date') items
         preDocument
             %= ( <>
-                    Sequence
+                    ISequence
                         [ fancyhead ["l"] (assemble topLeft)
                         , fancyhead ["c"] (assemble topCenter)
                         , fancyhead ["r"] (assemble topRight)

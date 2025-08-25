@@ -78,7 +78,7 @@ import Language.Ltml.ToLaTeX.Format
     )
 import qualified Language.Ltml.ToLaTeX.GlobalState as GS
 import Language.Ltml.ToLaTeX.PreLaTeXType
-    ( PreLaTeX (MissingRef, ISequence, IText)
+    ( PreLaTeX (ISequence, IText, MissingRef)
     , center
     , enumerate
     , footnote
@@ -233,7 +233,8 @@ instance ToPreLaTeXM SimpleSection where
         content' <- mapM toPreLaTeXM content
         pure $ (if hasHLine then hrule else mempty) <> ISequence content'
 
-createHeading :: HeadingFormat b -> PreLaTeX -> PreLaTeX -> State GS.GlobalState PreLaTeX
+createHeading
+    :: HeadingFormat b -> PreLaTeX -> PreLaTeX -> State GS.GlobalState PreLaTeX
 createHeading (HeadingFormat t hfmt) tt ident = do
     pure $
         applyTextStyle t $

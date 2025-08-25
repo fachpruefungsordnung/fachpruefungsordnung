@@ -75,25 +75,26 @@ import Language.Ltml.Parser.Common.Lexeme (nSc)
 import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX (generatePDFFromSection)
-import Language.Ltml.ToLaTeX.Format (staticDocumentFormat)
 import Language.Ltml.ToLaTeX.GlobalState
-    ( GlobalState (_labelToFootNote, _labelToRef)
+    ( GlobalState (_labelToFootNote)
     , initialGlobalState
+    , labelToRef
     , preDocument
     )
+import Language.Ltml.ToLaTeX.PreLaTeXType
 import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
-import Language.Ltml.ToLaTeX.ToLaTeXM (ToLaTeXM (toLaTeXM))
-import Language.Ltml.ToLaTeX.Type
+import Language.Ltml.ToLaTeX.ToLaTeX (toLaTeX)
+import Language.Ltml.ToLaTeX.ToPreLaTeXM (ToPreLaTeXM (toPreLaTeXM))
 import System.IO.Unsafe (unsafePerformIO)
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 
 readText :: String -> Text
 readText filename = unsafePerformIO $ TIO.readFile filename
 
-testThis :: (ToLaTeXM a) => a -> (LaTeX, GlobalState)
+testThis :: (ToPreLaTeXM a) => a -> (PreLaTeX, GlobalState)
 testThis a =
     runState
-        (toLaTeXM a)
+        (toPreLaTeXM a)
         initialGlobalState
 
 runTestToPDF :: IO ()
@@ -114,13 +115,14 @@ runTestToLaTeX = do
         Left err -> return (errorBundlePretty err)
         Right parsedInput -> do
             let texFile = "./src/Language/Ltml/ToLaTeX/Auxiliary/test.tex"
-            -- Write LaTeX source
+            -- Write PreLaTeX source
             LTIO.writeFile texFile (sectionToText parsedInput)
             return "everything went well!"
   where
     sectionToText (sec, labelmap) =
-        let (latexSection, gs) = runState (toLaTeXM sec) $ initialGlobalState {_labelToFootNote = labelmap}
-         in renderLaTeX (_labelToRef gs) (staticDocumentFormat <> document latexSection)
+        let (latexSection, gs) = runState (toPreLaTeXM sec) $ initialGlobalState {_labelToFootNote = labelmap}
+         in renderLaTeX $
+                toLaTeX (view labelToRef gs) (view preDocument gs <> document latexSection)
 
 testingParagraph :: Paragraph
 testingParagraph =
@@ -307,4 +309,5 @@ startTesting :: IO ()
 startTesting = do
     let (latex, gs) = testThis testingDocumentContainer
     LT.putStrLn $
-        renderLaTeX (_labelToRef gs) (view preDocument gs <> document latex)
+        renderLaTeX $
+            toLaTeX (view labelToRef gs) (view preDocument gs <> document latex)

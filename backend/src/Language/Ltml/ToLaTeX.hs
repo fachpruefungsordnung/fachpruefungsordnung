@@ -23,9 +23,10 @@ import Language.Ltml.ToLaTeX.GlobalState
     , labelToRef
     , preDocument
     )
+import Language.Ltml.ToLaTeX.PreLaTeXType (document)
 import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
-import Language.Ltml.ToLaTeX.ToLaTeXM (ToLaTeXM (toLaTeXM))
-import Language.Ltml.ToLaTeX.Type (document)
+import Language.Ltml.ToLaTeX.ToLaTeX (toLaTeX)
+import Language.Ltml.ToLaTeX.ToPreLaTeXM (ToPreLaTeXM (toPreLaTeXM))
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO (hClose)
@@ -104,8 +105,9 @@ generatePDFFromSection input =
         (input <> "\n")
   where
     sectionToText (sec, labelmap) =
-        let (latexSection, gs) = runState (toLaTeXM sec) $ initialGlobalState & labelToFootNote .~ labelmap
-         in renderLaTeX (view labelToRef gs) (view preDocument gs <> document latexSection)
+        let (latexSection, gs) = runState (toPreLaTeXM sec) $ initialGlobalState & labelToFootNote .~ labelmap
+         in renderLaTeX $
+                toLaTeX (view labelToRef gs) (view preDocument gs <> document latexSection)
 
 -- mkPDF :: FilePath -> IO (Either String BS.ByteString)
 -- mkPDF filename = do

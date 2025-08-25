@@ -42,8 +42,8 @@ import Language.Lsd.AST.Type.DocumentContainer
     ( HeaderFooterFormatAtom (..)
     , HeaderFooterItemFormat (HeaderFooterItemFormat)
     )
-import Language.Ltml.ToLaTeX.Type
-    ( LaTeX (Raw, Sequence, Text)
+import Language.Ltml.ToLaTeX.PreLaTeXType
+    ( PreLaTeX (IRaw, ISequence, IText)
     , bold
     , center
     , documentclass
@@ -59,7 +59,7 @@ import Language.Ltml.ToLaTeX.Type
     )
 
 class Stylable a where
-    applyTextStyle :: a -> LaTeX -> LaTeX
+    applyTextStyle :: a -> PreLaTeX -> PreLaTeX
 
 instance Stylable Void where
     applyTextStyle = absurd
@@ -102,28 +102,28 @@ emptyAppendixFormat =
     AppendixElementFormat emptyIdentifierFormat emptyTocKeyFormat emptyHeadingFormat
 
 formatHeading
-    :: FormatString (HeadingPlaceholderAtom b) -> LaTeX -> LaTeX -> LaTeX
+    :: FormatString (HeadingPlaceholderAtom b) -> PreLaTeX -> PreLaTeX -> PreLaTeX
 formatHeading (FormatString []) _ _ = mempty
 formatHeading (FormatString (StringAtom s : rest)) i latex =
-    Sequence (map replace s) <> formatHeading (FormatString rest) i latex
+    ISequence (map replace s) <> formatHeading (FormatString rest) i latex
   where
     replace '\n' = linebreak
-    replace c = Text (LT.pack [c])
+    replace c = IText (LT.pack [c])
 formatHeading (FormatString (PlaceholderAtom a : rest)) i latex =
     case a of
         HeadingTextPlaceholder -> latex <> formatHeading (FormatString rest) i latex
         IdentifierPlaceholder -> i <> formatHeading (FormatString rest) i latex
 
-formatKey :: KeyFormat -> LaTeX -> LaTeX
+formatKey :: KeyFormat -> PreLaTeX -> PreLaTeX
 formatKey (FormatString []) _ = mempty
 formatKey (FormatString (StringAtom s : rest)) n =
-    Text (LT.pack s) <> formatKey (FormatString rest) n
+    IText (LT.pack s) <> formatKey (FormatString rest) n
 formatKey (FormatString (PlaceholderAtom KeyIdentifierPlaceholder : rest)) n =
     n <> formatKey (FormatString rest) n
 
-staticDocumentFormat :: LaTeX
+staticDocumentFormat :: PreLaTeX
 staticDocumentFormat =
-    Sequence
+    ISequence
         [ documentclass [] "article"
         , setfontArabic
         , usepackage
@@ -146,8 +146,8 @@ staticDocumentFormat =
         , usepackage ["utf8"] "inputenc"
         , usepackage [] "fancyhdr"
         , usepackage [] "lastpage"
-        , Raw "\\pagestyle{fancy}"
-        , Raw "\\fancyhf{}"
+        , IRaw "\\pagestyle{fancy}"
+        , IRaw "\\fancyhf{}"
         ]
 
 getIdentifier :: IdentifierFormat -> Int -> LT.Text
@@ -183,23 +183,23 @@ getEnumStyle ident key = "label=" <> buildKey (getEnumIdentifier' ident) key
             AlphabeticUpper -> "\\Alph*" <> getEnumIdentifier' (FormatString rest)
 
 formatHeaderFooterItem
-    :: LaTeX -> LaTeX -> LaTeX -> HeaderFooterItemFormat -> LaTeX
+    :: PreLaTeX -> PreLaTeX -> PreLaTeX -> HeaderFooterItemFormat -> PreLaTeX
 formatHeaderFooterItem superTitle title date (HeaderFooterItemFormat fontsize styles fstring) =
     applyTextStyle fontsize $
         foldr (\style acc -> acc . applyTextStyle style) id styles $
             formatHeaderFooterFstring fstring
   where
-    formatHeaderFooterFstring :: FormatString HeaderFooterFormatAtom -> LaTeX
+    formatHeaderFooterFstring :: FormatString HeaderFooterFormatAtom -> PreLaTeX
     formatHeaderFooterFstring (FormatString []) = mempty
     formatHeaderFooterFstring (FormatString (StringAtom s : rest)) =
-        Sequence (map replace s) <> formatHeaderFooterFstring (FormatString rest)
+        ISequence (map replace s) <> formatHeaderFooterFstring (FormatString rest)
       where
         replace '\n' = linebreak
-        replace c = Text (LT.pack [c])
+        replace c = IText (LT.pack [c])
     formatHeaderFooterFstring (FormatString (PlaceholderAtom a : rest)) =
         case a of
             HeaderFooterSuperTitleAtom -> superTitle <> formatHeaderFooterFstring (FormatString rest)
             HeaderFooterTitleAtom -> title <> formatHeaderFooterFstring (FormatString rest)
             HeaderFooterDateAtom -> date <> formatHeaderFooterFstring (FormatString rest)
-            HeaderFooterCurPageNumAtom -> Raw "\\thepage" <> formatHeaderFooterFstring (FormatString rest)
-            HeaderFooterLastPageNumAtom -> Raw "\\pageref{LastPage}" <> formatHeaderFooterFstring (FormatString rest)
+            HeaderFooterCurPageNumAtom -> IRaw "\\thepage" <> formatHeaderFooterFstring (FormatString rest)
+            HeaderFooterLastPageNumAtom -> IRaw "\\pageref{LastPage}" <> formatHeaderFooterFstring (FormatString rest)

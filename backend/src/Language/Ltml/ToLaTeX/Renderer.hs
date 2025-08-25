@@ -5,26 +5,16 @@ module Language.Ltml.ToLaTeX.Renderer
     ) where
 
 import Data.Int (Int64)
-import qualified Data.Map as Map (Map, lookup)
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as B
-import Language.Ltml.AST.Label (Label (Label))
-import Language.Ltml.ToLaTeX.Type (LaTeX (..))
+import Language.Ltml.ToLaTeX.LaTeXType (LaTeX (..))
 
-renderLaTeX :: Map.Map Label LT.Text -> LaTeX -> LT.Text
-renderLaTeX m = B.toLazyText . go 0
+renderLaTeX :: LaTeX -> LT.Text
+renderLaTeX = B.toLazyText . go 0
   where
     go :: Int64 -> LaTeX -> B.Builder
     go _ (Text t) = escape t
     go _ (Raw t) = B.fromLazyText t
-    go _ (MissingRef l@(Label t)) = case Map.lookup l m of
-        Nothing -> B.fromLazyText "{\\Large ??}"
-        Just ref ->
-            B.fromText "\\hyperlink{"
-                <> B.fromText t
-                <> "}{"
-                <> B.fromLazyText ref
-                <> B.fromText "}"
     go _ (CommandS name) =
         "\\"
             <> B.fromLazyText name

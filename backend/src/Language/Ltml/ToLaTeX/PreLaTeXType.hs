@@ -77,8 +77,6 @@ instance Semigroup PreLaTeX where
 instance Monoid PreLaTeX where
     mempty = ISequence []
 
-
-
 -------------------------------------------------------------------------------
 {-                                styling                                   -}
 
