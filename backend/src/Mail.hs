@@ -8,7 +8,7 @@ import qualified Data.Text as Text
 import Network.Mail.Mime (Part, htmlPart, plainPart)
 import Network.Mail.SMTP
     ( Address (Address)
-    , sendMailWithLoginTLS'
+    , sendMailWithLoginSTARTTLS'
     , simpleMail
     )
 import Network.Socket (PortNumber)
@@ -48,7 +48,7 @@ sendMailTo' :: MailSettings -> Mail -> IO ()
 sendMailTo' settings mail = do
     print settings
     print mail
-    sendMailWithLoginTLS'
+    sendMailWithLoginSTARTTLS'
         (host settings)
         (port settings)
         (username settings)
