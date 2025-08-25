@@ -1193,8 +1193,8 @@ getComments =
                     LEFT JOIN doc_text_elements
                         ON comments.text_element = doc_text_elements.id
                 WHERE
-                    comments.text_element = $1 :: INT8
-                    AND doc_text_elements.document = $2 :: INT8
+                    comments.text_element = $2 :: INT8
+                    AND doc_text_elements.document = $1 :: INT8
             |]
 
 createReply :: Statement (UserID, CommentID, Text) Message
