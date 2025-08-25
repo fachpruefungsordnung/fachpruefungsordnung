@@ -12,6 +12,7 @@ module Logging.Scope
     , docsTreeRevision
     , docsComment
     , userManagement
+    , email
     ) where
 
 import Data.Text (Text)
@@ -64,3 +65,6 @@ docsComment = Scope "docs.comment"
 
 userManagement :: Scope
 userManagement = Scope "user-management"
+
+email :: Scope
+email = Scope "email"
