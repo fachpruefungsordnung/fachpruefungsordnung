@@ -22,7 +22,7 @@ import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
-import Data.Array (catMaybes, filter, intercalate, uncons, (:))
+import Data.Array (catMaybes, filter, intercalate, snoc, uncons, (:))
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
@@ -87,7 +87,7 @@ import Web.HTML.HTMLElement (offsetWidth, toElement)
 import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
-import Data.Argonaut.Encode (class EncodeJson, encodeJson)
+import Data.Argonaut (encodeJson, stringify)
 import Effect.Console (log)
 
 type Path = Array Int
@@ -631,9 +631,8 @@ editor = connect selectTranslator $ H.mkComponent
 
                   -- convert into a newtype for encodeJson
                   let
-                    commentTs = map ContentDto.convertToCommentAnchor updatedMarkers
-                    newWrapper = ContentDto.setWrapper newContent commentTs
-
+                    comments = map ContentDto.convertToCommentAnchor updatedMarkers
+                    newWrapper = ContentDto.setWrapper newContent comments
                   -- Try to upload
                   handleAction $ Upload entry title newWrapper
 
@@ -642,7 +641,7 @@ editor = connect selectTranslator $ H.mkComponent
       let 
         jsonContent = ContentDto.encodeWrapper newWrapper
         newContent = ContentDto.getWrapperContent newWrapper
-
+      H.liftEffect $ log $ stringify jsonContent
       -- send the new content as POST to the server
       response <- Request.postJson (ContentDto.extractNewParent newContent)
         ("/docs/" <> show state.docID <> "/text/" <> show newEntry.id <> "/rev")
@@ -800,7 +799,9 @@ editor = connect selectTranslator $ H.mkComponent
             case state.mTocEntry of
               Just entry -> do
                 H.modify_ \st ->
-                  st { liveMarkers = newLiveMarkers }
+                  st { markers = snoc st.markers newMarker, liveMarkers = newLiveMarkers }
+                -- set dirty to true to be able to save
+                for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r
                 handleAction Save
                 H.raise (AddComment state.docID entry.id newComment)
                 -- H.raise
@@ -847,13 +848,13 @@ editor = connect selectTranslator $ H.mkComponent
           tocEntry = case state.mTocEntry of
             Nothing -> emptyTOCEntry
             Just e -> e
-          -- markers = tocEntry.markers
+          markers = state.markers
         pure unit
-        -- when (foundID >= 0)
-        --   case (find (\m -> m.id == foundID) markers) of
-        --     Nothing -> pure unit
-        --     Just foundMarker -> H.raise
-        --       (SelectedCommentSection tocEntry.id foundMarker.id)
+        when (foundID >= 0)
+          case (find (\m -> m.id == foundID) markers) of
+            Nothing -> pure unit
+            Just foundMarker -> H.raise
+              (SelectedCommentSection tocEntry.id foundMarker.id)
 
     HandleResize width -> do
       -- Decides whether to show button text based on the width.
@@ -918,7 +919,6 @@ editor = connect selectTranslator $ H.mkComponent
           -- convert markers
           markers = map ContentDto.convertToAnnotetedMarker comments
         
-        H.liftEffect $ log $ show wrapper
         H.modify_ \st -> st
           { mContent = Just content
           , markers = markers

@@ -203,7 +203,7 @@ commentview = H.mkComponent
           pText
         case res of 
           Left _ -> pure unit
-          Right com -> do --H.liftEffect $ log $ show com
+          Right com -> do 
             case state.mCommentSection of
               Nothing -> pure unit
               Just cs -> do

@@ -880,7 +880,6 @@ splitview = H.mkComponent
         case renderedPDF' of
           Left _ -> pure unit
           Right body -> do
-            --H.liftEffect $ log body
             -- create blobl link
             url <- H.liftEffect $ createObjectURL body
             -- Create an invisible link and click it to download PDF
