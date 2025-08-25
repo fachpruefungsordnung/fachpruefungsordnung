@@ -79,7 +79,6 @@ import Language.Ltml.ToLaTeX.Format
 import qualified Language.Ltml.ToLaTeX.GlobalState as GS
 import Language.Ltml.ToLaTeX.PreLaTeXType
     ( PreLaTeX (ISequence, IText, MissingRef)
-    , center
     , enumerate
     , footnote
     , footref
@@ -261,7 +260,7 @@ instance Labelable Section where
                         GS.addTOCEntry n keyident ident headingText
                         headingDoc <- buildHeading n
                         content' <- mapM toPreLaTeXM paragraphs
-                        let anchor = maybe (center [headingDoc]) (`hypertarget` center [headingDoc]) mLabel
+                        let anchor = maybe headingDoc (`hypertarget` headingDoc) mLabel
                         pure $ anchor <> ISequence content'
                     InnerSectionBody subsections -> do
                         n <- GS.nextSupersection
