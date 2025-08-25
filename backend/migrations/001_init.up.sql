@@ -55,11 +55,6 @@ VALUES
         'admin'
     ),
     (
-        '7f59659a-9a46-4ba0-a911-09698107a4ea',
-        1,
-        'admin'
-    ),
-    (
         '7f59659a-9a46-4ba0-a911-09698107a5ea',
         1,
         'admin'
@@ -75,5 +70,4 @@ INSERT INTO
     superadmins (user_id)
 VALUES
     ('7f59659a-9a46-4ba0-a911-09698107a6ea'),
-    ('7f59659a-9a46-4ba0-a911-09698107a4ea'),
     ('7f59659a-9a46-4ba0-a911-09698107a5ea');
