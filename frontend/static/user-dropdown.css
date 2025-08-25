@@ -1,0 +1,131 @@
+ /* Custom CSS for ONLY the user hover dropdown */
+.user-hover-dropdown:hover .dropdown-menu,
+.user-hover-dropdown .dropdown-menu:hover {
+  display: block;
+}
+
+.user-hover-dropdown .dropdown-menu {
+  margin-top: 0.66rem;
+}
+
+.user-hover-dropdown .dropdown-menu {
+  transition: opacity 0.15s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.user-hover-dropdown:hover .dropdown-menu,
+.user-hover-dropdown .dropdown-menu:hover {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Create invisible bridge between name and dropdown - only for user dropdown */
+.user-hover-dropdown::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 0.66rem;
+  background: transparent;
+  z-index: 999;
+}
+
+.user-hover-dropdown:hover::before {
+  display: block;
+}
+
+.user-hover-dropdown .dropdown-menu {
+  background-color: #f7f7f7;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 0.4rem;
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.1);
+  min-width: 80px;
+  position: relative;
+}
+
+/* Triangular arrow pointing up to user name */
+.user-hover-dropdown .dropdown-menu::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid #f7f7f7;
+  z-index: 1001;
+}
+
+/* Arrow border */
+.user-hover-dropdown .dropdown-menu::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 8px solid transparent;
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.user-hover-dropdown .dropdown-item {
+  color: #6c757d;
+  font-size: 0.875rem;
+  padding: 0.2em 0.7rem;
+  border: none;
+  background: none;
+}
+
+.user-hover-dropdown .dropdown-item:hover {
+  background-color: #f2f2f2;
+  color: #495057;
+}
+
+/* User name styling to indicate it's clickable */
+.user-profile-link {
+  position: relative;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  text-decoration: none;
+}
+
+.user-profile-link:hover {
+  color: #085fff !important;
+  text-decoration: none;
+}
+
+.user-profile-link::after {
+  content: '';
+  position: absolute;
+  bottom: 0px;
+  left: 0;
+  right: 0;
+  width: 0;
+  height: 2px;
+  background-color: #5689da;
+  transition: width 0.3s ease;
+  z-index: 999;
+}
+
+.user-profile-link:hover::after {
+  width: 100%;
+}
+
+.user-hover-dropdown {
+  position: relative;
+}
+
+.user-hover-dropdown .dropdown-menu {
+  z-index: 1000;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+}

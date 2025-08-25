@@ -24,13 +24,13 @@ import FPO.Translations.Translator
   , getTranslatorForLanguage
   )
 import FPO.Translations.Util (FPOState)
-import FPO.UI.HTML (addClass)
 import Halogen (AttrName(..), ClassName(..))
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
-import Halogen.HTML.Properties (attr, classes, style) as HP
+import Halogen.HTML.Properties (attr, classes, id, style, title) as HP
 import Halogen.HTML.Properties.ARIA (role)
+import Halogen.HTML.Properties.ARIA as HPA
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Store.Select (selectEq)
@@ -177,12 +177,15 @@ navbar = connect (selectEq identity) $ H.mkComponent
   userDropdown :: State -> FullUserDto -> H.ComponentHTML Action () m
   userDropdown state user =
     HH.li
-      [ HP.classes [ HB.navItem, HB.dropdown ] ]
+      [ HP.classes [ HB.navItem, HB.dropdown, H.ClassName "user-hover-dropdown" ] ]
       [ HH.a
-          [ HP.classes [ HB.navLink, HB.dropdownToggle ]
-          , role "button"
-          , HP.attr (AttrName "data-bs-toggle") "dropdown"
+          [ HP.classes [ HB.navLink, H.ClassName "user-profile-link" ]
+          , HPA.role "button"
+          , HP.id "userDropdown"
           , HP.attr (AttrName "aria-expanded") "false"
+          , HE.onClick $ const $ Navigate
+              (Profile { loginSuccessful: Nothing, userId: Nothing })
+          , HP.title (translate (label :: _ "prof_profile") state.translator)
           ]
           [ HH.i [ HP.classes [ ClassName "bi-person", HB.me1 ] ] []
           , HH.text $ getUserName user
@@ -191,36 +194,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
           [ HP.classes [ HB.dropdownMenu, HB.dropdownMenuEnd ]
           , HP.attr (AttrName "aria-labelledby") "navbarDarkDropdownMenuLink"
           ]
-          ( [ dropdownEntry
-                (translate (label :: _ "prof_profile") state.translator)
-                "person"
-                (Navigate (Profile { loginSuccessful: Nothing, userId: Nothing }))
-            ]
-              <>
-                ( if isUserSuperadmin user then
-                    [ dropdownEntry
-                        ( translate (label :: _ "au_userManagement")
-                            state.translator
-                        )
-                        "person-exclamation"
-                        (Navigate AdminViewUsers) `addClass` HB.bgWarningSubtle
-                    ]
-                  else []
-                )
-              <>
-                ( if isAdmin user then
-                    [ dropdownEntry
-                        ( translate (label :: _ "au_groupManagement")
-                            state.translator
-                        )
-                        "people"
-                        (Navigate AdminViewGroups) `addClass` HB.bgWarningSubtle
-                    ]
-                  else []
-                )
-              <>
-                [ dropdownEntry "Logout" "box-arrow-right" Logout ]
-          )
+          ([ dropdownEntry "Logout" "box-arrow-right" Logout ])
       ]
 
   -- Creates a dropdown entry with a label, bootstrap icon, and action.
