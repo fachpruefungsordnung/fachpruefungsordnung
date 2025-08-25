@@ -123,14 +123,25 @@ decodeContentWrapper json = decodeJson json
 encodeContent :: Content -> Json
 encodeContent content = encodeJson content
 
+encodeWrapper :: ContentWrapper -> Json
+encodeWrapper wrapper = encodeJson wrapper
+
 getContentText :: Content -> String
 getContentText (Content { content }) = content
+
+-- Wrapper getter and setter
 
 getWrapperContent :: ContentWrapper -> Content
 getWrapperContent (Wrapper { content }) = content
 
 getWrapperComments :: ContentWrapper -> Array CommentAnchor
 getWrapperComments (Wrapper { comments }) = comments
+
+setWrapper :: Content -> Array CommentAnchor -> ContentWrapper
+setWrapper content comments = Wrapper {content, comments}
+
+setWrapperContent :: Content -> ContentWrapper -> ContentWrapper
+setWrapperContent content (Wrapper {comments}) = Wrapper {content, comments}
 
 setContentText :: String -> Content -> Content
 setContentText newText (Content { parent }) = Content { content: newText, parent }
@@ -166,3 +177,9 @@ convertToAnnotetedMarker (CommentAnchor {id, startCol, startRow, endCol, endRow 
   , markerText: "tbc"
   , mCommentSection: Nothing
   } 
+
+convertToCommentAnchor
+  :: AnnotatedMarker
+  -> CommentAnchor
+convertToCommentAnchor { id, startRow, startCol, endRow, endCol } =
+  CommentAnchor { id, startCol, startRow,  endCol, endRow }

@@ -2,7 +2,7 @@ module FPO.Components.Comment where
 
 import Prelude
 
-import Data.Array (elem, snoc, uncons)
+import Data.Array (elem, find, snoc, uncons)
 import Data.Either (Either(..))
 import Data.Foldable (for_)
 import Data.Formatter.DateTime (Formatter, format)
@@ -13,13 +13,17 @@ import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Store as Store
 import FPO.Dto.UserDto (getUserName)
-import FPO.Types (Comment, CommentSection)
+import FPO.Dto.CommentDto as CD
+import FPO.Types (Comment, CommentSection, cdCommentToComment, sectionDtoToCS)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
+import FPO.Data.Request as Request
+import Data.Argonaut.Encode (class EncodeJson, encodeJson)
+import Effect.Console (log)
 
 type Input = Unit
 
@@ -33,12 +37,16 @@ data Action
   | SendComment
 
 data Query a
-  = DeletedComment (Array Int) a
+  = AddComment Int Int CommentSection a
+  | DeletedComment (Array Int) a
   | ReceiveTimeFormatter (Maybe Formatter) a
-  | SelectedCommentSection Int a
+  | SelectedCommentSection Int Int Int a
 
 type State =
-  { markerID :: Int
+  { docID :: Int 
+  , tocID :: Int
+  , markerID :: Int
+  , commentSections :: Array CommentSection
   , mCommentSection :: Maybe CommentSection
   , commentDraft :: String
   , mTimeFormatter :: Maybe Formatter
@@ -52,7 +60,10 @@ commentview
   => H.Component Query Input Output m
 commentview = H.mkComponent
   { initialState: \_ ->
-      { markerID: -1
+      { docID: -1
+      , tocID: -1
+      , markerID: -1
+      , commentSections: []
       , mCommentSection: Nothing
       , commentDraft: ""
       , mTimeFormatter: Nothing
@@ -185,29 +196,39 @@ commentview = H.mkComponent
 
     SendComment -> do
       state <- H.get
-      when (state.commentDraft /= "") $
-        for_ state.mCommentSection \commentSection -> do
-          now <- H.liftEffect nowDateTime
-          userWithError <- getUser
-          case userWithError of
-            Left _ -> pure unit -- TODO error handling 
-            Right user -> do
-              let
-                author = getUserName user
-                comments = commentSection.comments
-                newComment =
-                  { author: author, timestamp: now, content: state.commentDraft }
-                newCommentSection = commentSection
-                  { comments = snoc comments newComment }
-              H.modify_ \st -> st
-                { mCommentSection = Just newCommentSection, commentDraft = "" }
-              H.raise (UpdateComment state.markerID newCommentSection)
+      when (state.commentDraft /= "") do
+        let pText = encodeJson { text: state.commentDraft }
+        res <- Request.postJson CD.decodeComment 
+          ("/docs/" <> show state.docID <> "/text/" <> show state.tocID <> "/comments/" <> show state.markerID <> "/replies")
+          pText
+        case res of 
+          Left _ -> pure unit
+          Right com -> do --H.liftEffect $ log $ show com
+            case state.mCommentSection of
+              Nothing -> pure unit
+              Just cs -> do
+                let 
+                  com' = cdCommentToComment com
+                  newCs = cs { comments = snoc cs.comments com'}
+                H.modify_ _ {mCommentSection = Just newCs, commentDraft = ""}
 
   handleQuery
     :: forall slots a
      . Query a
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
+
+    AddComment docID tocID newComment a -> do
+      state <- H.get
+      let newCommentSections = snoc state.commentSections newComment
+      H.modify_ \st -> st 
+        { docID = docID
+        , tocID = tocID
+        , markerID = newComment.markerID
+        , commentSections = newCommentSections
+        , mCommentSection = Just newComment
+        }
+      pure (Just a)
 
     DeletedComment deletedIDs a -> do
       state <- H.get
@@ -219,16 +240,26 @@ commentview = H.mkComponent
       H.modify_ \state -> state { mTimeFormatter = mTimeFormatter }
       pure (Just a)
 
-    SelectedCommentSection markerID a -> do
-      let 
-        section =
-          { markerID: 0
-          , comments: []
-          , resolved: false
-          }
-      H.modify_ \state -> state
-        { markerID = markerID
-        , mCommentSection = Just section
-        }
+    SelectedCommentSection docID tocID markerID a -> do
+      state <- H.get
+      let commentSections = state.commentSections
+      when (state.docID /= docID || tocID == state.tocID) do
+        recComs <- H.liftAff
+          $ Request.getFromJSONEndpoint CD.decodeCommentSection
+          $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
+        let 
+          commentSections = case recComs of 
+            Nothing -> []
+            Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
+        H.modify_ \st -> st { docID = docID, commentSections = commentSections }
+
+      when ( markerID /= state.markerID) do
+        case (find (\cs -> cs.markerID == markerID) commentSections) of
+          Nothing -> pure unit
+          Just section -> do
+            H.modify_ \st -> st
+              { markerID = markerID
+              , mCommentSection = Just section
+              }
       pure (Just a)
 

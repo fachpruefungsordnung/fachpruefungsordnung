@@ -29,6 +29,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -569,6 +570,7 @@ splitview = H.mkComponent
   handleAction = case _ of
 
     Init -> do
+      docID <- H.gets _.docID
       let timeFormatter = head timeStampsVersions
       H.modify_ \st -> do
         st { mTimeFormatter = timeFormatter }
@@ -796,53 +798,67 @@ splitview = H.mkComponent
         H.modify_ \st -> st { commentShown = false }
 
       -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
-      Comment.UpdateComment tocID markerID newCommentSection -> do
-        H.tell _editor 0 Editor.SaveSection
-        state <- H.get
-        case
-          findRootTree (\e -> e.elementID == tocID && e.versionID /= Nothing)
-            state.versionMapping
-          of
-          Just _ -> do
-            let
-              updatedTOCEntries = map
-                ( \entry ->
-                    if entry.id /= tocID then entry
-                    else
-                      let
-                        newMarkers =
-                          ( map
-                              ( \marker ->
-                                  if marker.id /= markerID then marker
-                                  else marker
-                                    { mCommentSection = Just newCommentSection }
-                              )
-                              entry.markers
-                          )
-                      in
-                        entry { markers = newMarkers }
-                )
-                state.tocEntries
-              updateTOCEntry = fromMaybe
-                emptyTOCEntry
-                (findTOCEntry tocID updatedTOCEntries)
-              title = fromMaybe
-                ""
-                (findTitleTOCEntry tocID updatedTOCEntries)
-            H.modify_ \s -> s { tocEntries = updatedTOCEntries }
-            H.tell _editor 0 (Editor.ChangeSection title updateTOCEntry Nothing)
-          Nothing -> do
-            H.liftEffect $ log
-              "unable to unpdate comment on outdated versions of elements"
+      Comment.UpdateComment markerID newCommentSection -> do
+        pure unit
+        -- H.tell _editor 0 Editor.SaveSection
+        -- state <- H.get
+        -- case
+        --   findRootTree (\e -> e.elementID == tocID && e.versionID /= Nothing)
+        --     state.versionMapping
+        --   of
+        --   Just _ -> do
+        --     let
+        --       updatedTOCEntries = map
+        --         ( \entry ->
+        --             if entry.id /= tocID then entry
+        --             else
+        --               let
+        --                 newMarkers =
+        --                   ( map
+        --                       ( \marker ->
+        --                           if marker.id /= markerID then marker
+        --                           else marker
+        --                             { mCommentSection = Just newCommentSection }
+        --                       )
+        --                       entry.markers
+        --                   )
+        --               in
+        --                 entry { markers = newMarkers }
+        --         )
+        --         state.tocEntries
+        --       updateTOCEntry = fromMaybe
+        --         emptyTOCEntry
+        --         (findTOCEntry tocID updatedTOCEntries)
+        --       title = fromMaybe
+        --         ""
+        --         (findTitleTOCEntry tocID updatedTOCEntries)
+        --     H.modify_ \s -> s { tocEntries = updatedTOCEntries }
+        --     H.tell _editor 0 (Editor.ChangeSection title updateTOCEntry Nothing)
+        --   Nothing -> do
+        --     H.liftEffect $ log
+        --       "unable to unpdate comment on outdated versions of elements"
 
     HandleCommentOverview output -> case output of
 
       CommentOverview.JumpToCommentSection tocID markerID commentSection -> do
+        docID <- H.gets _.docID 
         H.modify_ \st -> st { commentShown = true }
         H.tell _comment unit
-          (Comment.SelectedCommentSection markerID)
+          (Comment.SelectedCommentSection docID tocID markerID)
 
     HandleEditor output -> case output of
+
+      Editor.AddComment docID tocID newComment -> do
+        state <- H.get
+        if state.sidebarShown then
+          H.modify_ _ { commentShown = true }
+        else
+          H.modify_ \st -> st
+            { sidebarRatio = st.lastExpandedSidebarRatio
+            , sidebarShown = true
+            , commentShown = true
+            }
+        H.tell _comment unit (Comment.AddComment docID tocID newComment)
 
       Editor.ClickedQuery response -> do
         H.modify_ _ { renderedHtml = Just Loading }
@@ -907,7 +923,7 @@ splitview = H.mkComponent
             , commentShown = true
             }
         H.tell _comment unit
-          (Comment.SelectedCommentSection markerID)
+          (Comment.SelectedCommentSection state.docID tocID markerID)
 
       Editor.SendingTOC tocEntry -> do
         H.tell _commentOverview unit (CommentOverview.ReceiveTOC tocEntry)

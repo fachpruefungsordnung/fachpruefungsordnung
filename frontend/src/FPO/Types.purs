@@ -3,11 +3,14 @@ module FPO.Types where
 import Prelude
 
 import Ace.Types as Types
-import Data.Array (find, sortBy)
+import Data.Array (cons, find, sortBy)
 import Data.DateTime (DateTime)
 import Data.Formatter.DateTime (Formatter, FormatterCommand(..))
 import Data.List (List(..), (:))
 import Data.Maybe (Maybe)
+import FPO.Dto.CommentDto as CD
+import FPO.Dto.CommentDto (CommentT(..), Section(..))
+import FPO.Dto.DocumentDto.DocDate (docDateToDateTime)
 import FPO.Dto.DocumentDto.DocumentTree as DT
 import FPO.Dto.DocumentDto.NodeHeader as NH
 import FPO.Dto.DocumentDto.TreeDto
@@ -37,8 +40,8 @@ type CommentSection =
 
 type Comment =
   { author :: String
-  , timestamp :: DateTime
   , content :: String
+  , timestamp :: DateTime
   }
 
 type TOCEntry =
@@ -56,6 +59,13 @@ emptyTOCEntry =
   { id: -1
   , name: "Error"
   , paraID: -1
+  }
+
+emptyCommentSection :: CommentSection
+emptyCommentSection =
+  { markerID: -1
+  , comments: []
+  , resolved: false
   }
 
 findTOCEntry :: Int -> TOCTree -> Maybe TOCEntry
@@ -149,3 +159,23 @@ documentTreeToTOCTree = map nodeHeaderToTOCEntry
 
 tocTreeToDocumentTree :: TOCTree -> DT.DocumentTree
 tocTreeToDocumentTree = map tocEntryToNodeHeader
+
+-- Comment functions
+
+cdCommentToComment :: CD.CommentT -> Comment
+cdCommentToComment (Comment {author, content, timestamp}) =
+  let 
+    name = CD.getName author 
+    time = docDateToDateTime timestamp
+  in
+  {author: name, content: content, timestamp: time}
+
+sectionDtoToCS :: CD.Section -> CommentSection
+sectionDtoToCS (Section { id, firstComment, replies, status }) =
+  let
+    -- fst = cdCommentToComment firstComment 
+    rep = map cdCommentToComment replies
+    -- comments = cons fst rep
+    resolved = if status == "open" then true else false
+  in
+  { markerID: id, comments: rep, resolved: resolved }
