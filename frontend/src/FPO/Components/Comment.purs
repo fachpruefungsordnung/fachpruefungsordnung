@@ -2,17 +2,13 @@ module FPO.Components.Comment where
 
 import Prelude
 
-import Data.Array (cons, elem, find, snoc, uncons)
+import Data.Array (elem, find, snoc)
 import Data.Either (Either(..))
-import Data.Foldable (for_)
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Now (nowDateTime)
 import FPO.Data.Navigate (class Navigate)
-import FPO.Data.Request (getUser)
 import FPO.Data.Store as Store
-import FPO.Dto.UserDto (getUserName)
 import FPO.Dto.CommentDto as CD
 import FPO.Types (Comment, CommentSection, cdCommentToComment, sectionDtoToCS)
 import Halogen as H
@@ -22,7 +18,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import FPO.Data.Request as Request
-import Data.Argonaut.Encode (class EncodeJson, encodeJson)
+import Data.Argonaut.Encode (encodeJson)
 
 type Input = Unit
 
@@ -257,8 +253,6 @@ commentview = H.mkComponent
   handleQuery = case _ of
 
     AddComment docID tocID a -> do
-      state <- H.get
-      -- let newCommentSections = snoc state.commentSections newComment
       H.modify_ \st -> st 
         { docID = docID
         , tocID = tocID

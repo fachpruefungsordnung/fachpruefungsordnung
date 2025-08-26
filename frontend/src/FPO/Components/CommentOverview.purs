@@ -2,11 +2,11 @@ module FPO.Components.CommentOverview where
 
 import Prelude
 
-import Data.Array (head, mapMaybe)
+import Data.Array (mapMaybe)
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff)
-import FPO.Types (Comment, CommentSection, TOCEntry)
+import FPO.Types (Comment, TOCEntry)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -16,12 +16,11 @@ import Halogen.Themes.Bootstrap5 as HB
 type Input = Unit
 
 -- DeleteComment later
-data Output = JumpToCommentSection Int Int CommentSection
+data Output = JumpToCommentSection Int Int
 
 data Action
   = Init
-  | SelectCommentSection Int Int CommentSection
-
+  | SelectCommentSection Int Int
 data Query a
   = ReceiveTimeFormatter (Maybe Formatter) a
   | ReceiveTOC TOCEntry a
@@ -56,7 +55,7 @@ commentOverviewview = H.mkComponent
                 Just cs -> case cs.first of
                   Nothing -> Nothing
                   Just c -> Just
-                    (renderFirstComment state.mTimeFormatter c tocEntry.id m.id cs)
+                    (renderFirstComment state.mTimeFormatter c tocEntry.id m.id)
             )
             [] --tocEntry.markers
         )
@@ -67,8 +66,8 @@ commentOverviewview = H.mkComponent
     Init -> do
       pure unit
 
-    SelectCommentSection tocID markerID commentSection -> do
-      H.raise (JumpToCommentSection tocID markerID commentSection)
+    SelectCommentSection tocID markerID -> do
+      H.raise (JumpToCommentSection tocID markerID)
 
   handleQuery
     :: forall slots a
@@ -89,10 +88,9 @@ commentOverviewview = H.mkComponent
     -> Comment
     -> Int
     -> Int
-    -> CommentSection
     -> forall slots
      . H.ComponentHTML Action slots m
-  renderFirstComment mFormatter c tocID markerID cs =
+  renderFirstComment mFormatter c tocID markerID =
     HH.div
       [ HP.classes
           [ HB.p2
@@ -104,7 +102,7 @@ commentOverviewview = H.mkComponent
           , HB.flexColumn
           ]
       , HP.style "background-color:rgba(246, 250, 0, 0.9);"
-      , HE.onClick \_ -> SelectCommentSection tocID markerID cs
+      , HE.onClick \_ -> SelectCommentSection tocID markerID
       ]
       [ HH.div_
           [ HH.div

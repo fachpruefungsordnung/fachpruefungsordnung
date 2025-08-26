@@ -12,7 +12,6 @@ import Data.Argonaut (fromString)
 import Data.Array
   ( cons
   , deleteAt
-  , find
   , head
   , insertAt
   , mapWithIndex
@@ -29,7 +28,6 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -51,8 +49,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , modifyNodeRootTree
   )
 import FPO.Types
-  ( CommentSection
-  , TOCEntry
+  ( TOCEntry
   , TOCTree
   , documentTreeToTOCTree
   , emptyTOCEntry
@@ -570,7 +567,6 @@ splitview = H.mkComponent
   handleAction = case _ of
 
     Init -> do
-      docID <- H.gets _.docID
       let timeFormatter = head timeStampsVersions
       H.modify_ \st -> do
         st { mTimeFormatter = timeFormatter }
@@ -591,7 +587,7 @@ splitview = H.mkComponent
         tree = tocTreeToDocumentTree state.tocEntries
         encodedTree = DT.encodeDocumentTree tree
 
-      rep <- Request.postJson Right ("/docs/" <> show state.docID <> "/tree")
+      _ <- Request.postJson Right ("/docs/" <> show state.docID <> "/tree")
         encodedTree
       pure unit
 
@@ -802,7 +798,7 @@ splitview = H.mkComponent
         H.tell _editor 0 (Editor.UpdateComment newCommentSection)
     HandleCommentOverview output -> case output of
 
-      CommentOverview.JumpToCommentSection tocID markerID commentSection -> do
+      CommentOverview.JumpToCommentSection tocID markerID -> do
         docID <- H.gets _.docID 
         H.modify_ \st -> st { commentShown = true }
         H.tell _comment unit
