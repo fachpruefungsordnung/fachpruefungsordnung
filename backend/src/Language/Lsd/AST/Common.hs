@@ -14,7 +14,6 @@ import Data.Text (Text)
 newtype KindName = KindName String
     deriving (Show, IsString, Eq)
 
--- TODO: Define somehow for each type.
 newtype TypeName = TypeName String
     deriving (Show, IsString, Eq, Ord)
 

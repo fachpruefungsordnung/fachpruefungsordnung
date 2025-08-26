@@ -162,8 +162,10 @@ mainDocT =
                     ]
                 )
                 ( Disjunction
-                    [ InnerSectionBodyType (Star sectionT)
-                    , InnerSectionBodyType (Star superSectionT)
+                    [ DocumentMainBodyType $
+                        InnerSectionBodyType (Star sectionT)
+                    , DocumentMainBodyType $
+                        InnerSectionBodyType (Star superSectionT)
                     ]
                 )
                 ( Sequence
@@ -181,7 +183,11 @@ simpleDocT =
             DocumentFormat {docHasTableOfContents = False}
             ( DocumentBodyType
                 (Sequence [])
-                (Disjunction [SimpleLeafSectionBodyType (Star simpleBlockT)])
+                ( Disjunction
+                    [ DocumentMainBodyType $
+                        SimpleLeafSectionBodyType (Star simpleBlockT)
+                    ]
+                )
                 (Sequence [])
             )
             (Disjunction [footnoteT])

@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Language.Lsd.AST.Type.DocumentContainer
     ( DocumentContainerFormat (..)
     , DocumentContainerType (..)
@@ -10,7 +12,7 @@ where
 import Data.Typography (FontSize, FontStyle)
 import Language.Lsd.AST.Format (FormatString, MainHeadingFormat)
 import Language.Lsd.AST.SimpleRegex (Sequence)
-import Language.Lsd.AST.Type (NamedType)
+import Language.Lsd.AST.Type (KindNameOf (kindNameOf), NamedType)
 import Language.Lsd.AST.Type.AppendixSection (AppendixSectionType)
 import Language.Lsd.AST.Type.Document (DocumentType)
 
@@ -30,6 +32,9 @@ data DocumentContainerType
         DocumentContainerFormat
         (NamedType DocumentType)
         (Sequence (NamedType AppendixSectionType))
+
+instance KindNameOf DocumentContainerType where
+    kindNameOf _ = "document-container"
 
 -- | The format of a printed header/footer.
 data HeaderFooterFormat
