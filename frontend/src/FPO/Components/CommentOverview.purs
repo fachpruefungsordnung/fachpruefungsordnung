@@ -20,6 +20,7 @@ data Output = JumpToCommentSection Int Int
 data Action
   = Init
   | SelectCommentSection Int Int
+
 data Query a
   = ReceiveTimeFormatter (Maybe Formatter) a
   | ReceiveComments Int (Array FirstComment) a
@@ -50,7 +51,9 @@ commentOverviewview = H.mkComponent
     _ ->
       HH.div [ HP.style "comment-section space-y-3" ]
         ( map
-            ( \{markerID, first} -> (renderFirstComment state.mTimeFormatter first state.tocID markerID) )
+            ( \{ markerID, first } ->
+                (renderFirstComment state.mTimeFormatter first state.tocID markerID)
+            )
             state.comments
         )
 

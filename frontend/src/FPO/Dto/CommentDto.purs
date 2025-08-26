@@ -12,7 +12,7 @@ import Data.Newtype (class Newtype)
 import Data.Traversable (traverse)
 import FPO.Dto.DocumentDto.DocDate (DocDate)
 
-newtype Author = Author 
+newtype Author = Author
   { id :: String
   , name :: String
   }
@@ -40,7 +40,7 @@ derive instance newtypeCommentSections :: Newtype CommentSections _
 
 instance decodeJsonAuthor :: DecodeJson Author where
   decodeJson json = do
-    obj <- decodeJson json 
+    obj <- decodeJson json
     id <- obj .: "identifier"
     name <- obj .: "name"
     pure $ Author { id: id, name: name }
@@ -51,7 +51,7 @@ instance decodeJsonCommentT :: DecodeJson CommentT where
     aut <- obj .: "author"
     con <- obj .: "content"
     time <- obj .: "timestamp"
-    pure $ Comment { author: aut, content: con, timestamp: time } 
+    pure $ Comment { author: aut, content: con, timestamp: time }
 
 instance decodeJsonSection :: DecodeJson Section where
   decodeJson json = do
@@ -84,10 +84,10 @@ decodeCommentSection :: Json -> Either JsonDecodeError CommentSections
 decodeCommentSection json = decodeJson json
 
 getName :: Author -> String
-getName (Author {name}) = name
+getName (Author { name }) = name
 
 getSectionID :: Section -> Int
-getSectionID (Section {id}) = id
+getSectionID (Section { id }) = id
 
 getCommentSections :: CommentSections -> Array Section
-getCommentSections (CommentSections {comments} ) = comments
+getCommentSections (CommentSections { comments }) = comments

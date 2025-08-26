@@ -618,7 +618,9 @@ editor = connect selectTranslator $ H.mkComponent
                   -- extract them now and store them
                   updatedMarkers <- H.liftEffect do
                     for state.markers \m -> do
-                      case find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers of
+                      case
+                        find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers
+                        of
                         -- TODO Should we add other markers in liveMarkers such as errors?
                         Nothing -> pure m
                         Just lm -> do
@@ -640,7 +642,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     Upload newEntry title newWrapper -> do
       state <- H.get
-      let 
+      let
         jsonContent = ContentDto.encodeWrapper newWrapper
         newContent = ContentDto.getWrapperContent newWrapper
       -- send the new content as POST to the server
@@ -680,13 +682,14 @@ editor = connect selectTranslator $ H.mkComponent
       case loadedContent of
         -- TODO: Error handling
         Nothing -> pure unit
-        Just res -> 
+        Just res ->
           let
-            newContent' = ContentDto.setContentText (ContentDto.getContentText newContent) res
+            newContent' = ContentDto.setContentText
+              (ContentDto.getContentText newContent)
+              res
             newWrapper' = ContentDto.setWrapperContent newContent' newWrapper
           in
             handleAction $ Upload newEntry title newWrapper'
-              
 
     SavedIcon -> do
       state <- H.get
@@ -810,7 +813,7 @@ editor = connect selectTranslator $ H.mkComponent
                 --  newTOCEntry = tocEntry { markers = newMarkers }
                 H.liftEffect $ removeLiveMarker lm session
                 H.modify_ \st ->
-                  st { mTocEntry = Just tocEntry} --, liveMarkers = newLiveMarkers }
+                  st { mTocEntry = Just tocEntry } --, liveMarkers = newLiveMarkers }
                 H.raise (DeletedComment tocEntry [ foundID ])
 
     SelectComment -> do
@@ -897,11 +900,11 @@ editor = connect selectTranslator $ H.mkComponent
           comments = ContentDto.getWrapperComments wrapper
           -- convert markers
           markers = map ContentDto.convertToAnnotetedMarker comments
-        
+
         H.modify_ \st -> st
           { mContent = Just content
           , markers = markers
-          , isEditorReadonly = version /= "latest" 
+          , isEditorReadonly = version /= "latest"
           }
 
         newLiveMarkers <- H.liftEffect do
@@ -998,12 +1001,12 @@ editor = connect selectTranslator $ H.mkComponent
       state <- H.get
       case state.mLiveMarker, newCommentSection.first of
         Just marker, Just first -> do
-          let 
-            newLiveMarker = marker {annotedMarkerID = newCommentSection.markerID}
+          let
+            newLiveMarker = marker { annotedMarkerID = newCommentSection.markerID }
             newLiveMarkers = snoc state.liveMarkers newLiveMarker
           start <- H.liftEffect $ Anchor.getPosition marker.startAnchor
           end <- H.liftEffect $ Anchor.getPosition marker.endAnchor
-          let 
+          let
             newMarker =
               { id: newCommentSection.markerID
               , type: "info"
@@ -1015,10 +1018,10 @@ editor = connect selectTranslator $ H.mkComponent
               , mCommentSection: Just newCommentSection
               }
             newMarkers = snoc state.markers newMarker
-          H.modify_ \st -> st 
+          H.modify_ \st -> st
             { mLiveMarker = Nothing
             , markers = newMarkers
-            , liveMarkers = newLiveMarkers 
+            , liveMarkers = newLiveMarkers
             }
           -- set dirty to true to be able to save
           for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r

@@ -2,23 +2,30 @@ module FPO.Components.Comment where
 
 import Prelude
 
+import Data.Argonaut.Encode (encodeJson)
 import Data.Array (elem, find, snoc)
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate)
+import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.CommentDto as CD
-import FPO.Types (Comment, CommentSection, FirstComment, cdCommentToComment, emptyComment, sectionDtoToCS)
+import FPO.Types
+  ( Comment
+  , CommentSection
+  , FirstComment
+  , cdCommentToComment
+  , emptyComment
+  , sectionDtoToCS
+  )
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
-import FPO.Data.Request as Request
-import Data.Argonaut.Encode (encodeJson)
 
 type Input = Unit
 
@@ -31,7 +38,7 @@ data Action
   = Init
   | UpdateDraft String
   | SendComment
-  | SelectingCommentSection Int 
+  | SelectingCommentSection Int
 
 data Query a
   = AddComment Int Int a
@@ -41,7 +48,7 @@ data Query a
   | Overview Int Int a
 
 type State =
-  { docID :: Int 
+  { docID :: Int
   , tocID :: Int
   , markerID :: Int
   , commentSections :: Array CommentSection
@@ -79,7 +86,7 @@ commentview = H.mkComponent
 
   render :: State -> forall slots. H.ComponentHTML Action slots m
   render state = case state.mCommentSection of
-    Nothing -> 
+    Nothing ->
       if state.newComment then
         HH.div [ HP.style "comment-section space-y-3" ]
           [ renderInput state.commentDraft ]
@@ -205,41 +212,52 @@ commentview = H.mkComponent
         let pText = encodeJson { text: state.commentDraft }
         if state.newComment then do
           res <- Request.postJson CD.decodeSection
-            ("/docs/" <> show state.docID <> "/text/" <> show state.tocID <> "/comments")
+            ( "/docs/" <> show state.docID <> "/text/" <> show state.tocID <>
+                "/comments"
+            )
             pText
-          case res of 
+          case res of
             Left _ -> pure unit
             Right r -> do
-              let 
+              let
                 cs = sectionDtoToCS r
                 newCommentSections = snoc state.commentSections cs
-              H.modify_ _ 
+              H.modify_ _
                 { markerID = cs.markerID
                 , commentSections = newCommentSections
                 , mCommentSection = Just cs
                 , newComment = false
-                , commentDraft = ""}
+                , commentDraft = ""
+                }
               H.raise (UpdateComment cs)
         else do
-          res <- Request.postJson CD.decodeComment 
-            ("/docs/" <> show state.docID <> "/text/" <> show state.tocID <> "/comments/" <> show state.markerID <> "/replies")
+          res <- Request.postJson CD.decodeComment
+            ( "/docs/" <> show state.docID <> "/text/" <> show state.tocID
+                <> "/comments/"
+                <> show state.markerID
+                <> "/replies"
+            )
             pText
-          case res of 
+          case res of
             Left _ -> pure unit
             Right com -> do
               case state.mCommentSection of
                 Nothing -> pure unit
                 Just cs -> do
-                  let 
+                  let
                     com' = cdCommentToComment com
-                    newCs = cs { replies = snoc cs.replies com'}
+                    newCs = cs { replies = snoc cs.replies com' }
                     newCSs = updateCommentSection newCs state.commentSections
-                  H.modify_ _ {commentSections = newCSs, mCommentSection = Just newCs, commentDraft = ""}
+                  H.modify_ _
+                    { commentSections = newCSs
+                    , mCommentSection = Just newCs
+                    , commentDraft = ""
+                    }
 
     SelectingCommentSection markerID -> do
       state <- H.get
       let commentSections = state.commentSections
-      when ( markerID /= state.markerID) do
+      when (markerID /= state.markerID) do
         case (find (\cs -> cs.markerID == markerID) commentSections) of
           Nothing -> pure unit
           Just section -> do
@@ -255,7 +273,7 @@ commentview = H.mkComponent
   handleQuery = case _ of
 
     AddComment docID tocID a -> do
-      H.modify_ \st -> st 
+      H.modify_ \st -> st
         { docID = docID
         , tocID = tocID
         , markerID = -360
@@ -280,42 +298,45 @@ commentview = H.mkComponent
         recComs <- H.liftAff
           $ Request.getFromJSONEndpoint CD.decodeCommentSection
           $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
-        let 
-          commentSections = case recComs of 
+        let
+          commentSections = case recComs of
             Nothing -> []
             Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
-        H.modify_ \st -> st { docID = docID, tocID = tocID, commentSections = commentSections }
+        H.modify_ \st -> st
+          { docID = docID, tocID = tocID, commentSections = commentSections }
         handleAction $ SelectingCommentSection markerID
       else do
         handleAction $ SelectingCommentSection markerID
       pure (Just a)
-    
+
     Overview docID tocID a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
         recComs <- H.liftAff
           $ Request.getFromJSONEndpoint CD.decodeCommentSection
           $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
-        let 
-          commentSections = case recComs of 
+        let
+          commentSections = case recComs of
             Nothing -> []
             Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
           cs = map extractFirst commentSections
-        H.modify_ \st -> st { docID = docID, tocID = tocID, commentSections = commentSections }
+        H.modify_ \st -> st
+          { docID = docID, tocID = tocID, commentSections = commentSections }
         H.raise (CommentOverview state.tocID cs)
       else do
-        let 
+        let
           css = state.commentSections
           cs = map extractFirst css
         H.raise (CommentOverview state.tocID cs)
       pure (Just a)
 
-  updateCommentSection :: CommentSection -> Array CommentSection -> Array CommentSection
+  updateCommentSection
+    :: CommentSection -> Array CommentSection -> Array CommentSection
   updateCommentSection cs = map \c ->
     if c.markerID == cs.markerID then cs else c
 
   extractFirst :: CommentSection -> FirstComment
-  extractFirst {markerID, first} = case first of
-    Nothing -> {markerID: -1, first: emptyComment}
-    Just c -> {markerID: markerID, first: c}
+  extractFirst { markerID, first } = case first of
+    Nothing -> { markerID: -1, first: emptyComment }
+    Just c -> { markerID: markerID, first: c }
 

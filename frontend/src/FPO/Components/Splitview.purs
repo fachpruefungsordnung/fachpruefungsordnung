@@ -803,7 +803,7 @@ splitview = H.mkComponent
     HandleCommentOverview output -> case output of
 
       CommentOverview.JumpToCommentSection tocID markerID -> do
-        docID <- H.gets _.docID 
+        docID <- H.gets _.docID
         H.modify_ \st -> st { commentShown = true }
         H.tell _comment unit
           (Comment.SelectedCommentSection docID tocID markerID)

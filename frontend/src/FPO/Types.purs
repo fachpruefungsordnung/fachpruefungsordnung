@@ -4,12 +4,18 @@ import Prelude
 
 import Ace.Types as Types
 import Data.Array (cons, find, sortBy)
+import Data.Date (canonicalDate)
+import Data.Date.Component (Day, Month(..), Year)
 import Data.DateTime (DateTime(..))
+import Data.Enum (toEnum)
 import Data.Formatter.DateTime (Formatter, FormatterCommand(..))
 import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), fromJust)
-import FPO.Dto.CommentDto as CD
+import Data.Time (Time(..))
+import Data.Time.Component (Hour, Millisecond, Minute, Second)
+import Effect.Now (nowDateTime)
 import FPO.Dto.CommentDto (CommentT(..), Section(..))
+import FPO.Dto.CommentDto as CD
 import FPO.Dto.DocumentDto.DocDate (docDateToDateTime)
 import FPO.Dto.DocumentDto.DocumentTree as DT
 import FPO.Dto.DocumentDto.NodeHeader as NH
@@ -19,13 +25,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , findTitleRootTree
   , replaceNodeRootTree
   )
-import Effect.Now (nowDateTime)
-import Data.Date.Component ( Year, Month(..), Day)
-import Data.Time.Component ( Hour , Minute , Second , Millisecond)
-import Data.Enum (toEnum)
 import Partial.Unsafe (unsafePartial)
-import Data.Date (canonicalDate)
-import Data.Time (Time(..))
 
 -- TODO We can also store different markers, such as errors. But do we want to?
 type AnnotatedMarker =
@@ -77,14 +77,14 @@ emptyTOCEntry =
 defaultDateTime :: DateTime
 defaultDateTime =
   let
-    y    = unsafePartial $ fromJust (toEnum 1970 :: Maybe Year)
-    m    = January
-    d    = unsafePartial $ fromJust (toEnum 1    :: Maybe Day)
+    y = unsafePartial $ fromJust (toEnum 1970 :: Maybe Year)
+    m = January
+    d = unsafePartial $ fromJust (toEnum 1 :: Maybe Day)
     date = (canonicalDate y m d)
 
-    h  = unsafePartial $ fromJust (toEnum 0 :: Maybe Hour)
+    h = unsafePartial $ fromJust (toEnum 0 :: Maybe Hour)
     mi = unsafePartial $ fromJust (toEnum 0 :: Maybe Minute)
-    s  = unsafePartial $ fromJust (toEnum 0 :: Maybe Second)
+    s = unsafePartial $ fromJust (toEnum 0 :: Maybe Second)
     ms = unsafePartial $ fromJust (toEnum 0 :: Maybe Millisecond)
     time = Time h mi s ms
   in
@@ -200,19 +200,19 @@ tocTreeToDocumentTree = map tocEntryToNodeHeader
 -- Comment functions
 
 cdCommentToComment :: CD.CommentT -> Comment
-cdCommentToComment (Comment {author, content, timestamp}) =
-  let 
-    name = CD.getName author 
+cdCommentToComment (Comment { author, content, timestamp }) =
+  let
+    name = CD.getName author
     time = docDateToDateTime timestamp
   in
-  {author: name, content: content, timestamp: time}
+    { author: name, content: content, timestamp: time }
 
 sectionDtoToCS :: CD.Section -> CommentSection
 sectionDtoToCS (Section { id, firstComment, replies, status }) =
   let
-    fst = cdCommentToComment firstComment 
+    fst = cdCommentToComment firstComment
     rep = map cdCommentToComment replies
     -- comments = cons fst rep
     resolved = if status == "open" then true else false
   in
-  { markerID: id, first: Just fst, replies: rep, resolved: resolved }
+    { markerID: id, first: Just fst, replies: rep, resolved: resolved }

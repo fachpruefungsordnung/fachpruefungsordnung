@@ -44,13 +44,13 @@ instance decodeJsonCommentAnchor :: DecodeJson CommentAnchor where
     end <- anc .: "end"
     eCol <- end .: "col"
     eRow <- end .: "row"
-    pure $ 
-      CommentAnchor 
+    pure $
+      CommentAnchor
         { id: comId
         , startCol: sCol
         , startRow: sRow
         , endCol: eCol
-        , endRow: eRow 
+        , endRow: eRow
         }
 
 instance decodeJsonContent :: DecodeJson Content where
@@ -67,29 +67,29 @@ instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
     rev <- obj .: "revision"
     con <- decodeJson (fromObject rev)
     coms <- rev .: "commentAnchors"
-    pure $ Wrapper { content: con, comments: coms}
+    pure $ Wrapper { content: con, comments: coms }
 
 instance encodeJsonCommentAnchor :: EncodeJson CommentAnchor where
-  encodeJson (CommentAnchor {id, startCol, startRow, endCol, endRow }) =
-    encodeJson 
-      { anchor: 
-        { start: 
-          { col: startCol
-          , row: startRow
+  encodeJson (CommentAnchor { id, startCol, startRow, endCol, endRow }) =
+    encodeJson
+      { anchor:
+          { start:
+              { col: startCol
+              , row: startRow
+              }
+          , end:
+              { col: endCol
+              , row: endRow
+              }
           }
-        , end: 
-          { col: endCol
-          , row: endRow
-          }
-        } 
-        , comment: id
-        }
+      , comment: id
+      }
 
 instance encodeJsonContent :: EncodeJson Content where
   encodeJson (Content { content, parent }) =
-    encodeJson 
+    encodeJson
       { content: content
-      , parent: parent 
+      , parent: parent
       }
 
 instance encodeJsonContentWrapper :: EncodeJson ContentWrapper where
@@ -101,8 +101,14 @@ instance encodeJsonContentWrapper :: EncodeJson ContentWrapper where
       }
 
 instance showCommentAnchor :: Show CommentAnchor where
-  show (CommentAnchor {id, startCol, startRow, endCol, endRow }) = 
-    "Comment { id: " <> show id <> ", startCol: " <> show startCol <> ", startRow: " <> show startRow <> ", endCol: " <> show endCol <> ", endRow: " <> show endRow <>" }"
+  show (CommentAnchor { id, startCol, startRow, endCol, endRow }) =
+    "Comment { id: " <> show id <> ", startCol: " <> show startCol <> ", startRow: "
+      <> show startRow
+      <> ", endCol: "
+      <> show endCol
+      <> ", endRow: "
+      <> show endRow
+      <> " }"
 
 instance showContent :: Show Content where
   show (Content { content, parent }) = "Content { content: " <> content
@@ -111,7 +117,9 @@ instance showContent :: Show Content where
     <> " }"
 
 instance showContentWrapper :: Show ContentWrapper where
-  show (Wrapper { content, comments }) = "Content : { " <> show content <> ", " <> show comments <> " }"
+  show (Wrapper { content, comments }) = "Content : { " <> show content <> ", "
+    <> show comments
+    <> " }"
 
 decodeContent :: Json -> Either JsonDecodeError Content
 decodeContent json = decodeJson json
@@ -137,10 +145,10 @@ getWrapperComments :: ContentWrapper -> Array CommentAnchor
 getWrapperComments (Wrapper { comments }) = comments
 
 setWrapper :: Content -> Array CommentAnchor -> ContentWrapper
-setWrapper content comments = Wrapper {content, comments}
+setWrapper content comments = Wrapper { content, comments }
 
 setWrapperContent :: Content -> ContentWrapper -> ContentWrapper
-setWrapperContent content (Wrapper {comments}) = Wrapper {content, comments}
+setWrapperContent content (Wrapper { comments }) = Wrapper { content, comments }
 
 setContentText :: String -> Content -> Content
 setContentText newText (Content { parent }) = Content { content: newText, parent }
@@ -163,10 +171,10 @@ extractNewParent (Content cont) json = do
   newPar <- header .: "identifier"
   pure $ Content $ cont { parent = newPar }
 
-convertToAnnotetedMarker 
+convertToAnnotetedMarker
   :: CommentAnchor
   -> AnnotatedMarker
-convertToAnnotetedMarker (CommentAnchor {id, startCol, startRow, endCol, endRow }) =
+convertToAnnotetedMarker (CommentAnchor { id, startCol, startRow, endCol, endRow }) =
   { id: id
   , type: "info"
   , startRow: startRow
@@ -175,10 +183,10 @@ convertToAnnotetedMarker (CommentAnchor {id, startCol, startRow, endCol, endRow 
   , endCol: endCol
   , markerText: "tbc"
   , mCommentSection: Nothing
-  } 
+  }
 
 convertToCommentAnchor
   :: AnnotatedMarker
   -> CommentAnchor
 convertToCommentAnchor { id, startRow, startCol, endRow, endCol } =
-  CommentAnchor { id, startCol, startRow,  endCol, endRow }
+  CommentAnchor { id, startCol, startRow, endCol, endRow }
