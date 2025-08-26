@@ -3,11 +3,14 @@
 module Language.Lsd.AST.Type.Document
     ( DocumentFormat (..)
     , DocumentType (..)
+    , DocumentHeadingType (..)
     , DocumentBodyType (..)
     , DocumentMainBodyType (..)
     )
 where
 
+import Data.Void (Void)
+import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Disjunction, Sequence)
 import Language.Lsd.AST.Type
     ( KindNameOf (kindNameOf)
@@ -17,6 +20,7 @@ import Language.Lsd.AST.Type
 import Language.Lsd.AST.Type.Footnote (FootnoteType)
 import Language.Lsd.AST.Type.Section (SectionBodyType (..))
 import Language.Lsd.AST.Type.SimpleSection (SimpleSectionType)
+import Language.Lsd.AST.Type.Text (TextType)
 
 newtype DocumentFormat
     = DocumentFormat
@@ -26,12 +30,16 @@ newtype DocumentFormat
 
 data DocumentType
     = DocumentType
+        Keyword
         DocumentFormat
+        DocumentHeadingType
         DocumentBodyType
         (Disjunction (NamedType FootnoteType))
 
 instance KindNameOf DocumentType where
     kindNameOf _ = "document"
+
+newtype DocumentHeadingType = DocumentHeadingType (TextType Void)
 
 data DocumentBodyType
     = -- | document body type

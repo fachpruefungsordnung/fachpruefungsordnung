@@ -153,7 +153,9 @@ mainDocT :: NamedType DocumentType
 mainDocT =
     NamedType "fpo-maindoc" "Fachprüfungsordnung (Hauptdokument)" $
         DocumentType
+            (Keyword "!")
             DocumentFormat {docHasTableOfContents = True}
+            (DocumentHeadingType plainTextT)
             ( DocumentBodyType
                 ( Sequence
                     [ dateSSecT
@@ -180,7 +182,9 @@ simpleDocT :: NamedType DocumentType
 simpleDocT =
     NamedType "simpledoc" "Einfaches Textdokument" $
         DocumentType
+            (Keyword "!")
             DocumentFormat {docHasTableOfContents = False}
+            (DocumentHeadingType plainTextT)
             ( DocumentBodyType
                 (Sequence [])
                 ( Disjunction
