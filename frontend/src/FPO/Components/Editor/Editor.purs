@@ -146,8 +146,7 @@ data Output
   | SavedSection Boolean String TOCEntry
   | RenamedNode String Path
   | SelectedCommentSection Int Int
-  | SendingTOC TOCEntry
-  | ShowAllCommentsOutput
+  | ShowAllCommentsOutput Int Int
 
 data Action
   = Init
@@ -193,7 +192,6 @@ data Query a
   | ChangeToNode String Path a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
-  | SendCommentSections a
   | UpdateComment CommentSection a
 
 -- | UpdateCompareToElement ElementData a
@@ -566,7 +564,9 @@ editor = connect selectTranslator $ H.mkComponent
       H.raise (PostPDF content)
 
     ShowAllComments -> do
-      H.raise ShowAllCommentsOutput
+      state <- H.get
+      let tocID = maybe (-1) _.id state.mTocEntry
+      H.raise $ ShowAllCommentsOutput state.docID tocID
 
     -- Save section
 
@@ -992,15 +992,6 @@ editor = connect selectTranslator $ H.mkComponent
           >>= Session.getDocument
           >>= Document.getAllLines
       H.raise (ClickedQuery $ fromMaybe [] allLines)
-      pure (Just a)
-
-    SendCommentSections a -> do
-      state <- H.get
-      -- Send the current comment sections to the splitview
-      case state.mTocEntry of
-        Nothing -> pure unit
-        Just tocEntry -> do
-          H.raise (SendingTOC tocEntry)
       pure (Just a)
 
     UpdateComment newCommentSection a -> do

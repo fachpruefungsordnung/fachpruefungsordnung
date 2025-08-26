@@ -98,7 +98,7 @@ data Action
   | HandleMouseMove MouseEvent
   -- Toggle buttons
   | ToggleComment
-  | ToggleCommentOverview Boolean
+  | ToggleCommentOverview Boolean Int Int
   | ToggleSidebar
   | TogglePreview
   -- Query Output
@@ -360,7 +360,7 @@ splitview = H.mkComponent
                 \border: 1px solid #f5c6cb; \
                 \border-radius: 0.2rem; \
                 \z-index: 10;"
-            , HE.onClick \_ -> ToggleCommentOverview false
+            , HE.onClick \_ -> ToggleCommentOverview false (-1) (-1)
             ]
             [ HH.text "x" ]
         , HH.h4
@@ -700,9 +700,9 @@ splitview = H.mkComponent
 
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
-    ToggleCommentOverview shown ->
+    ToggleCommentOverview shown docID tocID ->
       if shown then do
-        H.tell _editor 0 Editor.SendCommentSections
+        H.tell _comment unit (Comment.Overview docID tocID)
         H.modify_ \st -> st { commentShown = false, commentOverviewShown = shown }
       else
         H.modify_ \st -> st { commentOverviewShown = shown }
@@ -796,6 +796,10 @@ splitview = H.mkComponent
       -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
       Comment.UpdateComment newCommentSection -> do
         H.tell _editor 0 (Editor.UpdateComment newCommentSection)
+
+      Comment.CommentOverview tocID cs -> do
+        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID cs)
+
     HandleCommentOverview output -> case output of
 
       CommentOverview.JumpToCommentSection tocID markerID -> do
@@ -882,15 +886,12 @@ splitview = H.mkComponent
         H.tell _comment unit
           (Comment.SelectedCommentSection state.docID tocID markerID)
 
-      Editor.SendingTOC tocEntry -> do
-        H.tell _commentOverview unit (CommentOverview.ReceiveTOC tocEntry)
-
       Editor.RenamedNode newName path -> do
         s <- H.get
         updateTree $ changeNodeName path newName s.tocEntries
 
-      Editor.ShowAllCommentsOutput -> do
-        handleAction $ ToggleCommentOverview true
+      Editor.ShowAllCommentsOutput docID tocID -> do
+        handleAction $ ToggleCommentOverview true docID tocID
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of

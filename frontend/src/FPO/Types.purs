@@ -46,6 +46,11 @@ type CommentSection =
   , resolved :: Boolean
   }
 
+type FirstComment =
+  { markerID :: Int
+  , first :: Comment
+  }
+
 type Comment =
   { author :: String
   , content :: String

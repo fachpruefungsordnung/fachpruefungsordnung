@@ -10,7 +10,7 @@ import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Store as Store
 import FPO.Dto.CommentDto as CD
-import FPO.Types (Comment, CommentSection, cdCommentToComment, sectionDtoToCS)
+import FPO.Types (Comment, CommentSection, FirstComment, cdCommentToComment, emptyComment, sectionDtoToCS)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -25,6 +25,7 @@ type Input = Unit
 data Output
   = CloseCommentSection
   | UpdateComment CommentSection
+  | CommentOverview Int (Array FirstComment)
 
 data Action
   = Init
@@ -37,6 +38,7 @@ data Query a
   | DeletedComment (Array Int) a
   | ReceiveTimeFormatter (Maybe Formatter) a
   | SelectedCommentSection Int Int Int a
+  | Overview Int Int a
 
 type State =
   { docID :: Int 
@@ -287,8 +289,33 @@ commentview = H.mkComponent
       else do
         handleAction $ SelectingCommentSection markerID
       pure (Just a)
+    
+    Overview docID tocID a -> do
+      state <- H.get
+      if (state.docID /= docID || tocID /= state.tocID) then do
+        recComs <- H.liftAff
+          $ Request.getFromJSONEndpoint CD.decodeCommentSection
+          $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
+        let 
+          commentSections = case recComs of 
+            Nothing -> []
+            Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
+          cs = map extractFirst commentSections
+        H.modify_ \st -> st { docID = docID, tocID = tocID, commentSections = commentSections }
+        H.raise (CommentOverview state.tocID cs)
+      else do
+        let 
+          css = state.commentSections
+          cs = map extractFirst css
+        H.raise (CommentOverview state.tocID cs)
+      pure (Just a)
 
   updateCommentSection :: CommentSection -> Array CommentSection -> Array CommentSection
   updateCommentSection cs = map \c ->
     if c.markerID == cs.markerID then cs else c
+
+  extractFirst :: CommentSection -> FirstComment
+  extractFirst {markerID, first} = case first of
+    Nothing -> {markerID: -1, first: emptyComment}
+    Just c -> {markerID: markerID, first: c}
 
