@@ -798,46 +798,8 @@ splitview = H.mkComponent
         H.modify_ \st -> st { commentShown = false }
 
       -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
-      Comment.UpdateComment markerID newCommentSection -> do
-        pure unit
-        -- H.tell _editor 0 Editor.SaveSection
-        -- state <- H.get
-        -- case
-        --   findRootTree (\e -> e.elementID == tocID && e.versionID /= Nothing)
-        --     state.versionMapping
-        --   of
-        --   Just _ -> do
-        --     let
-        --       updatedTOCEntries = map
-        --         ( \entry ->
-        --             if entry.id /= tocID then entry
-        --             else
-        --               let
-        --                 newMarkers =
-        --                   ( map
-        --                       ( \marker ->
-        --                           if marker.id /= markerID then marker
-        --                           else marker
-        --                             { mCommentSection = Just newCommentSection }
-        --                       )
-        --                       entry.markers
-        --                   )
-        --               in
-        --                 entry { markers = newMarkers }
-        --         )
-        --         state.tocEntries
-        --       updateTOCEntry = fromMaybe
-        --         emptyTOCEntry
-        --         (findTOCEntry tocID updatedTOCEntries)
-        --       title = fromMaybe
-        --         ""
-        --         (findTitleTOCEntry tocID updatedTOCEntries)
-        --     H.modify_ \s -> s { tocEntries = updatedTOCEntries }
-        --     H.tell _editor 0 (Editor.ChangeSection title updateTOCEntry Nothing)
-        --   Nothing -> do
-        --     H.liftEffect $ log
-        --       "unable to unpdate comment on outdated versions of elements"
-
+      Comment.UpdateComment newCommentSection -> do
+        H.tell _editor 0 (Editor.UpdateComment newCommentSection)
     HandleCommentOverview output -> case output of
 
       CommentOverview.JumpToCommentSection tocID markerID commentSection -> do
@@ -848,7 +810,7 @@ splitview = H.mkComponent
 
     HandleEditor output -> case output of
 
-      Editor.AddComment docID tocID newComment -> do
+      Editor.AddComment docID tocID -> do
         state <- H.get
         if state.sidebarShown then
           H.modify_ _ { commentShown = true }
@@ -858,7 +820,7 @@ splitview = H.mkComponent
             , sidebarShown = true
             , commentShown = true
             }
-        H.tell _comment unit (Comment.AddComment docID tocID newComment)
+        H.tell _comment unit (Comment.AddComment docID tocID)
 
       Editor.ClickedQuery response -> do
         H.modify_ _ { renderedHtml = Just Loading }

@@ -25,7 +25,7 @@ import Ace.UndoManager as UndoMgr
 import Data.Array (catMaybes, filter, intercalate, snoc, uncons, (:))
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
-import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
+import Data.Maybe (Maybe(..), fromJust, fromMaybe, isJust, maybe)
 import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
@@ -101,6 +101,11 @@ type State = FPOState
   , mNodePath :: Maybe Path
   , title :: String
   , mContent :: Maybe Content
+  -- comments
+  -- temporary comments and marker. Only set, if first comment is sent in Comment component
+  -- Otherwise delete them later
+  , mLiveMarker :: Maybe LiveMarker
+  -- comment markers and its corresponding livemarker
   , markers :: Array AnnotatedMarker
   , liveMarkers :: Array LiveMarker
   , fontSize :: Int
@@ -139,7 +144,7 @@ type LiveMarker =
 type Input = { docID :: DocumentID, elementData :: ElementData }
 
 data Output
-  = AddComment Int Int CommentSection
+  = AddComment Int Int
   | ClickedQuery (Array String)
   | DeletedComment TOCEntry (Array Int)
   | PostPDF String
@@ -195,6 +200,7 @@ data Query a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
   | SendCommentSections a
+  | UpdateComment CommentSection a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -225,6 +231,7 @@ editor = connect selectTranslator $ H.mkComponent
     , mNodePath: Nothing
     , title: ""
     , mContent: Nothing
+    , mLiveMarker: Nothing
     , markers: []
     , liveMarkers: []
     , fontSize: 12
@@ -748,18 +755,6 @@ editor = connect selectTranslator $ H.mkComponent
       case userWithError of
         Left _ -> pure unit -- TODO error handling 
         Right user -> do
-          let 
-            tocID = case state.mTocEntry of
-              Nothing -> -1
-              Just toc -> toc.id
-            jsonString = encodeJson {text: "Test"}
-          res <- Request.postJson (CommentDto.decodeSection)
-            ("/docs/" <> show state.docID <> "/text/" <> show tocID <> "/comments")
-            jsonString
-          let
-            newComment = case res of
-              Left _ -> emptyCommentSection
-              Right r -> sectionDtoToCS r
           H.gets _.mEditor >>= traverse_ \ed -> do
             state <- H.get
             session <- H.liftEffect $ Editor.getSession ed
@@ -767,45 +762,45 @@ editor = connect selectTranslator $ H.mkComponent
             start <- H.liftEffect $ Range.getStart range
             end <- H.liftEffect $ Range.getEnd range
 
+            -- delete temporary live marker, as the first comment has not been sent
+            case state.mLiveMarker of
+              Nothing -> pure unit
+              Just lm -> do
+                H.modify_ _ { mLiveMarker = Nothing }
+                H.liftEffect $ removeLiveMarker lm session
+
             let
               sRow = Types.getRow start
               sCol = Types.getColumn start
               eRow = Types.getRow end
               eCol = Types.getColumn end
               userName = getUserName user
-              newMarkerID = newComment.markerID
-              newCommentSection =
-                { markerID: newMarkerID
-                , first: Nothing
-                , replies: []
-                , resolved: false
-                }
               newMarker =
-                { id: newMarkerID
+                { id: -360
                 , type: "info"
                 , startRow: sRow
                 , startCol: sCol
                 , endRow: eRow
                 , endCol: eCol
                 , markerText: userName
-                , mCommentSection: Just newCommentSection
+                , mCommentSection: Nothing
                 }
 
             mLiveMarker <- H.liftEffect $ addAnchor newMarker session
 
-            let
-              newLiveMarkers = case mLiveMarker of
-                Nothing -> state.liveMarkers
-                Just lm -> lm : state.liveMarkers
+            -- let
+            --   newLiveMarkers = case mLiveMarker of
+            --     Nothing -> state.liveMarkers
+            --     Just lm -> lm : state.liveMarkers
 
             case state.mTocEntry of
               Just entry -> do
                 H.modify_ \st ->
-                  st { markers = snoc st.markers newMarker, liveMarkers = newLiveMarkers }
+                  st { mLiveMarker = mLiveMarker }
                 -- set dirty to true to be able to save
-                for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r
-                handleAction Save
-                H.raise (AddComment state.docID entry.id newComment)
+                -- for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r
+                -- handleAction Save
+                H.raise (AddComment state.docID entry.id)
                 -- H.raise
                 --   (SelectedCommentSection entry.id newMarker.id)
               Nothing -> pure unit
@@ -1024,6 +1019,35 @@ editor = connect selectTranslator $ H.mkComponent
         Nothing -> pure unit
         Just tocEntry -> do
           H.raise (SendingTOC tocEntry)
+      pure (Just a)
+
+    UpdateComment newCommentSection a -> do
+      state <- H.get
+      case state.mLiveMarker, newCommentSection.first of
+        Just marker, Just first -> do
+          let 
+            newLiveMarker = marker {annotedMarkerID = newCommentSection.markerID}
+            newLiveMarkers = snoc state.liveMarkers newLiveMarker
+          start <- H.liftEffect $ Anchor.getPosition marker.startAnchor
+          end <- H.liftEffect $ Anchor.getPosition marker.endAnchor
+          let 
+            newMarker =
+              { id: newCommentSection.markerID
+              , type: "info"
+              , startRow: Types.getRow start
+              , startCol: Types.getColumn start
+              , endRow: Types.getColumn end
+              , endCol: Types.getColumn end
+              , markerText: first.author
+              , mCommentSection: Just newCommentSection
+              }
+            newMarkers = snoc state.markers newMarker
+          H.modify_ \st -> st 
+            { mLiveMarker = Nothing
+            , markers = newMarkers
+            , liveMarkers = newLiveMarkers 
+            }
+        _, _ -> pure unit
       pure (Just a)
 
 -- | Change listener for the editor.
