@@ -6,6 +6,7 @@ module Language.Ltml.Tree.Parser
     ( TreeParser
     , runTreeParser
     , TreeParserWrapper (wrapTreeParser)
+    , TreeError (..)
     , treeError
     , leafError
     , leafParser
