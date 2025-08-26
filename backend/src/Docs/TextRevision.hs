@@ -11,7 +11,7 @@ module Docs.TextRevision
     , TextRevisionHistory (..)
     , NewTextRevision (..)
     , TextRevisionRef (..)
-    , contentsChanged
+    , contentsNotChanged
     , prettyPrintTextRevisionRef
     , textRevisionRef
     , specificTextRevision
@@ -274,8 +274,8 @@ data NewTextRevision = NewTextRevision
     }
 
 -- | Check if a new revisions contents changed from an existing one.
-contentsChanged :: TextRevision -> NewTextRevision -> Bool
-contentsChanged latest newRevision =
+contentsNotChanged :: TextRevision -> NewTextRevision -> Bool
+contentsNotChanged latest newRevision =
     content latest == newTextRevisionContent newRevision
         && commentAnchors latest `eqAsSet` newTextRevisionCommentAnchors newRevision
   where
