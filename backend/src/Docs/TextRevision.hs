@@ -11,6 +11,7 @@ module Docs.TextRevision
     , TextRevisionHistory (..)
     , NewTextRevision (..)
     , TextRevisionRef (..)
+    , contentsChanged
     , prettyPrintTextRevisionRef
     , textRevisionRef
     , specificTextRevision
@@ -19,9 +20,11 @@ module Docs.TextRevision
 
 import Data.Proxy (Proxy (Proxy))
 import Data.Scientific (toBoundedInteger)
+import qualified Data.Set as Set
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time (UTCTime)
+import qualified Data.Vector as Vector
 
 import Text.Read (readMaybe)
 
@@ -269,6 +272,15 @@ data NewTextRevision = NewTextRevision
     , newTextRevisionContent :: Text
     , newTextRevisionCommentAnchors :: Vector CommentAnchor
     }
+
+-- | Check if a new revisions contents changed from an existing one.
+contentsChanged :: TextRevision -> NewTextRevision -> Bool
+contentsChanged latest newRevision =
+    content latest == newTextRevisionContent newRevision
+        && commentAnchors latest `eqAsSet` newTextRevisionCommentAnchors newRevision
+  where
+    eqAsSet a b =
+        Set.fromList (Vector.toList a) == Set.fromList (Vector.toList b)
 
 -- | A conflict with another text revision.
 data ConflictStatus

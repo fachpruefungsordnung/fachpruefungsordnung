@@ -1363,6 +1363,8 @@ getCommentAnchors =
                     doc_comment_anchors
                 WHERE
                     revision = $1 :: INT8
+                ORDER BY
+                    comment, start_col, end_col
             |]
 
 deleteCommentAnchorsExcept :: Statement (TextRevisionID, Vector CommentID) ()
