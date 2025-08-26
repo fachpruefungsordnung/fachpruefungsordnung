@@ -39,3 +39,10 @@ cyanStyle = HP.classes
 -- | the scrollbar while still allowing scrolling functionality.
 disableScrollbar ∷ HH.ClassName
 disableScrollbar = HH.ClassName "disable-scrollbar"
+
+-- | A class to enable title tooltips on truncated text elements.
+-- | When applied to an element, if the text is truncated due to
+-- | insufficient space, hovering over the element will show a tooltip
+-- | with the full text content. Logic implemented in `Truncated.purs`.
+truncateHoverTitle :: HH.ClassName
+truncateHoverTitle = HH.ClassName "truncate-hover-title"

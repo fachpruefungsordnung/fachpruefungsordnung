@@ -38,6 +38,7 @@ import FPO.Translations.Translator
   , getTranslatorForLanguage
   )
 import FPO.UI.Style as Style
+import FPO.UI.Truncated (setupTruncationListener)
 import Halogen (liftEffect)
 import Halogen as H
 import Halogen.Aff as HA
@@ -230,3 +231,5 @@ main = HA.runHalogenAff do
       _response <- halogenIO.query $ H.mkTell $ NavigateQ new
       log $ "Navigated to: " <> routeToString new
       pure unit
+
+  void $ liftEffect setupTruncationListener
