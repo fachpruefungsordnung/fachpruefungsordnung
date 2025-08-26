@@ -22,10 +22,10 @@ import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
-import Data.Array (catMaybes, filter, intercalate, snoc, uncons, (:))
+import Data.Array (catMaybes, intercalate, snoc, uncons, (:))
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
-import Data.Maybe (Maybe(..), fromJust, fromMaybe, isJust, maybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
@@ -44,7 +44,6 @@ import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
-import FPO.Dto.CommentDto as CommentDto
 import FPO.Dto.ContentDto (Content, ContentWrapper)
 import FPO.Dto.ContentDto as ContentDto
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
@@ -55,11 +54,8 @@ import FPO.Types
   ( AnnotatedMarker
   , CommentSection
   , TOCEntry
-  , emptyCommentSection
   , emptyTOCEntry
   , markerToAnnotation
-  , sectionDtoToCS
-  , sortMarkers
   )
 import FPO.Util (prependIf)
 import Halogen (liftEffect)
@@ -87,8 +83,6 @@ import Web.HTML.HTMLElement (offsetWidth, toElement)
 import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
-import Data.Argonaut (encodeJson, stringify)
-import Effect.Console (log)
 
 type Path = Array Int
 
@@ -649,7 +643,6 @@ editor = connect selectTranslator $ H.mkComponent
       let 
         jsonContent = ContentDto.encodeWrapper newWrapper
         newContent = ContentDto.getWrapperContent newWrapper
-      H.liftEffect $ log $ stringify jsonContent
       -- send the new content as POST to the server
       response <- Request.postJson (ContentDto.extractNewParent newContent)
         ("/docs/" <> show state.docID <> "/text/" <> show newEntry.id <> "/rev")
@@ -756,7 +749,6 @@ editor = connect selectTranslator $ H.mkComponent
         Left _ -> pure unit -- TODO error handling 
         Right user -> do
           H.gets _.mEditor >>= traverse_ \ed -> do
-            state <- H.get
             session <- H.liftEffect $ Editor.getSession ed
             range <- H.liftEffect $ Editor.getSelectionRange ed
             start <- H.liftEffect $ Range.getStart range
