@@ -261,7 +261,7 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                 Nothing -> createRevision <&> TextRevision.NoConflict
                 Just latest
                     -- content has not changed? -> return latest
-                    | content latest == newTextRevisionContent revision ->
+                    | TextRevision.contentsNotChanged latest revision ->
                         return $ TextRevision.NoConflict latest
                     -- no conflict, and can update? -> update (squash)
                     | latestRevisionID == parentRevisionID && shouldUpdate now latest ->
@@ -281,7 +281,6 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
   where
     header = TextRevision.header
     identifier = TextRevision.identifier . header
-    content = TextRevision.content
     timestamp = TextRevision.timestamp . header
     author = TextRevision.author . header
     authorID = UserRef.identifier . author
