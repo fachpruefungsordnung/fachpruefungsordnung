@@ -12,6 +12,7 @@ module Language.Ltml.Parser.Text
     , hangingTextP
     , HangingTextP
     , hangingTextP'
+    , rawWordP
     )
 where
 
@@ -336,6 +337,9 @@ gWordP isValid isSemiSpecial isSpecial =
 
     escapedCharP :: (MonadParser m) => m Text
     escapedCharP = Text.singleton <$ char '\\' <*> satisfy isValid
+
+rawWordP :: (MonadParser m) => m Text
+rawWordP = takeWhile1P Nothing isWordChar
 
 -- NOTE: isControl '\n' == True
 isWordChar :: Char -> Bool
