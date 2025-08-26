@@ -532,6 +532,18 @@ updateTextRevision =
                         creation_ts :: timestamptz,
                         author :: uuid,
                         content :: text
+                ),
+                updated_anchors AS (
+                    UPDATE
+                        doc_comment_anchors
+                    SET
+                        comment = updated.id
+                    FROM
+                        updated
+                    WHERE
+                        doc_comment_anchors.comment = $1 :: int8
+                    RETURNING
+                        doc_comment_anchors.id
                 )
                 SELECT
                     updated.id :: int8,
