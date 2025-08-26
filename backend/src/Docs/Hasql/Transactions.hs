@@ -87,10 +87,10 @@ updateTextRevision
     -> Vector CommentAnchor
     -> Transaction TextRevision
 updateTextRevision rev text commentAnchors = do
-    textRevision <- statement (rev, text) Statements.updateTextRevision
     statement
         (rev, Comment.comment <$> commentAnchors)
         Statements.deleteCommentAnchorsExcept
+    textRevision <- statement (rev, text) Statements.updateTextRevision
     textRevision $
         const $
             mapM (`statement` Statements.putCommentAnchor) ((rev,) <$> commentAnchors)
