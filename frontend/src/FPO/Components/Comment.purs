@@ -34,6 +34,7 @@ data Action
   = Init
   | UpdateDraft String
   | SendComment
+  | SelectingCommentSection Int 
 
 data Query a
   = AddComment Int Int a
@@ -237,6 +238,18 @@ commentview = H.mkComponent
                     newCSs = updateCommentSection newCs state.commentSections
                   H.modify_ _ {commentSections = newCSs, mCommentSection = Just newCs, commentDraft = ""}
 
+    SelectingCommentSection markerID -> do
+      state <- H.get
+      let commentSections = state.commentSections
+      when ( markerID /= state.markerID) do
+        case (find (\cs -> cs.markerID == markerID) commentSections) of
+          Nothing -> pure unit
+          Just section -> do
+            H.modify_ \st -> st
+              { markerID = markerID
+              , mCommentSection = Just section
+              }
+
   handleQuery
     :: forall slots a
      . Query a
@@ -267,7 +280,7 @@ commentview = H.mkComponent
 
     SelectedCommentSection docID tocID markerID a -> do
       state <- H.get
-      when (state.docID /= docID || tocID /= state.tocID) do
+      if (state.docID /= docID || tocID /= state.tocID) then do
         recComs <- H.liftAff
           $ Request.getFromJSONEndpoint CD.decodeCommentSection
           $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
@@ -275,17 +288,10 @@ commentview = H.mkComponent
           commentSections = case recComs of 
             Nothing -> []
             Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
-        H.modify_ \st -> st { docID = docID, commentSections = commentSections }
-
-      when ( markerID /= state.markerID) do
-        let commentSections = state.commentSections
-        case (find (\cs -> cs.markerID == markerID) commentSections) of
-          Nothing -> pure unit
-          Just section -> do
-            H.modify_ \st -> st
-              { markerID = markerID
-              , mCommentSection = Just section
-              }
+        H.modify_ \st -> st { docID = docID, tocID = tocID, commentSections = commentSections }
+        handleAction $ SelectingCommentSection markerID
+      else do
+        handleAction $ SelectingCommentSection markerID
       pure (Just a)
 
   updateCommentSection :: CommentSection -> Array CommentSection -> Array CommentSection

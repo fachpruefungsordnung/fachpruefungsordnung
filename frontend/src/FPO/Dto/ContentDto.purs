@@ -67,8 +67,7 @@ instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
     rev <- obj .: "revision"
     con <- decodeJson (fromObject rev)
     coms <- rev .: "commentAnchors"
-    coms' <- traverse (map CommentAnchor <<< decodeJson) coms
-    pure $ Wrapper { content: con, comments: coms'}
+    pure $ Wrapper { content: con, comments: coms}
 
 instance encodeJsonCommentAnchor :: EncodeJson CommentAnchor where
   encodeJson (CommentAnchor {id, startCol, startRow, endCol, endRow }) =

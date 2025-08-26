@@ -788,21 +788,11 @@ editor = connect selectTranslator $ H.mkComponent
 
             mLiveMarker <- H.liftEffect $ addAnchor newMarker session
 
-            -- let
-            --   newLiveMarkers = case mLiveMarker of
-            --     Nothing -> state.liveMarkers
-            --     Just lm -> lm : state.liveMarkers
-
             case state.mTocEntry of
               Just entry -> do
                 H.modify_ \st ->
                   st { mLiveMarker = mLiveMarker }
-                -- set dirty to true to be able to save
-                -- for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r
-                -- handleAction Save
                 H.raise (AddComment state.docID entry.id)
-                -- H.raise
-                --   (SelectedCommentSection entry.id newMarker.id)
               Nothing -> pure unit
 
     DeleteComment -> do
@@ -954,7 +944,7 @@ editor = connect selectTranslator $ H.mkComponent
 
         -- Update state with new marker IDs
         H.modify_ \st ->
-          st { liveMarkers = [] } --newLiveMarkers }
+          st { liveMarkers = newLiveMarkers }
 
   handleQuery
     :: forall slots a
@@ -1047,6 +1037,9 @@ editor = connect selectTranslator $ H.mkComponent
             , markers = newMarkers
             , liveMarkers = newLiveMarkers 
             }
+          -- set dirty to true to be able to save
+          for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r
+          handleAction Save
         _, _ -> pure unit
       pure (Just a)
 
