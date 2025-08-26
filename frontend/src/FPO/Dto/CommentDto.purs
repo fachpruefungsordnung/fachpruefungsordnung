@@ -2,14 +2,10 @@ module FPO.Dto.CommentDto where
 
 import Prelude
 
-import Data.Argonaut (Json, fromObject)
+import Data.Argonaut (Json)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError, decodeJson, (.:))
-import Data.Argonaut.Encode (class EncodeJson, encodeJson)
-import Data.DateTime (DateTime)
 import Data.Either (Either)
-import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Traversable (traverse)
 import FPO.Dto.DocumentDto.DocDate (DocDate)
 
 newtype Author = Author

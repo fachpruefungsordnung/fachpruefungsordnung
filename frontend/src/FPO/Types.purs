@@ -3,7 +3,7 @@ module FPO.Types where
 import Prelude
 
 import Ace.Types as Types
-import Data.Array (cons, find, sortBy)
+import Data.Array (sortBy)
 import Data.Date (canonicalDate)
 import Data.Date.Component (Day, Month(..), Year)
 import Data.DateTime (DateTime(..))
@@ -13,7 +13,6 @@ import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Time (Time(..))
 import Data.Time.Component (Hour, Millisecond, Minute, Second)
-import Effect.Now (nowDateTime)
 import FPO.Dto.CommentDto (CommentT(..), Section(..))
 import FPO.Dto.CommentDto as CD
 import FPO.Dto.DocumentDto.DocDate (docDateToDateTime)

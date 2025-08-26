@@ -8,7 +8,6 @@ import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
-import Data.Traversable (traverse)
 import FPO.Types (AnnotatedMarker)
 
 newtype CommentAnchor = CommentAnchor
