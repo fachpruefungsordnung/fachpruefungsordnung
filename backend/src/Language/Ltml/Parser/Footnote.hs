@@ -22,7 +22,7 @@ import Language.Lsd.AST.Type.Footnote (FootnoteType (FootnoteType))
 import Language.Ltml.AST.Footnote (Footnote (Footnote))
 import Language.Ltml.AST.Label (Label (unLabel))
 import Language.Ltml.Parser (Parser, ParserWrapper (wrapParser))
-import Language.Ltml.Parser.Text (lHangingTextP)
+import Language.Ltml.Parser.Text (hangingTextP')
 
 type FootnotePT m =
     ReaderT [FootnoteType] (StateT (Map Label Footnote) m)
@@ -62,4 +62,4 @@ footnoteP =
 
 footnoteP' :: FootnoteType -> Parser (Label, Footnote)
 footnoteP' (FootnoteType kw fmt tt) =
-    fmap (Footnote fmt) <$> lHangingTextP kw tt
+    fmap (Footnote fmt) <$> hangingTextP' kw tt

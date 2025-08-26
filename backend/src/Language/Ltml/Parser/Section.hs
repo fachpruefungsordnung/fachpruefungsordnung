@@ -29,7 +29,7 @@ import Language.Ltml.Parser.Footnote.Combinators (manyWithFootnotesTillSucc)
 import Language.Ltml.Parser.Keyword (keywordP)
 import Language.Ltml.Parser.Paragraph (paragraphP)
 import Language.Ltml.Parser.SimpleBlock (simpleBlockP)
-import Language.Ltml.Parser.Text (mlHangingTextP)
+import Language.Ltml.Parser.Text (hangingTextP')
 import Text.Megaparsec (many)
 
 sectionP :: SectionType -> Parser () -> FootnoteParser (Node Section)
@@ -59,4 +59,4 @@ toStartP (SectionType kw _ _ _) = void $ keywordP kw
 
 headingP :: Keyword -> HeadingType -> Parser (Maybe Label, Heading)
 headingP kw (HeadingType fmt tt) =
-    nLexeme $ fmap (Heading fmt) <$> mlHangingTextP kw tt
+    nLexeme $ fmap (Heading fmt) <$> hangingTextP' kw tt

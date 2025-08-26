@@ -10,13 +10,14 @@ module Language.Ltml.Parser.Text
     ( ParagraphParser
     , textForestP
     , hangingTextP
-    , lHangingTextP
-    , mlHangingTextP
+    , HangingTextP
+    , hangingTextP'
     )
 where
 
 import Control.Applicative (empty, (<|>))
 import Control.Applicative.Combinators (choice)
+import Control.Monad.Identity (Identity (Identity), runIdentity)
 import Control.Monad.State (StateT, get, put)
 import Control.Monad.Trans.Class (lift)
 import qualified Data.Char as Char (isControl)
@@ -141,33 +142,33 @@ hangingTextP
     => Keyword
     -> TextType enumType
     -> m [TextTree lbrk fnref style enum special]
-hangingTextP kw t = hangingBlock_ (keywordP kw) elementPF (childPF t)
+hangingTextP kw t = runIdentity <$> hangingTextP' kw t
 
-lHangingTextP
-    :: ( ParserWrapper m
-       , LineBreakP lbrk
-       , FootnoteRefP fnref
-       , StyleP style
-       , EnumP enumType enum
-       , SpecialP m special
-       )
-    => Keyword
-    -> TextType enumType
-    -> m (Label, [TextTree lbrk fnref style enum special])
-lHangingTextP kw t = hangingBlock' (lKeywordP kw) elementPF (childPF t)
+class (Functor f) => HangingTextP f where
+    hangingTextP'
+        :: ( ParserWrapper m
+           , LineBreakP lbrk
+           , FootnoteRefP fnref
+           , StyleP style
+           , EnumP enumType enum
+           , SpecialP m special
+           )
+        => Keyword
+        -> TextType enumType
+        -> m (f [TextTree lbrk fnref style enum special])
 
-mlHangingTextP
-    :: ( ParserWrapper m
-       , LineBreakP lbrk
-       , FootnoteRefP fnref
-       , StyleP style
-       , EnumP enumType enum
-       , SpecialP m special
-       )
-    => Keyword
-    -> TextType enumType
-    -> m (Maybe Label, [TextTree lbrk fnref style enum special])
-mlHangingTextP kw t = hangingBlock' (mlKeywordP kw) elementPF (childPF t)
+instance HangingTextP Identity where
+    hangingTextP' kw t =
+        Identity <$> hangingBlock_ (keywordP kw) elementPF (childPF t)
+
+instance HangingTextP Node where
+    hangingTextP' kw t = uncurry Node <$> hangingTextP' kw t
+
+instance HangingTextP ((,) Label) where
+    hangingTextP' kw t = hangingBlock' (lKeywordP kw) elementPF (childPF t)
+
+instance HangingTextP ((,) (Maybe Label)) where
+    hangingTextP' kw t = hangingBlock' (mlKeywordP kw) elementPF (childPF t)
 
 class LineBreakP lbrk where
     bracedLineBreakP :: (MonadParser m) => m (MiElementConfig, lbrk)
@@ -207,7 +208,7 @@ instance EnumP Void Void where
 instance EnumP EnumType Enumeration where
     enumP (EnumType kw fmt tt) = Enumeration fmt <$> someIndented enumItemP
       where
-        enumItemP = uncurry Node . fmap EnumItem <$> mlHangingTextP kw tt
+        enumItemP = uncurry Node . fmap EnumItem <$> hangingTextP' kw tt
 
 class SpecialP m special | special -> m where
     specialP :: m (MiElementConfig, Maybe special)
