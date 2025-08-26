@@ -53,7 +53,7 @@ commentOverviewview = H.mkComponent
         ( mapMaybe
             ( \m -> case m.mCommentSection of
                 Nothing -> Nothing
-                Just cs -> case head cs.comments of
+                Just cs -> case cs.first of
                   Nothing -> Nothing
                   Just c -> Just
                     (renderFirstComment state.mTimeFormatter c tocEntry.id m.id cs)

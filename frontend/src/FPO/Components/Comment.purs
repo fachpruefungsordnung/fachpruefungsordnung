@@ -82,20 +82,20 @@ commentview = H.mkComponent
     Nothing -> HH.text ""
     Just commentSection ->
       HH.div [ HP.style "comment-section space-y-3" ]
-        ( renderComments state.mTimeFormatter commentSection.comments
+        ( renderComments state.mTimeFormatter commentSection
             <> [ renderInput state.commentDraft ]
         )
 
   renderComments
     :: Maybe Formatter
-    -> Array Comment
+    -> CommentSection
     -> forall slots
      . Array (H.ComponentHTML Action slots m)
-  renderComments mFormatter comments = case uncons comments of
+  renderComments mFormatter commentSection = case commentSection.first of
     Nothing -> [ HH.text "" ]
-    Just { head: c, tail: cs } ->
-      [ renderFirstComment mFormatter c ]
-        <> map (renderComment mFormatter) cs
+    Just cs ->
+      [ renderFirstComment mFormatter cs ]
+        <> map (renderComment mFormatter) commentSection.replies
 
   renderFirstComment
     :: Maybe Formatter -> Comment -> forall slots. H.ComponentHTML Action slots m
@@ -209,7 +209,7 @@ commentview = H.mkComponent
               Just cs -> do
                 let 
                   com' = cdCommentToComment com
-                  newCs = cs { comments = snoc cs.comments com'}
+                  newCs = cs { replies = snoc cs.replies com'}
                 H.modify_ _ {mCommentSection = Just newCs, commentDraft = ""}
 
   handleQuery

@@ -4,10 +4,10 @@ import Prelude
 
 import Ace.Types as Types
 import Data.Array (cons, find, sortBy)
-import Data.DateTime (DateTime)
+import Data.DateTime (DateTime(..))
 import Data.Formatter.DateTime (Formatter, FormatterCommand(..))
 import Data.List (List(..), (:))
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..), fromJust)
 import FPO.Dto.CommentDto as CD
 import FPO.Dto.CommentDto (CommentT(..), Section(..))
 import FPO.Dto.DocumentDto.DocDate (docDateToDateTime)
@@ -19,6 +19,13 @@ import FPO.Dto.DocumentDto.TreeDto
   , findTitleRootTree
   , replaceNodeRootTree
   )
+import Effect.Now (nowDateTime)
+import Data.Date.Component ( Year, Month(..), Day)
+import Data.Time.Component ( Hour , Minute , Second , Millisecond)
+import Data.Enum (toEnum)
+import Partial.Unsafe (unsafePartial)
+import Data.Date (canonicalDate)
+import Data.Time (Time(..))
 
 -- TODO We can also store different markers, such as errors. But do we want to?
 type AnnotatedMarker =
@@ -34,7 +41,8 @@ type AnnotatedMarker =
 
 type CommentSection =
   { markerID :: Int
-  , comments :: Array Comment
+  , first :: Maybe Comment
+  , replies :: Array Comment
   , resolved :: Boolean
   }
 
@@ -61,10 +69,34 @@ emptyTOCEntry =
   , paraID: -1
   }
 
+defaultDateTime :: DateTime
+defaultDateTime =
+  let
+    y    = unsafePartial $ fromJust (toEnum 1970 :: Maybe Year)
+    m    = January
+    d    = unsafePartial $ fromJust (toEnum 1    :: Maybe Day)
+    date = (canonicalDate y m d)
+
+    h  = unsafePartial $ fromJust (toEnum 0 :: Maybe Hour)
+    mi = unsafePartial $ fromJust (toEnum 0 :: Maybe Minute)
+    s  = unsafePartial $ fromJust (toEnum 0 :: Maybe Second)
+    ms = unsafePartial $ fromJust (toEnum 0 :: Maybe Millisecond)
+    time = Time h mi s ms
+  in
+    DateTime date time
+
+emptyComment :: Comment
+emptyComment =
+  { author: "No author"
+  , content: ""
+  , timestamp: defaultDateTime
+  }
+
 emptyCommentSection :: CommentSection
 emptyCommentSection =
   { markerID: -1
-  , comments: []
+  , first: Nothing
+  , replies: []
   , resolved: false
   }
 
@@ -173,9 +205,9 @@ cdCommentToComment (Comment {author, content, timestamp}) =
 sectionDtoToCS :: CD.Section -> CommentSection
 sectionDtoToCS (Section { id, firstComment, replies, status }) =
   let
-    -- fst = cdCommentToComment firstComment 
+    fst = cdCommentToComment firstComment 
     rep = map cdCommentToComment replies
     -- comments = cons fst rep
     resolved = if status == "open" then true else false
   in
-  { markerID: id, comments: rep, resolved: resolved }
+  { markerID: id, first: Just fst, replies: rep, resolved: resolved }

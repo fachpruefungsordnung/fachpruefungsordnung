@@ -776,7 +776,8 @@ editor = connect selectTranslator $ H.mkComponent
               newMarkerID = newComment.markerID
               newCommentSection =
                 { markerID: newMarkerID
-                , comments: []
+                , first: Nothing
+                , replies: []
                 , resolved: false
                 }
               newMarker =
