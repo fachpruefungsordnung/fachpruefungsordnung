@@ -1,5 +1,6 @@
 module Language.Ltml.Parser.Section
     ( sectionP
+    , sectionBodyP
     , headingP
     )
 where
@@ -35,8 +36,11 @@ import Text.Megaparsec (many)
 sectionP :: SectionType -> Parser () -> FootnoteParser (Node Section)
 sectionP (SectionType kw headingT fmt bodyT) succStartP = do
     (mLabel, heading) <- wrapParser $ nonIndented $ headingP kw headingT
-    body <- nonIndented $ bodyP bodyT
+    body <- nonIndented $ sectionBodyP bodyT succStartP
     return $ Node mLabel $ Section fmt (Flagged False heading) body
+
+sectionBodyP :: SectionBodyType -> Parser () -> FootnoteParser SectionBody
+sectionBodyP t0 succStartP = bodyP t0
   where
     bodyP :: SectionBodyType -> FootnoteParser SectionBody
     bodyP (InnerSectionBodyType (Star t)) =
