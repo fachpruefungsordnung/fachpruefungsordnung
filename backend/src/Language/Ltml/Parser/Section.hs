@@ -1,5 +1,6 @@
 module Language.Ltml.Parser.Section
     ( sectionP
+    , headingP
     )
 where
 
@@ -13,7 +14,6 @@ import Language.Lsd.AST.Type.Section
     , SectionBodyType (..)
     , SectionType (SectionType)
     )
-import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Node (Node (Node))
 import Language.Ltml.AST.Section
     ( Heading (Heading)
@@ -29,7 +29,7 @@ import Language.Ltml.Parser.Footnote.Combinators (manyWithFootnotesTillSucc)
 import Language.Ltml.Parser.Keyword (keywordP)
 import Language.Ltml.Parser.Paragraph (paragraphP)
 import Language.Ltml.Parser.SimpleBlock (simpleBlockP)
-import Language.Ltml.Parser.Text (hangingTextP')
+import Language.Ltml.Parser.Text (HangingTextP, hangingTextP')
 import Text.Megaparsec (many)
 
 sectionP :: SectionType -> Parser () -> FootnoteParser (Node Section)
@@ -57,6 +57,6 @@ sectionP (SectionType kw headingT fmt bodyT) succStartP = do
 toStartP :: SectionType -> Parser ()
 toStartP (SectionType kw _ _ _) = void $ keywordP kw
 
-headingP :: Keyword -> HeadingType -> Parser (Maybe Label, Heading)
+headingP :: (HangingTextP f) => Keyword -> HeadingType -> Parser (f Heading)
 headingP kw (HeadingType fmt tt) =
     nLexeme $ fmap (Heading fmt) <$> hangingTextP' kw tt

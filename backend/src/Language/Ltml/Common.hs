@@ -5,6 +5,8 @@ module Language.Ltml.Common
     )
 where
 
+import Control.Functor.Utils (SequenceF (sequenceF))
+
 -- | Flagging wrapper for AST nodes.
 --   A positive flag indicates that the respective node was originally
 --   requested for update.
@@ -13,3 +15,6 @@ where
 --   The flag should only be set for one node in a tree.
 data Flagged a = Flagged Bool a
     deriving (Functor, Show)
+
+instance SequenceF Flagged where
+    sequenceF (Flagged flag x) = fmap (Flagged flag) x
