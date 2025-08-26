@@ -50,7 +50,7 @@ prettyPrintCommentRef (CommentRef textElementRef id_) =
 newtype CommentID = CommentID
     { unCommentID :: Int64
     }
-    deriving (Show)
+    deriving (Show, Eq, Ord)
 
 instance ToJSON CommentID where
     toJSON = toJSON . unCommentID
@@ -116,7 +116,7 @@ data CommentAnchor = CommentAnchor
     { comment :: CommentID
     , anchor :: Range
     }
-    deriving (Generic)
+    deriving (Generic, Eq, Ord)
 
 instance ToJSON CommentAnchor
 
@@ -145,7 +145,7 @@ data Range = Range
     { start :: Anchor
     , end :: Anchor
     }
-    deriving (Generic)
+    deriving (Generic, Eq, Ord)
 
 instance ToJSON Range
 
