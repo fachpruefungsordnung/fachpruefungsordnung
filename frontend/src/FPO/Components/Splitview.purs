@@ -157,8 +157,6 @@ type State =
   , commentOverviewShown :: Boolean
   , commentShown :: Boolean
   , previewShown :: Boolean
-  , pdfWarningAvailable :: Boolean
-  , pdfWarningIsShown :: Boolean
   , compareToElement :: ElementData
   }
 
@@ -204,8 +202,6 @@ splitview = H.mkComponent
       , commentOverviewShown: false
       , commentShown: false
       , previewShown: true
-      , pdfWarningAvailable: false
-      , pdfWarningIsShown: false
       , docID: docID
       , compareToElement: Nothing
       }
@@ -700,12 +696,21 @@ splitview = H.mkComponent
 
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
-    ToggleCommentOverview shown docID tocID ->
+    ToggleCommentOverview shown docID tocID -> do
+      sidebarShown <- H.gets _.sidebarShown
       if shown then do
+        if sidebarShown then
+          H.modify_ _ { commentShown = false, commentOverviewShown = true }
+        else
+          H.modify_ \st -> st
+            { sidebarRatio = st.lastExpandedSidebarRatio
+            , sidebarShown = true
+            , commentShown = false
+            , commentOverviewShown = true
+            }
         H.tell _comment unit (Comment.Overview docID tocID)
-        H.modify_ \st -> st { commentShown = false, commentOverviewShown = shown }
       else
-        H.modify_ \st -> st { commentOverviewShown = shown }
+        H.modify_ \st -> st { commentOverviewShown = false }
 
     -- Toggle the sidebar
     -- Add logic in calculating the middle ratio
@@ -892,6 +897,7 @@ splitview = H.mkComponent
 
       Editor.ShowAllCommentsOutput docID tocID -> do
         handleAction $ ToggleCommentOverview true docID tocID
+
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of

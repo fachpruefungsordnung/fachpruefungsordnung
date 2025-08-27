@@ -245,9 +245,7 @@ editor = connect selectTranslator $ H.mkComponent
   render :: State -> H.ComponentHTML Action () m
   render state =
     HH.div
-      [ HE.onClick $ const SelectComment
-      , HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ]
-      ]
+      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
       [ HH.div
           -- toolbar
           [ HP.classes [ HB.dFlex, HB.justifyContentBetween ] ]
@@ -351,6 +349,7 @@ editor = connect selectTranslator $ H.mkComponent
       , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
+          , HE.onClick $ const SelectComment
           , HP.classes [ HB.flexGrow1 ]
           , HP.style "min-height: 0"
           ]
