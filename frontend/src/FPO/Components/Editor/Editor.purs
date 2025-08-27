@@ -22,7 +22,7 @@ import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
-import Data.Array (catMaybes, filter, intercalate, uncons, (:))
+import Data.Array (catMaybes, intercalate, snoc, uncons, (:))
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
@@ -44,7 +44,7 @@ import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
-import FPO.Dto.ContentDto (Content)
+import FPO.Dto.ContentDto (Content, ContentWrapper)
 import FPO.Dto.ContentDto as ContentDto
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.UserDto (getUserName)
@@ -52,10 +52,10 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types
   ( AnnotatedMarker
+  , CommentSection
   , TOCEntry
   , emptyTOCEntry
   , markerToAnnotation
-  , sortMarkers
   )
 import FPO.Util (prependIf)
 import Halogen (liftEffect)
@@ -95,6 +95,12 @@ type State = FPOState
   , mNodePath :: Maybe Path
   , title :: String
   , mContent :: Maybe Content
+  -- comments
+  -- temporary comments and marker. Only set, if first comment is sent in Comment component
+  -- Otherwise delete them later
+  , mLiveMarker :: Maybe LiveMarker
+  -- comment markers and its corresponding livemarker
+  , markers :: Array AnnotatedMarker
   , liveMarkers :: Array LiveMarker
   , fontSize :: Int
   , mListener :: Maybe (HS.Listener Action)
@@ -132,15 +138,15 @@ type LiveMarker =
 type Input = { docID :: DocumentID, elementData :: ElementData }
 
 data Output
-  = ClickedQuery (Array String)
+  = AddComment Int Int
+  | ClickedQuery (Array String)
   | DeletedComment TOCEntry (Array Int)
   | PostPDF String
   -- SavedSection toBePosted title TOCEntry
   | SavedSection Boolean String TOCEntry
   | RenamedNode String Path
   | SelectedCommentSection Int Int
-  | SendingTOC TOCEntry
-  | ShowAllCommentsOutput
+  | ShowAllCommentsOutput Int Int
 
 data Action
   = Init
@@ -157,9 +163,9 @@ data Action
   | Redo
   | Save
   -- Subsection of Save
-  | Upload TOCEntry String Content
+  | Upload TOCEntry String ContentWrapper
   -- Subsection of Upload
-  | LostParentID TOCEntry String Content
+  | LostParentID TOCEntry String ContentWrapper
   | SavedIcon
   -- new change in editor -> reset timer
   | AutoSaveTimer
@@ -186,7 +192,7 @@ data Query a
   | ChangeToNode String Path a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
-  | SendCommentSections a
+  | UpdateComment CommentSection a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -217,6 +223,8 @@ editor = connect selectTranslator $ H.mkComponent
     , mNodePath: Nothing
     , title: ""
     , mContent: Nothing
+    , mLiveMarker: Nothing
+    , markers: []
     , liveMarkers: []
     , fontSize: 12
     , mListener: Nothing
@@ -237,9 +245,7 @@ editor = connect selectTranslator $ H.mkComponent
   render :: State -> H.ComponentHTML Action () m
   render state =
     HH.div
-      [ HE.onClick $ const SelectComment
-      , HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ]
-      ]
+      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
       [ HH.div
           -- toolbar
           [ HP.classes [ HB.dFlex, HB.justifyContentBetween ] ]
@@ -343,6 +349,7 @@ editor = connect selectTranslator $ H.mkComponent
       , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
+          , HE.onClick $ const SelectComment
           , HP.classes [ HB.flexGrow1 ]
           , HP.style "min-height: 0"
           ]
@@ -556,7 +563,9 @@ editor = connect selectTranslator $ H.mkComponent
       H.raise (PostPDF content)
 
     ShowAllComments -> do
-      H.raise ShowAllCommentsOutput
+      state <- H.get
+      let tocID = maybe (-1) _.id state.mTocEntry
+      H.raise $ ShowAllCommentsOutput state.docID tocID
 
     -- Save section
 
@@ -607,7 +616,7 @@ editor = connect selectTranslator $ H.mkComponent
                   -- Since the ids and postions in liveMarkers are changing constantly,
                   -- extract them now and store them
                   updatedMarkers <- H.liftEffect do
-                    for entry.markers \m -> do
+                    for state.markers \m -> do
                       case
                         find (\lm -> lm.annotedMarkerID == m.id) state.liveMarkers
                         of
@@ -622,16 +631,19 @@ editor = connect selectTranslator $ H.mkComponent
                             , endRow = Types.getRow end
                             , endCol = Types.getColumn end
                             }
-                  -- update the markers in entry
-                  let newEntry = entry { markers = updatedMarkers }
 
+                  -- convert into a newtype for encodeJson
+                  let
+                    comments = map ContentDto.convertToCommentAnchor updatedMarkers
+                    newWrapper = ContentDto.setWrapper newContent comments
                   -- Try to upload
-                  handleAction $ Upload newEntry title newContent
+                  handleAction $ Upload entry title newWrapper
 
-    Upload newEntry title newContent -> do
+    Upload newEntry title newWrapper -> do
       state <- H.get
-      let jsonContent = ContentDto.encodeContent newContent
-
+      let
+        jsonContent = ContentDto.encodeWrapper newWrapper
+        newContent = ContentDto.getWrapperContent newWrapper
       -- send the new content as POST to the server
       response <- Request.postJson (ContentDto.extractNewParent newContent)
         ("/docs/" <> show state.docID <> "/text/" <> show newEntry.id <> "/rev")
@@ -639,7 +651,7 @@ editor = connect selectTranslator $ H.mkComponent
 
       -- handle errors in pos and decodeJson
       case response of
-        Left _ -> handleAction $ LostParentID newEntry title newContent
+        Left _ -> handleAction $ LostParentID newEntry title newWrapper
         -- extract and insert new parentID into newContent
         Right updatedContent -> do
           -- Update the tree to backend, when title was really changed
@@ -659,7 +671,8 @@ editor = connect selectTranslator $ H.mkComponent
           for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
           pure unit
 
-    LostParentID newEntry title newContent -> do
+    LostParentID newEntry title newWrapper -> do
+      let newContent = ContentDto.getWrapperContent newWrapper
       docID <- H.gets _.docID
       loadedContent <- H.liftAff $
         Request.getFromJSONEndpoint
@@ -669,11 +682,13 @@ editor = connect selectTranslator $ H.mkComponent
         -- TODO: Error handling
         Nothing -> pure unit
         Just res ->
-          handleAction $
-            Upload
-              newEntry
-              title
-              (ContentDto.setContentText (ContentDto.getContentText newContent) res)
+          let
+            newContent' = ContentDto.setContentText
+              (ContentDto.getContentText newContent)
+              res
+            newWrapper' = ContentDto.setWrapperContent newContent' newWrapper
+          in
+            handleAction $ Upload newEntry title newWrapper'
 
     SavedIcon -> do
       state <- H.get
@@ -730,16 +745,23 @@ editor = connect selectTranslator $ H.mkComponent
         H.modify_ _ { mPendingDebounceF = Nothing, mPendingMaxWaitF = Nothing }
 
     Comment -> do
+      state <- H.get
       userWithError <- getUser
       case userWithError of
         Left _ -> pure unit -- TODO error handling 
         Right user -> do
           H.gets _.mEditor >>= traverse_ \ed -> do
-            state <- H.get
             session <- H.liftEffect $ Editor.getSession ed
             range <- H.liftEffect $ Editor.getSelectionRange ed
             start <- H.liftEffect $ Range.getStart range
             end <- H.liftEffect $ Range.getEnd range
+
+            -- delete temporary live marker, as the first comment has not been sent
+            case state.mLiveMarker of
+              Nothing -> pure unit
+              Just lm -> do
+                H.modify_ _ { mLiveMarker = Nothing }
+                H.liftEffect $ removeLiveMarker lm session
 
             let
               sRow = Types.getRow start
@@ -747,50 +769,24 @@ editor = connect selectTranslator $ H.mkComponent
               eRow = Types.getRow end
               eCol = Types.getColumn end
               userName = getUserName user
-              newMarkerID = case state.mTocEntry of
-                Nothing -> 0
-                Just tocEntry -> tocEntry.newMarkerNextID
-              newCommentSection =
-                { markerID: newMarkerID
-                , comments: []
-                , resolved: false
-                }
               newMarker =
-                { id: newMarkerID
+                { id: -360
                 , type: "info"
                 , startRow: sRow
                 , startCol: sCol
                 , endRow: eRow
                 , endCol: eCol
                 , markerText: userName
-                , mCommentSection: Just newCommentSection
+                , mCommentSection: Nothing
                 }
 
             mLiveMarker <- H.liftEffect $ addAnchor newMarker session
 
-            let
-              newLiveMarkers = case mLiveMarker of
-                Nothing -> state.liveMarkers
-                Just lm -> lm : state.liveMarkers
-
             case state.mTocEntry of
               Just entry -> do
-                let
-                  newEntry =
-                    { id: entry.id
-                    , name: entry.name
-                    , paraID: entry.paraID
-                    , newMarkerNextID: entry.newMarkerNextID + 1
-                    , markers: sortMarkers (newMarker : entry.markers)
-                    }
                 H.modify_ \st ->
-                  st
-                    { mTocEntry = Just newEntry
-                    , liveMarkers = newLiveMarkers
-                    }
-                H.raise (SavedSection false state.title newEntry)
-                H.raise
-                  (SelectedCommentSection entry.id newMarker.id)
+                  st { mLiveMarker = mLiveMarker }
+                H.raise (AddComment state.docID entry.id)
               Nothing -> pure unit
 
     DeleteComment -> do
@@ -809,15 +805,15 @@ editor = connect selectTranslator $ H.mkComponent
               Just lm -> do
                 let
                   foundID = lm.annotedMarkerID
-                  newMarkers = filter (\m -> not (m.id == foundID)) tocEntry.markers
-                  newLiveMarkers =
-                    filter (\l -> not (l.annotedMarkerID == foundID))
-                      state.liveMarkers
-                  newTOCEntry = tocEntry { markers = newMarkers }
+                --   newMarkers = filter (\m -> not (m.id == foundID)) tocEntry.markers
+                --   newLiveMarkers =
+                --     filter (\l -> not (l.annotedMarkerID == foundID))
+                --       state.liveMarkers
+                --  newTOCEntry = tocEntry { markers = newMarkers }
                 H.liftEffect $ removeLiveMarker lm session
                 H.modify_ \st ->
-                  st { mTocEntry = Just newTOCEntry, liveMarkers = newLiveMarkers }
-                H.raise (DeletedComment newTOCEntry [ foundID ])
+                  st { mTocEntry = Just tocEntry } --, liveMarkers = newLiveMarkers }
+                H.raise (DeletedComment tocEntry [ foundID ])
 
     SelectComment -> do
       H.gets _.mEditor >>= traverse_ \ed -> do
@@ -833,8 +829,8 @@ editor = connect selectTranslator $ H.mkComponent
           tocEntry = case state.mTocEntry of
             Nothing -> emptyTOCEntry
             Just e -> e
-          markers = tocEntry.markers
-
+          markers = state.markers
+        pure unit
         when (foundID >= 0)
           case (find (\m -> m.id == foundID) markers) of
             Nothing -> pure unit
@@ -890,17 +886,25 @@ editor = connect selectTranslator $ H.mkComponent
         -- See, why and fix it
         loadedContent <- H.liftAff $
           Request.getFromJSONEndpoint
-            ContentDto.decodeContent
+            ContentDto.decodeContentWrapper
             ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
                 <> "/rev/"
                 <> version
             )
         let
-          content = case loadedContent of
-            Nothing -> ContentDto.failureContent
+          wrapper = case loadedContent of
+            Nothing -> ContentDto.failureContentWrapper
             Just res -> res
+          content = ContentDto.getWrapperContent wrapper
+          comments = ContentDto.getWrapperComments wrapper
+          -- convert markers
+          markers = map ContentDto.convertToAnnotetedMarker comments
+
         H.modify_ \st -> st
-          { mContent = Just content, isEditorReadonly = version /= "latest" }
+          { mContent = Just content
+          , markers = markers
+          , isEditorReadonly = version /= "latest"
+          }
 
         newLiveMarkers <- H.liftEffect do
           session <- Editor.getSession ed
@@ -922,16 +926,12 @@ editor = connect selectTranslator $ H.mkComponent
           -- Remove existing markers
           for_ state.liveMarkers \lm -> do
             removeLiveMarker lm session
-          -- existingMarkers <- Session.getMarkers session
-          -- for_ existingMarkers \marker -> do
-          --   id <- Marker.getId marker
-          --   Session.removeMarker id session
 
           -- Clear annotations
           Session.clearAnnotations session
 
           -- Add annotations from marker
-          tmp <- for (entry.markers) \marker -> do
+          tmp <- for markers \marker -> do
             addAnchor marker session
 
           pure (catMaybes tmp)
@@ -996,13 +996,36 @@ editor = connect selectTranslator $ H.mkComponent
       H.raise (ClickedQuery $ fromMaybe [] allLines)
       pure (Just a)
 
-    SendCommentSections a -> do
+    UpdateComment newCommentSection a -> do
       state <- H.get
-      -- Send the current comment sections to the splitview
-      case state.mTocEntry of
-        Nothing -> pure unit
-        Just tocEntry -> do
-          H.raise (SendingTOC tocEntry)
+      case state.mLiveMarker, newCommentSection.first of
+        Just marker, Just first -> do
+          let
+            newLiveMarker = marker { annotedMarkerID = newCommentSection.markerID }
+            newLiveMarkers = snoc state.liveMarkers newLiveMarker
+          start <- H.liftEffect $ Anchor.getPosition marker.startAnchor
+          end <- H.liftEffect $ Anchor.getPosition marker.endAnchor
+          let
+            newMarker =
+              { id: newCommentSection.markerID
+              , type: "info"
+              , startRow: Types.getRow start
+              , startCol: Types.getColumn start
+              , endRow: Types.getColumn end
+              , endCol: Types.getColumn end
+              , markerText: first.author
+              , mCommentSection: Just newCommentSection
+              }
+            newMarkers = snoc state.markers newMarker
+          H.modify_ \st -> st
+            { mLiveMarker = Nothing
+            , markers = newMarkers
+            , liveMarkers = newLiveMarkers
+            }
+          -- set dirty to true to be able to save
+          for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r
+          handleAction Save
+        _, _ -> pure unit
       pure (Just a)
 
 -- | Change listener for the editor.
