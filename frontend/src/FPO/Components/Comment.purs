@@ -278,16 +278,23 @@ commentview = H.mkComponent
       pure unit
 
     SelectingCommentSection markerID -> do
-      state <- H.get
-      let commentSections = state.commentSections
-      when (markerID /= state.markerID) do
-        case (find (\cs -> cs.markerID == markerID) commentSections) of
-          Nothing -> pure unit
-          Just section -> do
-            H.modify_ \st -> st
-              { markerID = markerID
-              , mCommentSection = Just section
-              }
+      if markerID == -360 then do
+        H.modify_ \st -> st 
+          {markerID = -360
+          , mCommentSection = Nothing
+          , newComment = true
+          }
+      else do
+        state <- H.get
+        let commentSections = state.commentSections
+        when (markerID /= state.markerID) do
+          case (find (\cs -> cs.markerID == markerID) commentSections) of
+            Nothing -> pure unit
+            Just section -> do
+              H.modify_ \st -> st
+                { markerID = markerID
+                , mCommentSection = Just section
+                }
 
   handleQuery
     :: forall slots a
@@ -296,13 +303,27 @@ commentview = H.mkComponent
   handleQuery = case _ of
 
     AddComment docID tocID a -> do
+      -- load comments, when section was changed
+      state <- H.get
+      when (state.docID /= docID || tocID /= state.tocID) do
+        recComs <- H.liftAff
+          $ Request.getFromJSONEndpoint CD.decodeCommentSection
+          $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
+        let
+          commentSections = case recComs of
+            Nothing -> []
+            Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
+        H.modify_ \st -> st
+          { docID = docID
+          , tocID = tocID
+          , commentSections = commentSections 
+          }
+      -- Always set this
       H.modify_ \st -> st
-        { docID = docID
-        , tocID = tocID
-        , markerID = -360
-        , mCommentSection = Nothing
-        , newComment = true
-        }
+          { markerID = -360
+          , mCommentSection = Nothing
+          , newComment = true
+          }
       pure (Just a)
 
     DeletedComment deletedIDs a -> do

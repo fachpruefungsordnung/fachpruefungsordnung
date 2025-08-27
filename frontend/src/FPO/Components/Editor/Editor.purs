@@ -818,8 +818,12 @@ editor = connect selectTranslator $ H.mkComponent
     SelectComment -> do
       H.gets _.mEditor >>= traverse_ \ed -> do
         state <- H.get
+        let
+          liveMarkers = case state.mLiveMarker of
+            Nothing -> state.liveMarkers
+            Just lm -> snoc state.liveMarkers lm
         cursor <- H.liftEffect $ Editor.getCursorPosition ed
-        foundLM <- H.liftEffect $ cursorInRange state.liveMarkers cursor
+        foundLM <- H.liftEffect $ cursorInRange liveMarkers cursor
         let
           foundID = case foundLM of
             Nothing -> -1
@@ -831,11 +835,15 @@ editor = connect selectTranslator $ H.mkComponent
             Just e -> e
           markers = state.markers
         pure unit
-        when (foundID >= 0)
+        if (foundID >= 0) then do
           case (find (\m -> m.id == foundID) markers) of
             Nothing -> pure unit
             Just foundMarker -> H.raise
               (SelectedCommentSection tocEntry.id foundMarker.id)
+        else if (foundID == -360) then do
+          H.raise (SelectedCommentSection tocEntry.id (-360))
+        else 
+          pure unit
 
     HandleResize width -> do
       -- Decides whether to show button text based on the width.
