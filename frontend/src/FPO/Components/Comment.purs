@@ -26,6 +26,9 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
+import Data.Argonaut.Core (jsonEmptyObject)
+
+import Effect.Console (log)
 
 type Input = Unit
 
@@ -90,13 +93,13 @@ commentview = H.mkComponent
     Nothing ->
       if state.newComment then
         HH.div [ HP.style "comment-section space-y-3" ]
-          [ renderInput state.commentDraft ]
+          [ renderInput state.commentDraft state.newComment ]
       else
         HH.text ""
     Just commentSection ->
       HH.div [ HP.style "comment-section space-y-3" ]
         ( renderComments state.mTimeFormatter commentSection
-            <> [ renderInput state.commentDraft ]
+            <> (if commentSection.resolved then [] else [ renderInput state.commentDraft state.newComment ])
         )
 
   renderComments
@@ -106,13 +109,13 @@ commentview = H.mkComponent
      . Array (H.ComponentHTML Action slots m)
   renderComments mFormatter commentSection = case commentSection.first of
     Nothing -> [ HH.text "" ]
-    Just cs ->
-      [ renderFirstComment mFormatter cs ]
+    Just c ->
+      [ renderFirstComment mFormatter c commentSection.resolved ]
         <> map (renderComment mFormatter) commentSection.replies
 
   renderFirstComment
-    :: Maybe Formatter -> Comment -> forall slots. H.ComponentHTML Action slots m
-  renderFirstComment mFormatter c =
+    :: Maybe Formatter -> Comment -> Boolean -> forall slots. H.ComponentHTML Action slots m
+  renderFirstComment mFormatter c resolved =
     HH.div
       [ HP.classes
           [ HB.p2
@@ -123,7 +126,7 @@ commentview = H.mkComponent
           , HB.dFlex
           , HB.flexColumn
           ]
-      , HP.style "background-color:rgba(246, 250, 0, 0.9);"
+      , HP.style $ "background-color:" <> (if resolved then "rgba(66, 250, 0, 0.9)" else "rgba(246, 250, 0, 0.9)") <> ";"
       ]
       [ HH.div_
           [ HH.div
@@ -181,8 +184,8 @@ commentview = H.mkComponent
           ]
       ]
 
-  renderInput :: String -> forall slots. H.ComponentHTML Action slots m
-  renderInput draft =
+  renderInput :: String -> Boolean -> forall slots. H.ComponentHTML Action slots m
+  renderInput draft newComment =
     HH.div [ HP.classes [ HB.dFlex, HB.flexColumn ], HP.style "gap: .5rem; padding-left: 0.5rem; padding-right: 0.5rem; padding-top: 0.75rem; padding-bottom: 1rem;" ]
       [ HH.textarea
           [ HP.style "border-radius: .375rem; padding: .5rem; resize: none; min-height: 5rem;"
@@ -206,9 +209,11 @@ commentview = H.mkComponent
 
             -- Resolve (rechts)
           , HH.button
-              [ HP.classes [ HB.btn, HB.btnSuccess, HB.px3, HB.py1, HB.m0, HB.msAuto ]
+              [ HP.classes 
+                  ([ HB.btn, HB.btnSuccess, HB.px3, HB.py1, HB.m0, HB.msAuto ] <> (if (not newComment) then [] else [ HB.opacity50 ]))
               , HP.style "white-space: nowrap;"
-              , HE.onClick \_ -> SendComment
+              , HP.enabled (not newComment)
+              , HE.onClick \_ -> ResolveComment
               ]
               [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text "Resolve" ]
               , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
@@ -261,6 +266,7 @@ commentview = H.mkComponent
           case res of
             Left _ -> pure unit
             Right com -> do
+            -- update the current commentSection in the list of other commentSections
               case state.mCommentSection of
                 Nothing -> pure unit
                 Just cs -> do
@@ -275,6 +281,26 @@ commentview = H.mkComponent
                     }
 
     ResolveComment -> do
+      state <- H.get
+      _ <- Request.postIgnore 
+        ( "/docs/" <> show state.docID <> "/text/" <> show state.tocID
+            <> "/comments/"
+            <> show state.markerID
+            <> "/resolve"
+        )
+        jsonEmptyObject
+      case state.mCommentSection of
+        Nothing -> pure unit
+        Just cs -> do
+          let
+            newCs = cs { resolved = true }
+            newCSs = updateCommentSection newCs state.commentSections
+          H.modify_ _
+            { commentSections = newCSs
+            , mCommentSection = Just newCs
+            , commentDraft = ""
+            }
+
       pure unit
 
     SelectingCommentSection markerID -> do
@@ -346,6 +372,7 @@ commentview = H.mkComponent
           commentSections = case recComs of
             Nothing -> []
             Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
+        H.liftEffect $ log $ show commentSections
         H.modify_ \st -> st
           { docID = docID, tocID = tocID, commentSections = commentSections }
         handleAction $ SelectingCommentSection markerID

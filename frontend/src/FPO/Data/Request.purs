@@ -26,6 +26,7 @@ module FPO.Data.Request
   , patchString
   , postBlob
   , postDocument
+  , postIgnore
   , postJson
   , postRenderHtml
   , postString
@@ -337,6 +338,16 @@ postDocument
   -> H.HalogenM st act slots msg m (Either AppError Document)
 postDocument url body = handleRequest' url (postDocument' url body)
 
+postIgnore  
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => String
+  -> Json
+  -> H.HalogenM st act slots msg m (Either AppError Unit)
+postIgnore url body = handleUnitRequest url (postIgnore' url body)
+
 putJson
   :: forall a st act slots msg m
    . MonadAff m
@@ -635,6 +646,12 @@ postDocument' url body = do
 postBlob' :: String -> Json -> Aff (Either Error (Response Blob))
 postBlob' url body = do
   fpoRequest <- liftEffect $ defaultFpoRequest AXRF.blob ("/api" <> url) POST
+  let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
+
+postIgnore' :: String -> Json -> Aff (Either Error (Response Unit))
+postIgnore' url body = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.ignore ("/api" <> url) POST
   let request' = fpoRequest { content = Just (RequestBody.json body) }
   liftAff $ request driver request'
 
