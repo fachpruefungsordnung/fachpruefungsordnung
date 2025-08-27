@@ -21,7 +21,6 @@ module Language.Ltml.HTML.Common
     , Delayed (..)
     , evalDelayed
     , returnNow
-    , fromNow
     ) where
 
 import Control.Monad.Reader (ReaderT)
@@ -242,10 +241,6 @@ evalDelayed (Later fa) s = fa s
 
 returnNow :: Html () -> HtmlReaderState
 returnNow = return . Now
-
-fromNow :: Delayed a -> a
-fromNow (Now a) = a
-fromNow (Later _) = error "fromNow was called with Later"
 
 instance (Monoid a) => Monoid (Delayed a) where
     mempty = Now mempty

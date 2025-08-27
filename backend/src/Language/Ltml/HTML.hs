@@ -87,7 +87,7 @@ renderSectionHtmlCss section fnMap =
         finalState' = finalState {labels = usedFootnotes ++ labels finalState}
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
 
-renderHtmlCss :: DocumentContainer -> (Html (), Css)
+renderHtmlCss :: Flagged DocumentContainer -> (Html (), Css)
 renderHtmlCss docContainer =
     -- \| Render with given footnote context
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) initReaderState) initGlobalState
@@ -143,11 +143,19 @@ instance ToHtmlM Document where
                             , currentSuperSectionID = currentSuperSectionID initGlobalState
                             }
                     )
+                renderTitle <- asks shouldRender
                 titleHtml <- toHtmlM documentHeading
                 introHtml <- toHtmlM introSSections
                 mainHtml <- toHtmlM sectionBody
                 outroHtml <- toHtmlM outroSSections
-                return $ div_ <$> (titleHtml <> introHtml <> mainHtml <> outroHtml)
+                -- \| Render DocumentHeading only if renderFlag was set by parent
+                return $
+                    div_
+                        <$> ( (if renderTitle then titleHtml else mempty)
+                                <> introHtml
+                                <> mainHtml
+                                <> outroHtml
+                            )
 
 instance ToHtmlM DocumentHeading where
     toHtmlM (DocumentHeading headingTextTree) = do
@@ -172,6 +180,8 @@ instance ToHtmlM DocumentHeading where
                 return (headingHtml, Just htmlId)
         return $ h1_ [cssClass_ Class.DocumentTitle, mTextId_ mId] <$> formattedTitle
 
+-------------------------------------------------------------------------------
+
 -- | This combined instances creates the sectionIDHtml before building the reference,
 --   which is needed for correct referencing
 instance ToHtmlM (Node Section) where
@@ -180,13 +190,12 @@ instance ToHtmlM (Node Section) where
                 mLabel
                 ( Section
                         sectionFormatS
-                        (Flagged renderFlag (Heading headingFormatS title))
+                        (Heading headingFormatS title)
                         sectionBody
                     )
             ) = do
             globalState <- get
             titleHtml <- toHtmlM title
-            renderChild <- asks shouldRender
             let (sectionIDGetter, incrementSectionID, sectionCssClass) =
                     -- \| Check if we are inside a section or a super-section
                     -- TODO: Is [SimpleBlocks] counted as super-section? (i think yes)
@@ -195,12 +204,8 @@ instance ToHtmlM (Node Section) where
                         else (currentSectionID, incSectionID, Class.Section)
                 (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (sectionIDGetter globalState)
                 headingHtml =
-                    -- \| render if Flagged is True or any parent Flagged is True
-                    if renderFlag || renderChild
-                        then
-                            (h2_ <#> Class.Heading) . headingFormatId headingFormatS sectionIDHtml
-                                <$> titleHtml
-                        else mempty
+                    (h2_ <#> Class.Heading) . headingFormatId headingFormatS sectionIDHtml
+                        <$> titleHtml
              in do
                     addMaybeLabelToState mLabel sectionIDHtml
                     -- \| Add table of contents entry for section
@@ -473,6 +478,8 @@ instance ToHtmlM AppendixSection where
 
 -------------------------------------------------------------------------------
 
+-- | This instance manages which part of the AST is actually translated into HTML;
+--   Everything else is just used to build up the needed context (labels, etc.)
 instance (ToHtmlM a) => ToHtmlM (Flagged a) where
     toHtmlM (Flagged renderFlag a) = do
         -- \| Set False to see if child sets it True again
