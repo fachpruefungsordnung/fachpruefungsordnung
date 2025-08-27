@@ -1,12 +1,19 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module Language.Lsd.AST.Type.SimpleSection
     ( SimpleSectionFormat (..)
     , SimpleSectionType (..)
-    , PreSimpleSectionType (..)
     )
 where
 
-import Language.Lsd.AST.Common (Keyword, TypeName)
-import Language.Lsd.AST.SimpleRegex (Star)
+import Language.Lsd.AST.Common (Keyword)
+import Language.Lsd.AST.SimpleRegex (Sequence, Star)
+import Language.Lsd.AST.Type
+    ( KindNameOf (kindNameOf)
+    , NamedType
+    , TypeNameOf (typeNameOf)
+    )
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphType)
 
 newtype SimpleSectionFormat
@@ -19,10 +26,10 @@ data SimpleSectionType
     = SimpleSectionType
         Keyword
         SimpleSectionFormat
-        (Star SimpleParagraphType)
+        (Star (NamedType SimpleParagraphType))
 
-data PreSimpleSectionType
-    = PreSimpleSectionType
-        Keyword
-        SimpleSectionFormat
-        (Star TypeName)
+instance KindNameOf (Sequence (NamedType SimpleSectionType)) where
+    kindNameOf _ = "simple-section-sequence"
+
+instance TypeNameOf (Sequence (NamedType SimpleSectionType)) where
+    typeNameOf _ = ""

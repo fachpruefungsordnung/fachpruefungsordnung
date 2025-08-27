@@ -1,17 +1,26 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Language.Lsd.AST.Type.Document
     ( DocumentFormat (..)
     , DocumentType (..)
+    , DocumentHeadingType (..)
     , DocumentBodyType (..)
-    , PreDocumentType (..)
-    , PreDocumentBodyType (..)
+    , DocumentMainBodyType (..)
     )
 where
 
-import Language.Lsd.AST.Common (TypeName)
+import Data.Void (Void)
+import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Disjunction, Sequence)
-import Language.Lsd.AST.Type.Footnote (FootnoteType, PreFootnoteType)
-import Language.Lsd.AST.Type.Section (PreSectionBodyType, SectionBodyType)
+import Language.Lsd.AST.Type
+    ( KindNameOf (kindNameOf)
+    , NamedType
+    , TypeNameOf (typeNameOf)
+    )
+import Language.Lsd.AST.Type.Footnote (FootnoteType)
+import Language.Lsd.AST.Type.Section (SectionBodyType (..))
 import Language.Lsd.AST.Type.SimpleSection (SimpleSectionType)
+import Language.Lsd.AST.Type.Text (TextType)
 
 newtype DocumentFormat
     = DocumentFormat
@@ -21,32 +30,35 @@ newtype DocumentFormat
 
 data DocumentType
     = DocumentType
+        Keyword
         DocumentFormat
+        DocumentHeadingType
         DocumentBodyType
-        (Disjunction FootnoteType)
+        (Disjunction (NamedType FootnoteType))
 
-data PreDocumentType
-    = PreDocumentType
-        DocumentFormat
-        PreDocumentBodyType
-        (Disjunction PreFootnoteType)
+instance KindNameOf DocumentType where
+    kindNameOf _ = "document"
+
+newtype DocumentHeadingType = DocumentHeadingType (TextType Void)
 
 data DocumentBodyType
     = -- | document body type
       DocumentBodyType
-        (Sequence SimpleSectionType)
+        (Sequence (NamedType SimpleSectionType))
         -- ^ intro
-        (Disjunction SectionBodyType)
+        (Disjunction DocumentMainBodyType)
         -- ^ main
-        (Sequence SimpleSectionType)
+        (Sequence (NamedType SimpleSectionType))
         -- ^ outro
 
-data PreDocumentBodyType
-    = -- | pre document body type
-      PreDocumentBodyType
-        (Sequence TypeName)
-        -- ^ intro
-        (Disjunction PreSectionBodyType)
-        -- ^ main
-        (Sequence TypeName)
-        -- ^ outro
+newtype DocumentMainBodyType
+    = DocumentMainBodyType SectionBodyType
+
+instance KindNameOf DocumentMainBodyType where
+    kindNameOf _ = "document-mainbody"
+
+instance TypeNameOf DocumentMainBodyType where
+    typeNameOf (DocumentMainBodyType (InnerSectionBodyType _)) = "inner"
+    typeNameOf (DocumentMainBodyType (LeafSectionBodyType _)) = "leaf"
+    typeNameOf (DocumentMainBodyType (SimpleLeafSectionBodyType _)) =
+        "simple-leaf"

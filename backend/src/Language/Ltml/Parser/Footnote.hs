@@ -3,7 +3,9 @@
 
 module Language.Ltml.Parser.Footnote
     ( FootnoteParser
+    , FootnotePT
     , unwrapFootnoteParser
+    , unwrapFootnoteParser'
     , footnoteP
     )
 where
@@ -20,19 +22,28 @@ import Language.Lsd.AST.Type.Footnote (FootnoteType (FootnoteType))
 import Language.Ltml.AST.Footnote (Footnote (Footnote))
 import Language.Ltml.AST.Label (Label (unLabel))
 import Language.Ltml.Parser (Parser, ParserWrapper (wrapParser))
-import Language.Ltml.Parser.Text (lHangingTextP)
+import Language.Ltml.Parser.Text (hangingTextP')
 
-type FootnoteParser =
-    ReaderT [FootnoteType] (StateT (Map Label Footnote) Parser)
+type FootnotePT m =
+    ReaderT [FootnoteType] (StateT (Map Label Footnote) m)
+
+type FootnoteParser = FootnotePT Parser
 
 instance ParserWrapper FootnoteParser where
     wrapParser = lift . lift
 
 unwrapFootnoteParser
     :: [FootnoteType]
-    -> FootnoteParser a
-    -> Parser (a, Map Label Footnote)
-unwrapFootnoteParser ts p = runStateT (runReaderT p ts) Map.empty
+    -> FootnotePT m a
+    -> m (a, Map Label Footnote)
+unwrapFootnoteParser ts = unwrapFootnoteParser' ts Map.empty
+
+unwrapFootnoteParser'
+    :: [FootnoteType]
+    -> Map Label Footnote
+    -> FootnotePT m a
+    -> m (a, Map Label Footnote)
+unwrapFootnoteParser' ts fnMap p = runStateT (runReaderT p ts) fnMap
 
 footnoteP :: FootnoteParser ()
 footnoteP =
@@ -51,4 +62,4 @@ footnoteP =
 
 footnoteP' :: FootnoteType -> Parser (Label, Footnote)
 footnoteP' (FootnoteType kw fmt tt) =
-    fmap (Footnote fmt) <$> lHangingTextP kw tt
+    fmap (Footnote fmt) <$> hangingTextP' kw tt
