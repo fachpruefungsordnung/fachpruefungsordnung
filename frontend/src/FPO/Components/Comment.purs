@@ -38,6 +38,7 @@ data Action
   = Init
   | UpdateDraft String
   | SendComment
+  | ResolveComment
   | SelectingCommentSection Int
 
 data Query a
@@ -182,18 +183,37 @@ commentview = H.mkComponent
 
   renderInput :: String -> forall slots. H.ComponentHTML Action slots m
   renderInput draft =
-    HH.div [ HP.style "flex flex-col space-y-2" ]
+    HH.div [ HP.classes [ HB.dFlex, HB.flexColumn ], HP.style "gap: .5rem; padding-left: 0.5rem; padding-right: 0.5rem; padding-top: 0.75rem; padding-bottom: 1rem;" ]
       [ HH.textarea
-          [ HP.style "border rounded-md p-2 resize-none"
+          [ HP.style "border-radius: .375rem; padding: .5rem; resize: none; min-height: 5rem;"
           , HP.rows 3
           , HP.value draft
           , HE.onValueChange UpdateDraft
           ]
-      , HH.button
-          [ HP.style "bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-          , HE.onClick \_ -> SendComment
+      , HH.div
+          [ HP.classes [ HB.dFlex, HB.alignItemsCenter, HB.w100 ]
+          , HP.style "gap: .5rem; padding-left: 0.5rem; padding-right: 0.5rem;" 
           ]
-          [ HH.text "Senden" ]
+          [ -- Senden (links)
+            HH.button
+              [ HP.classes [ HB.btn, HB.btnPrimary, HB.px3, HB.py1, HB.m0 ]
+              , HP.style "white-space: nowrap;"
+              , HE.onClick \_ -> SendComment
+              ]
+              [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text "Senden" ]
+              , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-send" ] ] []
+              ]
+
+            -- Resolve (rechts)
+          , HH.button
+              [ HP.classes [ HB.btn, HB.btnSuccess, HB.px3, HB.py1, HB.m0, HB.msAuto ]
+              , HP.style "white-space: nowrap;"
+              , HE.onClick \_ -> SendComment
+              ]
+              [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text "Resolve" ]
+              , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
+              ]
+          ]
       ]
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
@@ -253,6 +273,9 @@ commentview = H.mkComponent
                     , mCommentSection = Just newCs
                     , commentDraft = ""
                     }
+
+    ResolveComment -> do
+      pure unit
 
     SelectingCommentSection markerID -> do
       state <- H.get
