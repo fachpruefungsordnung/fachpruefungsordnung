@@ -7,13 +7,18 @@ where
 
 import Data.Text (Text, unlines)
 import Language.Ltml.Common (Flagged (Flagged))
-import Language.Ltml.Tree (Tree (Leaf, Tree), TypedTree (TypedTree))
+import Language.Ltml.Tree
+    ( FlaggedTree
+    , Tree (Leaf, Tree)
+    , TypedTree (TypedTree)
+    )
 import Prelude hiding (unlines)
 
-fpoTree :: TypedTree
+fpoTree :: FlaggedTree
 fpoTree =
-    TypedTree "document-container" "fpo-container" $
-        Tree (Just $ Flagged False header) (mainDocTree : appTrees)
+    Flagged False $
+        TypedTree "document-container" "fpo-container" $
+            Tree (Just header) (mainDocTree : appTrees)
   where
     header :: Text
     header =
@@ -31,12 +36,13 @@ fpoTree =
             , "header-footer-date: 2025-08-26"
             ]
 
-mainDocTree :: TypedTree
+mainDocTree :: FlaggedTree
 mainDocTree =
-    TypedTree "document" "fpo-maindoc" $
-        Tree
-            (Just $ Flagged False heading)
-            [introTree, mainBodyTree, extroTree]
+    Flagged False $
+        TypedTree "document" "fpo-maindoc" $
+            Tree
+                (Just heading)
+                [introTree, mainBodyTree, extroTree]
   where
     heading =
         unlines
@@ -45,29 +51,34 @@ mainDocTree =
             ]
 
     introTree =
-        TypedTree "simple-section-sequence" "" $
-            Leaf (Flagged False introText)
+        Flagged False $
+            TypedTree "simple-section-sequence" "" $
+                Leaf introText
 
     mainBodyTree =
-        TypedTree "document-mainbody" "inner" $
-            Tree Nothing [sampleSectionTree True]
+        Flagged False $
+            TypedTree "document-mainbody" "inner" $
+                Tree Nothing [Flagged True sampleSectionTree]
 
     extroTree =
-        TypedTree "simple-section-sequence" "" $
-            Leaf (Flagged False extroText)
+        Flagged False $
+            TypedTree "simple-section-sequence" "" $
+                Leaf extroText
 
-appTrees :: [TypedTree]
+appTrees :: [FlaggedTree]
 appTrees = [appendixTree, attachmentsTree]
 
-appendixTree :: TypedTree
+appendixTree :: FlaggedTree
 appendixTree =
-    TypedTree "appendix-section" "appendix" $
-        Tree Nothing []
+    Flagged False $
+        TypedTree "appendix-section" "appendix" $
+            Tree Nothing []
 
-attachmentsTree :: TypedTree
+attachmentsTree :: FlaggedTree
 attachmentsTree =
-    TypedTree "appendix-section" "attachments" $
-        Tree Nothing []
+    Flagged False $
+        TypedTree "appendix-section" "attachments" $
+            Tree Nothing []
 
 introText :: Text
 introText =
@@ -90,10 +101,10 @@ introText =
         , "// \"Aufgrund ... wird ... erlassen:\""
         ]
 
-sampleSectionTree :: Bool -> TypedTree
-sampleSectionTree flag =
+sampleSectionTree :: TypedTree
+sampleSectionTree =
     TypedTree "section" "section" $
-        Leaf (Flagged flag sampleSectionText)
+        Leaf sampleSectionText
 
 sampleSectionText :: Text
 sampleSectionText =

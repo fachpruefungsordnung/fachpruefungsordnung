@@ -17,7 +17,7 @@ import Language.Ltml.Common (Flagged)
 data Document
     = Document
         DocumentFormat
-        (Flagged DocumentHeading)
+        DocumentHeading
         DocumentBody
         (Map Label Footnote)
     deriving (Show)

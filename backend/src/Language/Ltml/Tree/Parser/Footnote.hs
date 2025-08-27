@@ -12,7 +12,6 @@ import Control.Monad.Reader (ask)
 import Control.Monad.State (get, put)
 import Control.Monad.Trans.Class (lift)
 import Data.Text (Text)
-import Language.Ltml.Common (Flagged (Flagged))
 import Language.Ltml.Parser.Common.Lexeme (nSc)
 import Language.Ltml.Parser.Footnote
     ( FootnotePT
@@ -33,12 +32,12 @@ instance TreeParserWrapper FootnoteTreeParser where
 
 leafFootnoteParser
     :: FootnoteParser a
-    -> Flagged Text
-    -> FootnoteTreeParser (Flagged a)
-leafFootnoteParser p (Flagged f x) = do
+    -> Text
+    -> FootnoteTreeParser a
+leafFootnoteParser p x = do
     env <- ask
     st <- get
     let p' = unwrapFootnoteParser' env st p
     case runParser (nSc *> p') "" (x <> "\n") of
         Left e -> leafError e
-        Right (y, st') -> put st' >> return (Flagged f y)
+        Right (y, st') -> put st' >> return y
