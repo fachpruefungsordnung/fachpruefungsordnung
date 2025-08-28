@@ -26,7 +26,7 @@ import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (LoadState(..), getUser, getUserDocuments)
+import FPO.Data.Request (LoadState(..), fromLoading, getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocDate as DocDate
@@ -68,7 +68,7 @@ data Action
 
 type State = FPOState
   ( user :: LoadState (Maybe FullUserDto)
-  , projects :: Array DocumentHeader
+  , projects :: LoadState (Array DocumentHeader)
   , currentTime :: Maybe DateTime
   , searchQuery :: String
   , page :: Int
@@ -100,7 +100,7 @@ component =
   initialState { context } =
     { user: Loading
     , translator: fromFpoTranslator context
-    , projects: []
+    , projects: Loading
     , currentTime: Nothing
     , searchQuery: ""
     , page: 0
@@ -137,24 +137,23 @@ component =
         Left _ -> do
           H.modify_ _
             { user = Loaded Nothing
-            , translator = fromFpoTranslator store.translator
             , currentTime = Just now
             }
         Right user -> do
+          H.modify_ _
+            { projects = Loading
+            , user = Loaded $ Just user
+            }
           docsResult <- getUserDocuments $ getUserID user
           case docsResult of
             Left _ -> do -- TODO correct error handling
               H.modify_ _
-                { user = Loaded $ Just user
-                , translator = fromFpoTranslator store.translator
-                , projects = []
+                { projects = Loading
                 , currentTime = Just now
                 }
             Right docs -> do
               H.modify_ _
-                { user = Loaded $ Just user
-                , translator = fromFpoTranslator store.translator
-                , projects = docs
+                { projects = Loaded docs
                 , currentTime = Just now
                 }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
@@ -170,26 +169,29 @@ component =
       pure unit
     ChangeSorting (TH.Clicked title order) -> do
       state <- H.get
+      case state.projects of
+        Loading -> pure unit
+        Loaded projects' -> do
 
-      -- Sorting logic based on the clicked column title:
-      projects <- pure $ case title of
-        "Title" ->
-          TH.sortByF
-            order
-            (comparing DocumentHeader.getName)
-            state.projects
-        "Last Updated" ->
-          TH.sortByF
-            (TH.toggleSorting order) -- The newest project should be first.
-            (comparing getEditTimestamp)
-            state.projects
-        _ -> state.projects -- Ignore other columns.
+          -- Sorting logic based on the clicked column title:
+          projects <- pure $ case title of
+            "Title" ->
+              TH.sortByF
+                order
+                (comparing DocumentHeader.getName)
+                projects'
+            "Last Updated" ->
+              TH.sortByF
+                (TH.toggleSorting order) -- The newest project should be first.
+                (comparing getEditTimestamp)
+                projects'
+            _ -> projects' -- Ignore other columns.
 
-      H.modify_ _ { projects = projects }
+          H.modify_ _ { projects = Loaded projects }
 
-      -- After changing the sorting, tell the pagination component
-      -- to reset to the first page:
-      H.tell _pagination unit $ P.SetPageQ 0
+          -- After changing the sorting, tell the pagination component
+          -- to reset to the first page:
+          H.tell _pagination unit $ P.SetPageQ 0
     HandleSearchInput query -> do
       H.modify_ _ { searchQuery = query }
     SetPage (P.Clicked page) -> do
@@ -467,14 +469,14 @@ component =
                   HP.InputText
                   HandleSearchInput
               ]
-          , HH.div [ HP.classes [ HB.col12 ] ]
-              [ renderProjectTable ps state ]
+          , if state.projects == Loading then HH.div_ [ HH.text "Loading" ]
+            else HH.div [ HP.classes [ HB.col12 ] ] [ renderProjectTable ps state ]
           , HH.slot _pagination unit P.component paginationSettings SetPage
           ]
       ]
     where
     -- All projects filtered by the search query:
-    fps = filterProjects state.searchQuery state.projects
+    fps = filterProjects state.searchQuery (fromLoading state.projects [])
     -- Slice of the projects for the current page:
     ps = slice (state.page * 5) ((state.page + 1) * 5) $ fps
     paginationSettings =
