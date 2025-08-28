@@ -16,7 +16,7 @@ import Language.Ltml.Common (Flagged)
 data Section
     = Section
         SectionFormat
-        (Flagged Heading)
+        Heading
         SectionBody
     deriving (Show)
 

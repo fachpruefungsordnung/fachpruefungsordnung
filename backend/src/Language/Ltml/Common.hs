@@ -5,7 +5,7 @@ module Language.Ltml.Common
     )
 where
 
-import Control.Functor.Utils (SequenceF (sequenceF))
+import Control.Functor.Utils (TraversableF (traverseF))
 
 -- | Flagging wrapper for AST nodes.
 --   A positive flag indicates that the respective node was originally
@@ -16,5 +16,5 @@ import Control.Functor.Utils (SequenceF (sequenceF))
 data Flagged a = Flagged Bool a
     deriving (Functor, Show)
 
-instance SequenceF Flagged where
-    sequenceF (Flagged flag x) = fmap (Flagged flag) x
+instance TraversableF Flagged where
+    traverseF f (Flagged flag x) = Flagged flag <$> f x

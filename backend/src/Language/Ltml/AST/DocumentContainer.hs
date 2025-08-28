@@ -13,9 +13,9 @@ import Language.Ltml.Common (Flagged)
 data DocumentContainer
     = DocumentContainer
         DocumentContainerFormat
-        (Flagged DocumentContainerHeader)
-        Document
-        [AppendixSection]
+        DocumentContainerHeader
+        (Flagged Document)
+        [Flagged AppendixSection]
     deriving (Show)
 
 data DocumentContainerHeader

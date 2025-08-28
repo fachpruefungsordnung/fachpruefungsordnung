@@ -4,7 +4,6 @@ module Language.Ltml.Tree.Parser.Section
     )
 where
 
-import Control.Functor.Utils (sequenceF)
 import Data.Text (Text)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Star (Star))
@@ -20,13 +19,13 @@ import Language.Ltml.AST.Section
     , Section (Section)
     , SectionBody (InnerSectionBody)
     )
-import Language.Ltml.Common (Flagged (Flagged))
+import Language.Ltml.Common (Flagged)
 import Language.Ltml.Parser.Section (headingP, sectionP)
-import Language.Ltml.Tree (Tree (Leaf, Tree), TypedTree)
+import Language.Ltml.Tree (FlaggedTree, Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
     ( TreeParser
     , leafParser
-    , nTypedTreePF
+    , nFlaggedTreePF
     , treeError
     , wrapTreeParser
     )
@@ -38,33 +37,31 @@ import Text.Megaparsec (eof)
 
 sectionTP
     :: NamedType SectionType
-    -> TypedTree
+    -> FlaggedTree
     -> FootnoteTreeParser (Flagged (Node Section))
-sectionTP = nTypedTreePF sectionTP'
+sectionTP = nFlaggedTreePF sectionTP'
   where
     sectionTP'
         :: SectionType
         -> Tree
-        -> FootnoteTreeParser (Flagged (Node Section))
+        -> FootnoteTreeParser (Node Section)
     sectionTP' t (Leaf x) = leafFootnoteParser (sectionP t eof) x
     sectionTP' (SectionType kw headingT fmt bodyT) (Tree x children) = do
-        wHeading <- wrapTreeParser $ sequenceF <$> headingTP kw headingT x
+        wHeading <- wrapTreeParser $ headingTP kw headingT x
         body <- sectionBodyTP bodyT children
-        return $
-            Flagged False $
-                fmap (\heading -> Section fmt heading body) wHeading
+        return $ fmap (\heading -> Section fmt heading body) wHeading
 
 headingTP
     :: Keyword
     -> HeadingType
-    -> Maybe (Flagged Text)
-    -> TreeParser (Flagged (Node Heading))
+    -> Maybe Text
+    -> TreeParser (Node Heading)
 headingTP kw t (Just x) = leafParser (headingP kw t) x
 headingTP _ _ Nothing = treeError "Section lacks heading"
 
 sectionBodyTP
     :: SectionBodyType
-    -> [TypedTree]
+    -> [FlaggedTree]
     -> FootnoteTreeParser SectionBody
 sectionBodyTP (InnerSectionBodyType (Star nt)) trees =
     InnerSectionBody <$> mapM (sectionTP nt) trees

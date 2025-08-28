@@ -37,7 +37,7 @@ sectionP :: SectionType -> Parser () -> FootnoteParser (Node Section)
 sectionP (SectionType kw headingT fmt bodyT) succStartP = do
     (mLabel, heading) <- wrapParser $ nonIndented $ headingP kw headingT
     body <- nonIndented $ sectionBodyP bodyT succStartP
-    return $ Node mLabel $ Section fmt (Flagged False heading) body
+    return $ Node mLabel $ Section fmt heading body
 
 sectionBodyP :: SectionBodyType -> Parser () -> FootnoteParser SectionBody
 sectionBodyP t0 succStartP = bodyP t0

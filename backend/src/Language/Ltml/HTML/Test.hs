@@ -73,29 +73,29 @@ import Lucid (renderToFile)
 import System.Directory (removeDirectoryRecursive)
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 import Prelude hiding (Enum, Word, readFile)
+import Language.Ltml.Tree.ToLtml (treeToLtml)
+import Language.Ltml.Tree.Example.Fpo (fpoTree)
+import Language.Ltml.Tree.Parser (TreeError(..))
 
 testDoc = readFile "src/Language/Ltml/HTML/Test/test.txt"
 
 parseTest :: IO ()
 parseTest = do
     text <- testDoc
-    case runParser
-        (nSc *> unwrapFootnoteParser [footnoteT] (sectionP superSectionT eof))
-        ""
-        text of
-        Left err -> error $ errorBundlePretty err
-        Right (nodeSection, footnoteMap) -> do
-            let (body, css) = renderSectionHtmlCss nodeSection footnoteMap
+    case treeToLtml fpoTree of
+        Left treeErr -> case treeErr of
+            LeafError parseErr -> error $ errorBundlePretty parseErr
+            TreeError strucErr -> putStrLn $ unlines strucErr
+        Right markedDocCon -> do
+            let (body, css) = renderHtmlCss markedDocCon
              in do
                     renderToFile
                         "src/Language/Ltml/HTML/Test/out.html"
                         (addHtmlHeader "" "out.css" body)
                     writeCss css "src/Language/Ltml/HTML/Test/out.css"
 
-                    prettyPrint nodeSection
-
 -------------------------------------------------------------------------------
-
+{-
 renderDocCon :: IO ()
 renderDocCon =
     let (body, css) = renderHtmlCss documentContainer
@@ -1046,3 +1046,5 @@ superSection =
 --             )
 
 -------------------------------------------------------------------------------
+
+-}
