@@ -1,20 +1,21 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Language.Lsd.AST.Type.AppendixSection
     ( AppendixSectionFormat (..)
     , AppendixSectionTitle (..)
     , AppendixElementFormat (..)
     , AppendixSectionType (..)
-    , PreAppendixSectionType (..)
     )
 where
 
 import Data.Text (Text)
-import Language.Lsd.AST.Common (TypeName)
 import Language.Lsd.AST.Format
     ( IdentifierFormat
     , InnerHeadingFormat
     , TocKeyFormat
     )
 import Language.Lsd.AST.SimpleRegex (Disjunction, Star)
+import Language.Lsd.AST.Type (KindNameOf (kindNameOf), NamedType)
 import Language.Lsd.AST.Type.Document (DocumentType)
 
 data AppendixSectionFormat
@@ -38,9 +39,7 @@ data AppendixElementFormat
 data AppendixSectionType
     = AppendixSectionType
         AppendixSectionFormat
-        (Star (Disjunction DocumentType))
+        (Star (Disjunction (NamedType DocumentType)))
 
-data PreAppendixSectionType
-    = PreAppendixSectionType
-        AppendixSectionFormat
-        (Star (Disjunction TypeName))
+instance KindNameOf AppendixSectionType where
+    kindNameOf _ = "appendix-section"

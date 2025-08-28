@@ -12,6 +12,7 @@ import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as TLE
+import Language.Lsd.AST.Type (NamedType (NamedType))
 import Language.Lsd.Example.Fpo (footnoteT, sectionT)
 import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (nSc)
@@ -99,10 +100,12 @@ generatePDFfromParsed parser render input =
 
 generatePDFFromSection :: Text -> IO (Either String BSL.ByteString)
 generatePDFFromSection input =
-    generatePDFfromParsed
-        (nSc *> unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
-        sectionToText
-        (input <> "\n")
+    let NamedType _ _ sectionT' = sectionT
+        NamedType _ _ footnoteT' = footnoteT
+     in generatePDFfromParsed
+            (nSc *> unwrapFootnoteParser [footnoteT'] (sectionP sectionT' eof))
+            sectionToText
+            (input <> "\n")
   where
     sectionToText (sec, labelmap) =
         let (latexSection, gs) = runState (toPreLaTeXM sec) $ initialGlobalState & labelToFootNote .~ labelmap
