@@ -45,8 +45,25 @@
   position: absolute;
   z-index: 2;
   background-color: rgba(255, 255, 0, 0.8);
-  border: 1px solid black;
   box-sizing: border-box;
+
+  border-left: 1px solid black;
+  border-right: 1px solid black;
+
+  border-top: 1px solid black;
+  border-bottom: 1px solid black;
+}
+
+/* obere Linie entfernen, wenn ein Vorgänger existiert */
+.ace_marker-layer .my-marker + .my-marker {
+  border-left: none;
+  border-top: none;
+}
+
+/* untere Linie entfernen, wenn ein Nachfolger existiert */
+.ace_marker-layer .my-marker:has(+ .my-marker) {
+  border-right: none;
+  border-bottom: none;
 }
 
 /* --- Annotation --- */

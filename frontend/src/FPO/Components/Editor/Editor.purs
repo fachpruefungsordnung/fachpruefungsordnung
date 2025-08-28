@@ -1019,7 +1019,7 @@ editor = connect selectTranslator $ H.mkComponent
               , type: "info"
               , startRow: Types.getRow start
               , startCol: Types.getColumn start
-              , endRow: Types.getColumn end
+              , endRow: Types.getRow end
               , endCol: Types.getColumn end
               , markerText: first.author
               , mCommentSection: Just newCommentSection
@@ -1108,7 +1108,7 @@ addAnchor marker session =
     Anchor.setInsertRight true endAnchor
 
     range <- createMarkerRange marker
-    id <- Session.addMarker range "my-marker" "string" false session
+    id <- Session.addMarker range "my-marker" "text" false session
     markerRef <- Ref.new id
 
     let
@@ -1126,7 +1126,7 @@ addAnchor marker session =
         newId <- Session.addMarker
           markRange
           "my-marker"
-          "string"
+          "text"
           false
           session
 
