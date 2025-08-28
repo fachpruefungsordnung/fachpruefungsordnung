@@ -307,13 +307,14 @@ instance
         -- \| ignore value since type Void does not have any values
         LineBreak _ -> returnNow $ br_ []
         Special special -> toHtmlM special
-        Reference label -> return $ Later $ \globalState ->
-            case lookup label $ labels globalState of
-                -- \| Label was not found in GlobalState and a red error is emitted
-                Nothing ->
-                    span_ <#> Class.InlineError $
-                        toHtml (("Error: Label \"" <> unLabel label <> "\" not found!") :: Text)
-                Just labelHtml -> labelWrapperFunc globalState label labelHtml
+        Reference label -> do
+            -- \| Label func for wrapping arbitrary Html (like anchor links) around the reference
+            labelFunc <- asks labelWrapperFunc
+            return $ Later $ \globalState ->
+                case lookup label $ labels globalState of
+                    -- \| Label was not found in GlobalState and a red error is emitted
+                    Nothing -> htmlError ("Label \"" <> unLabel label <> "\" not found!")
+                    Just labelHtml -> labelFunc label labelHtml
         Styled style textTrees ->
             let styleClass = toCssClass style
              in -- \| Wrap raw text in <span> and enums in <div>
@@ -403,7 +404,9 @@ instance ToHtmlM FootnoteReference where
                             Set.insert (NumLabel (footId, footLabel)) (locallyUsedFootnotes s)
                         }
                 )
-            returnNow $ sup_ footHtml
+            -- \| Function for wrapping arbitrary Html (like anchor links) around footnote refs
+            footnoteFunc <- asks footnoteWrapperFunc
+            returnNow $ sup_ $ footnoteFunc footLabel footHtml
 
 instance ToHtmlM Footnote where
     toHtmlM (Footnote SuperscriptFootnoteFormat textTrees) = do
@@ -441,7 +444,7 @@ instance ToHtmlM FootnoteSet where
                 Just (_, idHtml, delayedTextHtml) ->
                     -- \| <div> <sup>id</sup> <span>text</span> </div>
                     return
-                        ( (div_ <#> Class.Footnote <$> ((sup_ <#> Class.FootnoteID) idHtml <>)) . span_
+                        ( (div_ [cssClass_ Class.Footnote, id_ (unLabel label)] <$> ((sup_ <#> Class.FootnoteID) idHtml <>)) . span_
                             <$> delayedTextHtml
                         )
 
