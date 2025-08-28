@@ -60,19 +60,3 @@ preview = H.mkComponent
   handleAction = case _ of
     Receive { renderedHtml, isDragging } -> do
       H.modify_ _ { renderedHtml = renderedHtml, isDragging = isDragging }
--- htmlElementRef <- getHTMLElementRef (RefLabel "injectHtml")
--- case htmlElementRef of
---   Just ref -> do
---     case renderedHtml of
---       Just htmlContent -> do
---         currentState <- H.get
---         if currentState.renderedHtml /= Just htmlContent then do
---           -- Update the state and set the inner HTML only if it has changed
---           -- otherwise, selecting text would trigger a re-render
---           H.modify_ \st -> st { renderedHtml = Just htmlContent }
---           H.liftEffect $ setInnerHtml ref htmlContent
---           pure unit
---         else
---           pure unit
---       Nothing -> pure unit
---   Nothing -> pure unit
