@@ -28,7 +28,6 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -853,7 +852,10 @@ splitview = H.mkComponent
           Left _ -> pure unit
           Right blobOrError ->
             case blobOrError of
-              Left errMsg -> H.liftEffect $ log errMsg
+              Left errMsg -> H.modify_ _
+                { renderedHtml = Just
+                    (Loaded ("<pre><code>" <> errMsg <> "</code></pre>"))
+                }
               Right body -> do
                 -- create blobl link
                 url <- H.liftEffect $ createObjectURL body
