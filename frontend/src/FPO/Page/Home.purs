@@ -29,8 +29,9 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (LoadState(..), getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto.DocDate as DD
-import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.DocDate as DocDate
+import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader)
+import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -58,7 +59,7 @@ data Action
   = Initialize
   | NavLogin
   | ScrollToFeatures
-  | ViewProject DH.DocumentHeader
+  | ViewProject DocumentHeader
   | Receive (Connected FPOTranslator Input)
   | DoNothing
   | ChangeSorting TH.Output
@@ -67,7 +68,7 @@ data Action
 
 type State = FPOState
   ( user :: LoadState (Maybe FullUserDto)
-  , projects :: Array DH.DocumentHeader
+  , projects :: Array DocumentHeader
   , currentTime :: Maybe DateTime
   , searchQuery :: String
   , page :: Int
@@ -158,8 +159,8 @@ component =
                 }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
-      log $ "Routing to editor for project " <> (DH.getName project)
-      navigate (Editor { docID: DH.getID project })
+      log $ "Routing to editor for project " <> (DocumentHeader.getName project)
+      navigate (Editor { docID: DocumentHeader.getID project })
     NavLogin -> do
       updateStore $ Store.SetLoginRedirect (Just Home)
       navigate Login
@@ -175,7 +176,7 @@ component =
         "Title" ->
           TH.sortByF
             order
-            (comparing DH.getName)
+            (comparing DocumentHeader.getName)
             state.projects
         "Last Updated" ->
           TH.sortByF
@@ -485,7 +486,7 @@ component =
 
   -- Renders the list of projects.
   renderProjectTable
-    :: Array DH.DocumentHeader -> State -> H.ComponentHTML Action Slots m
+    :: Array DocumentHeader -> State -> H.ComponentHTML Action Slots m
   renderProjectTable ps state =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
@@ -522,17 +523,18 @@ component =
       ]
 
   -- Renders a single project row in the table.
-  renderProjectRow :: forall w. State -> DH.DocumentHeader -> HH.HTML w Action
+  renderProjectRow :: forall w. State -> DocumentHeader -> HH.HTML w Action
   renderProjectRow state project =
     HH.tr
       [ HE.onClick $ const $ ViewProject project
       , HP.style "cursor: pointer;"
       ]
       [ HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ DH.getName project ]
+          [ HH.text $ DocumentHeader.getName project ]
       , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ formatRelativeTime state.currentTime $ DD.docDateToDateTime $
-              DH.getLastEdited project
+          [ HH.text $ formatRelativeTime state.currentTime $ DocDate.docDateToDateTime
+              $
+                DocumentHeader.getLastEdited project
           ]
       ]
 
@@ -547,9 +549,10 @@ component =
           [ HH.text $ "Empty Row" ]
       ]
 
-  filterProjects :: String -> Array DH.DocumentHeader -> Array DH.DocumentHeader
+  filterProjects :: String -> Array DocumentHeader -> Array DocumentHeader
   filterProjects query projects =
-    filter (\p -> contains (Pattern $ toLower query) (toLower $ DH.getName p))
+    filter
+      (\p -> contains (Pattern $ toLower query) (toLower $ DocumentHeader.getName p))
       projects
 
 -- | Helper function to adjust a DateTime by a duration (subtract from current time)
@@ -557,8 +560,8 @@ adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime
 adjustDateTime duration dt =
   fromMaybe dt $ adjust (negateDuration duration) dt
 
-getEditTimestamp ∷ DH.DocumentHeader → DateTime
-getEditTimestamp = DD.docDateToDateTime <<< DH.getLastEdited
+getEditTimestamp ∷ DocumentHeader → DateTime
+getEditTimestamp = DocDate.docDateToDateTime <<< DocumentHeader.getLastEdited
 
 -- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
 formatRelativeTime :: Maybe DateTime -> DateTime -> String
