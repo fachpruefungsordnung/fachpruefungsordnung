@@ -123,6 +123,8 @@ data ReaderState = ReaderState
     -- ^ Wrapper around the Reference Html inside the TextTree (e.g. for adding anchor links)
     , footnoteWrapperFunc :: Label -> Html () -> Html ()
     -- ^ Wrapper around Footnote reference Html inside the TextTree (e.g. for adding anchor links)
+    , tocEntryWrapperFunc :: Label -> Html () -> Html ()
+    -- ^ Wrapper around an ToC entry (e.g. for adding anchor links)
     }
 
 initGlobalState :: GlobalState
@@ -160,8 +162,9 @@ initReaderState =
         , currentEnumIDFormatString = error "Undefined enum id format!"
         , footnoteMap = Map.empty
         , -- \| Default rendering method is "preview", so no anchor links
-          labelWrapperFunc = anchorLink -- const id
-        , footnoteWrapperFunc = anchorLink
+          labelWrapperFunc = const id -- anchorLink
+        , footnoteWrapperFunc = const id
+        , tocEntryWrapperFunc = const id
         }
 
 -------------------------------------------------------------------------------

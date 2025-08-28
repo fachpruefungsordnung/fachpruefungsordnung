@@ -22,6 +22,7 @@ import Control.Monad (zipWithM)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
+import Data.DList (toList)
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 import Data.Text (Text, unpack)
@@ -31,6 +32,7 @@ import Language.Lsd.AST.Type.AppendixSection
     , AppendixSectionFormat (..)
     , AppendixSectionTitle (..)
     )
+import Language.Lsd.AST.Type.Document (DocumentFormat (..))
 import Language.Lsd.AST.Type.DocumentContainer (DocumentContainerFormat (..))
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Lsd.AST.Type.Footnote
@@ -42,7 +44,7 @@ import Language.Ltml.AST.AppendixSection (AppendixSection (..))
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.DocumentContainer (DocumentContainer (..))
 import Language.Ltml.AST.Footnote (Footnote (..))
-import Language.Ltml.AST.Label (Label (unLabel))
+import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.AST.Paragraph (Paragraph (..))
 import Language.Ltml.AST.Section
@@ -113,7 +115,12 @@ instance ToHtmlM DocumentContainer where
             mainDocHtml <-
                 local (\s -> s {documentHeadingFormat = Left docHeadingFormat}) $ toHtmlM doc
             appendicesHtml <- toHtmlM appendices
-            return $ mainDocHtml <> appendicesHtml
+            -- \| Render ToC last so all context is already build
+            toc <- gets tableOfContents
+            tocHtml <- toHtmlM toc
+            renderFlag <- asks shouldRender
+            return $
+                (if renderFlag then tocHtml else mempty) <> mainDocHtml <> appendicesHtml
 
 -- | This instance is used for documents inside the appendix,
 --   since the main document does not have a label.
@@ -125,7 +132,10 @@ instance ToHtmlM Document where
     toHtmlM
         ( Document
                 -- TODO: Check ToC Flag in format
-                format
+                --       If main document Flag is True render big Toc at the begiining od docContainer
+                --       containing full main doc and only the headings of appendixSections;
+                --       If Appendix Doc is true; give it a local ToC
+                (DocumentFormat hasToC)
                 documentHeading
                 (DocumentBody introSSections sectionBody outroSSections)
                 footNotes
@@ -514,6 +524,25 @@ instance (ToHtmlM a) => ToHtmlM (Flagged a) where
         -- \| Tell parent that we exist
         modify (\s -> s {hasFlagged = True})
         return $ if render then aHtml else mempty
+
+-------------------------------------------------------------------------------
+
+instance ToHtmlM ToC where
+    toHtmlM dlist = do
+        tocFunc <- asks tocEntryWrapperFunc
+        let tupleList = toList dlist
+            -- \| Wrap with wrapper func (e.g. anchor links)
+            tocEntries = map (\(i, t, l) -> tocFunc (Label l) <$> buildEntry i t) tupleList
+            tableHead =
+                thead_ $ tr_ (th_ mempty <> th_ (toHtml ("Literaturverzeichnis" :: Text)))
+                    :: Html ()
+            tableBody = tbody_ <$> mconcat tocEntries
+        -- TODO: title from AST
+        return (table_ . (tableHead <>) <$> tableBody)
+      where
+        -- \| Build <div><span>id</span> <span>title</span></div>,
+        buildEntry :: Html () -> Delayed (Html ()) -> Delayed (Html ())
+        buildEntry idHtml delayedTitle = (tr_ <$> (td_ idHtml <>)) . td_ <$> delayedTitle
 
 -------------------------------------------------------------------------------
 
