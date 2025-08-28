@@ -2,11 +2,10 @@ module FPO.Components.CommentOverview where
 
 import Prelude
 
-import Data.Array (head, mapMaybe)
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff)
-import FPO.Types (Comment, CommentSection, TOCEntry)
+import FPO.Types (Comment, FirstComment)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -16,24 +15,25 @@ import Halogen.Themes.Bootstrap5 as HB
 type Input = Unit
 
 -- DeleteComment later
-data Output = JumpToCommentSection Int Int CommentSection
+data Output = JumpToCommentSection Int Int
 
 data Action
   = Init
-  | SelectCommentSection Int Int CommentSection
+  | SelectCommentSection Int Int
 
 data Query a
   = ReceiveTimeFormatter (Maybe Formatter) a
-  | ReceiveTOC TOCEntry a
+  | ReceiveComments Int (Array FirstComment) a
 
 type State =
-  { mTocEntry :: Maybe TOCEntry
+  { tocID :: Int
+  , comments :: Array FirstComment
   , mTimeFormatter :: Maybe Formatter
   }
 
 commentOverviewview :: forall m. MonadAff m => H.Component Query Input Output m
 commentOverviewview = H.mkComponent
-  { initialState: \_ -> { mTocEntry: Nothing, mTimeFormatter: Nothing }
+  { initialState: \_ -> { tocID: -1, comments: [], mTimeFormatter: Nothing }
   , render
   , eval: H.mkEval $ H.defaultEval
       { initialize = Just Init
@@ -44,21 +44,17 @@ commentOverviewview = H.mkComponent
   where
 
   render :: State -> forall slots. H.ComponentHTML Action slots m
-  render state = case state.mTocEntry of
-    Nothing ->
+  render state = case state.comments of
+    [] ->
       HH.div [ HP.style "padding: 1rem;" ]
         [ HH.text "No comments in this section." ]
-    Just tocEntry ->
+    _ ->
       HH.div [ HP.style "comment-section space-y-3" ]
-        ( mapMaybe
-            ( \m -> case m.mCommentSection of
-                Nothing -> Nothing
-                Just cs -> case head cs.comments of
-                  Nothing -> Nothing
-                  Just c -> Just
-                    (renderFirstComment state.mTimeFormatter c tocEntry.id m.id cs)
+        ( map
+            ( \{ markerID, first } ->
+                (renderFirstComment state.mTimeFormatter first state.tocID markerID)
             )
-            tocEntry.markers
+            state.comments
         )
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
@@ -67,8 +63,8 @@ commentOverviewview = H.mkComponent
     Init -> do
       pure unit
 
-    SelectCommentSection tocID markerID commentSection -> do
-      H.raise (JumpToCommentSection tocID markerID commentSection)
+    SelectCommentSection tocID markerID -> do
+      H.raise (JumpToCommentSection tocID markerID)
 
   handleQuery
     :: forall slots a
@@ -80,8 +76,8 @@ commentOverviewview = H.mkComponent
       H.modify_ \state -> state { mTimeFormatter = mTimeFormatter }
       pure (Just a)
 
-    ReceiveTOC entry a -> do
-      H.modify_ \state -> state { mTocEntry = Just entry }
+    ReceiveComments tocID cs a -> do
+      H.modify_ \state -> state { tocID = tocID, comments = cs }
       pure (Just a)
 
   renderFirstComment
@@ -89,10 +85,9 @@ commentOverviewview = H.mkComponent
     -> Comment
     -> Int
     -> Int
-    -> CommentSection
     -> forall slots
      . H.ComponentHTML Action slots m
-  renderFirstComment mFormatter c tocID markerID cs =
+  renderFirstComment mFormatter c tocID markerID =
     HH.div
       [ HP.classes
           [ HB.p2
@@ -104,7 +99,7 @@ commentOverviewview = H.mkComponent
           , HB.flexColumn
           ]
       , HP.style "background-color:rgba(246, 250, 0, 0.9);"
-      , HE.onClick \_ -> SelectCommentSection tocID markerID cs
+      , HE.onClick \_ -> SelectCommentSection tocID markerID
       ]
       [ HH.div_
           [ HH.div

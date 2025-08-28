@@ -3,11 +3,19 @@ module FPO.Types where
 import Prelude
 
 import Ace.Types as Types
-import Data.Array (find, sortBy)
-import Data.DateTime (DateTime)
+import Data.Array (sortBy)
+import Data.Date (canonicalDate)
+import Data.Date.Component (Day, Month(..), Year)
+import Data.DateTime (DateTime(..))
+import Data.Enum (toEnum)
 import Data.Formatter.DateTime (Formatter, FormatterCommand(..))
 import Data.List (List(..), (:))
-import Data.Maybe (Maybe)
+import Data.Maybe (Maybe(..), fromJust)
+import Data.Time (Time(..))
+import Data.Time.Component (Hour, Millisecond, Minute, Second)
+import FPO.Dto.CommentDto (CommentT(..), Section(..))
+import FPO.Dto.CommentDto as CD
+import FPO.Dto.DocumentDto.DocDate (docDateToDateTime)
 import FPO.Dto.DocumentDto.DocumentTree as DT
 import FPO.Dto.DocumentDto.NodeHeader as NH
 import FPO.Dto.DocumentDto.TreeDto
@@ -16,6 +24,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , findTitleRootTree
   , replaceNodeRootTree
   )
+import Partial.Unsafe (unsafePartial)
 
 -- TODO We can also store different markers, such as errors. But do we want to?
 type AnnotatedMarker =
@@ -31,14 +40,20 @@ type AnnotatedMarker =
 
 type CommentSection =
   { markerID :: Int
-  , comments :: Array Comment
+  , first :: Maybe Comment
+  , replies :: Array Comment
   , resolved :: Boolean
+  }
+
+type FirstComment =
+  { markerID :: Int
+  , first :: Comment
   }
 
 type Comment =
   { author :: String
-  , timestamp :: DateTime
   , content :: String
+  , timestamp :: DateTime
   }
 
 type TOCEntry =
@@ -46,18 +61,6 @@ type TOCEntry =
   , name :: String
   -- paragraph ID (§id) for later
   , paraID :: Int
-  -- Is stored as 32bit Int = 2,147,483,647
-  -- Schould not create so many markers, right?
-  , newMarkerNextID :: Int
-  , markers :: Array AnnotatedMarker
-  }
-
--- shortend version for TOC component to not update its content
--- since it only uses id and name only
-type ShortendTOCEntry =
-  { id :: Int
-  , paraID :: Int
-  , name :: String
   }
 
 type TOCTree = RootTree TOCEntry
@@ -68,8 +71,37 @@ emptyTOCEntry =
   { id: -1
   , name: "Error"
   , paraID: -1
-  , newMarkerNextID: -1
-  , markers: []
+  }
+
+defaultDateTime :: DateTime
+defaultDateTime =
+  let
+    y = unsafePartial $ fromJust (toEnum 1970 :: Maybe Year)
+    m = January
+    d = unsafePartial $ fromJust (toEnum 1 :: Maybe Day)
+    date = (canonicalDate y m d)
+
+    h = unsafePartial $ fromJust (toEnum 0 :: Maybe Hour)
+    mi = unsafePartial $ fromJust (toEnum 0 :: Maybe Minute)
+    s = unsafePartial $ fromJust (toEnum 0 :: Maybe Second)
+    ms = unsafePartial $ fromJust (toEnum 0 :: Maybe Millisecond)
+    time = Time h mi s ms
+  in
+    DateTime date time
+
+emptyComment :: Comment
+emptyComment =
+  { author: "No author"
+  , content: ""
+  , timestamp: defaultDateTime
+  }
+
+emptyCommentSection :: CommentSection
+emptyCommentSection =
+  { markerID: -1
+  , first: Nothing
+  , replies: []
+  , resolved: false
   }
 
 findTOCEntry :: Int -> TOCTree -> Maybe TOCEntry
@@ -81,12 +113,6 @@ findTitleTOCEntry tocID = findTitleRootTree (\e -> e.id == tocID)
 replaceTOCEntry :: Int -> String -> TOCEntry -> TOCTree -> TOCTree
 replaceTOCEntry tocID = replaceNodeRootTree (\e -> e.id == tocID)
 
-findCommentSection :: Int -> Int -> TOCTree -> Maybe CommentSection
-findCommentSection tocID markerID tocEntries = do
-  entry <- findTOCEntry tocID tocEntries
-  marker <- find (\m -> m.id == markerID) entry.markers
-  marker.mCommentSection
-
 sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker
 sortMarkers = sortBy (comparing _.startRow <> comparing _.startCol)
 
@@ -97,9 +123,6 @@ markerToAnnotation m =
   , text: m.markerText
   , type: m.type
   }
-
-shortenTOC :: TOCEntry -> ShortendTOCEntry
-shortenTOC { id, paraID, name } = { id, paraID, name }
 
 -- TODO create more timestamps versions and discuss, where to store this
 timeStampsVersions :: Array Formatter
@@ -161,8 +184,6 @@ nodeHeaderToTOCEntry nh =
   { id: NH.getId nh
   , name: NH.getKind nh
   , paraID: 0 -- implement it later
-  , newMarkerNextID: 0
-  , markers: []
   }
 
 tocEntryToNodeHeader :: TOCEntry -> NH.NodeHeader
@@ -174,3 +195,23 @@ documentTreeToTOCTree = map nodeHeaderToTOCEntry
 
 tocTreeToDocumentTree :: TOCTree -> DT.DocumentTree
 tocTreeToDocumentTree = map tocEntryToNodeHeader
+
+-- Comment functions
+
+cdCommentToComment :: CD.CommentT -> Comment
+cdCommentToComment (Comment { author, content, timestamp }) =
+  let
+    name = CD.getName author
+    time = docDateToDateTime timestamp
+  in
+    { author: name, content: content, timestamp: time }
+
+sectionDtoToCS :: CD.Section -> CommentSection
+sectionDtoToCS (Section { id, firstComment, replies, status }) =
+  let
+    fst = cdCommentToComment firstComment
+    rep = map cdCommentToComment replies
+    -- comments = cons fst rep
+    resolved = if status == "open" then true else false
+  in
+    { markerID: id, first: Just fst, replies: rep, resolved: resolved }

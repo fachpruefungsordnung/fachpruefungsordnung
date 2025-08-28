@@ -43,6 +43,7 @@
 
 .ace_marker-layer .my-marker {
   position: absolute;
+  z-index: 2;
   background-color: rgba(255, 255, 0, 0.8);
   border: 1px solid black;
   box-sizing: border-box;
@@ -53,4 +54,10 @@
 .ace_gutter-cell.ace_info {
   /* Found icon on https://icon-sets.iconify.design/picon/?keyword=c&category=UI+Other+%2F+Mixed+Grid */
   background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDggOCI+PHBhdGggZmlsbD0iI2U4YTU1MiIgZD0iTTQgNkwxIDhWMWg2djciLz48L3N2Zz4=");
+}
+
+/* Active-Line bewusst nach hinten */
+.ace_editor .ace_marker-layer .ace_active-line {
+  z-index: 1;
+  background: rgba(255, 255, 0, 0.15) !important; 
 }
