@@ -214,3 +214,9 @@ addError msg =
           [ HH.text err ]
         Nothing -> HH.text ""
     ]
+
+loadingSpinner :: forall w i. HH.HTML w i
+loadingSpinner =
+  HH.div [ HP.classes [ HB.textCenter, HB.my5 ] ]
+    [ HH.span [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] []
+    ]

@@ -35,7 +35,7 @@ import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addCard, addColumn)
+import FPO.UI.HTML (addCard, addColumn, loadingSpinner)
 import FPO.UI.SmoothScroll (smoothScrollToElement)
 import Halogen (liftEffect)
 import Halogen as H
@@ -111,12 +111,7 @@ component =
     -> H.ComponentHTML Action Slots m
   render state =
     case state.user of
-      Loading ->
-        HH.div
-          [ HP.classes [ HB.textCenter, HB.my5 ]
-          ]
-          [ HH.span [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] []
-          ]
+      Loading -> loadingSpinner
       Loaded u -> case u of
         Just _ ->
           renderProjectsOverview state
@@ -468,7 +463,7 @@ component =
                   HP.InputText
                   HandleSearchInput
               ]
-          , if state.projects == Loading then HH.div_ [ HH.text "Loading" ]
+          , if state.projects == Loading then loadingSpinner
             else HH.div [ HP.classes [ HB.col12 ] ] [ renderProjectTable ps state ]
           , HH.slot _pagination unit P.component paginationSettings SetPage
           ]
