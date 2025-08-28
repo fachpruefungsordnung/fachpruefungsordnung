@@ -38,6 +38,7 @@ cabal.project.local~
 .intellij/
 .zed/
 .idea/
+.VSCodeCounter/
 
 # direnv, nix und so
 .direnv
