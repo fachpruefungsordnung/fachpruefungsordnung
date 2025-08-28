@@ -13,7 +13,8 @@ import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.CommentDto as CD
 import FPO.Types
-  ( Comment
+  ( AbstractedCS
+  , Comment
   , CommentSection
   , FirstComment
   , cdCommentToComment
@@ -36,6 +37,7 @@ data Output
   = CloseCommentSection
   | UpdateComment CommentSection
   | CommentOverview Int (Array FirstComment)
+  | SendAbstractedComments (Array AbstractedCS) (Maybe Int)
 
 data Action
   = Init
@@ -48,6 +50,7 @@ data Query a
   = AddComment Int Int a
   | DeletedComment (Array Int) a
   | ReceiveTimeFormatter (Maybe Formatter) a
+  | RequestComments Int Int (Maybe Int) a
   | SelectedCommentSection Int Int Int a
   | Overview Int Int a
 
@@ -233,8 +236,10 @@ commentview = H.mkComponent
 
     SendComment -> do
       state <- H.get
+      -- only send, if the the user has wrote something
       when (state.commentDraft /= "") do
         let pText = encodeJson { text: state.commentDraft }
+        -- Is it the first comment sent?
         if state.newComment then do
           res <- Request.postJson CD.decodeSection
             ( "/docs/" <> show state.docID <> "/text/" <> show state.tocID <>
@@ -301,8 +306,6 @@ commentview = H.mkComponent
             , commentDraft = ""
             }
 
-      pure unit
-
     SelectingCommentSection markerID -> do
       if markerID == -360 then do
         H.modify_ \st -> st 
@@ -361,6 +364,27 @@ commentview = H.mkComponent
     ReceiveTimeFormatter mTimeFormatter a -> do
       H.modify_ \state -> state { mTimeFormatter = mTimeFormatter }
       pure (Just a)
+    
+    RequestComments docID tocID rev a -> do
+      state <- H.get
+      if (state.docID /= docID || tocID /= state.tocID) then do
+        recComs <- H.liftAff
+          $ Request.getFromJSONEndpoint CD.decodeCommentSection
+          $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
+        let
+          commentSections = case recComs of
+            Nothing -> []
+            Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
+          abstractedCSs = map abstractCS commentSections
+        H.modify_ \st -> st
+          { docID = docID, tocID = tocID, commentSections = commentSections }
+        H.raise (SendAbstractedComments abstractedCSs rev)
+      else do
+        let
+          css = state.commentSections
+          abstractedCSs = map abstractCS css
+        H.raise (SendAbstractedComments abstractedCSs rev)
+      pure (Just a)
 
     SelectedCommentSection docID tocID markerID a -> do
       state <- H.get
@@ -410,4 +434,13 @@ commentview = H.mkComponent
   extractFirst { markerID, first } = case first of
     Nothing -> { markerID: -1, first: emptyComment }
     Just c -> { markerID: markerID, first: c }
+
+  abstractCS :: CommentSection -> AbstractedCS
+  abstractCS { markerID, first, resolved } = 
+    let
+      author = case first of
+        Nothing -> "No author found"
+        Just f -> f.author
+    in
+      {markerID, author, resolved}
 

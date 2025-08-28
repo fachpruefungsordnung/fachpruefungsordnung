@@ -805,6 +805,9 @@ splitview = H.mkComponent
       Comment.CommentOverview tocID cs -> do
         H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID cs)
 
+      Comment.SendAbstractedComments abstractCSs rev -> do
+        H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs rev)
+
     HandleCommentOverview output -> case output of
 
       CommentOverview.JumpToCommentSection tocID markerID -> do
@@ -869,6 +872,9 @@ splitview = H.mkComponent
               H.liftAff $ delay (Milliseconds 1000.0)
               H.liftEffect $ revokeObjectURL url
             pure unit
+
+      Editor.RequestComments docID entryID rev -> do
+        H.tell _comment unit (Comment.RequestComments docID entryID rev)
 
       Editor.SavedSection toBePosted title tocEntry -> do
         state <- H.get

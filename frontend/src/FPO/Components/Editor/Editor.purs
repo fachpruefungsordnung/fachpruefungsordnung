@@ -22,7 +22,8 @@ import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
-import Data.Array (catMaybes, intercalate, snoc, uncons, (:))
+import Data.Array (catMaybes, intercalate, mapMaybe, snoc, uncons, (:))
+import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
@@ -51,7 +52,8 @@ import FPO.Dto.UserDto (getUserName)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types
-  ( AnnotatedMarker
+  ( AbstractedCS
+  , AnnotatedMarker
   , CommentSection
   , TOCEntry
   , emptyTOCEntry
@@ -83,6 +85,8 @@ import Web.HTML.HTMLElement (offsetWidth, toElement)
 import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
+
+import Effect.Console (log)
 
 type Path = Array Int
 
@@ -145,6 +149,7 @@ data Output
   -- SavedSection toBePosted title TOCEntry
   | SavedSection Boolean String TOCEntry
   | RenamedNode String Path
+  | RequestComments Int Int (Maybe Int)
   | SelectedCommentSection Int Int
   | ShowAllCommentsOutput Int Int
 
@@ -152,6 +157,7 @@ data Action
   = Init
   | Comment
   | ChangeToSection String TOCEntry (Maybe Int)
+  | ContinueChangeToSection (Array AbstractedCS) (Maybe Int)
   | DeleteComment
   | SelectComment
   | Bold
@@ -186,6 +192,7 @@ data Query a
   | SaveSection a
   -- | receive the selected TOC and put its content into the editor
   | ChangeSection String TOCEntry (Maybe Int) a
+  | ContinueChangeSection (Array AbstractedCS) (Maybe Int) a
   -- | Open and edit a raw string outside the TOCEntry structure.
   --   This is used to make the editor available for editing
   --   the section names of non-leaf nodes.
@@ -878,9 +885,16 @@ editor = connect selectTranslator $ H.mkComponent
       for_ state.mPendingMaxWaitF H.kill
 
     ChangeToSection title entry rev -> do
-      H.modify_ \state -> state { mTocEntry = Just entry, title = title }
       state <- H.get
-
+      -- Prevent of loading the same Section from backend again
+      when (Just entry /= state.mTocEntry) do
+        H.modify_ \st -> st { mTocEntry = Just entry, title = title }
+        -- Get comments information from Comment Child
+        H.raise (RequestComments state.docID entry.id rev)
+      pure unit
+    
+    ContinueChangeToSection absCSs rev -> do
+      state <- H.get
       -- Put the content of the section into the editor and update markers
       H.gets _.mEditor >>= traverse_ \ed -> do
 
@@ -888,6 +902,9 @@ editor = connect selectTranslator $ H.mkComponent
           version = case rev of
             Nothing -> "latest"
             Just v -> show v
+          entryID = case state.mTocEntry of
+            Nothing -> -1
+            Just e -> e.id
         -- Get the content from server here
         -- We need Aff for that and thus cannot go inside Eff
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
@@ -895,7 +912,7 @@ editor = connect selectTranslator $ H.mkComponent
         loadedContent <- H.liftAff $
           Request.getFromJSONEndpoint
             ContentDto.decodeContentWrapper
-            ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+            ( "/docs/" <> show state.docID <> "/text/" <> show entryID
                 <> "/rev/"
                 <> version
             )
@@ -907,10 +924,11 @@ editor = connect selectTranslator $ H.mkComponent
           comments = ContentDto.getWrapperComments wrapper
           -- convert markers
           markers = map ContentDto.convertToAnnotetedMarker comments
+          filMarkers = updateMarkers absCSs markers 
 
         H.modify_ \st -> st
           { mContent = Just content
-          , markers = markers
+          , markers = filMarkers
           , isEditorReadonly = version /= "latest"
           }
 
@@ -919,7 +937,7 @@ editor = connect selectTranslator $ H.mkComponent
           document <- Session.getDocument session
 
           -- Set the content of the editor
-          Document.setValue (title <> "\n" <> ContentDto.getContentText content)
+          Document.setValue (state.title <> "\n" <> ContentDto.getContentText content)
             document
           Editor.setReadOnly (version /= "latest") ed
 
@@ -939,7 +957,7 @@ editor = connect selectTranslator $ H.mkComponent
           Session.clearAnnotations session
 
           -- Add annotations from marker
-          tmp <- for markers \marker -> do
+          tmp <- for filMarkers \marker -> do
             addAnchor marker session
 
           pure (catMaybes tmp)
@@ -956,6 +974,10 @@ editor = connect selectTranslator $ H.mkComponent
 
     ChangeSection title entry rev a -> do
       handleAction (ChangeToSection title entry rev)
+      pure (Just a)
+
+    ContinueChangeSection absCSs rev a -> do
+      handleAction (ContinueChangeToSection absCSs rev)
       pure (Just a)
 
     ChangeToNode title path a -> do
@@ -1237,3 +1259,12 @@ buttonDivisor :: forall m. H.ComponentHTML Action () m
 buttonDivisor = HH.div
   [ HP.classes [ HB.vr, HB.mx1 ] ]
   []
+
+updateMarkers :: Array AbstractedCS -> Array AnnotatedMarker -> Array AnnotatedMarker
+updateMarkers abcCSs markers =
+  mapMaybe (\m ->
+      case Array.find (\cs -> cs.markerID == m.id && not cs.resolved) abcCSs of
+        Just cs -> Just (m { markerText = cs.author })
+        Nothing -> Nothing
+    ) 
+    markers
