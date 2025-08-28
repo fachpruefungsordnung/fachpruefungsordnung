@@ -69,13 +69,13 @@ import Language.Ltml.Parser.Common.Lexeme (nSc)
 import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.Pretty (prettyPrint)
+import Language.Ltml.Tree.Example.Fpo (fpoTree)
+import Language.Ltml.Tree.Parser (TreeError (..))
+import Language.Ltml.Tree.ToLtml (treeToLtml)
 import Lucid (renderToFile)
 import System.Directory (removeDirectoryRecursive)
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 import Prelude hiding (Enum, Word, readFile)
-import Language.Ltml.Tree.ToLtml (treeToLtml)
-import Language.Ltml.Tree.Example.Fpo (fpoTree)
-import Language.Ltml.Tree.Parser (TreeError(..))
 
 testDoc = readFile "src/Language/Ltml/HTML/Test/test.txt"
 
