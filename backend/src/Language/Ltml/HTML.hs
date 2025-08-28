@@ -228,7 +228,14 @@ instance ToHtmlM (Node Section) where
 instance ToHtmlM SectionBody where
     toHtmlM sectionBody = case sectionBody of
         -- \| Super Section
-        InnerSectionBody nodeSections -> toHtmlM nodeSections
+        -- \| We have to save the super-section counter, since super-sections are counted locally
+        InnerSectionBody nodeSections -> do
+            superSectionID <- gets currentSuperSectionID
+            modify (\s -> s {currentSuperSectionID = currentSuperSectionID initGlobalState})
+            bodyHtml <- toHtmlM nodeSections
+            modify (\s -> s {currentSuperSectionID = superSectionID})
+            return bodyHtml
+
         -- \| Section
         -- \| In this case the children are paragraphs, so we set the needed flag for them
         --    to decide if the should have a visible id
@@ -444,7 +451,10 @@ instance ToHtmlM FootnoteSet where
                 Just (_, idHtml, delayedTextHtml) ->
                     -- \| <div> <sup>id</sup> <span>text</span> </div>
                     return
-                        ( (div_ [cssClass_ Class.Footnote, id_ (unLabel label)] <$> ((sup_ <#> Class.FootnoteID) idHtml <>)) . span_
+                        ( ( div_ [cssClass_ Class.Footnote, id_ (unLabel label)]
+                                <$> ((sup_ <#> Class.FootnoteID) idHtml <>)
+                          )
+                            . span_
                             <$> delayedTextHtml
                         )
 
