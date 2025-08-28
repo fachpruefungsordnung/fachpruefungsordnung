@@ -844,6 +844,10 @@ splitview = H.mkComponent
 
       Editor.PostPDF content -> do
         renderedPDF' <- Request.postBlob "/render/pdf" (fromString content)
+        tocTitleMaybe <- H.request _toc unit TOC.RequestCurrentTocEntryTitle
+        let
+          tocTitle = join tocTitleMaybe -- This flattens Maybe (Maybe String) to Maybe String
+          filename = (fromMaybe "document" tocTitle) <> ".pdf"
         case renderedPDF' of
           Left _ -> pure unit
           Right body -> do
@@ -862,7 +866,7 @@ splitview = H.mkComponent
                 Nothing -> pure unit
                 Just aHtml -> do
                   Element.setAttribute "href" url aEl
-                  Element.setAttribute "download" "test.pdf" aEl
+                  Element.setAttribute "download" filename aEl
                   HTMLElement.click aHtml
             -- deactivate the blob link after 1 sec
             _ <- H.fork do

@@ -1,4 +1,16 @@
-module FPO.Components.TOC where
+module FPO.Components.TOC
+  ( Action(..)
+  , EntityKind(..)
+  , EntityToDelete
+  , Input
+  , Output(..)
+  , Path
+  , Query(..)
+  , SelectedEntity(..)
+  , Version
+  , findLeafTitleInTree
+  , tocview
+  ) where
 
 import Data.Array
   ( concat
@@ -135,7 +147,9 @@ data Action
 
 data EntityKind = Section | Paragraph
 
-data Query a = ReceiveTOCs (TOCTree) a
+data Query a
+  = ReceiveTOCs (TOCTree) a
+  | RequestCurrentTocEntryTitle (Maybe String -> a)
 
 type State = FPOState
   ( docID :: DH.DocumentID
@@ -461,6 +475,13 @@ tocview = connect (selectEq identity) $ H.mkComponent
         state
           { tocEntries = entries }
       pure (Just a)
+
+    RequestCurrentTocEntryTitle reply -> do
+      state <- H.get
+      let
+        currentTitle = getCurrentTocEntryTitle state.mSelectedTocEntry
+          state.tocEntries
+      pure (Just (reply currentTitle))
 
   rootTreeToHTML
     :: forall slots
@@ -976,3 +997,32 @@ tocview = connect (selectEq identity) $ H.mkComponent
       , HH.div [ HP.classes [ HB.fs6 ] ]
           [ HH.text str ]
       ]
+
+-- Helper function to extract the title from the current TOC entry
+getCurrentTocEntryTitle :: Maybe SelectedEntity -> RootTree TOCEntry -> Maybe String
+getCurrentTocEntryTitle mSelectedEntry tocEntries = case mSelectedEntry of
+  Nothing -> Nothing
+  Just (SelLeaf leafId) -> findLeafTitle leafId tocEntries
+  Just (SelNode path title) -> Just title
+
+-- Helper to find a leaf title by ID
+findLeafTitle :: Int -> RootTree TOCEntry -> Maybe String
+findLeafTitle _ Empty = Nothing
+findLeafTitle targetId (RootTree { children }) =
+  findLeafTitleInChildren targetId children
+
+findLeafTitleInChildren :: Int -> Array (Edge TOCEntry) -> Maybe String
+findLeafTitleInChildren targetId children =
+  case uncons children of
+    Nothing -> Nothing
+    Just { head: Edge tree, tail: rest } ->
+      case findLeafTitleInTree targetId tree of
+        Just title -> Just title
+        Nothing -> findLeafTitleInChildren targetId rest
+
+findLeafTitleInTree :: Int -> Tree TOCEntry -> Maybe String
+findLeafTitleInTree targetId = case _ of
+  Leaf { title, node: { id } } ->
+    if id == targetId then Just title else Nothing
+  Node { children } ->
+    findLeafTitleInChildren targetId children
