@@ -1003,7 +1003,7 @@ getCurrentTocEntryTitle :: Maybe SelectedEntity -> RootTree TOCEntry -> Maybe St
 getCurrentTocEntryTitle mSelectedEntry tocEntries = case mSelectedEntry of
   Nothing -> Nothing
   Just (SelLeaf leafId) -> findLeafTitle leafId tocEntries
-  Just (SelNode path title) -> Just title
+  Just (SelNode _ title) -> Just title
 
 -- Helper to find a leaf title by ID
 findLeafTitle :: Int -> RootTree TOCEntry -> Maybe String
