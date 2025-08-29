@@ -12,10 +12,10 @@ module Language.Ltml.Tree.Parser
     , leafError
     , leafParser
     , leafFootnoteParser
+    , flaggedTreePF
     , nFlaggedTreePF
-    , staticFlaggedTreePF
+    , disjFlaggedTreePF
     , disjNFlaggedTreePF
-    , disjStaticFlaggedTreePF
     )
 where
 
@@ -29,7 +29,8 @@ import Language.Lsd.AST.Common (TypeName)
 import Language.Lsd.AST.SimpleRegex (Disjunction (Disjunction))
 import Language.Lsd.AST.Type
     ( KindNameOf (kindNameOf)
-    , NamedType (ntTypeName, unwrapNT)
+    , NamedType
+    , unwrapNT
     , TypeNameOf (typeNameOf)
     )
 import Language.Ltml.Common (Flagged)
@@ -90,33 +91,34 @@ leafParser p x =
 leafFootnoteParser :: FootnoteParser a -> Text -> FootnoteTreeParser a
 leafFootnoteParser p x = mapFootnoteWriterT (\p' -> leafParser p' x) p
 
-flaggedTreePF
+flaggedTreePF'
     :: (MonadTreeParser m, KindNameOf t)
-    => (TypeName -> Tree flag a b -> m c)
+    => (TypeName -> Maybe (Tree flag a b -> m c))
     -> Proxy t
     -> FlaggedTree flag a b
     -> m (Flagged flag c)
-flaggedTreePF f kind = traverseF aux
+flaggedTreePF' f kind = traverseF aux
   where
     aux (TypedTree kindName typeName tree) =
-        if kindName == kindNameOf kind
-            then f typeName tree
-            else treeError "Invalid kind"
+        if kindName /= kindNameOf kind
+            then treeError "Invalid kind"
+            else case f typeName of
+                Nothing -> treeError "Invalid type"
+                Just f' -> f' tree
 
-flaggedTreePF'
+flaggedTreePF
     :: forall m t flag a b c
-     . (MonadTreeParser m, KindNameOf t)
-    => (Tree flag a b -> m c)
+     . (MonadTreeParser m, KindNameOf t, TypeNameOf t)
+    => (t -> Tree flag a b -> m c)
     -> t
-    -> TypeName
     -> FlaggedTree flag a b
     -> m (Flagged flag c)
-flaggedTreePF' f _ typeName = flaggedTreePF f' (Proxy :: Proxy t)
+flaggedTreePF f t = flaggedTreePF' f' (Proxy :: Proxy t)
   where
-    f' typeName' tree =
-        if typeName' == typeName
-            then f tree
-            else treeError "Invalid type"
+    f' typeName =
+        if typeName == typeNameOf t
+            then Just $ f t
+            else Nothing
 
 nFlaggedTreePF
     :: (MonadTreeParser m, KindNameOf t)
@@ -124,33 +126,18 @@ nFlaggedTreePF
     -> NamedType t
     -> FlaggedTree flag a b
     -> m (Flagged flag c)
-nFlaggedTreePF f nt = flaggedTreePF' (f t) t (ntTypeName nt)
-  where
-    t = unwrapNT nt
-
-staticFlaggedTreePF
-    :: (MonadTreeParser m, KindNameOf t, TypeNameOf t)
-    => (t -> Tree flag a b -> m c)
-    -> t
-    -> FlaggedTree flag a b
-    -> m (Flagged flag c)
-staticFlaggedTreePF f t = flaggedTreePF' (f t) t (typeNameOf t)
+nFlaggedTreePF f = flaggedTreePF (f . unwrapNT)
 
 disjFlaggedTreePF
     :: forall m t flag a b c
-     . (MonadTreeParser m, KindNameOf t)
-    => (t -> TypeName)
-    -> (t -> Tree flag a b -> m c)
+     . (MonadTreeParser m, KindNameOf t, TypeNameOf t)
+    => (t -> Tree flag a b -> m c)
     -> Disjunction t
     -> FlaggedTree flag a b
     -> m (Flagged flag c)
-disjFlaggedTreePF getTypeName f (Disjunction ts) =
-    flaggedTreePF f' (Proxy :: Proxy t)
+disjFlaggedTreePF f (Disjunction ts) = flaggedTreePF' f' (Proxy :: Proxy t)
   where
-    f' typeName tree =
-        case find ((typeName ==) . getTypeName) ts of
-            Just t -> f t tree
-            Nothing -> treeError "Invalid type"
+    f' typeName = f <$> find ((typeName ==) . typeNameOf) ts
 
 disjNFlaggedTreePF
     :: (MonadTreeParser m, KindNameOf t)
@@ -158,12 +145,4 @@ disjNFlaggedTreePF
     -> Disjunction (NamedType t)
     -> FlaggedTree flag a b
     -> m (Flagged flag c)
-disjNFlaggedTreePF f = disjFlaggedTreePF ntTypeName (f . unwrapNT)
-
-disjStaticFlaggedTreePF
-    :: (MonadTreeParser m, KindNameOf t, TypeNameOf t)
-    => (t -> Tree flag a b -> m c)
-    -> Disjunction t
-    -> FlaggedTree flag a b
-    -> m (Flagged flag c)
-disjStaticFlaggedTreePF = disjFlaggedTreePF typeNameOf
+disjNFlaggedTreePF f = disjFlaggedTreePF (f . unwrapNT)

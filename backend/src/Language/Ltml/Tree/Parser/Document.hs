@@ -38,11 +38,11 @@ import Language.Ltml.Tree (FlaggedInputTree', InputTree', Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
     ( FootnoteTreeParser
     , TreeParser
-    , disjStaticFlaggedTreePF
+    , disjFlaggedTreePF
+    , flaggedTreePF
     , leafFootnoteParser
     , leafParser
     , nFlaggedTreePF
-    , staticFlaggedTreePF
     , treeError
     )
 import Language.Ltml.Tree.Parser.Section (sectionBodyTP)
@@ -100,7 +100,7 @@ introExtroTP
     :: Sequence (NamedType SimpleSectionType)
     -> FlaggedInputTree'
     -> FootnoteTreeParser (Flagged' [SimpleSection])
-introExtroTP = staticFlaggedTreePF introExtroTP'
+introExtroTP = flaggedTreePF introExtroTP'
   where
     introExtroTP' t (Leaf x) =
         leafFootnoteParser (simpleSectionSequenceP (fmap unwrapNT t) eof) x
@@ -110,7 +110,7 @@ mainTP
     :: Disjunction DocumentMainBodyType
     -> FlaggedInputTree'
     -> FootnoteTreeParser (Flagged' SectionBody)
-mainTP = disjStaticFlaggedTreePF (aux . \(DocumentMainBodyType t) -> t)
+mainTP = disjFlaggedTreePF (aux . \(DocumentMainBodyType t) -> t)
   where
     aux :: SectionBodyType -> InputTree' -> FootnoteTreeParser SectionBody
     aux t (Leaf x) = leafFootnoteParser (sectionBodyP t eof) x

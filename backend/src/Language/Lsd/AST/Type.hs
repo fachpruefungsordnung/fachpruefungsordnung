@@ -37,3 +37,6 @@ instance (KindNameOf t) => KindNameOf (NamedType t) where
 --   a type name.
 class TypeNameOf t where
     typeNameOf :: t -> TypeName
+
+instance TypeNameOf (NamedType t) where
+    typeNameOf = ntTypeName
