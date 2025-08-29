@@ -30,3 +30,4 @@ data SimpleSectionType
 instance ProperNodeKind (Sequence (NamedType SimpleSectionType)) where
     kindNameOf _ = "simple-section-sequence"
     typeNameOf _ = ""
+    displayNameOf _ = "simple section sequence"

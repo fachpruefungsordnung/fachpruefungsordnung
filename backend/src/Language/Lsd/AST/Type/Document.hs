@@ -57,7 +57,14 @@ newtype DocumentMainBodyType
 instance ProperNodeKind DocumentMainBodyType where
     kindNameOf _ = "document-mainbody"
 
-    typeNameOf (DocumentMainBodyType (InnerSectionBodyType _)) = "inner"
-    typeNameOf (DocumentMainBodyType (LeafSectionBodyType _)) = "leaf"
-    typeNameOf (DocumentMainBodyType (SimpleLeafSectionBodyType _)) =
-        "simple-leaf"
+    typeNameOf (DocumentMainBodyType t') = aux t'
+      where
+        aux (InnerSectionBodyType _) = "inner"
+        aux (LeafSectionBodyType _) = "leaf"
+        aux (SimpleLeafSectionBodyType _) = "simple-leaf"
+
+    displayNameOf (DocumentMainBodyType t') = aux t'
+      where
+        aux (InnerSectionBodyType _) = "nested main body"
+        aux (LeafSectionBodyType _) = "textual main body"
+        aux (SimpleLeafSectionBodyType _) = "simple textual main body"

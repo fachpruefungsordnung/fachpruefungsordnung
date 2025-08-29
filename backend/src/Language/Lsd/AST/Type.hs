@@ -31,6 +31,7 @@ data NamedType t
 class ProperNodeKind t where
     kindNameOf :: Proxy t -> KindName
     typeNameOf :: t -> TypeName
+    displayNameOf :: t -> DisplayName
 
 -- | An LTML kind @t@ is raw-proper iff @'NamedType' t@ is proper
 --   (see 'ProperNodeKind').
@@ -40,3 +41,4 @@ class RawProperNodeKind t where
 instance (RawProperNodeKind t) => ProperNodeKind (NamedType t) where
     kindNameOf _ = kindNameOfRaw (Proxy :: Proxy t)
     typeNameOf = ntTypeName
+    displayNameOf = ntDisplayName
