@@ -33,6 +33,7 @@
             "newtype",
             "now",
             "parsing",
+            "partial",
             "prelude",
             "record",
             "record-extra",

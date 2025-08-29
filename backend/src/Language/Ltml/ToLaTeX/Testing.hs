@@ -33,6 +33,7 @@ import Language.Lsd.AST.Format
     , ParagraphKeyFormat (ParagraphKeyFormat)
     , TocKeyFormat (TocKeyFormat)
     )
+import Language.Lsd.AST.Type (NamedType (NamedType))
 import Language.Lsd.AST.Type.AppendixSection
     ( AppendixElementFormat (AppendixElementFormat)
     , AppendixSectionFormat (AppendixSectionFormat)
@@ -45,6 +46,7 @@ import Language.Lsd.AST.Type.DocumentContainer
     , HeaderFooterFormatAtom
         ( HeaderFooterCurPageNumAtom
         , HeaderFooterDateAtom
+        , HeaderFooterLastPageNumAtom
         , HeaderFooterSuperTitleAtom
         , HeaderFooterTitleAtom
         )
@@ -71,8 +73,9 @@ import Language.Ltml.AST.Section
     , SectionBody (InnerSectionBody, LeafSectionBody)
     )
 import Language.Ltml.AST.Text (TextTree (Space, Word))
+import Language.Ltml.Common (Flagged (Flagged))
 import Language.Ltml.Parser.Common.Lexeme (nSc)
-import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
+import Language.Ltml.Parser.Footnote (runFootnoteWriterT)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX (generatePDFFromSection)
 import Language.Ltml.ToLaTeX.GlobalState
@@ -108,8 +111,10 @@ runTestToPDF = do
 runTestToLaTeX :: IO String
 runTestToLaTeX = do
     let input = readText "./src/Language/Ltml/ToLaTeX/Auxiliary/test.txt"
+        NamedType _ _ sectionT' = sectionT
+        NamedType _ _ footnoteT' = footnoteT
     case runParser
-        (nSc *> unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
+        (nSc *> runFootnoteWriterT (sectionP sectionT' eof) [footnoteT'])
         ""
         (input <> "\n") of
         Left err -> return (errorBundlePretty err)
@@ -200,7 +205,11 @@ testingDocument =
             , Word "document"
             ]
         )
-        (DocumentBody [] (InnerSectionBody [Node Nothing testingSection]) [])
+        ( DocumentBody
+            (Flagged False [])
+            (Flagged False $ InnerSectionBody [Flagged True $ Node Nothing testingSection])
+            (Flagged False [])
+        )
         mempty
 
 testingAppendixSection :: AppendixSection
@@ -224,7 +233,7 @@ testingAppendixSection =
                 )
             )
         )
-        [Node Nothing doc, Node Nothing doc]
+        [Flagged False $ Node Nothing doc, Flagged False $ Node Nothing doc]
   where
     doc =
         Document
@@ -242,14 +251,15 @@ testingAppendixSection =
                 ]
             )
             ( DocumentBody
-                []
-                ( InnerSectionBody
-                    [ Node Nothing testingSection
-                    , Node Nothing testingSection
-                    , Node Nothing testingSection
-                    ]
+                (Flagged False [])
+                ( Flagged False $
+                    InnerSectionBody
+                        [ Flagged False $ Node Nothing testingSection
+                        , Flagged False $ Node Nothing testingSection
+                        , Flagged False $ Node Nothing testingSection
+                        ]
                 )
-                []
+                (Flagged False [])
             )
             mempty
 
@@ -288,7 +298,13 @@ testingDocumentContainer =
                 [ HeaderFooterItemFormat
                     SmallFontSize
                     []
-                    (FormatString [StringAtom "Seite ", PlaceholderAtom HeaderFooterCurPageNumAtom])
+                    ( FormatString
+                        [ StringAtom "Seite "
+                        , PlaceholderAtom HeaderFooterCurPageNumAtom
+                        , StringAtom "/"
+                        , PlaceholderAtom HeaderFooterLastPageNumAtom
+                        ]
+                    )
                 ]
             )
             ( HeadingFormat
@@ -302,8 +318,8 @@ testingDocumentContainer =
             "Made with Love"
             "August 22, 2023"
         )
-        testingDocument
-        [testingAppendixSection]
+        (Flagged False testingDocument)
+        [Flagged False testingAppendixSection]
 
 startTesting :: IO ()
 startTesting = do

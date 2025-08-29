@@ -532,6 +532,18 @@ updateTextRevision =
                         creation_ts :: timestamptz,
                         author :: uuid,
                         content :: text
+                ),
+                updated_anchors AS (
+                    UPDATE
+                        doc_comment_anchors
+                    SET
+                        comment = updated.id
+                    FROM
+                        updated
+                    WHERE
+                        doc_comment_anchors.comment = $1 :: int8
+                    RETURNING
+                        doc_comment_anchors.id
                 )
                 SELECT
                     updated.id :: int8,
@@ -1193,8 +1205,8 @@ getComments =
                     LEFT JOIN doc_text_elements
                         ON comments.text_element = doc_text_elements.id
                 WHERE
-                    comments.text_element = $1 :: INT8
-                    AND doc_text_elements.document = $2 :: INT8
+                    comments.text_element = $2 :: INT8
+                    AND doc_text_elements.document = $1 :: INT8
             |]
 
 createReply :: Statement (UserID, CommentID, Text) Message
@@ -1244,7 +1256,7 @@ getReplies =
                     doc_comment_replies replies
                     LEFT JOIN users ON replies.author = users.id
                     LEFT JOIN doc_comments comments ON replies.comment = comments.id
-                    LEFT JOIN doc_text_elements text_elements ON comments.text_element = doc_text_elements.id
+                    LEFT JOIN doc_text_elements text_elements ON comments.text_element = text_elements.id
                 WHERE
                     text_elements.document = $1 :: INT8
                     AND comments.text_element = $2 :: INT8
@@ -1351,6 +1363,8 @@ getCommentAnchors =
                     doc_comment_anchors
                 WHERE
                     revision = $1 :: INT8
+                ORDER BY
+                    comment, start_col, end_col
             |]
 
 deleteCommentAnchorsExcept :: Statement (TextRevisionID, Vector CommentID) ()

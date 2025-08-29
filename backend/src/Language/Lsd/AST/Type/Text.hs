@@ -1,15 +1,11 @@
 module Language.Lsd.AST.Type.Text
     ( TextType (..)
-    , PreTextType (..)
     )
 where
 
 import Language.Lsd.AST.SimpleRegex (Disjunction)
+import Language.Lsd.AST.Type (NamedType)
 
 newtype TextType enumT
     = TextType
-        (Disjunction enumT)
-
-newtype PreTextType enumT
-    = PreTextType
-        (Disjunction enumT)
+        (Disjunction (NamedType enumT))

@@ -39,6 +39,8 @@ module Language.Ltml.ToLaTeX.GlobalState
     , docHeadingFormat
     , onlyOneParagraph
     , isSupersection
+    , flaggedParent
+    , flaggedChildren
     , docType
     , labelToRef
     , labelToFootNote
@@ -117,6 +119,8 @@ data CounterState = CounterState
 data FlagState = FlagState
     { _onlyOneParagraph :: Bool -- needed for sections with only one paragraph
     , _isSupersection :: Bool -- needed for heading
+    , _flaggedParent :: Bool
+    , _flaggedChildren :: Bool
     , _docType :: DocType -- needed to distinguish between main document and appendix
     }
     deriving (Show)
@@ -278,6 +282,8 @@ initialFlagState =
     FlagState
         False -- onlyOneParagraph
         False -- isSupersection
+        False
+        False
         Main -- isAppendix
 
 initialFormatState :: FormatState

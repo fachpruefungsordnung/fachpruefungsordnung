@@ -21,7 +21,6 @@ module Language.Ltml.HTML.Common
     , Delayed (..)
     , evalDelayed
     , returnNow
-    , fromNow
     ) where
 
 import Control.Monad.Reader (ReaderT)
@@ -49,7 +48,10 @@ type HtmlReaderState =
     ReaderT ReaderState (State GlobalState) (Delayed (Html ()))
 
 data GlobalState = GlobalState
-    { currentAppendixSectionID :: Int
+    { hasFlagged :: Bool
+    -- ^ Is set True at every (Flagged ...); used to determine if current Flagged
+    --   has any Flagged children
+    , currentAppendixSectionID :: Int
     -- ^ Tracks the current appendix section id
     , currentSuperSectionID :: Int
     -- ^ Tracks the current super-section number
@@ -94,7 +96,9 @@ data GlobalState = GlobalState
     }
 
 data ReaderState = ReaderState
-    { currentAppendixElementID :: Int
+    { shouldRender :: Bool
+    -- ^ Is set True at every (Flagged True ...); to tell child Flagged to render
+    , currentAppendixElementID :: Int
     -- ^ Tracks the current appendix element (document) id;
     --   This is in ReaderState, since it is controlled from the AppendixSection
     , appendixElementIdFormat :: IdentifierFormat
@@ -122,7 +126,8 @@ data ReaderState = ReaderState
 initGlobalState :: GlobalState
 initGlobalState =
     GlobalState
-        { currentAppendixSectionID = 1
+        { hasFlagged = False
+        , currentAppendixSectionID = 1
         , currentSuperSectionID = 1
         , currentSectionID = 1
         , currentParagraphID = 1
@@ -145,7 +150,8 @@ initGlobalState =
 initReaderState :: ReaderState
 initReaderState =
     ReaderState
-        { currentAppendixElementID = 1
+        { shouldRender = False
+        , currentAppendixElementID = 1
         , appendixElementIdFormat = error "Undefined appendix element id format!"
         , appendixElementTocKeyFormat = error "Undefined appendix element ToC format!"
         , appendixElementMLabel = Nothing
@@ -235,10 +241,6 @@ evalDelayed (Later fa) s = fa s
 
 returnNow :: Html () -> HtmlReaderState
 returnNow = return . Now
-
-fromNow :: Delayed a -> a
-fromNow (Now a) = a
-fromNow (Later _) = error "fromNow was called with Later"
 
 instance (Monoid a) => Monoid (Delayed a) where
     mempty = Now mempty

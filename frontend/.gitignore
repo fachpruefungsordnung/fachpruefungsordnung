@@ -11,3 +11,4 @@ generated-docs/
 .spago
 .idea/
 index.js
+.VSCodeCounter/

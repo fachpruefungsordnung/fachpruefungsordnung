@@ -12,7 +12,6 @@ import Data.Argonaut (fromString)
 import Data.Array
   ( cons
   , deleteAt
-  , find
   , head
   , insertAt
   , mapWithIndex
@@ -29,7 +28,6 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -51,8 +49,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , modifyNodeRootTree
   )
 import FPO.Types
-  ( CommentSection
-  , TOCEntry
+  ( TOCEntry
   , TOCTree
   , documentTreeToTOCTree
   , emptyTOCEntry
@@ -101,7 +98,7 @@ data Action
   | HandleMouseMove MouseEvent
   -- Toggle buttons
   | ToggleComment
-  | ToggleCommentOverview Boolean
+  | ToggleCommentOverview Boolean Int Int
   | ToggleSidebar
   | TogglePreview
   -- Query Output
@@ -166,6 +163,16 @@ type State =
   -- , compareToElement :: ElementData
   -- this value is updated from the same value in TOC
   , mSelectedTocEntry :: Maybe SelectedEntity
+
+{- <<<<<<< HEAD
+  , pdfWarningAvailable :: Boolean
+  , pdfWarningIsShown :: Boolean
+  -- , compareToElement :: ElementData
+  -- this value is updated from the same value in TOC
+  , mSelectedTocEntry :: Maybe SelectedEntity
+=======
+  , compareToElement :: ElementData
+>>>>>>> main -}
   }
 
 type ElemVersion = { elementID :: Int, versionID :: Maybe Int , comparisonData :: ElementData}
@@ -210,8 +217,6 @@ splitview = H.mkComponent
       , commentOverviewShown: false
       , commentShown: false
       , previewShown: true
-      , pdfWarningAvailable: false
-      , pdfWarningIsShown: false
       , docID: docID
       -- , compareToElement: Nothing
       , mSelectedTocEntry: Nothing
@@ -383,7 +388,7 @@ splitview = H.mkComponent
                 \border: 1px solid #f5c6cb; \
                 \border-radius: 0.2rem; \
                 \z-index: 10;"
-            , HE.onClick \_ -> ToggleCommentOverview false
+            , HE.onClick \_ -> ToggleCommentOverview false (-1) (-1)
             ]
             [ HH.text "x" ]
         , HH.h4
@@ -611,13 +616,9 @@ splitview = H.mkComponent
         tree = tocTreeToDocumentTree state.tocEntries
         encodedTree = DT.encodeDocumentTree tree
 
-      rep <- Request.postJson Right ("/docs/" <> show state.docID <> "/tree")
+      _ <- Request.postJson Right ("/docs/" <> show state.docID <> "/tree")
         encodedTree
-      -- debugging logs in
-      case rep of -- TODO please handle the response
-        Left _ -> pure unit -- H.liftEffect $ Console.log $ Request.printError "post" err
-        Right _ -> pure unit
-    -- H.liftEffect $ Console.log "Successfully posted TOC to server"
+      pure unit
 
     GET -> do
       s <- H.get
@@ -725,12 +726,21 @@ splitview = H.mkComponent
 
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
-    ToggleCommentOverview shown ->
+    ToggleCommentOverview shown docID tocID -> do
+      sidebarShown <- H.gets _.sidebarShown
       if shown then do
-        H.tell _editor 0 Editor.SendCommentSections
-        H.modify_ \st -> st { commentShown = false, commentOverviewShown = shown }
+        if sidebarShown then
+          H.modify_ _ { commentShown = false, commentOverviewShown = true }
+        else
+          H.modify_ \st -> st
+            { sidebarRatio = st.lastExpandedSidebarRatio
+            , sidebarShown = true
+            , commentShown = false
+            , commentOverviewShown = true
+            }
+        H.tell _comment unit (Comment.Overview docID tocID)
       else
-        H.modify_ \st -> st { commentOverviewShown = shown }
+        H.modify_ \st -> st { commentOverviewShown = false }
 
     -- Toggle the sidebar
     -- Add logic in calculating the middle ratio
@@ -857,53 +867,33 @@ splitview = H.mkComponent
         H.modify_ \st -> st { commentShown = false }
 
       -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
-      Comment.UpdateComment tocID markerID newCommentSection -> do
-        H.tell _editor 0 Editor.SaveSection
-        state <- H.get
-        case
-          findRootTree (\e -> e.elementID == tocID && e.versionID /= Nothing)
-            state.versionMapping
-          of
-          Just _ -> do
-            let
-              updatedTOCEntries = map
-                ( \entry ->
-                    if entry.id /= tocID then entry
-                    else
-                      let
-                        newMarkers =
-                          ( map
-                              ( \marker ->
-                                  if marker.id /= markerID then marker
-                                  else marker
-                                    { mCommentSection = Just newCommentSection }
-                              )
-                              entry.markers
-                          )
-                      in
-                        entry { markers = newMarkers }
-                )
-                state.tocEntries
-              updateTOCEntry = fromMaybe
-                emptyTOCEntry
-                (findTOCEntry tocID updatedTOCEntries)
-              title = fromMaybe
-                ""
-                (findTitleTOCEntry tocID updatedTOCEntries)
-            H.modify_ \s -> s { tocEntries = updatedTOCEntries }
-            H.tell _editor 0 (Editor.ChangeSection title updateTOCEntry Nothing)
-          Nothing -> do
-            H.liftEffect $ log
-              "unable to unpdate comment on outdated versions of elements"
+      Comment.UpdateComment newCommentSection -> do
+        H.tell _editor 0 (Editor.UpdateComment newCommentSection)
+
+      Comment.CommentOverview tocID cs -> do
+        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID cs)
 
     HandleCommentOverview output -> case output of
 
-      CommentOverview.JumpToCommentSection tocID markerID commentSection -> do
+      CommentOverview.JumpToCommentSection tocID markerID -> do
+        docID <- H.gets _.docID
         H.modify_ \st -> st { commentShown = true }
         H.tell _comment unit
-          (Comment.SelectedCommentSection tocID markerID commentSection)
+          (Comment.SelectedCommentSection docID tocID markerID)
 
     HandleEditor output -> case output of
+
+      Editor.AddComment docID tocID -> do
+        state <- H.get
+        if state.sidebarShown then
+          H.modify_ _ { commentShown = true }
+        else
+          H.modify_ \st -> st
+            { sidebarRatio = st.lastExpandedSidebarRatio
+            , sidebarShown = true
+            , commentShown = true
+            }
+        H.tell _comment unit (Comment.AddComment docID tocID)
 
       Editor.ClickedQuery response -> do
         H.modify_ _ { renderedHtml = Just Loading }
@@ -918,36 +908,45 @@ splitview = H.mkComponent
             { tocEntries =
                 map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
             }
-        H.tell _comment unit (Comment.DeletedComment tocEntry.id deletedIDs)
+        H.tell _comment unit (Comment.DeletedComment deletedIDs)
 
       Editor.PostPDF content -> do
-        renderedPDF' <- Request.postBlob "/render/pdf" (fromString content)
+        renderedPDF' <- Request.postBlobOrError "/render/pdf" (fromString content)
+        tocTitleMaybe <- H.request _toc unit TOC.RequestCurrentTocEntryTitle
+        let
+          tocTitle = join tocTitleMaybe -- This flattens Maybe (Maybe String) to Maybe String
+          filename = (fromMaybe "document" tocTitle) <> ".pdf"
         case renderedPDF' of
           Left _ -> pure unit
-          Right body -> do
-            --H.liftEffect $ log body
-            -- create blobl link
-            url <- H.liftEffect $ createObjectURL body
-            -- Create an invisible link and click it to download PDF
-            H.liftEffect $ do
-              -- get window stuff
-              win <- window
-              hdoc <- document win
-              let doc = HTMLDocument.toDocument hdoc
+          Right blobOrError ->
+            case blobOrError of
+              Left errMsg -> H.modify_ _
+                { renderedHtml = Just
+                    (Loaded ("<pre><code>" <> errMsg <> "</code></pre>"))
+                }
+              Right body -> do
+                -- create blobl link
+                url <- H.liftEffect $ createObjectURL body
+                -- Create an invisible link and click it to download PDF
+                H.liftEffect $ do
+                  -- get window stuff
+                  win <- window
+                  hdoc <- document win
+                  let doc = HTMLDocument.toDocument hdoc
 
-              -- create link
-              aEl <- Document.createElement "a" doc
-              case HTMLElement.fromElement aEl of
-                Nothing -> pure unit
-                Just aHtml -> do
-                  Element.setAttribute "href" url aEl
-                  Element.setAttribute "download" "test.pdf" aEl
-                  HTMLElement.click aHtml
-            -- deactivate the blob link after 1 sec
-            _ <- H.fork do
-              H.liftAff $ delay (Milliseconds 1000.0)
-              H.liftEffect $ revokeObjectURL url
-            pure unit
+                  -- create link
+                  aEl <- Document.createElement "a" doc
+                  case HTMLElement.fromElement aEl of
+                    Nothing -> pure unit
+                    Just aHtml -> do
+                      Element.setAttribute "href" url aEl
+                      Element.setAttribute "download" filename aEl
+                      HTMLElement.click aHtml
+                -- deactivate the blob link after 1 sec
+                _ <- H.fork do
+                  H.liftAff $ delay (Milliseconds 1000.0)
+                  H.liftEffect $ revokeObjectURL url
+                pure unit
 
       Editor.SavedSection toBePosted title tocEntry -> do
         state <- H.get
@@ -967,21 +966,16 @@ splitview = H.mkComponent
             , sidebarShown = true
             , commentShown = true
             }
-        case (findCommentSection state.tocEntries tocID markerID) of
-          Nothing -> pure unit
-          Just commentSection -> do
-            H.tell _comment unit
-              (Comment.SelectedCommentSection tocID markerID commentSection)
-
-      Editor.SendingTOC tocEntry -> do
-        H.tell _commentOverview unit (CommentOverview.ReceiveTOC tocEntry)
+        H.tell _comment unit
+          (Comment.SelectedCommentSection state.docID tocID markerID)
 
       Editor.RenamedNode newName path -> do
         s <- H.get
         updateTree $ changeNodeName path newName s.tocEntries
 
-      Editor.ShowAllCommentsOutput -> do
-        handleAction $ ToggleCommentOverview true
+      Editor.ShowAllCommentsOutput docID tocID -> do
+        handleAction $ ToggleCommentOverview true docID tocID
+
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
@@ -1044,11 +1038,11 @@ splitview = H.mkComponent
       H.modify_ \st -> st { tocEntries = newTree }
       H.tell _toc unit (TOC.ReceiveTOCs newTree)
 
-findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
-findCommentSection tocEntries tocID markerID = do
-  tocEntry <- findTOCEntry tocID tocEntries
-  marker <- find (\m -> m.id == markerID) tocEntry.markers
-  marker.mCommentSection
+-- findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
+-- findCommentSection tocEntries tocID markerID = do
+--   tocEntry <- findTOCEntry tocID tocEntries
+--   marker <- find (\m -> m.id == markerID) tocEntry.markers
+--   marker.mCommentSection
 
 {- ------------------ Tree traversal and mutation function ------------------ -}
 {- --------------------- TODO: Move to seperate module  --------------------- -}

@@ -1,4 +1,16 @@
-module FPO.Components.TOC where
+module FPO.Components.TOC
+  ( Action(..)
+  , EntityKind(..)
+  , EntityToDelete
+  , Input
+  , Output(..)
+  , Path
+  , Query(..)
+  , SelectedEntity(..)
+  , Version
+  , findLeafTitleInTree
+  , tocview
+  ) where
 
 import Data.Array
   ( concat
@@ -34,7 +46,7 @@ import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
-import FPO.Types (ShortendTOCEntry, TOCEntry, TOCTree, shortenTOC)
+import FPO.Types (TOCEntry, TOCTree)
 import FPO.Util (isPrefixOf, prependIf)
 import Halogen as H
 import Halogen.HTML as HH
@@ -135,9 +147,12 @@ data Action
 
 data EntityKind = Section | Paragraph
 
+
 data Query a
   = ReceiveTOCs (TOCTree) a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
+  | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
+{- <<<<<<< HEAD
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
 
 {- <<<<<<< Updated upstream
@@ -148,11 +163,13 @@ data Query a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
 >>>>>>> Stashed changes -}
+=======
+>>>>>>> main -}
 
 type State = FPOState
   ( docID :: DH.DocumentID
   , documentName :: String
-  , tocEntries :: RootTree ShortendTOCEntry
+  , tocEntries :: RootTree TOCEntry
   , mSelectedTocEntry :: Maybe SelectedEntity
   , now :: Maybe DateTime
   , showAddMenu :: Array Int
@@ -328,8 +345,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     { id: PostTextDto.getID dto
                     , name: "New Subsection"
                     , paraID: 0 -- to be implemented later
-                    , newMarkerNextID: 0
-                    , markers: []
                     }
                 }
           H.raise (AddNode path newEntry)
@@ -471,11 +486,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
     ReceiveTOCs entries a -> do
-      let
-        shortendEntries = map shortenTOC entries
       H.modify_ \state ->
         state
-          { tocEntries = shortendEntries }
+          { tocEntries = entries }
       pure (Just a)
 
     RequestCurrentTocEntryTitle reply -> do
@@ -485,6 +498,12 @@ tocview = connect (selectEq identity) $ H.mkComponent
           state.tocEntries
       pure (Just (reply currentTitle))
 
+    RequestCurrentTocEntry reply -> do
+      state <- H.get
+      pure (Just (reply state.mSelectedTocEntry))
+
+
+{- <<<<<<< HEAD
     RequestCurrentTocEntry reply -> do
       state <- H.get
       pure (Just (reply state.mSelectedTocEntry))
@@ -503,6 +522,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
       pure (Just (reply state.mSelectedTocEntry))
 
 >>>>>>> Stashed changes -}
+=======
+>>>>>>> main -}
   rootTreeToHTML
     :: forall slots
      . State
@@ -511,7 +532,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Array Int
     -> Maybe SelectedEntity
     -> Maybe DateTime
-    -> RootTree ShortendTOCEntry
+    -> RootTree TOCEntry
     -> Array (H.ComponentHTML Action slots m)
   rootTreeToHTML _ _ _ _ _ _ Empty = []
   rootTreeToHTML
@@ -558,7 +579,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Maybe SelectedEntity
     -> Array Int
     -> Maybe DateTime
-    -> Tree ShortendTOCEntry
+    -> Tree TOCEntry
     -> Array (H.ComponentHTML Action slots m)
   treeToHTML state menuPath historyPath level mSelectedTocEntry path now = case _ of
     Node { title, children } ->
@@ -1017,3 +1038,32 @@ tocview = connect (selectEq identity) $ H.mkComponent
       , HH.div [ HP.classes [ HB.fs6 ] ]
           [ HH.text str ]
       ]
+
+-- Helper function to extract the title from the current TOC entry
+getCurrentTocEntryTitle :: Maybe SelectedEntity -> RootTree TOCEntry -> Maybe String
+getCurrentTocEntryTitle mSelectedEntry tocEntries = case mSelectedEntry of
+  Nothing -> Nothing
+  Just (SelLeaf leafId) -> findLeafTitle leafId tocEntries
+  Just (SelNode _ title) -> Just title
+
+-- Helper to find a leaf title by ID
+findLeafTitle :: Int -> RootTree TOCEntry -> Maybe String
+findLeafTitle _ Empty = Nothing
+findLeafTitle targetId (RootTree { children }) =
+  findLeafTitleInChildren targetId children
+
+findLeafTitleInChildren :: Int -> Array (Edge TOCEntry) -> Maybe String
+findLeafTitleInChildren targetId children =
+  case uncons children of
+    Nothing -> Nothing
+    Just { head: Edge tree, tail: rest } ->
+      case findLeafTitleInTree targetId tree of
+        Just title -> Just title
+        Nothing -> findLeafTitleInChildren targetId rest
+
+findLeafTitleInTree :: Int -> Tree TOCEntry -> Maybe String
+findLeafTitleInTree targetId = case _ of
+  Leaf { title, node: { id } } ->
+    if id == targetId then Just title else Nothing
+  Node { children } ->
+    findLeafTitleInChildren targetId children

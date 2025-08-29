@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | Definition of the FPO LSD.
+--
+--   This only exists because we cannot yet parse LSD.
 module Language.Lsd.Example.Fpo
     ( fpoT
     , superSectionT
@@ -9,11 +12,13 @@ module Language.Lsd.Example.Fpo
     )
 where
 
+import Data.Char (toLower)
 import Data.Typography
 import Data.Void (Void)
 import Language.Lsd.AST.Common
 import Language.Lsd.AST.Format
 import Language.Lsd.AST.SimpleRegex
+import Language.Lsd.AST.Type
 import Language.Lsd.AST.Type.AppendixSection
 import Language.Lsd.AST.Type.Document
 import Language.Lsd.AST.Type.DocumentContainer
@@ -27,12 +32,13 @@ import Language.Lsd.AST.Type.SimpleSection
 import Language.Lsd.AST.Type.Table
 import Language.Lsd.AST.Type.Text
 
-fpoT :: DocumentContainerType
+fpoT :: NamedType DocumentContainerType
 fpoT =
-    DocumentContainerType
-        (DocumentContainerFormat headerFormat footerFormat headingFormat)
-        mainDocT
-        (Sequence [appendixT, attachmentT])
+    NamedType "fpo-container" "Fachprüfungsordnung" $
+        DocumentContainerType
+            (DocumentContainerFormat headerFormat footerFormat headingFormat)
+            mainDocT
+            (Sequence [appendixT, attachmentT])
   where
     headingFormat =
         HeadingFormat
@@ -87,215 +93,255 @@ fpoT =
                 )
             ]
 
-appendixT :: AppendixSectionType
+appendixT :: NamedType AppendixSectionType
 appendixT =
-    AppendixSectionType
-        ( AppendixSectionFormat
-            (AppendixSectionTitle "Anlagen")
-            ( AppendixElementFormat
-                (FormatString [PlaceholderAtom Arabic])
-                ( TocKeyFormat $
-                    FormatString
-                        [ StringAtom "Anlage "
-                        , PlaceholderAtom KeyIdentifierPlaceholder
-                        ]
-                )
-                ( HeadingFormat
-                    (Typography LeftAligned LargeFontSize [Bold])
-                    ( FormatString
-                        [ StringAtom "Anlage "
-                        , PlaceholderAtom IdentifierPlaceholder
-                        , StringAtom "\n"
-                        , PlaceholderAtom HeadingTextPlaceholder
-                        ]
+    NamedType "appendix" "Anlagen" $
+        AppendixSectionType
+            ( AppendixSectionFormat
+                (AppendixSectionTitle "Anlagen")
+                ( AppendixElementFormat
+                    (FormatString [PlaceholderAtom Arabic])
+                    ( TocKeyFormat $
+                        FormatString
+                            [ StringAtom "Anlage "
+                            , PlaceholderAtom KeyIdentifierPlaceholder
+                            ]
+                    )
+                    ( HeadingFormat
+                        (Typography LeftAligned LargeFontSize [Bold])
+                        ( FormatString
+                            [ StringAtom "Anlage "
+                            , PlaceholderAtom IdentifierPlaceholder
+                            , StringAtom "\n"
+                            , PlaceholderAtom HeadingTextPlaceholder
+                            ]
+                        )
                     )
                 )
             )
-        )
-        (Star $ Disjunction [simpleDocT])
+            (Star $ Disjunction [simpleDocT])
 
-attachmentT :: AppendixSectionType
+attachmentT :: NamedType AppendixSectionType
 attachmentT =
-    AppendixSectionType
-        ( AppendixSectionFormat
-            (AppendixSectionTitle "Anhänge")
-            ( AppendixElementFormat
+    NamedType "attachments" "Anhänge" $
+        AppendixSectionType
+            ( AppendixSectionFormat
+                (AppendixSectionTitle "Anhänge")
+                ( AppendixElementFormat
+                    (FormatString [PlaceholderAtom Arabic])
+                    ( TocKeyFormat $
+                        FormatString
+                            [ StringAtom "Anhang "
+                            , PlaceholderAtom KeyIdentifierPlaceholder
+                            ]
+                    )
+                    ( HeadingFormat
+                        (Typography LeftAligned LargeFontSize [Bold])
+                        ( FormatString
+                            [ StringAtom "Anhang "
+                            , PlaceholderAtom IdentifierPlaceholder
+                            , StringAtom "\n"
+                            , PlaceholderAtom HeadingTextPlaceholder
+                            ]
+                        )
+                    )
+                )
+            )
+            (Star $ Disjunction [simpleDocT])
+
+mainDocT :: NamedType DocumentType
+mainDocT =
+    NamedType "fpo-maindoc" "Fachprüfungsordnung (Hauptdokument)" $
+        DocumentType
+            (Keyword "!")
+            DocumentFormat {docHasTableOfContents = True}
+            (DocumentHeadingType plainTextT)
+            ( DocumentBodyType
+                ( Sequence
+                    [ dateSSecT
+                    , publLogSSecT
+                    , introSSecT
+                    ]
+                )
+                ( Disjunction
+                    [ DocumentMainBodyType $
+                        InnerSectionBodyType (Star sectionT)
+                    , DocumentMainBodyType $
+                        InnerSectionBodyType (Star superSectionT)
+                    ]
+                )
+                ( Sequence
+                    [ extroSSecT
+                    , legalLogSSecT
+                    ]
+                )
+            )
+            (Disjunction [footnoteT])
+
+simpleDocT :: NamedType DocumentType
+simpleDocT =
+    NamedType "simpledoc" "Einfaches Textdokument" $
+        DocumentType
+            (Keyword "!")
+            DocumentFormat {docHasTableOfContents = False}
+            (DocumentHeadingType plainTextT)
+            ( DocumentBodyType
+                (Sequence [])
+                ( Disjunction
+                    [ DocumentMainBodyType $
+                        SimpleLeafSectionBodyType (Star simpleBlockT)
+                    ]
+                )
+                (Sequence [])
+            )
+            (Disjunction [footnoteT])
+
+dateSSecT :: NamedType SimpleSectionType
+dateSSecT =
+    NamedType "date" "Datumsabschnitt" $
+        SimpleSectionType
+            (Keyword "[date]")
+            SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
+            (Star (simpleParagraphTF Centered LargeFontSize))
+
+publLogSSecT :: NamedType SimpleSectionType
+publLogSSecT =
+    NamedType "publ_log" "Veröffentlichungshistorie" $
+        SimpleSectionType
+            (Keyword "[publ_log]")
+            SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
+            (Star (simpleParagraphTF LeftAligned SmallFontSize))
+
+introSSecT :: NamedType SimpleSectionType
+introSSecT =
+    NamedType "intro" "Einleitung" $
+        SimpleSectionType
+            (Keyword "[intro]")
+            SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
+            (Star simpleParagraphT)
+
+extroSSecT :: NamedType SimpleSectionType
+extroSSecT =
+    NamedType "extro" "Schluss" $
+        SimpleSectionType
+            (Keyword "[extro]")
+            SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
+            (Star simpleParagraphT)
+
+legalLogSSecT :: NamedType SimpleSectionType
+legalLogSSecT =
+    NamedType "legal_log" "Rechtliche Historie" $
+        SimpleSectionType
+            (Keyword "[legal_log]")
+            SimpleSectionFormat {ssHasPrecedingHorizontalBar = True}
+            (Star simpleParagraphT)
+
+superSectionT :: NamedType SectionType
+superSectionT =
+    NamedType "supersection" "Abschnitt" $
+        SectionType
+            (Keyword "=")
+            ( HeadingType
+                ( HeadingFormat
+                    (Typography LeftAligned MediumFontSize [Bold])
+                    ( FormatString
+                        [ StringAtom "Abschnitt "
+                        , PlaceholderAtom IdentifierPlaceholder
+                        , StringAtom " "
+                        , PlaceholderAtom HeadingTextPlaceholder
+                        ]
+                    )
+                )
+                plainTextT
+            )
+            ( SectionFormat
                 (FormatString [PlaceholderAtom Arabic])
                 ( TocKeyFormat $
                     FormatString
-                        [ StringAtom "Anhang "
+                        [ StringAtom "Abschnitt "
                         , PlaceholderAtom KeyIdentifierPlaceholder
                         ]
                 )
+            )
+            (InnerSectionBodyType (Star sectionT))
+
+sectionT :: NamedType SectionType
+sectionT =
+    NamedType "section" "Paragraph" $
+        SectionType
+            (Keyword "§")
+            ( HeadingType
                 ( HeadingFormat
-                    (Typography LeftAligned LargeFontSize [Bold])
+                    (Typography Centered MediumFontSize [Bold])
                     ( FormatString
-                        [ StringAtom "Anhang "
+                        [ StringAtom "§ "
                         , PlaceholderAtom IdentifierPlaceholder
                         , StringAtom "\n"
                         , PlaceholderAtom HeadingTextPlaceholder
                         ]
                     )
                 )
+                plainTextT
             )
-        )
-        (Star $ Disjunction [simpleDocT])
-
-mainDocT :: DocumentType
-mainDocT =
-    DocumentType
-        DocumentFormat {docHasTableOfContents = True}
-        ( DocumentBodyType
-            ( Sequence
-                [ dateSSecT
-                , publLogSSecT
-                , introSSecT
-                ]
-            )
-            ( Disjunction
-                [ InnerSectionBodyType (Star sectionT)
-                , InnerSectionBodyType (Star superSectionT)
-                ]
-            )
-            ( Sequence
-                [ extroSSecT
-                , legalLogSSecT
-                ]
-            )
-        )
-        (Disjunction [footnoteT])
-
-simpleDocT :: DocumentType
-simpleDocT =
-    DocumentType
-        DocumentFormat {docHasTableOfContents = False}
-        ( DocumentBodyType
-            (Sequence [])
-            (Disjunction [SimpleLeafSectionBodyType (Star simpleBlockT)])
-            (Sequence [])
-        )
-        (Disjunction [footnoteT])
-
-dateSSecT :: SimpleSectionType
-dateSSecT =
-    SimpleSectionType
-        (Keyword "[date]")
-        SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
-        (Star (simpleParagraphTF Centered LargeFontSize))
-
-publLogSSecT :: SimpleSectionType
-publLogSSecT =
-    SimpleSectionType
-        (Keyword "[publ_log]")
-        SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
-        (Star (simpleParagraphTF LeftAligned SmallFontSize))
-
-introSSecT :: SimpleSectionType
-introSSecT =
-    SimpleSectionType
-        (Keyword "[intro]")
-        SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
-        (Star simpleParagraphT)
-
-extroSSecT :: SimpleSectionType
-extroSSecT =
-    SimpleSectionType
-        (Keyword "[extro]")
-        SimpleSectionFormat {ssHasPrecedingHorizontalBar = False}
-        (Star simpleParagraphT)
-
-legalLogSSecT :: SimpleSectionType
-legalLogSSecT =
-    SimpleSectionType
-        (Keyword "[legal_log]")
-        SimpleSectionFormat {ssHasPrecedingHorizontalBar = True}
-        (Star simpleParagraphT)
-
-superSectionT :: SectionType
-superSectionT =
-    SectionType
-        (Keyword "=")
-        ( HeadingType
-            ( HeadingFormat
-                (Typography LeftAligned MediumFontSize [Bold])
-                ( FormatString
-                    [ StringAtom "Abschnitt "
-                    , PlaceholderAtom IdentifierPlaceholder
-                    , StringAtom " "
-                    , PlaceholderAtom HeadingTextPlaceholder
-                    ]
+            ( SectionFormat
+                (FormatString [PlaceholderAtom Arabic])
+                ( TocKeyFormat $
+                    FormatString
+                        [ StringAtom "§ "
+                        , PlaceholderAtom KeyIdentifierPlaceholder
+                        ]
                 )
             )
-            plainTextT
-        )
-        ( SectionFormat
-            (FormatString [PlaceholderAtom Arabic])
-            ( TocKeyFormat $
-                FormatString
-                    [ StringAtom "Abschnitt "
-                    , PlaceholderAtom KeyIdentifierPlaceholder
-                    ]
-            )
-        )
-        (InnerSectionBodyType (Star sectionT))
+            (LeafSectionBodyType (Star paragraphT))
 
-sectionT :: SectionType
-sectionT =
-    SectionType
-        (Keyword "§")
-        ( HeadingType
-            ( HeadingFormat
-                (Typography Centered MediumFontSize [Bold])
-                ( FormatString
-                    [ StringAtom "§ "
-                    , PlaceholderAtom IdentifierPlaceholder
-                    , StringAtom "\n"
-                    , PlaceholderAtom HeadingTextPlaceholder
-                    ]
-                )
-            )
-            plainTextT
-        )
-        ( SectionFormat
-            (FormatString [PlaceholderAtom Arabic])
-            ( TocKeyFormat $
-                FormatString
-                    [ StringAtom "§ "
-                    , PlaceholderAtom KeyIdentifierPlaceholder
-                    ]
-            )
-        )
-        (LeafSectionBodyType (Star paragraphT))
-
-paragraphT :: ParagraphType
+paragraphT :: NamedType ParagraphType
 paragraphT =
-    ParagraphType
-        ( ParagraphFormat
-            (FormatString [PlaceholderAtom Arabic])
-            ( ParagraphKeyFormat $
-                FormatString
-                    [ StringAtom "("
-                    , PlaceholderAtom KeyIdentifierPlaceholder
-                    , StringAtom ")"
-                    ]
+    NamedType "paragraph" "Absatz" $
+        ParagraphType
+            ( ParagraphFormat
+                (FormatString [PlaceholderAtom Arabic])
+                ( ParagraphKeyFormat $
+                    FormatString
+                        [ StringAtom "("
+                        , PlaceholderAtom KeyIdentifierPlaceholder
+                        , StringAtom ")"
+                        ]
+                )
             )
-        )
-        richTextT
+            richTextT
 
-simpleBlockT :: SimpleBlockType
-simpleBlockT = SimpleBlockType simpleParagraphT (Disjunction [dummyTableT])
+simpleBlockT :: NamedType SimpleBlockType
+simpleBlockT =
+    NamedType "simple_block" "Einfacher Block" $
+        SimpleBlockType simpleParagraphT (Disjunction [dummyTableT])
 
-simpleParagraphT :: SimpleParagraphType
+simpleParagraphT :: NamedType SimpleParagraphType
 simpleParagraphT = simpleParagraphTF LeftAligned MediumFontSize
 
-simpleParagraphTF :: TextAlignment -> FontSize -> SimpleParagraphType
+simpleParagraphTF
+    :: TextAlignment
+    -> FontSize
+    -> NamedType SimpleParagraphType
 simpleParagraphTF alignment fsize =
-    SimpleParagraphType
-        (SimpleParagraphFormat $ Typography alignment fsize [])
-        simpleTextT
+    NamedType typeName displayName $
+        SimpleParagraphType
+            (SimpleParagraphFormat $ Typography alignment fsize [])
+            simpleTextT
+  where
+    typeName =
+        TypeName $
+            "simple_paragraph_"
+                ++ map toLower (show alignment)
+                ++ "_"
+                ++ map toLower (show fsize)
+    displayName =
+        DisplayName $
+            "Einfacher Absatz (" ++ show alignment ++ ", " ++ show fsize ++ ")"
 
-dummyTableT :: TableType
-dummyTableT = TableType (Keyword "[dummy_table]")
+dummyTableT :: NamedType TableType
+dummyTableT =
+    NamedType "dummy_table" "Dummy Tabelle" $
+        TableType (Keyword "[dummy_table]")
 
 plainTextT :: TextType Void
 plainTextT = TextType (Disjunction [])
@@ -317,55 +363,64 @@ footnoteTextT = plainTextT
 maxRegularEnumDepth :: Int
 maxRegularEnumDepth = 3
 
-regularEnumT :: EnumType
+regularEnumT :: NamedType EnumType
 regularEnumT =
-    EnumType
-        (Keyword "#")
-        ( EnumFormat $
-            EnumItemFormat
-                (FormatString [PlaceholderAtom Arabic])
-                ( EnumItemKeyFormat $
-                    FormatString
-                        [ PlaceholderAtom KeyIdentifierPlaceholder
-                        , StringAtom "."
-                        ]
-                )
-        )
-        (TextType (Disjunction [enumTF 1, simpleEnumT]))
-  where
-    enumTF :: Int -> EnumType
-    enumTF depth =
+    NamedType "regular_enum" "Nummerierte Aufzählung" $
         EnumType
             (Keyword "#")
             ( EnumFormat $
                 EnumItemFormat
-                    ( FormatString $
-                        replicate depth (PlaceholderAtom AlphabeticLower)
-                    )
+                    (FormatString [PlaceholderAtom Arabic])
                     ( EnumItemKeyFormat $
                         FormatString
                             [ PlaceholderAtom KeyIdentifierPlaceholder
-                            , StringAtom ")"
+                            , StringAtom "."
                             ]
                     )
             )
-            (TextType (Disjunction nextEnumTs))
+            (TextType (Disjunction [enumTF 1, simpleEnumT]))
+  where
+    enumTF :: Int -> NamedType EnumType
+    enumTF depth =
+        NamedType typeName displayName $
+            EnumType
+                (Keyword "#")
+                ( EnumFormat $
+                    EnumItemFormat
+                        ( FormatString $
+                            replicate depth (PlaceholderAtom AlphabeticLower)
+                        )
+                        ( EnumItemKeyFormat $
+                            FormatString
+                                [ PlaceholderAtom KeyIdentifierPlaceholder
+                                , StringAtom ")"
+                                ]
+                        )
+                )
+                (TextType (Disjunction nextEnumTs))
       where
+        typeName = TypeName $ "regular_enum_" ++ show depth
+        displayName =
+            DisplayName $ "Nummerierte Aufzählung (Tiefe " ++ show depth ++ ")"
+
         nextEnumTs =
             if depth < maxRegularEnumDepth
                 then [enumTF (depth + 1), simpleEnumT]
                 else [simpleEnumT]
 
-simpleEnumT :: EnumType
+simpleEnumT :: NamedType EnumType
 simpleEnumT =
-    EnumType
-        (Keyword "-")
-        ( EnumFormat $
-            EnumItemFormat
-                (FormatString [PlaceholderAtom Arabic])
-                (EnumItemKeyFormat $ FormatString [StringAtom "-"])
-        )
-        (TextType (Disjunction []))
+    NamedType "simple_enum" "Strichpunkt-Aufzählung" $
+        EnumType
+            (Keyword "-")
+            ( EnumFormat $
+                EnumItemFormat
+                    (FormatString [PlaceholderAtom Arabic])
+                    (EnumItemKeyFormat $ FormatString [StringAtom "-"])
+            )
+            (TextType (Disjunction []))
 
-footnoteT :: FootnoteType
-footnoteT = FootnoteType (Keyword "^") SuperscriptFootnoteFormat footnoteTextT
+footnoteT :: NamedType FootnoteType
+footnoteT =
+    NamedType "footnote" "Fußnote" $
+        FootnoteType (Keyword "^") SuperscriptFootnoteFormat footnoteTextT

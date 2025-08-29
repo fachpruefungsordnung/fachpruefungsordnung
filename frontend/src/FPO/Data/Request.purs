@@ -33,6 +33,7 @@ module FPO.Data.Request
   , putJson
   , removeUser
   , getFromJSONEndpoint
+  , postBlobOrError
   , LoadState(..)
   ) where
 
@@ -553,6 +554,30 @@ postRenderHtml
 postRenderHtml content = do
   result <- handleRequest' "/docs/render/html" (postRenderHtml' content)
   pure result
+
+-- | Makes a POST request that can handle both Blob success and String error responses
+-- | Currently used for PDF generation to be able to display the internal error case.
+postBlobOrError
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => String
+  -> Json
+  -> H.HalogenM st act slots msg m (Either AppError (Either String Blob))
+postBlobOrError url body = do
+  -- First try as blob
+  blobResult <- handleRequest' url (postBlob' url body)
+  case blobResult of
+    Right blob -> pure $ Right $ Right blob
+    Left _ -> do
+      -- If blob failed, try as string (likely an error message)
+      stringResult <- H.liftAff $ postString' url body
+      case stringResult of
+        Right { body: errMsg, status } -> case status of
+          StatusCode 400 -> pure $ Right $ Left errMsg
+          _ -> pure $ Right $ Left "Unknown error occurred"
+        Left _ -> pure $ Left (ServerError "Error creating Blob.")
 
 -- | PUT-Requests ----------------------------------------------------------
 putJson' :: String -> Json -> Aff (Either Error (Response Json))

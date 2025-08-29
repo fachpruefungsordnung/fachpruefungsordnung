@@ -182,13 +182,22 @@ component = connect selectTranslator $ H.mkComponent
             ]
             $
               [ HH.div
-                  [ HP.classes [ HB.pe3, HB.textTruncate ]
+                  [ HP.classes
+                      [ HB.pe3
+                      , HB.textTruncate
+                      , Style.truncateHoverTitle
+                      ]
                   , HP.style "width: 160px; min-width: 160px; max-width: 160px;"
                   ]
                   [ HH.text $ UserOverviewDto.getName userOverviewDto
                   ]
               , HH.div
-                  [ HP.classes [ HB.pe3, HB.textTruncate, HB.flexGrow1 ]
+                  [ HP.classes
+                      [ HB.pe3
+                      , HB.textTruncate
+                      , Style.truncateHoverTitle
+                      , HB.flexGrow1
+                      ]
                   , HP.style "min-width: 60px;"
                   ]
                   [ HH.text $ UserOverviewDto.getEmail userOverviewDto
