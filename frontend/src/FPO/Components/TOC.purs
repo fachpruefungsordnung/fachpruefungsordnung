@@ -135,7 +135,19 @@ data Action
 
 data EntityKind = Section | Paragraph
 
+data Query a
+  = ReceiveTOCs (TOCTree) a
+  | RequestCurrentTocEntryTitle (Maybe String -> a)
+  | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
+
+{- <<<<<<< Updated upstream
 data Query a = ReceiveTOCs (TOCTree) a
+=======
+data Query a
+  = ReceiveTOCs (TOCTree) a
+  | RequestCurrentTocEntryTitle (Maybe String -> a)
+  | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
+>>>>>>> Stashed changes -}
 
 type State = FPOState
   ( docID :: DH.DocumentID
@@ -466,6 +478,31 @@ tocview = connect (selectEq identity) $ H.mkComponent
           { tocEntries = shortendEntries }
       pure (Just a)
 
+    RequestCurrentTocEntryTitle reply -> do
+      state <- H.get
+      let
+        currentTitle = getCurrentTocEntryTitle state.mSelectedTocEntry
+          state.tocEntries
+      pure (Just (reply currentTitle))
+
+    RequestCurrentTocEntry reply -> do
+      state <- H.get
+      pure (Just (reply state.mSelectedTocEntry))
+
+{- <<<<<<< Updated upstream
+=======
+    RequestCurrentTocEntryTitle reply -> do
+      state <- H.get
+      let
+        currentTitle = getCurrentTocEntryTitle state.mSelectedTocEntry
+          state.tocEntries
+      pure (Just (reply currentTitle))
+
+    RequestCurrentTocEntry reply -> do
+      state <- H.get
+      pure (Just (reply state.mSelectedTocEntry))
+
+>>>>>>> Stashed changes -}
   rootTreeToHTML
     :: forall slots
      . State
