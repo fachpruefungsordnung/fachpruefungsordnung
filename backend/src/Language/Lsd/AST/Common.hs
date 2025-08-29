@@ -3,7 +3,7 @@
 module Language.Lsd.AST.Common
     ( KindName (..)
     , TypeName (..)
-    , DisplayName (..)
+    , DisplayTypeName (..)
     , Keyword (..)
     )
 where
@@ -17,7 +17,7 @@ newtype KindName = KindName String
 newtype TypeName = TypeName String
     deriving (Show, IsString, Eq, Ord)
 
-newtype DisplayName = DisplayName String
+newtype DisplayTypeName = DisplayTypeName String
     deriving (Show, IsString)
 
 newtype Keyword = Keyword Text

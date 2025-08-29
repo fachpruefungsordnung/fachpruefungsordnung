@@ -63,7 +63,7 @@ instance ProperNodeKind DocumentMainBodyType where
         aux (LeafSectionBodyType _) = "leaf"
         aux (SimpleLeafSectionBodyType _) = "simple-leaf"
 
-    displayNameOf (DocumentMainBodyType t') = aux t'
+    displayTypeNameOf (DocumentMainBodyType t') = aux t'
       where
         aux (InnerSectionBodyType _) = "nested main body"
         aux (LeafSectionBodyType _) = "textual main body"

@@ -335,7 +335,7 @@ simpleParagraphTF alignment fsize =
                 ++ "_"
                 ++ map toLower (show fsize)
     displayName =
-        DisplayName $
+        DisplayTypeName $
             "Einfacher Absatz (" ++ show alignment ++ ", " ++ show fsize ++ ")"
 
 dummyTableT :: NamedType TableType
@@ -401,7 +401,8 @@ regularEnumT =
       where
         typeName = TypeName $ "regular_enum_" ++ show depth
         displayName =
-            DisplayName $ "Nummerierte Aufzählung (Tiefe " ++ show depth ++ ")"
+            DisplayTypeName $
+                "Nummerierte Aufzählung (Tiefe " ++ show depth ++ ")"
 
         nextEnumTs =
             if depth < maxRegularEnumDepth

@@ -17,12 +17,12 @@ module Language.Lsd.AST.Type
 where
 
 import Data.Proxy (Proxy (Proxy))
-import Language.Lsd.AST.Common (DisplayName, KindName, TypeName)
+import Language.Lsd.AST.Common (DisplayTypeName, KindName, TypeName)
 
 data NamedType t
     = NamedType
     { ntTypeName :: TypeName
-    , ntDisplayName :: DisplayName
+    , ntDisplayName :: DisplayTypeName
     , unwrapNT :: t
     }
 
@@ -31,7 +31,7 @@ data NamedType t
 class ProperNodeKind t where
     kindNameOf :: Proxy t -> KindName
     typeNameOf :: t -> TypeName
-    displayNameOf :: t -> DisplayName
+    displayTypeNameOf :: t -> DisplayTypeName
 
 -- | An LTML kind @t@ is raw-proper iff @'NamedType' t@ is proper
 --   (see 'ProperNodeKind').
@@ -41,4 +41,4 @@ class RawProperNodeKind t where
 instance (RawProperNodeKind t) => ProperNodeKind (NamedType t) where
     kindNameOf _ = kindNameOfRaw (Proxy :: Proxy t)
     typeNameOf = ntTypeName
-    displayNameOf = ntDisplayName
+    displayTypeNameOf = ntDisplayName
