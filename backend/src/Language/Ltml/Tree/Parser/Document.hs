@@ -30,7 +30,7 @@ import Language.Ltml.AST.Section (SectionBody)
 import Language.Ltml.AST.SimpleSection (SimpleSection)
 import Language.Ltml.Common (Flagged)
 import Language.Ltml.Parser.Document (documentHeadingP)
-import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
+import Language.Ltml.Parser.Footnote (runFootnoteWriterT)
 import Language.Ltml.Parser.Section (sectionBodyP)
 import Language.Ltml.Parser.SimpleSection (simpleSectionSequenceP)
 import Language.Ltml.Parser.Text (HangingTextP)
@@ -75,8 +75,7 @@ documentTXP'
     (Tree x children) = do
         wHheading <- headingTP kw headingT x
         (body, fnMap) <-
-            unwrapFootnoteParser (map unwrapNT fnTs) $
-                bodyTP bodyT children
+            runFootnoteWriterT (bodyTP bodyT children) (map unwrapNT fnTs)
         return $ fmap (\heading -> Document fmt heading body fnMap) wHheading
 
 headingTP

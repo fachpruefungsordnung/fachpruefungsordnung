@@ -5,7 +5,7 @@
 module Language.Ltml.Tree.Parser
     ( TreeParser
     , runTreeParser
-    , TreeParserWrapper (wrapTreeParser)
+    , MonadTreeParser (treeParser)
     , TreeError (..)
     , treeError
     , leafError
@@ -41,12 +41,11 @@ newtype TreeParser a = TreeParser (Either TreeError a)
 runTreeParser :: TreeParser a -> Either TreeError a
 runTreeParser (TreeParser x) = x
 
--- CONSIDER: Merge with ParserWrapper.
-class (Monad m) => TreeParserWrapper m where
-    wrapTreeParser :: TreeParser a -> m a
+class (Monad m) => MonadTreeParser m where
+    treeParser :: Either TreeError a -> m a
 
-instance TreeParserWrapper TreeParser where
-    wrapTreeParser = id
+instance MonadTreeParser TreeParser where
+    treeParser = TreeParser
 
 -- | An error that occurred parsing a tree.
 data TreeError
@@ -59,11 +58,11 @@ data TreeError
       TreeError [String]
     deriving (Show)
 
-treeError :: (TreeParserWrapper m) => String -> m a
-treeError = wrapTreeParser . TreeParser . Left . TreeError . pure
+treeError :: (MonadTreeParser m) => String -> m a
+treeError = treeParser . Left . TreeError . pure
 
-leafError :: (TreeParserWrapper m) => ParseErrorBundle Text Void -> m a
-leafError = wrapTreeParser . TreeParser . Left . LeafError
+leafError :: (MonadTreeParser m) => ParseErrorBundle Text Void -> m a
+leafError = treeParser . Left . LeafError
 
 leafParser :: Parser a -> Text -> TreeParser a
 leafParser p x =
@@ -72,7 +71,7 @@ leafParser p x =
         Right y -> return y
 
 flaggedTreePF
-    :: (TreeParserWrapper m, KindNameOf t)
+    :: (MonadTreeParser m, KindNameOf t)
     => (TypeName -> Tree -> m a)
     -> Proxy t
     -> FlaggedTree
@@ -86,7 +85,7 @@ flaggedTreePF f kind = traverseF aux
 
 flaggedTreePF'
     :: forall m t a
-     . (TreeParserWrapper m, KindNameOf t)
+     . (MonadTreeParser m, KindNameOf t)
     => (Tree -> m a)
     -> t
     -> TypeName
@@ -100,7 +99,7 @@ flaggedTreePF' f _ typeName = flaggedTreePF f' (Proxy :: Proxy t)
             else treeError "Invalid type"
 
 nFlaggedTreePF
-    :: (TreeParserWrapper m, KindNameOf t)
+    :: (MonadTreeParser m, KindNameOf t)
     => (t -> Tree -> m a)
     -> NamedType t
     -> FlaggedTree
@@ -110,7 +109,7 @@ nFlaggedTreePF f nt = flaggedTreePF' (f t) t (ntTypeName nt)
     t = unwrapNT nt
 
 staticFlaggedTreePF
-    :: (TreeParserWrapper m, KindNameOf t, TypeNameOf t)
+    :: (MonadTreeParser m, KindNameOf t, TypeNameOf t)
     => (t -> Tree -> m a)
     -> t
     -> FlaggedTree
@@ -119,7 +118,7 @@ staticFlaggedTreePF f t = flaggedTreePF' (f t) t (typeNameOf t)
 
 disjFlaggedTreePF
     :: forall m t a
-     . (TreeParserWrapper m, KindNameOf t)
+     . (MonadTreeParser m, KindNameOf t)
     => (t -> TypeName)
     -> (t -> Tree -> m a)
     -> Disjunction t
@@ -134,7 +133,7 @@ disjFlaggedTreePF getTypeName f (Disjunction ts) =
             Nothing -> treeError "Invalid type"
 
 disjNFlaggedTreePF
-    :: (TreeParserWrapper m, KindNameOf t)
+    :: (MonadTreeParser m, KindNameOf t)
     => (t -> Tree -> m a)
     -> Disjunction (NamedType t)
     -> FlaggedTree
@@ -142,7 +141,7 @@ disjNFlaggedTreePF
 disjNFlaggedTreePF f = disjFlaggedTreePF ntTypeName (f . unwrapNT)
 
 disjStaticFlaggedTreePF
-    :: (TreeParserWrapper m, KindNameOf t, TypeNameOf t)
+    :: (MonadTreeParser m, KindNameOf t, TypeNameOf t)
     => (t -> Tree -> m a)
     -> Disjunction t
     -> FlaggedTree

@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 
 module Language.Ltml.Tree.Parser.Footnote
@@ -8,36 +6,24 @@ module Language.Ltml.Tree.Parser.Footnote
     )
 where
 
-import Control.Monad.Reader (ask)
-import Control.Monad.State (get, put)
 import Control.Monad.Trans.Class (lift)
 import Data.Text (Text)
-import Language.Ltml.Parser.Common.Lexeme (nSc)
 import Language.Ltml.Parser.Footnote
-    ( FootnotePT
-    , FootnoteParser
-    , unwrapFootnoteParser'
+    ( FootnoteParser
+    , FootnoteWriterT
+    , mapFootnoteWriterT
     )
 import Language.Ltml.Tree.Parser
-    ( TreeParser
-    , TreeParserWrapper (wrapTreeParser)
-    , leafError
+    ( MonadTreeParser (treeParser)
+    , TreeParser
+    , leafParser
     )
-import Text.Megaparsec (runParser)
 
-type FootnoteTreeParser = FootnotePT TreeParser
+type FootnoteTreeParser = FootnoteWriterT TreeParser
 
-instance TreeParserWrapper FootnoteTreeParser where
-    wrapTreeParser = lift . lift
+instance (MonadTreeParser m) => MonadTreeParser (FootnoteWriterT m) where
+    treeParser = lift . treeParser
 
-leafFootnoteParser
-    :: FootnoteParser a
-    -> Text
-    -> FootnoteTreeParser a
-leafFootnoteParser p x = do
-    env <- ask
-    st <- get
-    let p' = unwrapFootnoteParser' env st p
-    case runParser (nSc *> p') "" (x <> "\n") of
-        Left e -> leafError e
-        Right (y, st') -> put st' >> return y
+{-# ANN leafFootnoteParser "HLint: ignore Avoid lambda using `infix`" #-}
+leafFootnoteParser :: FootnoteParser a -> Text -> FootnoteTreeParser a
+leafFootnoteParser p x = mapFootnoteWriterT (\p' -> leafParser p' x) p

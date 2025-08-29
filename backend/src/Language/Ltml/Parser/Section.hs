@@ -7,6 +7,7 @@ where
 
 import Control.Applicative ((<|>))
 import Control.Monad (void)
+import Control.Monad.Trans.Class (lift)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Star (Star))
 import Language.Lsd.AST.Type (unwrapNT)
@@ -22,7 +23,7 @@ import Language.Ltml.AST.Section
     , SectionBody (..)
     )
 import Language.Ltml.Common (Flagged (Flagged))
-import Language.Ltml.Parser (Parser, wrapParser)
+import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Indent (nonIndented)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
 import Language.Ltml.Parser.Footnote (FootnoteParser)
@@ -35,7 +36,7 @@ import Text.Megaparsec (many)
 
 sectionP :: SectionType -> Parser () -> FootnoteParser (Node Section)
 sectionP (SectionType kw headingT fmt bodyT) succStartP = do
-    (mLabel, heading) <- wrapParser $ nonIndented $ headingP kw headingT
+    (mLabel, heading) <- lift $ nonIndented $ headingP kw headingT
     body <- nonIndented $ sectionBodyP bodyT succStartP
     return $ Node mLabel $ Section fmt heading body
 

@@ -16,7 +16,7 @@ import Language.Lsd.AST.Type (NamedType (NamedType))
 import Language.Lsd.Example.Fpo (footnoteT, sectionT)
 import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (nSc)
-import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
+import Language.Ltml.Parser.Footnote (runFootnoteWriterT)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX.GlobalState
     ( initialGlobalState
@@ -103,7 +103,7 @@ generatePDFFromSection input =
     let NamedType _ _ sectionT' = sectionT
         NamedType _ _ footnoteT' = footnoteT
      in generatePDFfromParsed
-            (nSc *> unwrapFootnoteParser [footnoteT'] (sectionP sectionT' eof))
+            (nSc *> runFootnoteWriterT (sectionP sectionT' eof) [footnoteT'])
             sectionToText
             (input <> "\n")
   where
