@@ -16,7 +16,7 @@ import Language.Lsd.AST.Format
     , TocKeyFormat
     )
 import Language.Lsd.AST.SimpleRegex (Star)
-import Language.Lsd.AST.Type (KindNameOf (kindNameOf), NamedType)
+import Language.Lsd.AST.Type (NamedType, RawProperNodeKind (..))
 import Language.Lsd.AST.Type.Paragraph (ParagraphType)
 import Language.Lsd.AST.Type.SimpleBlock (SimpleBlockType)
 import Language.Lsd.AST.Type.Text (TextType)
@@ -34,8 +34,8 @@ data SectionType
         SectionFormat
         SectionBodyType
 
-instance KindNameOf SectionType where
-    kindNameOf _ = "section"
+instance RawProperNodeKind SectionType where
+    kindNameOfRaw _ = "section"
 
 data HeadingType
     = HeadingType

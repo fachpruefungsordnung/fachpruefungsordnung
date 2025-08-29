@@ -15,7 +15,7 @@ import Language.Lsd.AST.Format
     , TocKeyFormat
     )
 import Language.Lsd.AST.SimpleRegex (Disjunction, Star)
-import Language.Lsd.AST.Type (KindNameOf (kindNameOf), NamedType)
+import Language.Lsd.AST.Type (NamedType, RawProperNodeKind (..))
 import Language.Lsd.AST.Type.Document (DocumentType)
 
 data AppendixSectionFormat
@@ -41,5 +41,5 @@ data AppendixSectionType
         AppendixSectionFormat
         (Star (Disjunction (NamedType DocumentType)))
 
-instance KindNameOf AppendixSectionType where
-    kindNameOf _ = "appendix-section"
+instance RawProperNodeKind AppendixSectionType where
+    kindNameOfRaw _ = "appendix-section"

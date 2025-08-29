@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -28,10 +29,10 @@ import Data.Void (Void)
 import Language.Lsd.AST.Common (TypeName)
 import Language.Lsd.AST.SimpleRegex (Disjunction (Disjunction))
 import Language.Lsd.AST.Type
-    ( KindNameOf (kindNameOf)
-    , NamedType
+    ( NamedType
+    , ProperNodeKind (kindNameOf, typeNameOf)
+    , RawProperNodeKind
     , unwrapNT
-    , TypeNameOf (typeNameOf)
     )
 import Language.Ltml.Common (Flagged)
 import Language.Ltml.Parser (Parser)
@@ -92,7 +93,7 @@ leafFootnoteParser :: FootnoteParser a -> Text -> FootnoteTreeParser a
 leafFootnoteParser p x = mapFootnoteWriterT (\p' -> leafParser p' x) p
 
 flaggedTreePF'
-    :: (MonadTreeParser m, KindNameOf t)
+    :: (MonadTreeParser m, ProperNodeKind t)
     => (TypeName -> Maybe (Tree flag a b -> m c))
     -> Proxy t
     -> FlaggedTree flag a b
@@ -108,7 +109,7 @@ flaggedTreePF' f kind = traverseF aux
 
 flaggedTreePF
     :: forall m t flag a b c
-     . (MonadTreeParser m, KindNameOf t, TypeNameOf t)
+     . (MonadTreeParser m, ProperNodeKind t)
     => (t -> Tree flag a b -> m c)
     -> t
     -> FlaggedTree flag a b
@@ -121,7 +122,7 @@ flaggedTreePF f t = flaggedTreePF' f' (Proxy :: Proxy t)
             else Nothing
 
 nFlaggedTreePF
-    :: (MonadTreeParser m, KindNameOf t)
+    :: (MonadTreeParser m, RawProperNodeKind t)
     => (t -> Tree flag a b -> m c)
     -> NamedType t
     -> FlaggedTree flag a b
@@ -130,7 +131,7 @@ nFlaggedTreePF f = flaggedTreePF (f . unwrapNT)
 
 disjFlaggedTreePF
     :: forall m t flag a b c
-     . (MonadTreeParser m, KindNameOf t, TypeNameOf t)
+     . (MonadTreeParser m, ProperNodeKind t)
     => (t -> Tree flag a b -> m c)
     -> Disjunction t
     -> FlaggedTree flag a b
@@ -140,7 +141,7 @@ disjFlaggedTreePF f (Disjunction ts) = flaggedTreePF' f' (Proxy :: Proxy t)
     f' typeName = f <$> find ((typeName ==) . typeNameOf) ts
 
 disjNFlaggedTreePF
-    :: (MonadTreeParser m, KindNameOf t)
+    :: (MonadTreeParser m, RawProperNodeKind t)
     => (t -> Tree flag a b -> m c)
     -> Disjunction (NamedType t)
     -> FlaggedTree flag a b

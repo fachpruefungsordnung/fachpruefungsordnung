@@ -11,8 +11,8 @@
 --   A kind @t@ can be represented as Haskell value of type @'Proxy' t@.
 module Language.Lsd.AST.Type
     ( NamedType (..)
-    , KindNameOf (kindNameOf)
-    , TypeNameOf (typeNameOf)
+    , ProperNodeKind (..)
+    , RawProperNodeKind (..)
     )
 where
 
@@ -26,17 +26,17 @@ data NamedType t
     , unwrapNT :: t
     }
 
-class KindNameOf t where
+-- | A node in the LTML tree is proper iff it corresponds to a node in the
+--   input tree ('Language.Ltml.Tree.InputTree').
+class ProperNodeKind t where
     kindNameOf :: Proxy t -> KindName
-
-instance (KindNameOf t) => KindNameOf (NamedType t) where
-    kindNameOf _ = kindNameOf (Proxy :: Proxy t)
-
--- | Provider of standard names for pseudo-types; that is, such that are not
---   defined in an LSD, but rather form an integral part of LSD, yet require
---   a type name.
-class TypeNameOf t where
     typeNameOf :: t -> TypeName
 
-instance TypeNameOf (NamedType t) where
+-- | An LTML kind @t@ is raw-proper iff @'NamedType' t@ is proper
+--   (see 'ProperNodeKind').
+class RawProperNodeKind t where
+    kindNameOfRaw :: Proxy t -> KindName
+
+instance (RawProperNodeKind t) => ProperNodeKind (NamedType t) where
+    kindNameOf _ = kindNameOfRaw (Proxy :: Proxy t)
     typeNameOf = ntTypeName

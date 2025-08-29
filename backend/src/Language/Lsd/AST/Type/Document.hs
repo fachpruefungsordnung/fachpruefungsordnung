@@ -13,9 +13,9 @@ import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Disjunction, Sequence)
 import Language.Lsd.AST.Type
-    ( KindNameOf (kindNameOf)
-    , NamedType
-    , TypeNameOf (typeNameOf)
+    ( NamedType
+    , ProperNodeKind (..)
+    , RawProperNodeKind (..)
     )
 import Language.Lsd.AST.Type.Footnote (FootnoteType)
 import Language.Lsd.AST.Type.Section (SectionBodyType (..))
@@ -36,8 +36,8 @@ data DocumentType
         DocumentBodyType
         (Disjunction (NamedType FootnoteType))
 
-instance KindNameOf DocumentType where
-    kindNameOf _ = "document"
+instance RawProperNodeKind DocumentType where
+    kindNameOfRaw _ = "document"
 
 newtype DocumentHeadingType = DocumentHeadingType (TextType Void)
 
@@ -54,10 +54,9 @@ data DocumentBodyType
 newtype DocumentMainBodyType
     = DocumentMainBodyType SectionBodyType
 
-instance KindNameOf DocumentMainBodyType where
+instance ProperNodeKind DocumentMainBodyType where
     kindNameOf _ = "document-mainbody"
 
-instance TypeNameOf DocumentMainBodyType where
     typeNameOf (DocumentMainBodyType (InnerSectionBodyType _)) = "inner"
     typeNameOf (DocumentMainBodyType (LeafSectionBodyType _)) = "leaf"
     typeNameOf (DocumentMainBodyType (SimpleLeafSectionBodyType _)) =
