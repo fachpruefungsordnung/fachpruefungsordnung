@@ -92,10 +92,10 @@ leafFootnoteParser p x = mapFootnoteWriterT (\p' -> leafParser p' x) p
 
 flaggedTreePF
     :: (MonadTreeParser m, KindNameOf t)
-    => (TypeName -> Tree -> m a)
+    => (TypeName -> Tree flag a b -> m c)
     -> Proxy t
-    -> FlaggedTree
-    -> m (Flagged a)
+    -> FlaggedTree flag a b
+    -> m (Flagged flag c)
 flaggedTreePF f kind = traverseF aux
   where
     aux (TypedTree kindName typeName tree) =
@@ -104,13 +104,13 @@ flaggedTreePF f kind = traverseF aux
             else treeError "Invalid kind"
 
 flaggedTreePF'
-    :: forall m t a
+    :: forall m t flag a b c
      . (MonadTreeParser m, KindNameOf t)
-    => (Tree -> m a)
+    => (Tree flag a b -> m c)
     -> t
     -> TypeName
-    -> FlaggedTree
-    -> m (Flagged a)
+    -> FlaggedTree flag a b
+    -> m (Flagged flag c)
 flaggedTreePF' f _ typeName = flaggedTreePF f' (Proxy :: Proxy t)
   where
     f' typeName' tree =
@@ -120,30 +120,30 @@ flaggedTreePF' f _ typeName = flaggedTreePF f' (Proxy :: Proxy t)
 
 nFlaggedTreePF
     :: (MonadTreeParser m, KindNameOf t)
-    => (t -> Tree -> m a)
+    => (t -> Tree flag a b -> m c)
     -> NamedType t
-    -> FlaggedTree
-    -> m (Flagged a)
+    -> FlaggedTree flag a b
+    -> m (Flagged flag c)
 nFlaggedTreePF f nt = flaggedTreePF' (f t) t (ntTypeName nt)
   where
     t = unwrapNT nt
 
 staticFlaggedTreePF
     :: (MonadTreeParser m, KindNameOf t, TypeNameOf t)
-    => (t -> Tree -> m a)
+    => (t -> Tree flag a b -> m c)
     -> t
-    -> FlaggedTree
-    -> m (Flagged a)
+    -> FlaggedTree flag a b
+    -> m (Flagged flag c)
 staticFlaggedTreePF f t = flaggedTreePF' (f t) t (typeNameOf t)
 
 disjFlaggedTreePF
-    :: forall m t a
+    :: forall m t flag a b c
      . (MonadTreeParser m, KindNameOf t)
     => (t -> TypeName)
-    -> (t -> Tree -> m a)
+    -> (t -> Tree flag a b -> m c)
     -> Disjunction t
-    -> FlaggedTree
-    -> m (Flagged a)
+    -> FlaggedTree flag a b
+    -> m (Flagged flag c)
 disjFlaggedTreePF getTypeName f (Disjunction ts) =
     flaggedTreePF f' (Proxy :: Proxy t)
   where
@@ -154,16 +154,16 @@ disjFlaggedTreePF getTypeName f (Disjunction ts) =
 
 disjNFlaggedTreePF
     :: (MonadTreeParser m, KindNameOf t)
-    => (t -> Tree -> m a)
+    => (t -> Tree flag a b -> m c)
     -> Disjunction (NamedType t)
-    -> FlaggedTree
-    -> m (Flagged a)
+    -> FlaggedTree flag a b
+    -> m (Flagged flag c)
 disjNFlaggedTreePF f = disjFlaggedTreePF ntTypeName (f . unwrapNT)
 
 disjStaticFlaggedTreePF
     :: (MonadTreeParser m, KindNameOf t, TypeNameOf t)
-    => (t -> Tree -> m a)
+    => (t -> Tree flag a b -> m c)
     -> Disjunction t
-    -> FlaggedTree
-    -> m (Flagged a)
+    -> FlaggedTree flag a b
+    -> m (Flagged flag c)
 disjStaticFlaggedTreePF = disjFlaggedTreePF typeNameOf

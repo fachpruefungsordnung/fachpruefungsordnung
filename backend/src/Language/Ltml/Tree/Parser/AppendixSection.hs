@@ -9,8 +9,8 @@ import Language.Lsd.AST.Type.AppendixSection
     ( AppendixSectionType (AppendixSectionType)
     )
 import Language.Ltml.AST.AppendixSection (AppendixSection (AppendixSection))
-import Language.Ltml.Common (Flagged)
-import Language.Ltml.Tree (FlaggedTree, Tree (Leaf, Tree))
+import Language.Ltml.Common (Flagged')
+import Language.Ltml.Tree (FlaggedInputTree', InputTree', Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
     ( TreeParser
     , disjNFlaggedTreePF
@@ -21,11 +21,11 @@ import Language.Ltml.Tree.Parser.Document (documentTXP')
 
 appendixSectionTP
     :: NamedType AppendixSectionType
-    -> FlaggedTree
-    -> TreeParser (Flagged AppendixSection)
+    -> FlaggedInputTree'
+    -> TreeParser (Flagged' AppendixSection)
 appendixSectionTP = nFlaggedTreePF aux
   where
-    aux :: AppendixSectionType -> Tree -> TreeParser AppendixSection
+    aux :: AppendixSectionType -> InputTree' -> TreeParser AppendixSection
     aux _ (Leaf _) = treeError "Appendix section node is leaf"
     aux _ (Tree (Just _) _) = treeError "Appendix section node has header"
     aux (AppendixSectionType fmt (Star t)) (Tree Nothing trees) =

@@ -20,9 +20,9 @@ import Language.Ltml.AST.Section
     , Section (Section)
     , SectionBody (InnerSectionBody)
     )
-import Language.Ltml.Common (Flagged)
+import Language.Ltml.Common (Flagged')
 import Language.Ltml.Parser.Section (headingP, sectionP)
-import Language.Ltml.Tree (FlaggedTree, Tree (Leaf, Tree))
+import Language.Ltml.Tree (FlaggedInputTree', InputTree', Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
     ( FootnoteTreeParser
     , TreeParser
@@ -35,13 +35,13 @@ import Text.Megaparsec (eof)
 
 sectionTP
     :: NamedType SectionType
-    -> FlaggedTree
-    -> FootnoteTreeParser (Flagged (Node Section))
+    -> FlaggedInputTree'
+    -> FootnoteTreeParser (Flagged' (Node Section))
 sectionTP = nFlaggedTreePF sectionTP'
   where
     sectionTP'
         :: SectionType
-        -> Tree
+        -> InputTree'
         -> FootnoteTreeParser (Node Section)
     sectionTP' t (Leaf x) = leafFootnoteParser (sectionP t eof) x
     sectionTP' (SectionType kw headingT fmt bodyT) (Tree x children) = do
@@ -49,17 +49,13 @@ sectionTP = nFlaggedTreePF sectionTP'
         body <- sectionBodyTP bodyT children
         return $ fmap (\heading -> Section fmt heading body) wHeading
 
-headingTP
-    :: Keyword
-    -> HeadingType
-    -> Maybe Text
-    -> TreeParser (Node Heading)
+headingTP :: Keyword -> HeadingType -> Maybe Text -> TreeParser (Node Heading)
 headingTP kw t (Just x) = leafParser (headingP kw t) x
 headingTP _ _ Nothing = treeError "Section lacks heading"
 
 sectionBodyTP
     :: SectionBodyType
-    -> [FlaggedTree]
+    -> [FlaggedInputTree']
     -> FootnoteTreeParser SectionBody
 sectionBodyTP (InnerSectionBodyType (Star nt)) trees =
     InnerSectionBody <$> mapM (sectionTP nt) trees

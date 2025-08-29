@@ -2,19 +2,29 @@
 
 module Language.Ltml.Common
     ( Flagged (..)
+    , Flagged'
+    , flagMap
     )
 where
 
 import Control.Functor.Utils (TraversableF (traverseF))
 
--- | Flagging wrapper for AST nodes.
---   A positive flag indicates that the respective node was originally
---   requested for update.
---   The flag is only ever set for nodes that correspond to a node in the raw
---   tree ('Language.Ltml.Tree.Tree'), thus not during parsing text.
---   The flag should only be set for one node in a tree.
-data Flagged a = Flagged Bool a
+data Flagged flag a = Flagged flag a
     deriving (Functor, Show)
 
-instance TraversableF Flagged where
+-- | Boolean flagging wrapper for input tree nodes
+--   ('Language.Ltml.Tree.FlaggedInputTree') and AST nodes.
+--
+--   The flag indicates whether output should be generated for the respective
+--   flagged node.
+--
+--   Flags always match between corresponding input tree nodes and AST nodes;
+--   in particular, in the AST, the flag is only ever positive for nodes that
+--   correspond to a node in the input tree.
+type Flagged' = Flagged Bool
+
+flagMap :: (fl -> fl') -> Flagged fl a -> Flagged fl' a
+flagMap f (Flagged flag x) = Flagged (f flag) x
+
+instance TraversableF (Flagged flag) where
     traverseF f (Flagged flag x) = Flagged flag <$> f x
