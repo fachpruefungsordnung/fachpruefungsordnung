@@ -21,7 +21,7 @@ where
 
 import Control.Functor.Utils (traverseF)
 import Control.Monad.Trans.Class (lift)
-import Data.List (find)
+import Data.List (find, singleton)
 import Data.Proxy (Proxy (Proxy))
 import Data.Text (Text)
 import Data.Void (Void)
@@ -72,7 +72,7 @@ instance (MonadTreeParser m) => MonadTreeParser (FootnoteWriterT m) where
     treeParser = lift . treeParser
 
 treeError :: (MonadTreeParser m) => String -> m a
-treeError = treeParser . Left . TreeError . pure
+treeError = treeParser . Left . TreeError . singleton
 
 leafError :: (MonadTreeParser m) => ParseErrorBundle Text Void -> m a
 leafError = treeParser . Left . LeafError
