@@ -52,9 +52,9 @@ import FPO.Dto.UserDto (getUserName)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types
-  ( AbstractedCS
-  , AnnotatedMarker
+  ( AnnotatedMarker
   , CommentSection
+  , FirstComment
   , TOCEntry
   , emptyTOCEntry
   , markerToAnnotation
@@ -85,8 +85,6 @@ import Web.HTML.HTMLElement (offsetWidth, toElement)
 import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
-
-import Effect.Console (log)
 
 type Path = Array Int
 
@@ -149,7 +147,7 @@ data Output
   -- SavedSection toBePosted title TOCEntry
   | SavedSection Boolean String TOCEntry
   | RenamedNode String Path
-  | RequestComments Int Int (Maybe Int)
+  | RequestComments Int Int
   | SelectedCommentSection Int Int
   | ShowAllCommentsOutput Int Int
 
@@ -157,7 +155,7 @@ data Action
   = Init
   | Comment
   | ChangeToSection String TOCEntry (Maybe Int)
-  | ContinueChangeToSection (Array AbstractedCS) (Maybe Int)
+  | ContinueChangeToSection (Array FirstComment)
   | DeleteComment
   | SelectComment
   | Bold
@@ -192,7 +190,7 @@ data Query a
   | SaveSection a
   -- | receive the selected TOC and put its content into the editor
   | ChangeSection String TOCEntry (Maybe Int) a
-  | ContinueChangeSection (Array AbstractedCS) (Maybe Int) a
+  | ContinueChangeSection (Array FirstComment) a
   -- | Open and edit a raw string outside the TOCEntry structure.
   --   This is used to make the editor available for editing
   --   the section names of non-leaf nodes.
@@ -889,22 +887,10 @@ editor = connect selectTranslator $ H.mkComponent
       -- Prevent of loading the same Section from backend again
       when (Just entry /= state.mTocEntry) do
         H.modify_ \st -> st { mTocEntry = Just entry, title = title }
-        -- Get comments information from Comment Child
-        H.raise (RequestComments state.docID entry.id rev)
-      pure unit
-    
-    ContinueChangeToSection absCSs rev -> do
-      state <- H.get
-      -- Put the content of the section into the editor and update markers
-      H.gets _.mEditor >>= traverse_ \ed -> do
-
         let
           version = case rev of
             Nothing -> "latest"
             Just v -> show v
-          entryID = case state.mTocEntry of
-            Nothing -> -1
-            Just e -> e.id
         -- Get the content from server here
         -- We need Aff for that and thus cannot go inside Eff
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
@@ -912,7 +898,7 @@ editor = connect selectTranslator $ H.mkComponent
         loadedContent <- H.liftAff $
           Request.getFromJSONEndpoint
             ContentDto.decodeContentWrapper
-            ( "/docs/" <> show state.docID <> "/text/" <> show entryID
+            ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
                 <> "/rev/"
                 <> version
             )
@@ -924,22 +910,35 @@ editor = connect selectTranslator $ H.mkComponent
           comments = ContentDto.getWrapperComments wrapper
           -- convert markers
           markers = map ContentDto.convertToAnnotetedMarker comments
-          filMarkers = updateMarkers absCSs markers 
 
         H.modify_ \st -> st
           { mContent = Just content
-          , markers = filMarkers
+          , markers = markers
           , isEditorReadonly = version /= "latest"
           }
+        -- Get comments information from Comment Child
+        H.raise (RequestComments state.docID entry.id)
+      pure unit
+    
+    -- After getting information from from Comment
+    ContinueChangeToSection fCs -> do
+      state <- H.get
+      -- Put the content of the section into the editor and update markers
+      H.gets _.mEditor >>= traverse_ \ed -> do
+        let
+          filMarkers = updateMarkers fCs state.markers
+          content = case state.mContent of
+            Nothing -> ""
+            Just c -> ContentDto.getContentText c
 
         newLiveMarkers <- H.liftEffect do
           session <- Editor.getSession ed
           document <- Session.getDocument session
 
           -- Set the content of the editor
-          Document.setValue (state.title <> "\n" <> ContentDto.getContentText content)
+          Document.setValue (state.title <> "\n" <> content)
             document
-          Editor.setReadOnly (version /= "latest") ed
+          Editor.setReadOnly state.isEditorReadonly ed
 
           -- reset Ref, because loading new content is considered 
           -- changing the existing content, which would set the flag
@@ -976,8 +975,8 @@ editor = connect selectTranslator $ H.mkComponent
       handleAction (ChangeToSection title entry rev)
       pure (Just a)
 
-    ContinueChangeSection absCSs rev a -> do
-      handleAction (ContinueChangeToSection absCSs rev)
+    ContinueChangeSection fCs a -> do
+      handleAction (ContinueChangeToSection fCs)
       pure (Just a)
 
     ChangeToNode title path a -> do
@@ -1260,11 +1259,11 @@ buttonDivisor = HH.div
   [ HP.classes [ HB.vr, HB.mx1 ] ]
   []
 
-updateMarkers :: Array AbstractedCS -> Array AnnotatedMarker -> Array AnnotatedMarker
-updateMarkers abcCSs markers =
+updateMarkers :: Array FirstComment -> Array AnnotatedMarker -> Array AnnotatedMarker
+updateMarkers firsts markers =
   mapMaybe (\m ->
-      case Array.find (\cs -> cs.markerID == m.id && not cs.resolved) abcCSs of
-        Just cs -> Just (m { markerText = cs.author })
+      case Array.find (\fs -> fs.markerID == m.id && not fs.resolved) firsts of
+        Just fs -> Just (m { markerText = fs.first.author })
         Nothing -> Nothing
     ) 
     markers

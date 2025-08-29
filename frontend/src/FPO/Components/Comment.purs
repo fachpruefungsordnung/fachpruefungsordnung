@@ -13,8 +13,7 @@ import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.CommentDto as CD
 import FPO.Types
-  ( AbstractedCS
-  , Comment
+  ( Comment
   , CommentSection
   , FirstComment
   , cdCommentToComment
@@ -37,7 +36,7 @@ data Output
   = CloseCommentSection
   | UpdateComment CommentSection
   | CommentOverview Int (Array FirstComment)
-  | SendAbstractedComments (Array AbstractedCS) (Maybe Int)
+  | SendAbstractedComments (Array FirstComment)
 
 data Action
   = Init
@@ -50,7 +49,7 @@ data Query a
   = AddComment Int Int a
   | DeletedComment (Array Int) a
   | ReceiveTimeFormatter (Maybe Formatter) a
-  | RequestComments Int Int (Maybe Int) a
+  | RequestComments Int Int a
   | SelectedCommentSection Int Int Int a
   | Overview Int Int a
 
@@ -365,7 +364,7 @@ commentview = H.mkComponent
       H.modify_ \state -> state { mTimeFormatter = mTimeFormatter }
       pure (Just a)
     
-    RequestComments docID tocID rev a -> do
+    RequestComments docID tocID a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
         recComs <- H.liftAff
@@ -375,15 +374,15 @@ commentview = H.mkComponent
           commentSections = case recComs of
             Nothing -> []
             Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
-          abstractedCSs = map abstractCS commentSections
+          cs = map extractFirst commentSections
         H.modify_ \st -> st
           { docID = docID, tocID = tocID, commentSections = commentSections }
-        H.raise (SendAbstractedComments abstractedCSs rev)
+        H.raise (SendAbstractedComments cs)
       else do
         let
           css = state.commentSections
-          abstractedCSs = map abstractCS css
-        H.raise (SendAbstractedComments abstractedCSs rev)
+          cs = map extractFirst css
+        H.raise (SendAbstractedComments cs)
       pure (Just a)
 
     SelectedCommentSection docID tocID markerID a -> do
@@ -431,16 +430,8 @@ commentview = H.mkComponent
     if c.markerID == cs.markerID then cs else c
 
   extractFirst :: CommentSection -> FirstComment
-  extractFirst { markerID, first } = case first of
-    Nothing -> { markerID: -1, first: emptyComment }
-    Just c -> { markerID: markerID, first: c }
+  extractFirst { markerID, resolved, first } = case first of
+    Nothing -> { markerID: -1, resolved: true, first: emptyComment }
+    Just c -> { markerID, resolved, first: c }
 
-  abstractCS :: CommentSection -> AbstractedCS
-  abstractCS { markerID, first, resolved } = 
-    let
-      author = case first of
-        Nothing -> "No author found"
-        Just f -> f.author
-    in
-      {markerID, author, resolved}
 

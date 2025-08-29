@@ -45,14 +45,9 @@ type CommentSection =
   , resolved :: Boolean
   }
 
-type AbstractedCS =
-  { markerID :: Int
-  , author :: String
-  , resolved :: Boolean
-  }
-
 type FirstComment =
   { markerID :: Int
+  , resolved :: Boolean
   , first :: Comment
   }
 

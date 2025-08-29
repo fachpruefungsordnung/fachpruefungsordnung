@@ -805,8 +805,8 @@ splitview = H.mkComponent
       Comment.CommentOverview tocID cs -> do
         H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID cs)
 
-      Comment.SendAbstractedComments abstractCSs rev -> do
-        H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs rev)
+      Comment.SendAbstractedComments abstractCSs -> do
+        H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs)
 
     HandleCommentOverview output -> case output of
 
@@ -873,8 +873,8 @@ splitview = H.mkComponent
               H.liftEffect $ revokeObjectURL url
             pure unit
 
-      Editor.RequestComments docID entryID rev -> do
-        H.tell _comment unit (Comment.RequestComments docID entryID rev)
+      Editor.RequestComments docID entryID -> do
+        H.tell _comment unit (Comment.RequestComments docID entryID)
 
       Editor.SavedSection toBePosted title tocEntry -> do
         state <- H.get
