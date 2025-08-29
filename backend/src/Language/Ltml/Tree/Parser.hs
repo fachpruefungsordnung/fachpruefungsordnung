@@ -4,12 +4,14 @@
 
 module Language.Ltml.Tree.Parser
     ( TreeParser
+    , FootnoteTreeParser
     , runTreeParser
     , MonadTreeParser (treeParser)
     , TreeError (..)
     , treeError
     , leafError
     , leafParser
+    , leafFootnoteParser
     , nFlaggedTreePF
     , staticFlaggedTreePF
     , disjNFlaggedTreePF
@@ -18,6 +20,7 @@ module Language.Ltml.Tree.Parser
 where
 
 import Control.Functor.Utils (traverseF)
+import Control.Monad.Trans.Class (lift)
 import Data.List (find)
 import Data.Proxy (Proxy (Proxy))
 import Data.Text (Text)
@@ -32,6 +35,11 @@ import Language.Lsd.AST.Type
 import Language.Ltml.Common (Flagged)
 import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (nSc)
+import Language.Ltml.Parser.Footnote
+    ( FootnoteParser
+    , FootnoteWriterT
+    , mapFootnoteWriterT
+    )
 import Language.Ltml.Tree (FlaggedTree, Tree, TypedTree (TypedTree))
 import Text.Megaparsec (ParseErrorBundle, runParser)
 
@@ -58,6 +66,11 @@ data TreeError
       TreeError [String]
     deriving (Show)
 
+type FootnoteTreeParser = FootnoteWriterT TreeParser
+
+instance (MonadTreeParser m) => MonadTreeParser (FootnoteWriterT m) where
+    treeParser = lift . treeParser
+
 treeError :: (MonadTreeParser m) => String -> m a
 treeError = treeParser . Left . TreeError . pure
 
@@ -69,6 +82,13 @@ leafParser p x =
     case runParser (nSc *> p) "" (x <> "\n") of
         Left e -> leafError e
         Right y -> return y
+
+{-# ANN
+    leafFootnoteParser
+    ("HLint: ignore Avoid lambda using `infix`" :: String)
+    #-}
+leafFootnoteParser :: FootnoteParser a -> Text -> FootnoteTreeParser a
+leafFootnoteParser p x = mapFootnoteWriterT (\p' -> leafParser p' x) p
 
 flaggedTreePF
     :: (MonadTreeParser m, KindNameOf t)

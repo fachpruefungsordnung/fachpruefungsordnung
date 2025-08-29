@@ -24,14 +24,12 @@ import Language.Ltml.Common (Flagged)
 import Language.Ltml.Parser.Section (headingP, sectionP)
 import Language.Ltml.Tree (FlaggedTree, Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
-    ( TreeParser
+    ( FootnoteTreeParser
+    , TreeParser
+    , leafFootnoteParser
     , leafParser
     , nFlaggedTreePF
     , treeError
-    )
-import Language.Ltml.Tree.Parser.Footnote
-    ( FootnoteTreeParser
-    , leafFootnoteParser
     )
 import Text.Megaparsec (eof)
 

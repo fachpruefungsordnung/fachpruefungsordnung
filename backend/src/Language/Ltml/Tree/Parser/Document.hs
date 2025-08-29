@@ -36,16 +36,14 @@ import Language.Ltml.Parser.SimpleSection (simpleSectionSequenceP)
 import Language.Ltml.Parser.Text (HangingTextP)
 import Language.Ltml.Tree (FlaggedTree, Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
-    ( TreeParser
+    ( FootnoteTreeParser
+    , TreeParser
     , disjStaticFlaggedTreePF
+    , leafFootnoteParser
     , leafParser
     , nFlaggedTreePF
     , staticFlaggedTreePF
     , treeError
-    )
-import Language.Ltml.Tree.Parser.Footnote
-    ( FootnoteTreeParser
-    , leafFootnoteParser
     )
 import Language.Ltml.Tree.Parser.Section (sectionBodyTP)
 import Text.Megaparsec (eof)
