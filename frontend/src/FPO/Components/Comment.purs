@@ -27,8 +27,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Data.Argonaut.Core (jsonEmptyObject)
-
-import Effect.Console (log)
+import Effect.Aff (Aff)
 
 type Input = Unit
 
@@ -367,16 +366,10 @@ commentview = H.mkComponent
     RequestComments docID tocID a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
-        recComs <- H.liftAff
-          $ Request.getFromJSONEndpoint CD.decodeCommentSection
-          $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
-        let
-          commentSections = case recComs of
-            Nothing -> []
-            Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
-          cs = map extractFirst commentSections
+        commentSections <- H.liftAff $ fetchCommentSections docID tocID
         H.modify_ \st -> st
           { docID = docID, tocID = tocID, commentSections = commentSections }
+        let cs = map extractFirst commentSections
         H.raise (SendAbstractedComments cs)
       else do
         let
@@ -388,14 +381,7 @@ commentview = H.mkComponent
     SelectedCommentSection docID tocID markerID a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
-        recComs <- H.liftAff
-          $ Request.getFromJSONEndpoint CD.decodeCommentSection
-          $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
-        let
-          commentSections = case recComs of
-            Nothing -> []
-            Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
-        H.liftEffect $ log $ show commentSections
+        commentSections <- H.liftAff $ fetchCommentSections docID tocID
         H.modify_ \st -> st
           { docID = docID, tocID = tocID, commentSections = commentSections }
         handleAction $ SelectingCommentSection markerID
@@ -406,16 +392,10 @@ commentview = H.mkComponent
     Overview docID tocID a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
-        recComs <- H.liftAff
-          $ Request.getFromJSONEndpoint CD.decodeCommentSection
-          $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
-        let
-          commentSections = case recComs of
-            Nothing -> []
-            Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
-          cs = map extractFirst commentSections
+        commentSections <- H.liftAff $ fetchCommentSections docID tocID
         H.modify_ \st -> st
           { docID = docID, tocID = tocID, commentSections = commentSections }
+        let cs = map extractFirst commentSections
         H.raise (CommentOverview state.tocID cs)
       else do
         let
@@ -423,6 +403,13 @@ commentview = H.mkComponent
           cs = map extractFirst css
         H.raise (CommentOverview state.tocID cs)
       pure (Just a)
+
+  fetchCommentSections :: Int -> Int -> Aff (Array CommentSection)
+  fetchCommentSections docID tocID =
+    (maybe [] (map sectionDtoToCS <<< CD.getCommentSections))
+      <$> Request.getFromJSONEndpoint CD.decodeCommentSection url
+    where
+      url = "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
 
   updateCommentSection
     :: CommentSection -> Array CommentSection -> Array CommentSection
