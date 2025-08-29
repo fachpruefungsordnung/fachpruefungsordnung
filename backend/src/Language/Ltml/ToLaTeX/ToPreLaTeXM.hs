@@ -70,7 +70,7 @@ import Language.Ltml.AST.Text
     , SentenceStart (..)
     , TextTree (..)
     )
-import Language.Ltml.Common (Flagged (Flagged))
+import Language.Ltml.Common (Flagged (Flagged), Flagged')
 import Language.Ltml.ToLaTeX.Format
     ( Stylable (..)
     , formatHeading
@@ -113,7 +113,7 @@ instance (ToPreLaTeXM a) => ToPreLaTeXM [a] where
 
 ------------------------------- Flagged ----------------------------------
 
-instance (ToPreLaTeXM a) => ToPreLaTeXM (Flagged a) where
+instance (ToPreLaTeXM a) => ToPreLaTeXM (Flagged' a) where
     toPreLaTeXM (Flagged b content) = do
         {- first check whether the global render flag (flaggedParent) is set -}
         b0 <- use (GS.flagState . GS.flaggedParent)

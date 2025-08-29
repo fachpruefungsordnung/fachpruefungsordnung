@@ -51,7 +51,7 @@ import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (..))
 import Language.Ltml.AST.SimpleSection (SimpleSection (..))
 import Language.Ltml.AST.Table (Table)
 import Language.Ltml.AST.Text
-import Language.Ltml.Common (Flagged (..))
+import Language.Ltml.Common (Flagged (..), Flagged')
 import Language.Ltml.HTML.CSS (mainStylesheet)
 import Language.Ltml.HTML.CSS.Classes (ToCssClass (toCssClass))
 import qualified Language.Ltml.HTML.CSS.Classes as Class
@@ -87,7 +87,7 @@ renderSectionHtmlCss section fnMap =
         finalState' = finalState {labels = usedFootnotes ++ labels finalState}
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
 
-renderHtmlCss :: Flagged DocumentContainer -> (Html (), Css)
+renderHtmlCss :: Flagged' DocumentContainer -> (Html (), Css)
 renderHtmlCss docContainer =
     -- \| Render with given footnote context
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) initReaderState) initGlobalState
@@ -480,7 +480,7 @@ instance ToHtmlM AppendixSection where
 
 -- | This instance manages which part of the AST is actually translated into HTML;
 --   Everything else is just used to build up the needed context (labels, etc.)
-instance (ToHtmlM a) => ToHtmlM (Flagged a) where
+instance (ToHtmlM a) => ToHtmlM (Flagged' a) where
     toHtmlM (Flagged renderFlag a) = do
         -- \| Set False to see if child sets it True again
         modify (\s -> s {hasFlagged = False})

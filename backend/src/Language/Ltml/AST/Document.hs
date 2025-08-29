@@ -12,7 +12,7 @@ import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Section (SectionBody)
 import Language.Ltml.AST.SimpleSection (SimpleSection)
 import Language.Ltml.AST.Text (HeadingTextTree)
-import Language.Ltml.Common (Flagged)
+import Language.Ltml.Common (Flagged')
 
 data Document
     = Document
@@ -33,10 +33,10 @@ newtype DocumentHeading = DocumentHeading [HeadingTextTree]
 data DocumentBody
     = -- | document body
       DocumentBody
-        (Flagged [SimpleSection])
+        (Flagged' [SimpleSection])
         -- ^ intro
-        (Flagged SectionBody)
+        (Flagged' SectionBody)
         -- ^ main
-        (Flagged [SimpleSection])
+        (Flagged' [SimpleSection])
         -- ^ outro
     deriving (Show)
