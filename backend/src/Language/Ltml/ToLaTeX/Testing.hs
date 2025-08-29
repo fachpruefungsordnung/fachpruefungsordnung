@@ -75,7 +75,7 @@ import Language.Ltml.AST.Section
 import Language.Ltml.AST.Text (TextTree (Space, Word))
 import Language.Ltml.Common (Flagged (Flagged))
 import Language.Ltml.Parser.Common.Lexeme (nSc)
-import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
+import Language.Ltml.Parser.Footnote (runFootnoteWriterT)
 import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX (generatePDFFromSection)
 import Language.Ltml.ToLaTeX.GlobalState
@@ -114,7 +114,7 @@ runTestToLaTeX = do
         NamedType _ _ sectionT' = sectionT
         NamedType _ _ footnoteT' = footnoteT
     case runParser
-        (nSc *> unwrapFootnoteParser [footnoteT'] (sectionP sectionT' eof))
+        (nSc *> runFootnoteWriterT (sectionP sectionT' eof) [footnoteT'])
         ""
         (input <> "\n") of
         Left err -> return (errorBundlePretty err)

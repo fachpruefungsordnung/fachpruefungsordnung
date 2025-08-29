@@ -4,6 +4,7 @@ module Language.Ltml.Tree.Parser.Section
     )
 where
 
+import Control.Monad.Trans.Class (lift)
 import Data.Text (Text)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Star (Star))
@@ -23,15 +24,12 @@ import Language.Ltml.Common (Flagged)
 import Language.Ltml.Parser.Section (headingP, sectionP)
 import Language.Ltml.Tree (FlaggedTree, Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
-    ( TreeParser
+    ( FootnoteTreeParser
+    , TreeParser
+    , leafFootnoteParser
     , leafParser
     , nFlaggedTreePF
     , treeError
-    , wrapTreeParser
-    )
-import Language.Ltml.Tree.Parser.Footnote
-    ( FootnoteTreeParser
-    , leafFootnoteParser
     )
 import Text.Megaparsec (eof)
 
@@ -47,7 +45,7 @@ sectionTP = nFlaggedTreePF sectionTP'
         -> FootnoteTreeParser (Node Section)
     sectionTP' t (Leaf x) = leafFootnoteParser (sectionP t eof) x
     sectionTP' (SectionType kw headingT fmt bodyT) (Tree x children) = do
-        wHeading <- wrapTreeParser $ headingTP kw headingT x
+        wHeading <- lift $ headingTP kw headingT x
         body <- sectionBodyTP bodyT children
         return $ fmap (\heading -> Section fmt heading body) wHeading
 

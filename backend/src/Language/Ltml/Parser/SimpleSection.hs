@@ -6,13 +6,14 @@ where
 
 import Control.Applicative.Utils ((<:>))
 import Control.Monad (void)
+import Control.Monad.Trans.Class (lift)
 import Language.Lsd.AST.SimpleRegex (Sequence (Sequence), Star (Star))
 import Language.Lsd.AST.Type (unwrapNT)
 import Language.Lsd.AST.Type.SimpleSection
     ( SimpleSectionType (SimpleSectionType)
     )
 import Language.Ltml.AST.SimpleSection (SimpleSection (SimpleSection))
-import Language.Ltml.Parser (Parser, wrapParser)
+import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme1)
 import Language.Ltml.Parser.Footnote (FootnoteParser)
 import Language.Ltml.Parser.Footnote.Combinators (manyWithFootnotesTillSucc)
@@ -24,7 +25,7 @@ simpleSectionP
     -> Parser ()
     -> FootnoteParser SimpleSection
 simpleSectionP (SimpleSectionType kw fmt (Star childrenT)) succStartP = do
-    wrapParser $ nLexeme1 $ keywordP kw
+    lift $ nLexeme1 $ keywordP kw
     SimpleSection fmt
         <$> manyWithFootnotesTillSucc
             (simpleParagraphP $ unwrapNT childrenT)
@@ -36,7 +37,7 @@ simpleSectionSequenceP
     -> FootnoteParser [SimpleSection]
 simpleSectionSequenceP (Sequence ts') succStartP = aux ts'
   where
-    aux [] = wrapParser $ [] <$ succStartP
+    aux [] = lift $ [] <$ succStartP
     aux [t] = simpleSectionP t succStartP <:> aux []
     aux (t : ts@(t' : _)) = simpleSectionP t (toStartP t') <:> aux ts
 

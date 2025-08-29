@@ -12,7 +12,7 @@ import Language.Ltml.HTML (renderSectionHtmlCss)
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.Parser.Common.Lexeme (nSc)
-import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
+import Language.Ltml.Parser.Footnote (runFootnoteWriterT)
 import Language.Ltml.Parser.Section (sectionP)
 import Lucid
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
@@ -23,7 +23,7 @@ htmlPipeline input =
     let NamedType _ _ footnoteT' = footnoteT
         NamedType _ _ sectionT' = sectionT
      in case runParser
-            (nSc *> unwrapFootnoteParser [footnoteT'] (sectionP sectionT' eof))
+            (nSc *> runFootnoteWriterT (sectionP sectionT' eof) [footnoteT'])
             ""
             (input <> "\n") of
             Left err -> renderBS $ errorHtml (errorBundlePretty err)
