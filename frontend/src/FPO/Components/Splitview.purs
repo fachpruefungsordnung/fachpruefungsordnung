@@ -28,12 +28,13 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
 import FPO.Components.Editor as Editor
 import FPO.Components.Preview as Preview
-import FPO.Components.TOC (Path, SelectedEntity)
+import FPO.Components.TOC (Path, SelectedEntity(..))
 import FPO.Components.TOC as TOC
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (LoadState(..))
@@ -109,8 +110,13 @@ data Action
   | HandleTOC TOC.Output
   | GET
   | POST
-  | ModifyVersionMapping Int (Maybe (Maybe Int)) (Maybe (Maybe Int))
+  -- left part is elementID, center is for left editor, right is for comparison editor
+  -- outer maybe determines whether to change this part of the versionMapping,
+  -- inner maybe for how. Nothing for left Version means newest version, nothing
+  -- for right version means no comparison 
+  | ModifyVersionMapping Int (Maybe (Maybe Int)) (Maybe (ElementData))
   | UpdateMSelectedTocEntry
+  | SetComparison Int Int
 
 type State =
   { docID :: DocumentID
@@ -158,8 +164,6 @@ type State =
   , commentOverviewShown :: Boolean
   , commentShown :: Boolean
   , previewShown :: Boolean
-  , pdfWarningAvailable :: Boolean
-  , pdfWarningIsShown :: Boolean
   -- , compareToElement :: ElementData
   -- this value is updated from the same value in TOC
   , mSelectedTocEntry :: Maybe SelectedEntity
@@ -279,18 +283,18 @@ splitview = H.mkComponent
               case state.mSelectedTocEntry of
                 Nothing
                 -> renderPreview state
-                Just (SelNode _)
+                Just (SelNode _ _)
                 -> renderPreview state
                 Just (SelLeaf tocID)
                 ->
                   let
                     versionEntry = fromMaybe
-                      emptyRootTree
-                      findRootTree (\e -> e.elementID == tocID) state.versionMapping
+                      { elementID: -1, versionID: Nothing, comparisonData: Nothing }
+                      (findRootTree (\e -> e.elementID == tocID) state.versionMapping)
                   in
                     case versionEntry.comparisonData of
                       Nothing -> renderPreview state
-                      Just cData -> renderSecondEditor state cData                   
+                      Just cData -> renderSecondEditor state (Just cData)                   
                     
 {-               case state.compareToElement of
                 Nothing
@@ -721,8 +725,8 @@ splitview = H.mkComponent
     -- Toggle actions
     
     UpdateMSelectedTocEntry -> do
-      cToc  <- TOC.RequestCurrentTocEntry
-      H.modify_ _ { mSelectedTocEntry = cToc }
+      cToc <- H.request _toc unit TOC.RequestCurrentTocEntry
+      H.modify_ _ { mSelectedTocEntry = join cToc }
 
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
@@ -788,19 +792,21 @@ splitview = H.mkComponent
           case state.mSelectedTocEntry of
             Nothing
             -> mod
-            Just (SelNode _)
+            Just (SelNode _ _)
             -> mod
             Just (SelLeaf tocID)
             ->
               let
                 versionEntry = fromMaybe
-                  emptyRootTree
-                  findRootTree (\e -> e.elementID == tocID) state.versionMapping
+                  { elementID: -1, versionID: Nothing, comparisonData: Nothing }
+                  (findRootTree (\e -> e.elementID == tocID) state.versionMapping)
               in
                 case versionEntry.comparisonData of
                   Nothing -> mod
-                  Just cData -> do 
-                    handleAction (ModifyVersionMapping tocID Nothing cData.revID) 
+                  Just _ -> do
+                  -- Just cData -> do 
+                    -- handleAction (ModifyVersionMapping tocID Nothing cData.revID) 
+                    handleAction (ModifyVersionMapping tocID Nothing (Just Nothing)) 
 
 {-         if state.compareToElement /= Nothing then
           H.modify_ _ { compareToElement = Nothing }
@@ -820,23 +826,16 @@ splitview = H.mkComponent
           , previewShown = true
           }
 
-    ModifyVersionMapping tocID vID cID -> do
+    ModifyVersionMapping tocID vID cData -> do
+      handleAction UpdateMSelectedTocEntry
       state <- H.get
       let
         newVersionID = case vID of 
           Just id -> const id 
           Nothing -> (\v -> v) 
-        newComparisonData = case cID of 
-          Just id -> const $ 
-            let
-              tocEntry = fromMaybe
-                emptyTOCEntry
-                (findTOCEntry tocID state.tocEntries)
-              title = fromMaybe
-                ""
-                (findTitleTOCEntry tocID state.tocEntries)
-            Just { tocEntry: tocEntry, revID: id, title: title }
-          Nothing -> (\v -> \v)         
+        newComparisonData = case cData of 
+          Just d -> const d 
+          Nothing -> (\v -> v)         
         newVersionMapping =
           modifyNodeRootTree
             (\v -> v.elementID == tocID)
@@ -844,19 +843,22 @@ splitview = H.mkComponent
             (\v -> { elementID: v.elementID, versionID: newVersionID v.versionID, comparisonData: newComparisonData v.comparisonData })
             state.versionMapping
       H.modify_ _ { versionMapping = newVersionMapping }
-      case newComparisonData of
-        Nothing -> do
-          pure unit
-        Just nCD -> do
-          H.tell _editor 1
-            (Editor.ChangeSection nCD.title nCD.tocEntry (Just nCD.revID))
+      H.liftEffect $ log "Modified version" 
 
-{-     SetComparison elementID vID -> do
-      ModifyVersionMapping elementID Nothing vID
-      H.modify_ _
-        { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } }
+    SetComparison elementID vID -> do
+      state <- H.get
+      let
+        tocEntry = fromMaybe
+          emptyTOCEntry
+          (findTOCEntry elementID state.tocEntries)
+        title = fromMaybe
+          ""
+          (findTitleTOCEntry elementID state.tocEntries)
+      handleAction (ModifyVersionMapping elementID Nothing (Just (Just { tocEntry: tocEntry, revID: vID, title: title })))
+{-       H.modify_ _
+        { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } } -}
       H.tell _editor 1
-        (Editor.ChangeSection eData.title eData.tocEntry (Just eData.revID)) -}
+        (Editor.ChangeSection title tocEntry (Just vID))
 
 
     -- Query handler
@@ -981,14 +983,36 @@ splitview = H.mkComponent
     HandleTOC output -> case output of
 
       TOC.ModifyVersion elementID mVID -> do
-        handleAction (ModifyVersionMapping elementID mVID Nothing)
+        handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
 
       TOC.CompareTo elementID vID -> do
-        handleAction (ModifyVersionMapping elementID Nothing vID)
-        -- handleAction (SetComparison elementID vID)
+        handleAction (SetComparison elementID vID)
 
       TOC.ChangeToLeaf title selectedId -> do
         H.tell _editor 0 Editor.SaveSection
+        handleAction UpdateMSelectedTocEntry
+        state <- H.get
+        let
+          entry = case (findTOCEntry selectedId state.tocEntries) of
+            Nothing -> emptyTOCEntry
+            Just e -> e
+          ev =
+            case
+              findRootTree (\e -> e.elementID == selectedId) state.versionMapping
+              of
+              Nothing -> {elementID: -1, versionID: Nothing , comparisonData: Nothing}
+              Just elem -> elem
+        -- handleAction (ModifyVersionMapping selectedID rev)
+        H.tell _editor 0 (Editor.ChangeSection title entry ev.versionID)
+        case ev.comparisonData of
+          Nothing -> do
+            -- this case should be covered by mSelectedTocEntry being set to Nothing
+            pure unit
+          Just d -> 
+            H.tell _editor 1 (Editor.ChangeSection d.title d.tocEntry (Just d.revID))
+      {- TOC.ChangeToLeaf title selectedId -> do
+        H.tell _editor 0 Editor.SaveSection
+        handleAction UpdateMSelectedTocEntry
         state <- H.get
         let
           entry = case (findTOCEntry selectedId state.tocEntries) of
@@ -1001,7 +1025,7 @@ splitview = H.mkComponent
               Nothing -> Nothing
               Just elem -> elem.versionID
         -- handleAction (ModifyVersionMapping selectedID rev)
-        H.tell _editor 0 (Editor.ChangeSection title entry rev)
+        H.tell _editor 0 (Editor.ChangeSection title entry rev) -}
 
       TOC.ChangeToNode path title -> do
         H.tell _editor 0 (Editor.ChangeToNode title path)

@@ -155,14 +155,14 @@ data Query a
 {- <<<<<<< HEAD
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
 
-{- <<<<<<< Updated upstream
+ <<<<<<< Updated upstream
 data Query a = ReceiveTOCs (TOCTree) a
 =======
 data Query a
   = ReceiveTOCs (TOCTree) a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
->>>>>>> Stashed changes -}
+>>>>>>> Stashed changes 
 =======
 >>>>>>> main -}
 
@@ -502,28 +502,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
       state <- H.get
       pure (Just (reply state.mSelectedTocEntry))
 
-
-{- <<<<<<< HEAD
-    RequestCurrentTocEntry reply -> do
-      state <- H.get
-      pure (Just (reply state.mSelectedTocEntry))
-
-{- <<<<<<< Updated upstream
-=======
-    RequestCurrentTocEntryTitle reply -> do
-      state <- H.get
-      let
-        currentTitle = getCurrentTocEntryTitle state.mSelectedTocEntry
-          state.tocEntries
-      pure (Just (reply currentTitle))
-
-    RequestCurrentTocEntry reply -> do
-      state <- H.get
-      pure (Just (reply state.mSelectedTocEntry))
-
->>>>>>> Stashed changes -}
-=======
->>>>>>> main -}
   rootTreeToHTML
     :: forall slots
      . State
