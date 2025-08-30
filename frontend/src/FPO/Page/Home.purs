@@ -47,6 +47,9 @@ import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
+import Web.Event.Event (preventDefault, stopPropagation)
+import Web.UIEvent.MouseEvent (MouseEvent)
+import Web.UIEvent.MouseEvent as MouseEvent
 
 _tablehead = Proxy :: Proxy "tablehead"
 _pagination = Proxy :: Proxy "pagination"
@@ -65,7 +68,7 @@ data Action
   | ChangeSorting TH.Output
   | HandleSearchInput String
   | SetPage P.Output
-  | DownloadPdf DocumentID
+  | DownloadPdf DocumentID MouseEvent
 
 type State = FPOState
   ( user :: LoadState (Maybe FullUserDto)
@@ -195,7 +198,10 @@ component =
       H.modify_ _ { searchQuery = query }
     SetPage (P.Clicked page) -> do
       H.modify_ _ { page = page }
-    DownloadPdf _ -> do
+    DownloadPdf _ event -> do
+      H.liftEffect $ do
+        preventDefault (MouseEvent.toEvent event)
+        stopPropagation (MouseEvent.toEvent event)
       updateStore $ Store.AddWarning "Not yet implemented!"
 
   -- H.liftEffect $ downloadPdf projectId
@@ -555,8 +561,8 @@ component =
           [ HP.classes [ HB.dFlex, HB.justifyContentCenter, HB.alignItemsCenter ] ]
           [ HH.button
               [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
-              , HE.onClick $ const $ DownloadPdf
-                  (DocumentHeader.getIdentifier project)
+              , HE.onClick $ \e -> DownloadPdf (DocumentHeader.getIdentifier project)
+                  e
               ]
               [ HH.i
                   [ HP.classes
