@@ -25,7 +25,11 @@ import Language.Lsd.AST.Type.AppendixSection
     , AppendixSectionFormat (..)
     , AppendixSectionTitle (..)
     )
-import Language.Lsd.AST.Type.Document (DocumentFormat (..))
+import Language.Lsd.AST.Type.Document
+    ( DocumentFormat (..)
+    , TocFormat (..)
+    , TocHeading (..)
+    )
 import Language.Lsd.AST.Type.DocumentContainer
     ( DocumentContainerFormat (..)
     , HeaderFooterFormat (..)
@@ -159,7 +163,7 @@ docConTest =
             ( Flagged
                 False
                 ( Document
-                    (DocumentFormat {docHasTableOfContents = True})
+                    (DocumentFormat (Just (TocFormat (TocHeading "Inhaltsverzeichnis"))))
                     ( DocumentHeading
                         [Word "Beispiel-Überschrift"]
                     )
@@ -570,7 +574,7 @@ docConTest =
                         False
                         ( Node Nothing $
                             Document
-                                (DocumentFormat {docHasTableOfContents = True})
+                                (DocumentFormat (Just (TocFormat (TocHeading "Inhaltsverzeichnis"))))
                                 ( DocumentHeading
                                     [Word "Beispiel-Überschrift"]
                                 )
