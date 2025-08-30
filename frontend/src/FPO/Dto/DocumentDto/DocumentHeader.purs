@@ -4,6 +4,7 @@ module FPO.Dto.DocumentDto.DocumentHeader
   , getID
   , getLastEdited
   , getName
+  , getIdentifier
   , User
   ) where
 
@@ -42,5 +43,8 @@ getID (DH dh) = dh.identifier
 
 getLastEdited :: DocumentHeader -> DocDate
 getLastEdited (DH dh) = dh.lastEdited
+
+getIdentifier :: DocumentHeader -> DocumentID
+getIdentifier (DH dh) = dh.identifier
 
 derive newtype instance decodeJsonDocumentHeader :: DecodeJson DocumentHeader

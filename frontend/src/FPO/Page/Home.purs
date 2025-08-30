@@ -30,7 +30,7 @@ import FPO.Data.Request (LoadState(..), fromLoading, getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocDate as DocDate
-import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader)
+import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader, DocumentID)
 import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
@@ -65,6 +65,7 @@ data Action
   | ChangeSorting TH.Output
   | HandleSearchInput String
   | SetPage P.Output
+  | DownloadPdf DocumentID
 
 type State = FPOState
   ( user :: LoadState (Maybe FullUserDto)
@@ -194,6 +195,10 @@ component =
       H.modify_ _ { searchQuery = query }
     SetPage (P.Clicked page) -> do
       H.modify_ _ { page = page }
+    DownloadPdf _ -> do
+      updateStore $ Store.AddWarning "Not yet implemented!"
+
+  -- H.liftEffect $ downloadPdf projectId
 
   -- Renders the overview of projects for the user.
   renderProjectsOverview :: State -> H.ComponentHTML Action Slots m
@@ -491,8 +496,9 @@ component =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
       [ HH.colgroup_
-          [ HH.col [ HP.style "width: 70%;" ] -- 'Title' column
+          [ HH.col [ HP.style "width: 60%;" ] -- 'Title' column
           , HH.col [ HP.style "width: 30%;" ] -- 'Last Updated' column
+          , HH.col [ HP.style "width: 10%;" ] -- 'PDF' column
           ]
       , HH.slot _tablehead unit TH.component
           { columns: tableCols state.translator
@@ -503,7 +509,7 @@ component =
           if null ps then
             [ HH.tr []
                 [ HH.td
-                    [ HP.colSpan 2
+                    [ HP.colSpan 3
                     , HP.classes [ HB.textCenter ]
                     ]
                     [ HH.i_
@@ -526,6 +532,9 @@ component =
       , { title: translate (label :: _ "home_lastUpdated") translator
         , style: Just TH.Numeric
         }
+      , { title: "PDF"
+        , style: Just TH.Alpha
+        }
       ]
 
   -- Renders a single project row in the table.
@@ -541,6 +550,22 @@ component =
           [ HH.text $ formatRelativeTime state.currentTime $ DocDate.docDateToDateTime
               $
                 DocumentHeader.getLastEdited project
+          ]
+      , HH.td
+          [ HP.classes [ HB.dFlex, HB.justifyContentCenter, HB.alignItemsCenter ] ]
+          [ HH.button
+              [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+              , HE.onClick $ const $ DownloadPdf
+                  (DocumentHeader.getIdentifier project)
+              ]
+              [ HH.i
+                  [ HP.classes
+                      [ HH.ClassName "bi-file-earmark-pdf"
+                      , HB.bi
+                      ]
+                  ]
+                  []
+              ]
           ]
       ]
 
