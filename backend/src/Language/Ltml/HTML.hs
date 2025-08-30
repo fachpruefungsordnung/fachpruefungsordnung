@@ -18,7 +18,7 @@ module Language.Ltml.HTML
     ) where
 
 import Clay (Css)
-import Control.Monad (zipWithM)
+import Control.Monad (join, zipWithM)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.ByteString.Lazy (ByteString)
@@ -115,12 +115,7 @@ instance ToHtmlM DocumentContainer where
             mainDocHtml <-
                 local (\s -> s {documentHeadingFormat = Left docHeadingFormat}) $ toHtmlM doc
             appendicesHtml <- toHtmlM appendices
-            -- \| Render ToC last so all context is already build
-            toc <- gets tableOfContents
-            tocHtml <- toHtmlM toc
-            renderFlag <- asks shouldRender
-            return $
-                (if renderFlag then tocHtml else mempty) <> mainDocHtml <> appendicesHtml
+            return $ mainDocHtml <> appendicesHtml
 
 -- | This instance is used for documents inside the appendix,
 --   since the main document does not have a label.
@@ -131,11 +126,10 @@ instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
     toHtmlM
         ( Document
-                -- TODO: Check ToC Flag in format
-                --       If main document Flag is True render big Toc at the begiining od docContainer
-                --       containing full main doc and only the headings of appendixSections;
+                -- TODO: If main document Flag is True render big Toc at the beginning of docContainer
+                --       containing full main doc and only the headings of appendixSections!;
                 --       If Appendix Doc is true; give it a local ToC
-                (DocumentFormat hasToC)
+                (DocumentFormat hasToc)
                 documentHeading
                 (DocumentBody introSSections sectionBody outroSSections)
                 footNotes
@@ -153,15 +147,19 @@ instance ToHtmlM Document where
                             , currentSuperSectionID = currentSuperSectionID initGlobalState
                             }
                     )
-                renderTitle <- asks shouldRender
+                renderDoc <- asks shouldRender
+                let renderToC = hasToc && renderDoc
+                -- \| Render ToC but as a Later to use the final GlobalState
+                delayedToc <- renderDelayedToc
                 titleHtml <- toHtmlM documentHeading
                 introHtml <- toHtmlM introSSections
                 mainHtml <- toHtmlM sectionBody
                 outroHtml <- toHtmlM outroSSections
-                -- \| Render DocumentHeading only if renderFlag was set by parent
+                -- \| Render DocumentHeading / ToC only if renderFlag was set by parent
                 return $
                     div_
-                        <$> ( (if renderTitle then titleHtml else mempty)
+                        <$> ( (if renderToC then delayedToc else mempty)
+                                <> (if renderDoc then titleHtml else mempty)
                                 <> introHtml
                                 <> mainHtml
                                 <> outroHtml
@@ -387,7 +385,6 @@ instance ToHtmlM FootnoteReference where
         -- \| Check if footnote was already referenced (document-scoped)
         let mFootnoteIdText = lookup label usedFootnotes
         case mFootnoteIdText of
-            -- \| TODO: add anchor links to actual footnote text (in export version)
             Just (footnoteID, footnoteIdHtml, _) -> createFootnoteRef footnoteIdHtml footnoteID label
             Nothing -> do
                 -- \| Look for label in footnoteMap with unused footnotes
@@ -527,22 +524,37 @@ instance (ToHtmlM a) => ToHtmlM (Flagged a) where
 
 -------------------------------------------------------------------------------
 
-instance ToHtmlM ToC where
-    toHtmlM dlist = do
-        tocFunc <- asks tocEntryWrapperFunc
-        let tupleList = toList dlist
-            -- \| Wrap with wrapper func (e.g. anchor links)
-            tocEntries = map (\(i, t, l) -> tocFunc (Label l) <$> buildEntry i t) tupleList
-            tableHead =
+renderDelayedToc :: HtmlReaderState
+renderDelayedToc = do
+    tocFunc <- asks tocEntryWrapperFunc
+
+    -- \| Return Later to delay ToC generation to the end;
+    --    Join Delayed (Delayed (Html ())) together,
+    --    since the ToC itself contains Delayed (Html ()) too
+    return $ join $ Later $ \globalState -> do
+        let tableHead =
                 thead_ $ tr_ (th_ mempty <> th_ (toHtml ("Literaturverzeichnis" :: Text)))
                     :: Html ()
-            tableBody = tbody_ <$> mconcat tocEntries
+
+            -- \| Build List of ToC rows
+            tocEntries :: [Delayed (Html ())]
+            tocEntries =
+                let tupleList = toList $ tableOfContents globalState
+                 in map (buildWrappedRow tocFunc) tupleList
+
+            -- \| [Delayed (Html ())] -> Delayed [Html ()] -> Delayed (Html ())
+            tableBody = tbody_ . mconcat <$> sequence tocEntries
         -- TODO: title from AST
-        return (table_ . (tableHead <>) <$> tableBody)
-      where
-        -- \| Build <div><span>id</span> <span>title</span></div>,
-        buildEntry :: Html () -> Delayed (Html ()) -> Delayed (Html ())
-        buildEntry idHtml delayedTitle = (tr_ <$> (td_ idHtml <>)) . td_ <$> delayedTitle
+        table_ <$> (pure tableHead <> tableBody)
+  where
+    -- \| Build <tr><td>id</td> <td>title</td></tr> and wrap id and title seperatly
+    buildWrappedRow
+        :: (Label -> Html () -> Html ())
+        -> (Html (), Delayed (Html ()), Text)
+        -> Delayed (Html ())
+    buildWrappedRow wrapperFunc (idHtml, titleHtml, htmlId) =
+        let wrap = wrapperFunc (Label htmlId)
+         in ((tr_ <$> (td_ (wrap idHtml) <>)) . td_) . wrap <$> titleHtml
 
 -------------------------------------------------------------------------------
 
