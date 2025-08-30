@@ -166,20 +166,24 @@ component =
       case state.projects of
         Loading -> pure unit
         Loaded projects' -> do
-
           -- Sorting logic based on the clicked column title:
-          projects <- pure $ case title of
-            "Title" ->
+          let
+            title_title = translate (label :: _ "home_title") state.translator
+            title_lastUpdated = translate (label :: _ "home_lastUpdated")
+              state.translator
+          projects <- pure $
+            if title == title_title then
               TH.sortByF
                 order
                 (comparing DocumentHeader.getName)
                 projects'
-            "Last Updated" ->
+            else if title == title_lastUpdated then
               TH.sortByF
                 (TH.toggleSorting order) -- The newest project should be first.
                 (comparing getEditTimestamp)
                 projects'
-            _ -> projects' -- Ignore other columns.
+            else
+              projects' -- Ignore other columns.
 
           H.modify_ _ { projects = Loaded projects }
 
@@ -458,7 +462,7 @@ component =
               [ addColumn
                   state.searchQuery
                   ""
-                  "Search for Projects"
+                  (translate (label :: _ "home_searchForProjects") state.translator)
                   "bi-search"
                   HP.InputText
                   HandleSearchInput
@@ -491,7 +495,9 @@ component =
           , HH.col [ HP.style "width: 30%;" ] -- 'Last Updated' column
           ]
       , HH.slot _tablehead unit TH.component
-          { columns: tableCols, sortedBy: "Last Updated" }
+          { columns: tableCols state.translator
+          , sortedBy: translate (label :: _ "home_lastUpdated") state.translator
+          }
           ChangeSorting
       , HH.tbody_ $
           if null ps then
@@ -500,7 +506,11 @@ component =
                     [ HP.colSpan 2
                     , HP.classes [ HB.textCenter ]
                     ]
-                    [ HH.i_ [ HH.text "No projects found" ] ]
+                    [ HH.i_
+                        [ HH.text $ translate (label :: _ "home_noProjectsFound")
+                            state.translator
+                        ]
+                    ]
                 ]
             ]
           else
@@ -509,11 +519,11 @@ component =
             ) -- Fill up to 5 rows
       ]
     where
-    tableCols = TH.createTableColumns
-      [ { title: "Title"
+    tableCols translator = TH.createTableColumns
+      [ { title: translate (label :: _ "home_title") translator
         , style: Just TH.Alpha
         }
-      , { title: "Last Updated"
+      , { title: translate (label :: _ "home_lastUpdated") translator
         , style: Just TH.Numeric
         }
       ]
