@@ -68,7 +68,7 @@ data Action
   | ChangeSorting TH.Output
   | HandleSearchInput String
   | SetPage P.Output
-  | DownloadPdf DocumentID MouseEvent
+  | DownloadPdf DocumentID String MouseEvent
 
 type State = FPOState
   ( user :: LoadState (Maybe FullUserDto)
@@ -198,11 +198,43 @@ component =
       H.modify_ _ { searchQuery = query }
     SetPage (P.Clicked page) -> do
       H.modify_ _ { page = page }
-    DownloadPdf _ event -> do
+    DownloadPdf _ _ event -> do
       H.liftEffect $ do
         preventDefault (MouseEvent.toEvent event)
         stopPropagation (MouseEvent.toEvent event)
       updateStore $ Store.AddWarning "Not yet implemented!"
+
+  -- renderedPDF' <- Request.postBlobOrError ("/render/pdf" <> projectId)
+  -- let filename = projectName <> ".pdf"
+  -- case renderedPDF' of
+  --   Left _ -> pure unit
+  --   Right blobOrError ->
+  --     case blobOrError of
+  --       Left errMsg -> do
+  --         updateStore $ Store.AddError $ "Failed to generate PDF: " <> errMsg
+  --       Right body -> do
+  --         -- create blobl link
+  --         url <- H.liftEffect $ createObjectURL body
+  --         -- Create an invisible link and click it to download PDF
+  --         H.liftEffect $ do
+  --           -- get window stuff
+  --           win <- window
+  --           hdoc <- document win
+  --           let doc = HTMLDocument.toDocument hdoc
+
+  --           -- create link
+  --           aEl <- Document.createElement "a" doc
+  --           case HTMLElement.fromElement aEl of
+  --             Nothing -> pure unit
+  --             Just aHtml -> do
+  --               Element.setAttribute "href" url aEl
+  --               Element.setAttribute "download" filename aEl
+  --               HTMLElement.click aHtml
+  --         -- deactivate the blob link after 1 sec
+  --         _ <- H.fork do
+  --           H.liftAff $ delay (Milliseconds 1000.0)
+  --           H.liftEffect $ revokeObjectURL url
+  --         pure unit
 
   -- H.liftEffect $ downloadPdf projectId
 
@@ -562,6 +594,7 @@ component =
           [ HH.button
               [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
               , HE.onClick $ \e -> DownloadPdf (DocumentHeader.getIdentifier project)
+                  (DocumentHeader.getName project)
                   e
               ]
               [ HH.i
