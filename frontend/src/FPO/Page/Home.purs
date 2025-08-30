@@ -571,7 +571,7 @@ component =
         , style: Just TH.Numeric
         }
       , { title: "PDF"
-        , style: Just TH.Alpha
+        , style: Nothing
         }
       ]
 
