@@ -88,6 +88,7 @@ import Docs.Revision
     , RevisionSelector
     , prettyPrintRevisionRef
     )
+import Language.Ltml.Tree.Example.Fpo (fpoTree)
 import Server.DTOs.Comments (Comments (Comments))
 import Server.DTOs.CreateComment (CreateComment)
 import qualified Server.DTOs.CreateComment as CreateComment
@@ -134,7 +135,7 @@ type DocsAPI =
 type PostDocument =
     Auth AuthMethod Auth.Token
         :> ReqBody '[JSON] CreateDocument
-        :> Post '[JSON] Document
+        :> Post '[JSON] FullDocument
 
 type GetDocument =
     Auth AuthMethod Auth.Token
@@ -311,15 +312,16 @@ docsServer =
 postDocumentHandler
     :: AuthResult Auth.Token
     -> CreateDocument
-    -> Handler Document
+    -> Handler FullDocument
 postDocumentHandler auth doc = do
     userID <- getUser auth
     withDB $
-        run $
-            Docs.createDocument
+        runTransaction $
+            Docs.newDefaultDocument
                 userID
                 (CreateDocument.groupID doc)
                 (CreateDocument.title doc)
+                fpoTree
 
 getDocumentHandler
     :: AuthResult Auth.Token

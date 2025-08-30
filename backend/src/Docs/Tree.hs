@@ -50,6 +50,7 @@ import Docs.TextRevision
 data NodeHeader = NodeHeader
     { headerKind :: Text
     , headerType :: Text
+    , heading :: Maybe Text
     }
     deriving (Show, Generic)
 

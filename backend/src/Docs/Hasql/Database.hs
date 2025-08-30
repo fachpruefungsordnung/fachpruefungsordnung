@@ -194,3 +194,9 @@ instance HasCreateComment HasqlTransaction where
 
 instance HasLogMessage HasqlTransaction where
     logMessage = (((HasqlTransaction .) .) .) . Transactions.logMessage
+
+instance HasCreateDocument HasqlTransaction where
+    createDocument = ((HasqlTransaction .) .) . Transactions.createDocument
+
+instance HasCreateTextElement HasqlTransaction where
+    createTextElement = (HasqlTransaction .) . Transactions.createTextElement

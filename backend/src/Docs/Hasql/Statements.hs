@@ -732,7 +732,8 @@ getTreeNode =
             [singletonStatement|
             select
                 kind :: text,
-                type :: text
+                type :: text,
+                heading:: text?
             from
                 doc_tree_nodes
             where
@@ -802,11 +803,12 @@ uncurryTreeEdgeChild
        , Maybe ByteString
        , Maybe Text
        , Maybe Text
+       , Maybe Text
        , Maybe Int64
        , Maybe Text
        )
     -> Maybe (Text, TreeEdgeChild)
-uncurryTreeEdgeChild (title, nodeHash, nodeKind, nodeType, textID, textKind) =
+uncurryTreeEdgeChild (title, nodeHash, nodeKind, nodeType, nodeHeading, textID, textKind) =
     (title,) <$> (maybeNode <|> maybeText)
   where
     maybeNode = do
@@ -819,6 +821,7 @@ uncurryTreeEdgeChild (title, nodeHash, nodeKind, nodeType, textID, textKind) =
                 NodeHeader
                     { Tree.headerKind = kind
                     , Tree.headerType = type_
+                    , Tree.heading = nodeHeading
                     }
     maybeText = do
         id_ <- textID
@@ -842,6 +845,7 @@ getTreeEdgesByParent =
                     n.hash :: bytea?,
                     n.kind :: text?,
                     n.type :: text?,
+                    n.heading :: text?,
                     t.id :: int8?,
                     t.kind :: text?
                 from
