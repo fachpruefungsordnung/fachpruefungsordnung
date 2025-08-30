@@ -41,7 +41,7 @@ createTestDocument db = do
     anlage5 <- withDB $ run $ createTextElement userID docID "attachement"
     let tree =
             Node
-                (NodeHeader "BodyNode" "DocumentRoot")
+                (NodeHeader "BodyNode" "DocumentRoot" (Just "Fachprüfungsordnung"))
                 [ Edge "§ 1" (Leaf (TextElement.identifier paragraph1))
                 , Edge "§ 2" (Leaf (TextElement.identifier paragraph2))
                 , Edge "§ 3" (Leaf (TextElement.identifier paragraph3))
@@ -51,7 +51,7 @@ createTestDocument db = do
                     "Anlagen"
                     ( Tree
                         ( Node
-                            (NodeHeader "BodyNode" "Attachements")
+                            (NodeHeader "BodyNode" "Attachements" (Just "Anlagen"))
                             [ Edge "Thomann" (Leaf (TextElement.identifier anlage1))
                             , Edge "LD Systems" (Leaf (TextElement.identifier anlage2))
                             , Edge "Beyerdynamic" (Leaf (TextElement.identifier anlage3))
