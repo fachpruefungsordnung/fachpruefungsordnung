@@ -1136,11 +1136,12 @@ editor = connect selectTranslator $ H.mkComponent
     UpdateComment newCommentSection a -> do
       state <- H.get
       case state.mLiveMarker, state.mEditor, state.mListener, newCommentSection.first of
-        Just marker, Just ed, Just listener, Just first -> do
-          start <- H.liftEffect $ Anchor.getPosition marker.startAnchor
-          end <- H.liftEffect $ Anchor.getPosition marker.endAnchor
+        Just lm, Just ed, Just listener, Just first -> do
+          start <- H.liftEffect $ Anchor.getPosition lm.startAnchor
+          end <- H.liftEffect $ Anchor.getPositionlmr.endAnchor
           session <- H.liftEffect $ Editor.getSession ed
-          H.liftEffect $ removeLiveMarker marker session
+          H.liftEffect $ removeLiveMarker lm session
+          handleAction $ DeleteAnnotation lm false false
           let
             newMarker =
               { id: newCommentSection.markerID
@@ -1161,7 +1162,7 @@ editor = connect selectTranslator $ H.mkComponent
           let
             newLiveMarkers = case newLiveMarker of
               Nothing -> state.liveMarkers
-              Just lm -> snoc state.liveMarkers lm
+              Just lm' -> snoc state.liveMarkers lm'
           H.modify_ \st -> st
             { oldMarkerAnnoPos = newOldMarkerAnnoPos'
             , mLiveMarker = Nothing
