@@ -12,6 +12,7 @@ import Language.Lsd.AST.SimpleRegex (Sequence, Star)
 import Language.Lsd.AST.Type
     ( NamedType
     , ProperNodeKind (..)
+    , TreeSyntax (LeafSyntax)
     )
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphType)
 
@@ -31,3 +32,5 @@ instance ProperNodeKind (Sequence (NamedType SimpleSectionType)) where
     kindNameOf _ = "simple-section-sequence"
     typeNameOf _ = ""
     displayTypeNameOf _ = "simple section sequence"
+    treeSyntaxMap _ _ = LeafSyntax
+    kindHasTocHeading _ = False

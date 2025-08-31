@@ -13,12 +13,18 @@ import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Disjunction, Sequence)
 import Language.Lsd.AST.Type
-    ( NamedType
+    ( ChildrenOrder (SequenceOrder)
+    , HasEditableHeader (HasEditableHeader)
+    , NamedType
     , ProperNodeKind (..)
     , RawProperNodeKind (..)
+    , TreeSyntax (LeafSyntax, TreeSyntax)
     )
 import Language.Lsd.AST.Type.Footnote (FootnoteType)
-import Language.Lsd.AST.Type.Section (SectionBodyType (..))
+import Language.Lsd.AST.Type.Section
+    ( SectionBodyType (..)
+    , sectionBodyChildrenOrderMap
+    )
 import Language.Lsd.AST.Type.SimpleSection (SimpleSectionType)
 import Language.Lsd.AST.Type.Text (TextType)
 
@@ -38,6 +44,18 @@ data DocumentType
 
 instance RawProperNodeKind DocumentType where
     kindNameOfRaw _ = "document"
+
+    treeSyntaxMapRaw f (DocumentType _ _ _ bodyT _) =
+        TreeSyntax (HasEditableHeader True) $ aux bodyT
+      where
+        aux (DocumentBodyType introT mainT extroT) =
+            SequenceOrder
+                [ pure $ f introT
+                , fmap f mainT
+                , pure $ f extroT
+                ]
+
+    kindHasTocHeadingRaw _ = True
 
 newtype DocumentHeadingType = DocumentHeadingType (TextType Void)
 
@@ -68,3 +86,10 @@ instance ProperNodeKind DocumentMainBodyType where
         aux (InnerSectionBodyType _) = "nested main body"
         aux (LeafSectionBodyType _) = "textual main body"
         aux (SimpleLeafSectionBodyType _) = "simple textual main body"
+
+    treeSyntaxMap f (DocumentMainBodyType t) =
+        case sectionBodyChildrenOrderMap f t of
+            Just co -> TreeSyntax (HasEditableHeader False) co
+            Nothing -> LeafSyntax
+
+    kindHasTocHeading _ = False
