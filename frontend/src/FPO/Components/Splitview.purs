@@ -808,6 +808,9 @@ splitview = H.mkComponent
       Comment.SendAbstractedComments abstractCSs -> do
         H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs)
 
+      Comment.ToDeleteComment -> do
+        H.tell _editor 0 (Editor.ToDeleteComment)
+
     HandleCommentOverview output -> case output of
 
       CommentOverview.JumpToCommentSection tocID markerID -> do

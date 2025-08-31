@@ -36,12 +36,14 @@ data Output
   | UpdateComment CommentSection
   | CommentOverview Int (Array FirstComment)
   | SendAbstractedComments (Array FirstComment)
+  | ToDeleteComment
 
 data Action
   = Init
   | UpdateDraft String
   | SendComment
   | ResolveComment
+  | DeleteComment
   | SelectingCommentSection Int
 
 data Query a
@@ -209,16 +211,26 @@ commentview = H.mkComponent
               ]
 
             -- Resolve (rechts)
-          , HH.button
-              [ HP.classes 
-                  ([ HB.btn, HB.btnSuccess, HB.px3, HB.py1, HB.m0, HB.msAuto ] <> (if (not newComment) then [] else [ HB.opacity50 ]))
-              , HP.style "white-space: nowrap;"
-              , HP.enabled (not newComment)
-              , HE.onClick \_ -> ResolveComment
-              ]
-              [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text "Resolve" ]
-              , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
-              ]
+          , if newComment then
+              HH.button
+                [ HP.classes 
+                  [ HB.btn, HB.btnDanger, HB.px3, HB.py1, HB.m0, HB.msAuto ]
+                , HP.style "white-space: nowrap;"
+                , HE.onClick \_ -> DeleteComment
+                ]
+                [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text "Delete" ]
+                , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
+                ]
+            else
+              HH.button
+                [ HP.classes 
+                  [ HB.btn, HB.btnSuccess, HB.px3, HB.py1, HB.m0, HB.msAuto ]
+                , HP.style "white-space: nowrap;"
+                , HE.onClick \_ -> ResolveComment
+                ]
+                [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text "Resolve" ]
+                , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
+                ]
           ]
       ]
 
@@ -303,6 +315,14 @@ commentview = H.mkComponent
             , mCommentSection = Just newCs
             , commentDraft = ""
             }
+    
+    DeleteComment -> do
+      H.modify_ _
+        { markerID = -1
+        , newComment = false
+        , commentDraft = ""
+        }
+      H.raise (ToDeleteComment)
 
     SelectingCommentSection markerID -> do
       if markerID == -360 then do

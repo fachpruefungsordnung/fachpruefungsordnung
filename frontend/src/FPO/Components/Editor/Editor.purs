@@ -86,7 +86,6 @@ import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
-import Effect.Console (log)
 import Data.HashMap (HashMap, empty, toArrayBy, insert, delete, lookup, size)
 
 type Path = Array Int
@@ -211,6 +210,7 @@ data Query a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
   | UpdateComment CommentSection a
+  | ToDeleteComment a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -930,7 +930,11 @@ editor = connect selectTranslator $ H.mkComponent
               insert oldRow newEntry state.markerAnnoHS
       H.modify_ \st -> st {markerAnnoHS = newMarkerAnnoHS}
       -- if we want to update the live marker annotation
-      when reAdd (handleAction $ AddAnnotation lm setAnn)
+      if reAdd then
+        handleAction $ AddAnnotation lm setAnn
+      else
+        when setAnn $
+          handleAction SetAnnotations
     
     -- delete and readd Annotation if the startRow of live marker has changed
     UpdateAnnotation lm -> do
@@ -1169,6 +1173,18 @@ editor = connect selectTranslator $ H.mkComponent
           handleAction Save
         _, _, _, _ -> pure unit
       pure (Just a)
+    
+    ToDeleteComment a -> do
+      state <- H.get
+      case state.mEditor, state.mLiveMarker of
+        Just ed, Just lm -> do
+          session <- H.liftEffect $ Editor.getSession ed
+          H.liftEffect $ removeLiveMarker lm session
+          handleAction $ DeleteAnnotation lm false true
+        _, _ -> pure unit
+      H.modify_ \st -> st {mLiveMarker = Nothing}
+      pure (Just a)
+
 
 -- | Change listener for the editor.
 --
