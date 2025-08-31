@@ -21,6 +21,8 @@ module Docs.Hasql.Transactions
     , resolveComment
     , createReply
     , logMessage
+    , updateLatestTitle
+    , getTextElement
     ) where
 
 import qualified Crypto.Hash.SHA1 as SHA1
@@ -214,3 +216,9 @@ logMessage
     -- ^ created log message
 logMessage severity source scope content =
     statement (severity, source, scope, content) Statements.logMessage
+
+updateLatestTitle :: TextElementID -> Text -> Transaction ()
+updateLatestTitle = curry (`statement` Statements.updateLatestTitle)
+
+getTextElement :: TextElementID -> Transaction (Maybe TextElement)
+getTextElement = flip statement Statements.getTextElement
