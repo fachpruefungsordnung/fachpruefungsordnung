@@ -6,12 +6,13 @@ import Clay (render)
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (Text)
 import Data.Text.Lazy (toStrict)
+import Language.Lsd.AST.Type (NamedType (NamedType))
 import Language.Lsd.Example.Fpo (footnoteT, sectionT)
 import Language.Ltml.HTML (renderSectionHtmlCss)
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.Parser.Common.Lexeme (nSc)
-import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
+import Language.Ltml.Parser.Footnote (runFootnoteWriterT)
 import Language.Ltml.Parser.Section (sectionP)
 import Lucid
 import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
@@ -19,14 +20,16 @@ import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 -- | Parse section and render HTML with inlined CSS
 htmlPipeline :: Text -> ByteString
 htmlPipeline input =
-    case runParser
-        (nSc *> unwrapFootnoteParser [footnoteT] (sectionP sectionT eof))
-        ""
-        (input <> "\n") of
-        Left err -> renderBS $ errorHtml (errorBundlePretty err)
-        Right (nodeSection, footnoteMap) ->
-            let (body, css) = renderSectionHtmlCss nodeSection footnoteMap
-             in renderBS $ addInlineCssHeader css body
+    let NamedType _ _ footnoteT' = footnoteT
+        NamedType _ _ sectionT' = sectionT
+     in case runParser
+            (nSc *> runFootnoteWriterT (sectionP sectionT' eof) [footnoteT'])
+            ""
+            (input <> "\n") of
+            Left err -> renderBS $ errorHtml (errorBundlePretty err)
+            Right (nodeSection, footnoteMap) ->
+                let (body, css) = renderSectionHtmlCss nodeSection footnoteMap
+                 in renderBS $ addInlineCssHeader css body
 
 -------------------------------------------------------------------------------
 

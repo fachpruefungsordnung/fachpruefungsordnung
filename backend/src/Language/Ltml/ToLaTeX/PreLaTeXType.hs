@@ -38,6 +38,8 @@ module Language.Ltml.ToLaTeX.PreLaTeXType
     , document
     {- other -}
     , setindent
+    , setlistdepth
+    , renewlist
     , setfontArabic
     , enumStyle
     ) where
@@ -55,7 +57,7 @@ data PreLaTeX
     | ISequence [PreLaTeX] -- concatenation
     {- the reason why we introduced this intermediate data type: -}
     | MissingRef Label
-    deriving (Show)
+    deriving (Show, Eq)
 
 -- | We want to be able to connect PreLaTeX structures and avoid deeply rooted sequences.
 --   Here we are using a monoid to be able to concat PreLaTeX structures while flattening sequences.
@@ -181,6 +183,12 @@ document content = IEnvironment "document" [] [content]
 
 setindent :: PreLaTeX
 setindent = IRaw "\\setlength{\\parindent}{0pt}"
+
+setlistdepth :: PreLaTeX
+setlistdepth = IRaw "\\setlistdepth{9}"
+
+renewlist :: PreLaTeX
+renewlist = IRaw "\\renewlist{enumerate}{enumerate}{9}"
 
 setfontArabic :: PreLaTeX
 setfontArabic =

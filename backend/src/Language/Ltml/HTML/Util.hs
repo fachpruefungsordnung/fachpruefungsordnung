@@ -1,25 +1,30 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Avoid lambda using `infix`" #-}
 
 module Language.Ltml.HTML.Util
     ( intToLower
     , intToCapital
     , whenJust
     , mapState
+    , withModified
     , convertNewLine
     , mId_
     , mTextId_
-    , anchorLink
     , getNextRawTextTree
     , isSuper
     ) where
 
+import Control.Monad.State (MonadState, gets, modify)
 import Data.Char (chr)
-import Data.Text (Text, cons)
+import Data.Text (Text)
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Section (SectionBody (InnerSectionBody))
 import Language.Ltml.AST.Text (TextTree (..))
+import Language.Ltml.HTML.Common (GlobalState, HtmlReaderState)
 import Lucid
 
 -- | Converts Int to corresponding lowercase letter in the alphabet.
@@ -55,6 +60,22 @@ mapState f s (a : as) = do
     s' <- f s a
     mapState f s' as
 
+-- | Saves state field and modifies it with a new temporary value for the span
+--   of the given monadic action (like local); restores old state field afterwards
+withModified
+    :: (MonadState GlobalState m)
+    => (GlobalState -> a)
+    -> (GlobalState -> a -> GlobalState)
+    -> a
+    -> m b
+    -> m b
+withModified getter setter newValue action = do
+    saved <- gets getter
+    modify (\s -> setter s newValue)
+    res <- action
+    modify (\s -> setter s saved)
+    return res
+
 -------------------------------------------------------------------------------
 
 -- | Replaces every '\n' with HTML <br> while maintaining toHtml input sanitization
@@ -77,10 +98,6 @@ mId_ (Just label) = id_ $ unLabel label
 mTextId_ :: Maybe Text -> Attributes
 mTextId_ Nothing = mempty
 mTextId_ (Just text) = id_ text
-
--- | Converts Label into <a href = "#<label>"> for jumping to a HTML id
-anchorLink :: Label -> Html () -> Html ()
-anchorLink label = a_ [href_ (cons '#' $ unLabel label)]
 
 -------------------------------------------------------------------------------
 

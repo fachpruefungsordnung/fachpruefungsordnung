@@ -5,6 +5,7 @@ module Language.Ltml.Parser.Common.Lexeme
     ( sp
     , sp1
     , lexeme
+    , symbol
     , nSc
     , nLexeme
     , nLexeme1
@@ -23,6 +24,7 @@ import qualified Text.Megaparsec.Char.Lexer as L
     ( lexeme
     , skipLineComment
     , space
+    , symbol
     )
 
 -- TODO: Use.
@@ -31,6 +33,9 @@ import qualified Text.Megaparsec.Char.Lexer as L
 --   no newlines.
 lexeme :: (MonadParser m) => m a -> m a
 lexeme = L.lexeme (void sp)
+
+symbol :: (MonadParser m) => Text -> m ()
+symbol = void . L.symbol (void sp)
 
 -- | Space parser (accepts any number of ASCII spaces and, optionally, a final
 --   line comment).

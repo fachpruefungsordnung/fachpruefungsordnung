@@ -846,32 +846,42 @@ splitview = H.mkComponent
         H.tell _comment unit (Comment.DeletedComment deletedIDs)
 
       Editor.PostPDF content -> do
-        renderedPDF' <- Request.postBlob "/render/pdf" (fromString content)
+        renderedPDF' <- Request.postBlobOrError "/render/pdf" (fromString content)
+        tocTitleMaybe <- H.request _toc unit TOC.RequestCurrentTocEntryTitle
+        let
+          tocTitle = join tocTitleMaybe -- This flattens Maybe (Maybe String) to Maybe String
+          filename = (fromMaybe "document" tocTitle) <> ".pdf"
         case renderedPDF' of
           Left _ -> pure unit
-          Right body -> do
-            -- create blobl link
-            url <- H.liftEffect $ createObjectURL body
-            -- Create an invisible link and click it to download PDF
-            H.liftEffect $ do
-              -- get window stuff
-              win <- window
-              hdoc <- document win
-              let doc = HTMLDocument.toDocument hdoc
+          Right blobOrError ->
+            case blobOrError of
+              Left errMsg -> H.modify_ _
+                { renderedHtml = Just
+                    (Loaded ("<pre><code>" <> errMsg <> "</code></pre>"))
+                }
+              Right body -> do
+                -- create blobl link
+                url <- H.liftEffect $ createObjectURL body
+                -- Create an invisible link and click it to download PDF
+                H.liftEffect $ do
+                  -- get window stuff
+                  win <- window
+                  hdoc <- document win
+                  let doc = HTMLDocument.toDocument hdoc
 
-              -- create link
-              aEl <- Document.createElement "a" doc
-              case HTMLElement.fromElement aEl of
-                Nothing -> pure unit
-                Just aHtml -> do
-                  Element.setAttribute "href" url aEl
-                  Element.setAttribute "download" "test.pdf" aEl
-                  HTMLElement.click aHtml
-            -- deactivate the blob link after 1 sec
-            _ <- H.fork do
-              H.liftAff $ delay (Milliseconds 1000.0)
-              H.liftEffect $ revokeObjectURL url
-            pure unit
+                  -- create link
+                  aEl <- Document.createElement "a" doc
+                  case HTMLElement.fromElement aEl of
+                    Nothing -> pure unit
+                    Just aHtml -> do
+                      Element.setAttribute "href" url aEl
+                      Element.setAttribute "download" filename aEl
+                      HTMLElement.click aHtml
+                -- deactivate the blob link after 1 sec
+                _ <- H.fork do
+                  H.liftAff $ delay (Milliseconds 1000.0)
+                  H.liftEffect $ revokeObjectURL url
+                pure unit
 
       Editor.RequestComments docID entryID -> do
         H.tell _comment unit (Comment.RequestComments docID entryID)

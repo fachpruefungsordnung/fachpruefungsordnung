@@ -5,7 +5,7 @@ module Language.Ltml.ToLaTeX.ToPreLaTeXM (ToPreLaTeXM (..))
 where
 
 import Control.Lens (use, (%=), (.=), (.~))
-import Control.Monad.State (State, modify)
+import Control.Monad.State (MonadState (get, put), State, modify, runState)
 import qualified Data.DList as DList
 import qualified Data.Map as Map
 import qualified Data.Text.Lazy as LT
@@ -70,6 +70,7 @@ import Language.Ltml.AST.Text
     , SentenceStart (..)
     , TextTree (..)
     )
+import Language.Ltml.Common (Flagged (Flagged), Flagged')
 import Language.Ltml.ToLaTeX.Format
     ( Stylable (..)
     , formatHeading
@@ -103,6 +104,35 @@ class Labelable a where
 instance ToPreLaTeXM Void where
     toPreLaTeXM = absurd
 
+-------------------------------- [] -----------------------------------
+
+instance (ToPreLaTeXM a) => ToPreLaTeXM [a] where
+    toPreLaTeXM content = do
+        content' <- mapM toPreLaTeXM content
+        pure $ ISequence content'
+
+------------------------------- Flagged ----------------------------------
+
+instance (ToPreLaTeXM a) => ToPreLaTeXM (Flagged' a) where
+    toPreLaTeXM (Flagged b content) = do
+        {- first check whether the global render flag (flaggedParent) is set -}
+        b0 <- use (GS.flagState . GS.flaggedParent)
+        {- set the scope for the content -}
+        (GS.flagState . GS.flaggedParent) .= (b || b0)
+        (GS.flagState . GS.flaggedChildren) .= False
+        {- run the state to build the globalstate and get the potential result -}
+        gs <- get
+        let (res, gs') = runState (toPreLaTeXM content) gs
+        put gs'
+        {- reset the scope -}
+        (GS.flagState . GS.flaggedParent) .= b0
+        isParent <- use (GS.flagState . GS.flaggedChildren)
+        (GS.flagState . GS.flaggedChildren) .= True
+
+        if not isParent && not (b || b0)
+            then pure mempty
+            else pure res
+
 -------------------------------- Node -----------------------------------
 
 instance (Labelable a) => ToPreLaTeXM (Node a) where
@@ -126,8 +156,8 @@ instance
     toPreLaTeXM (Special s) = toPreLaTeXM s
     toPreLaTeXM (Reference l) = pure $ MissingRef l
     toPreLaTeXM (Styled style tt) = do
-        tt' <- mapM toPreLaTeXM tt
-        pure $ applyTextStyle style (ISequence tt')
+        tt' <- toPreLaTeXM tt
+        pure $ applyTextStyle style tt'
     toPreLaTeXM (Enum enum) = toPreLaTeXM enum
     toPreLaTeXM (FootnoteRef fnref) = toPreLaTeXM fnref
 
@@ -145,12 +175,12 @@ instance ToPreLaTeXM FootnoteReference where
                 case Map.lookup l labelToFootNote of
                     Nothing -> pure mempty -- TODO: maybe throw error here?
                     Just (Footnote _ tt) -> do
-                        tt' <- mapM toPreLaTeXM tt
+                        tt' <- toPreLaTeXM tt
                         pure $
                             footnote $
                                 hypertarget l mempty
                                     <> label (LT.fromStrict lt)
-                                    <> ISequence tt'
+                                    <> tt'
             Just _ -> pure $ footref $ LT.fromStrict lt
 
 instance ToPreLaTeXM Enumeration where
@@ -173,9 +203,9 @@ instance Labelable EnumItem where
         path <- GS.nextEnumPosition
         ident <- use (GS.formatState . GS.enumIdentifierFormat)
         GS.insertRefLabel mLabel (getIdentifier ident (last path))
-        tt' <- GS.descendEnumTree $ mapM toPreLaTeXM tt
+        tt' <- GS.descendEnumTree $ toPreLaTeXM tt
         let anchor = maybe mempty (`hypertarget` mempty) mLabel
-        pure $ anchor <> ISequence tt'
+        pure $ anchor <> tt'
 
 instance ToPreLaTeXM SentenceStart where
     toPreLaTeXM (SentenceStart mLabel) = do
@@ -192,10 +222,8 @@ instance ToPreLaTeXM Label where
 
 instance ToPreLaTeXM SimpleParagraph where
     toPreLaTeXM (SimpleParagraph (SimpleParagraphFormat t) content) = do
-        content' <- mapM toPreLaTeXM content
-        pure $
-            applyTextStyle t $
-                ISequence content'
+        content' <- toPreLaTeXM content
+        pure $ applyTextStyle t content'
 
 instance ToPreLaTeXM Paragraph where
     toPreLaTeXM = attachLabel Nothing
@@ -206,19 +234,19 @@ instance Labelable Paragraph where
         let identifier = getIdentifier ident n
         GS.insertRefLabel mLabel identifier
         GS.enumPosition .= [0]
-        content' <- mapM toPreLaTeXM content
+        content' <- toPreLaTeXM content
         let anchor = maybe mempty (`hypertarget` mempty) mLabel
         b <- use (GS.flagState . GS.onlyOneParagraph)
         pure $
             anchor
                 <> if b
-                    then ISequence content'
+                    then content'
                     else
                         enumerate
                             [ LT.pack $ "start=" <> show n
                             , getEnumStyle ident key
                             ]
-                            [ISequence content']
+                            [content']
 
 --------------------------------- Table ------------------------------------
 
@@ -229,8 +257,8 @@ instance ToPreLaTeXM Table where
 
 instance ToPreLaTeXM SimpleSection where
     toPreLaTeXM (SimpleSection (SimpleSectionFormat hasHLine) content) = do
-        content' <- mapM toPreLaTeXM content
-        pure $ (if hasHLine then hrule else mempty) <> ISequence content'
+        content' <- toPreLaTeXM content
+        pure $ (if hasHLine then hrule else mempty) <> content'
 
 createHeading
     :: HeadingFormat b -> PreLaTeX -> PreLaTeX -> State GS.GlobalState PreLaTeX
@@ -247,8 +275,8 @@ instance Labelable Section where
         mLabel
         (Section (SectionFormat ident (TocKeyFormat keyident)) (Heading fmt tt) nodes) =
             do
-                tt' <- mapM toPreLaTeXM tt
-                let headingText = ISequence tt'
+                tt' <- toPreLaTeXM tt
+                let headingText = tt'
                     buildHeading n = do
                         createHeading fmt headingText (IText $ getIdentifier ident n)
                     setLabel n = GS.insertRefLabel mLabel (LT.pack (show n))
@@ -259,27 +287,30 @@ instance Labelable Section where
                         GS.flagState . GS.onlyOneParagraph .= (length paragraphs == 1)
                         GS.addTOCEntry n keyident ident headingText
                         headingDoc <- buildHeading n
-                        content' <- mapM toPreLaTeXM paragraphs
+                        content' <- toPreLaTeXM paragraphs
                         let anchor = maybe headingDoc (`hypertarget` headingDoc) mLabel
-                        pure $ anchor <> ISequence content'
+                        pure $ anchor <> content'
                     InnerSectionBody subsections -> do
                         n <- GS.nextSupersection
                         setLabel n
                         modify $
+                            {-  -}
+                            {-  -}
                             {-  -} (GS.flagState . GS.isSupersection .~ True)
                                 . (GS.counterState . GS.supersectionCTR .~ 0)
                         GS.addTOCEntry n keyident ident headingText
                         headingDoc <- buildHeading n
-                        content' <- mapM toPreLaTeXM subsections
+                        content' <- toPreLaTeXM subsections
                         modify $
+                            {-  -}
+                            {-  -}
                             {-  -} (GS.flagState . GS.isSupersection .~ False)
                                 . (GS.counterState . GS.supersectionCTR .~ n)
                         let anchor =
                                 maybe (headingDoc <> linebreak) (`hypertarget` (headingDoc <> linebreak)) mLabel
-                        pure $ anchor <> ISequence content'
+                        pure $ anchor <> content'
                     SimpleLeafSectionBody simpleblocks -> do
-                        content' <- mapM toPreLaTeXM simpleblocks
-                        pure $ ISequence content'
+                        toPreLaTeXM simpleblocks
 
 -------------------------------- Block ----------------------------------
 
@@ -303,7 +334,7 @@ instance Labelable Document where
             ) = do
             {- build the heading text from the given HeadingFormat
                passed by the state and depending on the position we are in -}
-            tt' <- mapM toPreLaTeXM tt
+            tt' <- toPreLaTeXM tt
             headingText <- buildHeading tt'
 
             {- prepare the state for this document -}
@@ -312,28 +343,31 @@ instance Labelable Document where
             GS.toc .= mempty
 
             {- recursively receive the needed parts of the document -}
-            intro' <- mapM toPreLaTeXM intro
+            intro' <- toPreLaTeXM intro
             content' <- case content of
-                LeafSectionBody paragraphs -> do
-                    mapM toPreLaTeXM paragraphs
-                SimpleLeafSectionBody simpleblocks -> do
-                    mapM toPreLaTeXM simpleblocks
-                InnerSectionBody sections -> do
-                    mapM toPreLaTeXM sections
-            outro' <- mapM toPreLaTeXM outro
+                Flagged b (LeafSectionBody paragraphs) -> do
+                    toPreLaTeXM (Flagged b paragraphs)
+                Flagged b (SimpleLeafSectionBody simpleblocks) -> do
+                    toPreLaTeXM (Flagged b simpleblocks)
+                Flagged b (InnerSectionBody sections) -> do
+                    toPreLaTeXM (Flagged b sections)
+            outro' <- toPreLaTeXM outro
 
             {- if we need a toc then we assemble it. -}
-            toc' <- buildTOC
+            toc' <- if hasTOC then buildTOC else pure mempty
+
+            isFlagged <- use (GS.flagState . GS.flaggedParent)
+
+            preamble <- if isFlagged then pure $ headingText <> toc' else pure mempty
 
             {- assemble the final document -}
             pure $
-                headingText
-                    <> ISequence toc'
-                    <> ISequence intro'
-                    <> ISequence content'
-                    <> ISequence outro'
+                preamble
+                    <> intro'
+                    <> content'
+                    <> outro'
           where
-            buildHeading :: [PreLaTeX] -> State GS.GlobalState PreLaTeX
+            buildHeading :: PreLaTeX -> State GS.GlobalState PreLaTeX
             buildHeading tt' = do
                 b <- use (GS.flagState . GS.docType)
                 case b of
@@ -343,26 +377,24 @@ instance Labelable Document where
                             use (GS.formatState . GS.appendixFormat)
                         let iText = getIdentifier ident n
                         GS.insertRefLabel mLabel iText
-                        GS.addTOCEntry n key ident (ISequence tt')
-                        GS.addAppendixHeaderEntry n key ident (ISequence tt')
-                        createHeading fmt (ISequence tt') (IText iText)
+                        GS.addTOCEntry n key ident tt'
+                        GS.addAppendixHeaderEntry n key ident tt'
+                        createHeading fmt tt' (IText iText)
                     GS.Main -> do
                         fmt <- use (GS.formatState . GS.docHeadingFormat)
-                        createHeading fmt (ISequence tt') (IText " ")
+                        createHeading fmt tt' (IText " ")
 
-            buildTOC :: State GS.GlobalState [PreLaTeX]
-            buildTOC
-                | not hasTOC = pure mempty
-                | otherwise = do
-                    t <- use (GS.flagState . GS.docType)
-                    case t of
-                        GS.Main -> do
-                            toc' <- use GS.toc
-                            appendixHeaders' <- use GS.appendixHeaders
-                            pure $ DList.toList (toc' <> appendixHeaders')
-                        GS.Appendix -> do
-                            toc' <- use GS.toc
-                            pure $ DList.toList toc'
+            buildTOC :: State GS.GlobalState PreLaTeX
+            buildTOC = do
+                t <- use (GS.flagState . GS.docType)
+                case t of
+                    GS.Main -> do
+                        toc' <- use GS.toc
+                        appendixHeaders' <- use GS.appendixHeaders
+                        pure $ ISequence $ DList.toList (toc' <> appendixHeaders')
+                    GS.Appendix -> do
+                        toc' <- use GS.toc
+                        pure $ ISequence $ DList.toList toc'
 
 -------------------------------- AppendixSection -----------------------------------
 
@@ -396,10 +428,10 @@ instance ToPreLaTeXM DocumentContainer where
             GS.formatState . GS.docHeadingFormat .= headingFmt
             GS.resetCountersHard
 
-            appendices' <- mapM toPreLaTeXM appendices
+            appendices' <- toPreLaTeXM appendices
 
             GS.flagState . GS.docType .= GS.Main
             doc' <- toPreLaTeXM doc
 
             {- assemble the final document container -}
-            pure $ doc' <> ISequence appendices'
+            pure $ doc' <> appendices'

@@ -2,8 +2,7 @@
 
 module Language.Ltml.HTML.Test () where
 
-import qualified Data.Map as Map
-import Data.Text.IO.Utf8 (readFile)
+import Data.Map (fromList)
 import Data.Typography
     ( FontSize (..)
     , FontStyle (..)
@@ -26,34 +25,35 @@ import Language.Lsd.AST.Type.AppendixSection
     , AppendixSectionFormat (..)
     , AppendixSectionTitle (..)
     )
+import Language.Lsd.AST.Type.Document (DocumentFormat (..))
 import Language.Lsd.AST.Type.DocumentContainer
-    ( DocumentContainerFormat (DocumentContainerFormat)
+    ( DocumentContainerFormat (..)
+    , HeaderFooterFormat (..)
+    , HeaderFooterFormatAtom (..)
+    , HeaderFooterItemFormat (..)
     )
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Lsd.AST.Type.Footnote (FootnoteFormat (..))
 import Language.Lsd.AST.Type.Paragraph (ParagraphFormat (..))
 import Language.Lsd.AST.Type.Section (SectionFormat (..))
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
-import Language.Lsd.AST.Type.SimpleSection
-    ( SimpleSectionFormat (SimpleSectionFormat)
-    )
-import Language.Lsd.Example.Fpo
+import Language.Lsd.AST.Type.SimpleSection (SimpleSectionFormat (..))
 import Language.Ltml.AST.AppendixSection (AppendixSection (..))
 import Language.Ltml.AST.Document
     ( Document (..)
     , DocumentBody (..)
-    , DocumentHeading (DocumentHeading)
+    , DocumentHeading (..)
     )
 import Language.Ltml.AST.DocumentContainer
-    ( DocumentContainer (DocumentContainer)
-    , DocumentContainerHeader (DocumentContainerHeader)
+    ( DocumentContainer (..)
+    , DocumentContainerHeader (..)
     )
-import Language.Ltml.AST.Footnote (Footnote (Footnote))
+import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Node (Node (..))
-import Language.Ltml.AST.Paragraph (Paragraph (Paragraph))
+import Language.Ltml.AST.Paragraph (Paragraph (..))
 import Language.Ltml.AST.Section (Heading (..), Section (..), SectionBody (..))
-import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (SimpleParagraph))
+import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (..))
 import Language.Ltml.AST.SimpleSection (SimpleSection (..))
 import Language.Ltml.AST.Text
     ( EnumItem (..)
@@ -62,692 +62,667 @@ import Language.Ltml.AST.Text
     , SentenceStart (..)
     , TextTree (..)
     )
+import Language.Ltml.Common (Flagged (..))
 import Language.Ltml.HTML
 import Language.Ltml.HTML.CSS (writeCss)
 import Language.Ltml.HTML.CSS.Util (addHtmlHeader)
-import Language.Ltml.Parser.Common.Lexeme (nSc)
-import Language.Ltml.Parser.Footnote (unwrapFootnoteParser)
-import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.Pretty (prettyPrint)
+import Language.Ltml.Tree.Example.Fpo (fpoTree)
+import Language.Ltml.Tree.Parser (TreeError (..))
+import Language.Ltml.Tree.ToLtml (treeToLtml)
 import Lucid (renderToFile)
 import System.Directory (removeDirectoryRecursive)
-import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
+import Text.Megaparsec (errorBundlePretty)
 import Prelude hiding (Enum, Word, readFile)
-
-testDoc = readFile "src/Language/Ltml/HTML/Test/test.txt"
 
 parseTest :: IO ()
 parseTest = do
-    text <- testDoc
-    case runParser
-        (nSc *> unwrapFootnoteParser [footnoteT] (sectionP superSectionT eof))
-        ""
-        text of
-        Left err -> error $ errorBundlePretty err
-        Right (nodeSection, footnoteMap) -> do
-            let (body, css) = renderSectionHtmlCss nodeSection footnoteMap
+    case treeToLtml fpoTree of
+        Left treeErr -> case treeErr of
+            LeafError parseErr -> error $ errorBundlePretty parseErr
+            TreeError strucErr -> putStrLn $ unlines strucErr
+        Right markedDocCon -> do
+            let (body, css) = renderHtmlCss markedDocCon
              in do
                     renderToFile
                         "src/Language/Ltml/HTML/Test/out.html"
                         (addHtmlHeader "" "out.css" body)
                     writeCss css "src/Language/Ltml/HTML/Test/out.css"
 
-                    prettyPrint nodeSection
+-- prettyPrint markedDocCon
 
 -------------------------------------------------------------------------------
 
-renderDocCon :: IO ()
-renderDocCon =
-    let (body, css) = renderHtmlCss documentContainer
-     in do
-            renderToFile
-                "src/Language/Ltml/HTML/Test/out.html"
-                (addHtmlHeader "" "out.css" body)
-            writeCss css "src/Language/Ltml/HTML/Test/out.css"
-
--- Sample DocumentContainer
-
-documentContainer :: DocumentContainer
-documentContainer =
-    DocumentContainer
-        ( DocumentContainerFormat
-            undefined
-            undefined
-            ( HeadingFormat
-                (Typography Centered LargeFontSize [Bold])
-                (FormatString [PlaceholderAtom HeadingTextPlaceholder])
-            )
-        )
-        undefined
-        document
-        [appendixSection]
-
--- Sample Document
-
-document :: Document
-document =
-    Document
-        undefined
-        (DocumentHeading [Word "Erstes", Word "Dokument"])
-        ( DocumentBody
-            [ SimpleSection
-                (SimpleSectionFormat True)
-                [ SimpleParagraph
-                    (SimpleParagraphFormat $ Typography LeftAligned MediumFontSize [])
-                    [Word "Intro:", Word "Paragraph", Space, Word "Text"]
-                ]
-            ]
-            -- \^ intro
-            (InnerSectionBody [superSection])
-            -- \^ main
-            []
-            -- \^ outro
-        )
-        ( Map.insert
-            (Label "f1")
-            (Footnote SuperscriptFootnoteFormat [Word "Erste", Space, Word "Fußnote!"])
-            Map.empty
-        )
-
--- Sample AppendixSection
-
-appendixSection :: AppendixSection
-appendixSection =
-    AppendixSection
-        ( AppendixSectionFormat
-            (AppendixSectionTitle "Anhang")
-            ( AppendixElementFormat
-                (FormatString [PlaceholderAtom Arabic])
-                ( TocKeyFormat $
-                    FormatString
-                        [ StringAtom "Anlage "
-                        , PlaceholderAtom KeyIdentifierPlaceholder
-                        ]
+docConTest =
+    Flagged
+        False
+        ( DocumentContainer
+            ( DocumentContainerFormat
+                ( HeaderFooterFormat
+                    [ HeaderFooterItemFormat
+                        MediumFontSize
+                        [Bold]
+                        ( FormatString
+                            [ PlaceholderAtom HeaderFooterSuperTitleAtom
+                            , StringAtom "\n"
+                            ]
+                        )
+                    , HeaderFooterItemFormat
+                        MediumFontSize
+                        []
+                        (FormatString [PlaceholderAtom HeaderFooterTitleAtom])
+                    ]
+                    []
+                    [ HeaderFooterItemFormat
+                        SmallFontSize
+                        []
+                        ( FormatString
+                            [StringAtom "(Keine amtliche Bekanntmachung)"]
+                        )
+                    ]
+                )
+                ( HeaderFooterFormat
+                    [ HeaderFooterItemFormat
+                        SmallFontSize
+                        []
+                        ( FormatString
+                            [ StringAtom "Stand: "
+                            , PlaceholderAtom HeaderFooterDateAtom
+                            ]
+                        )
+                    ]
+                    []
+                    [ HeaderFooterItemFormat
+                        SmallFontSize
+                        []
+                        ( FormatString
+                            [ StringAtom "Seite "
+                            , PlaceholderAtom HeaderFooterCurPageNumAtom
+                            , StringAtom " / "
+                            , PlaceholderAtom HeaderFooterLastPageNumAtom
+                            ]
+                        )
+                    ]
                 )
                 ( HeadingFormat
-                    (Typography LeftAligned LargeFontSize [Bold])
-                    ( FormatString
-                        [ StringAtom "Anlage "
-                        , PlaceholderAtom IdentifierPlaceholder
-                        , StringAtom "\n"
-                        , PlaceholderAtom HeadingTextPlaceholder
-                        ]
-                    )
+                    (Typography Centered LargeFontSize [Bold])
+                    (FormatString [PlaceholderAtom HeadingTextPlaceholder])
                 )
             )
-        )
-        [Node (Just $ Label "anhang1") document, Node (Just $ Label "anhang2") document]
-
-superSection :: Node Section
-superSection =
-    Node
-        ( Just
-            ( Label
-                { unLabel = "main"
+            ( DocumentContainerHeader
+                { dchPdfTitle = "Beispieltitel"
+                , dchHeaderFooterSuperTitle = "Universität BeispielStadt"
+                , dchHeaderFooterTitle = "FPO Beispiel 2025"
+                , dchHeaderFooterDate = "2025-08-26"
                 }
             )
-        )
-        ( Section
-            ( SectionFormat
-                (FormatString [PlaceholderAtom Arabic])
-                ( TocKeyFormat
-                    ( FormatString
-                        [ StringAtom "Abschnitt "
-                        , PlaceholderAtom KeyIdentifierPlaceholder
-                        ]
+            ( Flagged
+                False
+                ( Document
+                    (DocumentFormat {docHasTableOfContents = True})
+                    ( DocumentHeading
+                        [Word "Beispiel-Überschrift"]
                     )
-                )
-            )
-            ( Heading
-                ( HeadingFormat
-                    (Typography LeftAligned MediumFontSize [Bold])
-                    ( FormatString
-                        [ StringAtom "Abschnitt "
-                        , PlaceholderAtom IdentifierPlaceholder
-                        , StringAtom " "
-                        , PlaceholderAtom HeadingTextPlaceholder
-                        ]
-                    )
-                )
-                [Word "Main"]
-            )
-            ( InnerSectionBody
-                [ Node
-                    ( Just
-                        ( Label
-                            { unLabel = "section_a"
-                            }
-                        )
-                    )
-                    ( Section
-                        ( SectionFormat
-                            (FormatString [PlaceholderAtom Arabic])
-                            ( TocKeyFormat
-                                ( FormatString
-                                    [ StringAtom "§ "
-                                    , PlaceholderAtom KeyIdentifierPlaceholder
+                    ( DocumentBody
+                        ( Flagged
+                            False
+                            [ SimpleSection
+                                (SimpleSectionFormat {ssHasPrecedingHorizontalBar = False})
+                                [ SimpleParagraph
+                                    ( SimpleParagraphFormat
+                                        (Typography Centered LargeFontSize [])
+                                    )
+                                    [ Word "Vom"
+                                    , Space
+                                    , Word "19."
+                                    , Space
+                                    , Word "Januar"
+                                    , Space
+                                    , Word "2038"
                                     ]
-                                )
-                            )
-                        )
-                        ( Heading
-                            ( HeadingFormat
-                                (Typography Centered MediumFontSize [Bold])
-                                ( FormatString
-                                    [ StringAtom "§ "
-                                    , PlaceholderAtom IdentifierPlaceholder
-                                    , StringAtom "\n"
-                                    , PlaceholderAtom HeadingTextPlaceholder
-                                    ]
-                                )
-                            )
-                            [ Word "Some"
-                            , Space
-                            , Word "section"
+                                ]
+                            , SimpleSection
+                                (SimpleSectionFormat {ssHasPrecedingHorizontalBar = False})
+                                []
+                            , SimpleSection
+                                (SimpleSectionFormat {ssHasPrecedingHorizontalBar = False})
+                                []
                             ]
                         )
-                        ( LeafSectionBody
-                            [ Node
-                                Nothing
-                                ( Paragraph
-                                    ( ParagraphFormat
-                                        (FormatString [PlaceholderAtom Arabic])
-                                        ( ParagraphKeyFormat
-                                            ( FormatString
-                                                [ StringAtom "("
-                                                , PlaceholderAtom KeyIdentifierPlaceholder
-                                                , StringAtom ")"
-                                                ]
-                                            )
-                                        )
-                                    )
-                                    [ Special (SentenceStart Nothing)
-                                    , Word "This"
-                                    , Space
-                                    , Word "paragraph"
-                                    , Space
-                                    , Word "is"
-                                    , Space
-                                    , Word "in"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "section_a"
-                                            }
-                                        )
-                                    , Space
-                                    , Word "in"
-                                    , Space
-                                    , Word "super-section"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "main"
-                                            }
-                                        )
-                                    , Word "."
-                                    ]
-                                )
-                            , Node
-                                Nothing
-                                ( Paragraph
-                                    ( ParagraphFormat
-                                        (FormatString [PlaceholderAtom Arabic])
-                                        ( ParagraphKeyFormat
-                                            ( FormatString
-                                                [ StringAtom "("
-                                                , PlaceholderAtom KeyIdentifierPlaceholder
-                                                , StringAtom ")"
-                                                ]
-                                            )
-                                        )
-                                    )
-                                    [ Special (SentenceStart Nothing)
-                                    , Word "This"
-                                    , Space
-                                    , Word "is"
-                                    , Space
-                                    , Word "another"
-                                    , Space
-                                    , Word "paragraph"
-                                    , Space
-                                    , Word "in"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "section_a"
-                                            }
-                                        )
-                                    , Word "."
-                                    , Space
-                                    , Special (SentenceStart Nothing)
-                                    , Word "Paragraphs"
-                                    , Space
-                                    , Word "don't"
-                                    , Space
-                                    , Word "have"
-                                    , Space
-                                    , Word "keywords"
-                                    , Space
-                                    , Word "and"
-                                    , Space
-                                    , Word "are"
-                                    , Space
-                                    , Word "just"
-                                    , Space
-                                    , Word "separated"
-                                    , Space
-                                    , Word "by"
-                                    , Space
-                                    , Word "empty"
-                                    , Space
-                                    , Word "lines"
-                                    , Word "."
-                                    ]
-                                )
-                            ]
-                        )
-                    )
-                , Node
-                    ( Just
-                        ( Label
-                            { unLabel = "section_b"
-                            }
-                        )
-                    )
-                    ( Section
-                        ( SectionFormat
-                            (FormatString [PlaceholderAtom Arabic])
-                            ( TocKeyFormat
-                                ( FormatString
-                                    [ StringAtom "§ "
-                                    , PlaceholderAtom KeyIdentifierPlaceholder
-                                    ]
-                                )
-                            )
-                        )
-                        ( Heading
-                            ( HeadingFormat
-                                (Typography Centered MediumFontSize [Bold])
-                                ( FormatString
-                                    [ StringAtom "§ "
-                                    , PlaceholderAtom IdentifierPlaceholder
-                                    , StringAtom "\n"
-                                    , PlaceholderAtom HeadingTextPlaceholder
-                                    ]
-                                )
-                            )
-                            [ Word "Another"
-                            , Space
-                            , Word "section,"
-                            , Space
-                            , Word "with"
-                            , Space
-                            , Word "a"
-                            , Space
-                            , Word "title"
-                            , Space
-                            , Word "spanning"
-                            , Space
-                            , Word "several"
-                            , Space
-                            , Word "lines"
-                            , Space
-                            , FootnoteRef
-                                ( FootnoteReference
-                                    ( Label
-                                        { unLabel = "f1"
-                                        }
-                                    )
-                                )
-                            ]
-                        )
-                        ( LeafSectionBody
-                            [ Node
-                                Nothing
-                                ( Paragraph
-                                    ( ParagraphFormat
-                                        (FormatString [PlaceholderAtom Arabic])
-                                        ( ParagraphKeyFormat
-                                            ( FormatString
-                                                [ StringAtom "("
-                                                , PlaceholderAtom KeyIdentifierPlaceholder
-                                                , StringAtom ")"
-                                                ]
-                                            )
-                                        )
-                                    )
-                                    [ Special (SentenceStart Nothing)
-                                    , Word "This"
-                                    , Space
-                                    , Word "paragraph"
-                                    , Space
-                                    , Word "is"
-                                    , Space
-                                    , Word "in"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "section_b"
-                                            }
-                                        )
-                                    , Space
-                                    , Word "in"
-                                    , Space
-                                    , Word "super-section"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "main"
-                                            }
-                                        )
-                                    , Word "."
-                                    ]
-                                )
-                            ]
-                        )
-                    )
-                , Node
-                    ( Just
-                        ( Label
-                            { unLabel = "sectiona"
-                            }
-                        )
-                    )
-                    ( Section
-                        ( SectionFormat
-                            (FormatString [PlaceholderAtom Arabic])
-                            ( TocKeyFormat
-                                ( FormatString
-                                    [ StringAtom "§ "
-                                    , PlaceholderAtom KeyIdentifierPlaceholder
-                                    ]
-                                )
-                            )
-                        )
-                        ( Heading
-                            ( HeadingFormat
-                                (Typography Centered MediumFontSize [Bold])
-                                ( FormatString
-                                    [ StringAtom "§ "
-                                    , PlaceholderAtom IdentifierPlaceholder
-                                    , StringAtom "\n"
-                                    , PlaceholderAtom HeadingTextPlaceholder
-                                    ]
-                                )
-                            )
-                            [ Word "Some"
-                            , Space
-                            , Word "section"
-                            ]
-                        )
-                        ( LeafSectionBody
-                            [ Node
-                                Nothing
-                                ( Paragraph
-                                    ( ParagraphFormat
-                                        (FormatString [PlaceholderAtom Arabic])
-                                        ( ParagraphKeyFormat
-                                            ( FormatString
-                                                [ StringAtom "("
-                                                , PlaceholderAtom KeyIdentifierPlaceholder
-                                                , StringAtom ")"
-                                                ]
-                                            )
-                                        )
-                                    )
-                                    [ Special (SentenceStart Nothing)
-                                    , Word "And"
-                                    , Space
-                                    , Word "now"
-                                    , Space
-                                    , Word "i"
-                                    , Space
-                                    , Word "reference"
-                                    , Space
-                                    , Word "into"
-                                    , Space
-                                    , Word "the"
-                                    , Space
-                                    , Word "future"
-                                    , Space
-                                    , Word "to"
-                                    , Space
-                                    , Word "sentence"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "sen1"
-                                            }
-                                        )
-                                    , Word "."
-                                    ]
-                                )
-                            , Node
-                                ( Just
-                                    ( Label
-                                        { unLabel = "para"
-                                        }
-                                    )
-                                )
-                                ( Paragraph
-                                    ( ParagraphFormat
-                                        (FormatString [PlaceholderAtom Arabic])
-                                        ( ParagraphKeyFormat
-                                            ( FormatString
-                                                [ StringAtom "("
-                                                , PlaceholderAtom KeyIdentifierPlaceholder
-                                                , StringAtom ")"
-                                                ]
-                                            )
-                                        )
-                                    )
-                                    [ Special (SentenceStart Nothing)
-                                    , Word "This"
-                                    , Space
-                                    , Styled
-                                        Underlined
-                                        [Word "paragraph"]
-                                    , Space
-                                    , Word "is"
-                                    , Space
-                                    , Word "in"
-                                    , Space
-                                    , Word "section"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "sectiona"
-                                            }
-                                        )
-                                    , Space
-                                    , Word "in"
-                                    , Space
-                                    , Word "super-section"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "main"
-                                            }
-                                        )
-                                    , Word "."
-                                    , Space
-                                    , Special
-                                        ( SentenceStart
-                                            ( Just
-                                                ( Label
-                                                    { unLabel = "sentencea"
-                                                    }
+                        ( Flagged
+                            False
+                            ( InnerSectionBody
+                                [ Flagged
+                                    True
+                                    ( Node
+                                        Nothing
+                                        ( Section
+                                            ( SectionFormat
+                                                (FormatString [PlaceholderAtom Arabic])
+                                                ( TocKeyFormat
+                                                    ( FormatString
+                                                        [ StringAtom "§ "
+                                                        , PlaceholderAtom KeyIdentifierPlaceholder
+                                                        ]
+                                                    )
                                                 )
                                             )
-                                        )
-                                    , Word "This"
-                                    , Space
-                                    , Word "sentence"
-                                    , Space
-                                    , Word "is"
-                                    , Space
-                                    , Word "actually"
-                                    , Space
-                                    , Word "in"
-                                    , Space
-                                    , Word "§"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "para"
-                                            }
-                                        )
-                                    , Space
-                                    , Word "and"
-                                    , Space
-                                    , Word "this"
-                                    , Space
-                                    , Word "sentence"
-                                    , Space
-                                    , Word "is"
-                                    , Space
-                                    , Word "number"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "sentencea"
-                                            }
-                                        )
-                                    , Word "."
-                                    , Space
-                                    , Special (SentenceStart Nothing)
-                                    , Word "And"
-                                    , Space
-                                    , Word "it"
-                                    , Space
-                                    , Word "has"
-                                    , Space
-                                    , Word "a"
-                                    , Space
-                                    , Word "big"
-                                    , Space
-                                    , Word "Enumeration:"
-                                    , Enum
-                                        ( Enumeration
-                                            ( EnumFormat
-                                                ( EnumItemFormat
-                                                    (FormatString [PlaceholderAtom Arabic])
-                                                    ( EnumItemKeyFormat
-                                                        ( FormatString
-                                                            [ PlaceholderAtom KeyIdentifierPlaceholder
-                                                            , StringAtom "."
-                                                            ]
+                                            ( Heading
+                                                ( HeadingFormat
+                                                    (Typography Centered MediumFontSize [Bold])
+                                                    ( FormatString
+                                                        [ StringAtom "§ "
+                                                        , PlaceholderAtom IdentifierPlaceholder
+                                                        , StringAtom "\n"
+                                                        , PlaceholderAtom HeadingTextPlaceholder
+                                                        ]
+                                                    )
+                                                )
+                                                [ Word "section"
+                                                , Space
+                                                , Word "title"
+                                                ]
+                                            )
+                                            ( LeafSectionBody
+                                                [ Node
+                                                    Nothing
+                                                    ( Paragraph
+                                                        ( ParagraphFormat
+                                                            (FormatString [PlaceholderAtom Arabic])
+                                                            ( ParagraphKeyFormat
+                                                                ( FormatString
+                                                                    [ StringAtom "("
+                                                                    , PlaceholderAtom KeyIdentifierPlaceholder
+                                                                    , StringAtom ")"
+                                                                    ]
+                                                                )
+                                                            )
                                                         )
+                                                        [ Special (SentenceStart Nothing)
+                                                        , Word "This"
+                                                        , Space
+                                                        , Word "is"
+                                                        , Space
+                                                        , Word "a"
+                                                        , Space
+                                                        , Word "simple"
+                                                        , Space
+                                                        , Word "paragraph"
+                                                        , Word "."
+                                                        ]
                                                     )
-                                                )
-                                            )
-                                            [ Node
-                                                ( Just
-                                                    ( Label
-                                                        { unLabel = "enum0"
-                                                        }
-                                                    )
-                                                )
-                                                ( EnumItem
-                                                    [Word "First"]
-                                                )
-                                            , Node
-                                                ( Just
-                                                    ( Label
-                                                        { unLabel = "enum1"
-                                                        }
-                                                    )
-                                                )
-                                                ( EnumItem
-                                                    [ Word "Second"
-                                                    , Enum
-                                                        ( Enumeration
-                                                            ( EnumFormat
-                                                                ( EnumItemFormat
-                                                                    (FormatString [PlaceholderAtom AlphabeticLower])
-                                                                    ( EnumItemKeyFormat
-                                                                        ( FormatString
-                                                                            [ PlaceholderAtom KeyIdentifierPlaceholder
-                                                                            , StringAtom ")"
-                                                                            ]
+                                                , Node
+                                                    Nothing
+                                                    ( Paragraph
+                                                        ( ParagraphFormat
+                                                            (FormatString [PlaceholderAtom Arabic])
+                                                            ( ParagraphKeyFormat
+                                                                ( FormatString
+                                                                    [ StringAtom "("
+                                                                    , PlaceholderAtom KeyIdentifierPlaceholder
+                                                                    , StringAtom ")"
+                                                                    ]
+                                                                )
+                                                            )
+                                                        )
+                                                        [ Special (SentenceStart Nothing)
+                                                        , Word "This"
+                                                        , Space
+                                                        , Word "is"
+                                                        , Space
+                                                        , Word "another"
+                                                        , Space
+                                                        , Word "paragraph,"
+                                                        , Space
+                                                        , Word "with"
+                                                        , Space
+                                                        , Word "an"
+                                                        , Space
+                                                        , Word "enumeration:"
+                                                        , Enum
+                                                            ( Enumeration
+                                                                ( EnumFormat
+                                                                    ( EnumItemFormat
+                                                                        (FormatString [PlaceholderAtom Arabic])
+                                                                        ( EnumItemKeyFormat
+                                                                            ( FormatString
+                                                                                [ PlaceholderAtom KeyIdentifierPlaceholder
+                                                                                , StringAtom "."
+                                                                                ]
+                                                                            )
                                                                         )
                                                                     )
                                                                 )
+                                                                [ Node
+                                                                    Nothing
+                                                                    ( EnumItem
+                                                                        [ Word "first"
+                                                                        , Space
+                                                                        , Word "item"
+                                                                        ]
+                                                                    )
+                                                                , Node
+                                                                    Nothing
+                                                                    ( EnumItem
+                                                                        [ Word "second"
+                                                                        , Space
+                                                                        , Word "item"
+                                                                        , Enum
+                                                                            ( Enumeration
+                                                                                ( EnumFormat
+                                                                                    ( EnumItemFormat
+                                                                                        (FormatString [PlaceholderAtom AlphabeticLower])
+                                                                                        ( EnumItemKeyFormat
+                                                                                            ( FormatString
+                                                                                                [ PlaceholderAtom KeyIdentifierPlaceholder
+                                                                                                , StringAtom ")"
+                                                                                                ]
+                                                                                            )
+                                                                                        )
+                                                                                    )
+                                                                                )
+                                                                                [ Node
+                                                                                    Nothing
+                                                                                    ( EnumItem
+                                                                                        [Word "sub-item"]
+                                                                                    )
+                                                                                ]
+                                                                            )
+                                                                        ]
+                                                                    )
+                                                                , Node
+                                                                    Nothing
+                                                                    ( EnumItem
+                                                                        [ Word "third"
+                                                                        , Space
+                                                                        , Word "item,"
+                                                                        , Space
+                                                                        , Word "which"
+                                                                        , Space
+                                                                        , Word "spans"
+                                                                        , Space
+                                                                        , Word "several"
+                                                                        , Space
+                                                                        , Word "lines"
+                                                                        ]
+                                                                    )
+                                                                ]
                                                             )
-                                                            [ Node
+                                                        ]
+                                                    )
+                                                , Node
+                                                    ( Just
+                                                        ( Label
+                                                            { unLabel = "some_paragraph"
+                                                            }
+                                                        )
+                                                    )
+                                                    ( Paragraph
+                                                        ( ParagraphFormat
+                                                            (FormatString [PlaceholderAtom Arabic])
+                                                            ( ParagraphKeyFormat
+                                                                ( FormatString
+                                                                    [ StringAtom "("
+                                                                    , PlaceholderAtom KeyIdentifierPlaceholder
+                                                                    , StringAtom ")"
+                                                                    ]
+                                                                )
+                                                            )
+                                                        )
+                                                        [ Special (SentenceStart Nothing)
+                                                        , Word "A"
+                                                        , Space
+                                                        , Word "labeled"
+                                                        , Space
+                                                        , Word "paragraph,"
+                                                        , Space
+                                                        , Word "referencing"
+                                                        , Space
+                                                        , Word "itself:"
+                                                        , Space
+                                                        , Reference
+                                                            ( Label
+                                                                { unLabel = "some_paragraph"
+                                                                }
+                                                            )
+                                                        , Word "."
+                                                        , Space
+                                                        , Special (SentenceStart Nothing)
+                                                        , Word "It"
+                                                        , Space
+                                                        , Word "also"
+                                                        , Space
+                                                        , Word "has"
+                                                        , Space
+                                                        , Word "a"
+                                                        , Space
+                                                        , Word "footnote"
+                                                        , FootnoteRef
+                                                            ( FootnoteReference
+                                                                ( Label
+                                                                    { unLabel = "a_footnote"
+                                                                    }
+                                                                )
+                                                            )
+                                                        , Word "."
+                                                        , Space
+                                                        , Special
+                                                            ( SentenceStart
                                                                 ( Just
                                                                     ( Label
-                                                                        { unLabel = "enum2"
+                                                                        { unLabel = "a_sentence"
                                                                         }
                                                                     )
                                                                 )
-                                                                ( EnumItem
-                                                                    [ Word "Sub"
+                                                            )
+                                                        , Word "It"
+                                                        , Space
+                                                        , Word "also"
+                                                        , Space
+                                                        , Word "has"
+                                                        , Space
+                                                        , Word "a"
+                                                        , Space
+                                                        , Word "self-referencing"
+                                                        , Space
+                                                        , Word "sentence:"
+                                                        , Space
+                                                        , Reference
+                                                            ( Label
+                                                                { unLabel = "a_sentence"
+                                                                }
+                                                            )
+                                                        , Word "."
+                                                        ]
+                                                    )
+                                                ]
+                                            )
+                                        )
+                                    )
+                                ]
+                            )
+                        )
+                        ( Flagged
+                            False
+                            [ SimpleSection
+                                (SimpleSectionFormat {ssHasPrecedingHorizontalBar = False})
+                                []
+                            , SimpleSection
+                                (SimpleSectionFormat {ssHasPrecedingHorizontalBar = True})
+                                [ SimpleParagraph
+                                    ( SimpleParagraphFormat
+                                        (Typography LeftAligned MediumFontSize [])
+                                    )
+                                    [ Styled
+                                        Bold
+                                        [ Word "Artikel"
+                                        , Space
+                                        , Word "42"
+                                        , Space
+                                        , Word "der"
+                                        , Space
+                                        , Word "Änderungssatzung"
+                                        , Space
+                                        , Word "vom"
+                                        , Space
+                                        , Word "19."
+                                        , Space
+                                        , Word "Januar"
+                                        , Space
+                                        , Word "2038:"
+                                        ]
+                                    , Space
+                                    , Word "Diese"
+                                    , Space
+                                    , Word "Satzung"
+                                    , Space
+                                    , Word "tritt"
+                                    , Space
+                                    , Word "am"
+                                    , Space
+                                    , Word "Tag"
+                                    , Space
+                                    , Word "nach"
+                                    , Space
+                                    , Word "ihrer"
+                                    , Space
+                                    , Word "Bekanntmachung"
+                                    , Space
+                                    , Word "in"
+                                    , Space
+                                    , Word "Kraft."
+                                    ]
+                                ]
+                            ]
+                        )
+                    )
+                    ( fromList
+                        [
+                            ( Label
+                                { unLabel = "a_footnote"
+                                }
+                            , Footnote
+                                SuperscriptFootnoteFormat
+                                [ Word "The"
+                                , Space
+                                , Word "footnote."
+                                ]
+                            )
+                        ]
+                    )
+                )
+            )
+            [ Flagged
+                False
+                ( AppendixSection
+                    ( AppendixSectionFormat
+                        (AppendixSectionTitle "Anlagen")
+                        ( AppendixElementFormat
+                            (FormatString [PlaceholderAtom Arabic])
+                            ( TocKeyFormat
+                                ( FormatString
+                                    [ StringAtom "Anlage "
+                                    , PlaceholderAtom KeyIdentifierPlaceholder
+                                    ]
+                                )
+                            )
+                            ( HeadingFormat
+                                (Typography LeftAligned LargeFontSize [Bold])
+                                ( FormatString
+                                    [ StringAtom "Anlage "
+                                    , PlaceholderAtom IdentifierPlaceholder
+                                    , StringAtom "\n"
+                                    , PlaceholderAtom HeadingTextPlaceholder
+                                    ]
+                                )
+                            )
+                        )
+                    )
+                    []
+                )
+            , Flagged
+                False
+                ( AppendixSection
+                    ( AppendixSectionFormat
+                        (AppendixSectionTitle "Anhänge")
+                        ( AppendixElementFormat
+                            (FormatString [PlaceholderAtom Arabic])
+                            ( TocKeyFormat
+                                ( FormatString
+                                    [ StringAtom "Anhang "
+                                    , PlaceholderAtom KeyIdentifierPlaceholder
+                                    ]
+                                )
+                            )
+                            ( HeadingFormat
+                                (Typography LeftAligned LargeFontSize [Bold])
+                                ( FormatString
+                                    [ StringAtom "Anhang "
+                                    , PlaceholderAtom IdentifierPlaceholder
+                                    , StringAtom ""
+                                    , PlaceholderAtom HeadingTextPlaceholder
+                                    ]
+                                )
+                            )
+                        )
+                    )
+                    [ Flagged
+                        False
+                        ( Node Nothing $
+                            Document
+                                (DocumentFormat {docHasTableOfContents = True})
+                                ( DocumentHeading
+                                    [Word "Beispiel-Überschrift"]
+                                )
+                                ( DocumentBody
+                                    ( Flagged
+                                        False
+                                        [ SimpleSection
+                                            (SimpleSectionFormat {ssHasPrecedingHorizontalBar = False})
+                                            [ SimpleParagraph
+                                                ( SimpleParagraphFormat
+                                                    (Typography Centered LargeFontSize [])
+                                                )
+                                                [ Word "Vom"
+                                                , Space
+                                                , Word "19."
+                                                , Space
+                                                , Word "Januar"
+                                                , Space
+                                                , Word "2038"
+                                                ]
+                                            ]
+                                        , SimpleSection
+                                            (SimpleSectionFormat {ssHasPrecedingHorizontalBar = False})
+                                            []
+                                        , SimpleSection
+                                            (SimpleSectionFormat {ssHasPrecedingHorizontalBar = False})
+                                            []
+                                        ]
+                                    )
+                                    ( Flagged
+                                        False
+                                        ( InnerSectionBody
+                                            [ Flagged
+                                                True
+                                                ( Node
+                                                    Nothing
+                                                    ( Section
+                                                        ( SectionFormat
+                                                            (FormatString [PlaceholderAtom Arabic])
+                                                            ( TocKeyFormat
+                                                                ( FormatString
+                                                                    [ StringAtom "§ "
+                                                                    , PlaceholderAtom KeyIdentifierPlaceholder
+                                                                    ]
+                                                                )
+                                                            )
+                                                        )
+                                                        ( Heading
+                                                            ( HeadingFormat
+                                                                (Typography Centered MediumFontSize [Bold])
+                                                                ( FormatString
+                                                                    [ StringAtom "§ "
+                                                                    , PlaceholderAtom IdentifierPlaceholder
+                                                                    , StringAtom "\n"
+                                                                    , PlaceholderAtom HeadingTextPlaceholder
+                                                                    ]
+                                                                )
+                                                            )
+                                                            [ Word "section"
+                                                            , Space
+                                                            , Word "title"
+                                                            ]
+                                                        )
+                                                        ( LeafSectionBody
+                                                            [ Node
+                                                                Nothing
+                                                                ( Paragraph
+                                                                    ( ParagraphFormat
+                                                                        (FormatString [PlaceholderAtom Arabic])
+                                                                        ( ParagraphKeyFormat
+                                                                            ( FormatString
+                                                                                [ StringAtom "("
+                                                                                , PlaceholderAtom KeyIdentifierPlaceholder
+                                                                                , StringAtom ")"
+                                                                                ]
+                                                                            )
+                                                                        )
+                                                                    )
+                                                                    [ Special (SentenceStart Nothing)
+                                                                    , Word "This"
                                                                     , Space
-                                                                    , Word "One"
+                                                                    , Word "is"
+                                                                    , Space
+                                                                    , Word "a"
+                                                                    , Space
+                                                                    , Word "simple"
+                                                                    , Space
+                                                                    , Word "paragraph"
+                                                                    , Word "."
                                                                     ]
                                                                 )
                                                             , Node
-                                                                ( Just
-                                                                    ( Label
-                                                                        { unLabel = "enum3"
-                                                                        }
+                                                                Nothing
+                                                                ( Paragraph
+                                                                    ( ParagraphFormat
+                                                                        (FormatString [PlaceholderAtom Arabic])
+                                                                        ( ParagraphKeyFormat
+                                                                            ( FormatString
+                                                                                [ StringAtom "("
+                                                                                , PlaceholderAtom KeyIdentifierPlaceholder
+                                                                                , StringAtom ")"
+                                                                                ]
+                                                                            )
+                                                                        )
                                                                     )
-                                                                )
-                                                                ( EnumItem
-                                                                    [ Word "Sub"
+                                                                    [ Special (SentenceStart Nothing)
+                                                                    , Word "This"
                                                                     , Space
-                                                                    , Word "Two"
+                                                                    , Word "is"
+                                                                    , Space
+                                                                    , Word "another"
+                                                                    , Space
+                                                                    , Word "paragraph,"
+                                                                    , Space
+                                                                    , Word "with"
+                                                                    , Space
+                                                                    , Word "an"
+                                                                    , Space
+                                                                    , Word "enumeration:"
                                                                     , Enum
                                                                         ( Enumeration
                                                                             ( EnumFormat
                                                                                 ( EnumItemFormat
-                                                                                    ( FormatString
-                                                                                        [ PlaceholderAtom AlphabeticLower
-                                                                                        , PlaceholderAtom AlphabeticLower
-                                                                                        ]
-                                                                                    )
+                                                                                    (FormatString [PlaceholderAtom Arabic])
                                                                                     ( EnumItemKeyFormat
                                                                                         ( FormatString
                                                                                             [ PlaceholderAtom KeyIdentifierPlaceholder
-                                                                                            , StringAtom ")"
+                                                                                            , StringAtom "."
                                                                                             ]
                                                                                         )
                                                                                     )
                                                                                 )
                                                                             )
                                                                             [ Node
-                                                                                ( Just
-                                                                                    ( Label
-                                                                                        { unLabel = "enum4"
-                                                                                        }
-                                                                                    )
-                                                                                )
+                                                                                Nothing
                                                                                 ( EnumItem
-                                                                                    [Word "Third"]
+                                                                                    [ Word "first"
+                                                                                    , Space
+                                                                                    , Word "item"
+                                                                                    ]
                                                                                 )
                                                                             , Node
-                                                                                ( Just
-                                                                                    ( Label
-                                                                                        { unLabel = "enum5"
-                                                                                        }
-                                                                                    )
-                                                                                )
+                                                                                Nothing
                                                                                 ( EnumItem
-                                                                                    [ Word "Third"
+                                                                                    [ Word "second"
                                                                                     , Space
-                                                                                    , Word "Two"
+                                                                                    , Word "item"
                                                                                     , Enum
                                                                                         ( Enumeration
                                                                                             ( EnumFormat
                                                                                                 ( EnumItemFormat
-                                                                                                    ( FormatString
-                                                                                                        [ PlaceholderAtom AlphabeticLower
-                                                                                                        , PlaceholderAtom AlphabeticLower
-                                                                                                        , PlaceholderAtom AlphabeticLower
-                                                                                                        ]
-                                                                                                    )
+                                                                                                    (FormatString [PlaceholderAtom AlphabeticLower])
                                                                                                     ( EnumItemKeyFormat
                                                                                                         ( FormatString
                                                                                                             [ PlaceholderAtom KeyIdentifierPlaceholder
@@ -758,197 +733,198 @@ superSection =
                                                                                                 )
                                                                                             )
                                                                                             [ Node
-                                                                                                ( Just
-                                                                                                    ( Label
-                                                                                                        { unLabel = "enum6"
-                                                                                                        }
-                                                                                                    )
-                                                                                                )
+                                                                                                Nothing
                                                                                                 ( EnumItem
-                                                                                                    [ Word "Too"
-                                                                                                    , Space
-                                                                                                    , Word "much"
-                                                                                                    ]
-                                                                                                )
-                                                                                            , Node
-                                                                                                ( Just
-                                                                                                    ( Label
-                                                                                                        { unLabel = "enum7"
-                                                                                                        }
-                                                                                                    )
-                                                                                                )
-                                                                                                ( EnumItem
-                                                                                                    [ Word "Way"
-                                                                                                    , Space
-                                                                                                    , Word "too"
-                                                                                                    , Space
-                                                                                                    , Word "much"
-                                                                                                    , Enum
-                                                                                                        ( Enumeration
-                                                                                                            ( EnumFormat
-                                                                                                                ( EnumItemFormat
-                                                                                                                    (FormatString [PlaceholderAtom Arabic])
-                                                                                                                    ( EnumItemKeyFormat
-                                                                                                                        ( FormatString
-                                                                                                                            [StringAtom "-"]
-                                                                                                                        )
-                                                                                                                    )
-                                                                                                                )
-                                                                                                            )
-                                                                                                            [ Node
-                                                                                                                Nothing
-                                                                                                                ( EnumItem
-                                                                                                                    [Word "Fail?"]
-                                                                                                                )
-                                                                                                            ]
-                                                                                                        )
-                                                                                                    ]
+                                                                                                    [Word "sub-item"]
                                                                                                 )
                                                                                             ]
                                                                                         )
+                                                                                    ]
+                                                                                )
+                                                                            , Node
+                                                                                Nothing
+                                                                                ( EnumItem
+                                                                                    [ Word "third"
+                                                                                    , Space
+                                                                                    , Word "item,"
+                                                                                    , Space
+                                                                                    , Word "which"
+                                                                                    , Space
+                                                                                    , Word "spans"
+                                                                                    , Space
+                                                                                    , Word "several"
+                                                                                    , Space
+                                                                                    , Word "lines"
                                                                                     ]
                                                                                 )
                                                                             ]
                                                                         )
                                                                     ]
                                                                 )
+                                                            , Node
+                                                                ( Just
+                                                                    ( Label
+                                                                        { unLabel = "some_paragraph"
+                                                                        }
+                                                                    )
+                                                                )
+                                                                ( Paragraph
+                                                                    ( ParagraphFormat
+                                                                        (FormatString [PlaceholderAtom Arabic])
+                                                                        ( ParagraphKeyFormat
+                                                                            ( FormatString
+                                                                                [ StringAtom "("
+                                                                                , PlaceholderAtom KeyIdentifierPlaceholder
+                                                                                , StringAtom ")"
+                                                                                ]
+                                                                            )
+                                                                        )
+                                                                    )
+                                                                    [ Special (SentenceStart Nothing)
+                                                                    , Word "A"
+                                                                    , Space
+                                                                    , Word "labeled"
+                                                                    , Space
+                                                                    , Word "paragraph,"
+                                                                    , Space
+                                                                    , Word "referencing"
+                                                                    , Space
+                                                                    , Word "itself:"
+                                                                    , Space
+                                                                    , Reference
+                                                                        ( Label
+                                                                            { unLabel = "some_paragraph"
+                                                                            }
+                                                                        )
+                                                                    , Word "."
+                                                                    , Space
+                                                                    , Special (SentenceStart Nothing)
+                                                                    , Word "It"
+                                                                    , Space
+                                                                    , Word "also"
+                                                                    , Space
+                                                                    , Word "has"
+                                                                    , Space
+                                                                    , Word "a"
+                                                                    , Space
+                                                                    , Word "footnote"
+                                                                    , FootnoteRef
+                                                                        ( FootnoteReference
+                                                                            ( Label
+                                                                                { unLabel = "a_footnote"
+                                                                                }
+                                                                            )
+                                                                        )
+                                                                    , Word "."
+                                                                    , Space
+                                                                    , Special
+                                                                        ( SentenceStart
+                                                                            ( Just
+                                                                                ( Label
+                                                                                    { unLabel = "a_sentence"
+                                                                                    }
+                                                                                )
+                                                                            )
+                                                                        )
+                                                                    , Word "It"
+                                                                    , Space
+                                                                    , Word "also"
+                                                                    , Space
+                                                                    , Word "has"
+                                                                    , Space
+                                                                    , Word "a"
+                                                                    , Space
+                                                                    , Word "self-referencing"
+                                                                    , Space
+                                                                    , Word "sentence:"
+                                                                    , Space
+                                                                    , Reference
+                                                                        ( Label
+                                                                            { unLabel = "a_sentence"
+                                                                            }
+                                                                        )
+                                                                    , Word "."
+                                                                    ]
+                                                                )
                                                             ]
                                                         )
-                                                    ]
+                                                    )
                                                 )
                                             ]
                                         )
-                                    , Special (SentenceStart Nothing)
-                                    , Word "Sentence"
-                                    , Space
-                                    , Word "after"
-                                    , Space
-                                    , Word "enum"
-                                    , Word "."
-                                    ]
-                                )
-                            , Node
-                                Nothing
-                                ( Paragraph
-                                    ( ParagraphFormat
-                                        (FormatString [PlaceholderAtom Arabic])
-                                        ( ParagraphKeyFormat
-                                            ( FormatString
-                                                [ StringAtom "("
-                                                , PlaceholderAtom KeyIdentifierPlaceholder
-                                                , StringAtom ")"
-                                                ]
-                                            )
-                                        )
                                     )
-                                    [ Special (SentenceStart Nothing)
-                                    , Word "This"
-                                    , Space
-                                    , Word "is"
-                                    , Space
-                                    , Word "another"
-                                    , Space
-                                    , Word "paragraph"
-                                    , Space
-                                    , Word "in"
-                                    , Space
-                                    , Word "§"
-                                    , Space
-                                    , Reference
+                                    ( Flagged
+                                        False
+                                        [ SimpleSection
+                                            (SimpleSectionFormat {ssHasPrecedingHorizontalBar = False})
+                                            []
+                                        , SimpleSection
+                                            (SimpleSectionFormat {ssHasPrecedingHorizontalBar = True})
+                                            [ SimpleParagraph
+                                                ( SimpleParagraphFormat
+                                                    (Typography LeftAligned MediumFontSize [])
+                                                )
+                                                [ Styled
+                                                    Bold
+                                                    [ Word "Artikel"
+                                                    , Space
+                                                    , Word "42"
+                                                    , Space
+                                                    , Word "der"
+                                                    , Space
+                                                    , Word "Änderungssatzung"
+                                                    , Space
+                                                    , Word "vom"
+                                                    , Space
+                                                    , Word "19."
+                                                    , Space
+                                                    , Word "Januar"
+                                                    , Space
+                                                    , Word "2038:"
+                                                    ]
+                                                , Space
+                                                , Word "Diese"
+                                                , Space
+                                                , Word "Satzung"
+                                                , Space
+                                                , Word "tritt"
+                                                , Space
+                                                , Word "am"
+                                                , Space
+                                                , Word "Tag"
+                                                , Space
+                                                , Word "nach"
+                                                , Space
+                                                , Word "ihrer"
+                                                , Space
+                                                , Word "Bekanntmachung"
+                                                , Space
+                                                , Word "in"
+                                                , Space
+                                                , Word "Kraft."
+                                                ]
+                                            ]
+                                        ]
+                                    )
+                                )
+                                ( fromList
+                                    [
                                         ( Label
-                                            { unLabel = "sectiona"
+                                            { unLabel = "a_footnote"
                                             }
+                                        , Footnote
+                                            SuperscriptFootnoteFormat
+                                            [ Word "The"
+                                            , Space
+                                            , Word "footnote."
+                                            ]
                                         )
-                                    , Word "."
-                                    , Space
-                                    , Special (SentenceStart Nothing)
-                                    , Word "Paragraphs"
-                                    , Space
-                                    , Word "don't"
-                                    , Space
-                                    , Word "have"
-                                    , Space
-                                    , Word "keywords"
-                                    , Space
-                                    , Word "and"
-                                    , Space
-                                    , Word "are"
-                                    , Space
-                                    , Word "just"
-                                    , Space
-                                    , Word "separated"
-                                    , Space
-                                    , Word "by"
-                                    , Space
-                                    , Word "empty"
-                                    , Space
-                                    , Word "lines"
-                                    , Word "."
-                                    , Space
-                                    , Special (SentenceStart Nothing)
-                                    , Word "But"
-                                    , Space
-                                    , Word "whats"
-                                    , Space
-                                    , Word "about"
-                                    , Space
-                                    , Word "references"
-                                    , Space
-                                    , Word "that"
-                                    , Space
-                                    , Word "are"
-                                    , Space
-                                    , Word "into"
-                                    , Space
-                                    , Word "the"
-                                    , Space
-                                    , Word "future"
-                                    , Space
-                                    , Word "to"
-                                    , Space
-                                    , Word "§"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "sectionb"
-                                            }
-                                        )
-                                    , Word "?"
-                                    , Space
-                                    , Special (SentenceStart Nothing)
-                                    , Word "Testing"
-                                    , Space
-                                    , Word "references"
-                                    , Space
-                                    , Word "that"
-                                    , Space
-                                    , Word "dont"
-                                    , Space
-                                    , Word "even"
-                                    , Space
-                                    , Word "exist"
-                                    , Space
-                                    , Word "at"
-                                    , Space
-                                    , Word "all"
-                                    , Space
-                                    , Word "like:"
-                                    , Space
-                                    , Word "§"
-                                    , Space
-                                    , Reference
-                                        ( Label
-                                            { unLabel = "sectionc"
-                                            }
-                                        )
-                                    , Word "."
                                     ]
                                 )
-                            ]
                         )
-                    )
-                ]
-            )
+                    ]
+                )
+            ]
         )
 
 -------------------------------------------------------------------------------

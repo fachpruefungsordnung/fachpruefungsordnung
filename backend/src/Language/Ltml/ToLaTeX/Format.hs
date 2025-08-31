@@ -52,7 +52,9 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     , italic
     , large
     , linebreak
+    , renewlist
     , setfontArabic
+    , setlistdepth
     , small
     , underline
     , usepackage
@@ -148,6 +150,8 @@ staticDocumentFormat =
         , usepackage [] "lastpage"
         , IRaw "\\pagestyle{fancy}"
         , IRaw "\\fancyhf{}"
+        , setlistdepth
+        , renewlist
         ]
 
 getIdentifier :: IdentifierFormat -> Int -> LT.Text

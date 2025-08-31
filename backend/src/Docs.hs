@@ -1,10 +1,12 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Docs
     ( Error (..)
     , Result
     , Limit
     , logMessage
+    , newDefaultDocument
     , createDocument
     , getDocument
     , getDocuments
@@ -28,7 +30,7 @@ module Docs
     ) where
 
 import Control.Monad (join, unless)
-import Control.Monad.Except (ExceptT, runExceptT, throwError)
+import Control.Monad.Except (ExceptT (ExceptT), runExceptT, throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (find)
 import Data.Functor ((<&>))
@@ -40,9 +42,15 @@ import UserManagement.DocumentPermission (Permission (..))
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
+import qualified Language.Lsd.AST.Common as LSD
+import qualified Language.Ltml.Common as LTML
+import qualified Language.Ltml.Tree as LTML
+
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Maybe (fromMaybe)
 import Data.OpenApi (ToSchema)
+import qualified Data.Text as Text
+import qualified Data.Vector as Vector
 import Docs.Comment (Comment, CommentRef (CommentRef), Message)
 import qualified Docs.Comment as Comment
 import Docs.Database
@@ -72,6 +80,7 @@ import Docs.Database
     )
 import qualified Docs.Database as DB
 import Docs.Document (Document, DocumentID)
+import qualified Docs.Document as Document
 import Docs.DocumentHistory (DocumentHistory)
 import Docs.FullDocument (FullDocument (FullDocument))
 import qualified Docs.FullDocument as FullDocument
@@ -86,6 +95,7 @@ import Docs.TextElement
     , TextElementKind
     , TextElementRef (..)
     )
+import qualified Docs.TextElement as TextElement
 import Docs.TextRevision
     ( ConflictStatus
     , NewTextRevision (..)
@@ -94,7 +104,8 @@ import Docs.TextRevision
     , TextRevisionRef (..)
     )
 import qualified Docs.TextRevision as TextRevision
-import Docs.Tree (Node)
+import Docs.Tree (Edge (Edge), Node (Node), NodeHeader (NodeHeader))
+import qualified Docs.Tree as Tree
 import Docs.TreeRevision
     ( TreeRevision
     , TreeRevisionHistory
@@ -119,6 +130,7 @@ data Error
     | TextRevisionNotFound TextRevisionRef
     | TreeRevisionNotFound TreeRevisionRef
     | CommentNotFound CommentRef
+    | Custom Text
     deriving (Generic)
 
 instance ToJSON Error
@@ -512,6 +524,69 @@ createReply userID ref@(CommentRef (TextElementRef docID _) commentID) content =
         guardPermission Comment docID userID
         guardExistsComment ref
         lift $ DB.createReply userID commentID content
+
+newDefaultDocument
+    :: ( HasCreateDocument m
+       , HasLogMessage m
+       , HasCreateTextElement m
+       , HasCreateTextRevision m
+       , HasGetTextElementRevision m
+       , HasExistsComment m
+       , HasCreateTreeRevision m
+       )
+    => UserID
+    -> GroupID
+    -> Text
+    -> LTML.FlaggedInputTree'
+    -> m (Result FullDocument)
+newDefaultDocument userID groupID title tree = runExceptT $ do
+    doc <- ExceptT $ createDocument userID groupID title
+    let docID = Document.identifier doc
+    let emplaceTexts (LTML.Flagged _ (LTML.TypedTree (LSD.KindName kind) (LSD.TypeName type_) content)) =
+            case content of
+                (LTML.Tree heading children) -> do
+                    emplacedChildren <- mapM emplaceTexts children
+                    return $
+                        Tree.Tree $
+                            Tree.Node
+                                (Tree.NodeHeader (Text.pack kind) (Text.pack type_) heading)
+                                ( Edge
+                                    ( fromMaybe "" heading {- TODO: Das soll langfristig nicht in der Datenbank gespeichert werden. -}
+                                    )
+                                    <$> emplacedChildren
+                                )
+                (LTML.Leaf text) -> do
+                    textElement <-
+                        ExceptT $
+                            createTextElement userID docID $
+                                Text.pack kind
+                    let textID = TextElement.identifier textElement
+                    let textRev = TextElementRef docID textID
+                    textRevision <-
+                        ExceptT $
+                            createTextRevision userID $
+                                NewTextRevision
+                                    { newTextRevisionParent = Nothing
+                                    , newTextRevisionElement = textRev
+                                    , newTextRevisionContent = text
+                                    , newTextRevisionCommentAnchors = Vector.empty
+                                    }
+                    case textRevision of
+                        TextRevision.NoConflict revision ->
+                            return $ Tree.Leaf $ TextElementRevision textElement $ Just revision
+                        _ ->
+                            throwError $ Custom "Text Revision Conflict During Initial Document Creation."
+    root <- emplaceTexts tree
+    case root of
+        Tree.Tree node -> do
+            TreeRevision.TreeRevision header _ <-
+                ExceptT $
+                    createTreeRevision
+                        userID
+                        docID
+                        (TextElement.identifier . TextRevision.textElement <$> node)
+            return $ FullDocument doc $ Just $ TreeRevision.TreeRevision header node
+        Tree.Leaf _ -> throwError $ Custom "Root is leaf :/"
 
 -- guards
 

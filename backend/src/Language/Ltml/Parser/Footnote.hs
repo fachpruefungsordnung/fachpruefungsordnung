@@ -1,54 +1,79 @@
-{-# LANGUAGE FlexibleInstances #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving #-}
 
 module Language.Ltml.Parser.Footnote
     ( FootnoteParser
-    , unwrapFootnoteParser
+    , FootnoteWriterT
+    , runFootnoteWriterT
+    , mapFootnoteWriterT
     , footnoteP
     )
 where
 
+import Control.Applicative (Alternative)
 import Control.Applicative.Combinators (choice)
-import Control.Monad.Reader (ReaderT, ask, runReaderT)
-import Control.Monad.State (StateT, get, put, runStateT)
-import Control.Monad.Trans.Class (lift)
+import Control.Monad (MonadPlus)
+import Control.Monad.Reader (ReaderT, ask, mapReaderT, runReaderT)
+import Control.Monad.State (StateT, get, mapStateT, put, runStateT)
+import Control.Monad.Trans.Class (MonadTrans, lift)
 import Data.Map (Map)
 import qualified Data.Map as Map (empty)
 import Data.Map.Utils (insert')
-import Data.Text (unpack)
+import Data.Text (Text, unpack)
+import Data.Void (Void)
 import Language.Lsd.AST.Type.Footnote (FootnoteType (FootnoteType))
 import Language.Ltml.AST.Footnote (Footnote (Footnote))
 import Language.Ltml.AST.Label (Label (unLabel))
-import Language.Ltml.Parser (Parser, ParserWrapper (wrapParser))
-import Language.Ltml.Parser.Text (lHangingTextP)
+import Language.Ltml.Parser (Parser)
+import Language.Ltml.Parser.Text (hangingTextP')
+import Text.Megaparsec (MonadParsec)
 
-type FootnoteParser =
-    ReaderT [FootnoteType] (StateT (Map Label Footnote) Parser)
+type FootnoteMap = Map Label Footnote
 
-instance ParserWrapper FootnoteParser where
-    wrapParser = lift . lift
+newtype FootnoteWriterT m a
+    = FootnoteWriterT (ReaderT [FootnoteType] (StateT FootnoteMap m) a)
+    deriving (Functor, Applicative, Monad, MonadFail, Alternative, MonadPlus)
 
-unwrapFootnoteParser
-    :: [FootnoteType]
-    -> FootnoteParser a
-    -> Parser (a, Map Label Footnote)
-unwrapFootnoteParser ts p = runStateT (runReaderT p ts) Map.empty
+instance MonadTrans FootnoteWriterT where
+    lift = FootnoteWriterT . lift . lift
+
+type FootnoteParser = FootnoteWriterT Parser
+
+deriving instance
+    (MonadParsec Void Text m)
+    => MonadParsec Void Text (FootnoteWriterT m)
+
+mapFootnoteWriterT
+    :: (m (a, FootnoteMap) -> n (b, FootnoteMap))
+    -> FootnoteWriterT m a
+    -> FootnoteWriterT n b
+mapFootnoteWriterT f (FootnoteWriterT p) =
+    FootnoteWriterT $ mapReaderT (mapStateT f) p
+
+runFootnoteWriterT
+    :: FootnoteWriterT m a
+    -> [FootnoteType]
+    -> m (a, FootnoteMap)
+runFootnoteWriterT (FootnoteWriterT p) ts =
+    runStateT (runReaderT p ts) Map.empty
 
 footnoteP :: FootnoteParser ()
 footnoteP =
-    ask >>= wrapParser . choice . fmap footnoteP' >>= uncurry add
+    FootnoteWriterT ask >>= lift . choice . fmap footnoteP' >>= uncurry add
   where
     add :: Label -> Footnote -> FootnoteParser ()
     add label fn = do
-        fnMap <- get
+        fnMap <- FootnoteWriterT get
         case insert' label fn fnMap of
             Nothing ->
                 fail $
                     "Footnote {"
                         ++ unpack (unLabel label)
                         ++ "} already defined."
-            Just fnMap' -> put fnMap'
+            Just fnMap' -> FootnoteWriterT $ put fnMap'
 
 footnoteP' :: FootnoteType -> Parser (Label, Footnote)
 footnoteP' (FootnoteType kw fmt tt) =
-    fmap (Footnote fmt) <$> lHangingTextP kw tt
+    fmap (Footnote fmt) <$> hangingTextP' kw tt

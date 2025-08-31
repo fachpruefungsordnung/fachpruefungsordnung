@@ -26,15 +26,16 @@ import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (LoadState(..), getUser, getUserDocuments)
+import FPO.Data.Request (LoadState(..), fromLoading, getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Dto.DocumentDto.DocDate as DD
-import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.DocDate as DocDate
+import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader, DocumentID)
+import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addCard, addColumn)
+import FPO.UI.HTML (addCard, addColumn, loadingSpinner)
 import FPO.UI.SmoothScroll (smoothScrollToElement)
 import Halogen (liftEffect)
 import Halogen as H
@@ -42,10 +43,13 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
+import Web.Event.Event (preventDefault, stopPropagation)
+import Web.UIEvent.MouseEvent (MouseEvent)
+import Web.UIEvent.MouseEvent as MouseEvent
 
 _tablehead = Proxy :: Proxy "tablehead"
 _pagination = Proxy :: Proxy "pagination"
@@ -58,16 +62,17 @@ data Action
   = Initialize
   | NavLogin
   | ScrollToFeatures
-  | ViewProject DH.DocumentHeader
+  | ViewProject DocumentHeader
   | Receive (Connected FPOTranslator Input)
   | DoNothing
   | ChangeSorting TH.Output
   | HandleSearchInput String
   | SetPage P.Output
+  | DownloadPdf DocumentID String MouseEvent
 
 type State = FPOState
   ( user :: LoadState (Maybe FullUserDto)
-  , projects :: Array DH.DocumentHeader
+  , projects :: LoadState (Array DocumentHeader)
   , currentTime :: Maybe DateTime
   , searchQuery :: String
   , page :: Int
@@ -99,7 +104,7 @@ component =
   initialState { context } =
     { user: Loading
     , translator: fromFpoTranslator context
-    , projects: []
+    , projects: Loading
     , currentTime: Nothing
     , searchQuery: ""
     , page: 0
@@ -110,12 +115,7 @@ component =
     -> H.ComponentHTML Action Slots m
   render state =
     case state.user of
-      Loading ->
-        HH.div
-          [ HP.classes [ HB.textCenter, HB.my5 ]
-          ]
-          [ HH.span [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] []
-          ]
+      Loading -> loadingSpinner
       Loaded u -> case u of
         Just _ ->
           renderProjectsOverview state
@@ -128,7 +128,6 @@ component =
     -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
-      store <- getStore
       userWithError <- Store.preventErrorHandlingLocally getUser
       now <- liftEffect nowDateTime
       -- If the user is logged in, fetch their documents and convert them to projects.
@@ -136,30 +135,29 @@ component =
         Left _ -> do
           H.modify_ _
             { user = Loaded Nothing
-            , translator = fromFpoTranslator store.translator
             , currentTime = Just now
             }
         Right user -> do
+          H.modify_ _
+            { projects = Loading
+            , user = Loaded $ Just user
+            }
           docsResult <- getUserDocuments $ getUserID user
           case docsResult of
             Left _ -> do -- TODO correct error handling
               H.modify_ _
-                { user = Loaded $ Just user
-                , translator = fromFpoTranslator store.translator
-                , projects = []
+                { projects = Loading
                 , currentTime = Just now
                 }
             Right docs -> do
               H.modify_ _
-                { user = Loaded $ Just user
-                , translator = fromFpoTranslator store.translator
-                , projects = docs
+                { projects = Loaded docs
                 , currentTime = Just now
                 }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
-      log $ "Routing to editor for project " <> (DH.getName project)
-      navigate (Editor { docID: DH.getID project })
+      log $ "Routing to editor for project " <> (DocumentHeader.getName project)
+      navigate (Editor { docID: DocumentHeader.getID project })
     NavLogin -> do
       updateStore $ Store.SetLoginRedirect (Just Home)
       navigate Login
@@ -169,30 +167,76 @@ component =
       pure unit
     ChangeSorting (TH.Clicked title order) -> do
       state <- H.get
+      case state.projects of
+        Loading -> pure unit
+        Loaded projects' -> do
+          -- Sorting logic based on the clicked column title:
+          let
+            title_title = translate (label :: _ "home_title") state.translator
+            title_lastUpdated = translate (label :: _ "home_lastUpdated")
+              state.translator
+          projects <- pure $
+            if title == title_title then
+              TH.sortByF
+                order
+                (comparing DocumentHeader.getName)
+                projects'
+            else if title == title_lastUpdated then
+              TH.sortByF
+                (TH.toggleSorting order) -- The newest project should be first.
+                (comparing getEditTimestamp)
+                projects'
+            else
+              projects' -- Ignore other columns.
 
-      -- Sorting logic based on the clicked column title:
-      projects <- pure $ case title of
-        "Title" ->
-          TH.sortByF
-            order
-            (comparing DH.getName)
-            state.projects
-        "Last Updated" ->
-          TH.sortByF
-            (TH.toggleSorting order) -- The newest project should be first.
-            (comparing getEditTimestamp)
-            state.projects
-        _ -> state.projects -- Ignore other columns.
+          H.modify_ _ { projects = Loaded projects }
 
-      H.modify_ _ { projects = projects }
-
-      -- After changing the sorting, tell the pagination component
-      -- to reset to the first page:
-      H.tell _pagination unit $ P.SetPageQ 0
+          -- After changing the sorting, tell the pagination component
+          -- to reset to the first page:
+          H.tell _pagination unit $ P.SetPageQ 0
     HandleSearchInput query -> do
       H.modify_ _ { searchQuery = query }
     SetPage (P.Clicked page) -> do
       H.modify_ _ { page = page }
+    DownloadPdf _ _ event -> do
+      H.liftEffect $ do
+        preventDefault (MouseEvent.toEvent event)
+        stopPropagation (MouseEvent.toEvent event)
+      updateStore $ Store.AddWarning "Not yet implemented!"
+
+  -- renderedPDF' <- Request.postBlobOrError ("/render/pdf" <> projectId)
+  -- let filename = projectName <> ".pdf"
+  -- case renderedPDF' of
+  --   Left _ -> pure unit
+  --   Right blobOrError ->
+  --     case blobOrError of
+  --       Left errMsg -> do
+  --         updateStore $ Store.AddError $ "Failed to generate PDF: " <> errMsg
+  --       Right body -> do
+  --         -- create blobl link
+  --         url <- H.liftEffect $ createObjectURL body
+  --         -- Create an invisible link and click it to download PDF
+  --         H.liftEffect $ do
+  --           -- get window stuff
+  --           win <- window
+  --           hdoc <- document win
+  --           let doc = HTMLDocument.toDocument hdoc
+
+  --           -- create link
+  --           aEl <- Document.createElement "a" doc
+  --           case HTMLElement.fromElement aEl of
+  --             Nothing -> pure unit
+  --             Just aHtml -> do
+  --               Element.setAttribute "href" url aEl
+  --               Element.setAttribute "download" filename aEl
+  --               HTMLElement.click aHtml
+  --         -- deactivate the blob link after 1 sec
+  --         _ <- H.fork do
+  --           H.liftAff $ delay (Milliseconds 1000.0)
+  --           H.liftEffect $ revokeObjectURL url
+  --         pure unit
+
+  -- H.liftEffect $ downloadPdf projectId
 
   -- Renders the overview of projects for the user.
   renderProjectsOverview :: State -> H.ComponentHTML Action Slots m
@@ -461,19 +505,19 @@ component =
               [ addColumn
                   state.searchQuery
                   ""
-                  "Search for Projects"
+                  (translate (label :: _ "home_searchForProjects") state.translator)
                   "bi-search"
                   HP.InputText
                   HandleSearchInput
               ]
-          , HH.div [ HP.classes [ HB.col12 ] ]
-              [ renderProjectTable ps state ]
+          , if state.projects == Loading then loadingSpinner
+            else HH.div [ HP.classes [ HB.col12 ] ] [ renderProjectTable ps state ]
           , HH.slot _pagination unit P.component paginationSettings SetPage
           ]
       ]
     where
     -- All projects filtered by the search query:
-    fps = filterProjects state.searchQuery state.projects
+    fps = filterProjects state.searchQuery (fromLoading state.projects [])
     -- Slice of the projects for the current page:
     ps = slice (state.page * 5) ((state.page + 1) * 5) $ fps
     paginationSettings =
@@ -485,25 +529,32 @@ component =
 
   -- Renders the list of projects.
   renderProjectTable
-    :: Array DH.DocumentHeader -> State -> H.ComponentHTML Action Slots m
+    :: Array DocumentHeader -> State -> H.ComponentHTML Action Slots m
   renderProjectTable ps state =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
       [ HH.colgroup_
-          [ HH.col [ HP.style "width: 70%;" ] -- 'Title' column
+          [ HH.col [ HP.style "width: 60%;" ] -- 'Title' column
           , HH.col [ HP.style "width: 30%;" ] -- 'Last Updated' column
+          , HH.col [ HP.style "width: 10%;" ] -- 'PDF' column
           ]
       , HH.slot _tablehead unit TH.component
-          { columns: tableCols, sortedBy: "Last Updated" }
+          { columns: tableCols state.translator
+          , sortedBy: translate (label :: _ "home_lastUpdated") state.translator
+          }
           ChangeSorting
       , HH.tbody_ $
           if null ps then
             [ HH.tr []
                 [ HH.td
-                    [ HP.colSpan 2
+                    [ HP.colSpan 3
                     , HP.classes [ HB.textCenter ]
                     ]
-                    [ HH.i_ [ HH.text "No projects found" ] ]
+                    [ HH.i_
+                        [ HH.text $ translate (label :: _ "home_noProjectsFound")
+                            state.translator
+                        ]
+                    ]
                 ]
             ]
           else
@@ -512,27 +563,48 @@ component =
             ) -- Fill up to 5 rows
       ]
     where
-    tableCols = TH.createTableColumns
-      [ { title: "Title"
+    tableCols translator = TH.createTableColumns
+      [ { title: translate (label :: _ "home_title") translator
         , style: Just TH.Alpha
         }
-      , { title: "Last Updated"
+      , { title: translate (label :: _ "home_lastUpdated") translator
         , style: Just TH.Numeric
+        }
+      , { title: "PDF"
+        , style: Nothing
         }
       ]
 
   -- Renders a single project row in the table.
-  renderProjectRow :: forall w. State -> DH.DocumentHeader -> HH.HTML w Action
+  renderProjectRow :: forall w. State -> DocumentHeader -> HH.HTML w Action
   renderProjectRow state project =
     HH.tr
       [ HE.onClick $ const $ ViewProject project
       , HP.style "cursor: pointer;"
       ]
       [ HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ DH.getName project ]
+          [ HH.text $ DocumentHeader.getName project ]
       , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ formatRelativeTime state.currentTime $ DD.docDateToDateTime $
-              DH.getLastEdited project
+          [ HH.text $ formatRelativeTime state.currentTime $ DocDate.docDateToDateTime
+              $
+                DocumentHeader.getLastEdited project
+          ]
+      , HH.td
+          [ HP.classes [ HB.dFlex, HB.justifyContentCenter, HB.alignItemsCenter ] ]
+          [ HH.button
+              [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+              , HE.onClick $ \e -> DownloadPdf (DocumentHeader.getIdentifier project)
+                  (DocumentHeader.getName project)
+                  e
+              ]
+              [ HH.i
+                  [ HP.classes
+                      [ HH.ClassName "bi-file-earmark-pdf"
+                      , HB.bi
+                      ]
+                  ]
+                  []
+              ]
           ]
       ]
 
@@ -547,9 +619,10 @@ component =
           [ HH.text $ "Empty Row" ]
       ]
 
-  filterProjects :: String -> Array DH.DocumentHeader -> Array DH.DocumentHeader
+  filterProjects :: String -> Array DocumentHeader -> Array DocumentHeader
   filterProjects query projects =
-    filter (\p -> contains (Pattern $ toLower query) (toLower $ DH.getName p))
+    filter
+      (\p -> contains (Pattern $ toLower query) (toLower $ DocumentHeader.getName p))
       projects
 
 -- | Helper function to adjust a DateTime by a duration (subtract from current time)
@@ -557,8 +630,8 @@ adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime
 adjustDateTime duration dt =
   fromMaybe dt $ adjust (negateDuration duration) dt
 
-getEditTimestamp ∷ DH.DocumentHeader → DateTime
-getEditTimestamp = DD.docDateToDateTime <<< DH.getLastEdited
+getEditTimestamp ∷ DocumentHeader → DateTime
+getEditTimestamp = DocDate.docDateToDateTime <<< DocumentHeader.getLastEdited
 
 -- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
 formatRelativeTime :: Maybe DateTime -> DateTime -> String
