@@ -27,6 +27,7 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
+import Data.String (joinWith)
 import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
@@ -57,7 +58,6 @@ import FPO.Types
   , FirstComment
   , TOCEntry
   , emptyTOCEntry
-  , markerToAnnotation
   )
 import FPO.Util (prependIf)
 import Halogen (liftEffect)
@@ -86,6 +86,9 @@ import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
+import Effect.Console (log)
+import Data.HashMap (HashMap, empty, toArrayBy, insert, delete, lookup, size)
+
 type Path = Array Int
 
 type ElementData = Maybe { tocEntry :: TOCEntry, revID :: Int, title :: String }
@@ -98,7 +101,12 @@ type State = FPOState
   , title :: String
   , mContent :: Maybe Content
   -- comments
-  -- temporary comments and marker. Only set, if first comment is sent in Comment component
+  -- Hashmaps for Annotations
+  -- Row line -> Hashmap of Username -> how many times the use has comments in the line
+  , markerAnnoHS :: HashMap Int (HashMap String Int)
+  -- markerID -> old row position in Annotation
+  , oldMarkerAnnoPos :: HashMap Int Int
+  -- mLiveMarker is a temporary comment and marker. Only set, if first comment is sent in Comment component
   -- Otherwise delete them later
   , mLiveMarker :: Maybe LiveMarker
   -- comment markers and its corresponding livemarker
@@ -134,6 +142,7 @@ type LiveMarker =
   { annotedMarkerID :: Int
   , startAnchor :: Types.Anchor
   , endAnchor :: Types.Anchor
+  , markerText :: String
   , ref :: Ref Int
   }
 
@@ -175,6 +184,10 @@ data Action
   | AutoSaveTimer
   -- called by AutoSaveTimer subscription
   | AutoSave
+  | SetAnnotations
+  | AddAnnotation LiveMarker Boolean
+  | DeleteAnnotation LiveMarker Boolean Boolean
+  | UpdateAnnotation LiveMarker
   | RenderHTML
   | PDF
   | ShowAllComments
@@ -230,6 +243,8 @@ editor = connect selectTranslator $ H.mkComponent
     , mContent: Nothing
     , mLiveMarker: Nothing
     , markers: []
+    , markerAnnoHS: empty
+    , oldMarkerAnnoPos: empty
     , liveMarkers: []
     , fontSize: 12
     , mListener: Nothing
@@ -460,7 +475,7 @@ editor = connect selectTranslator $ H.mkComponent
       -- create eventListener for preventing the tab from closing
       -- when content has not been saved (Not changing through Navbar)
       buL <- H.liftEffect $ eventListener \ev -> do
-        readRef <- traverse Ref.read (Just dref) -- dref ist da; zur Not: Maybe-handling
+        readRef <- traverse Ref.read (Just dref)
         case readRef of
           -- Prevent the tab from closing in a certain way
           Just true -> do
@@ -752,9 +767,8 @@ editor = connect selectTranslator $ H.mkComponent
     Comment -> do
       state <- H.get
       userWithError <- getUser
-      case userWithError of
-        Left _ -> pure unit -- TODO error handling 
-        Right user -> do
+      case userWithError, state.mListener of
+        Right user, Just listener -> do
           H.gets _.mEditor >>= traverse_ \ed -> do
             session <- H.liftEffect $ Editor.getSession ed
             range <- H.liftEffect $ Editor.getSelectionRange ed
@@ -763,10 +777,10 @@ editor = connect selectTranslator $ H.mkComponent
 
             -- delete temporary live marker, as the first comment has not been sent
             case state.mLiveMarker of
-              Nothing -> pure unit
               Just lm -> do
-                H.modify_ _ { mLiveMarker = Nothing }
                 H.liftEffect $ removeLiveMarker lm session
+                handleAction $ DeleteAnnotation lm false false
+              Nothing -> pure unit
 
             let
               sRow = Types.getRow start
@@ -785,7 +799,8 @@ editor = connect selectTranslator $ H.mkComponent
                 , mCommentSection: Nothing
                 }
 
-            mLiveMarker <- H.liftEffect $ addAnchor newMarker session
+            mLiveMarker <- H.liftEffect $ addAnchor newMarker session listener true
+            handleAction SetAnnotations
 
             case state.mTocEntry of
               Just entry -> do
@@ -793,6 +808,8 @@ editor = connect selectTranslator $ H.mkComponent
                   st { mLiveMarker = mLiveMarker }
                 H.raise (AddComment state.docID entry.id)
               Nothing -> pure unit
+
+        _, _ -> pure unit -- TODO error handling 
 
     DeleteComment -> do
       state <- H.get
@@ -849,6 +866,85 @@ editor = connect selectTranslator $ H.mkComponent
           H.raise (SelectedCommentSection tocEntry.id (-360))
         else 
           pure unit
+
+    -- Convert hash map into annotations and set them into editor
+    SetAnnotations -> do
+      markerAnnoHS <- H.gets _.markerAnnoHS
+      H.gets _.mEditor >>= traverse_ \ed -> H.liftEffect do
+        session <- Editor.getSession ed
+        let
+          -- extract information from markerAnnoHS
+          tmp = toArrayBy (\k v -> {line: k, text: joinWith ", " (toArrayBy addNames v)}) markerAnnoHS
+          -- map it to correct Annotation type
+          anns =
+            map (\{line, text} -> { row: line, column: 1, text: text, type: "info"}) tmp
+        Session.setAnnotations anns session
+        
+    AddAnnotation lm setAnn-> do
+      state <- H.get
+      pos <- H.liftEffect $ Anchor.getPosition lm.startAnchor
+      let 
+        startRow = Types.getRow pos
+        newOldMarkerAnnoPos = insert lm.annotedMarkerID startRow state.oldMarkerAnnoPos
+        newMarkerAnnoHS = case lookup startRow state.markerAnnoHS of
+          Nothing -> 
+            let 
+              newEntry = insert lm.markerText 1 empty 
+            in
+              insert startRow newEntry state.markerAnnoHS
+          Just entry -> 
+            let 
+              oldValue = fromMaybe 0 (lookup lm.markerText entry)
+              newEntry = insert lm.markerText (oldValue+1) entry
+            in
+              insert startRow newEntry state.markerAnnoHS
+      H.modify_ \st -> st 
+        { markerAnnoHS = newMarkerAnnoHS
+        , oldMarkerAnnoPos = newOldMarkerAnnoPos
+        }
+      when setAnn (handleAction SetAnnotations)
+
+    DeleteAnnotation lm reAdd setAnn -> do
+      state <- H.get
+      let
+        -- get old row number for this marker
+        oldRow = fromMaybe 0 (lookup lm.annotedMarkerID state.oldMarkerAnnoPos)
+        -- update Annotation HashMap
+        newMarkerAnnoHS = case lookup oldRow state.markerAnnoHS of
+          -- should not happen
+          Nothing -> state.markerAnnoHS
+          -- update this HashMap entry
+          Just entry -> do
+            let
+              -- if 1 then delete it, bigger just decreament the value
+              oldValue = fromMaybe 0 (lookup lm.markerText entry)
+              newEntry =
+                if oldValue <= 1 then
+                  delete lm.markerText entry
+                else
+                  insert lm.markerText (oldValue-1) entry
+            -- delete entry if empty
+            if ((size newEntry) == 0) then
+              delete oldRow state.markerAnnoHS
+            else
+              insert oldRow newEntry state.markerAnnoHS
+      H.modify_ \st -> st {markerAnnoHS = newMarkerAnnoHS}
+      -- if we want to update the live marker annotation
+      when reAdd (handleAction $ AddAnnotation lm setAnn)
+    
+    -- delete and readd Annotation if the startRow of live marker has changed
+    UpdateAnnotation lm -> do
+      oldMarkerAnnoPos <- H.gets _.oldMarkerAnnoPos
+      -- get startRow from live marker
+      pos <- H.liftEffect $ Anchor.getPosition lm.startAnchor
+      let startRow = Types.getRow pos
+
+      -- checking if the startRow has changed
+      case lookup lm.annotedMarkerID oldMarkerAnnoPos of
+        Nothing -> pure unit
+        Just oldRow -> 
+          when (startRow /= oldRow) $
+            handleAction $ DeleteAnnotation lm true true
 
     HandleResize width -> do
       -- Decides whether to show button text based on the width.
@@ -913,6 +1009,8 @@ editor = connect selectTranslator $ H.mkComponent
 
         H.modify_ \st -> st
           { mContent = Just content
+          , markerAnnoHS = empty
+          , oldMarkerAnnoPos = empty
           , markers = markers
           , isEditorReadonly = version /= "latest"
           }
@@ -923,47 +1021,53 @@ editor = connect selectTranslator $ H.mkComponent
     -- After getting information from from Comment
     ContinueChangeToSection fCs -> do
       state <- H.get
-      -- Put the content of the section into the editor and update markers
-      H.gets _.mEditor >>= traverse_ \ed -> do
-        let
-          filMarkers = updateMarkers fCs state.markers
-          content = case state.mContent of
-            Nothing -> ""
-            Just c -> ContentDto.getContentText c
+      case state.mListener of
+        Nothing -> pure unit
+        Just listener -> do
+          -- Put the content of the section into the editor and update markers
+          H.gets _.mEditor >>= traverse_ \ed -> do
+            let
+              filMarkers = updateMarkers fCs state.markers
+              content = case state.mContent of
+                Nothing -> ""
+                Just c -> ContentDto.getContentText c
 
-        newLiveMarkers <- H.liftEffect do
-          session <- Editor.getSession ed
-          document <- Session.getDocument session
+            newLiveMarkers <- H.liftEffect do
+              session <- Editor.getSession ed
+              document <- Session.getDocument session
 
-          -- Set the content of the editor
-          Document.setValue (state.title <> "\n" <> content)
-            document
-          Editor.setReadOnly state.isEditorReadonly ed
+              -- Set the content of the editor
+              Document.setValue (state.title <> "\n" <> content)
+                document
+              Editor.setReadOnly state.isEditorReadonly ed
 
-          -- reset Ref, because loading new content is considered 
-          -- changing the existing content, which would set the flag
-          for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
+              -- reset Ref, because loading new content is considered 
+              -- changing the existing content, which would set the flag
+              for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
 
-          -- Reset Undo history
-          undoMgr <- Session.getUndoManager session
-          UndoMgr.reset undoMgr
+              -- Reset Undo history
+              undoMgr <- Session.getUndoManager session
+              UndoMgr.reset undoMgr
 
-          -- Remove existing markers
-          for_ state.liveMarkers \lm -> do
-            removeLiveMarker lm session
+              -- Remove existing markers
+              for_ state.liveMarkers \lm -> do
+                removeLiveMarker lm session
 
-          -- Clear annotations
-          Session.clearAnnotations session
+              -- Clear annotations
+              Session.clearAnnotations session
 
-          -- Add annotations from marker
-          tmp <- for filMarkers \marker -> do
-            addAnchor marker session
+              -- Add annotations from marker
+              tmp <- for filMarkers \marker -> do
+                addAnchor marker session listener true
 
-          pure (catMaybes tmp)
+              pure (catMaybes tmp)
 
-        -- Update state with new marker IDs
-        H.modify_ \st ->
-          st { liveMarkers = newLiveMarkers }
+            -- Update state with new marker IDs
+            H.modify_ \st ->
+              st { liveMarkers = newLiveMarkers }
+              
+      -- convert Hashmap to Annotations and show them
+      handleAction SetAnnotations
 
   handleQuery
     :: forall slots a
@@ -1027,13 +1131,12 @@ editor = connect selectTranslator $ H.mkComponent
 
     UpdateComment newCommentSection a -> do
       state <- H.get
-      case state.mLiveMarker, newCommentSection.first of
-        Just marker, Just first -> do
-          let
-            newLiveMarker = marker { annotedMarkerID = newCommentSection.markerID }
-            newLiveMarkers = snoc state.liveMarkers newLiveMarker
+      case state.mLiveMarker, state.mEditor, state.mListener, newCommentSection.first of
+        Just marker, Just ed, Just listener, Just first -> do
           start <- H.liftEffect $ Anchor.getPosition marker.startAnchor
           end <- H.liftEffect $ Anchor.getPosition marker.endAnchor
+          session <- H.liftEffect $ Editor.getSession ed
+          H.liftEffect $ removeLiveMarker marker session
           let
             newMarker =
               { id: newCommentSection.markerID
@@ -1046,15 +1149,25 @@ editor = connect selectTranslator $ H.mkComponent
               , mCommentSection: Just newCommentSection
               }
             newMarkers = snoc state.markers newMarker
+            -- delete temp id from hash map
+            newOldMarkerAnnoPos = delete (-360) state.oldMarkerAnnoPos
+            -- add the real id instead
+            newOldMarkerAnnoPos' = insert newMarker.id newMarker.startRow newOldMarkerAnnoPos
+          newLiveMarker <- H.liftEffect $ addAnchor newMarker session listener true
+          let
+            newLiveMarkers = case newLiveMarker of
+              Nothing -> state.liveMarkers
+              Just lm -> snoc state.liveMarkers lm
           H.modify_ \st -> st
-            { mLiveMarker = Nothing
+            { oldMarkerAnnoPos = newOldMarkerAnnoPos'
+            , mLiveMarker = Nothing
             , markers = newMarkers
             , liveMarkers = newLiveMarkers
             }
           -- set dirty to true to be able to save
           for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r
           handleAction Save
-        _, _ -> pure unit
+        _, _, _, _ -> pure unit
       pure (Just a)
 
 -- | Change listener for the editor.
@@ -1118,8 +1231,13 @@ addAnnotation annotation session = do
   anns <- Session.getAnnotations session
   Session.setAnnotations (annotation : anns) session
 
-addAnchor :: AnnotatedMarker -> Types.EditSession -> Effect (Maybe LiveMarker)
-addAnchor marker session =
+addAnchor 
+  :: AnnotatedMarker 
+  -> Types.EditSession
+  -> HS.Listener Action 
+  -> Boolean
+  -> Effect (Maybe LiveMarker)
+addAnchor marker session listener action =
   if (marker.startRow == marker.endRow && marker.startCol == marker.endCol) then
     pure Nothing -- No valid range, so no marker
   else do
@@ -1133,6 +1251,13 @@ addAnchor marker session =
     markerRef <- Ref.new id
 
     let
+      lm = 
+        { annotedMarkerID: marker.id
+        , startAnchor: startAnchor
+        , endAnchor: endAnchor
+        , markerText: marker.markerText
+        , ref: markerRef
+        }
       rerenderMarker _ = do
         Ref.read markerRef >>= flip Session.removeMarker session
         Types.Position { row: startRow, column: startColumn } <- Anchor.getPosition
@@ -1152,19 +1277,15 @@ addAnchor marker session =
           session
 
         Ref.write newId markerRef
+        HS.notify listener (UpdateAnnotation lm)
         pure unit
 
     Anchor.onChange startAnchor rerenderMarker
     Anchor.onChange endAnchor rerenderMarker
-    addAnnotation (markerToAnnotation marker) session
-    pure
-      ( Just
-          { annotedMarkerID: marker.id
-          , startAnchor: startAnchor
-          , endAnchor: endAnchor
-          , ref: markerRef
-          }
-      )
+    when action $
+      HS.notify listener (AddAnnotation lm false)
+    --addAnnotation (markerToAnnotation marker) session
+    pure (Just lm)
 
 removeLiveMarker :: LiveMarker -> Types.EditSession -> Effect Unit
 removeLiveMarker lm session = do
@@ -1267,3 +1388,11 @@ updateMarkers firsts markers =
         Nothing -> Nothing
     ) 
     markers
+
+-- Help function for markerAnnoHS
+addNames :: String -> Int -> String
+addNames name occurence = 
+  if occurence == 1 then
+    name
+  else 
+    name <> "+" <> show occurence
