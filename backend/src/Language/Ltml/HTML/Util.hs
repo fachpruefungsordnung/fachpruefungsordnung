@@ -24,7 +24,7 @@ import Data.Text (Text)
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Section (SectionBody (InnerSectionBody))
 import Language.Ltml.AST.Text (TextTree (..))
-import Language.Ltml.HTML.Common (GlobalState, HtmlReaderState)
+import Language.Ltml.HTML.Common (GlobalState)
 import Lucid
 
 -- | Converts Int to corresponding lowercase letter in the alphabet.

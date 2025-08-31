@@ -13,6 +13,7 @@ module Language.Ltml.HTML.Common
     , incSuperSectionID
     , FootnoteMap
     , convertLabelMap
+    , addUsedFootnoteLabels
     , FootnoteSet
     , NumLabel (..)
     , ToC
@@ -81,7 +82,7 @@ data GlobalState = GlobalState
     , labels :: [(Label, Html ())]
     -- ^ Holds all labels and the Html element that should be displayed when this label is referenced
     , tableOfContents :: ToC
-    -- ^ Holds all entries for the table of contents as (key (e.g. § 1), title, HTML id as anchor link).
+    -- ^ Holds all entries for the table of contents as (Maybe key (e.g. § 1), title, HTML id as anchor link).
     , mangledLabelName :: Text
     -- ^ Mangled prefix name for generating new label names that do not exist in source language
     , mangledLabelID :: Int
@@ -100,6 +101,9 @@ data ReaderState = ReaderState
     , hasGlobalToC :: Bool
     -- ^ Signals if a Document should have a global or local ToC (if it has any);
     --   Is set by the DocumentContainer
+    , appendixHasGlobalToC :: Bool
+    -- ^ Should Documents inside of an AppendixSection should have a global ToC?
+    --   This also means all Headings of those Documents appear in the global ToC
     , currentAppendixElementID :: Int
     -- ^ Tracks the current appendix element (document) id;
     --   This is in ReaderState, since it is controlled from the AppendixSection
@@ -158,6 +162,7 @@ initReaderState =
     ReaderState
         { shouldRender = False
         , hasGlobalToC = False
+        , appendixHasGlobalToC = False
         , currentAppendixElementID = 1
         , appendixElementIdFormat = error "Undefined appendix element id format!"
         , appendixElementTocKeyFormat = error "Undefined appendix element ToC format!"
@@ -191,6 +196,13 @@ type FootnoteMap = [(Label, (Int, Html (), Delayed (Html ())))]
 convertLabelMap :: FootnoteMap -> [(Label, Html ())]
 convertLabelMap = map (\(label, (_, idHtml, _)) -> (label, idHtml))
 
+-- | Adds used Footnotes as "normal" references to GlobalState
+--   Note: Footnote Labels will shadow normal Labels with the same name!
+addUsedFootnoteLabels :: GlobalState -> GlobalState
+addUsedFootnoteLabels globalState =
+    let usedFootnotes = convertLabelMap $ usedFootnoteMap globalState
+     in globalState {labels = usedFootnotes ++ labels globalState}
+
 -------------------------------------------------------------------------------
 
 -- | Set of footnote labels with their respective footnote id
@@ -210,17 +222,17 @@ instance Ord NumLabel where
 
 -- | The ToC uses a difference list to get constant time appending at the end, which has no speed draw backs,
 --   since the list is evaluated only ones when building the ToC Html at the end of rendering.
-type ToC = DList (Html (), Delayed (Html ()), Text)
+type ToC = DList (Maybe (Html ()), Delayed (Html ()), Text)
 
 -- | Add entry to table of contents with: key Html (e.g. § 1), title Html and html anchor link id;
 --   If Label is present uses it as the anchor link id, otherwise it creates a new mangled label name;
 --   the used label name is returned;
 addTocEntry
-    :: Html ()
+    :: Maybe (Html ())
     -> Delayed (Html ())
     -> Maybe Label
     -> ReaderT ReaderState (State GlobalState) Text
-addTocEntry key title mLabel = do
+addTocEntry mKey title mLabel = do
     globalState <- get
     htmlId <- case mLabel of
         -- \| Create new mangled name for non existing label
@@ -233,7 +245,7 @@ addTocEntry key title mLabel = do
                     return mangledLabel
         Just label -> return $ unLabel label
     modify
-        (\s -> s {tableOfContents = snoc (tableOfContents s) (key, title, htmlId)})
+        (\s -> s {tableOfContents = snoc (tableOfContents s) (mKey, title, htmlId)})
     return htmlId
 
 -------------------------------------------------------------------------------

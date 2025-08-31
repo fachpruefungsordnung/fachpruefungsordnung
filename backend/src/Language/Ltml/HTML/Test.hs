@@ -62,7 +62,7 @@ import Language.Ltml.AST.Text
     , SentenceStart (..)
     , TextTree (..)
     )
-import Language.Ltml.Common (Flagged (..))
+import Language.Ltml.Common (Flagged (..), Flagged')
 import Language.Ltml.HTML
 import Language.Ltml.HTML.CSS (writeCss)
 import Language.Ltml.HTML.CSS.Util (addHtmlHeader)
@@ -84,6 +84,7 @@ parseTest = do
         Right markedDocCon -> do
             let (body, css) = renderHtmlCss markedDocCon
              in do
+                    mapM_ print $ renderTocList markedDocCon
                     renderToFile
                         "src/Language/Ltml/HTML/Test/out.html"
                         (addHtmlHeader "" "out.css" body)
@@ -93,6 +94,7 @@ parseTest = do
 
 -------------------------------------------------------------------------------
 
+docConTest :: Flagged' DocumentContainer
 docConTest =
     Flagged
         False
