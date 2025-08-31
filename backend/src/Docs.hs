@@ -29,7 +29,7 @@ module Docs
     , getLogs
     ) where
 
-import Control.Monad (join, unless)
+import Control.Monad (join, msum, unless)
 import Control.Monad.Except (ExceptT (ExceptT), runExceptT, throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (find)
@@ -46,6 +46,7 @@ import qualified Language.Lsd.AST.Common as LSD
 import qualified Language.Ltml.Common as LTML
 import qualified Language.Ltml.Tree as LTML
 
+import Control.Applicative ((<|>))
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Maybe (fromMaybe)
 import Data.OpenApi (ToSchema)
@@ -104,7 +105,7 @@ import Docs.TextRevision
     , TextRevisionRef (..)
     )
 import qualified Docs.TextRevision as TextRevision
-import Docs.Tree (Edge (Edge), Node (Node), NodeHeader (NodeHeader))
+import Docs.Tree (Edge (Edge), Node (Node), Tree)
 import qualified Docs.Tree as Tree
 import Docs.TreeRevision
     ( TreeRevision
@@ -550,9 +551,7 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
                         Tree.Tree $
                             Tree.Node
                                 (Tree.NodeHeader (Text.pack kind) (Text.pack type_) heading)
-                                ( Edge
-                                    ( fromMaybe "" heading {- TODO: Das soll langfristig nicht in der Datenbank gespeichert werden. -}
-                                    )
+                                ( (\c -> Edge (fromMaybe "" (getTitle c)) c)
                                     <$> emplacedChildren
                                 )
                 (LTML.Leaf text) -> do
@@ -587,6 +586,34 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
                         (TextElement.identifier . TextRevision.textElement <$> node)
             return $ FullDocument doc $ Just $ TreeRevision.TreeRevision header node
         Tree.Leaf _ -> throwError $ Custom "Root is leaf :/"
+  where
+    -- Temporary function to get a somewhat usable title.
+    -- Should be replaced by a function provided by the language team later on.
+    getTitle :: Tree TextElementRevision -> Maybe Text
+    getTitle x =
+        typeTitle x
+            <|> ((msum . (maybeTitle <$>) . Text.lines) =<< getContent x)
+      where
+        typeTitle :: Tree TextElementRevision -> Maybe Text
+        typeTitle (Tree.Tree (Node header _)) =
+            case (Tree.headerKind header, Tree.headerType header) of
+                (_, "appendix") -> Just "Appendix"
+                (_, "attachments") -> Just "Anlagen"
+                ("document-mainbody", "inner") -> Just "Hauptteil"
+                _ -> Nothing
+        typeTitle _ = Nothing
+        maybeTitle :: Text -> Maybe Text
+        maybeTitle txt
+            | "§" `Text.isPrefixOf` stripped = Just stripped
+            | "!" `Text.isPrefixOf` stripped = Just stripped
+            | "[intro]" `Text.isPrefixOf` stripped = Just "Intro"
+            | "[extro]" `Text.isPrefixOf` stripped = Just "Extro"
+            | otherwise = Nothing
+          where
+            stripped = Text.strip txt
+        getContent :: Tree TextElementRevision -> Maybe Text
+        getContent (Tree.Leaf (TextElementRevision _ rev)) = TextRevision.content <$> rev
+        getContent (Tree.Tree (Tree.Node header _)) = Tree.heading header
 
 -- guards
 
