@@ -6,6 +6,7 @@ module FPO.Dto.DocumentDto.NodeHeader
 
 import Data.Argonaut (class DecodeJson, class EncodeJson)
 
+-- This seems to be `TextElement` in the backend?
 newtype NodeHeader = NodeHeader
   { identifier :: Int
   , kind :: String
