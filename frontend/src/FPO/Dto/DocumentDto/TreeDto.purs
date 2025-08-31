@@ -138,7 +138,10 @@ instance encodeJsonTree :: EncodeJson a => EncodeJson (Tree a) where
 
 instance showTreeHeader :: Show TreeHeader where
   show (TreeHeader { headerKind, headerType, heading }) =
-    "TreeHeader { headerKind: " <> headerKind <> ", headerType: " <> headerType <> ", heading: " <> heading <> " }"
+    "TreeHeader { headerKind: " <> headerKind <> ", headerType: " <> headerType
+      <> ", heading: "
+      <> heading
+      <> " }"
 
 instance showRootTree :: Show a => Show (RootTree a) where
   show Empty = "Empty"

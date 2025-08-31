@@ -5,7 +5,15 @@ module FPO.Dto.DocumentDto.DocumentTree where
 
 import Prelude
 
-import Data.Argonaut (class DecodeJson, Json, JsonDecodeError, decodeJson, encodeJson, stringify, (.:))
+import Data.Argonaut
+  ( class DecodeJson
+  , Json
+  , JsonDecodeError
+  , decodeJson
+  , encodeJson
+  , stringify
+  , (.:)
+  )
 import Data.Either (Either)
 import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
@@ -23,7 +31,8 @@ type DocumentTreeTER = DocumentTree TextElementRevision
 
 type DocumentTree a = RootTree a
 
-decodeDocument :: forall a. DecodeJson a => Json -> Either JsonDecodeError (DocumentTree a)
+decodeDocument
+  :: forall a. DecodeJson a => Json -> Either JsonDecodeError (DocumentTree a)
 decodeDocument json = do
   obj <- decodeJson json
   let _ = unsafePerformEffect $ log $ "Full JSON: " <> stringify json

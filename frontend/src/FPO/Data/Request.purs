@@ -68,8 +68,20 @@ import FPO.Dto.DocumentDto.FullDocument (decodeFullDocument)
 import FPO.Dto.DocumentDto.FullDocument as FD
 import FPO.Dto.DocumentDto.Query as DQ
 import FPO.Dto.DocumentDto.TextElement as TE
-import FPO.Dto.GroupDto (GroupCreate, GroupDto, GroupID, GroupOverview, toGroupOverview)
-import FPO.Dto.UserDto (FullUserDto, UserID, getAllAdminRoles, isAdminOf, isUserSuperadmin)
+import FPO.Dto.GroupDto
+  ( GroupCreate
+  , GroupDto
+  , GroupID
+  , GroupOverview
+  , toGroupOverview
+  )
+import FPO.Dto.UserDto
+  ( FullUserDto
+  , UserID
+  , getAllAdminRoles
+  , isAdminOf
+  , isUserSuperadmin
+  )
 import FPO.Dto.UserRoleDto (Role)
 import FPO.Translations.Translator (fromFpoTranslator)
 import Halogen as H

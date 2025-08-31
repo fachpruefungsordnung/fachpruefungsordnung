@@ -9,7 +9,18 @@ module FPO.Component.Splitview where
 import Prelude
 
 import Data.Argonaut (fromString)
-import Data.Array (cons, deleteAt, head, insertAt, mapWithIndex, null, snoc, uncons, updateAt, (!!))
+import Data.Array
+  ( cons
+  , deleteAt
+  , head
+  , insertAt
+  , mapWithIndex
+  , null
+  , snoc
+  , uncons
+  , updateAt
+  , (!!)
+  )
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
@@ -30,8 +41,25 @@ import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
-import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..), TreeHeader(..), findRootTree, modifyNodeRootTree)
-import FPO.Types (TOCEntry, TOCTree, documentTreeToTOCTree, emptyTOCEntry, findTOCEntry, findTitleTOCEntry, replaceTOCEntry, timeStampsVersions, tocTreeToDocumentTree)
+import FPO.Dto.DocumentDto.TreeDto
+  ( Edge(..)
+  , RootTree(..)
+  , Tree(..)
+  , TreeHeader(..)
+  , findRootTree
+  , modifyNodeRootTree
+  )
+import FPO.Types
+  ( TOCEntry
+  , TOCTree
+  , documentTreeToTOCTree
+  , emptyTOCEntry
+  , findTOCEntry
+  , findTitleTOCEntry
+  , replaceTOCEntry
+  , timeStampsVersions
+  , tocTreeToDocumentTree
+  )
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -961,7 +989,9 @@ addRootNode [] entry (RootTree { children, header }) =
   RootTree { children: snoc children (Edge entry), header }
 addRootNode _ entry Empty =
   RootTree
-    { children: [ Edge entry ], header: TreeHeader { headerKind: "root", headerType: "root", heading: "" } }
+    { children: [ Edge entry ]
+    , header: TreeHeader { headerKind: "root", headerType: "root", heading: "" }
+    }
 addRootNode path entry (RootTree { children, header }) =
   case uncons path of
     Nothing ->

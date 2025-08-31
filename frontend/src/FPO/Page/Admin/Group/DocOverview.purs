@@ -20,7 +20,13 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (createNewDocument, deleteIgnore, getAuthorizedUser, getDocumentsQueryFromURL, getGroup)
+import FPO.Data.Request
+  ( createNewDocument
+  , deleteIgnore
+  , getAuthorizedUser
+  , getDocumentsQueryFromURL
+  , getGroup
+  )
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto(..))
