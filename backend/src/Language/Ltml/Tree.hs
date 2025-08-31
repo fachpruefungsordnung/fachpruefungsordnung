@@ -77,3 +77,4 @@ type TypedMetaTree id = TypedTree id (Maybe HtmlHeading) (Maybe HtmlHeading)
 type MetaTree id = Tree id (Maybe HtmlHeading) (Maybe HtmlHeading)
 
 newtype HtmlHeading = HtmlHeading Text
+    deriving (Show)
