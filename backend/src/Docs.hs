@@ -72,6 +72,7 @@ import Docs.Database
     , HasGetDocumentHistory
     , HasGetLogs
     , HasGetRevisionKey
+    , HasGetTextElement
     , HasGetTextElementRevision
     , HasGetTextHistory
     , HasGetTreeHistory
@@ -242,15 +243,17 @@ createTextRevision
        , HasGetTextElementRevision m
        , HasExistsComment m
        , HasLogMessage m
+       , HasGetTextElement m
        )
     => UserID
     -> NewTextRevision
     -> m (Result ConflictStatus)
 createTextRevision userID revision = logged userID Scope.docsTextRevision $
     runExceptT $ do
-        let ref@(TextElementRef docID _) = newTextRevisionElement revision
+        let ref@(TextElementRef docID textID) = newTextRevisionElement revision
         guardPermission Edit docID userID
         guardExistsTextElement ref
+        textElement <- lift $ DB.getTextElement textID
         mapM_
             guardExistsComment
             (CommentRef ref . Comment.comment <$> newTextRevisionCommentAnchors revision)
@@ -270,23 +273,37 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                     (newTextRevisionCommentAnchors revision)
         lift $ do
             now <- DB.now
+            let updateTitle rev =
+                    mapM_
+                        (DB.updateLatestTitle textID)
+                        ( textElement
+                            >>= throwTogetherTitle
+                                . (Tree.Leaf . flip TextElementRevision (Just rev))
+                        )
             case latestRevision of
                 -- first revision
-                Nothing -> createRevision <&> TextRevision.NoConflict
+                Nothing -> do
+                    newRevision <- createRevision
+                    updateTitle newRevision
+                    return $ TextRevision.NoConflict newRevision
                 Just latest
                     -- content has not changed? -> return latest
                     | TextRevision.contentsNotChanged latest revision ->
                         return $ TextRevision.NoConflict latest
                     -- no conflict, and can update? -> update (squash)
-                    | latestRevisionID == parentRevisionID && shouldUpdate now latest ->
-                        DB.updateTextRevision
-                            (identifier latest)
-                            (newTextRevisionContent revision)
-                            (newTextRevisionCommentAnchors revision)
-                            <&> TextRevision.NoConflict
+                    | latestRevisionID == parentRevisionID && shouldUpdate now latest -> do
+                        newRevision <-
+                            DB.updateTextRevision
+                                (identifier latest)
+                                (newTextRevisionContent revision)
+                                (newTextRevisionCommentAnchors revision)
+                        updateTitle newRevision
+                        return $ TextRevision.NoConflict newRevision
                     -- no conflict, but can not update? -> create new
-                    | latestRevisionID == parentRevisionID ->
-                        createRevision <&> TextRevision.NoConflict
+                    | latestRevisionID == parentRevisionID -> do
+                        newRevision <- createRevision
+                        updateTitle newRevision
+                        return $ TextRevision.NoConflict newRevision
                     -- conflict
                     | otherwise ->
                         return $
@@ -338,7 +355,11 @@ getDocumentRevisionText userID ref@(RevisionRef docID _) textID =
             return $ join result
 
 createTreeRevision
-    :: (HasCreateTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
+    :: ( HasCreateTreeRevision m
+       , HasLogMessage m
+       , HasGetTextElementRevision m
+       , HasGetTextElement m
+       )
     => UserID
     -> DocumentID
     -> Node TextElementID
@@ -351,7 +372,7 @@ createTreeRevision userID docID root = logged userID Scope.docsTreeRevision $
         case firstFalse existsTextElement root of
             Just textID -> throwError $ TextElementNotFound $ TextElementRef docID textID
             Nothing -> do
-                rootWithText <- lift $ Tree.treeMapM getter root <&> filterMapNode id
+                rootWithText <- lift $ Tree.treeMapM getter' root <&> filterMapNode id
                 let updatedTitles = nodeWithTitle rootWithText
                 let mapped = nodeWithoutText updatedTitles
                 lift $ DB.createTreeRevision userID docID mapped
@@ -361,6 +382,13 @@ createTreeRevision userID docID root = logged userID Scope.docsTreeRevision $
         DB.getTextElementRevision
             . (`TextRevisionRef` TextRevision.Latest)
             . TextElementRef docID
+    getter' textID = do
+        bla <- getter textID
+        case bla of
+            Nothing -> do
+                textElement <- DB.getTextElement textID
+                return $ flip TextElementRevision Nothing <$> textElement
+            Just _ -> return bla
 
 getTreeRevision
     :: (HasGetTreeRevision m, HasLogMessage m)
@@ -543,6 +571,7 @@ newDefaultDocument
        , HasGetTextElementRevision m
        , HasExistsComment m
        , HasCreateTreeRevision m
+       , HasGetTextElement m
        )
     => UserID
     -> GroupID
@@ -598,10 +627,6 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
 
 nodeWithTitle :: Node TextElementRevision -> Node TextElementRevision
 nodeWithTitle (Node content children) = Node content (edgeWithTitle <$> children)
-
-treeWithTitle :: Tree TextElementRevision -> Tree TextElementRevision
-treeWithTitle (Tree.Tree node) = Tree.Tree $ nodeWithTitle node
-treeWithTitle leaf = leaf
 
 edgeWithTitle :: Edge TextElementRevision -> Edge TextElementRevision
 edgeWithTitle edge =

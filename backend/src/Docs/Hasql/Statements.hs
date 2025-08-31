@@ -43,6 +43,7 @@ module Docs.Hasql.Statements
     , getLogs
     , logMessage
     , getRevisionKey
+    , updateLatestTitle
     ) where
 
 import Control.Applicative ((<|>))
@@ -1475,3 +1476,26 @@ logMessage =
         , unScope scope
         , toJSON content
         )
+
+updateLatestTitle :: Statement (TextElementID, Text) ()
+updateLatestTitle =
+    lmap
+        (first unTextElementID)
+        [resultlessStatement|
+            UPDATE
+                doc_tree_edges d
+            SET
+                title = $2::text
+            WHERE
+                d.ctid = (
+                    SELECT
+                        ctid
+                    FROM
+                        doc_tree_edges
+                    WHERE
+                        child_text_element = $1::bigint
+                    ORDER BY
+                        creation_ts DESC
+                    LIMIT 1
+                )
+        |]
