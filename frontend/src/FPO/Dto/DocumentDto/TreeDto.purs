@@ -21,9 +21,10 @@ import Data.Foldable (foldr)
 import Data.Maybe (Maybe(..))
 import Data.Traversable (traverse)
 
-type TreeHeader =
+newtype TreeHeader = TreeHeader
   { headerKind :: String
   , headerType :: String
+  , heading :: String
   }
 
 data RootTree a
@@ -52,6 +53,15 @@ derive instance functorEdge :: Functor Edge
 -- derive instance newtypeEdge :: Newtype (Edge a) _
 
 -- DecodeJson instances
+
+instance decodeJsonTreeHeader :: DecodeJson TreeHeader where
+  decodeJson json = do
+    obj <- decodeJson json
+    headerKind <- obj .: "headerKind"
+    headerType <- obj .: "headerType"
+    -- `heading` might be `null`, so we provide a default value:
+    heading <- obj .: "heading" <|> pure ""
+    pure $ TreeHeader { headerKind, headerType, heading }
 
 instance decodeJsonRootTree :: DecodeJson a => DecodeJson (RootTree a) where
   decodeJson json = do
@@ -88,6 +98,14 @@ instance decodeJsonTree :: DecodeJson a => DecodeJson (Tree a) where
 
 -- EncodeJson instances
 
+instance encodeJsonTreeHeader :: EncodeJson TreeHeader where
+  encodeJson (TreeHeader { headerKind, headerType, heading }) =
+    encodeJson
+      { headerKind
+      , headerType
+      , heading
+      }
+
 instance encodeJsonRootTree :: EncodeJson a => EncodeJson (RootTree a) where
   encodeJson Empty = encodeJson {}
   encodeJson (RootTree root) = encodeJson root
@@ -103,7 +121,7 @@ instance encodeJsonTree :: EncodeJson a => EncodeJson (Tree a) where
           { type: "tree"
           , node:
               { children: map encodeJson children
-              , header
+              , header: encodeJson header
               }
           }
       }
@@ -117,6 +135,10 @@ instance encodeJsonTree :: EncodeJson a => EncodeJson (Tree a) where
       }
 
 -- Show instances
+
+instance showTreeHeader :: Show TreeHeader where
+  show (TreeHeader { headerKind, headerType, heading }) =
+    "TreeHeader { headerKind: " <> headerKind <> ", headerType: " <> headerType <> ", heading: " <> heading <> " }"
 
 instance showRootTree :: Show a => Show (RootTree a) where
   show Empty = "Empty"

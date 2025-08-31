@@ -12,18 +12,7 @@ module FPO.Components.TOC
   , tocview
   ) where
 
-import Data.Array
-  ( concat
-  , cons
-  , drop
-  , last
-  , length
-  , mapWithIndex
-  , snoc
-  , take
-  , uncons
-  , unsnoc
-  )
+import Data.Array (concat, cons, drop, last, length, mapWithIndex, snoc, take, uncons, unsnoc)
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -40,7 +29,7 @@ import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
-import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..))
+import FPO.Dto.DocumentDto.TreeDto (TreeHeader(..), Edge(..), RootTree(..), Tree(..))
 import FPO.Dto.PostTextDto (PostTextDto(..))
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Page.Home (formatRelativeTime)
@@ -56,32 +45,7 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
-import Prelude
-  ( class Eq
-  , Unit
-  , bind
-  , const
-  , discard
-  , identity
-  , map
-  , negate
-  , not
-  , pure
-  , show
-  , unit
-  , when
-  , ($)
-  , (&&)
-  , (+)
-  , (-)
-  , (/=)
-  , (<)
-  , (<<<)
-  , (<>)
-  , (==)
-  , (>)
-  , (||)
-  )
+import Prelude (class Eq, Unit, bind, const, discard, identity, map, negate, not, pure, show, unit, when, ($), (&&), (+), (-), (/=), (<), (<<<), (<>), (==), (>), (||))
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
 import Web.HTML.Event.DragEvent (DragEvent, toEvent)
@@ -341,7 +305,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
         newEntry = Node
           { title: "New Section"
           , children: []
-          , header: { headerKind: "section", headerType: "section" }
+          , header: TreeHeader { headerKind: "section", headerType: "section", heading: "" }
           }
       H.raise (AddNode path newEntry)
 

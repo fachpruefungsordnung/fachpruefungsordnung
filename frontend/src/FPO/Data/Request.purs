@@ -64,22 +64,12 @@ import FPO.Data.Store as Store
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.FullDocument (decodeFullDocument)
+import FPO.Dto.DocumentDto.FullDocument as FD
 import FPO.Dto.DocumentDto.Query as DQ
 import FPO.Dto.DocumentDto.TextElement as TE
-import FPO.Dto.GroupDto
-  ( GroupCreate
-  , GroupDto
-  , GroupID
-  , GroupOverview
-  , toGroupOverview
-  )
-import FPO.Dto.UserDto
-  ( FullUserDto
-  , UserID
-  , getAllAdminRoles
-  , isAdminOf
-  , isUserSuperadmin
-  )
+import FPO.Dto.GroupDto (GroupCreate, GroupDto, GroupID, GroupOverview, toGroupOverview)
+import FPO.Dto.UserDto (FullUserDto, UserID, getAllAdminRoles, isAdminOf, isUserSuperadmin)
 import FPO.Dto.UserRoleDto (Role)
 import FPO.Translations.Translator (fromFpoTranslator)
 import Halogen as H
@@ -503,8 +493,8 @@ createNewDocument
   => MonadStore Store.Action Store.Store m
   => Navigate m
   => NewDocumentCreateDto
-  -> H.HalogenM st act slots msg m (Either AppError DH.DocumentHeader)
-createNewDocument dto = postJson decodeJson "/docs" (encodeJson dto)
+  -> H.HalogenM st act slots msg m (Either AppError FD.FullDocument)
+createNewDocument dto = postJson decodeFullDocument "/docs" (encodeJson dto)
 
 getDocumentsQueryFromURL
   :: forall st act slots msg m

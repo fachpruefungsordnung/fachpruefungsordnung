@@ -20,18 +20,13 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request
-  ( createNewDocument
-  , deleteIgnore
-  , getAuthorizedUser
-  , getDocumentsQueryFromURL
-  , getGroup
-  )
+import FPO.Data.Request (createNewDocument, deleteIgnore, getAuthorizedUser, getDocumentsQueryFromURL, getGroup)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto(..))
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.FullDocument as FD
 import FPO.Dto.DocumentDto.Query as DQ
 import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName)
 import FPO.Page.Home (formatRelativeTime)
@@ -486,9 +481,11 @@ component =
             log "Created Document"
             now <- H.liftEffect nowDateTime
 
+            let header = FD.getHeader h
+
             H.modify_ \s' -> s'
-              { documents = h : s'.documents
-              , filteredDocuments = h : s'.filteredDocuments
+              { documents = header : s'.documents
+              , filteredDocuments = header : s'.filteredDocuments
               , currentTime = Just now
               }
 

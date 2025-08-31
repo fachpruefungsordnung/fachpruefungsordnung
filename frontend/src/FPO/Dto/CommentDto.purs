@@ -1,4 +1,5 @@
-module FPO.Dto.CommentDto where
+module FPO.Dto.CommentDto
+  where
 
 import Prelude
 
