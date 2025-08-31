@@ -29,6 +29,8 @@ import Halogen.Themes.Bootstrap5 as HB
 import Data.Argonaut.Core (jsonEmptyObject)
 import Effect.Aff (Aff)
 
+import Effect.Console (log)
+
 type Input = Unit
 
 data Output
@@ -305,6 +307,7 @@ commentview = H.mkComponent
         )
         jsonEmptyObject
       case state.mCommentSection of
+        -- should not happen
         Nothing -> pure unit
         Just cs -> do
           let
@@ -315,6 +318,9 @@ commentview = H.mkComponent
             , mCommentSection = Just newCs
             , commentDraft = ""
             }
+          -- Delete it from Editor
+          H.liftEffect $ log "Delete after resolve"
+          H.raise (ToDeleteComment)
     
     DeleteComment -> do
       H.modify_ _

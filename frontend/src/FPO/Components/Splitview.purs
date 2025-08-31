@@ -818,6 +818,7 @@ splitview = H.mkComponent
         H.modify_ \st -> st { commentShown = true }
         H.tell _comment unit
           (Comment.SelectedCommentSection docID tocID markerID)
+        H.tell _editor 0 (Editor.SelectCommentSection markerID)
 
     HandleEditor output -> case output of
 

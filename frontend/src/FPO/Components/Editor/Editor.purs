@@ -87,6 +87,7 @@ import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
 import Data.HashMap (HashMap, empty, toArrayBy, insert, delete, lookup, size)
+import Effect.Console (log)
 
 type Path = Array Int
 
@@ -105,10 +106,12 @@ type State = FPOState
   , markerAnnoHS :: HashMap Int (HashMap String Int)
   -- markerID -> old row position in Annotation
   , oldMarkerAnnoPos :: HashMap Int Int
-  -- mLiveMarker is a temporary comment and marker. Only set, if first comment is sent in Comment component
+  -- tmpLiveMarker is a temporary comment and marker. Only set, if first comment is sent in Comment component
   -- Otherwise delete them later
-  , mLiveMarker :: Maybe LiveMarker
+  , tmpLiveMarker :: Maybe LiveMarker
+  , selectedLiveMarker :: Maybe LiveMarker
   -- comment markers and its corresponding livemarker
+  -- mostly going to use livemarkers. Markers are used for API requests
   , markers :: Array AnnotatedMarker
   , liveMarkers :: Array LiveMarker
   , fontSize :: Int
@@ -210,6 +213,7 @@ data Query a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
   | UpdateComment CommentSection a
+  | SelectCommentSection Int a
   | ToDeleteComment a
 
 -- | UpdateCompareToElement ElementData a
@@ -241,7 +245,8 @@ editor = connect selectTranslator $ H.mkComponent
     , mNodePath: Nothing
     , title: ""
     , mContent: Nothing
-    , mLiveMarker: Nothing
+    , tmpLiveMarker: Nothing
+    , selectedLiveMarker: Nothing
     , markers: []
     , markerAnnoHS: empty
     , oldMarkerAnnoPos: empty
@@ -776,7 +781,7 @@ editor = connect selectTranslator $ H.mkComponent
             end <- H.liftEffect $ Range.getEnd range
 
             -- delete temporary live marker, as the first comment has not been sent
-            case state.mLiveMarker of
+            case state.tmpLiveMarker of
               Just lm -> do
                 H.liftEffect $ removeLiveMarker lm session
                 handleAction $ DeleteAnnotation lm false false
@@ -805,7 +810,7 @@ editor = connect selectTranslator $ H.mkComponent
             case state.mTocEntry of
               Just entry -> do
                 H.modify_ \st ->
-                  st { mLiveMarker = mLiveMarker }
+                  st { tmpLiveMarker = mLiveMarker, selectedLiveMarker = mLiveMarker }
                 H.raise (AddComment state.docID entry.id)
               Nothing -> pure unit
 
@@ -841,27 +846,24 @@ editor = connect selectTranslator $ H.mkComponent
       H.gets _.mEditor >>= traverse_ \ed -> do
         state <- H.get
         let
-          liveMarkers = case state.mLiveMarker of
+          liveMarkers = case state.tmpLiveMarker of
             Nothing -> state.liveMarkers
             Just lm -> snoc state.liveMarkers lm
         cursor <- H.liftEffect $ Editor.getCursorPosition ed
         foundLM <- H.liftEffect $ cursorInRange liveMarkers cursor
         let
-          foundID = case foundLM of
-            Nothing -> -1
-            Just lm -> lm.annotedMarkerID
+          lm = case foundLM of
+            Nothing -> failureLiveMarker
+            Just found -> found
+          foundID = lm.annotedMarkerID
 
-          -- extract markers from the current TOC entry
+          -- need it only for its ID
           tocEntry = case state.mTocEntry of
             Nothing -> emptyTOCEntry
             Just e -> e
-          markers = state.markers
-        pure unit
+        H.modify_ \st -> st {selectedLiveMarker = Just lm}
         if (foundID >= 0) then do
-          case (find (\m -> m.id == foundID) markers) of
-            Nothing -> pure unit
-            Just foundMarker -> H.raise
-              (SelectedCommentSection tocEntry.id foundMarker.id)
+          H.raise (SelectedCommentSection tocEntry.id foundID)
         else if (foundID == -360) then do
           H.raise (SelectedCommentSection tocEntry.id (-360))
         else 
@@ -1013,6 +1015,7 @@ editor = connect selectTranslator $ H.mkComponent
 
         H.modify_ \st -> st
           { mContent = Just content
+          , selectedLiveMarker = Nothing
           , markerAnnoHS = empty
           , oldMarkerAnnoPos = empty
           , markers = markers
@@ -1133,12 +1136,13 @@ editor = connect selectTranslator $ H.mkComponent
       H.raise (ClickedQuery $ fromMaybe [] allLines)
       pure (Just a)
 
+    -- Repurpose it to confirm, that the first comment was sent
     UpdateComment newCommentSection a -> do
       state <- H.get
-      case state.mLiveMarker, state.mEditor, state.mListener, newCommentSection.first of
+      case state.tmpLiveMarker, state.mEditor, state.mListener, newCommentSection.first of
         Just lm, Just ed, Just listener, Just first -> do
           start <- H.liftEffect $ Anchor.getPosition lm.startAnchor
-          end <- H.liftEffect $ Anchor.getPositionlmr.endAnchor
+          end <- H.liftEffect $ Anchor.getPosition lm.endAnchor
           session <- H.liftEffect $ Editor.getSession ed
           H.liftEffect $ removeLiveMarker lm session
           handleAction $ DeleteAnnotation lm false false
@@ -1160,12 +1164,16 @@ editor = connect selectTranslator $ H.mkComponent
             newOldMarkerAnnoPos' = insert newMarker.id newMarker.startRow newOldMarkerAnnoPos
           newLiveMarker <- H.liftEffect $ addAnchor newMarker session listener true
           let
+            newLM = case newLiveMarker of
+              Nothing -> failureLiveMarker
+              Just lm' -> lm'
             newLiveMarkers = case newLiveMarker of
               Nothing -> state.liveMarkers
               Just lm' -> snoc state.liveMarkers lm'
           H.modify_ \st -> st
             { oldMarkerAnnoPos = newOldMarkerAnnoPos'
-            , mLiveMarker = Nothing
+            , tmpLiveMarker = Nothing
+            , selectedLiveMarker = Just newLM
             , markers = newMarkers
             , liveMarkers = newLiveMarkers
             }
@@ -1175,15 +1183,28 @@ editor = connect selectTranslator $ H.mkComponent
         _, _, _, _ -> pure unit
       pure (Just a)
     
+    SelectCommentSection markerID a -> do
+      lms <- H.gets _.liveMarkers
+      case (find (\m -> m.annotedMarkerID == markerID) lms) of
+        Nothing -> pure unit
+        Just lm -> H.modify_ \st -> st { selectedLiveMarker = Just lm }
+      pure (Just a)
+    
     ToDeleteComment a -> do
       state <- H.get
-      case state.mEditor, state.mLiveMarker of
+      H.liftEffect $ log "ToDeleteComment"
+      case state.mEditor, state.selectedLiveMarker of
         Just ed, Just lm -> do
+          H.liftEffect $ log $ "passed case: " <> show lm.annotedMarkerID
           session <- H.liftEffect $ Editor.getSession ed
           H.liftEffect $ removeLiveMarker lm session
           handleAction $ DeleteAnnotation lm false true
+          H.modify_ \st -> st {selectedLiveMarker = Nothing}
+          case state.tmpLiveMarker of
+            Nothing -> pure unit
+            Just tmpLM -> when (tmpLM.annotedMarkerID == lm.annotedMarkerID) $
+              H.modify_ \st -> st {tmpLiveMarker = Nothing}
         _, _ -> pure unit
-      H.modify_ \st -> st {mLiveMarker = Nothing}
       pure (Just a)
 
 
@@ -1413,3 +1434,12 @@ addNames name occurence =
     name
   else 
     name <> "+" <> show occurence
+
+failureLiveMarker :: LiveMarker
+failureLiveMarker =
+  { annotedMarkerID: -1
+  , startAnchor: unsafeCoerce unit  -- Fake Anchor
+  , endAnchor: unsafeCoerce unit    -- Fake Anchor
+  , markerText: ""
+  , ref: unsafeCoerce (-1 :: Int)   -- Fake Ref
+  }
