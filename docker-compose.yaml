@@ -89,17 +89,6 @@ services:
     profiles:
       - development
 
-  # mailhog:
-  #   container_name: fpo-mailhog 
-  #   image: mailhog/mailhog:latest
-  #   ports:
-  #     - "1025:1025"  # SMTP port
-  #     - "8025:8025"  # Web UI port
-  #   networks:
-  #     - backend
-  #   profiles:
-  #     - development
-
 volumes:
   database:
 
