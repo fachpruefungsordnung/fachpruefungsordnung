@@ -157,6 +157,7 @@ component =
                   )
                   (translate (label :: _ "common_email") state.translator)
                   "bi-envelope-fill"
+                  false
                   HP.InputEmail
                   UpdateEmail
               , addColumn
@@ -164,6 +165,7 @@ component =
                   ((translate (label :: _ "common_password") state.translator) <> ":")
                   (translate (label :: _ "common_password") state.translator)
                   "bi-lock-fill"
+                  false
                   HP.InputPassword
                   UpdatePassword
               , HH.div [ HP.classes [ HB.mb4, HB.textCenter ] ]

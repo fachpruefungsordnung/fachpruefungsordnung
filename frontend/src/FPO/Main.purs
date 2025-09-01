@@ -13,7 +13,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console (log, logShow)
+import Effect.Class.Console (log)
 import FPO.AppM (runAppM)
 import FPO.Components.AppToasts as AppToasts
 import FPO.Components.Navbar as Navbar

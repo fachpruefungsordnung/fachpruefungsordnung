@@ -342,6 +342,7 @@ component =
                     state.translator
                 )
                 "bi-search"
+                false
                 HP.InputText
                 ChangeFilterGroupName
             , HH.ul [ HP.classes [ HB.listGroup ] ]
@@ -376,6 +377,7 @@ component =
                       state.translator
                   )
                   "bi-people"
+                  false
                   HP.InputText
                   ChangeCreateGroupName
               , HH.div [ HP.classes [ HB.col12, HB.textCenter ] ]

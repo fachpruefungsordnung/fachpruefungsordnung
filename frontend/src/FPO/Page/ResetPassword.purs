@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Argonaut (encodeJson)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (null)
 import Data.String.Regex (regex, test)
 import Data.String.Regex.Flags (noFlags)
@@ -23,6 +23,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
+import Prim.Boolean (False)
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
 import Web.Event.Internal.Types (Event)
@@ -42,6 +43,7 @@ type State = FPOState
   , passwordPrimary :: String
   , passwordSecondary :: String
   , code :: String
+  , calledWithToken :: Boolean
   )
 
 type Input = { token :: Maybe String }
@@ -61,6 +63,7 @@ component =
         , passwordSecondary: ""
         , code: fromMaybe "" token
         , translator: fromFpoTranslator context
+        , calledWithToken: isJust token
         }
     , render
     , eval: H.mkEval H.defaultEval
@@ -88,6 +91,7 @@ component =
                       )
                       (translate (label :: _ "common_email") state.translator)
                       "bi-envelope-fill"
+                      state.calledWithToken
                       HP.InputEmail
                       UpdateEmail
                   , addColumn
@@ -97,6 +101,7 @@ component =
                       )
                       (translate (label :: _ "common_password") state.translator)
                       "bi-lock-fill"
+                      false
                       HP.InputPassword
                       UpdatePasswordPrimary
                   , addColumn
@@ -106,6 +111,7 @@ component =
                       )
                       (translate (label :: _ "common_password") state.translator)
                       "bi-lock-fill"
+                      false
                       HP.InputPassword
                       UpdatePasswordSecondary
                   , HH.div []
