@@ -28,7 +28,7 @@ import Simple.I18n.Translator (Translator, label, translate)
 -- |  5. an action to proceed the deletion
 -- |  6. a name for the type of the given object
 infoModal
-  :: forall w a action
+  :: forall w action
    . Translator Labels
   -> action
   -> HH.HTML w action
