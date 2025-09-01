@@ -129,10 +129,10 @@ component =
 renderResetForm :: forall w. State -> HH.HTML w Action
 renderResetForm state =
   HH.div [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my3 ] ]
-    [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
-        [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-            [ HH.text $ translate (label :: _ "rp_Header") state.translator ]
-        , HH.form
+    [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+        [ HH.text $ translate (label :: _ "rp_Header") state.translator ]
+    , HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
+        [ HH.form
             [ HE.onSubmit DoSubmit ]
             [ addColumn
                 state.email
