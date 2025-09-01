@@ -507,7 +507,6 @@ component =
                   ""
                   (translate (label :: _ "home_searchForProjects") state.translator)
                   "bi-search"
-                  false
                   HP.InputText
                   HandleSearchInput
               ]

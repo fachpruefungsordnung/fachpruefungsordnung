@@ -215,7 +215,6 @@ component =
               ""
               (translate (label :: _ "gp_searchProjects") state.translator)
               "bi-search"
-              false
               HP.InputText
               ChangeFilterDocumentName
           , HH.div [ HP.classes [ HB.col12 ] ]

@@ -24,11 +24,10 @@ addColumn
   -> String -- ^ label
   -> String -- ^ placeholder
   -> String -- ^ icon
-  -> Boolean -- ^ whether the input is disabled
   -> InputType -- ^ input type
   -> (String -> a) -- ^ action (parametrized with the value)
   -> HH.HTML w a
-addColumn val str placeholder bi disabled for act =
+addColumn val str placeholder bi for act =
   HH.div_ $
     ( if null str then []
       else
@@ -41,13 +40,13 @@ addColumn val str placeholder bi disabled for act =
             [ HH.span [ HP.classes [ HB.inputGroupText ] ]
                 [ HH.i [ HP.class_ (H.ClassName bi) ] [] ]
             , HH.input
-                ( [ HP.type_ for
-                  , HP.classes [ HB.formControl ]
-                  , HP.placeholder placeholder
-                  , HP.value val
-                  , HE.onValueInput act
-                  ] <> (if disabled then [ HP.disabled true ] else [])
-                )
+                [ HP.type_ for
+                , HP.classes [ HB.formControl ]
+                , HP.placeholder placeholder
+                , HP.value val
+                , HE.onValueInput act
+                ]
+
             ]
         ]
 

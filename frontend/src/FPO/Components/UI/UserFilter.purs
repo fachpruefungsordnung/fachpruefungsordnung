@@ -63,7 +63,6 @@ component = connect selectTranslator $ H.mkComponent
               (translate (label :: _ "common_userName") state.translator)
               (translate (label :: _ "common_userName") state.translator)
               "bi-person"
-              false
               HP.InputText
               SetUsername
           , addColumn
@@ -71,7 +70,6 @@ component = connect selectTranslator $ H.mkComponent
               (translate (label :: _ "common_email") state.translator)
               (translate (label :: _ "common_email") state.translator)
               "bi-envelope-fill"
-              false
               HP.InputEmail
               SetEmail
           ]

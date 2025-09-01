@@ -204,7 +204,6 @@ component =
               ""
               (translate (label :: _ "gm_searchMembers") state.translator)
               "bi-search"
-              false
               HP.InputText
               FilterForMember
           , HH.div [ HP.classes [ HB.col12 ] ]

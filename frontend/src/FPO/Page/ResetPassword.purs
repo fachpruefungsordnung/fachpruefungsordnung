@@ -134,7 +134,6 @@ component =
                       )
                       (translate (label :: _ "common_password") state.translator)
                       "bi-lock-fill"
-                      false
                       HP.InputPassword
                       UpdatePasswordPrimary
                   , addColumn
@@ -144,7 +143,6 @@ component =
                       )
                       (translate (label :: _ "common_password") state.translator)
                       "bi-lock-fill"
-                      false
                       HP.InputPassword
                       UpdatePasswordSecondary
                   , HH.div []
