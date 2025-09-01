@@ -3,7 +3,7 @@
 
 module Language.Ltml.Tree.ToMeta
     ( MetaError (..)
-    , buildMeta
+    , treeToMeta
     )
 where
 
@@ -51,14 +51,14 @@ data MetaError
     deriving (Show)
 
 -- | Build metadata, to be sent to the frontend.
-buildMeta
+treeToMeta
     :: FlaggedInputTree ident
     -> Either
         MetaError
         ( FlaggedMetaTree ident
         , Map FullTypeName ProperTypeMeta
         )
-buildMeta tree = do
+treeToMeta tree = do
     ast <- first MetaTreeError $ treeToLtml tree'
     let headings = renderTocList ast
     first MetaBug $ buildMeta' headings tree
