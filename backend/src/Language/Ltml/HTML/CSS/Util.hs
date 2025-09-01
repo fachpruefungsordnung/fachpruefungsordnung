@@ -41,11 +41,12 @@ addHtmlHeader title cssPath html = doctypehtml_ $ do
     body_ $ div_ <#> Class.Body $ html
 
 -- | Adds html, head and body tags onto given html,
---   renders and inlines given css;
+--   adds title, renders and inlines given css;
 --   This is used for creating a "preview" HTML;
-addInlineCssHeader :: Css -> Html () -> Html ()
-addInlineCssHeader css html =
+addInlineCssHeader :: String -> Css -> Html () -> Html ()
+addInlineCssHeader title css html =
     doctypehtml_ $ do
         head_ $ do
+            title_ (toHtml title)
             style_ (toStrict $ render css)
         body_ $ div_ <#> Class.Body $ html

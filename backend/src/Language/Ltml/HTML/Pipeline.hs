@@ -29,7 +29,7 @@ htmlPipeline input =
             Left err -> renderBS $ errorHtml (errorBundlePretty err)
             Right (nodeSection, footnoteMap) ->
                 let (body, css) = renderSectionHtmlCss nodeSection footnoteMap
-                 in renderBS $ addInlineCssHeader css body
+                 in renderBS $ addInlineCssHeader "Generated Document Preview" css body
 
 -------------------------------------------------------------------------------
 
