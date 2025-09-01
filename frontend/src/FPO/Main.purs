@@ -13,7 +13,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console (log)
+import Effect.Class.Console (log, logShow)
 import FPO.AppM (runAppM)
 import FPO.Components.AppToasts as AppToasts
 import FPO.Components.Navbar as Navbar
@@ -145,7 +145,9 @@ component =
           Home -> HH.slot_ _home unit Home.component unit
           Editor { docID } -> HH.slot_ _editor unit EditorPage.component docID
           Login -> HH.slot_ _login unit Login.component unit
-          PasswordReset -> HH.slot_ _resetPassword unit PasswordReset.component unit
+          PasswordReset { token } -> HH.slot_ _resetPassword unit
+            PasswordReset.component
+            { token }
           AdminViewUsers -> HH.slot_ _adminUsers unit AdminViewUsers.component unit
           AdminViewGroups -> HH.slot_ _adminGroups unit AdminViewGroups.component unit
           ViewGroupDocuments { groupID } -> HH.slot_ _viewGroupDocuments unit
@@ -167,7 +169,9 @@ component =
   handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
   handleAction = case _ of
     Initialize -> do
+      initialHash <- liftEffect getHash
       initialRoute <- hush <<< (RD.parse routeCodec) <$> liftEffect getHash
+      log initialHash
       navigate $ fromMaybe Home initialRoute
     HandleProfile profileOutput -> case profileOutput of
       Profile.ChangedUsername -> do

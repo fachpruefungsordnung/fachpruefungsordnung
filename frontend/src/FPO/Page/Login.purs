@@ -118,7 +118,7 @@ component =
     EmitError error -> do
       H.modify_ \state -> state { error = Just error }
     NavigateToPasswordReset -> do
-      navigate PasswordReset
+      navigate (PasswordReset { token: Nothing })
     DoLogin loginDto event -> do
       H.liftEffect $ preventDefault event
       -- trying to do a login by calling the api at /api/login

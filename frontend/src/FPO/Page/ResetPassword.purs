@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Argonaut (encodeJson)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (null)
 import Data.String.Regex (regex, test)
 import Data.String.Regex.Flags (noFlags)
@@ -35,7 +35,7 @@ data Action
   | UpdatePasswordPrimary String
   | UpdatePasswordSecondary String
   | UpdateCode String
-  | Receive (Connected FPOTranslator Unit)
+  | Receive (Connected FPOTranslator Input)
 
 type State = FPOState
   ( email :: String
@@ -44,20 +44,22 @@ type State = FPOState
   , code :: String
   )
 
+type Input = { token :: Maybe String }
+
 -- | Password reset component.
 component
   :: forall query output m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
   => Navigate m
-  => H.Component query Unit output m
+  => H.Component query Input output m
 component =
   connect selectTranslator $ H.mkComponent
-    { initialState: \{ context } ->
+    { initialState: \{ input: { token }, context } ->
         { email: ""
         , passwordPrimary: ""
         , passwordSecondary: ""
-        , code: ""
+        , code: fromMaybe "" token
         , translator: fromFpoTranslator context
         }
     , render
