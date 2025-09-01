@@ -51,18 +51,25 @@ enCommon = fromRecord
   , common_membersOf: "Members of "
   , common_mergingInfo: "Working on Outdated Files"
   , common_mergingInfoText: "You are currently editing an outdated version. \n\n"
-                          <>"How was this caused? \n"
-                          <>"As this website supports editing by multiple people simultaneously, "
-                          <>"it is possible that someone else started editing the same part of this "
-                          <>"file as you and saved their version. Alternatively, You may have simply openend "
-                          <>"an old version.\n\n"
-                          <>"What does this mean for you?\n"
-                          <>"You can keep editing this text element as usual, but once you are done and want to save your changes, you will need to "
-                          <>"merge your changes with the current version so you can ensure that no changes get lost. "
-                          <>"Otherwise, either your changes or the changes of the current file would get lost.\n"
-                          <>"Once you choose to save, the current version will be opened on the left side of your screen so you can compare the changes made "
-                          <>"and copy over any changes you want to keep. Once you are done, you can save again, at which point you will be up to date again.\n\n"
-                          <>"If you do not wish to save your currently opened version, you can click on \"discard\" to discard them and open the current version."
+      <> "How was this caused? \n"
+      <> "As this website supports editing by multiple people simultaneously, "
+      <> "it is possible that someone else started editing the same part of this "
+      <>
+        "file as you and saved their version. Alternatively, You may have simply openend "
+      <> "an old version.\n\n"
+      <> "What does this mean for you?\n"
+      <>
+        "You can keep editing this text element as usual, but once you are done and want to save your changes, you will need to "
+      <>
+        "merge your changes with the current version so you can ensure that no changes get lost. "
+      <>
+        "Otherwise, either your changes or the changes of the current file would get lost.\n"
+      <>
+        "Once you choose to save, the current version will be opened on the left side of your screen so you can compare the changes made "
+      <>
+        "and copy over any changes you want to keep. Once you are done, you can save again, at which point you will be up to date again.\n\n"
+      <>
+        "If you do not wish to save your currently opened version, you can click on \"discard\" to discard them and open the current version."
   , common_password: "Password"
   , common_project: "project"
   , common_projects: "Projects"
@@ -95,18 +102,25 @@ deCommon = fromRecord
   , common_membersOf: "Mitglieder von "
   , common_mergingInfo: "Veraltete Versionen bearbeiten"
   , common_mergingInfoText: "You are currently editing an outdated version. \n\n"
-                          <>"How was this caused? \n"
-                          <>"As this website supports editing by multiple people simultaneously, "
-                          <>"it is possible that someone else started editing the same part of this "
-                          <>"file as you and saved their version. Alternatively, You may have simply openend "
-                          <>"an old version.\n\n"
-                          <>"What does this mean for you?\n"
-                          <>"You can keep editing this text element as usual, but once you are done and want to save your changes, you will need to "
-                          <>"merge your changes with the current version so you can ensure that no changes get lost. "
-                          <>"Otherwise, either your changes or the changes of the current file would get lost.\n"
-                          <>"Once you choose to save, the current version will be opened on the left side of your screen so you can compare the changes made "
-                          <>"and copy over any changes you want to keep. Once you are done, you can save again, at which point you will be up to date again.\n\n"
-                          <>"If you do not wish to save your currently opened version, you can click on \"discard\" to discard them and open the current version."
+      <> "How was this caused? \n"
+      <> "As this website supports editing by multiple people simultaneously, "
+      <> "it is possible that someone else started editing the same part of this "
+      <>
+        "file as you and saved their version. Alternatively, You may have simply openend "
+      <> "an old version.\n\n"
+      <> "What does this mean for you?\n"
+      <>
+        "You can keep editing this text element as usual, but once you are done and want to save your changes, you will need to "
+      <>
+        "merge your changes with the current version so you can ensure that no changes get lost. "
+      <>
+        "Otherwise, either your changes or the changes of the current file would get lost.\n"
+      <>
+        "Once you choose to save, the current version will be opened on the left side of your screen so you can compare the changes made "
+      <>
+        "and copy over any changes you want to keep. Once you are done, you can save again, at which point you will be up to date again.\n\n"
+      <>
+        "If you do not wish to save your currently opened version, you can click on \"discard\" to discard them and open the current version."
   , common_password: "Passwort"
   , common_project: "Projekt"
   , common_projects: "Projekte"

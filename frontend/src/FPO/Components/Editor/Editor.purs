@@ -87,7 +87,7 @@ import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
-foreign import _resize :: Types.Editor -> Effect Unit 
+foreign import _resize :: Types.Editor -> Effect Unit
 type Path = Array Int
 
 type ElementData = Maybe { tocEntry :: TOCEntry, revID :: Maybe Int, title :: String }
@@ -185,7 +185,7 @@ data Action
   | Finalize
   | DoNothing
   | DoNothingWithNum Int
-  | Resize 
+  | Resize
 
 -- We use a query to get the content of the editor
 data Query a
@@ -252,18 +252,20 @@ editor = connect selectTranslator $ H.mkComponent
     , outdatedInfoPopup: false
     }
 
-{-   render :: State -> H.ComponentHTML Action () m
+  {-   render :: State -> H.ComponentHTML Action () m
   render state = renderAll state -}
 
   render :: State -> H.ComponentHTML Action () m
-  render state = 
-    HH.div 
-      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ], HP.style "min-height: 0;" ] $
-      [renderAll state] <>
-      renderDeleteModal
+  render state =
+    HH.div
+      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ]
+      , HP.style "min-height: 0;"
+      ] $
+      [ renderAll state ] <>
+        renderDeleteModal
     where
     renderDeleteModal = case state.outdatedInfoPopup of
-      false ->  []
+      false -> []
       true ->
         [ infoModal
             state.translator
@@ -274,7 +276,7 @@ editor = connect selectTranslator $ H.mkComponent
             " "
         ]
 
-{-   render :: State -> H.ComponentHTML Action () m
+  {-   render :: State -> H.ComponentHTML Action () m
   render state = 
     HH.div_ $
       renderDeleteModal
@@ -294,9 +296,11 @@ editor = connect selectTranslator $ H.mkComponent
         ] -}
 
   renderAll :: State -> H.ComponentHTML Action () m
-  renderAll state = 
+  renderAll state =
     HH.div
-      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ], HP.style "min-height: 0;" ]
+      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ]
+      , HP.style "min-height: 0;"
+      ]
       [ HH.div
           -- toolbar
           [ HP.classes [ HB.dFlex, HB.justifyContentBetween ] ]
@@ -400,7 +404,10 @@ editor = connect selectTranslator $ H.mkComponent
       , if state.isEditorReadonly then
           HH.div
             -- toolbar
-            [ HP.classes [ HB.dFlex, HB.justifyContentCenter ], HP.style "border-top-style: solid; border-color: blue; border-width: 1px;" ]
+            [ HP.classes [ HB.dFlex, HB.justifyContentCenter ]
+            , HP.style
+                "border-top-style: solid; border-color: blue; border-width: 1px;"
+            ]
             if (not state.showButtons) then
               -- keep the toolbar even though there is not space, so that the screen doesnt pop higher
               [ HH.div
@@ -415,18 +422,19 @@ editor = connect selectTranslator $ H.mkComponent
             else
               [ HH.div
                   [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
-                  [ HH.text (translate (label :: _ "editor_oldVersion") state.translator)
-{-                   , HH.button
-                        [ HP.classes
-                            [ HB.btn
-                            , HB.btnLight
-                            , HB.btnSm
-                            , H.ClassName "bi bi-info-circle"
-                            ]
-                        , HE.onClick $ const $ ToggleOutdatedInfoPopup
-                        ]
-                        [] -}
-{-                   , HH.button
+                  [ HH.text
+                      (translate (label :: _ "editor_oldVersion") state.translator)
+                  {-                   , HH.button
+                  [ HP.classes
+                      [ HB.btn
+                      , HB.btnLight
+                      , HB.btnSm
+                      , H.ClassName "bi bi-info-circle"
+                      ]
+                  , HE.onClick $ const $ ToggleOutdatedInfoPopup
+                  ]
+                  [] -}
+                  {-                   , HH.button
                         [ HP.classes
                             [ HB.btn
                             , HB.btnLight
@@ -445,21 +453,22 @@ editor = connect selectTranslator $ H.mkComponent
                         ]
                         [HH.text "Discard"] -}
                   , makeEditorToolbarButton
-                    true
-                    ""
-                    ToggleOutdatedInfoPopup
-                    "bi bi-info-circle"
+                      true
+                      ""
+                      ToggleOutdatedInfoPopup
+                      "bi bi-info-circle"
                   , makeEditorToolbarButtonWithText
-                    true
-                    state.showButtonText
-                    ToggleOutdatedInfoPopup
-                    "bi bi-trash"
-                    (translate (label :: _ "editor_discard") state.translator)
+                      true
+                      state.showButtonText
+                      ToggleOutdatedInfoPopup
+                      "bi bi-trash"
+                      (translate (label :: _ "editor_discard") state.translator)
                   ]
               ]
-        else 
+        else
           HH.text ""
       , HH.div -- Editor container
+
           [ HP.ref (H.RefLabel "container")
           , HE.onClick $ const SelectComment
           , HP.classes [ HB.flexGrow1 ]
@@ -504,45 +513,45 @@ editor = connect selectTranslator $ H.mkComponent
               HH.text ""
 
           ]
-{-           [ -- Add overlay when readonly
-            if state.isEditorReadonly then
-              HH.div
+      {-           [ -- Add overlay when readonly
+        if state.isEditorReadonly then
+          HH.div
+            [ HP.classes
+                [ HB.positionAbsolute
+                , HB.top0
+                , HB.start0
+                , HB.w100
+                , HB.h100
+                , HB.dFlex
+                , HB.justifyContentCenter
+                , HB.alignItemsEnd
+                , HB.peNone
+                ]
+            , HP.style
+                "background: rgba(0,0,0,0.1); z-index: 20; padding-bottom: 1.5rem;"
+            ]
+            [ HH.div
                 [ HP.classes
-                    [ HB.positionAbsolute
-                    , HB.top0
-                    , HB.start0
-                    , HB.w100
-                    , HB.h100
-                    , HB.dFlex
-                    , HB.justifyContentCenter
-                    , HB.alignItemsEnd
-                    , HB.peNone
+                    [ HB.bgLight
+                    , HB.border
+                    , HB.rounded
+                    , HB.px3
+                    , HB.py2
+                    , HB.shadow
                     ]
-                , HP.style
-                    "background: rgba(0,0,0,0.1); z-index: 20; padding-bottom: 1.5rem;"
+                , HP.style "pointer-events: auto;"
                 ]
-                [ HH.div
-                    [ HP.classes
-                        [ HB.bgLight
-                        , HB.border
-                        , HB.rounded
-                        , HB.px3
-                        , HB.py2
-                        , HB.shadow
-                        ]
-                    , HP.style "pointer-events: auto;"
-                    ]
-                    [ HH.i
-                        [ HP.classes [ HB.bi, H.ClassName "bi-lock-fill", HB.me2 ] ]
-                        []
-                    , HH.text
-                        (translate (label :: _ "editor_readonly") state.translator)
-                    ]
+                [ HH.i
+                    [ HP.classes [ HB.bi, H.ClassName "bi-lock-fill", HB.me2 ] ]
+                    []
+                , HH.text
+                    (translate (label :: _ "editor_readonly") state.translator)
                 ]
-            else
-              HH.text ""
+            ]
+        else
+          HH.text ""
 
-          ] -}
+      ] -}
       -- Saved Icon
       , if state.showSavedIcon then
           HH.div
@@ -557,18 +566,18 @@ editor = connect selectTranslator $ H.mkComponent
       ]
     where
     fullFeatures = isJust state.mTocEntry
-{-     renderDeleteModal = case state.outdatedInfoPopup of
-      false ->  []
-      true ->
-        [ infoModal
-            state.translator
-            0
-            (const " ")
-            ToggleOutdatedInfoPopup
-            DoNothingWithNum
-            " "
-        ] -}
 
+  {-     renderDeleteModal = case state.outdatedInfoPopup of
+  false ->  []
+  true ->
+    [ infoModal
+        state.translator
+        0
+        (const " ")
+        ToggleOutdatedInfoPopup
+        DoNothingWithNum
+        " "
+    ] -}
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
@@ -646,27 +655,27 @@ editor = connect selectTranslator $ H.mkComponent
         -> pure unit
         Just { tocEntry: tocEntry, revID: revID, title: title }
         -> handleAction (ChangeToSection title tocEntry revID)
-{-       _ <- H.subscribe =<< resizeDelay Resize
-      pure unit -}
+    {-       _ <- H.subscribe =<< resizeDelay Resize
+    pure unit -}
 
-    Resize -> do 
+    Resize -> do
       state <- H.get
+      H.liftEffect
+        case state.mEditor of
+          Nothing -> pure unit
+          Just e ->
+            _resize e
+
+    {-     Resize -> do 
+    state <- H.get
+    _ <- H.fork do
+      H.liftAff $ delay (Milliseconds 1000.0)
       H.liftEffect
         case state.mEditor of
           Nothing -> pure unit
           Just e -> 
             _resize e
-
-{-     Resize -> do 
-      state <- H.get
-      _ <- H.fork do
-        H.liftAff $ delay (Milliseconds 1000.0)
-        H.liftEffect
-          case state.mEditor of
-            Nothing -> pure unit
-            Just e -> 
-              _resize e
-      pure unit -}
+    pure unit -}
 
     DoNothing -> do
       pure unit
@@ -676,12 +685,12 @@ editor = connect selectTranslator $ H.mkComponent
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
-      -- handleAction Resize
+    -- handleAction Resize
 
     ToggleOutdatedInfoPopup -> do
-      state <- H.get 
+      state <- H.get
       let toggledInfo = (state.outdatedInfoPopup == false)
-      H.modify_ _ { outdatedInfoPopup = toggledInfo}
+      H.modify_ _ { outdatedInfoPopup = toggledInfo }
 
     Bold -> do
       state <- H.get
@@ -716,7 +725,7 @@ editor = connect selectTranslator $ H.mkComponent
         H.liftEffect $ do
           Editor.setFontSize (show newSize <> "px") ed
           Editor.focus ed
-        -- handleAction Resize
+    -- handleAction Resize
 
     FontSizeDown -> do
       H.gets _.mEditor >>= traverse_ \ed -> do
@@ -1102,7 +1111,7 @@ editor = connect selectTranslator $ H.mkComponent
           , markers = markers
           , isEditorReadonly = version /= "latest"
           }
-        
+
         handleAction Resize
 
         newLiveMarkers <- H.liftEffect do

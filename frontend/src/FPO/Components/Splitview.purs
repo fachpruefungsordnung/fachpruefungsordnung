@@ -169,7 +169,7 @@ type State =
   -- this value is updated from the same value in TOC
   , mSelectedTocEntry :: Maybe SelectedEntity
 
-{- <<<<<<< HEAD
+  {- <<<<<<< HEAD
   , pdfWarningAvailable :: Boolean
   , pdfWarningIsShown :: Boolean
   -- , compareToElement :: ElementData
@@ -180,7 +180,8 @@ type State =
 >>>>>>> main -}
   }
 
-type ElemVersion = { elementID :: Int, versionID :: Maybe Int , comparisonData :: ElementData}
+type ElemVersion =
+  { elementID :: Int, versionID :: Maybe Int, comparisonData :: ElementData }
 
 type Slots =
   ( comment :: H.Slot Comment.Query Comment.Output Unit
@@ -294,7 +295,7 @@ splitview = H.mkComponent
                   in
                     case versionEntry.comparisonData of
                       Nothing -> renderPreview state
-                      Just cData -> renderSecondEditor state (Just cData)                   
+                      Just cData -> renderSecondEditor state (Just cData)
         )
 
   -- Render both TOC and Comment but make them visable depending of the flags
@@ -631,7 +632,9 @@ splitview = H.mkComponent
       let
         finalTree = fromMaybe Empty (documentTreeToTOCTree <$> maybeTree)
         vMapping = map
-          (\elem -> { elementID: elem.id, versionID: Nothing, comparisonData: Nothing })
+          ( \elem ->
+              { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
+          )
           finalTree
       H.modify_ _
         { tocEntries = finalTree
@@ -717,7 +720,7 @@ splitview = H.mkComponent
         _ -> pure unit
 
     -- Toggle actions
-    
+
     UpdateMSelectedTocEntry -> do
       cToc <- H.request _toc unit TOC.RequestCurrentTocEntry
       H.modify_ _ { mSelectedTocEntry = join cToc }
@@ -774,7 +777,7 @@ splitview = H.mkComponent
       -- close preview
       if state.previewShown then
         -- just hide the compare to element if it is shown
-        let 
+        let
           oldPreviewRatio = state.previewRatio
           mod = do
             H.modify_ \st -> st
@@ -798,9 +801,9 @@ splitview = H.mkComponent
                 case versionEntry.comparisonData of
                   Nothing -> mod
                   Just _ -> do
-                  -- Just cData -> do 
+                    -- Just cData -> do 
                     -- handleAction (ModifyVersionMapping tocID Nothing cData.revID) 
-                    handleAction (ModifyVersionMapping tocID Nothing (Just Nothing)) 
+                    handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
       -- open preview
       else do
         -- restore the last expanded middle ratio, when toggling preview back on
@@ -813,20 +816,25 @@ splitview = H.mkComponent
       handleAction UpdateMSelectedTocEntry
       state <- H.get
       let
-        newVersionID = case vID of 
-          Just id -> const id 
-          Nothing -> (\v -> v) 
-        newComparisonData = case cData of 
-          Just d -> const d 
-          Nothing -> (\v -> v)         
+        newVersionID = case vID of
+          Just id -> const id
+          Nothing -> (\v -> v)
+        newComparisonData = case cData of
+          Just d -> const d
+          Nothing -> (\v -> v)
         newVersionMapping =
           modifyNodeRootTree
             (\v -> v.elementID == tocID)
             (\string -> string)
-            (\v -> { elementID: v.elementID, versionID: newVersionID v.versionID, comparisonData: newComparisonData v.comparisonData })
+            ( \v ->
+                { elementID: v.elementID
+                , versionID: newVersionID v.versionID
+                , comparisonData: newComparisonData v.comparisonData
+                }
+            )
             state.versionMapping
       H.modify_ _ { versionMapping = newVersionMapping }
-      H.liftEffect $ log "Modified version" 
+      H.liftEffect $ log "Modified version"
 
     SetComparison elementID vID -> do
       state <- H.get
@@ -837,12 +845,14 @@ splitview = H.mkComponent
         title = fromMaybe
           ""
           (findTitleTOCEntry elementID state.tocEntries)
-      handleAction (ModifyVersionMapping elementID Nothing (Just (Just { tocEntry: tocEntry, revID: vID, title: title })))
-{-       H.modify_ _
-        { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } } -}
+      handleAction
+        ( ModifyVersionMapping elementID Nothing
+            (Just (Just { tocEntry: tocEntry, revID: vID, title: title }))
+        )
+      {-       H.modify_ _
+      { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } } -}
       H.tell _editor 1
         (Editor.ChangeSection title tocEntry vID)
-
 
     -- Query handler
 
@@ -983,7 +993,8 @@ splitview = H.mkComponent
             case
               findRootTree (\e -> e.elementID == selectedId) state.versionMapping
               of
-              Nothing -> {elementID: -1, versionID: Nothing , comparisonData: Nothing}
+              Nothing ->
+                { elementID: -1, versionID: Nothing, comparisonData: Nothing }
               Just elem -> elem
         -- handleAction (ModifyVersionMapping selectedID rev)
         H.tell _editor 0 (Editor.ChangeSection title entry ev.versionID)
@@ -991,7 +1002,7 @@ splitview = H.mkComponent
           Nothing -> do
             -- this case should be covered by mSelectedTocEntry being set to Nothing
             pure unit
-          Just d -> 
+          Just d ->
             H.tell _editor 1 (Editor.ChangeSection d.title d.tocEntry d.revID)
 
       TOC.ChangeToNode path title -> do

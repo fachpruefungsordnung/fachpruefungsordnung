@@ -149,11 +149,11 @@ data Action
 
 data EntityKind = Section | Paragraph
 
-
 data Query a
   = ReceiveTOCs (TOCTree) a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
+
 {- <<<<<<< HEAD
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
 
@@ -284,8 +284,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
             -- used to correctly identify which one is the newest version
             -- neither of the Nothing cases should ever occur
             newVersions = case head nV of
-              Just entry -> case tail nV of 
-                Just entries -> cons { identifier: Nothing, timestamp: entry.timestamp} entries
+              Just entry -> case tail nV of
+                Just entries -> cons
+                  { identifier: Nothing, timestamp: entry.timestamp }
+                  entries
                 Nothing -> nV
               Nothing -> nV
 
