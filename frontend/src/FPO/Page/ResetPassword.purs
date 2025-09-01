@@ -1,18 +1,16 @@
--- | Simple test page for password reset.
--- |
--- | This page is currently not connected to any backend and
--- | does not perform any meaningful password reset.
-
 module FPO.Page.ResetPassword (component) where
 
 import Prelude
 
+import Data.Argonaut (encodeJson)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String (null)
 import Data.String.Regex (regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
+import FPO.Data.Navigate (class Navigate)
+import FPO.Data.Request (postIgnore)
 import FPO.Data.Store as Store
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -50,6 +48,7 @@ component
   :: forall query output m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
+  => Navigate m
   => H.Component query Unit output m
 component =
   connect selectTranslator $ H.mkComponent
@@ -91,15 +90,23 @@ component =
     UpdatePasswordSecondary password -> do
       H.modify_ \state -> state { passwordSecondary = password }
     RequestCode -> do
-      -- TODO: This is where we would ask the backend to send a code to the user's email.
-      --       We could also, instead of handling a code here, simply send an email with a link
-      --       to reset the password.
-      --       For now, we are just emitting an error.
-      updateStore $ Store.AddWarning
-        "[TODO] A code has (not) been sent to you by email!"
+      state <- H.get
+      if null state.email then
+        updateStore $ Store.AddWarning $ translate (label :: _ "rp_NoEmail")
+          state.translator
+      else do
+        response <- postIgnore "/password-reset/request"
+          (encodeJson { resetRequestEmail: state.email })
+        case response of
+          Left _ -> pure unit
+          Right _ -> do
+            updateStore $ Store.AddSuccess
+              ( ( translate (label :: _ "prof_sentResetLinkDone")
+                    state.translator
+                ) <> state.email
+              )
     DoSubmit event -> do
       H.liftEffect $ preventDefault event
-
       st <- H.get
       if (st.passwordPrimary /= st.passwordSecondary) then do
         updateStore $ Store.AddWarning $ translate (label :: _ "rp_NoMatch")

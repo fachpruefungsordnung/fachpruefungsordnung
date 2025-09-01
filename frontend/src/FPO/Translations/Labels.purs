@@ -250,6 +250,7 @@ type Labels =
       ::: "rp_ConfirmationCode"
       ::: "rp_Header"
       ::: "rp_InputCode"
+      ::: "rp_NoEmail"
       ::: "rp_NoMatch"
       ::: "rp_PasswordConfirm"
       ::: "rp_PasswordNew"
