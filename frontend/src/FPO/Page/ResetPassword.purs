@@ -197,11 +197,23 @@ component =
               )
     DoSubmit event -> do
       H.liftEffect $ preventDefault event
-      st <- H.get
-      if (st.passwordPrimary /= st.passwordSecondary) then do
+      state <- H.get
+      if (state.passwordPrimary /= state.passwordSecondary) then do
         updateStore $ Store.AddWarning $ translate (label :: _ "rp_NoMatch")
-          st.translator
+          state.translator
       else do
-        updateStore $ Store.AddWarning "[TODO] Password reset is not supported yet!"
+        response <- postIgnore "/password-reset/confirm"
+          ( encodeJson
+              { resetConfirmToken: state.code
+              , resetConfirmNewPassword: state.passwordPrimary
+              }
+          )
+        case response of
+          Left _ -> pure unit
+          Right _ -> do
+            updateStore $ Store.AddSuccess $ translate
+              (label :: _ "prof_passwordUpdated")
+              state.translator
+    -- updateStore $ Store.AddWarning "[TODO] Password reset is not supported yet!"
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
