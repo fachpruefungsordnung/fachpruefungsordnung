@@ -33,6 +33,7 @@ module FPO.Data.Request
   , postJson
   , postRenderHtml
   , postString
+  , postIgnore
   , putIgnore
   , putJson
   , removeUser
@@ -305,6 +306,16 @@ getIgnore
   => String
   -> H.HalogenM st act slots msg m (Either AppError Unit)
 getIgnore url = handleUnitRequest url (getIgnore' url)
+
+postIgnore
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => String
+  -> Json
+  -> H.HalogenM st act slots msg m (Either AppError Unit)
+postIgnore url body = handleUnitRequest url (postIgnore' url body)
 
 postJson
   :: forall a st act slots msg m
@@ -670,6 +681,13 @@ postDocument' url body = do
 postBlob' :: String -> Json -> Aff (Either Error (Response Blob))
 postBlob' url body = do
   fpoRequest <- liftEffect $ defaultFpoRequest AXRF.blob ("/api" <> url) POST
+  let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
+
+-- | Makes a POST request and expects a Null response.
+postIgnore' :: String -> Json -> Aff (Either Error (Response Unit))
+postIgnore' url body = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.ignore ("/api" <> url) POST
   let request' = fpoRequest { content = Just (RequestBody.json body) }
   liftAff $ request driver request'
 
