@@ -39,7 +39,11 @@ import Language.Lsd.AST.Type.AppendixSection
     , AppendixSectionFormat (AppendixSectionFormat)
     , AppendixSectionTitle (AppendixSectionTitle)
     )
-import Language.Lsd.AST.Type.Document (DocumentFormat (DocumentFormat))
+import Language.Lsd.AST.Type.Document
+    ( DocumentFormat (DocumentFormat)
+    , TocFormat (TocFormat)
+    , TocHeading (TocHeading)
+    )
 import Language.Lsd.AST.Type.DocumentContainer
     ( DocumentContainerFormat (DocumentContainerFormat)
     , HeaderFooterFormat (HeaderFooterFormat)
@@ -192,7 +196,7 @@ testingSection =
 testingDocument :: Document
 testingDocument =
     Document
-        (DocumentFormat True)
+        (DocumentFormat $ Just $ TocFormat $ TocHeading "Inhaltsverzeichnis")
         ( DocumentHeading
             [ Word "This"
             , Space
@@ -237,7 +241,7 @@ testingAppendixSection =
   where
     doc =
         Document
-            (DocumentFormat True)
+            (DocumentFormat Nothing)
             ( DocumentHeading
                 [ Word "This"
                 , Space
