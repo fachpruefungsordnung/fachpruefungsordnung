@@ -2,16 +2,20 @@ module FPO.Components.Comment where
 
 import Prelude
 
+import Data.Argonaut.Core (jsonEmptyObject)
 import Data.Argonaut.Encode (encodeJson)
 import Data.Array (elem, find, snoc)
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..), maybe)
+import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.CommentDto as CD
+import FPO.Translations.Translator (fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types
   ( Comment
   , CommentSection
@@ -24,8 +28,10 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Store.Connect (connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
+import Simple.I18n.Translator (label, translate)
 
 type Input = Unit
 
@@ -33,22 +39,27 @@ data Output
   = CloseCommentSection
   | UpdateComment CommentSection
   | CommentOverview Int (Array FirstComment)
+  | SendAbstractedComments (Array FirstComment)
+  | ToDeleteComment
 
 data Action
   = Init
   | UpdateDraft String
   | SendComment
+  | ResolveComment
+  | DeleteComment
   | SelectingCommentSection Int
 
 data Query a
   = AddComment Int Int a
   | DeletedComment (Array Int) a
   | ReceiveTimeFormatter (Maybe Formatter) a
+  | RequestComments Int Int a
   | SelectedCommentSection Int Int Int a
   | Overview Int Int a
 
-type State =
-  { docID :: Int
+type State = FPOState
+  ( docID :: Int
   , tocID :: Int
   , markerID :: Int
   , commentSections :: Array CommentSection
@@ -56,7 +67,7 @@ type State =
   , newComment :: Boolean
   , commentDraft :: String
   , mTimeFormatter :: Maybe Formatter
-  }
+  )
 
 commentview
   :: forall m
@@ -64,9 +75,10 @@ commentview
   => MonadStore Store.Action Store.Store m
   => Navigate m
   => H.Component Query Input Output m
-commentview = H.mkComponent
-  { initialState: \_ ->
-      { docID: -1
+commentview = connect selectTranslator $ H.mkComponent
+  { initialState: \{ context } ->
+      { translator: fromFpoTranslator context
+      , docID: -1
       , tocID: -1
       , markerID: -1
       , commentSections: []
@@ -84,34 +96,41 @@ commentview = H.mkComponent
   }
   where
 
-  render :: State -> forall slots. H.ComponentHTML Action slots m
+  render :: State -> H.ComponentHTML Action () m
   render state = case state.mCommentSection of
     Nothing ->
       if state.newComment then
         HH.div [ HP.style "comment-section space-y-3" ]
-          [ renderInput state.commentDraft ]
+          [ renderInput state ]
       else
         HH.text ""
     Just commentSection ->
       HH.div [ HP.style "comment-section space-y-3" ]
-        ( renderComments state.mTimeFormatter commentSection
-            <> [ renderInput state.commentDraft ]
+        ( renderComments state commentSection
+            <>
+              ( if commentSection.resolved then []
+                else [ renderInput state ]
+              )
         )
 
   renderComments
-    :: Maybe Formatter
+    :: State
     -> CommentSection
     -> forall slots
      . Array (H.ComponentHTML Action slots m)
-  renderComments mFormatter commentSection = case commentSection.first of
+  renderComments state commentSection = case commentSection.first of
     Nothing -> [ HH.text "" ]
-    Just cs ->
-      [ renderFirstComment mFormatter cs ]
-        <> map (renderComment mFormatter) commentSection.replies
+    Just c ->
+      [ renderFirstComment state c commentSection.resolved ]
+        <> map (renderComment state) commentSection.replies
 
   renderFirstComment
-    :: Maybe Formatter -> Comment -> forall slots. H.ComponentHTML Action slots m
-  renderFirstComment mFormatter c =
+    :: State
+    -> Comment
+    -> Boolean
+    -> forall slots
+     . H.ComponentHTML Action slots m
+  renderFirstComment state c resolved =
     HH.div
       [ HP.classes
           [ HB.p2
@@ -122,7 +141,9 @@ commentview = H.mkComponent
           , HB.dFlex
           , HB.flexColumn
           ]
-      , HP.style "background-color:rgba(246, 250, 0, 0.9);"
+      , HP.style $ "background-color:"
+          <> (if resolved then "rgba(66, 250, 0, 0.9)" else "rgba(246, 250, 0, 0.9)")
+          <> ";"
       ]
       [ HH.div_
           [ HH.div
@@ -138,15 +159,16 @@ commentview = H.mkComponent
           [ HP.classes [ HB.mt2 ]
           , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;"
           ]
-          [ HH.text $ maybe "No timestamp found."
+          [ HH.text $ maybe
+              (translate (label :: _ "comment_no_timestamp") state.translator)
               (\formatter -> format formatter c.timestamp)
-              mFormatter
+              state.mTimeFormatter
           ]
       ]
 
   renderComment
-    :: Maybe Formatter -> Comment -> forall slots. H.ComponentHTML Action slots m
-  renderComment mFormatter c =
+    :: State -> Comment -> forall slots. H.ComponentHTML Action slots m
+  renderComment state c =
     HH.div
       [ HP.classes
           [ HB.p1
@@ -174,26 +196,70 @@ commentview = H.mkComponent
           [ HP.classes [ HB.mt2 ]
           , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;"
           ]
-          [ HH.text $ maybe "No timestamp found."
+          [ HH.text $ maybe
+              (translate (label :: _ "comment_no_timestamp") state.translator)
               (\formatter -> format formatter c.timestamp)
-              mFormatter
+              state.mTimeFormatter
           ]
       ]
 
-  renderInput :: String -> forall slots. H.ComponentHTML Action slots m
-  renderInput draft =
-    HH.div [ HP.style "flex flex-col space-y-2" ]
+  renderInput :: State -> forall slots. H.ComponentHTML Action slots m
+  renderInput state =
+    HH.div
+      [ HP.classes [ HB.dFlex, HB.flexColumn ]
+      , HP.style
+          "gap: .5rem; padding-left: 0.5rem; padding-right: 0.5rem; padding-top: 0.75rem; padding-bottom: 1rem;"
+      ]
       [ HH.textarea
-          [ HP.style "border rounded-md p-2 resize-none"
+          [ HP.style
+              "border-radius: .375rem; padding: .5rem; resize: none; min-height: 5rem;"
           , HP.rows 3
-          , HP.value draft
+          , HP.value state.commentDraft
           , HE.onValueChange UpdateDraft
           ]
-      , HH.button
-          [ HP.style "bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
-          , HE.onClick \_ -> SendComment
+      , HH.div
+          [ HP.classes [ HB.dFlex, HB.alignItemsCenter, HB.w100 ]
+          , HP.style "gap: .5rem; padding-left: 0.5rem; padding-right: 0.5rem;"
           ]
-          [ HH.text "Senden" ]
+          [ -- Senden (links)
+            HH.button
+              [ HP.classes [ HB.btn, HB.btnPrimary, HB.px3, HB.py1, HB.m0 ]
+              , HP.style "white-space: nowrap;"
+              , HE.onClick \_ -> SendComment
+              ]
+              [ HH.small [ HP.style "margin-right: 0.25rem;" ]
+                  [ HH.text (translate (label :: _ "comment_send") state.translator) ]
+              , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-send" ] ] []
+              ]
+
+          -- Resolve (rechts)
+          , if state.newComment then
+              HH.button
+                [ HP.classes
+                    [ HB.btn, HB.btnDanger, HB.px3, HB.py1, HB.m0, HB.msAuto ]
+                , HP.style "white-space: nowrap;"
+                , HE.onClick \_ -> DeleteComment
+                ]
+                [ HH.small [ HP.style "margin-right: 0.25rem;" ]
+                    [ HH.text
+                        (translate (label :: _ "comment_delete") state.translator)
+                    ]
+                , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
+                ]
+            else
+              HH.button
+                [ HP.classes
+                    [ HB.btn, HB.btnSuccess, HB.px3, HB.py1, HB.m0, HB.msAuto ]
+                , HP.style "white-space: nowrap;"
+                , HE.onClick \_ -> ResolveComment
+                ]
+                [ HH.small [ HP.style "margin-right: 0.25rem;" ]
+                    [ HH.text
+                        (translate (label :: _ "comment_resolve") state.translator)
+                    ]
+                , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
+                ]
+          ]
       ]
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
@@ -208,8 +274,10 @@ commentview = H.mkComponent
 
     SendComment -> do
       state <- H.get
+      -- only send, if the the user has wrote something
       when (state.commentDraft /= "") do
         let pText = encodeJson { text: state.commentDraft }
+        -- Is it the first comment sent?
         if state.newComment then do
           res <- Request.postJson CD.decodeSection
             ( "/docs/" <> show state.docID <> "/text/" <> show state.tocID <>
@@ -241,6 +309,7 @@ commentview = H.mkComponent
           case res of
             Left _ -> pure unit
             Right com -> do
+              -- update the current commentSection in the list of other commentSections
               case state.mCommentSection of
                 Nothing -> pure unit
                 Just cs -> do
@@ -254,17 +323,56 @@ commentview = H.mkComponent
                     , commentDraft = ""
                     }
 
-    SelectingCommentSection markerID -> do
+    ResolveComment -> do
       state <- H.get
-      let commentSections = state.commentSections
-      when (markerID /= state.markerID) do
-        case (find (\cs -> cs.markerID == markerID) commentSections) of
-          Nothing -> pure unit
-          Just section -> do
-            H.modify_ \st -> st
-              { markerID = markerID
-              , mCommentSection = Just section
-              }
+      _ <- Request.postIgnore
+        ( "/docs/" <> show state.docID <> "/text/" <> show state.tocID
+            <> "/comments/"
+            <> show state.markerID
+            <> "/resolve"
+        )
+        jsonEmptyObject
+      case state.mCommentSection of
+        -- should not happen
+        Nothing -> pure unit
+        Just cs -> do
+          let
+            newCs = cs { resolved = true }
+            newCSs = updateCommentSection newCs state.commentSections
+          H.modify_ _
+            { commentSections = newCSs
+            , mCommentSection = Just newCs
+            , commentDraft = ""
+            }
+          -- Delete it from Editor
+          H.raise (ToDeleteComment)
+
+    DeleteComment -> do
+      H.modify_ _
+        { markerID = -1
+        , newComment = false
+        , commentDraft = ""
+        }
+      H.raise (ToDeleteComment)
+
+    SelectingCommentSection markerID -> do
+      if markerID == -360 then do
+        H.modify_ \st -> st
+          { markerID = -360
+          , mCommentSection = Nothing
+          , newComment = true
+          }
+      else do
+        state <- H.get
+        let commentSections = state.commentSections
+        when (markerID /= state.markerID) do
+          case (find (\cs -> cs.markerID == markerID) commentSections) of
+            Nothing -> pure unit
+            Just section -> do
+              H.modify_ \st -> st
+                { markerID = markerID
+                , mCommentSection = Just section
+                }
 
   handleQuery
     :: forall slots a
@@ -273,10 +381,24 @@ commentview = H.mkComponent
   handleQuery = case _ of
 
     AddComment docID tocID a -> do
+      -- load comments, when section was changed
+      state <- H.get
+      when (state.docID /= docID || tocID /= state.tocID) do
+        recComs <- H.liftAff
+          $ Request.getFromJSONEndpoint CD.decodeCommentSection
+          $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
+        let
+          commentSections = case recComs of
+            Nothing -> []
+            Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
+        H.modify_ \st -> st
+          { docID = docID
+          , tocID = tocID
+          , commentSections = commentSections
+          }
+      -- Always set this
       H.modify_ \st -> st
-        { docID = docID
-        , tocID = tocID
-        , markerID = -360
+        { markerID = -360
         , mCommentSection = Nothing
         , newComment = true
         }
@@ -292,16 +414,25 @@ commentview = H.mkComponent
       H.modify_ \state -> state { mTimeFormatter = mTimeFormatter }
       pure (Just a)
 
+    RequestComments docID tocID a -> do
+      state <- H.get
+      if (state.docID /= docID || tocID /= state.tocID) then do
+        commentSections <- H.liftAff $ fetchCommentSections docID tocID
+        H.modify_ \st -> st
+          { docID = docID, tocID = tocID, commentSections = commentSections }
+        let cs = map extractFirst commentSections
+        H.raise (SendAbstractedComments cs)
+      else do
+        let
+          css = state.commentSections
+          cs = map extractFirst css
+        H.raise (SendAbstractedComments cs)
+      pure (Just a)
+
     SelectedCommentSection docID tocID markerID a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
-        recComs <- H.liftAff
-          $ Request.getFromJSONEndpoint CD.decodeCommentSection
-          $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
-        let
-          commentSections = case recComs of
-            Nothing -> []
-            Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
+        commentSections <- H.liftAff $ fetchCommentSections docID tocID
         H.modify_ \st -> st
           { docID = docID, tocID = tocID, commentSections = commentSections }
         handleAction $ SelectingCommentSection markerID
@@ -312,16 +443,10 @@ commentview = H.mkComponent
     Overview docID tocID a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
-        recComs <- H.liftAff
-          $ Request.getFromJSONEndpoint CD.decodeCommentSection
-          $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
-        let
-          commentSections = case recComs of
-            Nothing -> []
-            Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
-          cs = map extractFirst commentSections
+        commentSections <- H.liftAff $ fetchCommentSections docID tocID
         H.modify_ \st -> st
           { docID = docID, tocID = tocID, commentSections = commentSections }
+        let cs = map extractFirst commentSections
         H.raise (CommentOverview state.tocID cs)
       else do
         let
@@ -330,13 +455,20 @@ commentview = H.mkComponent
         H.raise (CommentOverview state.tocID cs)
       pure (Just a)
 
+  fetchCommentSections :: Int -> Int -> Aff (Array CommentSection)
+  fetchCommentSections docID tocID =
+    (maybe [] (map sectionDtoToCS <<< CD.getCommentSections))
+      <$> Request.getFromJSONEndpoint CD.decodeCommentSection url
+    where
+    url = "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
+
   updateCommentSection
     :: CommentSection -> Array CommentSection -> Array CommentSection
   updateCommentSection cs = map \c ->
     if c.markerID == cs.markerID then cs else c
 
   extractFirst :: CommentSection -> FirstComment
-  extractFirst { markerID, first } = case first of
-    Nothing -> { markerID: -1, first: emptyComment }
-    Just c -> { markerID: markerID, first: c }
+  extractFirst { markerID, resolved, first } = case first of
+    Nothing -> { markerID: -1, resolved: true, first: emptyComment }
+    Just c -> { markerID, resolved, first: c }
 

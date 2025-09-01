@@ -5,7 +5,7 @@ import Prelude
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff)
-import FPO.Types (Comment, FirstComment)
+import FPO.Types (FirstComment)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -51,8 +51,8 @@ commentOverviewview = H.mkComponent
     _ ->
       HH.div [ HP.style "comment-section space-y-3" ]
         ( map
-            ( \{ markerID, first } ->
-                (renderFirstComment state.mTimeFormatter first state.tocID markerID)
+            ( \first ->
+                (renderFirstComment state.mTimeFormatter first state.tocID)
             )
             state.comments
         )
@@ -82,12 +82,11 @@ commentOverviewview = H.mkComponent
 
   renderFirstComment
     :: Maybe Formatter
-    -> Comment
-    -> Int
+    -> FirstComment
     -> Int
     -> forall slots
      . H.ComponentHTML Action slots m
-  renderFirstComment mFormatter c tocID markerID =
+  renderFirstComment mFormatter c tocID =
     HH.div
       [ HP.classes
           [ HB.p2
@@ -98,25 +97,28 @@ commentOverviewview = H.mkComponent
           , HB.dFlex
           , HB.flexColumn
           ]
-      , HP.style "background-color:rgba(246, 250, 0, 0.9);"
-      , HE.onClick \_ -> SelectCommentSection tocID markerID
+      , HP.style $ "background-color:"
+          <>
+            (if c.resolved then "rgba(66, 250, 0, 0.9)" else "rgba(246, 250, 0, 0.9)")
+          <> ";"
+      , HE.onClick \_ -> SelectCommentSection tocID c.markerID
       ]
       [ HH.div_
           [ HH.div
               [ HP.style "font-weight: 600; font-size: 1.2rem;" ]
-              [ HH.text c.author ]
+              [ HH.text c.first.author ]
           , HH.div
               [ HP.classes [ HB.mt1 ]
               , HP.style "font-size: 1rem;"
               ]
-              [ HH.text c.content ]
+              [ HH.text c.first.content ]
           ]
       , HH.div
           [ HP.classes [ HB.mt2 ]
           , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;"
           ]
           [ HH.text $ maybe "No timestamp found."
-              (\formatter -> format formatter c.timestamp)
+              (\formatter -> format formatter c.first.timestamp)
               mFormatter
           ]
       ]

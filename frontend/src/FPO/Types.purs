@@ -47,6 +47,7 @@ type CommentSection =
 
 type FirstComment =
   { markerID :: Int
+  , resolved :: Boolean
   , first :: Comment
   }
 
@@ -212,6 +213,6 @@ sectionDtoToCS (Section { id, firstComment, replies, status }) =
     fst = cdCommentToComment firstComment
     rep = map cdCommentToComment replies
     -- comments = cons fst rep
-    resolved = if status == "open" then true else false
+    resolved = status == "Resolved"
   in
     { markerID: id, first: Just fst, replies: rep, resolved: resolved }

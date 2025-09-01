@@ -42,6 +42,7 @@ package:
     - stringutils
     - transformers
     - tuples
+    - unordered-collections
     - unsafe-coerce
     - web-dom
     - web-events
