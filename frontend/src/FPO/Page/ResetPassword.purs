@@ -195,7 +195,7 @@ component =
           Left _ -> pure unit
           Right _ -> do
             updateStore $ Store.AddSuccess
-              ( ( translate (label :: _ "prof_sentResetLinkDone")
+              ( ( translate (label :: _ "common_sentResetLinkDone")
                     state.translator
                 ) <> state.email
               )
@@ -217,7 +217,7 @@ component =
           Right (Left msg) -> updateStore $ Store.AddError $ ServerError msg
           Right (Right _) -> do
             updateStore $ Store.AddSuccess $ translate
-              (label :: _ "prof_passwordUpdated")
+              (label :: _ "common_passwordUpdated")
               state.translator
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
