@@ -23,7 +23,6 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
-import Prim.Boolean (False)
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
 import Web.Event.Internal.Types (Event)
@@ -37,6 +36,7 @@ data Action
   | UpdatePasswordSecondary String
   | UpdateCode String
   | Receive (Connected FPOTranslator Input)
+  | EnableMail
 
 type State = FPOState
   ( email :: String
@@ -84,16 +84,49 @@ component =
           , HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
               [ HH.form
                   [ HE.onSubmit DoSubmit ]
-                  [ addColumn
-                      state.email
-                      ( translate (label :: _ "common_emailAddress") state.translator
-                          <> ":"
-                      )
-                      (translate (label :: _ "common_email") state.translator)
-                      "bi-envelope-fill"
-                      state.calledWithToken
-                      HP.InputEmail
-                      UpdateEmail
+                  [ HH.label [ HP.classes [ HB.formLabel ] ]
+                      [ HH.text
+                          ( translate (label :: _ "common_emailAddress")
+                              state.translator
+                              <> ":"
+                          )
+                      ]
+                  , HH.div
+                      [ HP.classes
+                          ( [ HB.inputGroup ] <>
+                              if state.calledWithToken then [] else [ HB.mb4 ]
+                          )
+                      ]
+                      [ HH.span
+                          [ HP.classes [ HB.inputGroupText ]
+                          , HE.onClick \_ -> EnableMail
+                          ]
+                          [ HH.i [ HP.class_ (H.ClassName "bi-envelope-fill") ] [] ]
+                      , HH.input
+                          ( [ HP.type_ HP.InputEmail
+                            , HP.classes [ HB.formControl ]
+                            , HP.placeholder
+                                ( translate (label :: _ "common_email")
+                                    state.translator
+                                )
+                            , HP.value state.email
+                            , HE.onValueInput UpdateEmail
+                            ] <>
+                              ( if state.calledWithToken then [ HP.disabled true ]
+                                else []
+                              )
+                          )
+                      ]
+                  , HH.small
+                      [ HP.classes [ HB.textMuted, HB.mb4 ] ] -- using small more often seems to shrinken the text even more, which looks better
+                      [ HH.small_
+                          [ if state.calledWithToken then
+                              HH.text $
+                                "If you need a new code, click on the mail icon and enter your email."
+                            else
+                              HH.text ""
+                          ]
+                      ]
                   , addColumn
                       state.passwordPrimary
                       ( translate (label :: _ "rp_PasswordNew") state.translator <>
@@ -229,3 +262,5 @@ component =
               state.translator
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
+    EnableMail -> do
+      H.modify_ \state -> state { calledWithToken = false }
