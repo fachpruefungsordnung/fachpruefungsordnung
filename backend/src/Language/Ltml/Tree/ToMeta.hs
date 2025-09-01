@@ -23,7 +23,7 @@ import Language.Lsd.AST.Type
     , properTypeCollect'
     )
 import Language.Lsd.AST.Type.DocumentContainer (DocumentContainerType)
-import Language.Lsd.Example.Fpo (fpoT)
+import Language.Lsd.Example (availableLSDs)
 import Language.Lsd.ToMetaMap (buildMetaMap)
 import Language.Ltml.Common (Flagged (Flagged))
 import Language.Ltml.Tree
@@ -56,8 +56,7 @@ buildMeta hs tree = do
     return (metaTree, metaMap)
   where
     getRootType (Flagged _ (TypedTree kindName typeName _)) =
-        -- TODO: Do not hard-code (`fpoT`).
-        case find ((== fullTypeName) . fullTypeNameOf) [fpoT] of
+        case find ((== fullTypeName) . fullTypeNameOf) availableLSDs of
             Just t -> Right t
             Nothing -> Left $ "Unknown type: " ++ show fullTypeName
       where
