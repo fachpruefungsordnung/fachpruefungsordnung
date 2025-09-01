@@ -443,9 +443,13 @@ component =
             (encodeJson { resetRequestEmail: mailAddress })
           case response of
             Left _ -> pure unit
-            Right _ ->
+            Right _ -> do
+              state <- H.get
               updateStore $ Store.AddSuccess
-                ("Sent password reset link to " <> mailAddress)
+                ( ( translate (label :: _ "prof_sentResetLinkDone")
+                      state.translator
+                  ) <> mailAddress
+                )
     HideLinkToast -> H.modify_ _ { showLinkToast = false }
 
     NewPwInput v -> H.modify_ _ { newPw = v }

@@ -238,6 +238,7 @@ type Labels =
       ::: "prof_role"
       ::: "prof_rolesHelp"
       ::: "prof_sendResetLink"
+      ::: "prof_sentResetLinkDone"
       ::: "prof_unsaved"
       ::: "prof_updatePassword"
       ::: "prof_userData"
