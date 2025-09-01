@@ -114,8 +114,6 @@ sendPasswordResetEmail userEmail userName resetUrl = do
             , "<p><strong>Important:</strong> This link will expire in 1 hour for security reasons.</p>"
             , "<p>If you did not request this password reset, please ignore this email. Your password will remain unchanged.</p>"
             , "<hr>"
-            , "<p>Note: The UI is currently not implemented, so use the /password-reset/confirm endpoint manually (https://batailley.informatik.uni-kiel.de/swagger/).</p>"
-            , "<hr>"
             , "<p><small>Best regards,<br>The Fachprüfungsordnung Team</small></p>"
             , "</body></html>"
             ]
