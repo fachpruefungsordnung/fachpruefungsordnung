@@ -19,7 +19,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick, onSubmit, onValueInput) as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
@@ -32,13 +32,11 @@ data Action
   | UpdatePasswordPrimary String
   | UpdatePasswordSecondary String
   | UpdateCode String
-  | EmitError String
   | Receive (Connected FPOTranslator Unit)
 
 type State = FPOState
   ( passwordPrimary :: String
   , passwordSecondary :: String
-  , error :: Maybe String
   , code :: String
   )
 
@@ -54,7 +52,6 @@ component =
         { passwordPrimary: ""
         , passwordSecondary: ""
         , code: ""
-        , error: Nothing
         , translator: fromFpoTranslator context
         }
     , render
@@ -71,44 +68,33 @@ component =
     HH.div
       [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
       [ renderResetForm state
-      , HH.div [ HP.classes [ HB.textCenter ] ]
-          [ case state.error of
-              Just err -> HH.div [ HP.classes [ HB.alert, HB.alertDanger ] ]
-                [ HH.text err ]
-              Nothing -> HH.text ""
-          ]
       ]
 
   handleAction :: MonadAff m => Action -> H.HalogenM State Action () output m Unit
   handleAction = case _ of
     Initialize -> pure unit
     UpdateCode code -> do
-      H.modify_ \state -> state { code = code, error = Nothing }
+      H.modify_ \state -> state { code = code }
     UpdatePasswordPrimary password -> do
-      H.modify_ \state -> state { passwordPrimary = password, error = Nothing }
+      H.modify_ \state -> state { passwordPrimary = password }
     UpdatePasswordSecondary password -> do
-      H.modify_ \state -> state { passwordSecondary = password, error = Nothing }
+      H.modify_ \state -> state { passwordSecondary = password }
     RequestCode -> do
       -- TODO: This is where we would ask the backend to send a code to the user's email.
       --       We could also, instead of handling a code here, simply send an email with a link
       --       to reset the password.
       --       For now, we are just emitting an error.
-      H.modify_ \state -> state
-        { error = Just "[TODO] A code has (not) been sent to you by email!" }
-      pure unit
+      updateStore $ Store.AddWarning
+        "[TODO] A code has (not) been sent to you by email!"
     DoSubmit event -> do
       H.liftEffect $ preventDefault event
 
       st <- H.get
       if (st.passwordPrimary /= st.passwordSecondary) then do
-        H.modify_ \state -> state
-          { error = Just $ translate (label :: _ "rp_NoMatch") st.translator }
+        updateStore $ Store.AddWarning $ translate (label :: _ "rp_NoMatch")
+          st.translator
       else do
-        H.modify_ \state -> state
-          { error = Just "[TODO] Password reset is not supported yet!" }
-    EmitError error -> do
-      H.modify_ \state -> state { error = Just error }
-
+        updateStore $ Store.AddWarning "[TODO] Password reset is not supported yet!"
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
 
