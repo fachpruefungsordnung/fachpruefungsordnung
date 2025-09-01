@@ -8,7 +8,9 @@ module Docs.Tree
     , Edge (..)
     , Node (..)
     , NodeHeader (..)
+    , treeMapM
     , withTextRevisions
+    , filterMapNode
     ) where
 
 import Data.Functor ((<&>))
@@ -36,6 +38,7 @@ import Data.OpenApi
     , type_
     )
 
+import Data.Maybe (mapMaybe)
 import qualified Data.Text as Text
 import Data.Typeable (typeRep)
 import Docs.Hash (Hashable (..))
@@ -50,6 +53,7 @@ import Docs.TextRevision
 data NodeHeader = NodeHeader
     { headerKind :: Text
     , headerType :: Text
+    , heading :: Maybe Text
     }
     deriving (Show, Generic)
 
@@ -193,3 +197,26 @@ withTextRevisions getTextRevision = withTextRevisions'
         getTextRevision (TextElement.identifier textElement)
             <&> Leaf . TextElementRevision textElement
     mapEdge (Edge label tree) = treeWithTextRevisions tree <&> Edge label
+
+treeMapM
+    :: (Monad m)
+    => (a -> m b)
+    -> Node a
+    -> m (Node b)
+treeMapM getTextRevision = withTextRevisions'
+  where
+    withTextRevisions' (Node metaData edges) = mapM mapEdge edges <&> Node metaData
+    treeWithTextRevisions (Tree node) = withTextRevisions' node <&> Tree
+    treeWithTextRevisions (Leaf x) =
+        getTextRevision x
+            <&> Leaf
+    mapEdge (Edge label tree) = treeWithTextRevisions tree <&> Edge label
+
+filterMapNode :: (a -> Maybe b) -> Node a -> Node b
+filterMapNode f (Node header' children') = Node header' $ mapMaybe edge children'
+  where
+    edge (Edge title' child) = case tree child of
+        Just x' -> Just $ Edge title' x'
+        Nothing -> Nothing
+    tree (Tree n) = Just $ Tree $ filterMapNode f n
+    tree (Leaf l) = Leaf <$> f l

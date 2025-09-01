@@ -42,7 +42,7 @@ import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
-import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..))
+import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..), TreeHeader(..))
 import FPO.Dto.PostTextDto (PostTextDto(..))
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Page.Home (formatRelativeTime)
@@ -367,7 +367,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
         newEntry = Node
           { title: "New Section"
           , children: []
-          , header: { headerKind: "section", headerType: "section" }
+          , header: TreeHeader
+              { headerKind: "section", headerType: "section", heading: "" }
           }
       H.raise (AddNode path newEntry)
 

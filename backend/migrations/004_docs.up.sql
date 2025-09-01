@@ -27,7 +27,8 @@ CREATE INDEX IF NOT EXISTS doc_text_revisions_timestamp_index ON doc_text_revisi
 CREATE TABLE IF NOT EXISTS doc_tree_nodes (
     hash BYTEA PRIMARY KEY NOT NULL, -- hash over metadata and children
     kind TEXT NOT NULL,
-    type TEXT NOT NULL
+    type TEXT NOT NULL,
+    heading TEXT
 );
 
 CREATE TABLE IF NOT EXISTS doc_tree_edges (
@@ -36,6 +37,7 @@ CREATE TABLE IF NOT EXISTS doc_tree_edges (
     title TEXT NOT NULL,
     child_node BYTEA REFERENCES doc_tree_nodes (hash),
     child_text_element BIGINT REFERENCES doc_text_elements (id),
+    creation_ts TIMESTAMPTZ DEFAULT now(),
     PRIMARY KEY (parent, position),
     CHECK (
         (

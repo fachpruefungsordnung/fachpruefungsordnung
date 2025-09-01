@@ -8,13 +8,14 @@ where
 import Data.Text (Text, unlines)
 import Language.Ltml.Common (Flagged (Flagged))
 import Language.Ltml.Tree
-    ( FlaggedTree
+    ( FlaggedInputTree'
     , Tree (Leaf, Tree)
+    , TypedInputTree'
     , TypedTree (TypedTree)
     )
 import Prelude hiding (unlines)
 
-fpoTree :: FlaggedTree
+fpoTree :: FlaggedInputTree'
 fpoTree =
     Flagged False $
         TypedTree "document-container" "fpo-container" $
@@ -36,7 +37,7 @@ fpoTree =
             , "header-footer-date: 2025-08-26"
             ]
 
-mainDocTree :: FlaggedTree
+mainDocTree :: FlaggedInputTree'
 mainDocTree =
     Flagged False $
         TypedTree "document" "fpo-maindoc" $
@@ -65,16 +66,16 @@ mainDocTree =
             TypedTree "simple-section-sequence" "" $
                 Leaf extroText
 
-appTrees :: [FlaggedTree]
+appTrees :: [FlaggedInputTree']
 appTrees = [appendixTree, attachmentsTree]
 
-appendixTree :: FlaggedTree
+appendixTree :: FlaggedInputTree'
 appendixTree =
     Flagged False $
         TypedTree "appendix-section" "appendix" $
             Tree Nothing []
 
-attachmentsTree :: FlaggedTree
+attachmentsTree :: FlaggedInputTree'
 attachmentsTree =
     Flagged False $
         TypedTree "appendix-section" "attachments" $
@@ -101,7 +102,7 @@ introText =
         , "// \"Aufgrund ... wird ... erlassen:\""
         ]
 
-sampleSectionTree :: TypedTree
+sampleSectionTree :: TypedInputTree'
 sampleSectionTree =
     TypedTree "section" "section" $
         Leaf sampleSectionText

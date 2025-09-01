@@ -15,9 +15,9 @@ import Language.Ltml.AST.DocumentContainer
     ( DocumentContainer (DocumentContainer)
     , DocumentContainerHeader
     )
-import Language.Ltml.Common (Flagged)
+import Language.Ltml.Common (Flagged')
 import Language.Ltml.Parser.DocumentContainer (documentContainerHeaderP)
-import Language.Ltml.Tree (FlaggedTree, Tree (Leaf, Tree))
+import Language.Ltml.Tree (FlaggedInputTree', InputTree', Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
     ( TreeParser
     , disjNFlaggedTreePF
@@ -29,11 +29,11 @@ import Language.Ltml.Tree.Parser.Document (documentTP)
 
 documentContainerTP
     :: Disjunction (NamedType DocumentContainerType)
-    -> FlaggedTree
-    -> TreeParser (Flagged DocumentContainer)
+    -> FlaggedInputTree'
+    -> TreeParser (Flagged' DocumentContainer)
 documentContainerTP = disjNFlaggedTreePF aux
   where
-    aux :: DocumentContainerType -> Tree -> TreeParser DocumentContainer
+    aux :: DocumentContainerType -> InputTree' -> TreeParser DocumentContainer
     aux _ (Leaf _) = treeError "Document container node is leaf"
     aux _ (Tree _ []) =
         treeError "Document container lacks main document child"
@@ -51,8 +51,8 @@ headerTP (Just x) = leafParser documentContainerHeaderP x
 
 appendicesTP
     :: Sequence (NamedType AppendixSectionType)
-    -> [FlaggedTree]
-    -> TreeParser [Flagged AppendixSection]
+    -> [FlaggedInputTree']
+    -> TreeParser [Flagged' AppendixSection]
 appendicesTP (Sequence ts) tTrees =
     case safeZipWith appendixSectionTP ts tTrees of
         Nothing -> treeError "Wrong number of appendix sections"

@@ -46,6 +46,7 @@ import FPO.Dto.DocumentDto.TreeDto
   ( Edge(..)
   , RootTree(..)
   , Tree(..)
+  , TreeHeader(..)
   , findRootTree
   , modifyNodeRootTree
   )
@@ -1047,7 +1048,9 @@ addRootNode [] entry (RootTree { children, header }) =
   RootTree { children: snoc children (Edge entry), header }
 addRootNode _ entry Empty =
   RootTree
-    { children: [ Edge entry ], header: { headerKind: "root", headerType: "root" } }
+    { children: [ Edge entry ]
+    , header: TreeHeader { headerKind: "root", headerType: "root", heading: "" }
+    }
 addRootNode path entry (RootTree { children, header }) =
   case uncons path of
     Nothing ->
@@ -1238,7 +1241,7 @@ insertNodeAtPosition [] node tree =
   case tree of
     Empty -> RootTree
       { children: [ Edge node ]
-      , header: { headerKind: "root", headerType: "root" }
+      , header: TreeHeader { headerKind: "root", headerType: "root", heading: "" }
       }
     RootTree { children, header } ->
       RootTree { children: snoc children (Edge node), header }
@@ -1246,7 +1249,7 @@ insertNodeAtPosition [] node tree =
 insertNodeAtPosition _ node Empty =
   RootTree
     { children: [ Edge node ]
-    , header: { headerKind: "root", headerType: "root" }
+    , header: TreeHeader { headerKind: "root", headerType: "root", heading: "" }
     }
 
 insertNodeAtPosition path node (RootTree { children, header }) =

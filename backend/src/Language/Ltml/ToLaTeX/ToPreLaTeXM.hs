@@ -8,6 +8,7 @@ import Control.Lens (use, (%=), (.=), (.~))
 import Control.Monad.State (MonadState (get, put), State, modify, runState)
 import qualified Data.DList as DList
 import qualified Data.Map as Map
+import Data.Text (Text)
 import qualified Data.Text.Lazy as LT
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Format
@@ -21,7 +22,11 @@ import Language.Lsd.AST.Type.AppendixSection
     , AppendixSectionFormat (AppendixSectionFormat)
     , AppendixSectionTitle (AppendixSectionTitle)
     )
-import Language.Lsd.AST.Type.Document (DocumentFormat (..))
+import Language.Lsd.AST.Type.Document
+    ( DocumentFormat (..)
+    , TocFormat (TocFormat)
+    , TocHeading (TocHeading)
+    )
 import Language.Lsd.AST.Type.DocumentContainer
     ( DocumentContainerFormat (DocumentContainerFormat)
     )
@@ -70,7 +75,7 @@ import Language.Ltml.AST.Text
     , SentenceStart (..)
     , TextTree (..)
     )
-import Language.Ltml.Common (Flagged (Flagged))
+import Language.Ltml.Common (Flagged (Flagged), Flagged')
 import Language.Ltml.ToLaTeX.Format
     ( Stylable (..)
     , formatHeading
@@ -113,7 +118,7 @@ instance (ToPreLaTeXM a) => ToPreLaTeXM [a] where
 
 ------------------------------- Flagged ----------------------------------
 
-instance (ToPreLaTeXM a) => ToPreLaTeXM (Flagged a) where
+instance (ToPreLaTeXM a) => ToPreLaTeXM (Flagged' a) where
     toPreLaTeXM (Flagged b content) = do
         {- first check whether the global render flag (flaggedParent) is set -}
         b0 <- use (GS.flagState . GS.flaggedParent)
@@ -327,7 +332,7 @@ instance Labelable Document where
     attachLabel
         mLabel
         ( Document
-                (DocumentFormat hasTOC)
+                (DocumentFormat mTOC)
                 (DocumentHeading tt)
                 (DocumentBody intro content outro)
                 footnotemap
@@ -354,7 +359,9 @@ instance Labelable Document where
             outro' <- toPreLaTeXM outro
 
             {- if we need a toc then we assemble it. -}
-            toc' <- if hasTOC then buildTOC else pure mempty
+            toc' <- case mTOC of
+                Nothing -> pure mempty
+                Just (TocFormat (TocHeading tocHeading)) -> buildTOC tocHeading
 
             isFlagged <- use (GS.flagState . GS.flaggedParent)
 
@@ -384,17 +391,17 @@ instance Labelable Document where
                         fmt <- use (GS.formatState . GS.docHeadingFormat)
                         createHeading fmt tt' (IText " ")
 
-            buildTOC :: State GS.GlobalState PreLaTeX
-            buildTOC = do
+            buildTOC :: Text -> State GS.GlobalState PreLaTeX
+            buildTOC tocHeading = do
                 t <- use (GS.flagState . GS.docType)
-                case t of
-                    GS.Main -> do
-                        toc' <- use GS.toc
-                        appendixHeaders' <- use GS.appendixHeaders
-                        pure $ ISequence $ DList.toList (toc' <> appendixHeaders')
-                    GS.Appendix -> do
-                        toc' <- use GS.toc
-                        pure $ ISequence $ DList.toList toc'
+                toc' <- use GS.toc
+                appendixHeaders' <- use GS.appendixHeaders
+                pure $
+                    IText (LT.fromStrict tocHeading) <> case t of
+                        GS.Appendix ->
+                            ISequence $ DList.toList toc'
+                        GS.Main ->
+                            ISequence $ DList.toList (toc' <> appendixHeaders')
 
 -------------------------------- AppendixSection -----------------------------------
 
