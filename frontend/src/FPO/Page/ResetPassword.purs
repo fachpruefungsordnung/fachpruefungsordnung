@@ -122,7 +122,7 @@ component =
                       [ HH.small_
                           [ if state.calledWithToken then
                               HH.text $
-                                ( translate (label :: _ "rp_ifYouNeedANewCode")
+                                ( translate (label :: _ "rp_IfYouNeedANewCode")
                                     state.translator
                                 )
                             else
