@@ -98,7 +98,8 @@ buildMetaTree t hs tree0 =
             Nothing -> fail $ "Unknown type: " ++ show (kindName, typeName)
 
     treeF
-        :: Bool -> InputTree ident
+        :: Bool
+        -> InputTree ident
         -> HeadingStack heading (MetaTree ident heading)
     treeF hasHeading = aux
       where
