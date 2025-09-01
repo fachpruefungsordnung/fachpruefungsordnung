@@ -9,8 +9,9 @@ import Data.String (null)
 import Data.String.Regex (regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
+import FPO.Data.AppError (AppError(..))
 import FPO.Data.Navigate (class Navigate)
-import FPO.Data.Request (postIgnore)
+import FPO.Data.Request (postIgnore, postIgnoreOrError)
 import FPO.Data.Store as Store
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -118,7 +119,9 @@ component =
                                 , HP.type_ HP.ButtonButton
                                 , HE.onClick \_ -> RequestCode
                                 ] <>
-                                  disable
+                                  if not (isValidEmail state.email) then
+                                    [ HP.disabled true ]
+                                  else []
                               )
                               [ HH.text $ translate (label :: _ "rp_RequestCode")
                                   state.translator
@@ -140,7 +143,8 @@ component =
                           ( [ HP.classes [ HB.btn, HB.btnPrimary ]
                             , HP.type_ HP.ButtonSubmit
                             ] <>
-                              disable
+                              if not (isValidForm state) then [ HP.disabled true ]
+                              else []
                           )
                           [ HH.text $ translate (label :: _ "common_submit")
                               state.translator
@@ -151,11 +155,6 @@ component =
           ]
       ]
     where
-    disable =
-      if not (isValidEmail state.email) then
-        [ HP.disabled true ]
-      else []
-
     isValidEmail :: String -> Boolean
     isValidEmail email =
       let
@@ -164,6 +163,11 @@ component =
         case regex pattern noFlags of
           Right r -> test r email
           Left _ -> false
+
+    isValidForm :: State -> Boolean
+    isValidForm s = s.code /= ""
+      && s.passwordPrimary /= ""
+      && s.passwordPrimary == s.passwordSecondary
 
   handleAction :: MonadAff m => Action -> H.HalogenM State Action () output m Unit
   handleAction = case _ of
@@ -202,7 +206,7 @@ component =
         updateStore $ Store.AddWarning $ translate (label :: _ "rp_NoMatch")
           state.translator
       else do
-        response <- postIgnore "/password-reset/confirm"
+        response <- postIgnoreOrError "/password-reset/confirm"
           ( encodeJson
               { resetConfirmToken: state.code
               , resetConfirmNewPassword: state.passwordPrimary
@@ -210,10 +214,10 @@ component =
           )
         case response of
           Left _ -> pure unit
-          Right _ -> do
+          Right (Left msg) -> updateStore $ Store.AddError $ ServerError msg
+          Right (Right _) -> do
             updateStore $ Store.AddSuccess $ translate
               (label :: _ "prof_passwordUpdated")
               state.translator
-    -- updateStore $ Store.AddWarning "[TODO] Password reset is not supported yet!"
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }

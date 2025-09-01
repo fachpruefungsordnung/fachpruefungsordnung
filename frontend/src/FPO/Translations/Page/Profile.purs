@@ -98,7 +98,7 @@ deProfile = fromRecord
   , prof_role: "Rolle"
   , prof_rolesHelp: "Rollen steuern, was Sie in jeder Gruppe tun können."
   , prof_sendResetLink: "Reset-Link an E-Mail senden"
-  , prof_sentResetLinkDone: "Link zum zurücksetzen gesendet an "
+  , prof_sentResetLinkDone: "Link zum Zurücksetzen gesendet an "
   , prof_unsaved: "Nicht gespeichert"
   , prof_updatePassword: "Passwort aktualisieren"
   , prof_userData: "Nutzerdaten"
