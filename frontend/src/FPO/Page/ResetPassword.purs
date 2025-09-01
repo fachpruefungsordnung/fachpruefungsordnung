@@ -72,8 +72,98 @@ component =
   render state =
     HH.div
       [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
-      [ renderResetForm state
+      [ HH.div [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my3 ] ]
+          [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+              [ HH.text $ translate (label :: _ "rp_Header") state.translator ]
+          , HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
+              [ HH.form
+                  [ HE.onSubmit DoSubmit ]
+                  [ addColumn
+                      state.email
+                      ( translate (label :: _ "common_emailAddress") state.translator
+                          <> ":"
+                      )
+                      (translate (label :: _ "common_email") state.translator)
+                      "bi-envelope-fill"
+                      HP.InputEmail
+                      UpdateEmail
+                  , addColumn
+                      state.passwordPrimary
+                      ( translate (label :: _ "rp_PasswordNew") state.translator <>
+                          ":"
+                      )
+                      (translate (label :: _ "common_password") state.translator)
+                      "bi-lock-fill"
+                      HP.InputPassword
+                      UpdatePasswordPrimary
+                  , addColumn
+                      state.passwordSecondary
+                      ( translate (label :: _ "rp_PasswordConfirm") state.translator
+                          <> ":"
+                      )
+                      (translate (label :: _ "common_password") state.translator)
+                      "bi-lock-fill"
+                      HP.InputPassword
+                      UpdatePasswordSecondary
+                  , HH.div []
+                      [ HH.label [ HP.classes [ HB.formLabel ], HP.for "code" ]
+                          [ HH.text $
+                              translate (label :: _ "rp_ConfirmationCode")
+                                state.translator
+                                <> ":"
+                          ]
+                      , HH.div [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
+                          [ HH.button
+                              ( [ HP.classes [ HB.btn, HB.btnOutlineSecondary ]
+                                , HP.type_ HP.ButtonButton
+                                , HE.onClick \_ -> RequestCode
+                                ] <>
+                                  disable
+                              )
+                              [ HH.text $ translate (label :: _ "rp_RequestCode")
+                                  state.translator
+                              ]
+                          , HH.input
+                              [ HP.type_ HP.InputText
+                              , HP.classes [ HB.formControl ]
+                              , HP.placeholder $ translate (label :: _ "rp_InputCode")
+                                  state.translator
+                              , HP.value state.code
+                              , HE.onValueInput UpdateCode
+                              , HP.id "code"
+                              ]
+                          ]
+                      ]
+
+                  , HH.div [ HP.classes [ HB.mb4, HB.textCenter ] ]
+                      [ HH.button
+                          ( [ HP.classes [ HB.btn, HB.btnPrimary ]
+                            , HP.type_ HP.ButtonSubmit
+                            ] <>
+                              disable
+                          )
+                          [ HH.text $ translate (label :: _ "common_submit")
+                              state.translator
+                          ]
+                      ]
+                  ]
+              ]
+          ]
       ]
+    where
+    disable =
+      if not (isValidEmail state.email) then
+        [ HP.disabled true ]
+      else []
+
+    isValidEmail :: String -> Boolean
+    isValidEmail email =
+      let
+        pattern = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+      in
+        case regex pattern noFlags of
+          Right r -> test r email
+          Left _ -> false
 
   handleAction :: MonadAff m => Action -> H.HalogenM State Action () output m Unit
   handleAction = case _ of
@@ -115,90 +205,3 @@ component =
         updateStore $ Store.AddWarning "[TODO] Password reset is not supported yet!"
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
-
-renderResetForm :: forall w. State -> HH.HTML w Action
-renderResetForm state =
-  HH.div [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my3 ] ]
-    [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-        [ HH.text $ translate (label :: _ "rp_Header") state.translator ]
-    , HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
-        [ HH.form
-            [ HE.onSubmit DoSubmit ]
-            [ addColumn
-                state.email
-                (translate (label :: _ "common_emailAddress") state.translator <> ":")
-                (translate (label :: _ "common_email") state.translator)
-                "bi-envelope-fill"
-                HP.InputEmail
-                UpdateEmail
-            , addColumn
-                state.passwordPrimary
-                (translate (label :: _ "rp_PasswordNew") state.translator <> ":")
-                (translate (label :: _ "common_password") state.translator)
-                "bi-lock-fill"
-                HP.InputPassword
-                UpdatePasswordPrimary
-            , addColumn
-                state.passwordSecondary
-                (translate (label :: _ "rp_PasswordConfirm") state.translator <> ":")
-                (translate (label :: _ "common_password") state.translator)
-                "bi-lock-fill"
-                HP.InputPassword
-                UpdatePasswordSecondary
-            , HH.div []
-                [ HH.label [ HP.classes [ HB.formLabel ], HP.for "code" ]
-                    [ HH.text $
-                        translate (label :: _ "rp_ConfirmationCode") state.translator
-                          <> ":"
-                    ]
-                , HH.div [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
-                    [ HH.button
-                        ( [ HP.classes [ HB.btn, HB.btnOutlineSecondary ]
-                          , HP.type_ HP.ButtonButton
-                          , HE.onClick \_ -> RequestCode
-                          ] <>
-                            disable
-                        )
-                        [ HH.text $ translate (label :: _ "rp_RequestCode")
-                            state.translator
-                        ]
-                    , HH.input
-                        [ HP.type_ HP.InputText
-                        , HP.classes [ HB.formControl ]
-                        , HP.placeholder $ translate (label :: _ "rp_InputCode")
-                            state.translator
-                        , HP.value state.code
-                        , HE.onValueInput UpdateCode
-                        , HP.id "code"
-                        ]
-                    ]
-                ]
-
-            , HH.div [ HP.classes [ HB.mb4, HB.textCenter ] ]
-                [ HH.button
-                    ( [ HP.classes [ HB.btn, HB.btnPrimary ]
-                      , HP.type_ HP.ButtonSubmit
-                      ] <>
-                        disable
-                    )
-                    [ HH.text $ translate (label :: _ "common_submit")
-                        state.translator
-                    ]
-                ]
-            ]
-        ]
-    ]
-  where
-  disable =
-    if not (isValidEmail state.email) then
-      [ HP.disabled true ]
-    else []
-
-  isValidEmail :: String -> Boolean
-  isValidEmail email =
-    let
-      pattern = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
-    in
-      case regex pattern noFlags of
-        Right r -> test r email
-        Left _ -> false
