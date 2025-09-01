@@ -16,10 +16,12 @@ import Data.Array
   ( concat
   , cons
   , drop
+  , head
   , last
   , length
   , mapWithIndex
   , snoc
+  , tail
   , take
   , uncons
   , unsnoc
@@ -88,7 +90,7 @@ import Web.HTML.Event.DragEvent (DragEvent, toEvent)
 
 type Input = DH.DocumentID
 
-type Version = { identifier :: Int, timestamp :: DD.DocDate }
+type Version = { identifier :: Maybe Int, timestamp :: DD.DocDate }
 
 data Output
   -- | Opens the editor for some leaf node, that is, a subsection or paragraph.
@@ -102,7 +104,7 @@ data Output
   | DeleteNode Path
   | ReorderItems { from :: Path, to :: Path }
   | ModifyVersion Int (Maybe Int)
-  | CompareTo Int Int
+  | CompareTo Int (Maybe Int)
   | RenameNode { path :: Path, newName :: String }
 
 type Path = Array Int
@@ -129,11 +131,11 @@ data Action
   | JumpToNodeSection Path String
   | ToggleAddMenu Path
   | ToggleHistoryMenu (Array Int) Int
-  | ToggleHistorySubmenu Int
+  | ToggleHistorySubmenu (Maybe Int)
   | CreateNewSubsection Path
   | CreateNewSection Path
-  | OpenVersion Int Int
-  | CompareVersion Int Int
+  | OpenVersion Int (Maybe Int)
+  | CompareVersion Int (Maybe Int)
   | UpdateVersions DateTime Int
   -- | Section deletion
   | RequestDeleteSection EntityToDelete
@@ -150,6 +152,21 @@ data EntityKind = Section | Paragraph
 data Query a
   = ReceiveTOCs (TOCTree) a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
+  | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
+
+{- <<<<<<< HEAD
+  | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
+
+ <<<<<<< Updated upstream
+data Query a = ReceiveTOCs (TOCTree) a
+=======
+data Query a
+  = ReceiveTOCs (TOCTree) a
+  | RequestCurrentTocEntryTitle (Maybe String -> a)
+  | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
+>>>>>>> Stashed changes 
+=======
+>>>>>>> main -}
 
 type State = FPOState
   ( docID :: DH.DocumentID
@@ -159,7 +176,7 @@ type State = FPOState
   , now :: Maybe DateTime
   , showAddMenu :: Array Int
   , showHistoryMenu :: Array Int
-  , showHistorySubmenu :: Int
+  , showHistorySubmenu :: Maybe (Maybe Int)
   , versions :: Array Version
   , dragState :: Maybe { draggedId :: Path, hoveredId :: Path }
   , requestDelete :: Maybe EntityToDelete
@@ -179,7 +196,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       , now: Nothing
       , showAddMenu: [ -1 ]
       , showHistoryMenu: [ -1 ]
-      , showHistorySubmenu: -1
+      , showHistorySubmenu: Nothing
       , versions: []
       , docID: input
       , dragState: Nothing
@@ -249,6 +266,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       handleAction act1
       handleAction act2
 
+    -- the newest version requested in this action is assumed to be the newest version in general
     UpdateVersions ts elementID -> do
       s <- H.get
       history <- H.liftAff $ getTextElemHistory s.docID elementID (DD.DocDate ts) 5
@@ -256,17 +274,27 @@ tocview = connect (selectEq identity) $ H.mkComponent
         Nothing -> do liftEffect $ log "unable to load textElements"
         Just h -> do
           let
-            newVersions = map
+            nV = map
               ( \hEntry ->
-                  { identifier: TE.getHistoryElementID hEntry
+                  { identifier: Just (TE.getHistoryElementID hEntry)
                   , timestamp: TE.getHistoryElementTimestamp hEntry
                   }
               )
               (TE.getTEHsFromFTEH h)
+            -- used to correctly identify which one is the newest version
+            -- neither of the Nothing cases should ever occur
+            newVersions = case head nV of
+              Just entry -> case tail nV of
+                Just entries -> cons
+                  { identifier: Nothing, timestamp: entry.timestamp }
+                  entries
+                Nothing -> nV
+              Nothing -> nV
+
           H.modify_ _ { versions = newVersions }
 
     OpenVersion elementID vID -> do
-      H.raise (ModifyVersion elementID (Just vID))
+      H.raise (ModifyVersion elementID vID)
 
     CompareVersion elementID vID -> do
       H.raise (CompareTo elementID vID)
@@ -307,8 +335,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
     ToggleHistorySubmenu vID -> do
       H.modify_ \state -> state
         { showHistorySubmenu =
-            if state.showHistorySubmenu /= vID then vID
-            else -1
+            if state.showHistorySubmenu /= (Just vID) then (Just vID)
+            else Nothing
         }
 
     CreateNewSubsection path -> do
@@ -483,6 +511,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
         currentTitle = getCurrentTocEntryTitle state.mSelectedTocEntry
           state.tocEntries
       pure (Just (reply currentTitle))
+
+    RequestCurrentTocEntry reply -> do
+      state <- H.get
+      pure (Just (reply state.mSelectedTocEntry))
 
   rootTreeToHTML
     :: forall slots
@@ -811,7 +843,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
      . Path
     -> Path
     -> Array Version
-    -> Int
+    -> Maybe (Maybe Int)
     -> Maybe DateTime
     -> String
     -> Int
@@ -853,10 +885,11 @@ tocview = connect (selectEq identity) $ H.mkComponent
         (\v -> addVersionButton v)
         versions
 
+    -- addVersionButton :: forall slots. Version -> H.ComponentHTML Action slots m
     addVersionButton version =
       let
         buttonStyle =
-          if showHistorySubmenu == version.identifier then
+          if showHistorySubmenu == (Just version.identifier) then
             [ HH.ClassName "active" ]
           else
             []
@@ -892,7 +925,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
               ]
           ]
             <>
-              [ if showHistorySubmenu == version.identifier then
+              [ if showHistorySubmenu == (Just version.identifier) then
                   HH.div
                     [ HP.classes
                         [ HB.positionAbsolute

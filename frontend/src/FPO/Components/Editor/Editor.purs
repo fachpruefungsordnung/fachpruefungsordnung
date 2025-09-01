@@ -40,6 +40,7 @@ import FPO.Components.Editor.Keybindings
   , makeItalic
   , underscore
   )
+import FPO.Components.Modals.InfoModal (infoModal)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
@@ -84,9 +85,10 @@ import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 
+foreign import _resize :: Types.Editor -> Effect Unit
 type Path = Array Int
 
-type ElementData = Maybe { tocEntry :: TOCEntry, revID :: Int, title :: String }
+type ElementData = Maybe { tocEntry :: TOCEntry, revID :: Maybe Int, title :: String }
 
 type State = FPOState
   ( docID :: DocumentID
@@ -124,6 +126,7 @@ type State = FPOState
   , compareToElement :: ElementData
 
   , isEditorReadonly :: Boolean
+  , outdatedInfoPopup :: Boolean
   )
 
 -- For tracking the comment markers live
@@ -176,7 +179,9 @@ data Action
   | ShowAllComments
   | Receive (Connected FPOTranslator Input)
   | HandleResize Number
+  | ToggleOutdatedInfoPopup
   | Finalize
+  | Resize
 
 -- We use a query to get the content of the editor
 data Query a
@@ -240,12 +245,35 @@ editor = connect selectTranslator $ H.mkComponent
     , mPendingMaxWaitF: Nothing
     , compareToElement: input.elementData
     , isEditorReadonly: false
+    , outdatedInfoPopup: false
     }
+
+  {-   render :: State -> H.ComponentHTML Action () m
+  render state = renderAll state -}
 
   render :: State -> H.ComponentHTML Action () m
   render state =
     HH.div
-      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
+      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ]
+      , HP.style "min-height: 0;"
+      ] $
+      [ renderAll state ] <>
+        renderInfoModal
+    where
+    renderInfoModal = case state.outdatedInfoPopup of
+      false -> []
+      true ->
+        [ infoModal
+            state.translator
+            ToggleOutdatedInfoPopup
+        ]
+
+  renderAll :: State -> H.ComponentHTML Action () m
+  renderAll state =
+    HH.div
+      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ]
+      , HP.style "min-height: 0;"
+      ]
       [ HH.div
           -- toolbar
           [ HP.classes [ HB.dFlex, HB.justifyContentBetween ] ]
@@ -346,12 +374,78 @@ editor = connect selectTranslator $ H.mkComponent
                     (translate (label :: _ "editor_allComments") state.translator)
                 ]
             ]
+      , if state.isEditorReadonly then
+          HH.div
+            -- toolbar
+            [ HP.classes [ HB.dFlex, HB.justifyContentCenter ]
+            , HP.style
+                "border-top-style: solid; border-color: blue; border-width: 1px;"
+            ]
+            if (not state.showButtons) then
+              -- keep the toolbar even though there is not space, so that the screen doesnt pop higher
+              [ HH.div
+                  [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+                  [ HH.div
+                      [ HP.style
+                          "visibility: hidden; height: 1.5rem; min-height: 1.5rem;"
+                      ]
+                      []
+                  ]
+              ]
+            else
+              [ HH.div
+                  [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+                  [ HH.text
+                      (translate (label :: _ "editor_oldVersion") state.translator)
+                  {-                   , HH.button
+                  [ HP.classes
+                      [ HB.btn
+                      , HB.btnLight
+                      , HB.btnSm
+                      , H.ClassName "bi bi-info-circle"
+                      ]
+                  , HE.onClick $ const $ ToggleOutdatedInfoPopup
+                  ]
+                  [] -}
+                  {-                   , HH.button
+                        [ HP.classes
+                            [ HB.btn
+                            , HB.btnLight
+                            , HB.btnSm
+                            ]
+                        , HE.onClick $ const $ ToggleOutdatedInfoPopup
+                        ]
+                        [HH.text "Save"]
+                  , HH.button
+                        [ HP.classes
+                            [ HB.btn
+                            , HB.btnLight
+                            , HB.btnSm
+                            ]
+                        , HE.onClick $ const $ ToggleOutdatedInfoPopup
+                        ]
+                        [HH.text "Discard"] -}
+                  , makeEditorToolbarButton
+                      true
+                      ""
+                      ToggleOutdatedInfoPopup
+                      "bi bi-info-circle"
+                  , makeEditorToolbarButtonWithText
+                      true
+                      state.showButtonText
+                      ToggleOutdatedInfoPopup
+                      "bi bi-trash"
+                      (translate (label :: _ "editor_discard") state.translator)
+                  ]
+              ]
+        else
+          HH.text ""
       , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
           , HE.onClick $ const SelectComment
           , HP.classes [ HB.flexGrow1 ]
-          , HP.style "min-height: 0"
+          , HP.style "min-height: 0; flex-grow: 1; flex-basis: 0"
           ]
           [ -- Add overlay when readonly
             if state.isEditorReadonly then
@@ -392,6 +486,45 @@ editor = connect selectTranslator $ H.mkComponent
               HH.text ""
 
           ]
+      {-           [ -- Add overlay when readonly
+        if state.isEditorReadonly then
+          HH.div
+            [ HP.classes
+                [ HB.positionAbsolute
+                , HB.top0
+                , HB.start0
+                , HB.w100
+                , HB.h100
+                , HB.dFlex
+                , HB.justifyContentCenter
+                , HB.alignItemsEnd
+                , HB.peNone
+                ]
+            , HP.style
+                "background: rgba(0,0,0,0.1); z-index: 20; padding-bottom: 1.5rem;"
+            ]
+            [ HH.div
+                [ HP.classes
+                    [ HB.bgLight
+                    , HB.border
+                    , HB.rounded
+                    , HB.px3
+                    , HB.py2
+                    , HB.shadow
+                    ]
+                , HP.style "pointer-events: auto;"
+                ]
+                [ HH.i
+                    [ HP.classes [ HB.bi, H.ClassName "bi-lock-fill", HB.me2 ] ]
+                    []
+                , HH.text
+                    (translate (label :: _ "editor_readonly") state.translator)
+                ]
+            ]
+        else
+          HH.text ""
+
+      ] -}
       -- Saved Icon
       , if state.showSavedIcon then
           HH.div
@@ -482,10 +615,37 @@ editor = connect selectTranslator $ H.mkComponent
         Nothing
         -> pure unit
         Just { tocEntry: tocEntry, revID: revID, title: title }
-        -> handleAction (ChangeToSection title tocEntry (Just revID))
+        -> handleAction (ChangeToSection title tocEntry revID)
+    {-       _ <- H.subscribe =<< resizeDelay Resize
+    pure unit -}
+
+    Resize -> do
+      state <- H.get
+      H.liftEffect
+        case state.mEditor of
+          Nothing -> pure unit
+          Just e ->
+            _resize e
+
+    {-     Resize -> do 
+    state <- H.get
+    _ <- H.fork do
+      H.liftAff $ delay (Milliseconds 1000.0)
+      H.liftEffect
+        case state.mEditor of
+          Nothing -> pure unit
+          Just e -> 
+            _resize e
+    pure unit -}
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
+    -- handleAction Resize
+
+    ToggleOutdatedInfoPopup -> do
+      state <- H.get
+      let toggledInfo = (state.outdatedInfoPopup == false)
+      H.modify_ _ { outdatedInfoPopup = toggledInfo }
 
     Bold -> do
       state <- H.get
@@ -520,6 +680,7 @@ editor = connect selectTranslator $ H.mkComponent
         H.liftEffect $ do
           Editor.setFontSize (show newSize <> "px") ed
           Editor.focus ed
+    -- handleAction Resize
 
     FontSizeDown -> do
       H.gets _.mEditor >>= traverse_ \ed -> do
@@ -906,6 +1067,8 @@ editor = connect selectTranslator $ H.mkComponent
           , isEditorReadonly = version /= "latest"
           }
 
+        handleAction Resize
+
         newLiveMarkers <- H.liftEffect do
           session <- Editor.getSession ed
           document <- Session.getDocument session
@@ -1157,6 +1320,14 @@ createMarkerRange marker = do
 -- we can use the
 --findLocalMarkerID
 
+{- resizeDelay :: forall m a. MonadAff m => a -> m (HS.Emitter a)
+resizeDelay val = do
+  { emitter, listener } <- H.liftEffect HS.create
+  _ <- H.liftAff $ Aff.forkAff $ forever do
+    Aff.delay $ Milliseconds 1000.0
+    H.liftEffect $ HS.notify listener val
+  pure emitter
+ -}
 cursorInRange :: Array LiveMarker -> Types.Position -> Effect (Maybe LiveMarker)
 cursorInRange [] _ = pure Nothing
 cursorInRange lms cursor =
