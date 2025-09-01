@@ -255,6 +255,7 @@ type Labels =
       -- | Reset Password Page
       ::: "rp_ConfirmationCode"
       ::: "rp_Header"
+      ::: "rp_IfYouNeedANewCode"
       ::: "rp_InputCode"
       ::: "rp_NoEmail"
       ::: "rp_NoMatch"
