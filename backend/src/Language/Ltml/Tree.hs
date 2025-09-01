@@ -20,6 +20,7 @@ where
 import Data.Text (Text)
 import Language.Lsd.AST.Common (KindName, TypeName)
 import Language.Ltml.Common (Flagged, flagMap)
+import Language.Ltml.HTML.Common (RenderedTocEntry)
 
 type FlaggedTree flag a b = Flagged flag (TypedTree flag a b)
 
@@ -69,8 +70,9 @@ type InputTree' = InputTree Bool
 
 -- | A tree containing metadata, to be sent to the frontend.
 --   The type parameter is typically an identifier type.
-type FlaggedMetaTree id heading =
-    FlaggedTree id (Maybe heading) (Maybe heading)
+type FlaggedMetaTree id =
+    FlaggedTree id (Maybe RenderedTocEntry) (Maybe RenderedTocEntry)
 
-type TypedMetaTree id heading = TypedTree id (Maybe heading) (Maybe heading)
-type MetaTree id heading = Tree id (Maybe heading) (Maybe heading)
+type TypedMetaTree id =
+    TypedTree id (Maybe RenderedTocEntry) (Maybe RenderedTocEntry)
+type MetaTree id = Tree id (Maybe RenderedTocEntry) (Maybe RenderedTocEntry)
