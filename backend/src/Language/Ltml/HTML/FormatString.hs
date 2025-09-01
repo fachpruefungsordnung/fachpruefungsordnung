@@ -18,11 +18,6 @@ import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (State, gets, modify)
 import Data.Text (Text, pack)
 import Language.Lsd.AST.Format
-import Language.Lsd.AST.Type.AppendixSection
-    ( AppendixElementFormat (..)
-    , AppendixSectionFormat (..)
-    , AppendixSectionTitle (..)
-    )
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Lsd.AST.Type.Paragraph (ParagraphFormat (..))
 import Language.Lsd.AST.Type.Section (SectionFormat (..))

@@ -3,28 +3,32 @@
 -- | The functions use the Affjax library to handle asynchronous HTTP requests.
 
 module FPO.Data.Request
-  ( addGroup
+  ( LoadState(..)
+  , addGroup
   , changeRole
   , createNewDocument
   , deleteIgnore
+  , fromLoading
   , getAuthorizedUser
   , getBlob
-  , getDocumentHeader
   , getDocument
+  , getDocumentHeader
   , getDocumentsQueryFromURL
+  , getFromJSONEndpoint
   , getGroup
   , getGroups
   , getIgnore
   , getJson
   , getString
   , getTextElemHistory
+  , getUser
   , getUserDocuments
   , getUserGroups
-  , getUser
   , getUserWithId
   , patchJson
   , patchString
   , postBlob
+  , postBlobOrError
   , postDocument
   , postJson
   , postRenderHtml
@@ -32,9 +36,6 @@ module FPO.Data.Request
   , putIgnore
   , putJson
   , removeUser
-  , getFromJSONEndpoint
-  , postBlobOrError
-  , LoadState(..)
   ) where
 
 import Prelude
@@ -63,6 +64,8 @@ import FPO.Data.Store as Store
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.FullDocument (decodeFullDocument)
+import FPO.Dto.DocumentDto.FullDocument as FD
 import FPO.Dto.DocumentDto.Query as DQ
 import FPO.Dto.DocumentDto.TextElement as TE
 import FPO.Dto.GroupDto
@@ -113,6 +116,13 @@ defaultFpoRequest responseFormat url method = do
 -- | State of an asynchronous load operation.
 -- | It can either be in a loading state or have successfully loaded data.
 data LoadState a = Loading | Loaded a
+
+-- | Extracts the loaded value from a LoadState, providing a default if not loaded.
+fromLoading :: forall a. LoadState a -> a -> a
+fromLoading Loading a = a
+fromLoading (Loaded a) _ = a
+
+derive instance eqLoadState :: Eq a => Eq (LoadState a)
 
 -- | Generic Error Handling Functions ----------------------------------------
 
@@ -495,8 +505,8 @@ createNewDocument
   => MonadStore Store.Action Store.Store m
   => Navigate m
   => NewDocumentCreateDto
-  -> H.HalogenM st act slots msg m (Either AppError DH.DocumentHeader)
-createNewDocument dto = postJson decodeJson "/docs" (encodeJson dto)
+  -> H.HalogenM st act slots msg m (Either AppError FD.FullDocument)
+createNewDocument dto = postJson decodeFullDocument "/docs" (encodeJson dto)
 
 getDocumentsQueryFromURL
   :: forall st act slots msg m

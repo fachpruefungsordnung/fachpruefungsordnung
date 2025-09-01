@@ -1,10 +1,12 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Docs
     ( Error (..)
     , Result
     , Limit
     , logMessage
+    , newDefaultDocument
     , createDocument
     , getDocument
     , getDocuments
@@ -27,8 +29,8 @@ module Docs
     , getLogs
     ) where
 
-import Control.Monad (join, unless)
-import Control.Monad.Except (ExceptT, runExceptT, throwError)
+import Control.Monad (join, msum, unless)
+import Control.Monad.Except (ExceptT (ExceptT), runExceptT, throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (find)
 import Data.Functor ((<&>))
@@ -40,11 +42,19 @@ import UserManagement.DocumentPermission (Permission (..))
 import UserManagement.Group (GroupID)
 import UserManagement.User (UserID)
 
+import qualified Language.Lsd.AST.Common as LSD
+import qualified Language.Ltml.Common as LTML
+import qualified Language.Ltml.Tree as LTML
+
+import Control.Applicative ((<|>))
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Maybe (fromMaybe)
 import Data.OpenApi (ToSchema)
+import qualified Data.Text as Text
+import qualified Data.Vector as Vector
 import Docs.Comment (Comment, CommentRef (CommentRef), Message)
 import qualified Docs.Comment as Comment
+import Docs.Common (nodeWithoutText)
 import Docs.Database
     ( HasCheckPermission
     , HasCreateComment
@@ -62,6 +72,7 @@ import Docs.Database
     , HasGetDocumentHistory
     , HasGetLogs
     , HasGetRevisionKey
+    , HasGetTextElement
     , HasGetTextElementRevision
     , HasGetTextHistory
     , HasGetTreeHistory
@@ -72,6 +83,7 @@ import Docs.Database
     )
 import qualified Docs.Database as DB
 import Docs.Document (Document, DocumentID)
+import qualified Docs.Document as Document
 import Docs.DocumentHistory (DocumentHistory)
 import Docs.FullDocument (FullDocument (FullDocument))
 import qualified Docs.FullDocument as FullDocument
@@ -86,6 +98,7 @@ import Docs.TextElement
     , TextElementKind
     , TextElementRef (..)
     )
+import qualified Docs.TextElement as TextElement
 import Docs.TextRevision
     ( ConflictStatus
     , NewTextRevision (..)
@@ -94,7 +107,8 @@ import Docs.TextRevision
     , TextRevisionRef (..)
     )
 import qualified Docs.TextRevision as TextRevision
-import Docs.Tree (Node)
+import Docs.Tree (Edge (Edge), Node (Node), Tree, filterMapNode)
+import qualified Docs.Tree as Tree
 import Docs.TreeRevision
     ( TreeRevision
     , TreeRevisionHistory
@@ -119,6 +133,7 @@ data Error
     | TextRevisionNotFound TextRevisionRef
     | TreeRevisionNotFound TreeRevisionRef
     | CommentNotFound CommentRef
+    | Custom Text
     deriving (Generic)
 
 instance ToJSON Error
@@ -228,15 +243,17 @@ createTextRevision
        , HasGetTextElementRevision m
        , HasExistsComment m
        , HasLogMessage m
+       , HasGetTextElement m
        )
     => UserID
     -> NewTextRevision
     -> m (Result ConflictStatus)
 createTextRevision userID revision = logged userID Scope.docsTextRevision $
     runExceptT $ do
-        let ref@(TextElementRef docID _) = newTextRevisionElement revision
+        let ref@(TextElementRef docID textID) = newTextRevisionElement revision
         guardPermission Edit docID userID
         guardExistsTextElement ref
+        textElement <- lift $ DB.getTextElement textID
         mapM_
             guardExistsComment
             (CommentRef ref . Comment.comment <$> newTextRevisionCommentAnchors revision)
@@ -256,23 +273,37 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                     (newTextRevisionCommentAnchors revision)
         lift $ do
             now <- DB.now
+            let updateTitle rev =
+                    mapM_
+                        (DB.updateLatestTitle textID)
+                        ( textElement
+                            >>= throwTogetherTitle
+                                . (Tree.Leaf . flip TextElementRevision (Just rev))
+                        )
             case latestRevision of
                 -- first revision
-                Nothing -> createRevision <&> TextRevision.NoConflict
+                Nothing -> do
+                    newRevision <- createRevision
+                    updateTitle newRevision
+                    return $ TextRevision.NoConflict newRevision
                 Just latest
                     -- content has not changed? -> return latest
                     | TextRevision.contentsNotChanged latest revision ->
                         return $ TextRevision.NoConflict latest
                     -- no conflict, and can update? -> update (squash)
-                    | latestRevisionID == parentRevisionID && shouldUpdate now latest ->
-                        DB.updateTextRevision
-                            (identifier latest)
-                            (newTextRevisionContent revision)
-                            (newTextRevisionCommentAnchors revision)
-                            <&> TextRevision.NoConflict
+                    | latestRevisionID == parentRevisionID && shouldUpdate now latest -> do
+                        newRevision <-
+                            DB.updateTextRevision
+                                (identifier latest)
+                                (newTextRevisionContent revision)
+                                (newTextRevisionCommentAnchors revision)
+                        updateTitle newRevision
+                        return $ TextRevision.NoConflict newRevision
                     -- no conflict, but can not update? -> create new
-                    | latestRevisionID == parentRevisionID ->
-                        createRevision <&> TextRevision.NoConflict
+                    | latestRevisionID == parentRevisionID -> do
+                        newRevision <- createRevision
+                        updateTitle newRevision
+                        return $ TextRevision.NoConflict newRevision
                     -- conflict
                     | otherwise ->
                         return $
@@ -324,7 +355,11 @@ getDocumentRevisionText userID ref@(RevisionRef docID _) textID =
             return $ join result
 
 createTreeRevision
-    :: (HasCreateTreeRevision m, HasLogMessage m)
+    :: ( HasCreateTreeRevision m
+       , HasLogMessage m
+       , HasGetTextElementRevision m
+       , HasGetTextElement m
+       )
     => UserID
     -> DocumentID
     -> Node TextElementID
@@ -336,9 +371,24 @@ createTreeRevision userID docID root = logged userID Scope.docsTreeRevision $
         existsTextElement <- lift $ DB.existsTextElementInDocument docID
         case firstFalse existsTextElement root of
             Just textID -> throwError $ TextElementNotFound $ TextElementRef docID textID
-            Nothing -> lift $ DB.createTreeRevision userID docID root
+            Nothing -> do
+                rootWithText <- lift $ Tree.treeMapM getter' root <&> filterMapNode id
+                let updatedTitles = nodeWithTitle rootWithText
+                let mapped = nodeWithoutText updatedTitles
+                lift $ DB.createTreeRevision userID docID mapped
   where
     firstFalse predicate = find (not . predicate)
+    getter =
+        DB.getTextElementRevision
+            . (`TextRevisionRef` TextRevision.Latest)
+            . TextElementRef docID
+    getter' textID = do
+        bla <- getter textID
+        case bla of
+            Nothing -> do
+                textElement <- DB.getTextElement textID
+                return $ flip TextElementRevision Nothing <$> textElement
+            Just _ -> return bla
 
 getTreeRevision
     :: (HasGetTreeRevision m, HasLogMessage m)
@@ -512,6 +562,108 @@ createReply userID ref@(CommentRef (TextElementRef docID _) commentID) content =
         guardPermission Comment docID userID
         guardExistsComment ref
         lift $ DB.createReply userID commentID content
+
+newDefaultDocument
+    :: ( HasCreateDocument m
+       , HasLogMessage m
+       , HasCreateTextElement m
+       , HasCreateTextRevision m
+       , HasGetTextElementRevision m
+       , HasExistsComment m
+       , HasCreateTreeRevision m
+       , HasGetTextElement m
+       )
+    => UserID
+    -> GroupID
+    -> Text
+    -> LTML.FlaggedInputTree'
+    -> m (Result FullDocument)
+newDefaultDocument userID groupID title tree = runExceptT $ do
+    doc <- ExceptT $ createDocument userID groupID title
+    let docID = Document.identifier doc
+    let emplaceTexts (LTML.Flagged _ (LTML.TypedTree (LSD.KindName kind) (LSD.TypeName type_) content)) =
+            case content of
+                (LTML.Tree heading children) -> do
+                    emplacedChildren <- mapM emplaceTexts children
+                    return $
+                        Tree.Tree $
+                            Tree.Node
+                                (Tree.NodeHeader (Text.pack kind) (Text.pack type_) heading)
+                                ( (\c -> Edge (fromMaybe "" (throwTogetherTitle c)) c)
+                                    <$> emplacedChildren
+                                )
+                (LTML.Leaf text) -> do
+                    textElement <-
+                        ExceptT $
+                            createTextElement userID docID $
+                                Text.pack kind
+                    let textID = TextElement.identifier textElement
+                    let textRev = TextElementRef docID textID
+                    textRevision <-
+                        ExceptT $
+                            createTextRevision userID $
+                                NewTextRevision
+                                    { newTextRevisionParent = Nothing
+                                    , newTextRevisionElement = textRev
+                                    , newTextRevisionContent = text
+                                    , newTextRevisionCommentAnchors = Vector.empty
+                                    }
+                    case textRevision of
+                        TextRevision.NoConflict revision ->
+                            return $ Tree.Leaf $ TextElementRevision textElement $ Just revision
+                        _ ->
+                            throwError $ Custom "Text Revision Conflict During Initial Document Creation."
+    root <- emplaceTexts tree
+    case root of
+        Tree.Tree node -> do
+            TreeRevision.TreeRevision header _ <-
+                ExceptT $
+                    createTreeRevision
+                        userID
+                        docID
+                        (TextElement.identifier . TextRevision.textElement <$> node)
+            return $ FullDocument doc $ Just $ TreeRevision.TreeRevision header node
+        Tree.Leaf _ -> throwError $ Custom "Root is leaf :/"
+
+nodeWithTitle :: Node TextElementRevision -> Node TextElementRevision
+nodeWithTitle (Node content children) = Node content (edgeWithTitle <$> children)
+
+edgeWithTitle :: Edge TextElementRevision -> Edge TextElementRevision
+edgeWithTitle edge =
+    edge
+        { Tree.title =
+            fromMaybe (Tree.title edge) $ throwTogetherTitle $ Tree.content edge
+        }
+
+-- Temporary function to get a somewhat usable title.
+-- Should be replaced by a function provided by the language team later on.
+-- Langfristig sollten die Titel wahrscheinlich beim Laden des Baums aus der Datenbank
+-- angefragt werden :)
+throwTogetherTitle :: Tree TextElementRevision -> Maybe Text
+throwTogetherTitle x =
+    typeTitle x
+        <|> ((msum . (maybeTitle <$>) . Text.lines) =<< getContent x)
+  where
+    typeTitle :: Tree TextElementRevision -> Maybe Text
+    typeTitle (Tree.Tree (Node header _)) =
+        case (Tree.headerKind header, Tree.headerType header) of
+            (_, "appendix") -> Just "Appendix"
+            (_, "attachments") -> Just "Anlagen"
+            ("document-mainbody", "inner") -> Just "Hauptteil"
+            _ -> Nothing
+    typeTitle _ = Nothing
+    maybeTitle :: Text -> Maybe Text
+    maybeTitle txt
+        | "§" `Text.isPrefixOf` stripped = Just stripped
+        | "!" `Text.isPrefixOf` stripped = Just stripped
+        | "[intro]" `Text.isPrefixOf` stripped = Just "Intro"
+        | "[extro]" `Text.isPrefixOf` stripped = Just "Extro"
+        | otherwise = Nothing
+      where
+        stripped = Text.strip txt
+    getContent :: Tree TextElementRevision -> Maybe Text
+    getContent (Tree.Leaf (TextElementRevision _ rev)) = TextRevision.content <$> rev
+    getContent (Tree.Tree (Tree.Node header _)) = Tree.heading header
 
 -- guards
 

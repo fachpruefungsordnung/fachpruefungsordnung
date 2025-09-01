@@ -43,6 +43,7 @@ module Docs.Hasql.Statements
     , getLogs
     , logMessage
     , getRevisionKey
+    , updateLatestTitle
     ) where
 
 import Control.Applicative ((<|>))
@@ -732,7 +733,8 @@ getTreeNode =
             [singletonStatement|
             select
                 kind :: text,
-                type :: text
+                type :: text,
+                heading:: text?
             from
                 doc_tree_nodes
             where
@@ -746,13 +748,14 @@ putTreeNode =
             ( unHash hash
             , Tree.headerKind header
             , Tree.headerType header
+            , Tree.heading header
             )
         )
         [resultlessStatement|
             insert into doc_tree_nodes
-                (hash, kind, type)
+                (hash, kind, type, heading)
             values
-                ($1 :: bytea, $2 :: text, $3 :: text)
+                ($1 :: bytea, $2 :: text, $3 :: text, $4 :: text?)
             on conflict do nothing
         |]
 
@@ -802,11 +805,12 @@ uncurryTreeEdgeChild
        , Maybe ByteString
        , Maybe Text
        , Maybe Text
+       , Maybe Text
        , Maybe Int64
        , Maybe Text
        )
     -> Maybe (Text, TreeEdgeChild)
-uncurryTreeEdgeChild (title, nodeHash, nodeKind, nodeType, textID, textKind) =
+uncurryTreeEdgeChild (title, nodeHash, nodeKind, nodeType, nodeHeading, textID, textKind) =
     (title,) <$> (maybeNode <|> maybeText)
   where
     maybeNode = do
@@ -819,6 +823,7 @@ uncurryTreeEdgeChild (title, nodeHash, nodeKind, nodeType, textID, textKind) =
                 NodeHeader
                     { Tree.headerKind = kind
                     , Tree.headerType = type_
+                    , Tree.heading = nodeHeading
                     }
     maybeText = do
         id_ <- textID
@@ -842,6 +847,7 @@ getTreeEdgesByParent =
                     n.hash :: bytea?,
                     n.kind :: text?,
                     n.type :: text?,
+                    n.heading :: text?,
                     t.id :: int8?,
                     t.kind :: text?
                 from
@@ -1470,3 +1476,26 @@ logMessage =
         , unScope scope
         , toJSON content
         )
+
+updateLatestTitle :: Statement (TextElementID, Text) ()
+updateLatestTitle =
+    lmap
+        (first unTextElementID)
+        [resultlessStatement|
+            UPDATE
+                doc_tree_edges d
+            SET
+                title = $2::text
+            WHERE
+                d.ctid = (
+                    SELECT
+                        ctid
+                    FROM
+                        doc_tree_edges
+                    WHERE
+                        child_text_element = $1::bigint
+                    ORDER BY
+                        creation_ts DESC
+                    LIMIT 1
+                )
+        |]

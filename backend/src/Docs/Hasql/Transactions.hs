@@ -2,6 +2,8 @@
 
 module Docs.Hasql.Transactions
     ( now
+    , createDocument
+    , createTextElement
     , getTextElementRevision
     , existsTextRevision
     , updateTextRevision
@@ -19,6 +21,8 @@ module Docs.Hasql.Transactions
     , resolveComment
     , createReply
     , logMessage
+    , updateLatestTitle
+    , getTextElement
     ) where
 
 import qualified Crypto.Hash.SHA1 as SHA1
@@ -39,7 +43,7 @@ import UserManagement.User (UserID)
 import Data.Aeson (ToJSON)
 import Docs.Comment (Comment, CommentAnchor, CommentID, CommentRef, Message)
 import qualified Docs.Comment as Comment
-import Docs.Document (DocumentID)
+import Docs.Document (Document, DocumentID)
 import Docs.Hash
     ( Hash (Hash)
     , Hashable (..)
@@ -47,7 +51,12 @@ import Docs.Hash
 import qualified Docs.Hasql.Statements as Statements
 import Docs.Hasql.TreeEdge (TreeEdge (TreeEdge), TreeEdgeChildRef (..))
 import qualified Docs.Hasql.TreeEdge as TreeEdge
-import Docs.TextElement (TextElementID, TextElementRef (..))
+import Docs.TextElement
+    ( TextElement
+    , TextElementID
+    , TextElementKind
+    , TextElementRef (..)
+    )
 import Docs.TextRevision
     ( TextElementRevision
     , TextRevision
@@ -68,6 +77,13 @@ getTextElementRevision
 getTextElementRevision ref = do
     textElementRevision <- statement ref Statements.getTextElementRevision
     textElementRevision $ flip statement Statements.getCommentAnchors
+
+createDocument :: Text -> GroupID -> UserID -> Transaction Document
+createDocument name group user =
+    statement (name, group, user) Statements.createDocument
+
+createTextElement :: DocumentID -> TextElementKind -> Transaction TextElement
+createTextElement = curry (`statement` Statements.createTextElement)
 
 existsTextRevision :: TextRevisionRef -> Transaction Bool
 existsTextRevision = flip statement Statements.existsTextRevision
@@ -200,3 +216,9 @@ logMessage
     -- ^ created log message
 logMessage severity source scope content =
     statement (severity, source, scope, content) Statements.logMessage
+
+updateLatestTitle :: TextElementID -> Text -> Transaction ()
+updateLatestTitle = curry (`statement` Statements.updateLatestTitle)
+
+getTextElement :: TextElementID -> Transaction (Maybe TextElement)
+getTextElement = flip statement Statements.getTextElement
