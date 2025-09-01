@@ -122,7 +122,9 @@ component =
                       [ HH.small_
                           [ if state.calledWithToken then
                               HH.text $
-                                "If you need a new code, click on the mail icon and enter your email."
+                                ( translate (label :: _ "rp_ifYouNeedANewCode")
+                                    state.translator
+                                )
                             else
                               HH.text ""
                           ]

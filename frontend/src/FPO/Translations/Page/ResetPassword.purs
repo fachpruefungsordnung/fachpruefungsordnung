@@ -6,6 +6,7 @@ import Simple.I18n.Translation (Translation, fromRecord)
 type PasswordResetLabels =
   ( "rp_ConfirmationCode"
       ::: "rp_Header"
+      ::: "rp_ifYouNeedANewCode"
       ::: "rp_InputCode"
       ::: "rp_NoEmail"
       ::: "rp_NoMatch"
@@ -19,6 +20,8 @@ enPasswordReset :: Translation PasswordResetLabels
 enPasswordReset = fromRecord
   { rp_ConfirmationCode: "Confirmation Code"
   , rp_Header: "Reset Password"
+  , rp_ifYouNeedANewCode:
+      "If you need a new code, click on the mail icon and enter your email."
   , rp_InputCode: "Input Code here"
   , rp_NoEmail: "No email address provided."
   , rp_NoMatch: "The passwords do not match."
@@ -31,6 +34,8 @@ dePasswordReset :: Translation PasswordResetLabels
 dePasswordReset = fromRecord
   { rp_ConfirmationCode: "Bestätigungscode"
   , rp_Header: "Passwort zurücksetzen"
+  , rp_ifYouNeedANewCode:
+      "Wenn Sie einen neuen Code benötigen, klicken Sie auf das Mail-Symbol und geben Sie Ihre E-Mail-Adresse ein."
   , rp_InputCode: "Code hier eingeben"
   , rp_NoEmail: "Keine E-Mail-Adresse angegeben."
   , rp_NoMatch: "Die Passwörter stimmen nicht überein."
