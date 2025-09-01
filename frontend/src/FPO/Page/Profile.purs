@@ -20,7 +20,7 @@ import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.AppError (AppError)
 import FPO.Data.Navigate (class Navigate)
-import FPO.Data.Request (getUser, getUserWithId, patchString)
+import FPO.Data.Request (getUser, getUserWithId, patchString, postIgnore)
 import FPO.Data.Store as Store
 import FPO.Dto.UserDto
   ( PatchUserDto(..)
@@ -433,7 +433,23 @@ component =
           pure unit
     HideSavedToast -> H.modify_ _ { showSavedToast = Nothing }
     HideNotYetImplementedToast -> H.modify_ _ { showNotYetImplementedToast = false }
-    SendResetLink -> H.modify_ _ { showNotYetImplementedToast = true }
+    SendResetLink -> do
+      maybeUser <- getUser
+      case maybeUser of
+        Left _ -> pure unit -- App error case
+        Right user -> do
+          let mailAddress = getUserEmail user
+          response <- postIgnore "/password-reset/request"
+            (encodeJson { resetRequestEmail: mailAddress })
+          case response of
+            Left _ -> pure unit
+            Right _ -> do
+              state <- H.get
+              updateStore $ Store.AddSuccess
+                ( ( translate (label :: _ "prof_sentResetLinkDone")
+                      state.translator
+                  ) <> mailAddress
+                )
     HideLinkToast -> H.modify_ _ { showLinkToast = false }
 
     NewPwInput v -> H.modify_ _ { newPw = v }

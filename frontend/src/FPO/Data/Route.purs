@@ -18,7 +18,7 @@ data Route
   = Home
   | Editor { docID :: DocumentID }
   | Login
-  | PasswordReset
+  | PasswordReset { token :: Maybe String }
   | AdminViewUsers
   | AdminViewGroups
   | ViewGroupDocuments { groupID :: GroupID }
@@ -39,7 +39,7 @@ routeCodec = root $ sum
   { "Home": noArgs
   , "Editor": "editor" ? { docID: int }
   , "Login": "login" / noArgs
-  , "PasswordReset": "password-reset" / noArgs
+  , "PasswordReset": "reset-password" ? { token: optional <<< string }
   , "AdminViewUsers": "admin-users" / noArgs
   , "AdminViewGroups": "admin-groups" / noArgs
   , "ViewGroupDocuments": "view-group-documents" ? { groupID: int }
@@ -57,7 +57,7 @@ routeToString = case _ of
   Home -> "Home"
   Editor docID -> "Editor:" <> show docID
   Login -> "Login"
-  PasswordReset -> "PasswordReset"
+  PasswordReset { token } -> "PasswordReset:" <> (show token)
   AdminViewUsers -> "AdminViewUsers"
   AdminViewGroups -> "AdminViewGroups"
   ViewGroupDocuments groupID -> "ViewGroupDocuments:" <> show groupID

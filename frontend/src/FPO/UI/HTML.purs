@@ -46,6 +46,7 @@ addColumn val str placeholder bi for act =
                 , HP.value val
                 , HE.onValueInput act
                 ]
+
             ]
         ]
 
