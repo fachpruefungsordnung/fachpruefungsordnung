@@ -30,10 +30,8 @@ import Data.String as String
 import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
---import Effect.Aff as Aff
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class as EC
-import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.Keybindings
@@ -183,8 +181,6 @@ data Action
   | HandleResize Number
   | ToggleOutdatedInfoPopup
   | Finalize
-  | DoNothing
-  | DoNothingWithNum Int
   | Resize
 
 -- We use a query to get the content of the editor
@@ -262,38 +258,15 @@ editor = connect selectTranslator $ H.mkComponent
       , HP.style "min-height: 0;"
       ] $
       [ renderAll state ] <>
-        renderDeleteModal
+        renderInfoModal
     where
-    renderDeleteModal = case state.outdatedInfoPopup of
+    renderInfoModal = case state.outdatedInfoPopup of
       false -> []
       true ->
         [ infoModal
             state.translator
-            0
-            (const " ")
             ToggleOutdatedInfoPopup
-            DoNothingWithNum
-            " "
         ]
-
-  {-   render :: State -> H.ComponentHTML Action () m
-  render state = 
-    HH.div_ $
-      renderDeleteModal
-        <>
-          [renderAll state]
-    where
-    renderDeleteModal = case state.outdatedInfoPopup of
-      false ->  []
-      true ->
-        [ deleteConfirmationModal
-            state.translator
-            0
-            (const " ")
-            DoNothing
-            DoNothingWithNum
-            " "
-        ] -}
 
   renderAll :: State -> H.ComponentHTML Action () m
   renderAll state =
@@ -567,18 +540,6 @@ editor = connect selectTranslator $ H.mkComponent
     where
     fullFeatures = isJust state.mTocEntry
 
-  {-     renderDeleteModal = case state.outdatedInfoPopup of
-  false ->  []
-  true ->
-    [ infoModal
-        state.translator
-        0
-        (const " ")
-        ToggleOutdatedInfoPopup
-        DoNothingWithNum
-        " "
-    ] -}
-
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
     Init -> do
@@ -676,12 +637,6 @@ editor = connect selectTranslator $ H.mkComponent
           Just e -> 
             _resize e
     pure unit -}
-
-    DoNothing -> do
-      pure unit
-
-    DoNothingWithNum _ -> do
-      pure unit
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }

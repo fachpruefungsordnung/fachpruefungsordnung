@@ -4,11 +4,9 @@ module FPO.Components.Modals.InfoModal
 
 import Prelude
 
-import Data.Array (singleton)
 import FPO.Translations.Labels (Labels)
 import FPO.UI.HTML (addModal)
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (Translator, label, translate)
@@ -32,19 +30,11 @@ import Simple.I18n.Translator (Translator, label, translate)
 infoModal
   :: forall w a action
    . Translator Labels
-  -> a
-  -> (a -> String)
   -> action
-  -> (a -> action)
-  -> String
   -> HH.HTML w action
 infoModal
   translator
-  objectIdentifier
-  toObjectName
-  cancelAction
-  confirmAction
-  objectTypeName =
+  cancelAction =
   addModal (translate (label :: _ "common_mergingInfo") translator)
     (const cancelAction) $
     [ HH.div
