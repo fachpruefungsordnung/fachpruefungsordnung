@@ -2,6 +2,8 @@
 
 module Language.Lsd.AST.Type.Document
     ( DocumentFormat (..)
+    , TocFormat (..)
+    , TocHeading (..)
     , DocumentType (..)
     , DocumentHeadingType (..)
     , DocumentBodyType (..)
@@ -9,6 +11,7 @@ module Language.Lsd.AST.Type.Document
     )
 where
 
+import Data.Text (Text)
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Disjunction, Sequence)
@@ -29,9 +32,18 @@ import Language.Lsd.AST.Type.SimpleSection (SimpleSectionType)
 import Language.Lsd.AST.Type.Text (TextType)
 
 newtype DocumentFormat
-    = DocumentFormat
-    { docHasTableOfContents :: Bool
-    }
+    = -- | ()
+      DocumentFormat
+        (Maybe TocFormat)
+        -- ^ @Just fmt@ iff a TOC is desired.
+    deriving (Show)
+
+newtype TocFormat
+    = TocFormat
+        TocHeading
+    deriving (Show)
+
+newtype TocHeading = TocHeading Text
     deriving (Show)
 
 data DocumentType

@@ -154,7 +154,7 @@ mainDocT =
     NamedType "fpo-maindoc" "Fachprüfungsordnung (Hauptdokument)" $
         DocumentType
             (Keyword "!")
-            DocumentFormat {docHasTableOfContents = True}
+            (DocumentFormat $ Just $ TocFormat $ TocHeading "Inhaltsübersicht")
             (DocumentHeadingType plainTextT)
             ( DocumentBodyType
                 ( Sequence
@@ -183,7 +183,7 @@ simpleDocT =
     NamedType "simpledoc" "Einfaches Textdokument" $
         DocumentType
             (Keyword "!")
-            DocumentFormat {docHasTableOfContents = False}
+            (DocumentFormat Nothing)
             (DocumentHeadingType plainTextT)
             ( DocumentBodyType
                 (Sequence [])

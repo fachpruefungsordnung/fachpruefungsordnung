@@ -22,7 +22,7 @@ import Data.Bifunctor (bimap)
 import Data.ByteString.Lazy (ByteString)
 import Data.DList (toList)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Set as Set
 import Data.Text (Text, unpack)
 import Data.Void (Void, absurd)
@@ -31,7 +31,11 @@ import Language.Lsd.AST.Type.AppendixSection
     , AppendixSectionFormat (..)
     , AppendixSectionTitle (..)
     )
-import Language.Lsd.AST.Type.Document (DocumentFormat (..))
+import Language.Lsd.AST.Type.Document
+    ( DocumentFormat (..)
+    , TocFormat (..)
+    , TocHeading (..)
+    )
 import Language.Lsd.AST.Type.DocumentContainer (DocumentContainerFormat (..))
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Lsd.AST.Type.Footnote
@@ -136,7 +140,7 @@ instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
     toHtmlM
         ( Document
-                (DocumentFormat hasToc)
+                (DocumentFormat mTocFormat)
                 documentHeading
                 (DocumentBody introSSections sectionBody outroSSections)
                 footNotes
@@ -156,7 +160,8 @@ instance ToHtmlM Document where
                     )
                 titleHtml <- toHtmlM documentHeading
                 renderDoc <- asks shouldRender
-                let renderToC = hasToc && renderDoc
+                -- \| mTocFormat = Nothing, means that no ToC should be rendered
+                let renderToC = isJust mTocFormat && renderDoc
 
                 -- \| If current Document has a local ToC its Sections
                 --   should NOT appear in global ToC, thats why we save the current global ToC
@@ -165,7 +170,7 @@ instance ToHtmlM Document where
                     if hasGlobalToc
                         then do
                             -- \| Render ToC but as a Later to use the final GlobalState
-                            delayedTocHtml <- renderDelayedToc
+                            delayedTocHtml <- renderDelayedToc mTocFormat
                             docPartsHtml <- renderDocParts
                             return (delayedTocHtml, docPartsHtml)
                         else
@@ -178,7 +183,7 @@ instance ToHtmlM Document where
                                     docPartsHtml <- renderDocParts
                                     -- \| Render ToC last so local ToC has all Headings set,
                                     --    since the local ToC uses the current State
-                                    localTocHtml <- renderLocalToc
+                                    localTocHtml <- renderLocalToc mTocFormat
                                     return (localTocHtml, docPartsHtml)
 
                 -- \| Render DocumentHeading / ToC only if renderFlag was set by parent
@@ -561,26 +566,27 @@ instance (ToHtmlM a) => ToHtmlM (Flagged' a) where
 -------------------------------------------------------------------------------
 
 -- | Render current ToC from State
-renderLocalToc :: HtmlReaderState
-renderLocalToc = do
+renderLocalToc :: Maybe TocFormat -> HtmlReaderState
+renderLocalToc mTocFormat = do
     globalState <- get
     tocFunc <- asks tocEntryWrapperFunc
-    return $ renderToc tocFunc globalState
+    return $ renderToc mTocFormat tocFunc globalState
 
 -- | Returns a Later which takes a GlobalState to render a delayed ToC
-renderDelayedToc :: HtmlReaderState
-renderDelayedToc = do
+renderDelayedToc :: Maybe TocFormat -> HtmlReaderState
+renderDelayedToc mTocFormat = do
     tocFunc <- asks tocEntryWrapperFunc
     -- \| Return Later to delay ToC generation to the end;
     --    Join Delayed (Delayed (Html ())) together,
     --    since the ToC itself contains Delayed (Html ()) too
-    return $ join $ Later $ \globalState -> renderToc tocFunc globalState
+    return $ join $ Later $ \globalState -> renderToc mTocFormat tocFunc globalState
 
 -- | Helper function for rendering a ToC from the given  GlobalState
-renderToc :: LabelWrapper -> GlobalState -> Delayed (Html ())
-renderToc tocFunc globalState =
+renderToc :: Maybe TocFormat -> LabelWrapper -> GlobalState -> Delayed (Html ())
+renderToc Nothing _ _ = mempty
+renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
     let tableHead =
-            thead_ $ tr_ (th_ mempty <> th_ (toHtml ("Literaturverzeichnis" :: Text)))
+            thead_ $ tr_ (th_ mempty <> th_ (toHtml title))
                 :: Html ()
 
         -- \| Build List of ToC rows
