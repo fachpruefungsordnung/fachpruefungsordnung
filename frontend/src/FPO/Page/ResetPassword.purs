@@ -7,11 +7,8 @@ module FPO.Page.ResetPassword (component) where
 
 import Prelude
 
-import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String (null)
-import Data.String.Regex (regex, test)
-import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Store as Store
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
@@ -22,7 +19,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick, onSubmit, onValueInput) as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
+import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
@@ -32,7 +29,6 @@ data Action
   = Initialize
   | RequestCode
   | DoSubmit Event
-  | UpdateEmail String
   | UpdatePasswordPrimary String
   | UpdatePasswordSecondary String
   | UpdateCode String
@@ -40,8 +36,7 @@ data Action
   | Receive (Connected FPOTranslator Unit)
 
 type State = FPOState
-  ( email :: String
-  , passwordPrimary :: String
+  ( passwordPrimary :: String
   , passwordSecondary :: String
   , error :: Maybe String
   , code :: String
@@ -56,8 +51,7 @@ component
 component =
   connect selectTranslator $ H.mkComponent
     { initialState: \{ context } ->
-        { email: ""
-        , passwordPrimary: ""
+        { passwordPrimary: ""
         , passwordSecondary: ""
         , code: ""
         , error: Nothing
@@ -87,14 +81,9 @@ component =
 
   handleAction :: MonadAff m => Action -> H.HalogenM State Action () output m Unit
   handleAction = case _ of
-    Initialize -> do
-      mail <- _.inputMail <$> getStore
-      H.modify_ \state -> state { email = mail }
+    Initialize -> pure unit
     UpdateCode code -> do
       H.modify_ \state -> state { code = code, error = Nothing }
-    UpdateEmail email -> do
-      H.modify_ \state -> state { email = email, error = Nothing }
-      updateStore $ Store.SetMail email
     UpdatePasswordPrimary password -> do
       H.modify_ \state -> state { passwordPrimary = password, error = Nothing }
     UpdatePasswordSecondary password -> do
@@ -118,11 +107,8 @@ component =
         H.modify_ \state -> state
           { error = Just "[TODO] Password reset is not supported yet!" }
     EmitError error -> do
-      mail <- H.gets _.email
       H.modify_ \state -> state { error = Just error }
 
-      when (not $ null mail) do
-        updateStore $ Store.SetMail mail
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
 
@@ -135,13 +121,6 @@ renderResetForm state =
         [ HH.form
             [ HE.onSubmit DoSubmit ]
             [ addColumn
-                state.email
-                (translate (label :: _ "common_emailAddress") state.translator <> ":")
-                (translate (label :: _ "common_email") state.translator)
-                "bi-envelope-fill"
-                HP.InputEmail
-                UpdateEmail
-            , addColumn
                 state.passwordPrimary
                 (translate (label :: _ "rp_PasswordNew") state.translator <> ":")
                 (translate (label :: _ "common_password") state.translator)
@@ -200,15 +179,11 @@ renderResetForm state =
     ]
   where
   disable =
-    if not (isValidEmail state.email) then
+    if not (isAllFilledOut state) then
       [ HP.disabled true ]
     else []
-
-  isValidEmail :: String -> Boolean
-  isValidEmail email =
-    let
-      pattern = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
-    in
-      case regex pattern noFlags of
-        Right r -> test r email
-        Left _ -> false
+  isAllFilledOut st =
+    not (null st.passwordPrimary)
+      && not (null st.passwordSecondary)
+      &&
+        not (null st.code)
