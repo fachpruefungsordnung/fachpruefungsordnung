@@ -18,6 +18,7 @@ module Language.Ltml.HTML.Common
     , NumLabel (..)
     , ToC
     , addTocEntry
+    , RenderedTocEntry
     , EnumStyleMap
     , LabelWrapper
     , anchorLink
@@ -28,6 +29,7 @@ module Language.Ltml.HTML.Common
 
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (State, get, modify)
+import Data.ByteString.Lazy (ByteString)
 import Data.DList (DList, snoc)
 import qualified Data.DList as DList (empty)
 import Data.Map (Map)
@@ -247,6 +249,9 @@ addTocEntry mKey title mLabel = do
     modify
         (\s -> s {tableOfContents = snoc (tableOfContents s) (mKey, title, htmlId)})
     return htmlId
+
+-- | Type of exported ToC Entries (especially for Frontend)
+type RenderedTocEntry = (Maybe ByteString, ByteString)
 
 -------------------------------------------------------------------------------
 

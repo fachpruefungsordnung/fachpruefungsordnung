@@ -19,7 +19,6 @@ import Control.Monad (join, zipWithM)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bifunctor (bimap)
-import Data.ByteString.Lazy (ByteString)
 import Data.DList (toList)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, isJust)
@@ -85,9 +84,9 @@ renderHtmlCss docContainer =
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
 
 -- | Renders a global ToC (including appendices) as a list of (Maybe idHtml, titleHtml)
-renderTocList :: Flagged' DocumentContainer -> [(Maybe ByteString, ByteString)]
+renderTocList :: Flagged' DocumentContainer -> [RenderedTocEntry]
 renderTocList docContainer =
-    -- \| Render with given footnote context
+    -- \| Create global ToC with Footnote context
     let (_, finalState) =
             runState
                 ( runReaderT
@@ -208,10 +207,11 @@ instance ToHtmlM DocumentHeading where
         headingFormatS <- asks documentHeadingFormat
         -- \| Here we check if we are inside an appendix, since
         --   the appendix heading format has an id and the main documents has not
-        (formattedTitle, mId) <- case headingFormatS of
-            Left headFormat ->
-                -- \| Main Document Heading without Id and without anchor link
-                return (headingFormat headFormat <$> titleHtml, Nothing)
+        (formattedTitle, htmlId) <- case headingFormatS of
+            Left headFormat -> do
+                -- \| Main Document Heading without Id and mangled anchor link
+                htmlId <- addTocEntry Nothing titleHtml Nothing
+                return (headingFormat headFormat <$> titleHtml, htmlId)
             Right headFormatId -> do
                 -- \| Heading for Appendix Element (with id and toc key)
                 docId <- asks currentAppendixElementID
@@ -221,8 +221,8 @@ instance ToHtmlM DocumentHeading where
                 -- \| Check if current document has Label and build ToC entry
                 mLabel <- asks appendixElementMLabel
                 htmlId <- addTocEntry (Just tocHtml) titleHtml mLabel
-                return (headingHtml, Just htmlId)
-        return $ h1_ [cssClass_ Class.DocumentTitle, mTextId_ mId] <$> formattedTitle
+                return (headingHtml, htmlId)
+        return $ h1_ [cssClass_ Class.DocumentTitle, id_ htmlId] <$> formattedTitle
 
 -------------------------------------------------------------------------------
 
@@ -548,17 +548,10 @@ instance (ToHtmlM a) => ToHtmlM (Flagged' a) where
         -- \| Set True for children if renderFlag is True, else keep value
         aHtml <-
             local (\s -> s {shouldRender = renderFlag || shouldRender s}) $ toHtmlM a
-        render <-
-            ( if renderFlag
-                    then return True
-                    else
-                        ( do
-                            -- \| Check if a has any Flagged
-                            hasFlaggedChild <- gets hasFlagged
-                            parentRender <- asks shouldRender
-                            return $ hasFlaggedChild || parentRender
-                        )
-                )
+        -- \| Decide if output is thrown away
+        hasFlaggedChild <- gets hasFlagged
+        parentRender <- asks shouldRender
+        let render = renderFlag || hasFlaggedChild || parentRender
         -- \| Tell parent that we exist
         modify (\s -> s {hasFlagged = True})
         return $ if render then aHtml else mempty
