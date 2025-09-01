@@ -347,7 +347,7 @@ postDocument
   -> H.HalogenM st act slots msg m (Either AppError Document)
 postDocument url body = handleRequest' url (postDocument' url body)
 
-postIgnore  
+postIgnore
   :: forall st act slots msg m
    . MonadAff m
   => MonadStore Store.Action Store.Store m

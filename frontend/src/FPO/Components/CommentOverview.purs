@@ -81,10 +81,11 @@ commentOverviewview = H.mkComponent
       pure (Just a)
 
   renderFirstComment
-    :: Maybe Formatter 
-    -> FirstComment 
+    :: Maybe Formatter
+    -> FirstComment
     -> Int
-    -> forall slots. H.ComponentHTML Action slots m
+    -> forall slots
+     . H.ComponentHTML Action slots m
   renderFirstComment mFormatter c tocID =
     HH.div
       [ HP.classes
@@ -96,7 +97,10 @@ commentOverviewview = H.mkComponent
           , HB.dFlex
           , HB.flexColumn
           ]
-      , HP.style $ "background-color:" <> (if c.resolved then "rgba(66, 250, 0, 0.9)" else "rgba(246, 250, 0, 0.9)") <> ";"
+      , HP.style $ "background-color:"
+          <>
+            (if c.resolved then "rgba(66, 250, 0, 0.9)" else "rgba(246, 250, 0, 0.9)")
+          <> ";"
       , HE.onClick \_ -> SelectCommentSection tocID c.markerID
       ]
       [ HH.div_
