@@ -2,6 +2,7 @@ module FPO.Translations.Labels where
 
 import Data.Function (($))
 import FPO.Translations.Common (deCommon, enCommon)
+import FPO.Translations.Components.Comment (deComment, enComment)
 import FPO.Translations.Components.Editor (deEditor, enEditor)
 import FPO.Translations.Components.Navbar (deNavbar, enNavbar)
 import FPO.Translations.Components.TOC (deTOC, enTOC)
@@ -32,6 +33,7 @@ en = fromRecord
   $ merge (toRecord enAdminUserPage)
   $ merge (toRecord enAddMembersPage)
   $ merge (toRecord enCommon)
+  $ merge (toRecord enComment)
   $ merge (toRecord enEditor)
   $ merge (toRecord enErrors)
   $ merge (toRecord enNavbar)
@@ -52,6 +54,7 @@ de = fromRecord
   $ merge (toRecord deAdminUserPage)
   $ merge (toRecord deAddMembersPage)
   $ merge (toRecord deCommon)
+  $ merge (toRecord deComment)
   $ merge (toRecord deEditor)
   $ merge (toRecord deErrors)
   $ merge (toRecord deNavbar)
@@ -104,6 +107,14 @@ type Labels =
       -- | Admin Panel
       ::: "au_groupManagement"
       ::: "au_userManagement"
+
+      -- | Comment
+      ::: "comment_allComments"
+      ::: "comment_comment"
+      ::: "comment_delete"
+      ::: "comment_no_timestamp"
+      ::: "comment_resolve"
+      ::: "comment_send"
 
       -- | Common Phrases
       ::: "common_cancel"

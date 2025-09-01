@@ -50,6 +50,8 @@ import FPO.Dto.DocumentDto.TreeDto
   , findRootTree
   , modifyNodeRootTree
   )
+import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types
   ( TOCEntry
   , TOCTree
@@ -65,8 +67,10 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
+import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
 import Web.DOM.Document as Document
 import Web.DOM.Element as Element
@@ -119,8 +123,8 @@ data Action
   | UpdateMSelectedTocEntry
   | SetComparison Int (Maybe Int)
 
-type State =
-  { docID :: DocumentID
+type State = FPOState
+  ( docID :: DocumentID
   , mDragTarget :: Maybe DragTarget
 
   -- Store the width values as ratios of the total width
@@ -178,7 +182,7 @@ type State =
 =======
   , compareToElement :: ElementData
 >>>>>>> main -}
-  }
+  )
 
 type ElemVersion =
   { elementID :: Int, versionID :: Maybe Int, comparisonData :: ElementData }
@@ -203,34 +207,37 @@ splitview
   => Navigate m
   => MonadStore Store.Action Store.Store m
   => H.Component query Input Output m
-splitview = H.mkComponent
-  { initialState: \docID ->
-      { mDragTarget: Nothing
-      , startMouseRatio: 0.0
-      , startSidebarRatio: 0.0
-      , startPreviewRatio: 0.0
-      , sidebarRatio: 0.2
-      , previewRatio: 0.4
-      , lastExpandedSidebarRatio: 0.2
-      , lastExpandedPreviewRatio: 0.4
-      , renderedHtml: Nothing
-      , testDownload: ""
-      , tocEntries: Empty
-      , versionMapping: Empty
-      , mTimeFormatter: Nothing
-      , sidebarShown: true
-      , tocShown: true
-      , commentOverviewShown: false
-      , commentShown: false
-      , previewShown: true
-      , docID: docID
-      , mSelectedTocEntry: Nothing
-      }
+splitview = connect selectTranslator $ H.mkComponent
+  { initialState
   , render
   , eval: H.mkEval $ H.defaultEval
       { initialize = Just Init, handleAction = handleAction }
   }
   where
+  initialState :: Connected FPOTranslator Input -> State
+  initialState { context, input } =
+    { docID: input
+    , translator: fromFpoTranslator context
+    , mDragTarget: Nothing
+    , startMouseRatio: 0.0
+    , startSidebarRatio: 0.0
+    , startPreviewRatio: 0.0
+    , sidebarRatio: 0.2
+    , previewRatio: 0.4
+    , lastExpandedSidebarRatio: 0.2
+    , lastExpandedPreviewRatio: 0.4
+    , renderedHtml: Nothing
+    , testDownload: ""
+    , tocEntries: Empty
+    , versionMapping: Empty
+    , mTimeFormatter: Nothing
+    , sidebarShown: true
+    , tocShown: true
+    , commentOverviewShown: false
+    , commentShown: false
+    , previewShown: true
+    , mSelectedTocEntry: Nothing
+    }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
@@ -354,7 +361,7 @@ splitview = H.mkComponent
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
             ]
-            [ HH.text "Conversation" ]
+            [ HH.text (translate (label :: _ "comment_comment") state.translator) ]
         , HH.slot _comment unit Comment.commentview unit HandleComment
         ]
     -- CommentOverview
@@ -394,7 +401,8 @@ splitview = H.mkComponent
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
             ]
-            [ HH.text "All comments" ]
+            [ HH.text (translate (label :: _ "comment_allComments") state.translator)
+            ]
         , HH.slot _commentOverview unit CommentOverview.commentOverviewview unit
             HandleCommentOverview
         ]

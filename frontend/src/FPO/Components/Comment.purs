@@ -14,6 +14,8 @@ import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.CommentDto as CD
+import FPO.Translations.Translator (fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types
   ( Comment
   , CommentSection
@@ -26,8 +28,10 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Store.Connect (connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
+import Simple.I18n.Translator (label, translate)
 
 type Input = Unit
 
@@ -54,8 +58,8 @@ data Query a
   | SelectedCommentSection Int Int Int a
   | Overview Int Int a
 
-type State =
-  { docID :: Int
+type State = FPOState
+  ( docID :: Int
   , tocID :: Int
   , markerID :: Int
   , commentSections :: Array CommentSection
@@ -63,7 +67,7 @@ type State =
   , newComment :: Boolean
   , commentDraft :: String
   , mTimeFormatter :: Maybe Formatter
-  }
+  )
 
 commentview
   :: forall m
@@ -71,9 +75,10 @@ commentview
   => MonadStore Store.Action Store.Store m
   => Navigate m
   => H.Component Query Input Output m
-commentview = H.mkComponent
-  { initialState: \_ ->
-      { docID: -1
+commentview = connect selectTranslator $ H.mkComponent
+  { initialState: \{ context } ->
+      { translator: fromFpoTranslator context
+      , docID: -1
       , tocID: -1
       , markerID: -1
       , commentSections: []
@@ -91,41 +96,41 @@ commentview = H.mkComponent
   }
   where
 
-  render :: State -> forall slots. H.ComponentHTML Action slots m
+  render :: State -> H.ComponentHTML Action () m
   render state = case state.mCommentSection of
     Nothing ->
       if state.newComment then
         HH.div [ HP.style "comment-section space-y-3" ]
-          [ renderInput state.commentDraft state.newComment ]
+          [ renderInput state ]
       else
         HH.text ""
     Just commentSection ->
       HH.div [ HP.style "comment-section space-y-3" ]
-        ( renderComments state.mTimeFormatter commentSection
+        ( renderComments state commentSection
             <>
               ( if commentSection.resolved then []
-                else [ renderInput state.commentDraft state.newComment ]
+                else [ renderInput state ]
               )
         )
 
   renderComments
-    :: Maybe Formatter
+    :: State
     -> CommentSection
     -> forall slots
      . Array (H.ComponentHTML Action slots m)
-  renderComments mFormatter commentSection = case commentSection.first of
+  renderComments state commentSection = case commentSection.first of
     Nothing -> [ HH.text "" ]
     Just c ->
-      [ renderFirstComment mFormatter c commentSection.resolved ]
-        <> map (renderComment mFormatter) commentSection.replies
+      [ renderFirstComment state c commentSection.resolved ]
+        <> map (renderComment state) commentSection.replies
 
   renderFirstComment
-    :: Maybe Formatter
+    :: State
     -> Comment
     -> Boolean
     -> forall slots
      . H.ComponentHTML Action slots m
-  renderFirstComment mFormatter c resolved =
+  renderFirstComment state c resolved =
     HH.div
       [ HP.classes
           [ HB.p2
@@ -154,15 +159,16 @@ commentview = H.mkComponent
           [ HP.classes [ HB.mt2 ]
           , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;"
           ]
-          [ HH.text $ maybe "No timestamp found."
+          [ HH.text $ maybe
+              (translate (label :: _ "comment_no_timestamp") state.translator)
               (\formatter -> format formatter c.timestamp)
-              mFormatter
+              state.mTimeFormatter
           ]
       ]
 
   renderComment
-    :: Maybe Formatter -> Comment -> forall slots. H.ComponentHTML Action slots m
-  renderComment mFormatter c =
+    :: State -> Comment -> forall slots. H.ComponentHTML Action slots m
+  renderComment state c =
     HH.div
       [ HP.classes
           [ HB.p1
@@ -190,14 +196,15 @@ commentview = H.mkComponent
           [ HP.classes [ HB.mt2 ]
           , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;"
           ]
-          [ HH.text $ maybe "No timestamp found."
+          [ HH.text $ maybe
+              (translate (label :: _ "comment_no_timestamp") state.translator)
               (\formatter -> format formatter c.timestamp)
-              mFormatter
+              state.mTimeFormatter
           ]
       ]
 
-  renderInput :: String -> Boolean -> forall slots. H.ComponentHTML Action slots m
-  renderInput draft newComment =
+  renderInput :: State -> forall slots. H.ComponentHTML Action slots m
+  renderInput state =
     HH.div
       [ HP.classes [ HB.dFlex, HB.flexColumn ]
       , HP.style
@@ -207,7 +214,7 @@ commentview = H.mkComponent
           [ HP.style
               "border-radius: .375rem; padding: .5rem; resize: none; min-height: 5rem;"
           , HP.rows 3
-          , HP.value draft
+          , HP.value state.commentDraft
           , HE.onValueChange UpdateDraft
           ]
       , HH.div
@@ -220,19 +227,23 @@ commentview = H.mkComponent
               , HP.style "white-space: nowrap;"
               , HE.onClick \_ -> SendComment
               ]
-              [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text "Senden" ]
+              [ HH.small [ HP.style "margin-right: 0.25rem;" ]
+                  [ HH.text (translate (label :: _ "comment_send") state.translator) ]
               , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-send" ] ] []
               ]
 
           -- Resolve (rechts)
-          , if newComment then
+          , if state.newComment then
               HH.button
                 [ HP.classes
                     [ HB.btn, HB.btnDanger, HB.px3, HB.py1, HB.m0, HB.msAuto ]
                 , HP.style "white-space: nowrap;"
                 , HE.onClick \_ -> DeleteComment
                 ]
-                [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text "Delete" ]
+                [ HH.small [ HP.style "margin-right: 0.25rem;" ]
+                    [ HH.text
+                        (translate (label :: _ "comment_delete") state.translator)
+                    ]
                 , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
                 ]
             else
@@ -242,7 +253,10 @@ commentview = H.mkComponent
                 , HP.style "white-space: nowrap;"
                 , HE.onClick \_ -> ResolveComment
                 ]
-                [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text "Resolve" ]
+                [ HH.small [ HP.style "margin-right: 0.25rem;" ]
+                    [ HH.text
+                        (translate (label :: _ "comment_resolve") state.translator)
+                    ]
                 , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
                 ]
           ]

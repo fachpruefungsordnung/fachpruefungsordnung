@@ -185,7 +185,6 @@ data Action
   | Comment
   | ChangeToSection String TOCEntry (Maybe Int)
   | ContinueChangeToSection (Array FirstComment)
-  | DeleteComment
   | SelectComment
   | Bold
   | Italic
@@ -386,11 +385,6 @@ editor = connect selectTranslator $ H.mkComponent
                     (translate (label :: _ "editor_comment") state.translator)
                     Comment
                     "bi-chat-square-text"
-                , makeEditorToolbarButton
-                    fullFeatures
-                    (translate (label :: _ "editor_deleteComment") state.translator)
-                    DeleteComment
-                    "bi-chat-square-text-fill"
 
                 ]
             , HH.div
@@ -660,7 +654,7 @@ editor = connect selectTranslator $ H.mkComponent
         -> pure unit
         Just { tocEntry: tocEntry, revID: revID, title: title }
         -> handleAction (ChangeToSection title tocEntry revID)
-    {-       _ <- H.subscribe =<< resizeDelay Resize
+      {-       _ <- H.subscribe =<< resizeDelay Resize
     pure unit -}
 
       -- add and start Editor listeners
@@ -706,7 +700,7 @@ editor = connect selectTranslator $ H.mkComponent
           HS.notify listener AutoSaveTimer
         H.liftEffect $ addEventListener (EventType "mouseup") upL true
           (toEventTarget $ toElement container)
-    
+
     Resize -> do
       state <- H.get
       H.liftEffect
@@ -1047,32 +1041,6 @@ editor = connect selectTranslator $ H.mkComponent
             H.liftEffect $ clearSelection ed
 
         _, _ -> pure unit -- TODO error handling 
-
-    DeleteComment -> do
-      state <- H.get
-      H.gets _.mEditor >>= traverse_ \ed -> do
-        case state.mTocEntry of
-          Nothing -> pure unit
-          Just tocEntry -> do
-            session <- H.liftEffect $ Editor.getSession ed
-            cursor <- H.liftEffect $ Editor.getCursorPosition ed
-
-            -- remove the marker at the cursor position and return the remaining markers
-            foundLM <- H.liftEffect $ cursorInRange state.liveMarkers cursor
-            case foundLM of
-              Nothing -> pure unit
-              Just lm -> do
-                let
-                  foundID = lm.annotedMarkerID
-                --   newMarkers = filter (\m -> not (m.id == foundID)) tocEntry.markers
-                --   newLiveMarkers =
-                --     filter (\l -> not (l.annotedMarkerID == foundID))
-                --       state.liveMarkers
-                --  newTOCEntry = tocEntry { markers = newMarkers }
-                H.liftEffect $ removeLiveMarker lm session
-                H.modify_ \st ->
-                  st { mTocEntry = Just tocEntry } --, liveMarkers = newLiveMarkers }
-                H.raise (DeletedComment tocEntry [ foundID ])
 
     SelectComment -> do
       state <- H.get
@@ -1572,7 +1540,6 @@ editor = connect selectTranslator $ H.mkComponent
 
     ToDeleteComment a -> do
       state <- H.get
-      H.liftEffect $ log "ToDeleteComment"
       case state.mEditor, state.selectedLiveMarker of
         Just ed, Just lm -> do
           H.liftEffect $ log $ "passed case: " <> show lm.annotedMarkerID
