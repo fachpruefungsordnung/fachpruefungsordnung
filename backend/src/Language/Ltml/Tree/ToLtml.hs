@@ -4,7 +4,7 @@ module Language.Ltml.Tree.ToLtml
 where
 
 import Language.Lsd.AST.SimpleRegex (Disjunction (Disjunction))
-import Language.Lsd.Example.Fpo (fpoT)
+import Language.Lsd.Example (availableLSDs)
 import Language.Ltml.AST.DocumentContainer (DocumentContainer)
 import Language.Ltml.Common (Flagged')
 import Language.Ltml.Tree (FlaggedInputTree')
@@ -19,4 +19,4 @@ treeToLtml
     -> Either TreeError (Flagged' DocumentContainer)
 treeToLtml tTree = runTreeParser $ documentContainerTP t tTree
   where
-    t = Disjunction [fpoT] -- TODO: Do not hard-code.
+    t = Disjunction availableLSDs

@@ -9,22 +9,19 @@
 
 module Language.Ltml.HTML
     ( ToHtmlM (..)
-    , renderHtml
-    , docToHtml
-    , sectionToHtml
-    , aToHtml
     , renderSectionHtmlCss
     , renderHtmlCss
+    , renderTocList
     ) where
 
 import Clay (Css)
 import Control.Monad (join, zipWithM)
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.ByteString.Lazy (ByteString)
+import Data.Bifunctor (bimap)
 import Data.DList (toList)
 import qualified Data.Map as Map
-import Data.Maybe (isJust)
+import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Set as Set
 import Data.Text (Text, unpack)
 import Data.Void (Void, absurd)
@@ -69,39 +66,44 @@ import Language.Ltml.HTML.References
 import Language.Ltml.HTML.Util
 import Lucid
 
-renderHtml :: Document -> ByteString
-renderHtml document = renderBS $ docToHtml document
-
-docToHtml :: Document -> Html ()
-docToHtml doc = addHtmlHeader "Test Dokument" "out.css" (aToHtml doc)
-
-sectionToHtml :: Node Section -> Html ()
-sectionToHtml sec = addHtmlHeader "Test Dokument" "out.css" (aToHtml sec)
-
--- | Internal function that renders to Html
-aToHtml :: (ToHtmlM a) => a -> Html ()
-aToHtml a =
-    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) initGlobalState
-     in evalDelayed delayedHtml finalState
-
 renderSectionHtmlCss :: Node Section -> Map.Map Label Footnote -> (Html (), Css)
 renderSectionHtmlCss section fnMap =
     -- \| Render with given footnote context
     let readerState = initReaderState {footnoteMap = fnMap}
         (delayedHtml, finalState) = runState (runReaderT (toHtmlM section) readerState) initGlobalState
-        usedFootnotes = convertLabelMap $ usedFootnoteMap finalState
         -- \| Add footnote labes for "normal" (non-footnote) references
-        finalState' = finalState {labels = usedFootnotes ++ labels finalState}
+        finalState' = addUsedFootnoteLabels finalState
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
 
 renderHtmlCss :: Flagged' DocumentContainer -> (Html (), Css)
 renderHtmlCss docContainer =
     -- \| Render with given footnote context
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) initReaderState) initGlobalState
-        usedFootnotes = convertLabelMap $ usedFootnoteMap finalState
         -- \| Add footnote labes for "normal" (non-footnote) references
-        finalState' = finalState {labels = usedFootnotes ++ labels finalState}
+        finalState' = addUsedFootnoteLabels finalState
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
+
+-- | Renders a global ToC (including appendices) as a list of (Maybe idHtml, titleHtml)
+renderTocList :: Flagged' DocumentContainer -> [RenderedTocEntry]
+renderTocList docContainer =
+    -- \| Create global ToC with Footnote context
+    let (_, finalState) =
+            runState
+                ( runReaderT
+                    (toHtmlM docContainer)
+                    (initReaderState {appendixHasGlobalToC = True})
+                )
+                initGlobalState
+        -- \| Add footnote labes for "normal" (non-footnote) references
+        finalState' = addUsedFootnoteLabels finalState
+        tocList = toList $ tableOfContents finalState'
+        -- \| Produce (Just <span>id</span>, <span>title</span>)
+        htmlTitleList =
+            map
+                (\(mId, dt, _) -> (span_ <$> mId, span_ $ evalDelayed dt finalState'))
+                tocList
+     in -- \| Render Maybe Html and Html to ByteString
+        map (bimap (fmap renderBS) renderBS) htmlTitleList
 
 -------------------------------------------------------------------------------
 
@@ -117,12 +119,15 @@ instance ToHtmlM DocumentContainer where
                 doc
                 appendices
             ) = do
-            -- \| Main Document has a global ToC, appendices do not
+            -- \| Main Document has a global ToC, appendices typically do not
             mainDocHtml <-
                 local
                     (\s -> s {hasGlobalToC = True, documentHeadingFormat = Left docHeadingFormat})
                     $ toHtmlM doc
-            appendicesHtml <- local (\s -> s {hasGlobalToC = False}) $ toHtmlM appendices
+            readerState <- ask
+            appendicesHtml <-
+                local (\s -> s {hasGlobalToC = appendixHasGlobalToC readerState}) $
+                    toHtmlM appendices
             return $ mainDocHtml <> appendicesHtml
 
 -- | This instance is used for documents inside the appendix,
@@ -202,10 +207,11 @@ instance ToHtmlM DocumentHeading where
         headingFormatS <- asks documentHeadingFormat
         -- \| Here we check if we are inside an appendix, since
         --   the appendix heading format has an id and the main documents has not
-        (formattedTitle, mId) <- case headingFormatS of
-            Left headFormat ->
-                -- \| Main Document Heading without Id and without anchor link
-                return (headingFormat headFormat <$> titleHtml, Nothing)
+        (formattedTitle, htmlId) <- case headingFormatS of
+            Left headFormat -> do
+                -- \| Main Document Heading without Id and mangled anchor link
+                htmlId <- addTocEntry Nothing titleHtml Nothing
+                return (headingFormat headFormat <$> titleHtml, htmlId)
             Right headFormatId -> do
                 -- \| Heading for Appendix Element (with id and toc key)
                 docId <- asks currentAppendixElementID
@@ -214,9 +220,9 @@ instance ToHtmlM DocumentHeading where
                 let (headingHtml, tocHtml) = appendixFormat idFormat docId tocFormat headFormatId titleHtml
                 -- \| Check if current document has Label and build ToC entry
                 mLabel <- asks appendixElementMLabel
-                htmlId <- addTocEntry tocHtml titleHtml mLabel
-                return (headingHtml, Just htmlId)
-        return $ h1_ [cssClass_ Class.DocumentTitle, mTextId_ mId] <$> formattedTitle
+                htmlId <- addTocEntry (Just tocHtml) titleHtml mLabel
+                return (headingHtml, htmlId)
+        return $ h1_ [cssClass_ Class.DocumentTitle, id_ htmlId] <$> formattedTitle
 
 -------------------------------------------------------------------------------
 
@@ -247,7 +253,7 @@ instance ToHtmlM (Node Section) where
              in do
                     addMaybeLabelToState mLabel sectionIDHtml
                     -- \| Add table of contents entry for section
-                    htmlId <- addTocEntry sectionTocKeyHtml titleHtml mLabel
+                    htmlId <- addTocEntry (Just sectionTocKeyHtml) titleHtml mLabel
                     -- \| Build heading Html with sectionID
                     childrenHtml <- toHtmlM sectionBody
                     -- \| Also render footnotes in super-sections, since their heading
@@ -513,7 +519,7 @@ instance ToHtmlM AppendixSection where
             ) = do
             -- \| Add Entry to ToC but without ID
             htmlId <-
-                addTocEntry (mempty :: Html ()) (Now $ toHtml appendixSectionTitle) Nothing
+                addTocEntry Nothing (Now $ toHtml appendixSectionTitle) Nothing
             -- \| Give each Document the corresponding appendix Id
             let zipFunc i nDoc = local (\s -> s {currentAppendixElementID = i}) $ toHtmlM nDoc
             documentHtmls <-
@@ -542,17 +548,10 @@ instance (ToHtmlM a) => ToHtmlM (Flagged' a) where
         -- \| Set True for children if renderFlag is True, else keep value
         aHtml <-
             local (\s -> s {shouldRender = renderFlag || shouldRender s}) $ toHtmlM a
-        render <-
-            ( if renderFlag
-                    then return True
-                    else
-                        ( do
-                            -- \| Check if a has any Flagged
-                            hasFlaggedChild <- gets hasFlagged
-                            parentRender <- asks shouldRender
-                            return $ hasFlaggedChild || parentRender
-                        )
-                )
+        -- \| Decide if output is thrown away
+        hasFlaggedChild <- gets hasFlagged
+        parentRender <- asks shouldRender
+        let render = renderFlag || hasFlaggedChild || parentRender
         -- \| Tell parent that we exist
         modify (\s -> s {hasFlagged = True})
         return $ if render then aHtml else mempty
@@ -597,12 +596,14 @@ renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
     -- \| Build <tr><td>id</td> <td>title</td></tr> and wrap id and title seperatly
     buildWrappedRow
         :: LabelWrapper
-        -> (Html (), Delayed (Html ()), Text)
+        -> (Maybe (Html ()), Delayed (Html ()), Text)
         -> Delayed (Html ())
-    buildWrappedRow wrapperFunc (idHtml, titleHtml, htmlId) =
+    buildWrappedRow wrapperFunc (mIdHtml, titleHtml, htmlId) =
         let wrap = wrapperFunc (Label htmlId)
          in -- TODO: Style ToC
-            ((tr_ <$> (td_ (wrap idHtml) <>)) . td_) . wrap <$> titleHtml
+            -- \| Nothing IdHtmls will be replaced with mempty
+            ((tr_ <$> (td_ (wrap (fromMaybe mempty mIdHtml)) <>)) . td_) . wrap
+                <$> titleHtml
 
 -------------------------------------------------------------------------------
 

@@ -10,9 +10,9 @@ where
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Sequence, Star)
 import Language.Lsd.AST.Type
-    ( KindNameOf (kindNameOf)
-    , NamedType
-    , TypeNameOf (typeNameOf)
+    ( NamedType
+    , ProperNodeKind (..)
+    , TreeSyntax (LeafSyntax)
     )
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphType)
 
@@ -28,8 +28,9 @@ data SimpleSectionType
         SimpleSectionFormat
         (Star (NamedType SimpleParagraphType))
 
-instance KindNameOf (Sequence (NamedType SimpleSectionType)) where
+instance ProperNodeKind (Sequence (NamedType SimpleSectionType)) where
     kindNameOf _ = "simple-section-sequence"
-
-instance TypeNameOf (Sequence (NamedType SimpleSectionType)) where
     typeNameOf _ = ""
+    displayTypeNameOf _ = "simple section sequence"
+    treeSyntaxMap _ _ = LeafSyntax
+    kindHasTocHeading _ = False

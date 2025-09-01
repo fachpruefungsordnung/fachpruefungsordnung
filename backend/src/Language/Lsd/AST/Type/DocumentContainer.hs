@@ -11,8 +11,14 @@ where
 
 import Data.Typography (FontSize, FontStyle)
 import Language.Lsd.AST.Format (FormatString, MainHeadingFormat)
-import Language.Lsd.AST.SimpleRegex (Sequence)
-import Language.Lsd.AST.Type (KindNameOf (kindNameOf), NamedType)
+import Language.Lsd.AST.SimpleRegex (Sequence (Sequence))
+import Language.Lsd.AST.Type
+    ( ChildrenOrder (SequenceOrder)
+    , HasEditableHeader (HasEditableHeader)
+    , NamedType
+    , RawProperNodeKind (..)
+    , TreeSyntax (TreeSyntax)
+    )
 import Language.Lsd.AST.Type.AppendixSection (AppendixSectionType)
 import Language.Lsd.AST.Type.Document (DocumentType)
 
@@ -33,8 +39,15 @@ data DocumentContainerType
         (NamedType DocumentType)
         (Sequence (NamedType AppendixSectionType))
 
-instance KindNameOf DocumentContainerType where
-    kindNameOf _ = "document-container"
+instance RawProperNodeKind DocumentContainerType where
+    kindNameOfRaw _ = "document-container"
+
+    treeSyntaxMapRaw f (DocumentContainerType _ mainDocT (Sequence appSecsT)) =
+        TreeSyntax (HasEditableHeader True) $
+            SequenceOrder $
+                pure <$> (f mainDocT : map f appSecsT)
+
+    kindHasTocHeadingRaw _ = False
 
 -- | The format of a printed header/footer.
 data HeaderFooterFormat

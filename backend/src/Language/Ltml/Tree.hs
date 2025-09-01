@@ -14,13 +14,13 @@ module Language.Ltml.Tree
     , FlaggedMetaTree
     , TypedMetaTree
     , MetaTree
-    , HtmlHeading (..)
     )
 where
 
 import Data.Text (Text)
 import Language.Lsd.AST.Common (KindName, TypeName)
 import Language.Ltml.Common (Flagged, flagMap)
+import Language.Ltml.HTML.Common (RenderedTocEntry)
 
 type FlaggedTree flag a b = Flagged flag (TypedTree flag a b)
 
@@ -71,9 +71,8 @@ type InputTree' = InputTree Bool
 -- | A tree containing metadata, to be sent to the frontend.
 --   The type parameter is typically an identifier type.
 type FlaggedMetaTree id =
-    FlaggedTree id (Maybe HtmlHeading) (Maybe HtmlHeading)
+    FlaggedTree id (Maybe RenderedTocEntry) (Maybe RenderedTocEntry)
 
-type TypedMetaTree id = TypedTree id (Maybe HtmlHeading) (Maybe HtmlHeading)
-type MetaTree id = Tree id (Maybe HtmlHeading) (Maybe HtmlHeading)
-
-newtype HtmlHeading = HtmlHeading Text
+type TypedMetaTree id =
+    TypedTree id (Maybe RenderedTocEntry) (Maybe RenderedTocEntry)
+type MetaTree id = Tree id (Maybe RenderedTocEntry) (Maybe RenderedTocEntry)

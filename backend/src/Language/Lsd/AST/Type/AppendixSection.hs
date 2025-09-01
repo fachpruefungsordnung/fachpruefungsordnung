@@ -14,8 +14,14 @@ import Language.Lsd.AST.Format
     , InnerHeadingFormat
     , TocKeyFormat
     )
-import Language.Lsd.AST.SimpleRegex (Disjunction, Star)
-import Language.Lsd.AST.Type (KindNameOf (kindNameOf), NamedType)
+import Language.Lsd.AST.SimpleRegex (Disjunction, Star (Star))
+import Language.Lsd.AST.Type
+    ( ChildrenOrder (StarOrder)
+    , HasEditableHeader (HasEditableHeader)
+    , NamedType
+    , RawProperNodeKind (..)
+    , TreeSyntax (TreeSyntax)
+    )
 import Language.Lsd.AST.Type.Document (DocumentType)
 
 data AppendixSectionFormat
@@ -41,5 +47,10 @@ data AppendixSectionType
         AppendixSectionFormat
         (Star (Disjunction (NamedType DocumentType)))
 
-instance KindNameOf AppendixSectionType where
-    kindNameOf _ = "appendix-section"
+instance RawProperNodeKind AppendixSectionType where
+    kindNameOfRaw _ = "appendix-section"
+
+    treeSyntaxMapRaw f (AppendixSectionType _ (Star t)) =
+        TreeSyntax (HasEditableHeader False) $ StarOrder $ fmap f t
+
+    kindHasTocHeadingRaw _ = True
