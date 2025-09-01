@@ -116,7 +116,7 @@ data Action
   -- for right version means no comparison 
   | ModifyVersionMapping Int (Maybe (Maybe Int)) (Maybe (ElementData))
   | UpdateMSelectedTocEntry
-  | SetComparison Int Int
+  | SetComparison Int (Maybe Int)
 
 type State =
   { docID :: DocumentID
@@ -222,7 +222,6 @@ splitview = H.mkComponent
       , commentShown: false
       , previewShown: true
       , docID: docID
-      -- , compareToElement: Nothing
       , mSelectedTocEntry: Nothing
       }
   , render
@@ -253,7 +252,7 @@ splitview = H.mkComponent
         , HP.classes [ HB.dFlex, HB.overflowHidden ]
         , HP.style
             ( "height: calc(100vh - " <> show navbarHeight <>
-                "px); max-height: 100%;"
+                "px); max-height: 100%; min-height: 0;"
             )
         ]
         ( -- TOC Sidebar
@@ -295,12 +294,6 @@ splitview = H.mkComponent
                     case versionEntry.comparisonData of
                       Nothing -> renderPreview state
                       Just cData -> renderSecondEditor state (Just cData)                   
-                    
-{-               case state.compareToElement of
-                Nothing
-                -> renderPreview state
-                Just _
-                -> renderSecondEditor state -}
         )
 
   -- Render both TOC and Comment but make them visable depending of the flags
@@ -807,17 +800,6 @@ splitview = H.mkComponent
                   -- Just cData -> do 
                     -- handleAction (ModifyVersionMapping tocID Nothing cData.revID) 
                     handleAction (ModifyVersionMapping tocID Nothing (Just Nothing)) 
-
-{-         if state.compareToElement /= Nothing then
-          H.modify_ _ { compareToElement = Nothing }
-        else do
-          let
-            oldPreviewRatio = state.previewRatio
-          H.modify_ \st -> st
-            { previewRatio = resizerRatio
-            , lastExpandedPreviewRatio = oldPreviewRatio
-            , previewShown = false
-            } -}
       -- open preview
       else do
         -- restore the last expanded middle ratio, when toggling preview back on
@@ -858,7 +840,7 @@ splitview = H.mkComponent
 {-       H.modify_ _
         { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } } -}
       H.tell _editor 1
-        (Editor.ChangeSection title tocEntry (Just vID))
+        (Editor.ChangeSection title tocEntry vID)
 
 
     -- Query handler
@@ -1009,23 +991,7 @@ splitview = H.mkComponent
             -- this case should be covered by mSelectedTocEntry being set to Nothing
             pure unit
           Just d -> 
-            H.tell _editor 1 (Editor.ChangeSection d.title d.tocEntry (Just d.revID))
-      {- TOC.ChangeToLeaf title selectedId -> do
-        H.tell _editor 0 Editor.SaveSection
-        handleAction UpdateMSelectedTocEntry
-        state <- H.get
-        let
-          entry = case (findTOCEntry selectedId state.tocEntries) of
-            Nothing -> emptyTOCEntry
-            Just e -> e
-          rev =
-            case
-              findRootTree (\e -> e.elementID == selectedId) state.versionMapping
-              of
-              Nothing -> Nothing
-              Just elem -> elem.versionID
-        -- handleAction (ModifyVersionMapping selectedID rev)
-        H.tell _editor 0 (Editor.ChangeSection title entry rev) -}
+            H.tell _editor 1 (Editor.ChangeSection d.title d.tocEntry d.revID)
 
       TOC.ChangeToNode path title -> do
         H.tell _editor 0 (Editor.ChangeToNode title path)
