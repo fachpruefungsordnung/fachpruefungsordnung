@@ -30,6 +30,8 @@ module FPO.Data.Request
   , postBlob
   , postBlobOrError
   , postDocument
+  , postIgnore
+  , postIgnoreOrError
   , postJson
   , postRenderHtml
   , postString
@@ -305,6 +307,16 @@ getIgnore
   => String
   -> H.HalogenM st act slots msg m (Either AppError Unit)
 getIgnore url = handleUnitRequest url (getIgnore' url)
+
+postIgnore
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => String
+  -> Json
+  -> H.HalogenM st act slots msg m (Either AppError Unit)
+postIgnore url body = handleUnitRequest url (postIgnore' url body)
 
 postJson
   :: forall a st act slots msg m
@@ -589,6 +601,28 @@ postBlobOrError url body = do
           _ -> pure $ Right $ Left "Unknown error occurred"
         Left _ -> pure $ Left (ServerError "Error creating Blob.")
 
+postIgnoreOrError
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => String
+  -> Json
+  -> H.HalogenM st act slots msg m (Either AppError (Either String Unit))
+postIgnoreOrError url body = do
+  -- First try as blob
+  ignoreResult <- handleRequest' url (postIgnore' url body)
+  case ignoreResult of
+    Right blob -> pure $ Right $ Right blob
+    Left _ -> do
+      -- If blob failed, try as string (likely an error message)
+      stringResult <- H.liftAff $ postString' url body
+      case stringResult of
+        Right { body: errMsg, status } -> case status of
+          StatusCode 400 -> pure $ Right $ Left errMsg
+          _ -> pure $ Right $ Left "Unknown error occurred"
+        Left _ -> pure $ Left (ServerError "Error while requesting.")
+
 -- | PUT-Requests ----------------------------------------------------------
 putJson' :: String -> Json -> Aff (Either Error (Response Json))
 putJson' url body = do
@@ -670,6 +704,13 @@ postDocument' url body = do
 postBlob' :: String -> Json -> Aff (Either Error (Response Blob))
 postBlob' url body = do
   fpoRequest <- liftEffect $ defaultFpoRequest AXRF.blob ("/api" <> url) POST
+  let request' = fpoRequest { content = Just (RequestBody.json body) }
+  liftAff $ request driver request'
+
+-- | Makes a POST request and expects a Null response.
+postIgnore' :: String -> Json -> Aff (Either Error (Response Unit))
+postIgnore' url body = do
+  fpoRequest <- liftEffect $ defaultFpoRequest AXRF.ignore ("/api" <> url) POST
   let request' = fpoRequest { content = Just (RequestBody.json body) }
   liftAff $ request driver request'
 

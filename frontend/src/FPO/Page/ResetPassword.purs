@@ -1,18 +1,17 @@
--- | Simple test page for password reset.
--- |
--- | This page is currently not connected to any backend and
--- | does not perform any meaningful password reset.
-
 module FPO.Page.ResetPassword (component) where
 
 import Prelude
 
+import Data.Argonaut (encodeJson)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (null)
 import Data.String.Regex (regex, test)
 import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
+import FPO.Data.AppError (AppError(..))
+import FPO.Data.Navigate (class Navigate)
+import FPO.Data.Request (postIgnore, postIgnoreOrError)
 import FPO.Data.Store as Store
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -36,32 +35,35 @@ data Action
   | UpdatePasswordPrimary String
   | UpdatePasswordSecondary String
   | UpdateCode String
-  | EmitError String
-  | Receive (Connected FPOTranslator Unit)
+  | Receive (Connected FPOTranslator Input)
+  | EnableMail
 
 type State = FPOState
   ( email :: String
   , passwordPrimary :: String
   , passwordSecondary :: String
-  , error :: Maybe String
   , code :: String
+  , calledWithToken :: Boolean
   )
+
+type Input = { token :: Maybe String }
 
 -- | Password reset component.
 component
   :: forall query output m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
-  => H.Component query Unit output m
+  => Navigate m
+  => H.Component query Input output m
 component =
   connect selectTranslator $ H.mkComponent
-    { initialState: \{ context } ->
+    { initialState: \{ input: { token }, context } ->
         { email: ""
         , passwordPrimary: ""
         , passwordSecondary: ""
-        , code: ""
-        , error: Nothing
+        , code: fromMaybe "" token
         , translator: fromFpoTranslator context
+        , calledWithToken: isJust token
         }
     , render
     , eval: H.mkEval H.defaultEval
@@ -76,14 +78,135 @@ component =
   render state =
     HH.div
       [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
-      [ renderResetForm state
-      , HH.div [ HP.classes [ HB.textCenter ] ]
-          [ case state.error of
-              Just err -> HH.div [ HP.classes [ HB.alert, HB.alertDanger ] ]
-                [ HH.text err ]
-              Nothing -> HH.text ""
+      [ HH.div [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my3 ] ]
+          [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+              [ HH.text $ translate (label :: _ "rp_Header") state.translator ]
+          , HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
+              [ HH.form
+                  [ HE.onSubmit DoSubmit ]
+                  [ HH.label [ HP.classes [ HB.formLabel ] ]
+                      [ HH.text
+                          ( translate (label :: _ "common_emailAddress")
+                              state.translator
+                              <> ":"
+                          )
+                      ]
+                  , HH.div
+                      [ HP.classes
+                          ( [ HB.inputGroup ] <>
+                              if state.calledWithToken then [] else [ HB.mb4 ]
+                          )
+                      ]
+                      [ HH.span
+                          [ HP.classes [ HB.inputGroupText ]
+                          , HE.onClick \_ -> EnableMail
+                          ]
+                          [ HH.i [ HP.class_ (H.ClassName "bi-envelope-fill") ] [] ]
+                      , HH.input
+                          ( [ HP.type_ HP.InputEmail
+                            , HP.classes [ HB.formControl ]
+                            , HP.placeholder
+                                ( translate (label :: _ "common_email")
+                                    state.translator
+                                )
+                            , HP.value state.email
+                            , HE.onValueInput UpdateEmail
+                            ] <>
+                              ( if state.calledWithToken then [ HP.disabled true ]
+                                else []
+                              )
+                          )
+                      ]
+                  , HH.small
+                      [ HP.classes [ HB.textMuted, HB.mb4 ] ] -- using small more often seems to shrinken the text even more, which looks better
+                      [ HH.small_
+                          [ if state.calledWithToken then
+                              HH.text $
+                                "If you need a new code, click on the mail icon and enter your email."
+                            else
+                              HH.text ""
+                          ]
+                      ]
+                  , addColumn
+                      state.passwordPrimary
+                      ( translate (label :: _ "rp_PasswordNew") state.translator <>
+                          ":"
+                      )
+                      (translate (label :: _ "common_password") state.translator)
+                      "bi-lock-fill"
+                      HP.InputPassword
+                      UpdatePasswordPrimary
+                  , addColumn
+                      state.passwordSecondary
+                      ( translate (label :: _ "rp_PasswordConfirm") state.translator
+                          <> ":"
+                      )
+                      (translate (label :: _ "common_password") state.translator)
+                      "bi-lock-fill"
+                      HP.InputPassword
+                      UpdatePasswordSecondary
+                  , HH.div []
+                      [ HH.label [ HP.classes [ HB.formLabel ], HP.for "code" ]
+                          [ HH.text $
+                              translate (label :: _ "rp_ConfirmationCode")
+                                state.translator
+                                <> ":"
+                          ]
+                      , HH.div [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
+                          [ HH.button
+                              ( [ HP.classes [ HB.btn, HB.btnOutlineSecondary ]
+                                , HP.type_ HP.ButtonButton
+                                , HE.onClick \_ -> RequestCode
+                                ] <>
+                                  if not (isValidEmail state.email) then
+                                    [ HP.disabled true ]
+                                  else []
+                              )
+                              [ HH.text $ translate (label :: _ "rp_RequestCode")
+                                  state.translator
+                              ]
+                          , HH.input
+                              [ HP.type_ HP.InputText
+                              , HP.classes [ HB.formControl ]
+                              , HP.placeholder $ translate (label :: _ "rp_InputCode")
+                                  state.translator
+                              , HP.value state.code
+                              , HE.onValueInput UpdateCode
+                              , HP.id "code"
+                              ]
+                          ]
+                      ]
+
+                  , HH.div [ HP.classes [ HB.mb4, HB.textCenter ] ]
+                      [ HH.button
+                          ( [ HP.classes [ HB.btn, HB.btnPrimary ]
+                            , HP.type_ HP.ButtonSubmit
+                            ] <>
+                              if not (isValidForm state) then [ HP.disabled true ]
+                              else []
+                          )
+                          [ HH.text $ translate (label :: _ "common_submit")
+                              state.translator
+                          ]
+                      ]
+                  ]
+              ]
           ]
       ]
+    where
+    isValidEmail :: String -> Boolean
+    isValidEmail email =
+      let
+        pattern = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+      in
+        case regex pattern noFlags of
+          Right r -> test r email
+          Left _ -> false
+
+    isValidForm :: State -> Boolean
+    isValidForm s = s.code /= ""
+      && s.passwordPrimary /= ""
+      && s.passwordPrimary == s.passwordSecondary
 
   handleAction :: MonadAff m => Action -> H.HalogenM State Action () output m Unit
   handleAction = case _ of
@@ -91,124 +214,51 @@ component =
       mail <- _.inputMail <$> getStore
       H.modify_ \state -> state { email = mail }
     UpdateCode code -> do
-      H.modify_ \state -> state { code = code, error = Nothing }
+      H.modify_ \state -> state { code = code }
     UpdateEmail email -> do
-      H.modify_ \state -> state { email = email, error = Nothing }
+      H.modify_ \state -> state { email = email }
       updateStore $ Store.SetMail email
     UpdatePasswordPrimary password -> do
-      H.modify_ \state -> state { passwordPrimary = password, error = Nothing }
+      H.modify_ \state -> state { passwordPrimary = password }
     UpdatePasswordSecondary password -> do
-      H.modify_ \state -> state { passwordSecondary = password, error = Nothing }
+      H.modify_ \state -> state { passwordSecondary = password }
     RequestCode -> do
-      -- TODO: This is where we would ask the backend to send a code to the user's email.
-      --       We could also, instead of handling a code here, simply send an email with a link
-      --       to reset the password.
-      --       For now, we are just emitting an error.
-      H.modify_ \state -> state
-        { error = Just "[TODO] A code has (not) been sent to you by email!" }
-      pure unit
+      state <- H.get
+      if null state.email then
+        updateStore $ Store.AddWarning $ translate (label :: _ "rp_NoEmail")
+          state.translator
+      else do
+        response <- postIgnore "/password-reset/request"
+          (encodeJson { resetRequestEmail: state.email })
+        case response of
+          Left _ -> pure unit
+          Right _ -> do
+            updateStore $ Store.AddSuccess
+              ( ( translate (label :: _ "common_sentResetLinkDone")
+                    state.translator
+                ) <> state.email
+              )
     DoSubmit event -> do
       H.liftEffect $ preventDefault event
-
-      st <- H.get
-      if (st.passwordPrimary /= st.passwordSecondary) then do
-        H.modify_ \state -> state
-          { error = Just $ translate (label :: _ "rp_NoMatch") st.translator }
+      state <- H.get
+      if (state.passwordPrimary /= state.passwordSecondary) then do
+        updateStore $ Store.AddWarning $ translate (label :: _ "rp_NoMatch")
+          state.translator
       else do
-        H.modify_ \state -> state
-          { error = Just "[TODO] Password reset is not supported yet!" }
-    EmitError error -> do
-      mail <- H.gets _.email
-      H.modify_ \state -> state { error = Just error }
-
-      when (not $ null mail) do
-        updateStore $ Store.SetMail mail
+        response <- postIgnoreOrError "/password-reset/confirm"
+          ( encodeJson
+              { resetConfirmToken: state.code
+              , resetConfirmNewPassword: state.passwordPrimary
+              }
+          )
+        case response of
+          Left _ -> pure unit
+          Right (Left msg) -> updateStore $ Store.AddError $ ServerError msg
+          Right (Right _) -> do
+            updateStore $ Store.AddSuccess $ translate
+              (label :: _ "common_passwordUpdated")
+              state.translator
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
-
-renderResetForm :: forall w. State -> HH.HTML w Action
-renderResetForm state =
-  HH.div [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my3 ] ]
-    [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
-        [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-            [ HH.text $ translate (label :: _ "rp_Header") state.translator ]
-        , HH.form
-            [ HE.onSubmit DoSubmit ]
-            [ addColumn
-                state.email
-                (translate (label :: _ "common_emailAddress") state.translator <> ":")
-                (translate (label :: _ "common_email") state.translator)
-                "bi-envelope-fill"
-                HP.InputEmail
-                UpdateEmail
-            , addColumn
-                state.passwordPrimary
-                (translate (label :: _ "rp_PasswordNew") state.translator <> ":")
-                (translate (label :: _ "common_password") state.translator)
-                "bi-lock-fill"
-                HP.InputPassword
-                UpdatePasswordPrimary
-            , addColumn
-                state.passwordSecondary
-                (translate (label :: _ "rp_PasswordConfirm") state.translator <> ":")
-                (translate (label :: _ "common_password") state.translator)
-                "bi-lock-fill"
-                HP.InputPassword
-                UpdatePasswordSecondary
-            , HH.div []
-                [ HH.label [ HP.classes [ HB.formLabel ], HP.for "code" ]
-                    [ HH.text $
-                        translate (label :: _ "rp_ConfirmationCode") state.translator
-                          <> ":"
-                    ]
-                , HH.div [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
-                    [ HH.button
-                        ( [ HP.classes [ HB.btn, HB.btnOutlineSecondary ]
-                          , HP.type_ HP.ButtonButton
-                          , HE.onClick \_ -> RequestCode
-                          ] <>
-                            disable
-                        )
-                        [ HH.text $ translate (label :: _ "rp_RequestCode")
-                            state.translator
-                        ]
-                    , HH.input
-                        [ HP.type_ HP.InputText
-                        , HP.classes [ HB.formControl ]
-                        , HP.placeholder $ translate (label :: _ "rp_InputCode")
-                            state.translator
-                        , HP.value state.code
-                        , HE.onValueInput UpdateCode
-                        , HP.id "code"
-                        ]
-                    ]
-                ]
-
-            , HH.div [ HP.classes [ HB.mb4, HB.textCenter ] ]
-                [ HH.button
-                    ( [ HP.classes [ HB.btn, HB.btnPrimary ]
-                      , HP.type_ HP.ButtonSubmit
-                      ] <>
-                        disable
-                    )
-                    [ HH.text $ translate (label :: _ "common_submit")
-                        state.translator
-                    ]
-                ]
-            ]
-        ]
-    ]
-  where
-  disable =
-    if not (isValidEmail state.email) then
-      [ HP.disabled true ]
-    else []
-
-  isValidEmail :: String -> Boolean
-  isValidEmail email =
-    let
-      pattern = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
-    in
-      case regex pattern noFlags of
-        Right r -> test r email
-        Left _ -> false
+    EnableMail -> do
+      H.modify_ \state -> state { calledWithToken = false }
