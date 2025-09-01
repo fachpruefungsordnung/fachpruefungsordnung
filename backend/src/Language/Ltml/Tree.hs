@@ -14,7 +14,6 @@ module Language.Ltml.Tree
     , FlaggedMetaTree
     , TypedMetaTree
     , MetaTree
-    , HtmlHeading (..)
     )
 where
 
@@ -70,11 +69,8 @@ type InputTree' = InputTree Bool
 
 -- | A tree containing metadata, to be sent to the frontend.
 --   The type parameter is typically an identifier type.
-type FlaggedMetaTree id =
-    FlaggedTree id (Maybe HtmlHeading) (Maybe HtmlHeading)
+type FlaggedMetaTree id heading =
+    FlaggedTree id (Maybe heading) (Maybe heading)
 
-type TypedMetaTree id = TypedTree id (Maybe HtmlHeading) (Maybe HtmlHeading)
-type MetaTree id = Tree id (Maybe HtmlHeading) (Maybe HtmlHeading)
-
-newtype HtmlHeading = HtmlHeading Text
-    deriving (Show)
+type TypedMetaTree id heading = TypedTree id (Maybe heading) (Maybe heading)
+type MetaTree id heading = Tree id (Maybe heading) (Maybe heading)

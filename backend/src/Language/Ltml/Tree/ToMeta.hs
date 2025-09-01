@@ -29,7 +29,6 @@ import Language.Ltml.Common (Flagged (Flagged))
 import Language.Ltml.Tree
     ( FlaggedInputTree
     , FlaggedMetaTree
-    , HtmlHeading
     , InputTree
     , MetaTree
     , Tree (Leaf, Tree)
@@ -46,9 +45,13 @@ import Prelude hiding (lookup)
 --   This does not fully check the validity of the input tree, which is done
 --   elsewhere (specifically, by 'Language.Ltml.Tree.ToLtml.treeToLtml').
 buildMeta
-    :: [HtmlHeading]
+    :: [heading]
     -> FlaggedInputTree ident
-    -> Either String (FlaggedMetaTree ident, Map FullTypeName ProperTypeMeta)
+    -> Either
+        String
+        ( FlaggedMetaTree ident heading
+        , Map FullTypeName ProperTypeMeta
+        )
 buildMeta hs tree = do
     t <- getRootType tree
     metaTree <- buildMetaTree t hs tree
@@ -68,29 +71,35 @@ newtype EitherFail a = EitherFail {runEitherFail :: Either String a}
 instance MonadFail EitherFail where
     fail = EitherFail . Left
 
-type HeadingStack = ConsumableStackT HtmlHeading EitherFail
+type HeadingStack heading = ConsumableStackT heading EitherFail
 
 buildMetaTree
     :: NamedType DocumentContainerType
-    -> [HtmlHeading]
+    -> [heading]
     -> FlaggedInputTree ident
-    -> Either String (FlaggedMetaTree ident)
+    -> Either String (FlaggedMetaTree ident heading)
 buildMetaTree t hs tree0 =
     runEitherFail $ runConsumableStackT (flaggedTreeF tree0) hs
   where
     hasHeadingMap :: Map FullTypeName Bool
     hasHeadingMap = properTypeCollect' (kindHasTocHeading . pure) t
 
-    flaggedTreeF :: FlaggedInputTree ident -> HeadingStack (FlaggedMetaTree ident)
+    flaggedTreeF
+        :: FlaggedInputTree ident
+        -> HeadingStack heading (FlaggedMetaTree ident heading)
     flaggedTreeF = traverseF typedTreeF
 
-    typedTreeF :: TypedInputTree ident -> HeadingStack (TypedMetaTree ident)
+    typedTreeF
+        :: TypedInputTree ident
+        -> HeadingStack heading (TypedMetaTree ident heading)
     typedTreeF (TypedTree kindName typeName tree) =
         case lookup (kindName, typeName) hasHeadingMap of
             Just b -> TypedTree kindName typeName <$> treeF b tree
             Nothing -> fail $ "Unknown type: " ++ show (kindName, typeName)
 
-    treeF :: Bool -> InputTree ident -> HeadingStack (MetaTree ident)
+    treeF
+        :: Bool -> InputTree ident
+        -> HeadingStack heading (MetaTree ident heading)
     treeF hasHeading = aux
       where
         aux (Tree _ trees) =
