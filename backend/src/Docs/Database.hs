@@ -7,6 +7,7 @@ module Docs.Database
     , HasExistsTextElement (..)
     , HasExistsTextRevision (..)
     , HasExistsTreeRevision (..)
+    , HasGetTextElement (..)
     , HasGetDocument (..)
     , HasGetTreeRevision (..)
     , HasGetTextElementRevision (..)
@@ -87,6 +88,9 @@ class (HasExistsTextElement m) => HasExistsComment m where
 
 -- get
 
+class (HasCheckPermission m) => HasGetTextElement m where
+    getTextElement :: TextElementID -> m (Maybe TextElement)
+
 class (HasCheckPermission m, HasIsGroupAdmin m, HasIsSuperAdmin m) => HasGetDocument m where
     getDocument :: DocumentID -> m (Maybe Document)
     getDocuments :: UserID -> m (Vector Document)
@@ -146,6 +150,9 @@ class
     createTextRevision
         :: UserID -> TextElementRef -> Text -> Vector CommentAnchor -> m TextRevision
     getLatestTextRevisionID :: TextElementRef -> m (Maybe TextRevisionID)
+
+    -- | currently only intended as a temporary solution
+    updateLatestTitle :: TextElementID -> Text -> m ()
 
 class (HasCheckPermission m, HasExistsDocument m) => HasCreateTreeRevision m where
     createTreeRevision

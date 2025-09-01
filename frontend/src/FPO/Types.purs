@@ -191,10 +191,10 @@ tocEntryToNodeHeader :: TOCEntry -> NH.NodeHeader
 tocEntryToNodeHeader { id, name } =
   NH.NodeHeader { identifier: id, kind: name }
 
-documentTreeToTOCTree :: DT.DocumentTree -> TOCTree
+documentTreeToTOCTree :: DT.DocumentTreeTE -> TOCTree
 documentTreeToTOCTree = map nodeHeaderToTOCEntry
 
-tocTreeToDocumentTree :: TOCTree -> DT.DocumentTree
+tocTreeToDocumentTree :: TOCTree -> DT.DocumentTreeTE
 tocTreeToDocumentTree = map tocEntryToNodeHeader
 
 -- Comment functions

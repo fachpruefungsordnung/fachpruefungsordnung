@@ -43,6 +43,7 @@ module Docs.Hasql.Statements
     , getLogs
     , logMessage
     , getRevisionKey
+    , updateLatestTitle
     ) where
 
 import Control.Applicative ((<|>))
@@ -747,13 +748,14 @@ putTreeNode =
             ( unHash hash
             , Tree.headerKind header
             , Tree.headerType header
+            , Tree.heading header
             )
         )
         [resultlessStatement|
             insert into doc_tree_nodes
-                (hash, kind, type)
+                (hash, kind, type, heading)
             values
-                ($1 :: bytea, $2 :: text, $3 :: text)
+                ($1 :: bytea, $2 :: text, $3 :: text, $4 :: text?)
             on conflict do nothing
         |]
 
@@ -1474,3 +1476,26 @@ logMessage =
         , unScope scope
         , toJSON content
         )
+
+updateLatestTitle :: Statement (TextElementID, Text) ()
+updateLatestTitle =
+    lmap
+        (first unTextElementID)
+        [resultlessStatement|
+            UPDATE
+                doc_tree_edges d
+            SET
+                title = $2::text
+            WHERE
+                d.ctid = (
+                    SELECT
+                        ctid
+                    FROM
+                        doc_tree_edges
+                    WHERE
+                        child_text_element = $1::bigint
+                    ORDER BY
+                        creation_ts DESC
+                    LIMIT 1
+                )
+        |]

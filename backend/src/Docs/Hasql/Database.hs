@@ -175,12 +175,16 @@ instance HasExistsComment HasqlTransaction where
 instance HasGetTextElementRevision HasqlTransaction where
     getTextElementRevision = HasqlTransaction . Transactions.getTextElementRevision
 
+instance HasGetTextElement HasqlTransaction where
+    getTextElement = HasqlTransaction . Transactions.getTextElement
+
 -- create
 
 instance HasCreateTextRevision HasqlTransaction where
     updateTextRevision = ((HasqlTransaction .) .) . Transactions.updateTextRevision
     createTextRevision = (((HasqlTransaction .) .) .) . Transactions.createTextRevision
     getLatestTextRevisionID = HasqlTransaction . Transactions.getLatestTextRevisionID
+    updateLatestTitle = (HasqlTransaction .) . Transactions.updateLatestTitle
 
 instance HasCreateTreeRevision HasqlTransaction where
     createTreeRevision = ((HasqlTransaction .) .) . Transactions.createTreeRevision
