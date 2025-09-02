@@ -172,16 +172,6 @@ type State = FPOState
   -- , compareToElement :: ElementData
   -- this value is updated from the same value in TOC
   , mSelectedTocEntry :: Maybe SelectedEntity
-
-  {- <<<<<<< HEAD
-  , pdfWarningAvailable :: Boolean
-  , pdfWarningIsShown :: Boolean
-  -- , compareToElement :: ElementData
-  -- this value is updated from the same value in TOC
-  , mSelectedTocEntry :: Maybe SelectedEntity
-=======
-  , compareToElement :: ElementData
->>>>>>> main -}
   )
 
 type ElemVersion =
@@ -821,8 +811,13 @@ splitview = connect selectTranslator $ H.mkComponent
           }
 
     ModifyVersionMapping tocID vID cData -> do
-      handleAction UpdateMSelectedTocEntry
       state <- H.get
+      when (not state.previewShown) $
+        H.modify_ \st -> st
+        { previewRatio = st.lastExpandedPreviewRatio
+        , previewShown = true
+        }
+      handleAction UpdateMSelectedTocEntry
       let
         newVersionID = case vID of
           Just id -> const id
