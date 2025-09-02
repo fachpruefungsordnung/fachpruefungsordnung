@@ -202,6 +202,23 @@ emptyEntryGen content =
         content
     ]
 
+-- | Creates an empty table entry for padding (`tr`).
+emptyTableRow :: forall w a. Int -> Int -> HH.HTML w a
+emptyTableRow height cols =
+  HH.tr []
+    [ HH.td
+        [ HP.colSpan cols
+        , HP.style $ "height: " <> show height <> "px;"
+        ]
+        []
+    ]
+
+-- | Creates an empty list entry for padding (`li`).
+emptyListEntry :: forall w a. Int -> HH.HTML w a
+emptyListEntry height =
+  HH.li [ HP.style $ "height: " <> show height <> "px;" ]
+    []
+
 -- | Adds an error message to the page.
 addError
   :: forall w i

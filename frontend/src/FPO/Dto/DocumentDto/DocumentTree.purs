@@ -40,5 +40,6 @@ decodeDocument json = do
   root <- obj .: "root"
   decodeJson root
 
+-- | Encodes a `DocumentTree NodeHeader` as a `DocumentTree TextElementID`.
 encodeDocumentTree :: DocumentTree NH.NodeHeader -> Json
 encodeDocumentTree = encodeJson <<< map NH.getId
