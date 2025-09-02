@@ -785,12 +785,9 @@ splitview = connect selectTranslator $ H.mkComponent
               }
         in
           case state.mSelectedTocEntry of
-            Nothing
-            -> mod
-            Just (SelNode _ _)
-            -> mod
-            Just (SelLeaf tocID)
-            ->
+            Nothing -> mod
+            Just (SelNode _ _) -> mod
+            Just (SelLeaf tocID) ->
               let
                 versionEntry = fromMaybe
                   { elementID: -1, versionID: Nothing, comparisonData: Nothing }
@@ -901,6 +898,11 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _comment unit (Comment.AddComment docID tocID)
 
       Editor.ClickedQuery response -> do
+        mSelectedTocEntry <- H.gets _.mSelectedTocEntry
+        case mSelectedTocEntry of
+          Just (SelLeaf tocID) -> 
+            handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
+          _ -> pure unit
         H.modify_ _ { renderedHtml = Just Loading }
         renderedHtml' <- Request.postRenderHtml (joinWith "\n" response)
         case renderedHtml' of
