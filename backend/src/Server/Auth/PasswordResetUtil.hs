@@ -120,4 +120,4 @@ sendPasswordResetEmail userEmail userName resetUrl = do
 
 -- | Calculate token expiration time (1 hour from now)
 getTokenExpirationTime :: IO UTCTime
-getTokenExpirationTime = do addUTCTime (60 * 60) <$> getCurrentTime
+getTokenExpirationTime = addUTCTime (60 * 60) <$> getCurrentTime
