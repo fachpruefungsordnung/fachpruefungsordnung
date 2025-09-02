@@ -172,16 +172,6 @@ type State = FPOState
   -- , compareToElement :: ElementData
   -- this value is updated from the same value in TOC
   , mSelectedTocEntry :: Maybe SelectedEntity
-
-  {- <<<<<<< HEAD
-  , pdfWarningAvailable :: Boolean
-  , pdfWarningIsShown :: Boolean
-  -- , compareToElement :: ElementData
-  -- this value is updated from the same value in TOC
-  , mSelectedTocEntry :: Maybe SelectedEntity
-=======
-  , compareToElement :: ElementData
->>>>>>> main -}
   )
 
 type ElemVersion =
@@ -795,12 +785,9 @@ splitview = connect selectTranslator $ H.mkComponent
               }
         in
           case state.mSelectedTocEntry of
-            Nothing
-            -> mod
-            Just (SelNode _ _)
-            -> mod
-            Just (SelLeaf tocID)
-            ->
+            Nothing -> mod
+            Just (SelNode _ _) -> mod
+            Just (SelLeaf tocID) ->
               let
                 versionEntry = fromMaybe
                   { elementID: -1, versionID: Nothing, comparisonData: Nothing }
@@ -821,8 +808,13 @@ splitview = connect selectTranslator $ H.mkComponent
           }
 
     ModifyVersionMapping tocID vID cData -> do
-      handleAction UpdateMSelectedTocEntry
       state <- H.get
+      when (not state.previewShown) $
+        H.modify_ \st -> st
+          { previewRatio = st.lastExpandedPreviewRatio
+          , previewShown = true
+          }
+      handleAction UpdateMSelectedTocEntry
       let
         newVersionID = case vID of
           Just id -> const id
@@ -906,6 +898,11 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _comment unit (Comment.AddComment docID tocID)
 
       Editor.ClickedQuery response -> do
+        mSelectedTocEntry <- H.gets _.mSelectedTocEntry
+        case mSelectedTocEntry of
+          Just (SelLeaf tocID) ->
+            handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
+          _ -> pure unit
         H.modify_ _ { renderedHtml = Just Loading }
         renderedHtml' <- Request.postRenderHtml (joinWith "\n" response)
         case renderedHtml' of
