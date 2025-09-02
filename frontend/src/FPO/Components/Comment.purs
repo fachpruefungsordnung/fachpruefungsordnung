@@ -32,6 +32,7 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
+import FPO.UI.HTML (addModal)
 
 type Input = Unit
 
@@ -50,6 +51,8 @@ data Action
   | ResolveComment
   | DeleteComment
   | SelectingCommentSection Int
+  | RequestModal Mode
+  | CancelModal
 
 data Query a
   = AddComment Int Int a
@@ -68,7 +71,10 @@ type State = FPOState
   , newComment :: Boolean
   , commentDraft :: String
   , mTimeFormatter :: Maybe Formatter
+  , requestModal :: Maybe Mode
   )
+
+data Mode = Delete | Resolve
 
 commentview
   :: forall m
@@ -87,6 +93,7 @@ commentview = connect selectTranslator $ H.mkComponent
       , newComment: false
       , commentDraft: ""
       , mTimeFormatter: Nothing
+      , requestModal: Nothing
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -212,6 +219,7 @@ commentview = connect selectTranslator $ H.mkComponent
       , HP.style
           "gap: .5rem; padding-left: 0.5rem; padding-right: 0.5rem; padding-top: 0.75rem; padding-bottom: 1rem;"
       ]
+      (renderModal <>
       [ HH.textarea
           [ HP.style
               "border-radius: .375rem; padding: .5rem; resize: none; min-height: 5rem;"
@@ -240,7 +248,7 @@ commentview = connect selectTranslator $ H.mkComponent
                 [ HP.classes
                     [ HB.btn, HB.btnDanger, HB.px3, HB.py1, HB.m0, HB.msAuto ]
                 , HP.style "white-space: nowrap;"
-                , HE.onClick \_ -> DeleteComment
+                , HE.onClick \_ -> RequestModal Delete -- DeleteComment
                 ]
                 [ HH.small [ HP.style "margin-right: 0.25rem;" ]
                     [ HH.text
@@ -253,7 +261,7 @@ commentview = connect selectTranslator $ H.mkComponent
                 [ HP.classes
                     [ HB.btn, HB.btnSuccess, HB.px3, HB.py1, HB.m0, HB.msAuto ]
                 , HP.style "white-space: nowrap;"
-                , HE.onClick \_ -> ResolveComment
+                , HE.onClick \_ -> RequestModal Resolve --ResolveComment
                 ]
                 [ HH.small [ HP.style "margin-right: 0.25rem;" ]
                     [ HH.text
@@ -262,7 +270,52 @@ commentview = connect selectTranslator $ H.mkComponent
                 , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
                 ]
           ]
-      ]
+      ])
+    where
+      renderModal = case state.requestModal of
+        Nothing -> []
+        Just mode ->
+          let
+            {titel, phrase, confirmButton, action} = 
+              case mode of
+                Delete ->
+                  { titel: translate (label :: _ "comment_modal_delete_titel") state.translator
+                  , phrase: translate (label :: _ "comment_delete_phrase") state.translator
+                  , confirmButton: (translate (label :: _ "common_delete") state.translator)
+                  , action: DeleteComment
+                  }
+                Resolve ->
+                  { titel: translate (label :: _ "comment_modal_resolve_titel") state.translator
+                  , phrase: translate (label :: _ "comment_resolve_phrase") state.translator
+                  , confirmButton: (translate (label :: _ "common_resolve") state.translator)
+                  , action: DeleteComment
+                  }
+          in
+            [ addModal
+              titel
+              (const CancelModal)
+              [ HH.div
+                  [ HP.classes [ HB.modalBody ] ]
+                  [ HH.text phrase ]
+              , HH.div
+                  [ HP.classes [ HB.modalFooter ] ]
+                  [ HH.button
+                      [ HP.type_ HP.ButtonButton
+                      , HP.classes [ HB.btn, HB.btnSecondary ]
+                      , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
+                      , HE.onClick (const CancelModal)
+                      ]
+                      [ HH.text (translate (label :: _ "common_cancel") state.translator) ]
+                  , HH.button
+                      [ HP.type_ HP.ButtonButton
+                      , HP.classes [ HB.btn, if mode == Just Delete then HB.btnDanger else HB.btnSuccess]
+                      , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
+                      , HE.onClick (const action)
+                      ]
+                      [ HH.text confirmButton ]
+                  ]
+              ]
+            ]
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
@@ -348,6 +401,7 @@ commentview = connect selectTranslator $ H.mkComponent
             { commentSections = newCSs
             , mCommentSection = Just newCs
             , commentDraft = ""
+            , requestModal = Nothing
             }
           -- Delete it from Editor
           H.raise (ToDeleteComment)
@@ -357,6 +411,7 @@ commentview = connect selectTranslator $ H.mkComponent
         { markerID = -1
         , newComment = false
         , commentDraft = ""
+        , requestModal = Nothing
         }
       H.raise (ToDeleteComment)
 
@@ -378,6 +433,12 @@ commentview = connect selectTranslator $ H.mkComponent
                 { markerID = markerID
                 , mCommentSection = Just section
                 }
+
+    RequestModal mode -> do
+      H.modify_ \st -> st {requestModal = Just mode}
+    
+    CancelModal -> do
+      H.modify_ \st -> st {requestModal = Nothing}
 
   handleQuery
     :: forall slots a
