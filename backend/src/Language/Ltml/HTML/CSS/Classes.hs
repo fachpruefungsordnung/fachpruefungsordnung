@@ -4,10 +4,15 @@
 {-# OPTIONS_GHC -Wincomplete-patterns -Werror=incomplete-patterns #-}
 
 module Language.Ltml.HTML.CSS.Classes
-    ( Class (..)
+    ( -- * CSS Class Defintions
+      Class (..)
     , className
     , classStyle
+
+      -- * Enumeration Counter
     , enumCounter
+
+      -- * LTML AST to CSS Class Mapping
     , ToCssClass (..)
     , toCssClasses
     ) where
@@ -70,7 +75,7 @@ data Class
       InlineError
     deriving (Show, Eq, Enum, Bounded)
 
--- | maps Class to its css style definition
+-- | Maps Class to its css style definition
 classStyle :: Class -> Css
 classStyle Body =
     toClassSelector Body ? do
@@ -197,7 +202,7 @@ className cssClass = case show cssClass of
     [] -> error "CSS Class has \"\" as show instance!"
     (c : cs) -> pack $ toLower c : cs
 
--- | converts Class to Clay Selector and adds "." infront for css selection
+-- | Converts Class to Clay Selector and adds "." infront for css selection
 toClassSelector :: Class -> Selector
 toClassSelector c = fromString ("." ++ unpack (className c))
 

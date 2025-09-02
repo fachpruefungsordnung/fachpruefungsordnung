@@ -1,7 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Ltml.HTML.CSS.CustomClay
-    ( renderStrict
+    ( -- * @Css@ Rendering
+      renderStrict
+
+      -- * EDSL for CSS Counters
     , Counter (..)
     , counter
     , counterNum
@@ -10,9 +13,13 @@ module Language.Ltml.HTML.CSS.CustomClay
     , stringCounter
     , counterReset
     , counterIncrement
+
+      -- * Custom CSS Values
     , alignLeft
     , alignRight
     , displayContents
+
+      -- * Custom CSS Properties
     , gap
     ) where
 
