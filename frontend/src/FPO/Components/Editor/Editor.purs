@@ -23,7 +23,7 @@ import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
-import Data.Array (catMaybes, intercalate, mapMaybe, snoc, uncons, (:))
+import Data.Array (catMaybes, deleteBy, intercalate, mapMaybe, snoc, uncons, (:))
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
@@ -37,7 +37,6 @@ import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class as EC
-import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -1542,15 +1541,18 @@ editor = connect selectTranslator $ H.mkComponent
       state <- H.get
       case state.mEditor, state.selectedLiveMarker of
         Just ed, Just lm -> do
-          H.liftEffect $ log $ "passed case: " <> show lm.annotedMarkerID
           session <- H.liftEffect $ Editor.getSession ed
           H.liftEffect $ removeLiveMarker lm session
           handleAction $ DeleteAnnotation lm false true
+          handleAction $ HideHandles
           H.modify_ \st -> st { selectedLiveMarker = Nothing }
           case state.tmpLiveMarker of
             Nothing -> pure unit
             Just tmpLM -> when (tmpLM.annotedMarkerID == lm.annotedMarkerID) $
               H.modify_ \st -> st { tmpLiveMarker = Nothing }
+          -- delete this marker from state. Otherwise, it can be still selected
+          H.modify_ \st -> st 
+            { liveMarkers = deleteBy (\b c -> b.annotedMarkerID == c.annotedMarkerID) lm st.liveMarkers }
         _, _ -> pure unit
       pure (Just a)
 
