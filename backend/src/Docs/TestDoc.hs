@@ -69,6 +69,7 @@ createTestDocument db = do
                 revisionID
                 text
                 Vector.empty
+                False  -- isAutoSave = False for test documents
     let machText = (((withDB . runTransaction . createTextRevision userID) .) .) . textRevision
     eins <- machText paragraph1 Nothing "Das hier ist ein Abschnitt."
     let parent = case eins of

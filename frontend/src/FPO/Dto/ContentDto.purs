@@ -3,9 +3,9 @@ module FPO.Dto.ContentDto where
 import Prelude
 
 import Data.Argonaut (Json, fromObject)
-import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError, decodeJson, (.:))
+import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson, (.:))
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
-import Data.Either (Either)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import FPO.Types (AnnotatedMarker)
@@ -129,8 +129,14 @@ decodeContentWrapper json = decodeJson json
 encodeContent :: Content -> Json
 encodeContent content = encodeJson content
 
-encodeWrapper :: ContentWrapper -> Json
-encodeWrapper wrapper = encodeJson wrapper
+encodeWrapper :: Boolean -> ContentWrapper -> Json
+encodeWrapper isAutoSave (Wrapper { content: Content { content, parent }, comments }) =
+  encodeJson
+    { content: content
+    , parent: parent
+    , commentAnchors: map encodeJson comments
+    , isAutoSave: isAutoSave
+    }
 
 getContentText :: Content -> String
 getContentText (Content { content }) = content
@@ -165,10 +171,23 @@ failureContentWrapper = Wrapper { content: failureContent, comments: [] }
 extractNewParent :: Content -> Json -> Either JsonDecodeError Content
 extractNewParent (Content cont) json = do
   obj <- decodeJson json
-  newRev <- obj .: "newRevision"
-  header <- newRev .: "header"
-  newPar <- header .: "identifier"
-  pure $ Content $ cont { parent = newPar }
+  response_type <- obj .: "type"
+  case response_type of
+    "noConflict" -> do
+      newRev <- obj .: "newRevision"
+      header <- newRev .: "header"
+      newPar <- header .: "identifier"
+      pure $ Content $ cont { parent = newPar }
+    "draft" -> do
+      draftRev <- obj .: "draftRevision"
+      header <- draftRev .: "header"
+      newPar <- header .: "identifier"
+      pure $ Content $ cont { parent = newPar }
+    "conflict" -> do
+      -- For conflicts, we don't update the parent ID
+      pure $ Content cont
+    _ -> 
+      Left $ TypeMismatch "Unknown response type"
 
 convertToAnnotetedMarker
   :: CommentAnchor

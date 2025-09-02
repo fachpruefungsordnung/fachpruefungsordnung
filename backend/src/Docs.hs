@@ -306,9 +306,20 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                         return $ TextRevision.NoConflict newRevision
                     -- conflict
                     | otherwise ->
-                        return $
-                            TextRevision.Conflict $
-                                identifier latest
+                        if newTextRevisionIsAutoSave revision
+                        then do
+                            -- For autosave conflicts, create a draft revision
+                            draftRevision <- createRevision
+                            updateTitle draftRevision
+                            return $
+                                TextRevision.Draft
+                                    (identifier latest)
+                                    draftRevision
+                        else
+                            -- For manual save conflicts, return conflict
+                            return $
+                                TextRevision.Conflict $
+                                    identifier latest
   where
     header = TextRevision.header
     identifier = TextRevision.identifier . header
@@ -607,6 +618,7 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
                                     , newTextRevisionElement = textRev
                                     , newTextRevisionContent = text
                                     , newTextRevisionCommentAnchors = Vector.empty
+                                    , newTextRevisionIsAutoSave = False  -- Document creation is not autosave
                                     }
                     case textRevision of
                         TextRevision.NoConflict revision ->

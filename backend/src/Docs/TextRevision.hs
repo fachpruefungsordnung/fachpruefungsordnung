@@ -271,6 +271,7 @@ data NewTextRevision = NewTextRevision
     , newTextRevisionParent :: Maybe TextRevisionID
     , newTextRevisionContent :: Text
     , newTextRevisionCommentAnchors :: Vector CommentAnchor
+    , newTextRevisionIsAutoSave :: Bool
     }
 
 -- | Check if a new revisions contents changed from an existing one.
@@ -286,12 +287,15 @@ contentsNotChanged latest newRevision =
 data ConflictStatus
     = Conflict TextRevisionID -- todo: maybe not id but whole TextRevision?
     | NoConflict TextRevision
+    | Draft TextRevisionID TextRevision -- ^ conflicting revision ID and created draft revision
 
 instance ToJSON ConflictStatus where
     toJSON (Conflict conflictWith) =
         Aeson.object ["type" .= ("conflict" :: Text), "with" .= conflictWith]
     toJSON (NoConflict newRevision) =
         Aeson.object ["type" .= ("noConflict" :: Text), "newRevision" .= newRevision]
+    toJSON (Draft conflictWith draftRevision) =
+        Aeson.object ["type" .= ("draft" :: Text), "with" .= conflictWith, "draftRevision" .= draftRevision]
 
 instance FromJSON ConflictStatus where
     parseJSON = Aeson.withObject "ConflictStatus" $ \obj -> do
@@ -299,6 +303,7 @@ instance FromJSON ConflictStatus where
         case ty of
             "conflict" -> Conflict <$> obj .: "with"
             "noConflict" -> NoConflict <$> obj .: "newRevision"
+            "draft" -> Draft <$> obj .: "with" <*> obj .: "draftRevision"
             _ -> fail $ "Unknown ConflictStatus type: " ++ show ty
 
 instance ToSchema ConflictStatus where
@@ -329,6 +334,16 @@ instance ToSchema ConflictStatus where
                                             , ("newRevision", textRevSchema)
                                             ]
                                     & required .~ ["type", "newRevision"]
+                           , Inline $
+                                mempty
+                                    & type_ ?~ OpenApiObject
+                                    & properties
+                                        .~ InsOrd.fromList
+                                            [ ("type", Inline $ schemaConstText "draft")
+                                            , ("with", textRevIdSchema)
+                                            , ("draftRevision", textRevSchema)
+                                            ]
+                                    & required .~ ["type", "with", "draftRevision"]
                            ]
       where
         schemaConstText :: Text -> Schema

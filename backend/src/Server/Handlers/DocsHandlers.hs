@@ -379,6 +379,7 @@ postTextRevisionHandler auth docID textID revision = do
                     (CreateTextRevision.parent revision)
                     (CreateTextRevision.content revision)
                     (CreateTextRevision.commentAnchors revision)
+                    (CreateTextRevision.isAutoSave revision)
 
 getTextElementRevisionHandler
     :: AuthResult Auth.Token
