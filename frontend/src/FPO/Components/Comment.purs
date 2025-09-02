@@ -76,6 +76,8 @@ type State = FPOState
 
 data Mode = Delete | Resolve
 
+derive instance eqMode :: Eq Mode
+
 commentview
   :: forall m
    . MonadAff m
@@ -156,8 +158,17 @@ commentview = connect selectTranslator $ H.mkComponent
       ]
       [ HH.div_
           [ HH.div
-              [ HP.style "font-weight: 600; font-size: 1.2rem;" ]
-              [ HH.text c.author ]
+              [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
+              , HP.style "font-weight: 500; font-size: 1rem;"
+              ]
+              [ HH.span_ [ HH.text c.author ]
+              , HH.i [ HP.classes [ HB.bi
+                                  , H.ClassName "bi-check-circle-fill"
+                                  , HB.msAuto
+                                  , H.ClassName "fs-4"
+                                  ]
+                    ] []
+              ]
           , HH.div
               [ HP.classes [ HB.mt1 ]
               , HP.style "font-size: 1rem;"
@@ -288,7 +299,7 @@ commentview = connect selectTranslator $ H.mkComponent
                   { titel: translate (label :: _ "comment_modal_resolve_titel") state.translator
                   , phrase: translate (label :: _ "comment_resolve_phrase") state.translator
                   , confirmButton: (translate (label :: _ "common_resolve") state.translator)
-                  , action: DeleteComment
+                  , action: ResolveComment
                   }
           in
             [ addModal
@@ -308,7 +319,7 @@ commentview = connect selectTranslator $ H.mkComponent
                       [ HH.text (translate (label :: _ "common_cancel") state.translator) ]
                   , HH.button
                       [ HP.type_ HP.ButtonButton
-                      , HP.classes [ HB.btn, if mode == Just Delete then HB.btnDanger else HB.btnSuccess]
+                      , HP.classes [ HB.btn, if mode == Delete then HB.btnDanger else HB.btnSuccess]
                       , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
                       , HE.onClick (const action)
                       ]
