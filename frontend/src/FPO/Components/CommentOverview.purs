@@ -108,7 +108,7 @@ commentOverviewview = H.mkComponent
               [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
               , HP.style "font-weight: 500; font-size: 1rem;"
               ]
-              [ HH.span_ [ HH.text c.author ]
+              [ HH.span_ [ HH.text c.first.author ]
               , HH.i [ HP.classes [ HB.bi
                                   , H.ClassName "bi-check-circle-fill"
                                   , HB.msAuto
