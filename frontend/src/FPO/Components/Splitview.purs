@@ -811,9 +811,9 @@ splitview = connect selectTranslator $ H.mkComponent
       state <- H.get
       when (not state.previewShown) $
         H.modify_ \st -> st
-        { previewRatio = st.lastExpandedPreviewRatio
-        , previewShown = true
-        }
+          { previewRatio = st.lastExpandedPreviewRatio
+          , previewShown = true
+          }
       handleAction UpdateMSelectedTocEntry
       let
         newVersionID = case vID of
@@ -900,7 +900,7 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.ClickedQuery response -> do
         mSelectedTocEntry <- H.gets _.mSelectedTocEntry
         case mSelectedTocEntry of
-          Just (SelLeaf tocID) -> 
+          Just (SelLeaf tocID) ->
             handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
           _ -> pure unit
         H.modify_ _ { renderedHtml = Just Loading }
