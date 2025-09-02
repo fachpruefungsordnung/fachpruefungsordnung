@@ -4,24 +4,37 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Language.Ltml.HTML.Common
-    ( HtmlReaderState
+    ( -- * Custom State Monad
+      HtmlReaderState
     , GlobalState (..)
     , ReaderState (..)
     , initGlobalState
     , initReaderState
+
+      -- * SectionID Functions
     , incSectionID
     , incSuperSectionID
+
+      -- * Footnotes
     , FootnoteMap
     , convertLabelMap
     , addUsedFootnoteLabels
     , FootnoteSet
     , NumLabel (..)
+
+      -- * Table of Contents
     , ToC
     , addTocEntry
     , RenderedTocEntry
+
+      -- * Enum Styles
     , EnumStyleMap
+
+      -- * Labels
     , LabelWrapper
     , anchorLink
+
+      -- * @ Delayed @ data type 
     , Delayed (..)
     , evalDelayed
     , returnNow

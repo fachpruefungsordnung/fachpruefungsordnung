@@ -6,14 +6,23 @@
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 
 module Language.Ltml.HTML.Util
-    ( intToLower
+    ( -- * ID Conversion
+      intToLower
     , intToCapital
+
+      -- * Monad Helpers
     , whenJust
     , mapState
     , withModified
+
+      -- * HTML Conversion
     , convertNewLine
+
+      -- * Lucid Attributes
     , mId_
     , mTextId_
+
+      -- * ToHtmlM Helpers
     , getNextRawTextTree
     , isSuper
     ) where
@@ -28,7 +37,21 @@ import Language.Ltml.HTML.Common (GlobalState)
 import Lucid
 
 -- | Converts Int to corresponding lowercase letter in the alphabet.
---   If Int is (<= 0) or (>= 27), it returns "?"
+-- If Int is (<= 0) or (>= 27), it returns "?"
+--
+-- === __Examples__
+--
+-- >>> intToLower 0
+-- "?"
+--
+-- >>> intToLower 1
+-- "a"
+--
+-- >>> intToLower 26
+-- "z"
+--
+-- >>> intToLower 27
+-- "a"
 intToLower :: Int -> String
 intToLower = intToLetter 96
 
