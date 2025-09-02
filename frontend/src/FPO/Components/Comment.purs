@@ -93,6 +93,7 @@ commentview = connect selectTranslator $ H.mkComponent
       { initialize = Just Init
       , handleAction = handleAction
       , handleQuery = handleQuery
+      , receive = Just <<< Receive  
       }
   }
   where

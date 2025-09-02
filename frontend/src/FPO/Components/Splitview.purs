@@ -97,6 +97,7 @@ data Query a = UnitQuery a
 
 data Action
   = Init
+  | Receive (Connected FPOTranslator Input)
   -- Resizing Actions
   -- | SetComparison Int Int
   | StartResize DragTarget MouseEvent
@@ -201,7 +202,10 @@ splitview = connect selectTranslator $ H.mkComponent
   { initialState
   , render
   , eval: H.mkEval $ H.defaultEval
-      { initialize = Just Init, handleAction = handleAction }
+      { initialize = Just Init
+      , handleAction = handleAction
+      , receive = Just <<< Receive
+      }
   }
   where
   initialState :: Connected FPOTranslator Input -> State
@@ -604,6 +608,9 @@ splitview = connect selectTranslator $ H.mkComponent
       -- or rather, we don't use commit anymore in the API
       handleAction GET
       handleAction UpdateMSelectedTocEntry
+
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
 
     -- API Actions
 
