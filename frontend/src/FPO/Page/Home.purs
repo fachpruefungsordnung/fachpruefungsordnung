@@ -35,7 +35,7 @@ import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addCard, addColumn, loadingSpinner)
+import FPO.UI.HTML (addCard, addColumn, emptyTableRow, loadingSpinner)
 import FPO.UI.SmoothScroll (smoothScrollToElement)
 import Halogen (liftEffect)
 import Halogen as H
@@ -559,7 +559,7 @@ component =
             ]
           else
             ( map (renderProjectRow state) ps
-                <> replicate (5 - length ps) emptyProjectRow
+                <> replicate (5 - length ps) (emptyTableRow 48 3)
             ) -- Fill up to 5 rows
       ]
     where
@@ -590,7 +590,7 @@ component =
                 DocumentHeader.getLastEdited project
           ]
       , HH.td
-          [ HP.classes [ HB.dFlex, HB.justifyContentCenter, HB.alignItemsCenter ] ]
+          [ HP.classes [ HB.textCenter, HB.alignMiddle ] ]
           [ HH.button
               [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
               , HE.onClick $ \e -> DownloadPdf (DocumentHeader.getIdentifier project)
@@ -606,17 +606,6 @@ component =
                   []
               ]
           ]
-      ]
-
-  -- Renders an empty project row for padding.
-  emptyProjectRow :: forall w. HH.HTML w Action
-  emptyProjectRow =
-    HH.tr []
-      [ HH.td
-          [ HP.colSpan 2
-          , HP.classes [ HB.textCenter, HB.invisible ]
-          ]
-          [ HH.text $ "Empty Row" ]
       ]
 
   filterProjects :: String -> Array DocumentHeader -> Array DocumentHeader
