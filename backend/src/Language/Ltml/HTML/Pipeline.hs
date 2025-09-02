@@ -1,6 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Ltml.HTML.Pipeline (htmlPipeline) where
+module Language.Ltml.HTML.Pipeline
+    ( -- * Rendering Pipeline
+      htmlPipeline
+    ) where
 
 import Clay (render)
 import Data.ByteString.Lazy (ByteString)

@@ -8,7 +8,8 @@
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 
 module Language.Ltml.HTML
-    ( ToHtmlM (..)
+    ( -- * Rendering HTML
+      ToHtmlM (..)
     , renderSectionHtmlCss
     , renderHtmlCss
     , renderTocList
@@ -66,6 +67,7 @@ import Language.Ltml.HTML.References
 import Language.Ltml.HTML.Util
 import Lucid
 
+-- | Render single @Node Section@ with given 'Footnote' Map to @Html ()@ and @Css@
 renderSectionHtmlCss :: Node Section -> Map.Map Label Footnote -> (Html (), Css)
 renderSectionHtmlCss section fnMap =
     -- \| Render with given footnote context
@@ -75,6 +77,7 @@ renderSectionHtmlCss section fnMap =
         finalState' = addUsedFootnoteLabels finalState
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
 
+-- | Render @Flagged' DocumentContainer@ to @Html ()@ and @Css@
 renderHtmlCss :: Flagged' DocumentContainer -> (Html (), Css)
 renderHtmlCss docContainer =
     -- \| Render with given footnote context
@@ -107,6 +110,8 @@ renderTocList docContainer =
 
 -------------------------------------------------------------------------------
 
+-- | Monadic Class to render @a@ to @Delayed (Html ())@ 
+--   using a @Reader@ and a @State@ Monad
 class ToHtmlM a where
     toHtmlM :: a -> HtmlReaderState
 

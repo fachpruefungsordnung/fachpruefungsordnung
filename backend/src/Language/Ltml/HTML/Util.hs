@@ -57,6 +57,20 @@ intToLower = intToLetter 96
 
 -- | Converts Int to corresponding capital letter in the alphabet.
 --   If Int is (<= 0) or (>= 27), it returns "?"
+--
+-- === __Examples__
+--
+-- >>> intToCapital 0
+-- "?"
+--
+-- >>> intToCapital 1
+-- "A"
+--
+-- >>> intToCapital 26
+-- "Z"
+--
+-- >>> intToCapital 27
+-- "A"
 intToCapital :: Int -> String
 intToCapital = intToLetter 64
 
