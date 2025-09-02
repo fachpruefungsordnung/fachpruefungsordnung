@@ -14,7 +14,7 @@ import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.CommentDto as CD
-import FPO.Translations.Translator (fromFpoTranslator)
+import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types
   ( Comment
@@ -28,7 +28,7 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Store.Connect (connect)
+import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
@@ -44,6 +44,7 @@ data Output
 
 data Action
   = Init
+  | Receive (Connected FPOTranslator Input)
   | UpdateDraft String
   | SendComment
   | ResolveComment
@@ -267,6 +268,9 @@ commentview = connect selectTranslator $ H.mkComponent
 
     Init -> do
       pure unit
+    
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
 
     UpdateDraft draft -> do
       H.modify_ \state ->
