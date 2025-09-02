@@ -6,6 +6,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
+{-# HLINT ignore "Use section" #-}
 
 module Language.Ltml.HTML
     ( ToHtmlM (..)
@@ -83,7 +84,7 @@ renderHtmlCss docContainer =
         finalState' = addUsedFootnoteLabels finalState
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
 
--- | Renders a global ToC (including appendices) as a list of (Maybe idHtml, titleHtml)
+-- | Renders a global ToC (including appendices) as a list of (Maybe idHtml, Result titleHtml)
 renderTocList :: Flagged' DocumentContainer -> [RenderedTocEntry]
 renderTocList docContainer =
     -- \| Create global ToC with Footnote context
@@ -97,13 +98,14 @@ renderTocList docContainer =
         -- \| Add footnote labes for "normal" (non-footnote) references
         finalState' = addUsedFootnoteLabels finalState
         tocList = toList $ tableOfContents finalState'
-        -- \| Produce (Just <span>id</span>, <span>title</span>)
+        -- \| Produce (Just <span>id</span>, Success <span>title</span>)
         htmlTitleList =
             map
-                (\(mId, dt, _) -> (span_ <$> mId, span_ $ evalDelayed dt finalState'))
+                ( \(mId, rDt, _) -> (span_ <$> mId, span_ . flip evalDelayed finalState' <$> rDt)
+                )
                 tocList
-     in -- \| Render Maybe Html and Html to ByteString
-        map (bimap (fmap renderBS) renderBS) htmlTitleList
+     in -- \| Render Maybe Html and Result Html to ByteString
+        map (bimap (fmap renderBS) (fmap renderBS)) htmlTitleList
 
 -------------------------------------------------------------------------------
 
@@ -210,7 +212,7 @@ instance ToHtmlM DocumentHeading where
         (formattedTitle, htmlId) <- case headingFormatS of
             Left headFormat -> do
                 -- \| Main Document Heading without Id and mangled anchor link
-                htmlId <- addTocEntry Nothing titleHtml Nothing
+                htmlId <- addTocEntry Nothing (Success titleHtml) Nothing
                 return (headingFormat headFormat <$> titleHtml, htmlId)
             Right headFormatId -> do
                 -- \| Heading for Appendix Element (with id and toc key)
@@ -220,7 +222,7 @@ instance ToHtmlM DocumentHeading where
                 let (headingHtml, tocHtml) = appendixFormat idFormat docId tocFormat headFormatId titleHtml
                 -- \| Check if current document has Label and build ToC entry
                 mLabel <- asks appendixElementMLabel
-                htmlId <- addTocEntry (Just tocHtml) titleHtml mLabel
+                htmlId <- addTocEntry (Just tocHtml) (Success titleHtml) mLabel
                 return (headingHtml, htmlId)
         return $ h1_ [cssClass_ Class.DocumentTitle, id_ htmlId] <$> formattedTitle
 
@@ -253,7 +255,7 @@ instance ToHtmlM (Node Section) where
              in do
                     addMaybeLabelToState mLabel sectionIDHtml
                     -- \| Add table of contents entry for section
-                    htmlId <- addTocEntry (Just sectionTocKeyHtml) titleHtml mLabel
+                    htmlId <- addTocEntry (Just sectionTocKeyHtml) (Success titleHtml) mLabel
                     -- \| Build heading Html with sectionID
                     childrenHtml <- toHtmlM sectionBody
                     -- \| Also render footnotes in super-sections, since their heading
@@ -519,7 +521,7 @@ instance ToHtmlM AppendixSection where
             ) = do
             -- \| Add Entry to ToC but without ID
             htmlId <-
-                addTocEntry Nothing (Now $ toHtml appendixSectionTitle) Nothing
+                addTocEntry Nothing (Success $ Now $ toHtml appendixSectionTitle) Nothing
             -- \| Give each Document the corresponding appendix Id
             let zipFunc i nDoc = local (\s -> s {currentAppendixElementID = i}) $ toHtmlM nDoc
             documentHtmls <-
@@ -596,11 +598,15 @@ renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
     -- \| Build <tr><td>id</td> <td>title</td></tr> and wrap id and title seperatly
     buildWrappedRow
         :: LabelWrapper
-        -> (Maybe (Html ()), Delayed (Html ()), Text)
+        -> (Maybe (Html ()), Result (Delayed (Html ())), Text)
         -> Delayed (Html ())
-    buildWrappedRow wrapperFunc (mIdHtml, titleHtml, htmlId) =
-        let wrap = wrapperFunc (Label htmlId)
-         in -- TODO: Style ToC
+    buildWrappedRow wrapperFunc (mIdHtml, rTitle, htmlId) =
+        let
+            -- \| Draw ToC Error titles as inline errors
+            titleHtml = result id (span_ <#> Class.InlineError <$>) rTitle
+            wrap = wrapperFunc (Label htmlId)
+         in
+            -- TODO: Style ToC
             -- \| Nothing IdHtmls will be replaced with mempty
             ((tr_ <$> (td_ (wrap (fromMaybe mempty mIdHtml)) <>)) . td_) . wrap
                 <$> titleHtml

@@ -19,6 +19,8 @@ module Language.Ltml.HTML.Common
     , ToC
     , addTocEntry
     , RenderedTocEntry
+    , Result (..)
+    , result
     , EnumStyleMap
     , LabelWrapper
     , anchorLink
@@ -84,7 +86,9 @@ data GlobalState = GlobalState
     , labels :: [(Label, Html ())]
     -- ^ Holds all labels and the Html element that should be displayed when this label is referenced
     , tableOfContents :: ToC
-    -- ^ Holds all entries for the table of contents as (Maybe key (e.g. § 1), title, HTML id as anchor link).
+    -- ^ Holds all entries for the table of contents as (Maybe key (e.g. § 1),
+    --   title, HTML id as anchor link). The title is wrapped into 'Result'.
+    --   In case of an parse error this title will be set to an Error title.
     , mangledLabelName :: Text
     -- ^ Mangled prefix name for generating new label names that do not exist in source language
     , mangledLabelID :: Int
@@ -224,14 +228,14 @@ instance Ord NumLabel where
 
 -- | The ToC uses a difference list to get constant time appending at the end, which has no speed draw backs,
 --   since the list is evaluated only ones when building the ToC Html at the end of rendering.
-type ToC = DList (Maybe (Html ()), Delayed (Html ()), Text)
+type ToC = DList (Maybe (Html ()), Result (Delayed (Html ())), Text)
 
 -- | Add entry to table of contents with: key Html (e.g. § 1), title Html and html anchor link id;
 --   If Label is present uses it as the anchor link id, otherwise it creates a new mangled label name;
 --   the used label name is returned;
 addTocEntry
     :: Maybe (Html ())
-    -> Delayed (Html ())
+    -> Result (Delayed (Html ()))
     -> Maybe Label
     -> ReaderT ReaderState (State GlobalState) Text
 addTocEntry mKey title mLabel = do
@@ -250,8 +254,23 @@ addTocEntry mKey title mLabel = do
         (\s -> s {tableOfContents = snoc (tableOfContents s) (mKey, title, htmlId)})
     return htmlId
 
--- | Type of exported ToC Entries (especially for Frontend)
-type RenderedTocEntry = (Maybe ByteString, ByteString)
+-- | Type of exported ToC Entries (especially for Frontend);
+--   @Result@ signals if the generated title was parsed successfully or not
+type RenderedTocEntry = (Maybe ByteString, Result ByteString)
+
+data Result a = Success a | Error a
+    deriving (Show)
+
+-- | Takes a @Result a@, a success function and an error function.
+--   Applies one of the two functions depending on the 'Result' constructor.
+result :: (a -> b) -> (a -> b) -> Result a -> b
+result fSuc fErr res = case res of
+    Success a -> fSuc a
+    Error a -> fErr a
+
+instance Functor Result where
+    fmap f (Success a) = Success (f a)
+    fmap f (Error a) = Error (f a)
 
 -------------------------------------------------------------------------------
 
