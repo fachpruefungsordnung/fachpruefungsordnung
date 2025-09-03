@@ -18,6 +18,7 @@ import Data.Time (UTCTime)
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import qualified Data.Text as T
 
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
@@ -707,6 +708,12 @@ guardDocsResult (Left err) = throwError $ mapErr err
                     "Comment "
                         ++ prettyPrintCommentRef ref
                         ++ " not found!\n"
+            }
+    mapErr (Docs.Custom msg) =
+        err400
+            { errBody =
+                LBS.pack $
+                    T.unpack msg ++ "\n"
             }
 
 -- | Get draft text revision for current user
