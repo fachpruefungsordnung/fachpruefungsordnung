@@ -61,11 +61,11 @@ import Docs.TextElement
     , TextElementRef (..)
     )
 import Docs.TextRevision
-    ( TextElementRevision
+    ( DraftRevision
+    , TextElementRevision
     , TextRevision
     , TextRevisionID
     , TextRevisionRef
-    , DraftRevision
     )
 import Docs.Tree (Edge (Edge), Node (Node), Tree (Leaf, Tree))
 import Docs.TreeRevision (TreeRevision, TreeRevisionRef (TreeRevisionRef))
@@ -237,13 +237,16 @@ createDraftTextRevision
     -> Transaction DraftRevision
 createDraftTextRevision userID (TextElementRef _ textID) basedOnRevision content commentAnchors = do
     draftRevision <-
-        statement (textID, basedOnRevision, userID, content) Statements.createDraftTextRevision
+        statement
+            (textID, basedOnRevision, userID, content)
+            Statements.createDraftTextRevision
     draftRevision $ \draftId ->
         mapM (`statement` Statements.putDraftCommentAnchors) [(draftId, commentAnchors)]
             >> statement draftId Statements.getDraftCommentAnchors
 
 -- | Get draft revision for a text element by a specific user
-getDraftTextRevision :: UserID -> TextElementRef -> Transaction (Maybe DraftRevision)
+getDraftTextRevision
+    :: UserID -> TextElementRef -> Transaction (Maybe DraftRevision)
 getDraftTextRevision userID (TextElementRef _ textID) = do
     draftGetter <- statement (textID, userID) Statements.getDraftTextRevision
     draftGetter (\draftId -> statement draftId Statements.getDraftCommentAnchors)

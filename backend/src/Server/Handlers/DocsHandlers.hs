@@ -25,6 +25,7 @@ import qualified Hasql.Session as Session
 import Servant
     ( Capture
     , Delete
+    , Description
     , Get
     , Handler
     , JSON
@@ -33,7 +34,6 @@ import Servant
     , ReqBody
     , Server
     , Summary
-    , Description
     , err400
     , err403
     , err500
@@ -295,7 +295,8 @@ type GetDocumentRevisionText =
 
 type GetDraftTextRevision =
     Summary "Get draft text revision"
-        :> Description "Retrieve the user's draft text revision for a specific text element, if it exists"
+        :> Description
+            "Retrieve the user's draft text revision for a specific text element, if it exists"
         :> Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> "text"
@@ -305,7 +306,8 @@ type GetDraftTextRevision =
 
 type PublishDraftTextRevision =
     Summary "Publish draft text revision"
-        :> Description "Publish the user's draft text revision to the main revision tree, potentially creating conflicts"
+        :> Description
+            "Publish the user's draft text revision to the main revision tree, potentially creating conflicts"
         :> Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> "text"
@@ -316,7 +318,8 @@ type PublishDraftTextRevision =
 
 type DiscardDraftTextRevision =
     Summary "Discard draft text revision"
-        :> Description "Delete the user's draft text revision, discarding all unsaved changes"
+        :> Description
+            "Delete the user's draft text revision, discarding all unsaved changes"
         :> Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> "text"

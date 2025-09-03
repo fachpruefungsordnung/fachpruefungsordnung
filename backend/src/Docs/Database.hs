@@ -47,12 +47,12 @@ import Docs.TextElement
     , TextElementRef
     )
 import Docs.TextRevision
-    ( TextElementRevision
+    ( DraftRevision
+    , TextElementRevision
     , TextRevision
     , TextRevisionHistory
     , TextRevisionID
     , TextRevisionRef
-    , DraftRevision
     )
 import Docs.Tree (Node)
 import Docs.TreeRevision (TreeRevision, TreeRevisionHistory, TreeRevisionRef)

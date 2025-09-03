@@ -76,9 +76,9 @@ import UserManagement.User (UserID)
 
 import Data.Aeson (ToJSON (toJSON))
 import qualified Data.Aeson as Aeson
-import Data.Aeson.Types (parseMaybe, parseJSON)
-import Data.Maybe (fromMaybe)
+import Data.Aeson.Types (parseJSON, parseMaybe)
 import Data.Functor ((<&>))
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as Text
 import qualified Data.Vector as Vector
 import Docs.Comment
@@ -117,15 +117,15 @@ import Docs.TextElement
     )
 import qualified Docs.TextElement as TextElement
 import Docs.TextRevision
-    ( TextElementRevision (TextElementRevision)
+    ( DraftRevision (DraftRevision)
+    , DraftRevisionHeader (DraftRevisionHeader)
+    , DraftRevisionID (..)
+    , TextElementRevision (TextElementRevision)
     , TextRevision (TextRevision)
     , TextRevisionHeader (TextRevisionHeader)
     , TextRevisionID (..)
     , TextRevisionRef (..)
     , TextRevisionSelector (..)
-    , DraftRevision (DraftRevision)
-    , DraftRevisionHeader (DraftRevisionHeader)
-    , DraftRevisionID (..)
     , latestTextRevisionAsOf
     , specificTextRevision
     )
@@ -1511,7 +1511,8 @@ updateLatestTitle =
         |]
 
 -- | Helper to construct DraftRevisionHeader from database row
-uncurryDraftRevisionHeader :: (Int64, Int64, UTCTime, UTCTime, UUID, Text) -> DraftRevisionHeader
+uncurryDraftRevisionHeader
+    :: (Int64, Int64, UTCTime, UTCTime, UUID, Text) -> DraftRevisionHeader
 uncurryDraftRevisionHeader (draftId, basedOnId, creationTs, updatedTs, authorID, authorName) =
     DraftRevisionHeader
         { TextRevision.draftIdentifier = DraftRevisionID draftId
@@ -1534,7 +1535,9 @@ uncurryDraftRevision
 uncurryDraftRevision (draftId, basedOnId, creationTs, updatedTs, authorID, authorName, content) getAnchors =
     getAnchors (DraftRevisionID draftId)
         <&> DraftRevision
-            (uncurryDraftRevisionHeader (draftId, basedOnId, creationTs, updatedTs, authorID, authorName))
+            ( uncurryDraftRevisionHeader
+                (draftId, basedOnId, creationTs, updatedTs, authorID, authorName)
+            )
             content
 
 -- | Create a new draft text revision
@@ -1610,7 +1613,7 @@ getDraftTextRevision =
                     AND drafts.author = $2 :: uuid
             |]
 
--- | Delete draft revision  
+-- | Delete draft revision
 deleteDraftTextRevision :: Statement (TextElementID, UUID) ()
 deleteDraftTextRevision =
     lmap
