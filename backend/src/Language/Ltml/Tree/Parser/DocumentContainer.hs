@@ -22,7 +22,6 @@ import Language.Ltml.Tree.Parser
     ( TreeParser
     , disjNFlaggedTreePF
     , leafParser
-    , treeError
     )
 import Language.Ltml.Tree.Parser.AppendixSection (appendixSectionTP)
 import Language.Ltml.Tree.Parser.Document (documentTP)
@@ -34,9 +33,8 @@ documentContainerTP
 documentContainerTP = disjNFlaggedTreePF aux
   where
     aux :: DocumentContainerType -> InputTree' -> TreeParser DocumentContainer
-    aux _ (Leaf _) = treeError "Document container node is leaf"
-    aux _ (Tree _ []) =
-        treeError "Document container lacks main document child"
+    aux _ (Leaf _) = fail "Document container node is leaf"
+    aux _ (Tree _ []) = fail "Document container lacks main document child"
     aux
         (DocumentContainerType fmt mainDocT appsT)
         (Tree x (mainDocTree : trees)) =
@@ -46,7 +44,7 @@ documentContainerTP = disjNFlaggedTreePF aux
                 <*> appendicesTP appsT trees
 
 headerTP :: Maybe Text -> TreeParser (Parsed DocumentContainerHeader)
-headerTP Nothing = treeError "Document container lacks header"
+headerTP Nothing = fail "Document container lacks header"
 headerTP (Just x) = leafParser documentContainerHeaderP x
 
 appendicesTP
@@ -55,7 +53,7 @@ appendicesTP
     -> TreeParser [Flagged' AppendixSection]
 appendicesTP (Sequence ts) tTrees =
     case safeZipWith appendixSectionTP ts tTrees of
-        Nothing -> treeError "Wrong number of appendix sections"
+        Nothing -> fail "Wrong number of appendix sections"
         Just apps -> sequence apps
 
 safeZipWith :: (a -> b -> c) -> [a] -> [b] -> Maybe [c]

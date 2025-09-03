@@ -30,7 +30,6 @@ import Language.Ltml.Tree.Parser
     , leafFootnoteParser
     , leafParser
     , nFlaggedTreePF
-    , treeError
     )
 import Text.Megaparsec (eof)
 
@@ -66,7 +65,7 @@ headingTP
     -> Maybe Text
     -> TreeParser (Parsed (Node Heading))
 headingTP kw t (Just x) = leafParser (headingP kw t) x
-headingTP _ _ Nothing = treeError "Section lacks heading"
+headingTP _ _ Nothing = fail "Section lacks heading"
 
 sectionBodyTP
     :: SectionBodyType
@@ -74,4 +73,4 @@ sectionBodyTP
     -> FootnoteTreeParser SectionBody
 sectionBodyTP (InnerSectionBodyType (Star nt)) trees =
     InnerSectionBody <$> mapM (sectionTP nt) trees
-sectionBodyTP _ _ = treeError "Invalid section body kind"
+sectionBodyTP _ _ = fail "Invalid section body kind"

@@ -44,7 +44,6 @@ import Language.Ltml.Tree.Parser
     , leafFootnoteParser
     , leafParser
     , nFlaggedTreePF
-    , treeError
     )
 import Language.Ltml.Tree.Parser.Section (sectionBodyTP)
 import Text.Megaparsec (eof)
@@ -68,7 +67,7 @@ documentTXP'
     -> InputTree'
     -> TreeParser (f Document)
 documentTXP' _ (Leaf _) =
-    treeError "Parsing textual documents not yet implemented" -- TODO
+    fail "Parsing textual documents not yet implemented" -- TODO
 documentTXP'
     (DocumentType kw fmt headingT bodyT (Disjunction fnTs))
     (Tree x children) = do
@@ -84,7 +83,7 @@ headingTP
     -> Maybe Text
     -> TreeParser (Parsed (f DocumentHeading))
 headingTP kw t (Just x) = leafParser (documentHeadingP kw t) x
-headingTP _ _ Nothing = treeError "Document lacks heading"
+headingTP _ _ Nothing = fail "Document lacks heading"
 
 bodyTP
     :: DocumentBodyType
@@ -95,7 +94,7 @@ bodyTP (DocumentBodyType introT mainT extroT) [intro, main, extro] =
         <$> introExtroTP introT intro
         <*> mainTP mainT main
         <*> introExtroTP extroT extro
-bodyTP _ _ = treeError "Invalid number of document body children"
+bodyTP _ _ = fail "Invalid number of document body children"
 
 introExtroTP
     :: Sequence (NamedType SimpleSectionType)
@@ -105,7 +104,7 @@ introExtroTP = flaggedTreePF introExtroTP'
   where
     introExtroTP' t (Leaf x) =
         leafFootnoteParser (simpleSectionSequenceP (fmap unwrapNT t) eof) x
-    introExtroTP' _ _ = treeError "Document intro/extro is not leaf"
+    introExtroTP' _ _ = fail "Document intro/extro is not leaf"
 
 mainTP
     :: Disjunction DocumentMainBodyType
@@ -118,5 +117,5 @@ mainTP = disjFlaggedTreePF (aux . \(DocumentMainBodyType t) -> t)
         -> InputTree'
         -> FootnoteTreeParser (Parsed SectionBody)
     aux t (Leaf x) = leafFootnoteParser (sectionBodyP t eof) x
-    aux _ (Tree (Just _) _) = treeError "Document main body has header"
+    aux _ (Tree (Just _) _) = fail "Document main body has header"
     aux t (Tree Nothing trees) = Right <$> sectionBodyTP t trees

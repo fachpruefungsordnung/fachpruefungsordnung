@@ -9,7 +9,6 @@ module Language.Ltml.Tree.Parser
     , runTreeParser
     , MonadTreeParser (treeParser)
     , TreeError (..)
-    , treeError
     , leafParser
     , leafFootnoteParser
     , flaggedTreePF
@@ -49,8 +48,11 @@ newtype TreeParser a = TreeParser (Either TreeError a)
 runTreeParser :: TreeParser a -> Either TreeError a
 runTreeParser (TreeParser x) = x
 
-class (Monad m) => MonadTreeParser m where
+class (MonadFail m) => MonadTreeParser m where
     treeParser :: Either TreeError a -> m a
+
+instance MonadFail TreeParser where
+    fail = TreeParser . Left . TreeError
 
 instance MonadTreeParser TreeParser where
     treeParser = TreeParser
@@ -65,9 +67,6 @@ type FootnoteTreeParser = FootnoteWriterT TreeParser
 
 instance (MonadTreeParser m) => MonadTreeParser (FootnoteWriterT m) where
     treeParser = lift . treeParser
-
-treeError :: (MonadTreeParser m) => String -> m a
-treeError = treeParser . Left . TreeError
 
 parseLeaf :: Parser a -> Text -> Parsed a
 parseLeaf p x = runParser (nSc *> p) "" (x <> "\n")
@@ -92,9 +91,9 @@ flaggedTreePF' f kind = traverseF aux
   where
     aux (TypedTree kindName typeName tree) =
         if kindName /= kindNameOf kind
-            then treeError "Invalid kind"
+            then fail "Invalid kind"
             else case f typeName of
-                Nothing -> treeError "Invalid type"
+                Nothing -> fail "Invalid type"
                 Just f' -> f' tree
 
 flaggedTreePF
