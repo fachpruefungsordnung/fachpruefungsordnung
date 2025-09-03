@@ -5,6 +5,7 @@ module Language.Ltml.Tree.Parser.Document
     )
 where
 
+import Control.Functor.Utils (Pure, sequenceEither)
 import Control.Monad.Identity (runIdentity)
 import Data.Text (Text)
 import Language.Lsd.AST.Common (Keyword)
@@ -28,7 +29,7 @@ import Language.Ltml.AST.Document
     )
 import Language.Ltml.AST.Section (SectionBody)
 import Language.Ltml.AST.SimpleSection (SimpleSection)
-import Language.Ltml.Common (Flagged')
+import Language.Ltml.Common (Flagged', Parsed)
 import Language.Ltml.Parser.Document (documentHeadingP)
 import Language.Ltml.Parser.Footnote (runFootnoteWriterT)
 import Language.Ltml.Parser.Section (sectionBodyP)
@@ -55,14 +56,14 @@ documentTP
 documentTP nt tTree = fmap runIdentity <$> documentTP' nt tTree
 
 documentTP'
-    :: (HangingTextP f)
+    :: (Pure f, HangingTextP f)
     => NamedType DocumentType
     -> FlaggedInputTree'
     -> TreeParser (Flagged' (f Document))
 documentTP' = nFlaggedTreePF documentTXP'
 
 documentTXP'
-    :: (HangingTextP f)
+    :: (Pure f, HangingTextP f)
     => DocumentType
     -> InputTree'
     -> TreeParser (f Document)
@@ -71,7 +72,7 @@ documentTXP' _ (Leaf _) =
 documentTXP'
     (DocumentType kw fmt headingT bodyT (Disjunction fnTs))
     (Tree x children) = do
-        wHheading <- headingTP kw headingT x
+        wHheading <- sequenceEither <$> headingTP kw headingT x
         (body, fnMap) <-
             runFootnoteWriterT (bodyTP bodyT children) (map unwrapNT fnTs)
         return $ fmap (\heading -> Document fmt heading body fnMap) wHheading
@@ -81,7 +82,7 @@ headingTP
     => Keyword
     -> DocumentHeadingType
     -> Maybe Text
-    -> TreeParser (f DocumentHeading)
+    -> TreeParser (Parsed (f DocumentHeading))
 headingTP kw t (Just x) = leafParser (documentHeadingP kw t) x
 headingTP _ _ Nothing = treeError "Document lacks heading"
 
@@ -99,7 +100,7 @@ bodyTP _ _ = treeError "Invalid number of document body children"
 introExtroTP
     :: Sequence (NamedType SimpleSectionType)
     -> FlaggedInputTree'
-    -> FootnoteTreeParser (Flagged' [SimpleSection])
+    -> FootnoteTreeParser (Flagged' (Parsed [SimpleSection]))
 introExtroTP = flaggedTreePF introExtroTP'
   where
     introExtroTP' t (Leaf x) =
@@ -109,10 +110,13 @@ introExtroTP = flaggedTreePF introExtroTP'
 mainTP
     :: Disjunction DocumentMainBodyType
     -> FlaggedInputTree'
-    -> FootnoteTreeParser (Flagged' SectionBody)
+    -> FootnoteTreeParser (Flagged' (Parsed SectionBody))
 mainTP = disjFlaggedTreePF (aux . \(DocumentMainBodyType t) -> t)
   where
-    aux :: SectionBodyType -> InputTree' -> FootnoteTreeParser SectionBody
+    aux
+        :: SectionBodyType
+        -> InputTree'
+        -> FootnoteTreeParser (Parsed SectionBody)
     aux t (Leaf x) = leafFootnoteParser (sectionBodyP t eof) x
     aux _ (Tree (Just _) _) = treeError "Document main body has header"
-    aux t (Tree Nothing trees) = sectionBodyTP t trees
+    aux t (Tree Nothing trees) = Right <$> sectionBodyTP t trees

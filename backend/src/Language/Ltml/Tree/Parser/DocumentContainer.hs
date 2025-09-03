@@ -15,7 +15,7 @@ import Language.Ltml.AST.DocumentContainer
     ( DocumentContainer (DocumentContainer)
     , DocumentContainerHeader
     )
-import Language.Ltml.Common (Flagged')
+import Language.Ltml.Common (Flagged', Parsed)
 import Language.Ltml.Parser.DocumentContainer (documentContainerHeaderP)
 import Language.Ltml.Tree (FlaggedInputTree', InputTree', Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
@@ -45,7 +45,7 @@ documentContainerTP = disjNFlaggedTreePF aux
                 <*> documentTP mainDocT mainDocTree
                 <*> appendicesTP appsT trees
 
-headerTP :: Maybe Text -> TreeParser DocumentContainerHeader
+headerTP :: Maybe Text -> TreeParser (Parsed DocumentContainerHeader)
 headerTP Nothing = treeError "Document container lacks header"
 headerTP (Just x) = leafParser documentContainerHeaderP x
 

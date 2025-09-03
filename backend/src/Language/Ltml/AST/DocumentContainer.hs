@@ -8,12 +8,12 @@ import Data.Text (Text)
 import Language.Lsd.AST.Type.DocumentContainer (DocumentContainerFormat)
 import Language.Ltml.AST.AppendixSection (AppendixSection)
 import Language.Ltml.AST.Document (Document)
-import Language.Ltml.Common (Flagged')
+import Language.Ltml.Common (Flagged', Parsed)
 
 data DocumentContainer
     = DocumentContainer
         DocumentContainerFormat
-        DocumentContainerHeader
+        (Parsed DocumentContainerHeader)
         (Flagged' Document)
         [Flagged' AppendixSection]
     deriving (Show)

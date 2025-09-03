@@ -4,6 +4,7 @@ module Language.Ltml.Tree.Parser.Section
     )
 where
 
+import Control.Functor.Utils (Pure, pure', sequenceEither)
 import Control.Monad.Trans.Class (lift)
 import Data.Text (Text)
 import Language.Lsd.AST.Common (Keyword)
@@ -20,7 +21,7 @@ import Language.Ltml.AST.Section
     , Section (Section)
     , SectionBody (InnerSectionBody)
     )
-import Language.Ltml.Common (Flagged')
+import Language.Ltml.Common (Flagged', ParseError, Parsed)
 import Language.Ltml.Parser.Section (headingP, sectionP)
 import Language.Ltml.Tree (FlaggedInputTree', InputTree', Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
@@ -43,13 +44,27 @@ sectionTP = nFlaggedTreePF sectionTP'
         :: SectionType
         -> InputTree'
         -> FootnoteTreeParser (Node Section)
-    sectionTP' t (Leaf x) = leafFootnoteParser (sectionP t eof) x
+    sectionTP' t (Leaf x) =
+        mkSection t <$> leafFootnoteParser (sectionP t eof) x
     sectionTP' (SectionType kw headingT fmt bodyT) (Tree x children) = do
-        wHeading <- lift $ headingTP kw headingT x
+        wHeading <- lift $ sequenceEither <$> headingTP kw headingT x
         body <- sectionBodyTP bodyT children
-        return $ fmap (\heading -> Section fmt heading body) wHeading
+        return $ fmap (\heading -> Section fmt heading (Right body)) wHeading
 
-headingTP :: Keyword -> HeadingType -> Maybe Text -> TreeParser (Node Heading)
+handleLeft :: (Pure f) => (e -> a) -> Either e (f a) -> f a
+handleLeft f = either (pure' . f) id
+
+mkSection :: SectionType -> Parsed (Node Section) -> Node Section
+mkSection t = handleLeft $ aux t
+  where
+    aux :: SectionType -> ParseError -> Section
+    aux (SectionType _ _ fmt _) e = Section fmt (Left e) (Left e)
+
+headingTP
+    :: Keyword
+    -> HeadingType
+    -> Maybe Text
+    -> TreeParser (Parsed (Node Heading))
 headingTP kw t (Just x) = leafParser (headingP kw t) x
 headingTP _ _ Nothing = treeError "Section lacks heading"
 
