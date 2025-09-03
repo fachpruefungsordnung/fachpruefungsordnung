@@ -312,24 +312,24 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                     -- conflict
                     | otherwise ->
                         if newTextRevisionIsAutoSave revision
-                        then do
-                            -- For autosave conflicts, create a draft revision
-                            draftRevision <-
-                                DB.createDraftTextRevision
-                                    userID
-                                    ref
-                                    (identifier latest)
-                                    (newTextRevisionContent revision)
-                                    (newTextRevisionCommentAnchors revision)
-                            return $
-                                TextRevision.DraftCreated
-                                    draftRevision
-                                    (identifier latest)
-                        else
-                            -- For manual save conflicts, return conflict
-                            return $
-                                TextRevision.Conflict $
-                                    identifier latest
+                            then do
+                                -- For autosave conflicts, create a draft revision
+                                draftRevision <-
+                                    DB.createDraftTextRevision
+                                        userID
+                                        ref
+                                        (identifier latest)
+                                        (newTextRevisionContent revision)
+                                        (newTextRevisionCommentAnchors revision)
+                                return $
+                                    TextRevision.DraftCreated
+                                        draftRevision
+                                        (identifier latest)
+                            else
+                                -- For manual save conflicts, return conflict
+                                return $
+                                    TextRevision.Conflict $
+                                        identifier latest
   where
     header = TextRevision.header
     identifier = TextRevision.identifier . header
@@ -629,7 +629,7 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
                                     , newTextRevisionElement = textRev
                                     , newTextRevisionContent = text
                                     , newTextRevisionCommentAnchors = Vector.empty
-                                    , newTextRevisionIsAutoSave = False  -- Document creation is not autosave
+                                    , newTextRevisionIsAutoSave = False -- Document creation is not autosave
                                     }
                     case textRevision of
                         TextRevision.NoConflict revision ->
@@ -824,7 +824,7 @@ publishDraftTextRevision
 publishDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Scope.docsTextRevision $ runExceptT $ do
     guardPermission Edit docID userID
     guardExistsTextElement ref
-    
+
     -- Get the current draft
     maybeDraft <- lift $ DB.getDraftTextRevision userID ref
     case maybeDraft of
@@ -833,23 +833,24 @@ publishDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Sco
             -- Create a new regular revision from the draft
             let draftHeader = TextRevision.draftHeader draft
             let basedOnRevisionID = TextRevision.basedOnRevision draftHeader
-            let newRevision = NewTextRevision
-                    { newTextRevisionElement = ref
-                    , newTextRevisionParent = Just basedOnRevisionID
-                    , newTextRevisionContent = TextRevision.draftContent draft
-                    , newTextRevisionCommentAnchors = TextRevision.draftCommentAnchors draft
-                    , newTextRevisionIsAutoSave = False  -- Publishing is explicit, not auto
-                    }
-            
+            let newRevision =
+                    NewTextRevision
+                        { newTextRevisionElement = ref
+                        , newTextRevisionParent = Just basedOnRevisionID
+                        , newTextRevisionContent = TextRevision.draftContent draft
+                        , newTextRevisionCommentAnchors = TextRevision.draftCommentAnchors draft
+                        , newTextRevisionIsAutoSave = False -- Publishing is explicit, not auto
+                        }
+
             -- Create the revision (may conflict with newer changes)
             result <- ExceptT $ createTextRevision userID newRevision
-            
+
             -- If successful, delete the draft
             case result of
                 TextRevision.NoConflict _ -> do
                     lift $ DB.deleteDraftTextRevision userID ref
                     return result
-                _ -> return result  -- Keep draft on conflict
+                _ -> return result -- Keep draft on conflict
 
 -- | Discard a draft text revision, permanently deleting all unsaved changes.
 -- This operation cannot be undone. The draft is completely removed from storage.

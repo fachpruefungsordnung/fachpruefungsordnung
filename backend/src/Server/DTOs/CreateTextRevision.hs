@@ -20,9 +20,9 @@ data CreateTextRevision
     { parent :: Maybe TextRevisionID
     , content :: Text
     , commentAnchors :: Vector CommentAnchor
-    -- | Whether this is an auto-save operation. Auto-saves create drafts on conflicts,
-    -- while manual saves return conflict errors. This distinguishes the conflict resolution strategy.
     , isAutoSave :: Bool
+    -- ^ Whether this is an auto-save operation. Auto-saves create drafts on conflicts,
+    -- while manual saves return conflict errors. This distinguishes the conflict resolution strategy.
     }
     deriving (Generic)
 

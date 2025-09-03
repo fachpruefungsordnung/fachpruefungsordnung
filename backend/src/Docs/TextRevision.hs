@@ -336,7 +336,8 @@ contentsNotChanged latest newRevision =
 data ConflictStatus
     = Conflict TextRevisionID -- todo: maybe not id but whole TextRevision?
     | NoConflict TextRevision
-    | DraftCreated DraftRevision TextRevisionID -- ^ created draft and conflicting revision ID
+    | -- | created draft and conflicting revision ID
+      DraftCreated DraftRevision TextRevisionID
 
 instance ToJSON ConflictStatus where
     toJSON (Conflict conflictWith) =
@@ -344,7 +345,11 @@ instance ToJSON ConflictStatus where
     toJSON (NoConflict newRevision) =
         Aeson.object ["type" .= ("noConflict" :: Text), "newRevision" .= newRevision]
     toJSON (DraftCreated draftRevision conflictWith) =
-        Aeson.object ["type" .= ("draftCreated" :: Text), "draft" .= draftRevision, "with" .= conflictWith]
+        Aeson.object
+            [ "type" .= ("draftCreated" :: Text)
+            , "draft" .= draftRevision
+            , "with" .= conflictWith
+            ]
 
 instance FromJSON ConflictStatus where
     parseJSON = Aeson.withObject "ConflictStatus" $ \obj -> do
@@ -365,7 +370,8 @@ instance ToSchema ConflictStatus where
             NamedSchema (Just "ConflictStatus") $
                 mempty
                     & type_ ?~ OpenApiObject
-                    & description ?~ "Status of text revision creation - can be no conflict, conflict with existing revision, or draft created due to AutoSave conflict"
+                    & description
+                        ?~ "Status of text revision creation - can be no conflict, conflict with existing revision, or draft created due to AutoSave conflict"
                     & oneOf
                         ?~ [ Inline $
                                 mempty
