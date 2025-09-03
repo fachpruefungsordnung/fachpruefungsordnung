@@ -178,8 +178,8 @@ extractNewParent (Content cont) json = do
       header <- newRev .: "header"
       newPar <- header .: "identifier"
       pure $ Content $ cont { parent = newPar }
-    "draft" -> do
-      draftRev <- obj .: "draftRevision"
+    "draftCreated" -> do
+      draftRev <- obj .: "draft"
       header <- draftRev .: "header"
       newPar <- header .: "identifier"
       pure $ Content $ cont { parent = newPar }
