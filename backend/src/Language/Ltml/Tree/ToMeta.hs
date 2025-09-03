@@ -16,19 +16,21 @@ import Control.Monad.ConsumableStack
 import Data.Bifunctor (first)
 import Data.List (find)
 import Data.Map (Map, lookup)
+import Data.Text (Text)
 import Language.Lsd.AST.Common (FullTypeName)
 import Language.Lsd.AST.Type
     ( NamedType
+    , NavHeadingGeneration (NavHeadingFromHtmlToc, NavHeadingStatic)
     , ProperTypeMeta
     , fullTypeNameOf
-    , kindHasTocHeading
+    , navHeadingGenerationOf
     , properTypeCollect'
     )
 import Language.Lsd.AST.Type.DocumentContainer (DocumentContainerType)
 import Language.Lsd.Example (availableLSDs)
 import Language.Lsd.ToMetaMap (buildMetaMap)
 import Language.Ltml.Common (Flagged (Flagged))
-import Language.Ltml.HTML (renderTocList)
+import Language.Ltml.HTML (mkRenderedTocEntry, renderTocList)
 import Language.Ltml.HTML.Common (RenderedTocEntry)
 import Language.Ltml.Tree
     ( FlaggedInputTree
@@ -107,8 +109,8 @@ buildMetaTree
 buildMetaTree t hs tree0 =
     runEitherFail $ runConsumableStackT (flaggedTreeF tree0) hs
   where
-    hasHeadingMap :: Map FullTypeName Bool
-    hasHeadingMap = properTypeCollect' (kindHasTocHeading . pure) t
+    headingGenMap :: Map FullTypeName NavHeadingGeneration
+    headingGenMap = properTypeCollect' (navHeadingGenerationOf . pure) t
 
     flaggedTreeF
         :: FlaggedInputTree ident
@@ -117,16 +119,20 @@ buildMetaTree t hs tree0 =
 
     typedTreeF :: TypedInputTree ident -> HeadingStack (TypedMetaTree ident)
     typedTreeF (TypedTree kindName typeName tree) =
-        case lookup (kindName, typeName) hasHeadingMap of
+        case lookup (kindName, typeName) headingGenMap of
             Just b -> TypedTree kindName typeName <$> treeF b tree
             Nothing -> fail $ "Unknown type: " ++ show (kindName, typeName)
 
-    treeF :: Bool -> InputTree ident -> HeadingStack (MetaTree ident)
-    treeF hasHeading = aux
+    treeF
+        :: NavHeadingGeneration
+        -> InputTree ident
+        -> HeadingStack (MetaTree ident)
+    treeF headingGen = aux
       where
         aux (Tree _ trees) =
-            Tree <$> headingF hasHeading <*> mapM flaggedTreeF trees
-        aux (Leaf _) = Leaf <$> headingF hasHeading
+            Tree <$> headingF headingGen <*> mapM flaggedTreeF trees
+        aux (Leaf _) = Leaf <$> headingF headingGen
 
-        headingF True = Just <$> pop
-        headingF False = pure Nothing
+    headingF :: NavHeadingGeneration -> HeadingStack RenderedTocEntry
+    headingF (NavHeadingStatic x) = pure $ mkRenderedTocEntry x
+    headingF NavHeadingFromHtmlToc = pop

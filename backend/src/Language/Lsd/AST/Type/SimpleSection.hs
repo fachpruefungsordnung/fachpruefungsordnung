@@ -11,6 +11,7 @@ import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Sequence, Star)
 import Language.Lsd.AST.Type
     ( NamedType
+    , NavHeadingGeneration (NavHeadingStatic)
     , ProperNodeKind (..)
     , TreeSyntax (LeafSyntax)
     )
@@ -33,4 +34,4 @@ instance ProperNodeKind (Sequence (NamedType SimpleSectionType)) where
     typeNameOf _ = ""
     displayTypeNameOf _ = "simple section sequence"
     treeSyntaxMap _ _ = LeafSyntax
-    kindHasTocHeading _ = False
+    navHeadingGenerationOf _ = NavHeadingStatic "(intro/extro)" -- TODO

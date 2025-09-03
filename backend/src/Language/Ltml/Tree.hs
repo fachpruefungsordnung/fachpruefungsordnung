@@ -70,9 +70,7 @@ type InputTree' = InputTree Bool
 
 -- | A tree containing metadata, to be sent to the frontend.
 --   The type parameter is typically an identifier type.
-type FlaggedMetaTree id =
-    FlaggedTree id (Maybe RenderedTocEntry) (Maybe RenderedTocEntry)
+type FlaggedMetaTree id = FlaggedTree id RenderedTocEntry RenderedTocEntry
 
-type TypedMetaTree id =
-    TypedTree id (Maybe RenderedTocEntry) (Maybe RenderedTocEntry)
-type MetaTree id = Tree id (Maybe RenderedTocEntry) (Maybe RenderedTocEntry)
+type TypedMetaTree id = TypedTree id RenderedTocEntry RenderedTocEntry
+type MetaTree id = Tree id RenderedTocEntry RenderedTocEntry

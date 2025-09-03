@@ -16,6 +16,7 @@ import Language.Lsd.AST.Type
     ( ChildrenOrder (SequenceOrder)
     , HasEditableHeader (HasEditableHeader)
     , NamedType
+    , NavHeadingGeneration (NavHeadingStatic)
     , RawProperNodeKind (..)
     , TreeSyntax (TreeSyntax)
     )
@@ -47,7 +48,7 @@ instance RawProperNodeKind DocumentContainerType where
             SequenceOrder $
                 pure <$> (f mainDocT : map f appSecsT)
 
-    kindHasTocHeadingRaw _ = False
+    navHeadingGenerationOfRaw _ = NavHeadingStatic "(header)"
 
 -- | The format of a printed header/footer.
 data HeaderFooterFormat
