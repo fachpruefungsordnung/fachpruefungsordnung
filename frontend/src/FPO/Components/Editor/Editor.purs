@@ -23,7 +23,7 @@ import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
-import Data.Array (catMaybes, intercalate, mapMaybe, snoc, uncons, (:))
+import Data.Array (catMaybes, deleteBy, intercalate, mapMaybe, snoc, uncons, (:))
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
@@ -37,7 +37,6 @@ import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class as EC
-import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -111,7 +110,6 @@ type State = FPOState
   , mEditor :: Maybe Types.Editor
   , mTocEntry :: Maybe TOCEntry
   , mNodePath :: Maybe Path
-  , title :: String
   , mContent :: Maybe Content
   -- comments
   -- Hashmaps for Annotations
@@ -123,6 +121,18 @@ type State = FPOState
   , dragState :: Maybe { which :: DragHandle, lm :: LiveMarker }
   , startHandleMarkerId :: Maybe Int
   , endHandleMarkerId :: Maybe Int
+  -- for autosave
+  , mPrevHandler :: Maybe Types.Position
+  , dragRowAS :: Int
+  , dragColAS :: Int
+  -- for not letting a drag Handler move past its partner
+  , mHandleBorder ::
+      Maybe
+        { row :: Int
+        , column :: Int
+        , falseCompare :: (Int -> Int -> Boolean)
+        , correction :: (Int -> Int)
+        }
   -- tmpLiveMarker is a temporary comment and marker. Only set, if first comment is sent in Comment component
   -- Otherwise delete them later
   , tmpLiveMarker :: Maybe LiveMarker
@@ -173,8 +183,7 @@ data Output
   | ClickedQuery (Array String)
   | DeletedComment TOCEntry (Array Int)
   | PostPDF String
-  -- SavedSection toBePosted title TOCEntry
-  | SavedSection Boolean String TOCEntry
+  | SavedSection TOCEntry
   | RenamedNode String Path
   | RequestComments Int Int
   | SelectedCommentSection Int Int
@@ -183,7 +192,7 @@ data Output
 data Action
   = Init
   | Comment
-  | ChangeToSection String TOCEntry (Maybe Int)
+  | ChangeToSection TOCEntry (Maybe Int)
   | ContinueChangeToSection (Array FirstComment)
   | SelectComment
   | Bold
@@ -195,9 +204,9 @@ data Action
   | Redo
   | Save
   -- Subsection of Save
-  | Upload TOCEntry String ContentWrapper
+  | Upload TOCEntry ContentWrapper
   -- Subsection of Upload
-  | LostParentID TOCEntry String ContentWrapper
+  | LostParentID TOCEntry ContentWrapper
   | SavedIcon
   -- new change in editor -> reset timer
   | AutoSaveTimer
@@ -229,12 +238,8 @@ data Query a
   -- | save the current content and send it to splitview
   | SaveSection a
   -- | receive the selected TOC and put its content into the editor
-  | ChangeSection String TOCEntry (Maybe Int) a
+  | ChangeSection TOCEntry (Maybe Int) a
   | ContinueChangeSection (Array FirstComment) a
-  -- | Open and edit a raw string outside the TOCEntry structure.
-  --   This is used to make the editor available for editing
-  --   the section names of non-leaf nodes.
-  | ChangeToNode String Path a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
   | UpdateComment CommentSection a
@@ -268,7 +273,6 @@ editor = connect selectTranslator $ H.mkComponent
     , mEditor: Nothing
     , mTocEntry: Nothing
     , mNodePath: Nothing
-    , title: ""
     , mContent: Nothing
     , tmpLiveMarker: Nothing
     , selectedLiveMarker: Nothing
@@ -276,6 +280,10 @@ editor = connect selectTranslator $ H.mkComponent
     , dragState: Nothing
     , startHandleMarkerId: Nothing
     , endHandleMarkerId: Nothing
+    , mPrevHandler: Nothing
+    , dragRowAS: -1
+    , dragColAS: -1
+    , mHandleBorder: Nothing
     , markerAnnoHS: empty
     , oldMarkerAnnoPos: empty
     , liveMarkers: []
@@ -652,8 +660,8 @@ editor = connect selectTranslator $ H.mkComponent
       case compareTo of
         Nothing
         -> pure unit
-        Just { tocEntry: tocEntry, revID: revID, title: title }
-        -> handleAction (ChangeToSection title tocEntry revID)
+        Just { tocEntry: tocEntry, revID: revID }
+        -> handleAction (ChangeToSection tocEntry revID)
       {-       _ <- H.subscribe =<< resizeDelay Resize
     pure unit -}
 
@@ -695,9 +703,6 @@ editor = connect selectTranslator $ H.mkComponent
           HS.notify listener SelectComment
           -- stop dragging the comment dragger
           HS.notify listener EndDrag
-          -- set dirty flag and autosave
-          Ref.write true dref
-          HS.notify listener AutoSaveTimer
         H.liftEffect $ addEventListener (EventType "mouseup") upL true
           (toEventTarget $ toElement container)
 
@@ -825,36 +830,18 @@ editor = connect selectTranslator $ H.mkComponent
               >>= Document.getAllLines
 
           let
-            contentLines =
-              fromMaybe { title: "", contentText: "" } do
-                { head, tail } <- uncons =<< allLines
-                pure { title: head, contentText: intercalate "\n" tail }
+            contentLines = intercalate "\n" (fromMaybe [] allLines)
 
           case state.mTocEntry of
-            Nothing -> do
-              -- No leaf entity was selected, so if a nodePath is set,
-              -- we can emit an event to rename the node.
-              case state.mNodePath of
-                Nothing -> do
-                  pure unit -- Nothing to do
-                Just path -> do
-                  H.raise $ RenamedNode (contentLines.title) path
-            Just _ ->
+            Nothing -> pure unit
+            Just entry ->
               case state.mContent of
                 Nothing -> pure unit
                 Just content -> do
                   -- Save the current content of the editor and send it to the server
                   let
-                    title = contentLines.title
-                    contentText = contentLines.contentText
-
                     -- place it in contentDto
-                    newContent = ContentDto.setContentText contentText content
-
-                    -- extract the current TOC entry
-                    entry = case state.mTocEntry of
-                      Nothing -> emptyTOCEntry
-                      Just e -> e
+                    newContent = ContentDto.setContentText contentLines content
 
                   -- Since the ids and postions in liveMarkers are changing constantly,
                   -- extract them now and store them
@@ -880,9 +867,9 @@ editor = connect selectTranslator $ H.mkComponent
                     comments = map ContentDto.convertToCommentAnchor updatedMarkers
                     newWrapper = ContentDto.setWrapper newContent comments
                   -- Try to upload
-                  handleAction $ Upload entry title newWrapper
+                  handleAction $ Upload entry newWrapper
 
-    Upload newEntry title newWrapper -> do
+    Upload newEntry newWrapper -> do
       state <- H.get
       let
         jsonContent = ContentDto.encodeWrapper newWrapper
@@ -894,16 +881,13 @@ editor = connect selectTranslator $ H.mkComponent
 
       -- handle errors in pos and decodeJson
       case response of
-        Left _ -> handleAction $ LostParentID newEntry title newWrapper
+        Left _ -> handleAction $ LostParentID newEntry newWrapper
         -- extract and insert new parentID into newContent
         Right updatedContent -> do
-          -- Update the tree to backend, when title was really changed
-          let oldTitle = state.title
-          H.raise (SavedSection (oldTitle /= title) title newEntry)
+          H.raise (SavedSection newEntry)
 
           H.modify_ _
             { mTocEntry = Just newEntry
-            , title = title
             , mContent = Just updatedContent
             }
 
@@ -914,7 +898,7 @@ editor = connect selectTranslator $ H.mkComponent
           for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
           pure unit
 
-    LostParentID newEntry title newWrapper -> do
+    LostParentID newEntry newWrapper -> do
       let newContent = ContentDto.getWrapperContent newWrapper
       docID <- H.gets _.docID
       loadedContent <- H.liftAff $
@@ -931,7 +915,7 @@ editor = connect selectTranslator $ H.mkComponent
               res
             newWrapper' = ContentDto.setWrapperContent newContent' newWrapper
           in
-            handleAction $ Upload newEntry title newWrapper'
+            handleAction $ Upload newEntry newWrapper'
 
     SavedIcon -> do
       state <- H.get
@@ -1084,8 +1068,8 @@ editor = connect selectTranslator $ H.mkComponent
 
     -- Try to get mouse position and maybe selected handle
     TryStartDrag clientX clientY -> do
-      st <- H.get
-      case st.mEditor, st.selectedLiveMarker of
+      state <- H.get
+      case state.mEditor, state.selectedLiveMarker of
         Just ed, Just lm -> do
           -- Mauspos -> Textpos
           pos <- H.liftEffect $ screenToText ed clientX clientY
@@ -1098,9 +1082,33 @@ editor = connect selectTranslator $ H.mkComponent
               Types.getRow a == Types.getRow b
                 && abs (Types.getColumn a - Types.getColumn b) <= 1
 
-          if near pos sPos then
+          if near pos sPos then do
+            let
+              row = Types.getRow ePos
+              column = Types.getColumn ePos
+            H.modify_ \st -> st
+              { mPrevHandler = Just sPos
+              , mHandleBorder = Just
+                  { row
+                  , column
+                  , falseCompare: (>)
+                  , correction: (\x -> x - 1)
+                  }
+              }
             handleAction (StartDrag DragStart lm clientX clientY)
-          else if near pos ePos then
+          else if near pos ePos then do
+            let
+              row = Types.getRow sPos
+              column = Types.getColumn sPos
+            H.modify_ \st -> st
+              { mPrevHandler = Just ePos
+              , mHandleBorder = Just
+                  { row
+                  , column
+                  , falseCompare: (<)
+                  , correction: (\x -> x + 1)
+                  }
+              }
             handleAction (StartDrag DragEnd lm clientX clientY)
           else
             pure unit
@@ -1132,32 +1140,48 @@ editor = connect selectTranslator $ H.mkComponent
 
     DragMove clientX clientY -> do
       st <- H.get
-      case st.dragState, st.mEditor of
-        Just { which, lm }, Just ed -> do
-          -- screen -> Textcoord.
-          pos <- H.liftEffect $ screenToText ed clientX clientY
-          let row = Types.getRow pos
-          let col = Types.getColumn pos
-          -- set drag anchor
-          case which of
-            DragStart -> H.liftEffect $ setAnchorPosition lm.startAnchor row col
-            DragEnd -> H.liftEffect $ setAnchorPosition lm.endAnchor row col
+      case st.dragState, st.mEditor, st.mHandleBorder of
+        Just { which, lm }, Just ed, Just { row, column, falseCompare, correction } ->
+          do
+            -- screen -> Textcoord.
+            pos <- H.liftEffect $ screenToText ed clientX clientY
+            let
+              firstRow = Types.getRow pos
+              row' =
+                if falseCompare firstRow row then
+                  row
+                else
+                  firstRow
+              firstCol = Types.getColumn pos
+              col' =
+                if row' == row && falseCompare firstCol column then
+                  correction column
+                else
+                  firstCol
+            -- set drag anchor
+            case which of
+              DragStart -> H.liftEffect $ setAnchorPosition lm.startAnchor row' col'
+              DragEnd -> H.liftEffect $ setAnchorPosition lm.endAnchor row' col'
 
-          -- draw new Handles (current position)
-          session <- H.liftEffect $ Editor.getSession ed
-          H.liftEffect $ hideHandlesFrom session st.startHandleMarkerId
-            st.endHandleMarkerId
-          ids <- H.liftEffect $ showHandlesFor session lm
-          H.modify_ _
-            { startHandleMarkerId = ids.startId, endHandleMarkerId = ids.endId }
-        _, _ -> pure unit
+            -- draw new Handles (current position)
+            session <- H.liftEffect $ Editor.getSession ed
+            H.liftEffect $ hideHandlesFrom session st.startHandleMarkerId
+              st.endHandleMarkerId
+            ids <- H.liftEffect $ showHandlesFor session lm
+            H.modify_ _
+              { startHandleMarkerId = ids.startId
+              , endHandleMarkerId = ids.endId
+              , dragRowAS = row'
+              , dragColAS = col'
+              }
+        _, _, _ -> pure unit
 
     EndDrag -> do
       dragState <- H.gets _.dragState
       when (isJust dragState) do
         H.modify_ _ { dragState = Nothing }
-        st <- H.get
-        case st.mEditor of
+        state <- H.get
+        case state.mEditor of
           Just ed -> do
             container <- H.liftEffect $ Editor.getContainer ed
             -- For CSS styling
@@ -1166,17 +1190,30 @@ editor = connect selectTranslator $ H.mkComponent
               removeClass container "fpo-dragging"
               -- remove the selected text in editor
               clearSelection ed
+
+            -- Auto save
+            case state.mPrevHandler, state.mDirtyRef of
+              Just prev, Just dref -> do
+                let
+                  pRow = Types.getRow prev
+                  pCol = Types.getColumn prev
+                when (pRow /= state.dragRowAS || pCol /= state.dragColAS) do
+                  H.modify_ \st -> st { mPrevHandler = Nothing }
+                  -- set dirty flag and autosave
+                  H.liftEffect $ Ref.write true dref
+                  handleAction AutoSaveTimer
+              _, _ -> pure unit
           Nothing -> pure unit
 
     ShowHandles lm -> do
-      st <- H.get
-      case st.mEditor of
+      state <- H.get
+      case state.mEditor of
         Nothing -> pure unit
         Just ed -> do
           session <- H.liftEffect $ Editor.getSession ed
           -- remove old markers
-          H.liftEffect $ hideHandlesFrom session st.startHandleMarkerId
-            st.endHandleMarkerId
+          H.liftEffect $ hideHandlesFrom session state.startHandleMarkerId
+            state.endHandleMarkerId
           -- set new ones
           ids <- H.liftEffect $ showHandlesFor session lm -- :: { startId :: Maybe Int, endId :: Maybe Int }
           H.modify_ _
@@ -1318,11 +1355,11 @@ editor = connect selectTranslator $ H.mkComponent
       for_ state.mPendingDebounceF H.kill
       for_ state.mPendingMaxWaitF H.kill
 
-    ChangeToSection title entry rev -> do
+    ChangeToSection entry rev -> do
       state <- H.get
       -- Prevent of loading the same Section from backend again
       when (Just entry /= state.mTocEntry) do
-        H.modify_ \st -> st { mTocEntry = Just entry, title = title }
+        H.modify_ \st -> st { mTocEntry = Just entry }
         let
           version = case rev of
             Nothing -> "latest"
@@ -1378,7 +1415,7 @@ editor = connect selectTranslator $ H.mkComponent
               document <- Session.getDocument session
 
               -- Set the content of the editor
-              Document.setValue (state.title <> "\n" <> content)
+              Document.setValue content
                 document
               Editor.setReadOnly state.isEditorReadonly ed
 
@@ -1416,35 +1453,12 @@ editor = connect selectTranslator $ H.mkComponent
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
 
-    ChangeSection title entry rev a -> do
-      handleAction (ChangeToSection title entry rev)
+    ChangeSection entry rev a -> do
+      handleAction (ChangeToSection entry rev)
       pure (Just a)
 
     ContinueChangeSection fCs a -> do
       handleAction (ContinueChangeToSection fCs)
-      pure (Just a)
-
-    ChangeToNode title path a -> do
-      -- Change the editor to a raw string outside the TOCEntry structure.
-      H.modify_ _ { mTocEntry = Nothing, mNodePath = Just path }
-      state <- H.get
-      H.gets _.mEditor >>= traverse_ \ed -> do
-        -- Set the content of the editor
-        H.liftEffect $ do
-          session <- Editor.getSession ed
-          document <- Session.getDocument session
-          Document.setValue title document
-
-          -- Reset Undo history
-          undoMgr <- Session.getUndoManager session
-          UndoMgr.reset undoMgr
-
-          -- Clear annotations
-          Session.clearAnnotations session
-
-      -- reset Ref, because loading new content is considered
-      -- changing the existing content, which would set the flag
-      for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
       pure (Just a)
 
     UpdateNodePosition path a -> do
@@ -1517,6 +1531,7 @@ editor = connect selectTranslator $ H.mkComponent
             , markers = newMarkers
             , liveMarkers = newLiveMarkers
             }
+          -- Save new created comment
           -- set dirty to true to be able to save
           for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r
           handleAction Save
@@ -1528,7 +1543,16 @@ editor = connect selectTranslator $ H.mkComponent
       lms <- H.gets _.liveMarkers
       editor_ <- H.gets _.mEditor
       case (find (\m -> m.annotedMarkerID == markerID) lms) of
-        Nothing -> pure unit
+        -- Comment not found because it is resolved
+        Nothing -> do
+          handleAction HideHandles
+          selectedLiveMarker <- H.gets _.selectedLiveMarker
+          case selectedLiveMarker, editor_ of
+            Just lm, Just ed -> do
+              session <- H.liftEffect $ Editor.getSession ed
+              H.liftEffect $ setMarkerSelectedClass session lm false
+            _, _ -> pure unit
+          H.modify_ \st -> st { selectedLiveMarker = Nothing }
         Just lm -> do
           H.modify_ \st -> st { selectedLiveMarker = Just lm }
           -- show comment drag handles
@@ -1542,15 +1566,21 @@ editor = connect selectTranslator $ H.mkComponent
       state <- H.get
       case state.mEditor, state.selectedLiveMarker of
         Just ed, Just lm -> do
-          H.liftEffect $ log $ "passed case: " <> show lm.annotedMarkerID
           session <- H.liftEffect $ Editor.getSession ed
           H.liftEffect $ removeLiveMarker lm session
           handleAction $ DeleteAnnotation lm false true
+          handleAction $ HideHandles
           H.modify_ \st -> st { selectedLiveMarker = Nothing }
           case state.tmpLiveMarker of
             Nothing -> pure unit
             Just tmpLM -> when (tmpLM.annotedMarkerID == lm.annotedMarkerID) $
               H.modify_ \st -> st { tmpLiveMarker = Nothing }
+          -- delete this marker from state. Otherwise, it can be still selected
+          H.modify_ \st -> st
+            { liveMarkers = deleteBy (\b c -> b.annotedMarkerID == c.annotedMarkerID)
+                lm
+                st.liveMarkers
+            }
         _, _ -> pure unit
       pure (Just a)
 
@@ -1804,14 +1834,18 @@ showHandlesFor
   -> LiveMarker
   -> Effect { startId :: Maybe Int, endId :: Maybe Int }
 showHandlesFor session lm = do
-  -- Start-Handle
+  -- Get Anchor-Positions
   Types.Position { row: sRow, column: sCol } <- Anchor.getPosition lm.startAnchor
+  Types.Position { row: eRow, column: eCol } <- Anchor.getPosition lm.endAnchor
+
+  -- Start Handle
   r1 <- Range.create sRow sCol sRow (sCol + 1)
   hid1 <- Session.addMarker r1 "fpo-handle-start" "text" false session
-  -- End-Handle
-  Types.Position { row: eRow, column: eCol } <- Anchor.getPosition lm.endAnchor
-  r2 <- Range.create (eRow - 1) eCol (eRow - 1) (eCol + 1)
+
+  -- End Handle
+  r2 <- Range.create eRow eCol eRow (eCol + 1)
   hid2 <- Session.addMarker r2 "fpo-handle-end" "text" false session
+
   pure { startId: Just hid1, endId: Just hid2 }
 
 hideHandlesFrom :: Types.EditSession -> Maybe Int -> Maybe Int -> Effect Unit

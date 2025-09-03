@@ -111,7 +111,7 @@ findTOCEntry tocID = findRootTree (\e -> e.id == tocID)
 findTitleTOCEntry :: Int -> TOCTree -> Maybe String
 findTitleTOCEntry tocID = findTitleRootTree (\e -> e.id == tocID)
 
-replaceTOCEntry :: Int -> String -> TOCEntry -> TOCTree -> TOCTree
+replaceTOCEntry :: Int -> TOCEntry -> TOCTree -> TOCTree
 replaceTOCEntry tocID = replaceNodeRootTree (\e -> e.id == tocID)
 
 sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker
