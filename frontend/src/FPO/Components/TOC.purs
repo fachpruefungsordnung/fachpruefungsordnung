@@ -95,8 +95,6 @@ type Version = { identifier :: Maybe Int, timestamp :: DD.DocDate }
 data Output
   -- | Opens the editor for some leaf node, that is, a subsection or paragraph.
   = ChangeToLeaf Int
-  -- | Opens the editor for some given node title. Used to rename sections.
-  | ChangeToNode Path String
   -- | Used to tell the editor to update the path of the selected node
   --   during title renaming.
   | UpdateNodePosition Path
@@ -128,7 +126,6 @@ data Action
   | Receive (Connected Store.Store Input)
   | DoNothing
   | JumpToLeafSection Int
-  | JumpToNodeSection Path String
   | ToggleAddMenu Path
   | ToggleHistoryMenu (Array Int) Int
   | ToggleHistorySubmenu (Maybe Int)
@@ -306,11 +303,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
       H.modify_ \state ->
         state { mSelectedTocEntry = Just $ SelLeaf id }
       H.raise (ChangeToLeaf id)
-
-    JumpToNodeSection path title -> do
-      H.modify_ \state ->
-        state { mSelectedTocEntry = Just $ SelNode path title }
-      H.raise (ChangeToNode path title)
 
     ToggleAddMenu path -> do
       H.modify_ \state ->
@@ -602,11 +594,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     ( [ HP.classes titleClasses
                       , HP.style "align-self: stretch; flex-basis: 0;"
                       , HP.title title
-                      ] <>
-                        ( if level > 0 then
-                            [ HE.onClick \_ -> JumpToNodeSection path title ]
-                          else []
-                        )
+                      ]
                     )
                     [ HH.text title ]
                 , renderSectionButtonInterface menuPath path true Section title

@@ -236,10 +236,6 @@ data Query a
   -- | receive the selected TOC and put its content into the editor
   | ChangeSection TOCEntry (Maybe Int) a
   | ContinueChangeSection (Array FirstComment) a
-  -- | Open and edit a raw string outside the TOCEntry structure.
-  --   This is used to make the editor available for editing
-  --   the section names of non-leaf nodes.
-  | ChangeToNode String Path a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
   | UpdateComment CommentSection a
@@ -1426,29 +1422,6 @@ editor = connect selectTranslator $ H.mkComponent
 
     ContinueChangeSection fCs a -> do
       handleAction (ContinueChangeToSection fCs)
-      pure (Just a)
-
-    ChangeToNode title path a -> do
-      -- Change the editor to a raw string outside the TOCEntry structure.
-      H.modify_ _ { mTocEntry = Nothing, mNodePath = Just path }
-      state <- H.get
-      H.gets _.mEditor >>= traverse_ \ed -> do
-        -- Set the content of the editor
-        H.liftEffect $ do
-          session <- Editor.getSession ed
-          document <- Session.getDocument session
-          Document.setValue title document
-
-          -- Reset Undo history
-          undoMgr <- Session.getUndoManager session
-          UndoMgr.reset undoMgr
-
-          -- Clear annotations
-          Session.clearAnnotations session
-
-      -- reset Ref, because loading new content is considered
-      -- changing the existing content, which would set the flag
-      for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
       pure (Just a)
 
     UpdateNodePosition path a -> do
