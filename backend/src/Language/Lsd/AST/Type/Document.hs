@@ -19,6 +19,7 @@ import Language.Lsd.AST.Type
     ( ChildrenOrder (SequenceOrder)
     , HasEditableHeader (HasEditableHeader)
     , NamedType
+    , NavHeadingGeneration (NavHeadingFromHtmlToc, NavHeadingStatic)
     , ProperNodeKind (..)
     , RawProperNodeKind (..)
     , TreeSyntax (LeafSyntax, TreeSyntax)
@@ -67,7 +68,7 @@ instance RawProperNodeKind DocumentType where
                 , pure $ f extroT
                 ]
 
-    kindHasTocHeadingRaw _ = True
+    navHeadingGenerationOfRaw _ = NavHeadingFromHtmlToc
 
 newtype DocumentHeadingType = DocumentHeadingType (TextType Void)
 
@@ -104,4 +105,4 @@ instance ProperNodeKind DocumentMainBodyType where
             Just co -> TreeSyntax (HasEditableHeader False) co
             Nothing -> LeafSyntax
 
-    kindHasTocHeading _ = False
+    navHeadingGenerationOf _ = NavHeadingStatic "(main)"
