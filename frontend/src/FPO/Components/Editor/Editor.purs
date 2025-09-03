@@ -123,6 +123,11 @@ type State = FPOState
   , dragState :: Maybe { which :: DragHandle, lm :: LiveMarker }
   , startHandleMarkerId :: Maybe Int
   , endHandleMarkerId :: Maybe Int
+  -- for autosave
+  , mPrevHandler :: Maybe Types.Position
+  , dragRowAS :: Int
+  , dragColAS :: Int
+  -- for not letting a drag Handler move past its partner
   , mHandleBorder :: Maybe 
     {row :: Int
     , column :: Int
@@ -276,6 +281,9 @@ editor = connect selectTranslator $ H.mkComponent
     , dragState: Nothing
     , startHandleMarkerId: Nothing
     , endHandleMarkerId: Nothing
+    , mPrevHandler: Nothing
+    , dragRowAS: -1
+    , dragColAS: -1
     , mHandleBorder: Nothing
     , markerAnnoHS: empty
     , oldMarkerAnnoPos: empty
@@ -696,9 +704,6 @@ editor = connect selectTranslator $ H.mkComponent
           HS.notify listener SelectComment
           -- stop dragging the comment dragger
           HS.notify listener EndDrag
-          -- set dirty flag and autosave
-          Ref.write true dref
-          HS.notify listener AutoSaveTimer
         H.liftEffect $ addEventListener (EventType "mouseup") upL true
           (toEventTarget $ toElement container)
 
@@ -1082,13 +1087,29 @@ editor = connect selectTranslator $ H.mkComponent
             let 
               row = Types.getRow ePos
               column = Types.getColumn ePos
-            H.modify_ \st -> st { mHandleBorder = Just {row, column, falseCompare: (>), correction: (\x -> x-1)} }
+            H.modify_ \st -> st 
+              { mPrevHandler = Just sPos
+              , mHandleBorder = Just 
+                { row
+                , column
+                , falseCompare: (>)
+                , correction: (\x -> x-1)
+                } 
+              }
             handleAction (StartDrag DragStart lm clientX clientY)
           else if near pos ePos then do
             let 
               row = Types.getRow sPos
               column = Types.getColumn sPos
-            H.modify_ \st -> st { mHandleBorder = Just {row, column, falseCompare: (<), correction: (\x -> x+1)} }
+            H.modify_ \st -> st 
+              { mPrevHandler = Just ePos
+              , mHandleBorder = Just 
+                {row
+                , column
+                , falseCompare: (<)
+                , correction: (\x -> x+1)
+                } 
+              }
             handleAction (StartDrag DragEnd lm clientX clientY)
           else
             pure unit
@@ -1148,15 +1169,19 @@ editor = connect selectTranslator $ H.mkComponent
             st.endHandleMarkerId
           ids <- H.liftEffect $ showHandlesFor session lm
           H.modify_ _
-            { startHandleMarkerId = ids.startId, endHandleMarkerId = ids.endId }
+            { startHandleMarkerId = ids.startId
+            , endHandleMarkerId = ids.endId
+            , dragRowAS = row'
+            , dragColAS = col'
+            }
         _, _, _ -> pure unit
 
     EndDrag -> do
       dragState <- H.gets _.dragState
       when (isJust dragState) do
         H.modify_ _ { dragState = Nothing }
-        st <- H.get
-        case st.mEditor of
+        state <- H.get
+        case state.mEditor of
           Just ed -> do
             container <- H.liftEffect $ Editor.getContainer ed
             -- For CSS styling
@@ -1165,17 +1190,30 @@ editor = connect selectTranslator $ H.mkComponent
               removeClass container "fpo-dragging"
               -- remove the selected text in editor
               clearSelection ed
+
+            -- Auto save
+            case state.mPrevHandler, state.mDirtyRef of
+              Just prev, Just dref -> do
+                let 
+                  pRow = Types.getRow prev
+                  pCol = Types.getColumn prev
+                when (pRow /= state.dragRowAS || pCol /= state.dragColAS) do
+                  H.modify_ \st -> st { mPrevHandler = Nothing }
+                  -- set dirty flag and autosave
+                  H.liftEffect $ Ref.write true dref
+                  handleAction AutoSaveTimer
+              _, _ -> pure unit
           Nothing -> pure unit
 
     ShowHandles lm -> do
-      st <- H.get
-      case st.mEditor of
+      state <- H.get
+      case state.mEditor of
         Nothing -> pure unit
         Just ed -> do
           session <- H.liftEffect $ Editor.getSession ed
           -- remove old markers
-          H.liftEffect $ hideHandlesFrom session st.startHandleMarkerId
-            st.endHandleMarkerId
+          H.liftEffect $ hideHandlesFrom session state.startHandleMarkerId
+            state.endHandleMarkerId
           -- set new ones
           ids <- H.liftEffect $ showHandlesFor session lm -- :: { startId :: Maybe Int, endId :: Maybe Int }
           H.modify_ _
@@ -1494,6 +1532,7 @@ editor = connect selectTranslator $ H.mkComponent
             , markers = newMarkers
             , liveMarkers = newLiveMarkers
             }
+          -- Save new created comment
           -- set dirty to true to be able to save
           for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r
           handleAction Save
