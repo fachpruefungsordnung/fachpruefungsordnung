@@ -98,8 +98,6 @@ import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
 
-import Effect.Console (log)
-
 foreign import _resize :: Types.Editor -> Effect Unit
 type Path = Array Int
 
@@ -128,12 +126,13 @@ type State = FPOState
   , dragRowAS :: Int
   , dragColAS :: Int
   -- for not letting a drag Handler move past its partner
-  , mHandleBorder :: Maybe 
-    {row :: Int
-    , column :: Int
-    , falseCompare :: (Int -> Int -> Boolean)
-    , correction :: (Int -> Int)
-    }
+  , mHandleBorder ::
+      Maybe
+        { row :: Int
+        , column :: Int
+        , falseCompare :: (Int -> Int -> Boolean)
+        , correction :: (Int -> Int)
+        }
   -- tmpLiveMarker is a temporary comment and marker. Only set, if first comment is sent in Comment component
   -- Otherwise delete them later
   , tmpLiveMarker :: Maybe LiveMarker
@@ -1084,31 +1083,31 @@ editor = connect selectTranslator $ H.mkComponent
                 && abs (Types.getColumn a - Types.getColumn b) <= 1
 
           if near pos sPos then do
-            let 
+            let
               row = Types.getRow ePos
               column = Types.getColumn ePos
-            H.modify_ \st -> st 
+            H.modify_ \st -> st
               { mPrevHandler = Just sPos
-              , mHandleBorder = Just 
-                { row
-                , column
-                , falseCompare: (>)
-                , correction: (\x -> x-1)
-                } 
+              , mHandleBorder = Just
+                  { row
+                  , column
+                  , falseCompare: (>)
+                  , correction: (\x -> x - 1)
+                  }
               }
             handleAction (StartDrag DragStart lm clientX clientY)
           else if near pos ePos then do
-            let 
+            let
               row = Types.getRow sPos
               column = Types.getColumn sPos
-            H.modify_ \st -> st 
+            H.modify_ \st -> st
               { mPrevHandler = Just ePos
-              , mHandleBorder = Just 
-                {row
-                , column
-                , falseCompare: (<)
-                , correction: (\x -> x+1)
-                } 
+              , mHandleBorder = Just
+                  { row
+                  , column
+                  , falseCompare: (<)
+                  , correction: (\x -> x + 1)
+                  }
               }
             handleAction (StartDrag DragEnd lm clientX clientY)
           else
@@ -1142,38 +1141,39 @@ editor = connect selectTranslator $ H.mkComponent
     DragMove clientX clientY -> do
       st <- H.get
       case st.dragState, st.mEditor, st.mHandleBorder of
-        Just { which, lm }, Just ed, Just {row, column, falseCompare, correction} -> do
-          -- screen -> Textcoord.
-          pos <- H.liftEffect $ screenToText ed clientX clientY
-          let 
-            firstRow = Types.getRow pos
-            row' = 
-              if falseCompare firstRow row then
-                row
-              else 
-                firstRow
-            firstCol = Types.getColumn pos
-            col' =
-              if row' == row && falseCompare firstCol column then
-                correction column
-              else
-                firstCol
-          -- set drag anchor
-          case which of
-            DragStart -> H.liftEffect $ setAnchorPosition lm.startAnchor row' col'
-            DragEnd -> H.liftEffect $ setAnchorPosition lm.endAnchor row' col'
+        Just { which, lm }, Just ed, Just { row, column, falseCompare, correction } ->
+          do
+            -- screen -> Textcoord.
+            pos <- H.liftEffect $ screenToText ed clientX clientY
+            let
+              firstRow = Types.getRow pos
+              row' =
+                if falseCompare firstRow row then
+                  row
+                else
+                  firstRow
+              firstCol = Types.getColumn pos
+              col' =
+                if row' == row && falseCompare firstCol column then
+                  correction column
+                else
+                  firstCol
+            -- set drag anchor
+            case which of
+              DragStart -> H.liftEffect $ setAnchorPosition lm.startAnchor row' col'
+              DragEnd -> H.liftEffect $ setAnchorPosition lm.endAnchor row' col'
 
-          -- draw new Handles (current position)
-          session <- H.liftEffect $ Editor.getSession ed
-          H.liftEffect $ hideHandlesFrom session st.startHandleMarkerId
-            st.endHandleMarkerId
-          ids <- H.liftEffect $ showHandlesFor session lm
-          H.modify_ _
-            { startHandleMarkerId = ids.startId
-            , endHandleMarkerId = ids.endId
-            , dragRowAS = row'
-            , dragColAS = col'
-            }
+            -- draw new Handles (current position)
+            session <- H.liftEffect $ Editor.getSession ed
+            H.liftEffect $ hideHandlesFrom session st.startHandleMarkerId
+              st.endHandleMarkerId
+            ids <- H.liftEffect $ showHandlesFor session lm
+            H.modify_ _
+              { startHandleMarkerId = ids.startId
+              , endHandleMarkerId = ids.endId
+              , dragRowAS = row'
+              , dragColAS = col'
+              }
         _, _, _ -> pure unit
 
     EndDrag -> do
@@ -1194,7 +1194,7 @@ editor = connect selectTranslator $ H.mkComponent
             -- Auto save
             case state.mPrevHandler, state.mDirtyRef of
               Just prev, Just dref -> do
-                let 
+                let
                   pRow = Types.getRow prev
                   pCol = Types.getColumn prev
                 when (pRow /= state.dragRowAS || pCol /= state.dragColAS) do
@@ -1409,7 +1409,6 @@ editor = connect selectTranslator $ H.mkComponent
               content = case state.mContent of
                 Nothing -> ""
                 Just c -> ContentDto.getContentText c
-            H.liftEffect $ log content
             handleAction Resize
             newLiveMarkers <- H.liftEffect do
               session <- Editor.getSession ed
@@ -1548,7 +1547,7 @@ editor = connect selectTranslator $ H.mkComponent
         Nothing -> do
           handleAction HideHandles
           selectedLiveMarker <- H.gets _.selectedLiveMarker
-          case selectedLiveMarker, editor_  of
+          case selectedLiveMarker, editor_ of
             Just lm, Just ed -> do
               session <- H.liftEffect $ Editor.getSession ed
               H.liftEffect $ setMarkerSelectedClass session lm false
@@ -1577,8 +1576,11 @@ editor = connect selectTranslator $ H.mkComponent
             Just tmpLM -> when (tmpLM.annotedMarkerID == lm.annotedMarkerID) $
               H.modify_ \st -> st { tmpLiveMarker = Nothing }
           -- delete this marker from state. Otherwise, it can be still selected
-          H.modify_ \st -> st 
-            { liveMarkers = deleteBy (\b c -> b.annotedMarkerID == c.annotedMarkerID) lm st.liveMarkers }
+          H.modify_ \st -> st
+            { liveMarkers = deleteBy (\b c -> b.annotedMarkerID == c.annotedMarkerID)
+                lm
+                st.liveMarkers
+            }
         _, _ -> pure unit
       pure (Just a)
 
@@ -1838,7 +1840,7 @@ showHandlesFor session lm = do
 
   -- Start Handle
   r1 <- Range.create sRow sCol sRow (sCol + 1)
-  hid1  <- Session.addMarker r1 "fpo-handle-start" "text" false session
+  hid1 <- Session.addMarker r1 "fpo-handle-start" "text" false session
 
   -- End Handle
   r2 <- Range.create eRow eCol eRow (eCol + 1)

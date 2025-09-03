@@ -39,11 +39,13 @@ deComment = fromRecord
   { comment_allComments: "Alle Konversationen"
   , comment_comment: "Konversation"
   , comment_delete: "Löschen"
-  , comment_delete_phrase: "Sind sie sicher, dass sie diesen Kommentar löschen möchten?"
+  , comment_delete_phrase:
+      "Sind sie sicher, dass sie diesen Kommentar löschen möchten?"
   , comment_modal_delete_titel: "Löschen bestätigen"
   , comment_modal_resolve_titel: "Auflösen bestätigen"
   , comment_no_timestamp: "Keinen timestamp gefunden."
   , comment_resolve: "Auflösen"
-  , comment_resolve_phrase: "Sind sie sicher, dass sie diesen Kommentar auflösen möchten?"
+  , comment_resolve_phrase:
+      "Sind sie sicher, dass sie diesen Kommentar auflösen möchten?"
   , comment_send: "Senden"
   }

@@ -109,16 +109,18 @@ commentOverviewview = H.mkComponent
               , HP.style "font-weight: 500; font-size: 1rem;"
               ]
               ( [ HH.span_ [ HH.text c.first.author ] ]
-                <> if c.resolved
-                    then [ HH.i
-                              [ HP.classes
-                                  [ HB.bi
-                                  , H.ClassName "bi-check-circle-fill"
-                                  , HB.msAuto
-                                  , H.ClassName "fs-4"
-                                  ]
-                              ] []
+                  <>
+                    if c.resolved then
+                      [ HH.i
+                          [ HP.classes
+                              [ HB.bi
+                              , H.ClassName "bi-check-circle-fill"
+                              , HB.msAuto
+                              , H.ClassName "fs-4"
+                              ]
                           ]
+                          []
+                      ]
                     else []
               )
           , HH.div
