@@ -1544,7 +1544,16 @@ editor = connect selectTranslator $ H.mkComponent
       lms <- H.gets _.liveMarkers
       editor_ <- H.gets _.mEditor
       case (find (\m -> m.annotedMarkerID == markerID) lms) of
-        Nothing -> pure unit
+        -- Comment not found because it is resolved
+        Nothing -> do
+          handleAction HideHandles
+          selectedLiveMarker <- H.gets _.selectedLiveMarker
+          case selectedLiveMarker, editor_  of
+            Just lm, Just ed -> do
+              session <- H.liftEffect $ Editor.getSession ed
+              H.liftEffect $ setMarkerSelectedClass session lm false
+            _, _ -> pure unit
+          H.modify_ \st -> st { selectedLiveMarker = Nothing }
         Just lm -> do
           H.modify_ \st -> st { selectedLiveMarker = Just lm }
           -- show comment drag handles

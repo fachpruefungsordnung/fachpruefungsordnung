@@ -161,14 +161,19 @@ commentview = connect selectTranslator $ H.mkComponent
               [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
               , HP.style "font-weight: 500; font-size: 1rem;"
               ]
-              [ HH.span_ [ HH.text c.author ]
-              , HH.i [ HP.classes [ HB.bi
+              ( [ HH.span_ [ HH.text c.author ] ]
+                <> if resolved
+                    then [ HH.i
+                              [ HP.classes
+                                  [ HB.bi
                                   , H.ClassName "bi-check-circle-fill"
                                   , HB.msAuto
                                   , H.ClassName "fs-4"
                                   ]
-                    ] []
-              ]
+                              ] []
+                          ]
+                    else []
+              )
           , HH.div
               [ HP.classes [ HB.mt1 ]
               , HP.style "font-size: 1rem;"
