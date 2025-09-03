@@ -98,6 +98,8 @@ import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
 
+import Effect.Console (log)
+
 foreign import _resize :: Types.Editor -> Effect Unit
 type Path = Array Int
 
@@ -110,7 +112,6 @@ type State = FPOState
   , mEditor :: Maybe Types.Editor
   , mTocEntry :: Maybe TOCEntry
   , mNodePath :: Maybe Path
-  , title :: String
   , mContent :: Maybe Content
   -- comments
   -- Hashmaps for Annotations
@@ -178,8 +179,7 @@ data Output
   | ClickedQuery (Array String)
   | DeletedComment TOCEntry (Array Int)
   | PostPDF String
-  -- SavedSection toBePosted title TOCEntry
-  | SavedSection Boolean String TOCEntry
+  | SavedSection TOCEntry
   | RenamedNode String Path
   | RequestComments Int Int
   | SelectedCommentSection Int Int
@@ -188,7 +188,7 @@ data Output
 data Action
   = Init
   | Comment
-  | ChangeToSection String TOCEntry (Maybe Int)
+  | ChangeToSection TOCEntry (Maybe Int)
   | ContinueChangeToSection (Array FirstComment)
   | SelectComment
   | Bold
@@ -200,9 +200,9 @@ data Action
   | Redo
   | Save
   -- Subsection of Save
-  | Upload TOCEntry String ContentWrapper
+  | Upload TOCEntry ContentWrapper
   -- Subsection of Upload
-  | LostParentID TOCEntry String ContentWrapper
+  | LostParentID TOCEntry ContentWrapper
   | SavedIcon
   -- new change in editor -> reset timer
   | AutoSaveTimer
@@ -234,7 +234,7 @@ data Query a
   -- | save the current content and send it to splitview
   | SaveSection a
   -- | receive the selected TOC and put its content into the editor
-  | ChangeSection String TOCEntry (Maybe Int) a
+  | ChangeSection TOCEntry (Maybe Int) a
   | ContinueChangeSection (Array FirstComment) a
   -- | Open and edit a raw string outside the TOCEntry structure.
   --   This is used to make the editor available for editing
@@ -273,7 +273,6 @@ editor = connect selectTranslator $ H.mkComponent
     , mEditor: Nothing
     , mTocEntry: Nothing
     , mNodePath: Nothing
-    , title: ""
     , mContent: Nothing
     , tmpLiveMarker: Nothing
     , selectedLiveMarker: Nothing
@@ -658,8 +657,8 @@ editor = connect selectTranslator $ H.mkComponent
       case compareTo of
         Nothing
         -> pure unit
-        Just { tocEntry: tocEntry, revID: revID, title: title }
-        -> handleAction (ChangeToSection title tocEntry revID)
+        Just { tocEntry: tocEntry, revID: revID }
+        -> handleAction (ChangeToSection tocEntry revID)
       {-       _ <- H.subscribe =<< resizeDelay Resize
     pure unit -}
 
@@ -831,36 +830,18 @@ editor = connect selectTranslator $ H.mkComponent
               >>= Document.getAllLines
 
           let
-            contentLines =
-              fromMaybe { title: "", contentText: "" } do
-                { head, tail } <- uncons =<< allLines
-                pure { title: head, contentText: intercalate "\n" tail }
+            contentLines = intercalate "\n" (fromMaybe [] allLines)
 
           case state.mTocEntry of
-            Nothing -> do
-              -- No leaf entity was selected, so if a nodePath is set,
-              -- we can emit an event to rename the node.
-              case state.mNodePath of
-                Nothing -> do
-                  pure unit -- Nothing to do
-                Just path -> do
-                  H.raise $ RenamedNode (contentLines.title) path
-            Just _ ->
+            Nothing -> pure unit
+            Just entry ->
               case state.mContent of
                 Nothing -> pure unit
                 Just content -> do
                   -- Save the current content of the editor and send it to the server
                   let
-                    title = contentLines.title
-                    contentText = contentLines.contentText
-
                     -- place it in contentDto
-                    newContent = ContentDto.setContentText contentText content
-
-                    -- extract the current TOC entry
-                    entry = case state.mTocEntry of
-                      Nothing -> emptyTOCEntry
-                      Just e -> e
+                    newContent = ContentDto.setContentText contentLines content
 
                   -- Since the ids and postions in liveMarkers are changing constantly,
                   -- extract them now and store them
@@ -886,9 +867,9 @@ editor = connect selectTranslator $ H.mkComponent
                     comments = map ContentDto.convertToCommentAnchor updatedMarkers
                     newWrapper = ContentDto.setWrapper newContent comments
                   -- Try to upload
-                  handleAction $ Upload entry title newWrapper
+                  handleAction $ Upload entry newWrapper
 
-    Upload newEntry title newWrapper -> do
+    Upload newEntry newWrapper -> do
       state <- H.get
       let
         jsonContent = ContentDto.encodeWrapper newWrapper
@@ -900,16 +881,13 @@ editor = connect selectTranslator $ H.mkComponent
 
       -- handle errors in pos and decodeJson
       case response of
-        Left _ -> handleAction $ LostParentID newEntry title newWrapper
+        Left _ -> handleAction $ LostParentID newEntry newWrapper
         -- extract and insert new parentID into newContent
         Right updatedContent -> do
-          -- Update the tree to backend, when title was really changed
-          let oldTitle = state.title
-          H.raise (SavedSection (oldTitle /= title) title newEntry)
+          H.raise (SavedSection newEntry)
 
           H.modify_ _
             { mTocEntry = Just newEntry
-            , title = title
             , mContent = Just updatedContent
             }
 
@@ -920,7 +898,7 @@ editor = connect selectTranslator $ H.mkComponent
           for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
           pure unit
 
-    LostParentID newEntry title newWrapper -> do
+    LostParentID newEntry newWrapper -> do
       let newContent = ContentDto.getWrapperContent newWrapper
       docID <- H.gets _.docID
       loadedContent <- H.liftAff $
@@ -937,7 +915,7 @@ editor = connect selectTranslator $ H.mkComponent
               res
             newWrapper' = ContentDto.setWrapperContent newContent' newWrapper
           in
-            handleAction $ Upload newEntry title newWrapper'
+            handleAction $ Upload newEntry newWrapper'
 
     SavedIcon -> do
       state <- H.get
@@ -1343,11 +1321,11 @@ editor = connect selectTranslator $ H.mkComponent
       for_ state.mPendingDebounceF H.kill
       for_ state.mPendingMaxWaitF H.kill
 
-    ChangeToSection title entry rev -> do
+    ChangeToSection entry rev -> do
       state <- H.get
       -- Prevent of loading the same Section from backend again
       when (Just entry /= state.mTocEntry) do
-        H.modify_ \st -> st { mTocEntry = Just entry, title = title }
+        H.modify_ \st -> st { mTocEntry = Just entry }
         let
           version = case rev of
             Nothing -> "latest"
@@ -1397,13 +1375,14 @@ editor = connect selectTranslator $ H.mkComponent
               content = case state.mContent of
                 Nothing -> ""
                 Just c -> ContentDto.getContentText c
+            H.liftEffect $ log content
             handleAction Resize
             newLiveMarkers <- H.liftEffect do
               session <- Editor.getSession ed
               document <- Session.getDocument session
 
               -- Set the content of the editor
-              Document.setValue (state.title <> "\n" <> content)
+              Document.setValue content
                 document
               Editor.setReadOnly state.isEditorReadonly ed
 
@@ -1441,8 +1420,8 @@ editor = connect selectTranslator $ H.mkComponent
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
 
-    ChangeSection title entry rev a -> do
-      handleAction (ChangeToSection title entry rev)
+    ChangeSection entry rev a -> do
+      handleAction (ChangeToSection entry rev)
       pure (Just a)
 
     ContinueChangeSection fCs a -> do

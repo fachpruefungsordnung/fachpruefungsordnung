@@ -832,7 +832,6 @@ splitview = connect selectTranslator $ H.mkComponent
         newVersionMapping =
           modifyNodeRootTree
             (\v -> v.elementID == tocID)
-            (\string -> string)
             ( \v ->
                 { elementID: v.elementID
                 , versionID: newVersionID v.versionID
@@ -859,7 +858,7 @@ splitview = connect selectTranslator $ H.mkComponent
       {-       H.modify_ _
       { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } } -}
       H.tell _editor 1
-        (Editor.ChangeSection title tocEntry vID)
+        (Editor.ChangeSection tocEntry vID)
 
     -- Query handler
 
@@ -965,13 +964,13 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.RequestComments docID entryID -> do
         H.tell _comment unit (Comment.RequestComments docID entryID)
 
-      Editor.SavedSection toBePosted title tocEntry -> do
+      Editor.SavedSection tocEntry -> do
         state <- H.get
         let
-          newTOCTree = replaceTOCEntry tocEntry.id title tocEntry state.tocEntries
+          newTOCTree = replaceTOCEntry tocEntry.id tocEntry state.tocEntries
         H.modify_ _ { tocEntries = newTOCTree }
         H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
-        when toBePosted (handleAction POST)
+        handleAction POST
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get
@@ -1003,7 +1002,7 @@ splitview = connect selectTranslator $ H.mkComponent
       TOC.CompareTo elementID vID -> do
         handleAction (SetComparison elementID vID)
 
-      TOC.ChangeToLeaf title selectedId -> do
+      TOC.ChangeToLeaf selectedId -> do
         H.tell _editor 0 Editor.SaveSection
         handleAction UpdateMSelectedTocEntry
         state <- H.get
@@ -1019,13 +1018,13 @@ splitview = connect selectTranslator $ H.mkComponent
                 { elementID: -1, versionID: Nothing, comparisonData: Nothing }
               Just elem -> elem
         -- handleAction (ModifyVersionMapping selectedID rev)
-        H.tell _editor 0 (Editor.ChangeSection title entry ev.versionID)
+        H.tell _editor 0 (Editor.ChangeSection entry ev.versionID)
         case ev.comparisonData of
           Nothing -> do
             -- this case should be covered by mSelectedTocEntry being set to Nothing
             pure unit
           Just d ->
-            H.tell _editor 1 (Editor.ChangeSection d.title d.tocEntry d.revID)
+            H.tell _editor 1 (Editor.ChangeSection d.tocEntry d.revID)
 
       TOC.ChangeToNode path title -> do
         H.tell _editor 0 (Editor.ChangeToNode title path)

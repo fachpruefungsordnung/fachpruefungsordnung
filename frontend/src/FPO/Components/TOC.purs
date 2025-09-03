@@ -94,7 +94,7 @@ type Version = { identifier :: Maybe Int, timestamp :: DD.DocDate }
 
 data Output
   -- | Opens the editor for some leaf node, that is, a subsection or paragraph.
-  = ChangeToLeaf String Int
+  = ChangeToLeaf Int
   -- | Opens the editor for some given node title. Used to rename sections.
   | ChangeToNode Path String
   -- | Used to tell the editor to update the path of the selected node
@@ -127,7 +127,7 @@ data Action
   | Both Action Action
   | Receive (Connected Store.Store Input)
   | DoNothing
-  | JumpToLeafSection Int String
+  | JumpToLeafSection Int
   | JumpToNodeSection Path String
   | ToggleAddMenu Path
   | ToggleHistoryMenu (Array Int) Int
@@ -302,10 +302,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
     DoNothing -> do
       pure unit
 
-    JumpToLeafSection id title -> do
+    JumpToLeafSection id -> do
       H.modify_ \state ->
         state { mSelectedTocEntry = Just $ SelLeaf id }
-      H.raise (ChangeToLeaf title id)
+      H.raise (ChangeToLeaf id)
 
     JumpToNodeSection path title -> do
       H.modify_ \state ->
@@ -652,7 +652,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
           [ HP.classes innerDivBaseClasses
           , HP.style "cursor: pointer;"
           ] <>
-            ( if level > 0 then [ HE.onClick \_ -> JumpToLeafSection id title ]
+            ( if level > 0 then [ HE.onClick \_ -> JumpToLeafSection id ]
               else []
             )
       in
