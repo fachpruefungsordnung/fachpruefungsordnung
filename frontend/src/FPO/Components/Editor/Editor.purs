@@ -122,6 +122,12 @@ type State = FPOState
   , dragState :: Maybe { which :: DragHandle, lm :: LiveMarker }
   , startHandleMarkerId :: Maybe Int
   , endHandleMarkerId :: Maybe Int
+  , mHandleBorder :: Maybe 
+    {row :: Int
+    , column :: Int
+    , falseCompare :: (Int -> Int -> Boolean)
+    , correction :: (Int -> Int)
+    }
   -- tmpLiveMarker is a temporary comment and marker. Only set, if first comment is sent in Comment component
   -- Otherwise delete them later
   , tmpLiveMarker :: Maybe LiveMarker
@@ -275,6 +281,7 @@ editor = connect selectTranslator $ H.mkComponent
     , dragState: Nothing
     , startHandleMarkerId: Nothing
     , endHandleMarkerId: Nothing
+    , mHandleBorder: Nothing
     , markerAnnoHS: empty
     , oldMarkerAnnoPos: empty
     , liveMarkers: []
@@ -1083,8 +1090,8 @@ editor = connect selectTranslator $ H.mkComponent
 
     -- Try to get mouse position and maybe selected handle
     TryStartDrag clientX clientY -> do
-      st <- H.get
-      case st.mEditor, st.selectedLiveMarker of
+      state <- H.get
+      case state.mEditor, state.selectedLiveMarker of
         Just ed, Just lm -> do
           -- Mauspos -> Textpos
           pos <- H.liftEffect $ screenToText ed clientX clientY
@@ -1097,9 +1104,17 @@ editor = connect selectTranslator $ H.mkComponent
               Types.getRow a == Types.getRow b
                 && abs (Types.getColumn a - Types.getColumn b) <= 1
 
-          if near pos sPos then
+          if near pos sPos then do
+            let 
+              row = Types.getRow ePos
+              column = Types.getColumn ePos
+            H.modify_ \st -> st { mHandleBorder = Just {row, column, falseCompare: (>), correction: (\x -> x-1)} }
             handleAction (StartDrag DragStart lm clientX clientY)
-          else if near pos ePos then
+          else if near pos ePos then do
+            let 
+              row = Types.getRow sPos
+              column = Types.getColumn sPos
+            H.modify_ \st -> st { mHandleBorder = Just {row, column, falseCompare: (<), correction: (\x -> x+1)} }
             handleAction (StartDrag DragEnd lm clientX clientY)
           else
             pure unit
@@ -1131,16 +1146,27 @@ editor = connect selectTranslator $ H.mkComponent
 
     DragMove clientX clientY -> do
       st <- H.get
-      case st.dragState, st.mEditor of
-        Just { which, lm }, Just ed -> do
+      case st.dragState, st.mEditor, st.mHandleBorder of
+        Just { which, lm }, Just ed, Just {row, column, falseCompare, correction} -> do
           -- screen -> Textcoord.
           pos <- H.liftEffect $ screenToText ed clientX clientY
-          let row = Types.getRow pos
-          let col = Types.getColumn pos
+          let 
+            firstRow = Types.getRow pos
+            row' = 
+              if falseCompare firstRow row then
+                row
+              else 
+                firstRow
+            firstCol = Types.getColumn pos
+            col' =
+              if row' == row && falseCompare firstCol (correction column) then
+                correction column
+              else
+                firstCol
           -- set drag anchor
           case which of
-            DragStart -> H.liftEffect $ setAnchorPosition lm.startAnchor row col
-            DragEnd -> H.liftEffect $ setAnchorPosition lm.endAnchor row col
+            DragStart -> H.liftEffect $ setAnchorPosition lm.startAnchor row' col'
+            DragEnd -> H.liftEffect $ setAnchorPosition lm.endAnchor row' col'
 
           -- draw new Handles (current position)
           session <- H.liftEffect $ Editor.getSession ed
@@ -1149,7 +1175,7 @@ editor = connect selectTranslator $ H.mkComponent
           ids <- H.liftEffect $ showHandlesFor session lm
           H.modify_ _
             { startHandleMarkerId = ids.startId, endHandleMarkerId = ids.endId }
-        _, _ -> pure unit
+        _, _, _ -> pure unit
 
     EndDrag -> do
       dragState <- H.gets _.dragState
