@@ -21,7 +21,7 @@ where
 
 import Control.Functor.Utils (traverseF)
 import Control.Monad.Trans.Class (lift)
-import Data.List (find, singleton)
+import Data.List (find)
 import Data.Proxy (Proxy (Proxy))
 import Data.Text (Text)
 import Language.Lsd.AST.Common (TypeName)
@@ -58,7 +58,7 @@ instance MonadTreeParser TreeParser where
 -- | An error that occurred parsing a tree's structure (not input text).
 --   The frontend should prohibit such errors, and thus treat such errors as
 --   internal / as bugs.
-newtype TreeError = TreeError [String]
+newtype TreeError = TreeError String
     deriving (Show)
 
 type FootnoteTreeParser = FootnoteWriterT TreeParser
@@ -67,7 +67,7 @@ instance (MonadTreeParser m) => MonadTreeParser (FootnoteWriterT m) where
     treeParser = lift . treeParser
 
 treeError :: (MonadTreeParser m) => String -> m a
-treeError = treeParser . Left . TreeError . singleton
+treeError = treeParser . Left . TreeError
 
 parseLeaf :: Parser a -> Text -> Parsed a
 parseLeaf p x = runParser (nSc *> p) "" (x <> "\n")
