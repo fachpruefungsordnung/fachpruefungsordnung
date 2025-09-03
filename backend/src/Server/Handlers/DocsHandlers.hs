@@ -24,6 +24,7 @@ import qualified Hasql.Session as Session
 
 import Servant
     ( Capture
+    , Delete
     , Get
     , Handler
     , JSON
@@ -31,6 +32,8 @@ import Servant
     , QueryParam
     , ReqBody
     , Server
+    , Summary
+    , Description
     , err400
     , err403
     , err500
@@ -59,6 +62,7 @@ import Docs.TextElement
     )
 import Docs.TextRevision
     ( ConflictStatus
+    , DraftRevision
     , NewTextRevision (..)
     , TextElementRevision
     , TextRevisionHistory
@@ -129,6 +133,9 @@ type DocsAPI =
                 :<|> GetDocumentRevision
                 :<|> GetDocumentRevisionTree
                 :<|> GetDocumentRevisionText
+                :<|> GetDraftTextRevision
+                :<|> PublishDraftTextRevision
+                :<|> DiscardDraftTextRevision
                 :<|> RenderAPI
            )
 
@@ -286,6 +293,37 @@ type GetDocumentRevisionText =
         :> Capture "textElementID" TextElementID
         :> Get '[JSON] (Maybe TextElementRevision)
 
+type GetDraftTextRevision =
+    Summary "Get draft text revision"
+        :> Description "Retrieve the user's draft text revision for a specific text element, if it exists"
+        :> Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "draft"
+        :> Get '[JSON] (Maybe DraftRevision)
+
+type PublishDraftTextRevision =
+    Summary "Publish draft text revision"
+        :> Description "Publish the user's draft text revision to the main revision tree, potentially creating conflicts"
+        :> Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "draft"
+        :> "publish"
+        :> Post '[JSON] ConflictStatus
+
+type DiscardDraftTextRevision =
+    Summary "Discard draft text revision"
+        :> Description "Delete the user's draft text revision, discarding all unsaved changes"
+        :> Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "draft"
+        :> Delete '[JSON] ()
+
 docsServer :: Server DocsAPI
 docsServer =
     {-    -} postDocumentHandler
@@ -307,6 +345,9 @@ docsServer =
         :<|> getDocumentRevisionHandler
         :<|> getDocumentRevisionTreeHandler
         :<|> getDocumentRevisionTextHandler
+        :<|> getDraftTextRevisionHandler
+        :<|> publishDraftTextRevisionHandler
+        :<|> discardDraftTextRevisionHandler
         :<|> renderServer
 
 postDocumentHandler
@@ -664,3 +705,42 @@ guardDocsResult (Left err) = throwError $ mapErr err
                         ++ prettyPrintCommentRef ref
                         ++ " not found!\n"
             }
+
+-- | Get draft text revision for current user
+getDraftTextRevisionHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> Handler (Maybe DraftRevision)
+getDraftTextRevisionHandler auth docID textID = do
+    userID <- getUser auth
+    withDB $
+        runTransaction $
+            Docs.getDraftTextRevision userID $
+                TextElementRef docID textID
+
+-- | Publish draft text revision to main revision tree
+publishDraftTextRevisionHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> Handler ConflictStatus
+publishDraftTextRevisionHandler auth docID textID = do
+    userID <- getUser auth
+    withDB $
+        runTransaction $
+            Docs.publishDraftTextRevision userID $
+                TextElementRef docID textID
+
+-- | Discard draft text revision
+discardDraftTextRevisionHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> Handler ()
+discardDraftTextRevisionHandler auth docID textID = do
+    userID <- getUser auth
+    withDB $
+        runTransaction $
+            Docs.discardDraftTextRevision userID $
+                TextElementRef docID textID

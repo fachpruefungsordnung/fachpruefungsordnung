@@ -27,6 +27,9 @@ module Docs
     , resolveComment
     , createReply
     , getLogs
+    , getDraftTextRevision
+    , publishDraftTextRevision
+    , discardDraftTextRevision
     ) where
 
 import Control.Monad (join, msum, unless)
@@ -101,6 +104,7 @@ import Docs.TextElement
 import qualified Docs.TextElement as TextElement
 import Docs.TextRevision
     ( ConflictStatus
+    , DraftRevision
     , NewTextRevision (..)
     , TextElementRevision (TextElementRevision)
     , TextRevisionHistory
@@ -244,6 +248,7 @@ createTextRevision
        , HasExistsComment m
        , HasLogMessage m
        , HasGetTextElement m
+       , DB.HasDraftTextRevision m
        )
     => UserID
     -> NewTextRevision
@@ -309,12 +314,17 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                         if newTextRevisionIsAutoSave revision
                         then do
                             -- For autosave conflicts, create a draft revision
-                            draftRevision <- createRevision
-                            updateTitle draftRevision
-                            return $
-                                TextRevision.Draft
+                            draftRevision <-
+                                DB.createDraftTextRevision
+                                    userID
+                                    ref
                                     (identifier latest)
+                                    (newTextRevisionContent revision)
+                                    (newTextRevisionCommentAnchors revision)
+                            return $
+                                TextRevision.CreatedDraft
                                     draftRevision
+                                    (identifier latest)
                         else
                             -- For manual save conflicts, return conflict
                             return $
@@ -583,6 +593,7 @@ newDefaultDocument
        , HasExistsComment m
        , HasCreateTreeRevision m
        , HasGetTextElement m
+       , DB.HasDraftTextRevision m
        )
     => UserID
     -> GroupID
@@ -781,3 +792,67 @@ guardExistsComment ref@(CommentRef textRef _) = do
     existsComment <- lift $ DB.existsComment ref
     unless existsComment $
         throwError (CommentNotFound ref)
+
+-- | Get draft text revision for a user and text element
+getDraftTextRevision
+    :: (DB.HasDraftTextRevision m, HasLogMessage m)
+    => UserID
+    -> TextElementRef
+    -> m (Result (Maybe DraftRevision))
+getDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Scope.docsTextRevision $ runExceptT $ do
+    guardPermission Read docID userID
+    guardExistsTextElement ref
+    lift $ DB.getDraftTextRevision userID ref
+
+-- | Publish a draft text revision to the main revision tree
+publishDraftTextRevision
+    :: ( DB.HasDraftTextRevision m
+       , HasCreateTextRevision m
+       , HasGetTextElementRevision m
+       , HasExistsComment m
+       , HasLogMessage m
+       , HasGetTextElement m
+       )
+    => UserID
+    -> TextElementRef
+    -> m (Result ConflictStatus)
+publishDraftTextRevision userID ref@(TextElementRef docID textID) = logged userID Scope.docsTextRevision $ runExceptT $ do
+    guardPermission Edit docID userID
+    guardExistsTextElement ref
+    
+    -- Get the current draft
+    maybeDraft <- lift $ DB.getDraftTextRevision userID ref
+    case maybeDraft of
+        Nothing -> throwError $ Custom "No draft found for this text element"
+        Just draft -> do
+            -- Create a new regular revision from the draft
+            let draftHeader = TextRevision.draftHeader draft
+            let basedOnRevisionID = TextRevision.basedOnRevision draftHeader
+            let newRevision = NewTextRevision
+                    { newTextRevisionElement = ref
+                    , newTextRevisionParent = Just basedOnRevisionID
+                    , newTextRevisionContent = TextRevision.draftContent draft
+                    , newTextRevisionCommentAnchors = TextRevision.draftCommentAnchors draft
+                    , newTextRevisionIsAutoSave = False  -- Publishing is explicit, not auto
+                    }
+            
+            -- Create the revision (may conflict with newer changes)
+            result <- ExceptT $ createTextRevision userID newRevision
+            
+            -- If successful, delete the draft
+            case result of
+                TextRevision.NoConflict _ -> do
+                    lift $ DB.deleteDraftTextRevision userID ref
+                    return result
+                _ -> return result  -- Keep draft on conflict
+
+-- | Discard a draft text revision
+discardDraftTextRevision
+    :: (DB.HasDraftTextRevision m, HasLogMessage m)
+    => UserID
+    -> TextElementRef
+    -> m (Result ())
+discardDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Scope.docsTextRevision $ runExceptT $ do
+    guardPermission Edit docID userID
+    guardExistsTextElement ref
+    lift $ DB.deleteDraftTextRevision userID ref

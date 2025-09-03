@@ -196,6 +196,11 @@ instance HasCreateComment HasqlTransaction where
     resolveComment = HasqlTransaction . Transactions.resolveComment
     createReply = ((HasqlTransaction .) .) . Transactions.createReply
 
+instance HasDraftTextRevision HasqlTransaction where
+    createDraftTextRevision = ((((HasqlTransaction .) .) .) .) . Transactions.createDraftTextRevision
+    getDraftTextRevision = (HasqlTransaction .) . Transactions.getDraftTextRevision
+    deleteDraftTextRevision = (HasqlTransaction .) . Transactions.deleteDraftTextRevision
+
 instance HasLogMessage HasqlTransaction where
     logMessage = (((HasqlTransaction .) .) .) . Transactions.logMessage
 

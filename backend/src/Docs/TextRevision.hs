@@ -11,6 +11,9 @@ module Docs.TextRevision
     , TextRevisionHistory (..)
     , NewTextRevision (..)
     , TextRevisionRef (..)
+    , DraftRevisionID (..)
+    , DraftRevision (..)
+    , DraftRevisionHeader (..)
     , contentsNotChanged
     , prettyPrintTextRevisionRef
     , textRevisionRef
@@ -45,6 +48,7 @@ import Data.OpenApi
     , ToParamSchema (..)
     , ToSchema (..)
     , declareSchemaRef
+    , description
     , enum_
     , exclusiveMinimum
     , minimum_
@@ -234,6 +238,51 @@ instance FromJSON TextElementRevision
 
 instance ToSchema TextElementRevision
 
+-- | ID for a draft text revision
+newtype DraftRevisionID = DraftRevisionID
+    { unDraftRevisionID :: Int64
+    }
+    deriving (Eq, Ord, Show)
+
+instance ToJSON DraftRevisionID where
+    toJSON = toJSON . unDraftRevisionID
+
+instance FromJSON DraftRevisionID where
+    parseJSON = fmap DraftRevisionID . parseJSON
+
+instance ToSchema DraftRevisionID where
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int64)
+
+-- | Header of a draft text revision.
+data DraftRevisionHeader = DraftRevisionHeader
+    { draftIdentifier :: DraftRevisionID
+    , basedOnRevision :: TextRevisionID
+    , creationTimestamp :: UTCTime
+    , lastUpdatedTimestamp :: UTCTime
+    , draftAuthor :: UserRef
+    }
+    deriving (Show, Generic)
+
+instance ToJSON DraftRevisionHeader
+
+instance FromJSON DraftRevisionHeader
+
+instance ToSchema DraftRevisionHeader
+
+-- | A draft text revision.
+data DraftRevision = DraftRevision
+    { draftHeader :: DraftRevisionHeader
+    , draftContent :: Text
+    , draftCommentAnchors :: Vector CommentAnchor
+    }
+    deriving (Generic)
+
+instance ToJSON DraftRevision
+
+instance FromJSON DraftRevision
+
+instance ToSchema DraftRevision
+
 -- | A sequence of revisions for a text element
 data TextRevisionHistory
     = TextRevisionHistory
@@ -287,15 +336,15 @@ contentsNotChanged latest newRevision =
 data ConflictStatus
     = Conflict TextRevisionID -- todo: maybe not id but whole TextRevision?
     | NoConflict TextRevision
-    | Draft TextRevisionID TextRevision -- ^ conflicting revision ID and created draft revision
+    | CreatedDraft DraftRevision TextRevisionID -- ^ created draft and conflicting revision ID
 
 instance ToJSON ConflictStatus where
     toJSON (Conflict conflictWith) =
         Aeson.object ["type" .= ("conflict" :: Text), "with" .= conflictWith]
     toJSON (NoConflict newRevision) =
         Aeson.object ["type" .= ("noConflict" :: Text), "newRevision" .= newRevision]
-    toJSON (Draft conflictWith draftRevision) =
-        Aeson.object ["type" .= ("draft" :: Text), "with" .= conflictWith, "draftRevision" .= draftRevision]
+    toJSON (CreatedDraft draftRevision conflictWith) =
+        Aeson.object ["type" .= ("createdDraft" :: Text), "draft" .= draftRevision, "with" .= conflictWith]
 
 instance FromJSON ConflictStatus where
     parseJSON = Aeson.withObject "ConflictStatus" $ \obj -> do
@@ -303,18 +352,20 @@ instance FromJSON ConflictStatus where
         case ty of
             "conflict" -> Conflict <$> obj .: "with"
             "noConflict" -> NoConflict <$> obj .: "newRevision"
-            "draft" -> Draft <$> obj .: "with" <*> obj .: "draftRevision"
+            "createdDraft" -> CreatedDraft <$> obj .: "draft" <*> obj .: "with"
             _ -> fail $ "Unknown ConflictStatus type: " ++ show ty
 
 instance ToSchema ConflictStatus where
     declareNamedSchema _ = do
         textRevIdSchema <- declareSchemaRef (Proxy :: Proxy TextRevisionID)
         textRevSchema <- declareSchemaRef (Proxy :: Proxy TextRevision)
+        draftRevSchema <- declareSchemaRef (Proxy :: Proxy DraftRevision)
 
         return $
             NamedSchema (Just "ConflictStatus") $
                 mempty
                     & type_ ?~ OpenApiObject
+                    & description ?~ "Status of text revision creation - can be no conflict, conflict with existing revision, or draft created due to AutoSave conflict"
                     & oneOf
                         ?~ [ Inline $
                                 mempty
@@ -339,11 +390,11 @@ instance ToSchema ConflictStatus where
                                     & type_ ?~ OpenApiObject
                                     & properties
                                         .~ InsOrd.fromList
-                                            [ ("type", Inline $ schemaConstText "draft")
+                                            [ ("type", Inline $ schemaConstText "createdDraft")
+                                            , ("draft", draftRevSchema)
                                             , ("with", textRevIdSchema)
-                                            , ("draftRevision", textRevSchema)
                                             ]
-                                    & required .~ ["type", "with", "draftRevision"]
+                                    & required .~ ["type", "draft", "with"]
                            ]
       where
         schemaConstText :: Text -> Schema

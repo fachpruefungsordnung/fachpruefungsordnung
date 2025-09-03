@@ -44,6 +44,11 @@ module Docs.Hasql.Statements
     , logMessage
     , getRevisionKey
     , updateLatestTitle
+    , createDraftTextRevision
+    , getDraftTextRevision
+    , deleteDraftTextRevision
+    , getDraftCommentAnchors
+    , putDraftCommentAnchors
     ) where
 
 import Control.Applicative ((<|>))
@@ -71,6 +76,8 @@ import UserManagement.User (UserID)
 
 import Data.Aeson (ToJSON (toJSON))
 import qualified Data.Aeson as Aeson
+import Data.Aeson.Types (parseMaybe, parseJSON)
+import Data.Maybe (fromMaybe)
 import Data.Functor ((<&>))
 import qualified Data.Text as Text
 import qualified Data.Vector as Vector
@@ -116,6 +123,9 @@ import Docs.TextRevision
     , TextRevisionID (..)
     , TextRevisionRef (..)
     , TextRevisionSelector (..)
+    , DraftRevision (DraftRevision)
+    , DraftRevisionHeader (DraftRevisionHeader)
+    , DraftRevisionID (..)
     , latestTextRevisionAsOf
     , specificTextRevision
     )
@@ -1498,4 +1508,141 @@ updateLatestTitle =
                         creation_ts DESC
                     LIMIT 1
                 )
+        |]
+
+-- | Helper to construct DraftRevisionHeader from database row
+uncurryDraftRevisionHeader :: (Int64, Int64, UTCTime, UTCTime, UUID, Text) -> DraftRevisionHeader
+uncurryDraftRevisionHeader (draftId, basedOnId, creationTs, updatedTs, authorID, authorName) =
+    DraftRevisionHeader
+        { TextRevision.draftIdentifier = DraftRevisionID draftId
+        , TextRevision.basedOnRevision = TextRevisionID basedOnId
+        , TextRevision.creationTimestamp = creationTs
+        , TextRevision.lastUpdatedTimestamp = updatedTs
+        , TextRevision.draftAuthor =
+            UserRef
+                { UserRef.identifier = authorID
+                , UserRef.name = authorName
+                }
+        }
+
+-- | Helper to construct DraftRevision from database row
+uncurryDraftRevision
+    :: (Monad m)
+    => (Int64, Int64, UTCTime, UTCTime, UUID, Text, Text)
+    -> (DraftRevisionID -> m (Vector CommentAnchor))
+    -> m DraftRevision
+uncurryDraftRevision (draftId, basedOnId, creationTs, updatedTs, authorID, authorName, content) getAnchors =
+    getAnchors (DraftRevisionID draftId)
+        <&> DraftRevision
+            (uncurryDraftRevisionHeader (draftId, basedOnId, creationTs, updatedTs, authorID, authorName))
+            content
+
+-- | Create a new draft text revision
+createDraftTextRevision
+    :: (Monad m)
+    => Statement
+        (TextElementID, TextRevisionID, UUID, Text)
+        ((DraftRevisionID -> m (Vector CommentAnchor)) -> m DraftRevision)
+createDraftTextRevision =
+    lmap
+        mapInput
+        $ rmap
+            uncurryDraftRevision
+            [singletonStatement|
+                WITH inserted AS (
+                    INSERT INTO doc_draft_text_revisions
+                        (text_element, based_on_revision, author, content)
+                    VALUES
+                        ($1 :: int8, $2 :: int8, $3 :: uuid, $4 :: text)
+                    ON CONFLICT (text_element, author)
+                    DO UPDATE SET
+                        content = EXCLUDED.content,
+                        last_updated_ts = NOW()
+                    RETURNING
+                        id :: int8,
+                        based_on_revision :: int8,
+                        creation_ts :: timestamptz,
+                        last_updated_ts :: timestamptz,
+                        author :: uuid,
+                        content :: text
+                )
+                SELECT
+                    inserted.id :: int8,
+                    inserted.based_on_revision :: int8,
+                    inserted.creation_ts :: timestamptz,
+                    inserted.last_updated_ts :: timestamptz,
+                    inserted.author :: uuid,
+                    users.name :: text,
+                    inserted.content :: text
+                FROM
+                    inserted
+                    JOIN users ON users.id = inserted.author
+            |]
+  where
+    mapInput (elementID, revisionID, author, content) =
+        (unTextElementID elementID, unTextRevisionID revisionID, author, content)
+
+-- | Get draft revision for a text element by a specific user
+getDraftTextRevision
+    :: (Monad m)
+    => Statement
+        (TextElementID, UUID)
+        ((DraftRevisionID -> m (Vector CommentAnchor)) -> m (Maybe DraftRevision))
+getDraftTextRevision =
+    lmap
+        (first unTextElementID)
+        $ rmap
+            (\row f -> mapM (`uncurryDraftRevision` f) row)
+            [maybeStatement|
+                SELECT
+                    drafts.id :: int8,
+                    drafts.based_on_revision :: int8,
+                    drafts.creation_ts :: timestamptz,
+                    drafts.last_updated_ts :: timestamptz,
+                    drafts.author :: uuid,
+                    users.name :: text,
+                    drafts.content :: text
+                FROM
+                    doc_draft_text_revisions drafts
+                    JOIN users ON users.id = drafts.author
+                WHERE
+                    drafts.text_element = $1 :: int8
+                    AND drafts.author = $2 :: uuid
+            |]
+
+-- | Delete draft revision  
+deleteDraftTextRevision :: Statement (TextElementID, UUID) ()
+deleteDraftTextRevision =
+    lmap
+        (first unTextElementID)
+        [resultlessStatement|
+            DELETE FROM doc_draft_text_revisions
+            WHERE
+                text_element = $1 :: int8
+                AND author = $2 :: uuid
+        |]
+
+-- | Get comment anchors for draft revision
+getDraftCommentAnchors :: Statement DraftRevisionID (Vector CommentAnchor)
+getDraftCommentAnchors =
+    lmap
+        unDraftRevisionID
+        $ rmap
+            (fromMaybe Vector.empty . (>>= parseMaybe parseJSON))
+            [maybeStatement|
+                SELECT
+                    comment_anchors :: jsonb
+                FROM doc_draft_text_revisions
+                WHERE id = $1 :: int8
+            |]
+
+-- | Put comment anchors for draft revision (replace all)
+putDraftCommentAnchors :: Statement (DraftRevisionID, Vector CommentAnchor) ()
+putDraftCommentAnchors =
+    lmap
+        (bimap unDraftRevisionID (toJSON . Vector.toList))
+        [resultlessStatement|
+            UPDATE doc_draft_text_revisions
+            SET comment_anchors = $2 :: jsonb
+            WHERE id = $1 :: int8
         |]

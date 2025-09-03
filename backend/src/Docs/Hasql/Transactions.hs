@@ -23,6 +23,9 @@ module Docs.Hasql.Transactions
     , logMessage
     , updateLatestTitle
     , getTextElement
+    , createDraftTextRevision
+    , getDraftTextRevision
+    , deleteDraftTextRevision
     ) where
 
 import qualified Crypto.Hash.SHA1 as SHA1
@@ -62,6 +65,7 @@ import Docs.TextRevision
     , TextRevision
     , TextRevisionID
     , TextRevisionRef
+    , DraftRevision
     )
 import Docs.Tree (Edge (Edge), Node (Node), Tree (Leaf, Tree))
 import Docs.TreeRevision (TreeRevision, TreeRevisionRef (TreeRevisionRef))
@@ -222,3 +226,29 @@ updateLatestTitle = curry (`statement` Statements.updateLatestTitle)
 
 getTextElement :: TextElementID -> Transaction (Maybe TextElement)
 getTextElement = flip statement Statements.getTextElement
+
+-- | Create or update a draft text revision for a user
+createDraftTextRevision
+    :: UserID
+    -> TextElementRef
+    -> TextRevisionID
+    -> Text
+    -> Vector CommentAnchor
+    -> Transaction DraftRevision
+createDraftTextRevision userID (TextElementRef _ textID) basedOnRevision content commentAnchors = do
+    draftRevision <-
+        statement (textID, basedOnRevision, userID, content) Statements.createDraftTextRevision
+    draftRevision $ \draftId ->
+        mapM (`statement` Statements.putDraftCommentAnchors) [(draftId, commentAnchors)]
+            >> statement draftId Statements.getDraftCommentAnchors
+
+-- | Get draft revision for a text element by a specific user
+getDraftTextRevision :: UserID -> TextElementRef -> Transaction (Maybe DraftRevision)
+getDraftTextRevision userID (TextElementRef _ textID) = do
+    draftGetter <- statement (textID, userID) Statements.getDraftTextRevision
+    draftGetter (\draftId -> statement draftId Statements.getDraftCommentAnchors)
+
+-- | Delete draft revision for a text element by a user
+deleteDraftTextRevision :: UserID -> TextElementRef -> Transaction ()
+deleteDraftTextRevision userID (TextElementRef _ textID) =
+    statement (textID, userID) Statements.deleteDraftTextRevision
