@@ -322,7 +322,7 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                                     (newTextRevisionContent revision)
                                     (newTextRevisionCommentAnchors revision)
                             return $
-                                TextRevision.CreatedDraft
+                                TextRevision.DraftCreated
                                     draftRevision
                                     (identifier latest)
                         else
@@ -793,7 +793,9 @@ guardExistsComment ref@(CommentRef textRef _) = do
     unless existsComment $
         throwError (CommentNotFound ref)
 
--- | Get draft text revision for a user and text element
+-- | Get draft text revision for a user and text element.
+-- Returns Nothing if no draft exists for this user/element combination.
+-- Drafts are user-specific and element-specific (one draft per user per text element).
 getDraftTextRevision
     :: (DB.HasDraftTextRevision m, HasLogMessage m)
     => UserID
@@ -804,7 +806,10 @@ getDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Scope.d
     guardExistsTextElement ref
     lift $ DB.getDraftTextRevision userID ref
 
--- | Publish a draft text revision to the main revision tree
+-- | Publish a draft text revision to the main revision tree.
+-- This attempts to create a regular text revision from the draft content.
+-- If conflicts occur, they are handled as errors (since publishing is explicit, not auto-save).
+-- On successful publish, the draft is automatically discarded.
 publishDraftTextRevision
     :: ( DB.HasDraftTextRevision m
        , HasCreateTextRevision m
@@ -816,7 +821,7 @@ publishDraftTextRevision
     => UserID
     -> TextElementRef
     -> m (Result ConflictStatus)
-publishDraftTextRevision userID ref@(TextElementRef docID textID) = logged userID Scope.docsTextRevision $ runExceptT $ do
+publishDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Scope.docsTextRevision $ runExceptT $ do
     guardPermission Edit docID userID
     guardExistsTextElement ref
     
@@ -846,7 +851,8 @@ publishDraftTextRevision userID ref@(TextElementRef docID textID) = logged userI
                     return result
                 _ -> return result  -- Keep draft on conflict
 
--- | Discard a draft text revision
+-- | Discard a draft text revision, permanently deleting all unsaved changes.
+-- This operation cannot be undone. The draft is completely removed from storage.
 discardDraftTextRevision
     :: (DB.HasDraftTextRevision m, HasLogMessage m)
     => UserID

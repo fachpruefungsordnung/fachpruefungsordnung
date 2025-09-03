@@ -336,15 +336,15 @@ contentsNotChanged latest newRevision =
 data ConflictStatus
     = Conflict TextRevisionID -- todo: maybe not id but whole TextRevision?
     | NoConflict TextRevision
-    | CreatedDraft DraftRevision TextRevisionID -- ^ created draft and conflicting revision ID
+    | DraftCreated DraftRevision TextRevisionID -- ^ created draft and conflicting revision ID
 
 instance ToJSON ConflictStatus where
     toJSON (Conflict conflictWith) =
         Aeson.object ["type" .= ("conflict" :: Text), "with" .= conflictWith]
     toJSON (NoConflict newRevision) =
         Aeson.object ["type" .= ("noConflict" :: Text), "newRevision" .= newRevision]
-    toJSON (CreatedDraft draftRevision conflictWith) =
-        Aeson.object ["type" .= ("createdDraft" :: Text), "draft" .= draftRevision, "with" .= conflictWith]
+    toJSON (DraftCreated draftRevision conflictWith) =
+        Aeson.object ["type" .= ("draftCreated" :: Text), "draft" .= draftRevision, "with" .= conflictWith]
 
 instance FromJSON ConflictStatus where
     parseJSON = Aeson.withObject "ConflictStatus" $ \obj -> do
@@ -352,7 +352,7 @@ instance FromJSON ConflictStatus where
         case ty of
             "conflict" -> Conflict <$> obj .: "with"
             "noConflict" -> NoConflict <$> obj .: "newRevision"
-            "createdDraft" -> CreatedDraft <$> obj .: "draft" <*> obj .: "with"
+            "draftCreated" -> DraftCreated <$> obj .: "draft" <*> obj .: "with"
             _ -> fail $ "Unknown ConflictStatus type: " ++ show ty
 
 instance ToSchema ConflictStatus where
@@ -390,7 +390,7 @@ instance ToSchema ConflictStatus where
                                     & type_ ?~ OpenApiObject
                                     & properties
                                         .~ InsOrd.fromList
-                                            [ ("type", Inline $ schemaConstText "createdDraft")
+                                            [ ("type", Inline $ schemaConstText "draftCreated")
                                             , ("draft", draftRevSchema)
                                             , ("with", textRevIdSchema)
                                             ]
