@@ -1133,7 +1133,7 @@ editor = connect selectTranslator $ H.mkComponent
                 firstRow
             firstCol = Types.getColumn pos
             col' =
-              if row' == row && falseCompare firstCol (correction column) then
+              if row' == row && falseCompare firstCol column then
                 correction column
               else
                 firstCol
@@ -1784,14 +1784,18 @@ showHandlesFor
   -> LiveMarker
   -> Effect { startId :: Maybe Int, endId :: Maybe Int }
 showHandlesFor session lm = do
-  -- Start-Handle
+  -- Get Anchor-Positions
   Types.Position { row: sRow, column: sCol } <- Anchor.getPosition lm.startAnchor
-  r1 <- Range.create sRow sCol sRow (sCol + 1)
-  hid1 <- Session.addMarker r1 "fpo-handle-start" "text" false session
-  -- End-Handle
   Types.Position { row: eRow, column: eCol } <- Anchor.getPosition lm.endAnchor
-  r2 <- Range.create (eRow - 1) eCol (eRow - 1) (eCol + 1)
+
+  -- Start Handle
+  r1 <- Range.create sRow sCol sRow (sCol + 1)
+  hid1  <- Session.addMarker r1 "fpo-handle-start" "text" false session
+
+  -- End Handle
+  r2 <- Range.create eRow eCol eRow (eCol + 1)
   hid2 <- Session.addMarker r2 "fpo-handle-end" "text" false session
+
   pure { startId: Just hid1, endId: Just hid2 }
 
 hideHandlesFrom :: Types.EditSession -> Maybe Int -> Maybe Int -> Effect Unit
