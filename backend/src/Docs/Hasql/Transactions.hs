@@ -241,7 +241,9 @@ createDraftTextRevision userID (TextElementRef _ textID) basedOnRevision content
             (textID, basedOnRevision, userID, content)
             Statements.createDraftTextRevision
     draftRevision $ \draftId ->
-        mapM_ (`statement` Statements.putDraftCommentAnchors) [(draftId, commentAnchors)]
+        mapM_
+            (`statement` Statements.putDraftCommentAnchors)
+            [(draftId, commentAnchors)]
             >> statement draftId Statements.getDraftCommentAnchors
 
 -- | Get draft revision for a text element by a specific user
