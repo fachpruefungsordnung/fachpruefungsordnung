@@ -241,7 +241,7 @@ createDraftTextRevision userID (TextElementRef _ textID) basedOnRevision content
             (textID, basedOnRevision, userID, content)
             Statements.createDraftTextRevision
     draftRevision $ \draftId ->
-        mapM (`statement` Statements.putDraftCommentAnchors) [(draftId, commentAnchors)]
+        mapM_ (`statement` Statements.putDraftCommentAnchors) [(draftId, commentAnchors)]
             >> statement draftId Statements.getDraftCommentAnchors
 
 -- | Get draft revision for a text element by a specific user
@@ -249,7 +249,7 @@ getDraftTextRevision
     :: UserID -> TextElementRef -> Transaction (Maybe DraftRevision)
 getDraftTextRevision userID (TextElementRef _ textID) = do
     draftGetter <- statement (textID, userID) Statements.getDraftTextRevision
-    draftGetter (\draftId -> statement draftId Statements.getDraftCommentAnchors)
+    draftGetter (`statement` Statements.getDraftCommentAnchors)
 
 -- | Delete draft revision for a text element by a user
 deleteDraftTextRevision :: UserID -> TextElementRef -> Transaction ()
