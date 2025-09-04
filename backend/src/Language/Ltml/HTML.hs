@@ -13,6 +13,7 @@ module Language.Ltml.HTML
     , renderSectionHtmlCss
     , renderHtmlCss
     , renderTocList
+    , renderTocEntry
     ) where
 
 import Clay (Css)
@@ -66,6 +67,7 @@ import Language.Ltml.HTML.FormatString
 import Language.Ltml.HTML.References
 import Language.Ltml.HTML.Util
 import Lucid
+import Data.ByteString.Lazy (ByteString)
 
 renderSectionHtmlCss :: Node Section -> Map.Map Label Footnote -> (Html (), Css)
 renderSectionHtmlCss section fnMap =
@@ -106,6 +108,11 @@ renderTocList docContainer =
                 tocList
      in -- \| Render Maybe Html and Result Html to ByteString
         map (bimap (fmap renderBS) (fmap renderBS)) htmlTitleList
+
+-- | Renders a single ToC entry from Text and wraps the given Result type;
+--   The given Text is wrapped into <span> </span>
+renderTocEntry :: (ByteString -> Result ByteString) -> Text -> RenderedTocEntry
+renderTocEntry resType text = (Nothing, resType $ renderBS $ span_ $ toHtml text) 
 
 -------------------------------------------------------------------------------
 
