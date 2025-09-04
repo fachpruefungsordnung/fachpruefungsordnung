@@ -8,18 +8,21 @@
 -- This must be changed. For now, the toProject function translates as needed and makes up
 -- missing data
 
-module FPO.Page.Home (component, adjustDateTime, formatRelativeTime) where
+-- module FPO.Page.Home (component, adjustDateTime, formatRelativeTime) where
+module FPO.Page.Home (component) where
 
 import Prelude
 
 import Data.Array (filter, length, null, replicate, slice)
-import Data.DateTime (DateTime, adjust, date, day, diff, month, year)
-import Data.Either (Either(..))
+-- import Data.DateTime (DateTime, adjust, date, day, diff, month, year)
+import Data.DateTime (DateTime)
+-- import Data.Either (Either(..))
 import Data.Enum (fromEnum)
-import Data.Int (floor)
-import Data.Maybe (Maybe(..), fromMaybe)
+-- import Data.Int (floor)
+-- import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), contains, toLower)
-import Data.Time.Duration (class Duration, Seconds(..), negateDuration, toDuration)
+-- import Data.Time.Duration (class Duration, Seconds(..), negateDuration, toDuration)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class.Console (log)
 import Effect.Now (nowDateTime)
@@ -29,6 +32,10 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (LoadState(..), fromLoading, getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
+import FPO.Data.Time
+    ( getEditTimestamp
+    , formatRelativeTime
+    )
 import FPO.Dto.DocumentDto.DocDate as DocDate
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader, DocumentID)
 import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
@@ -614,7 +621,7 @@ component =
       (\p -> contains (Pattern $ toLower query) (toLower $ DocumentHeader.getName p))
       projects
 
--- | Helper function to adjust a DateTime by a duration (subtract from current time)
+{- -- | Helper function to adjust a DateTime by a duration (subtract from current time)
 adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime
 adjustDateTime duration dt =
   fromMaybe dt $ adjust (negateDuration duration) dt
@@ -658,4 +665,4 @@ formatRelativeTime (Just current) updated =
     in
       d <> "." <> m <> "." <> y
     where
-    padZero n = if n < 10 then "0" <> show n else show n
+    padZero n = if n < 10 then "0" <> show n else show n -}

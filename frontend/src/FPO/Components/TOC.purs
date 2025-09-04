@@ -39,13 +39,14 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postJson)
 import FPO.Data.Store as Store
+import FPO.Data.Time (formatRelativeTime)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
 import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..), TreeHeader(..))
 import FPO.Dto.PostTextDto (PostTextDto(..))
 import FPO.Dto.PostTextDto as PostTextDto
-import FPO.Page.Home (formatRelativeTime)
+-- import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
 import FPO.Types (TOCEntry, TOCTree)
