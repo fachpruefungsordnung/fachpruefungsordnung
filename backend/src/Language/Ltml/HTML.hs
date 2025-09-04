@@ -49,10 +49,7 @@ import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
 import Language.Lsd.AST.Type.SimpleSection (SimpleSectionFormat (..))
 import Language.Ltml.AST.AppendixSection (AppendixSection (..))
 import Language.Ltml.AST.Document
-import Language.Ltml.AST.DocumentContainer
-    ( DocumentContainer (..)
-    , DocumentContainerHeader
-    )
+import Language.Ltml.AST.DocumentContainer (DocumentContainer (..))
 import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Node (Node (..))
@@ -92,7 +89,11 @@ renderHtmlCss docContainer =
         finalState' = addUsedFootnoteLabels finalState
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
 
--- | Renders a global ToC (including appendices) as a list of (Maybe idHtml, Result titleHtml)
+-- | Renders a global ToC (including appendices) as a list of
+--   either (@Maybe@ idHtml, @Result@ titleHtml) or a phantom result type
+--   for @SimpleSection@s which do not have a @Heading@.
+--   The @Result@ type signals the Frontend if an error occured while
+--   parsing the segment.
 renderTocList
     :: Flagged' DocumentContainer -> [Either (Result ()) RenderedTocEntry]
 renderTocList docContainer =
@@ -416,9 +417,7 @@ instance ToHtmlM SimpleParagraph where
 
 instance ToHtmlM Table where
     toHtmlM table =
-        returnNow $
-            span_ <#> Class.InlineError $
-                toHtml ("Error: Tables are not supported yet!" :: Text)
+        returnNow $ htmlError "Tables are not implemented yet :("
 
 -------------------------------------------------------------------------------
 
@@ -680,8 +679,7 @@ renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
 
         -- \| [Delayed (Html ())] -> Delayed [Html ()] -> Delayed (Html ())
         tableBody = tbody_ . mconcat <$> sequence tocEntries
-     in -- TODO: title from AST
-        table_ <$> (pure tableHead <> tableBody)
+     in table_ <$> (pure tableHead <> tableBody)
   where
     -- \| Build <tr><td>id</td> <td>title</td></tr> and wrap id and title seperatly
     buildWrappedRow

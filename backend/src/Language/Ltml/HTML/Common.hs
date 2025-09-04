@@ -168,7 +168,7 @@ initGlobalState =
 initReaderState :: ReaderState
 initReaderState =
     ReaderState
-        { shouldRender = True
+        { shouldRender = False
         , hasGlobalToC = False
         , appendixHasGlobalToC = False
         , currentAppendixElementID = 1
