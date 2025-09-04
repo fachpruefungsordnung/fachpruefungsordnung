@@ -20,6 +20,7 @@ module Language.Ltml.HTML.Common
     , ToC
     , addTocEntry
     , addPhantomTocEntry
+    , PhantomTocEntry
     , RenderedTocEntry
     , Result (..)
     , result

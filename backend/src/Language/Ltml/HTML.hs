@@ -49,7 +49,10 @@ import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
 import Language.Lsd.AST.Type.SimpleSection (SimpleSectionFormat (..))
 import Language.Ltml.AST.AppendixSection (AppendixSection (..))
 import Language.Ltml.AST.Document
-import Language.Ltml.AST.DocumentContainer (DocumentContainer (..))
+import Language.Ltml.AST.DocumentContainer
+    ( DocumentContainer (..)
+    , DocumentContainerHeader
+    )
 import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Node (Node (..))
@@ -95,7 +98,7 @@ renderHtmlCss docContainer =
 --   The @Result@ type signals the Frontend if an error occured while
 --   parsing the segment.
 renderTocList
-    :: Flagged' DocumentContainer -> [Either (Result ()) RenderedTocEntry]
+    :: Flagged' DocumentContainer -> [Either PhantomTocEntry RenderedTocEntry]
 renderTocList docContainer =
     -- \| Create global ToC with Footnote context
     let (_, finalState) =
@@ -121,8 +124,8 @@ renderTocList docContainer =
 
 -- | Renders a single ToC entry from Text and wraps the given Result type;
 --   The given Text is wrapped into <span> </span>
-renderTocEntry :: (ByteString -> Result ByteString) -> Text -> RenderedTocEntry
-renderTocEntry resType text = (Nothing, resType $ renderBS $ span_ $ toHtml text)
+renderTocEntry :: PhantomTocEntry -> Text -> RenderedTocEntry
+renderTocEntry resUnit text = (Nothing, renderBS (span_ $ toHtml text) <$ resUnit)
 
 -------------------------------------------------------------------------------
 
@@ -138,6 +141,8 @@ instance ToHtmlM DocumentContainer where
                 doc
                 appendices
             ) = do
+            -- \| Ignore Header but build its context (phantom ToC entry)
+            _ <- toHtmlM header
             -- \| Main Document has a global ToC, appendices typically do not
             mainDocHtml <-
                 local
@@ -628,6 +633,15 @@ instance (ToHtmlM a) => ToHtmlM (Flagged' a) where
 -------------------------------------------------------------------------------
 
 -- = The @Parsed a@ instances makes the rendering robust against parse errors
+
+instance ToHtmlM (Parsed DocumentContainerHeader) where
+    toHtmlM eErrDocConHeader = case eErrDocConHeader of
+        Left parseErr -> do
+            addPhantomTocEntry Error
+            returnNow $ parseErrorHtml Nothing parseErr
+        Right _ -> do
+            addPhantomTocEntry Success
+            return mempty
 
 -- | Signal the Frontend if SimpleSection parsing failed, via phantom ToC entry
 instance ToHtmlM (Parsed [SimpleSection]) where
