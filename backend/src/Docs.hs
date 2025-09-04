@@ -325,8 +325,8 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                                     TextRevision.DraftCreated
                                         draftRevision
                                         (identifier latest)
-                            else
-                                -- For manual save conflicts, return conflict
+                            else -- For manual save conflicts, return conflict
+
                                 return $
                                     TextRevision.Conflict $
                                         identifier latest

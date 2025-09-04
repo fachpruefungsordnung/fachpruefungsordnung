@@ -210,8 +210,7 @@ instance FromJSON TextRevisionHeader
 instance ToSchema TextRevisionHeader
 
 -- | A text revision.
-data TextRevision
-    = TextRevision
+data TextRevision = TextRevision
     { header :: TextRevisionHeader
     , content :: Text
     , commentAnchors :: Vector CommentAnchor
@@ -225,8 +224,7 @@ instance FromJSON TextRevision
 instance ToSchema TextRevision
 
 -- | A text revision with the text element it belongs to.
-data TextElementRevision
-    = TextElementRevision
+data TextElementRevision = TextElementRevision
     { textElement :: TextElement
     , revision :: Maybe TextRevision
     }
