@@ -211,6 +211,8 @@ data Action
   | SavedIcon
   -- new change in editor -> reset timer
   | AutoSaveTimer
+  -- called by AutoSaveTimer subscription
+  | AutoSave
   | TryStartDrag Number Number -- clientX, clientY
   | StartDrag DragHandle LiveMarker Number Number -- mouse down: which, lm, clientX, clientY
   | DragMove Number Number -- mouse move: clientX, clientY
@@ -826,22 +828,6 @@ editor = connect selectTranslator $ H.mkComponent
     -- Save section
 
     Save -> do
-      handleAction (PerformSave false)
-
-    AutoSave -> do
-      -- only save, if dirty
-      isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.mDirtyRef
-      when isDirty do
-        handleAction (PerformSave true)
-        -- after Save: dirty false + stop timer
-        mRef <- H.gets _.mDirtyRef
-        for_ mRef \r -> H.liftEffect $ Ref.write false r
-        st <- H.get
-        for_ st.mPendingDebounceF H.kill
-        for_ st.mPendingMaxWaitF H.kill
-        H.modify_ _ { mPendingDebounceF = Nothing, mPendingMaxWaitF = Nothing }
-
-    PerformSave isAutoSave -> do
       state <- H.get
       when (not state.isEditorReadonly) $ do
         isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
@@ -896,7 +882,7 @@ editor = connect selectTranslator $ H.mkComponent
     Upload newEntry newWrapper -> do
       state <- H.get
       let
-        jsonContent = ContentDto.encodeWrapper isAutoSave newWrapper
+        jsonContent = ContentDto.encodeWrapper newWrapper
         newContent = ContentDto.getWrapperContent newWrapper
       -- send the new content as POST to the server
       response <- Request.postJson (ContentDto.extractNewParent newContent)
@@ -981,6 +967,19 @@ editor = connect selectTranslator $ H.mkComponent
               Nothing -> EC.liftEffect $ Ref.new false
             when isDirty $ handleAction AutoSave
           H.modify_ _ { mPendingMaxWaitF = Just mFib }
+
+    AutoSave -> do
+      -- only save, if dirty
+      isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.mDirtyRef
+      when isDirty do
+        handleAction Save
+        -- after Save: dirty false + stop timer
+        mRef <- H.gets _.mDirtyRef
+        for_ mRef \r -> H.liftEffect $ Ref.write false r
+        st <- H.get
+        for_ st.mPendingDebounceF H.kill
+        for_ st.mPendingMaxWaitF H.kill
+        H.modify_ _ { mPendingDebounceF = Nothing, mPendingMaxWaitF = Nothing }
 
     Comment -> do
       state <- H.get
