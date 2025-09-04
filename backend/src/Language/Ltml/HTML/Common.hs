@@ -19,6 +19,7 @@ module Language.Ltml.HTML.Common
     , NumLabel (..)
     , ToC
     , addTocEntry
+    , addPhantomTocEntry
     , RenderedTocEntry
     , Result (..)
     , result
@@ -167,7 +168,7 @@ initGlobalState =
 initReaderState :: ReaderState
 initReaderState =
     ReaderState
-        { shouldRender = False
+        { shouldRender = True
         , hasGlobalToC = False
         , appendixHasGlobalToC = False
         , currentAppendixElementID = 1
@@ -229,7 +230,11 @@ instance Ord NumLabel where
 
 -- | The ToC uses a difference list to get constant time appending at the end, which has no speed draw backs,
 --   since the list is evaluated only ones when building the ToC Html at the end of rendering.
-type ToC = DList (Maybe (Html ()), Result (Delayed (Html ())), Text)
+type ToC = DList (Either PhantomTocEntry TocEntry)
+
+type TocEntry = (Maybe (Html ()), Result (Delayed (Html ())), Text)
+
+type PhantomTocEntry = Result ()
 
 -- | Add entry to table of contents with: key Html (e.g. § 1), title Html and html anchor link id;
 --   If Label is present uses it as the anchor link id, otherwise it creates a new mangled label name;
@@ -252,8 +257,17 @@ addTocEntry mKey title mLabel = do
                     return mangledLabel
         Just label -> return $ unLabel label
     modify
-        (\s -> s {tableOfContents = snoc (tableOfContents s) (mKey, title, htmlId)})
+        ( \s -> s {tableOfContents = snoc (tableOfContents s) (Right (mKey, title, htmlId))}
+        )
     return htmlId
+
+-- | Adds a phantom entry into the table of contents, which is ignored when rendering.
+--   Its only purpose is to tell the frontend if a parse error occured in this segment.
+--   This is only meant to be used for segments that do not have a normal Toc entry,
+--   like @SimpleSection@s.
+addPhantomTocEntry
+    :: (() -> Result ()) -> ReaderT ReaderState (State GlobalState) ()
+addPhantomTocEntry f = modify (\s -> s {tableOfContents = snoc (tableOfContents s) (Left $ f ())})
 
 -- | Type of exported ToC Entries (especially for Frontend);
 --   @Result@ signals if the generated title was parsed successfully or not

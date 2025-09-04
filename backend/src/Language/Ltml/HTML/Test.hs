@@ -85,9 +85,9 @@ parseTest = do
     case treeToLtml fpoTree of
         Left (TreeError errMsg) -> putStrLn errMsg
         Right markedDocCon -> do
-            let (body, css) = renderHtmlCss docConTest
+            let (body, css) = renderHtmlCss markedDocCon
              in do
-                    mapM_ print $ renderTocList docConTest
+                    mapM_ print $ renderTocList markedDocCon
                     renderToFile
                         "src/Language/Ltml/HTML/Test/out.html"
                         (addHtmlHeader "Generated Document Preview" "out.css" body)

@@ -23,7 +23,7 @@ import Control.Monad.State
 import Data.Bifunctor (bimap)
 import Data.ByteString.Lazy (ByteString)
 import Data.DList (toList)
-import Data.Either (isLeft)
+import Data.Either (isLeft, rights)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Set as Set
@@ -49,7 +49,10 @@ import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
 import Language.Lsd.AST.Type.SimpleSection (SimpleSectionFormat (..))
 import Language.Ltml.AST.AppendixSection (AppendixSection (..))
 import Language.Ltml.AST.Document
-import Language.Ltml.AST.DocumentContainer (DocumentContainer (..))
+import Language.Ltml.AST.DocumentContainer
+    ( DocumentContainer (..)
+    , DocumentContainerHeader
+    )
 import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Node (Node (..))
@@ -90,7 +93,8 @@ renderHtmlCss docContainer =
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
 
 -- | Renders a global ToC (including appendices) as a list of (Maybe idHtml, Result titleHtml)
-renderTocList :: Flagged' DocumentContainer -> [RenderedTocEntry]
+renderTocList
+    :: Flagged' DocumentContainer -> [Either (Result ()) RenderedTocEntry]
 renderTocList docContainer =
     -- \| Create global ToC with Footnote context
     let (_, finalState) =
@@ -103,14 +107,16 @@ renderTocList docContainer =
         -- \| Add footnote labes for "normal" (non-footnote) references
         finalState' = addUsedFootnoteLabels finalState
         tocList = toList $ tableOfContents finalState'
-        -- \| Produce (Just <span>id</span>, Success <span>title</span>)
+        -- \| Produce (Just <span>id</span>, Success <span>title</span>); ignore phantom entries
         htmlTitleList =
             map
-                ( \(mId, rDt, _) -> (span_ <$> mId, span_ . flip evalDelayed finalState' <$> rDt)
+                ( fmap
+                    ( \(mId, rDt, _) -> (span_ <$> mId, span_ . flip evalDelayed finalState' <$> rDt)
+                    )
                 )
                 tocList
-     in -- \| Render Maybe Html and Result Html to ByteString
-        map (bimap (fmap renderBS) (fmap renderBS)) htmlTitleList
+     in -- \| Render Maybe Html and Result Html to ByteString; ignore phantom entries
+        map (fmap (bimap (fmap renderBS) (fmap renderBS))) htmlTitleList
 
 -- | Renders a single ToC entry from Text and wraps the given Result type;
 --   The given Text is wrapped into <span> </span>
@@ -217,7 +223,7 @@ instance ToHtmlM Document where
 
 -- | Does not only produce the default error box on error,
 --   but also handles ToC entries.
-instance {-# OVERLAPPING #-} ToHtmlM (Parsed DocumentHeading) where
+instance ToHtmlM (Parsed DocumentHeading) where
     toHtmlM eErrDocumentHeading = do
         (resType, titleHtml) <- case eErrDocumentHeading of
             Left _ ->
@@ -262,20 +268,6 @@ instance {-# OVERLAPPING #-} ToHtmlM (Parsed DocumentHeading) where
             mLabel <- asks appendixElementMLabel
             return (Just tocHtml, headingHtml, mLabel)
 
--- Left headFormat -> do
---                 -- \| Main Document Heading without Id and mangled anchor link
---                 htmlId <- addTocEntry Nothing (resType titleHtml) Nothing
---                 return (headingFormat headFormat <$> titleHtml, htmlId)
--- Right headFormatId -> do
---                 -- \| Heading for Appendix Element (with id and toc key)
---                 docId <- asks currentAppendixElementID
---                 idFormat <- asks appendixElementIdFormat
---                 tocFormat <- asks appendixElementTocKeyFormat
---                 let (headingHtml, tocHtml) = appendixFormat idFormat docId tocFormat headFormatId titleHtml
---                 -- \| Check if current document has Label and build ToC entry
---                 mLabel <- asks appendixElementMLabel
---                 htmlId <- addTocEntry (Just tocHtml) (resType titleHtml) mLabel
---                 return (headingHtml, htmlId)
 -------------------------------------------------------------------------------
 
 -- | This combined instances creates the sectionIDHtml before building the reference,
@@ -634,9 +626,21 @@ instance (ToHtmlM a) => ToHtmlM (Flagged' a) where
         modify (\s -> s {hasFlagged = True})
         return $ if render then aHtml else mempty
 
--- | This instance makes the rendering robust against parse errors;
---   The @Parsed@ Type is around @DocumentContainerHeader@, @DocumentHeading@, @[SimpleSection]@, @SectionBody@, @Heading@.
-instance (ToHtmlM a) => ToHtmlM (Parsed a) where
+-------------------------------------------------------------------------------
+
+-- = The @Parsed a@ instances makes the rendering robust against parse errors
+
+-- | Signal the Frontend if SimpleSection parsing failed, via phantom ToC entry
+instance ToHtmlM (Parsed [SimpleSection]) where
+    toHtmlM eErrSSs = case eErrSSs of
+        Left parseErr -> do
+            addPhantomTocEntry Error
+            returnNow $ parseErrorHtml Nothing parseErr
+        Right sss -> do
+            addPhantomTocEntry Success
+            toHtmlM sss
+
+instance ToHtmlM (Parsed SectionBody) where
     toHtmlM eErrA = case eErrA of
         Left parseErr -> returnNow $ parseErrorHtml Nothing parseErr
         Right a -> toHtmlM a
@@ -670,7 +674,8 @@ renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
         -- \| Build List of ToC rows
         tocEntries :: [Delayed (Html ())]
         tocEntries =
-            let tupleList = toList $ tableOfContents globalState
+            -- \| @rights@ filters all phantom entries and unpacks real ones
+            let tupleList = rights $ toList $ tableOfContents globalState
              in map (buildWrappedRow tocFunc) tupleList
 
         -- \| [Delayed (Html ())] -> Delayed [Html ()] -> Delayed (Html ())
