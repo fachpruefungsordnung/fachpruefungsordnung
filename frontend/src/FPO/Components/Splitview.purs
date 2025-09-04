@@ -24,7 +24,7 @@ import Data.Array
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
@@ -97,6 +97,7 @@ data Query a = UnitQuery a
 
 data Action
   = Init
+  | Receive (Connected FPOTranslator Input)
   -- Resizing Actions
   -- | SetComparison Int Int
   | StartResize DragTarget MouseEvent
@@ -201,7 +202,10 @@ splitview = connect selectTranslator $ H.mkComponent
   { initialState
   , render
   , eval: H.mkEval $ H.defaultEval
-      { initialize = Just Init, handleAction = handleAction }
+      { initialize = Just Init
+      , handleAction = handleAction
+      , receive = Just <<< Receive
+      }
   }
   where
   initialState :: Connected FPOTranslator Input -> State
@@ -605,6 +609,9 @@ splitview = connect selectTranslator $ H.mkComponent
       handleAction GET
       handleAction UpdateMSelectedTocEntry
 
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
+
     -- API Actions
 
     POST -> do
@@ -717,6 +724,8 @@ splitview = connect selectTranslator $ H.mkComponent
 
         _ -> pure unit
 
+      when (isJust mt) (H.tell _editor 0 (Editor.EditorResize))
+
     -- Toggle actions
 
     UpdateMSelectedTocEntry -> do
@@ -825,7 +834,6 @@ splitview = connect selectTranslator $ H.mkComponent
         newVersionMapping =
           modifyNodeRootTree
             (\v -> v.elementID == tocID)
-            (\string -> string)
             ( \v ->
                 { elementID: v.elementID
                 , versionID: newVersionID v.versionID
@@ -852,7 +860,7 @@ splitview = connect selectTranslator $ H.mkComponent
       {-       H.modify_ _
       { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } } -}
       H.tell _editor 1
-        (Editor.ChangeSection title tocEntry vID)
+        (Editor.ChangeSection tocEntry vID)
 
     -- Query handler
 
@@ -958,13 +966,13 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.RequestComments docID entryID -> do
         H.tell _comment unit (Comment.RequestComments docID entryID)
 
-      Editor.SavedSection toBePosted title tocEntry -> do
+      Editor.SavedSection tocEntry -> do
         state <- H.get
         let
-          newTOCTree = replaceTOCEntry tocEntry.id title tocEntry state.tocEntries
+          newTOCTree = replaceTOCEntry tocEntry.id tocEntry state.tocEntries
         H.modify_ _ { tocEntries = newTOCTree }
         H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
-        when toBePosted (handleAction POST)
+        handleAction POST
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get
@@ -996,7 +1004,7 @@ splitview = connect selectTranslator $ H.mkComponent
       TOC.CompareTo elementID vID -> do
         handleAction (SetComparison elementID vID)
 
-      TOC.ChangeToLeaf title selectedId -> do
+      TOC.ChangeToLeaf selectedId -> do
         H.tell _editor 0 Editor.SaveSection
         handleAction UpdateMSelectedTocEntry
         state <- H.get
@@ -1012,16 +1020,13 @@ splitview = connect selectTranslator $ H.mkComponent
                 { elementID: -1, versionID: Nothing, comparisonData: Nothing }
               Just elem -> elem
         -- handleAction (ModifyVersionMapping selectedID rev)
-        H.tell _editor 0 (Editor.ChangeSection title entry ev.versionID)
+        H.tell _editor 0 (Editor.ChangeSection entry ev.versionID)
         case ev.comparisonData of
           Nothing -> do
             -- this case should be covered by mSelectedTocEntry being set to Nothing
             pure unit
           Just d ->
-            H.tell _editor 1 (Editor.ChangeSection d.title d.tocEntry d.revID)
-
-      TOC.ChangeToNode path title -> do
-        H.tell _editor 0 (Editor.ChangeToNode title path)
+            H.tell _editor 1 (Editor.ChangeSection d.tocEntry d.revID)
 
       TOC.UpdateNodePosition path -> do
         H.tell _editor 0 (Editor.UpdateNodePosition path)

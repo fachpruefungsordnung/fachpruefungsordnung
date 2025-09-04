@@ -112,8 +112,12 @@ type Labels =
       ::: "comment_allComments"
       ::: "comment_comment"
       ::: "comment_delete"
+      ::: "comment_delete_phrase"
+      ::: "comment_modal_delete_titel"
+      ::: "comment_modal_resolve_titel"
       ::: "comment_no_timestamp"
       ::: "comment_resolve"
+      ::: "comment_resolve_phrase"
       ::: "comment_send"
 
       -- | Common Phrases
@@ -137,6 +141,7 @@ type Labels =
       ::: "common_passwordUpdated"
       ::: "common_project"
       ::: "common_projects"
+      ::: "common_resolve"
       ::: "common_save"
       ::: "common_saving"
       ::: "common_sentResetLinkDone"

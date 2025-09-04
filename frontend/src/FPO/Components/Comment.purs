@@ -14,7 +14,7 @@ import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.CommentDto as CD
-import FPO.Translations.Translator (fromFpoTranslator)
+import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types
   ( Comment
@@ -24,11 +24,12 @@ import FPO.Types
   , emptyComment
   , sectionDtoToCS
   )
+import FPO.UI.HTML (addModal)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Store.Connect (connect)
+import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
@@ -44,11 +45,14 @@ data Output
 
 data Action
   = Init
+  | Receive (Connected FPOTranslator Input)
   | UpdateDraft String
   | SendComment
   | ResolveComment
   | DeleteComment
   | SelectingCommentSection Int
+  | RequestModal Mode
+  | CancelModal
 
 data Query a
   = AddComment Int Int a
@@ -67,7 +71,12 @@ type State = FPOState
   , newComment :: Boolean
   , commentDraft :: String
   , mTimeFormatter :: Maybe Formatter
+  , requestModal :: Maybe Mode
   )
+
+data Mode = Delete | Resolve
+
+derive instance eqMode :: Eq Mode
 
 commentview
   :: forall m
@@ -86,12 +95,14 @@ commentview = connect selectTranslator $ H.mkComponent
       , newComment: false
       , commentDraft: ""
       , mTimeFormatter: Nothing
+      , requestModal: Nothing
       }
   , render
   , eval: H.mkEval $ H.defaultEval
       { initialize = Just Init
       , handleAction = handleAction
       , handleQuery = handleQuery
+      , receive = Just <<< Receive
       }
   }
   where
@@ -147,8 +158,24 @@ commentview = connect selectTranslator $ H.mkComponent
       ]
       [ HH.div_
           [ HH.div
-              [ HP.style "font-weight: 600; font-size: 1.2rem;" ]
-              [ HH.text c.author ]
+              [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
+              , HP.style "font-weight: 500; font-size: 1rem;"
+              ]
+              ( [ HH.span_ [ HH.text c.author ] ]
+                  <>
+                    if resolved then
+                      [ HH.i
+                          [ HP.classes
+                              [ HB.bi
+                              , H.ClassName "bi-check-circle-fill"
+                              , HB.msAuto
+                              , H.ClassName "fs-4"
+                              ]
+                          ]
+                          []
+                      ]
+                    else []
+              )
           , HH.div
               [ HP.classes [ HB.mt1 ]
               , HP.style "font-size: 1rem;"
@@ -210,63 +237,128 @@ commentview = connect selectTranslator $ H.mkComponent
       , HP.style
           "gap: .5rem; padding-left: 0.5rem; padding-right: 0.5rem; padding-top: 0.75rem; padding-bottom: 1rem;"
       ]
-      [ HH.textarea
-          [ HP.style
-              "border-radius: .375rem; padding: .5rem; resize: none; min-height: 5rem;"
-          , HP.rows 3
-          , HP.value state.commentDraft
-          , HE.onValueChange UpdateDraft
-          ]
-      , HH.div
-          [ HP.classes [ HB.dFlex, HB.alignItemsCenter, HB.w100 ]
-          , HP.style "gap: .5rem; padding-left: 0.5rem; padding-right: 0.5rem;"
-          ]
-          [ -- Senden (links)
-            HH.button
-              [ HP.classes [ HB.btn, HB.btnPrimary, HB.px3, HB.py1, HB.m0 ]
-              , HP.style "white-space: nowrap;"
-              , HE.onClick \_ -> SendComment
+      ( renderModal <>
+          [ HH.textarea
+              [ HP.style
+                  "border-radius: .375rem; padding: .5rem; resize: none; min-height: 5rem;"
+              , HP.rows 3
+              , HP.value state.commentDraft
+              , HE.onValueChange UpdateDraft
               ]
-              [ HH.small [ HP.style "margin-right: 0.25rem;" ]
-                  [ HH.text (translate (label :: _ "comment_send") state.translator) ]
-              , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-send" ] ] []
+          , HH.div
+              [ HP.classes [ HB.dFlex, HB.alignItemsCenter, HB.w100 ]
+              , HP.style "gap: .5rem; padding-left: 0.5rem; padding-right: 0.5rem;"
               ]
+              [ -- Senden (links)
+                HH.button
+                  [ HP.classes [ HB.btn, HB.btnPrimary, HB.px3, HB.py1, HB.m0 ]
+                  , HP.style "white-space: nowrap;"
+                  , HE.onClick \_ -> SendComment
+                  ]
+                  [ HH.small [ HP.style "margin-right: 0.25rem;" ]
+                      [ HH.text
+                          (translate (label :: _ "comment_send") state.translator)
+                      ]
+                  , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-send" ] ] []
+                  ]
 
-          -- Resolve (rechts)
-          , if state.newComment then
-              HH.button
-                [ HP.classes
-                    [ HB.btn, HB.btnDanger, HB.px3, HB.py1, HB.m0, HB.msAuto ]
-                , HP.style "white-space: nowrap;"
-                , HE.onClick \_ -> DeleteComment
-                ]
-                [ HH.small [ HP.style "margin-right: 0.25rem;" ]
-                    [ HH.text
-                        (translate (label :: _ "comment_delete") state.translator)
+              -- Resolve (rechts)
+              , if state.newComment then
+                  HH.button
+                    [ HP.classes
+                        [ HB.btn, HB.btnDanger, HB.px3, HB.py1, HB.m0, HB.msAuto ]
+                    , HP.style "white-space: nowrap;"
+                    , HE.onClick \_ -> RequestModal Delete -- DeleteComment
                     ]
-                , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
-                ]
-            else
-              HH.button
-                [ HP.classes
-                    [ HB.btn, HB.btnSuccess, HB.px3, HB.py1, HB.m0, HB.msAuto ]
-                , HP.style "white-space: nowrap;"
-                , HE.onClick \_ -> ResolveComment
-                ]
-                [ HH.small [ HP.style "margin-right: 0.25rem;" ]
-                    [ HH.text
-                        (translate (label :: _ "comment_resolve") state.translator)
+                    [ HH.small [ HP.style "margin-right: 0.25rem;" ]
+                        [ HH.text
+                            (translate (label :: _ "comment_delete") state.translator)
+                        ]
+                    , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
                     ]
-                , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
-                ]
+                else
+                  HH.button
+                    [ HP.classes
+                        [ HB.btn, HB.btnSuccess, HB.px3, HB.py1, HB.m0, HB.msAuto ]
+                    , HP.style "white-space: nowrap;"
+                    , HE.onClick \_ -> RequestModal Resolve --ResolveComment
+                    ]
+                    [ HH.small [ HP.style "margin-right: 0.25rem;" ]
+                        [ HH.text
+                            ( translate (label :: _ "comment_resolve")
+                                state.translator
+                            )
+                        ]
+                    , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
+                    ]
+              ]
           ]
-      ]
+      )
+    where
+    renderModal = case state.requestModal of
+      Nothing -> []
+      Just mode ->
+        let
+          { titel, phrase, confirmButton, action } =
+            case mode of
+              Delete ->
+                { titel: translate (label :: _ "comment_modal_delete_titel")
+                    state.translator
+                , phrase: translate (label :: _ "comment_delete_phrase")
+                    state.translator
+                , confirmButton:
+                    (translate (label :: _ "common_delete") state.translator)
+                , action: DeleteComment
+                }
+              Resolve ->
+                { titel: translate (label :: _ "comment_modal_resolve_titel")
+                    state.translator
+                , phrase: translate (label :: _ "comment_resolve_phrase")
+                    state.translator
+                , confirmButton:
+                    (translate (label :: _ "common_resolve") state.translator)
+                , action: ResolveComment
+                }
+        in
+          [ addModal
+              titel
+              (const CancelModal)
+              [ HH.div
+                  [ HP.classes [ HB.modalBody ] ]
+                  [ HH.text phrase ]
+              , HH.div
+                  [ HP.classes [ HB.modalFooter ] ]
+                  [ HH.button
+                      [ HP.type_ HP.ButtonButton
+                      , HP.classes [ HB.btn, HB.btnSecondary ]
+                      , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
+                      , HE.onClick (const CancelModal)
+                      ]
+                      [ HH.text
+                          (translate (label :: _ "common_cancel") state.translator)
+                      ]
+                  , HH.button
+                      [ HP.type_ HP.ButtonButton
+                      , HP.classes
+                          [ HB.btn
+                          , if mode == Delete then HB.btnDanger else HB.btnSuccess
+                          ]
+                      , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
+                      , HE.onClick (const action)
+                      ]
+                      [ HH.text confirmButton ]
+                  ]
+              ]
+          ]
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
 
     Init -> do
       pure unit
+
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
 
     UpdateDraft draft -> do
       H.modify_ \state ->
@@ -343,6 +435,7 @@ commentview = connect selectTranslator $ H.mkComponent
             { commentSections = newCSs
             , mCommentSection = Just newCs
             , commentDraft = ""
+            , requestModal = Nothing
             }
           -- Delete it from Editor
           H.raise (ToDeleteComment)
@@ -352,6 +445,7 @@ commentview = connect selectTranslator $ H.mkComponent
         { markerID = -1
         , newComment = false
         , commentDraft = ""
+        , requestModal = Nothing
         }
       H.raise (ToDeleteComment)
 
@@ -373,6 +467,12 @@ commentview = connect selectTranslator $ H.mkComponent
                 { markerID = markerID
                 , mCommentSection = Just section
                 }
+
+    RequestModal mode -> do
+      H.modify_ \st -> st { requestModal = Just mode }
+
+    CancelModal -> do
+      H.modify_ \st -> st { requestModal = Nothing }
 
   handleQuery
     :: forall slots a

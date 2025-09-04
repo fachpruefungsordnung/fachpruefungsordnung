@@ -94,9 +94,7 @@ type Version = { identifier :: Maybe Int, timestamp :: DD.DocDate }
 
 data Output
   -- | Opens the editor for some leaf node, that is, a subsection or paragraph.
-  = ChangeToLeaf String Int
-  -- | Opens the editor for some given node title. Used to rename sections.
-  | ChangeToNode Path String
+  = ChangeToLeaf Int
   -- | Used to tell the editor to update the path of the selected node
   --   during title renaming.
   | UpdateNodePosition Path
@@ -127,8 +125,7 @@ data Action
   | Both Action Action
   | Receive (Connected Store.Store Input)
   | DoNothing
-  | JumpToLeafSection Int String
-  | JumpToNodeSection Path String
+  | JumpToLeafSection Int
   | ToggleAddMenu Path
   | ToggleHistoryMenu (Array Int) Int
   | ToggleHistorySubmenu (Maybe Int)
@@ -302,15 +299,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
     DoNothing -> do
       pure unit
 
-    JumpToLeafSection id title -> do
+    JumpToLeafSection id -> do
       H.modify_ \state ->
         state { mSelectedTocEntry = Just $ SelLeaf id }
-      H.raise (ChangeToLeaf title id)
-
-    JumpToNodeSection path title -> do
-      H.modify_ \state ->
-        state { mSelectedTocEntry = Just $ SelNode path title }
-      H.raise (ChangeToNode path title)
+      H.raise (ChangeToLeaf id)
 
     ToggleAddMenu path -> do
       H.modify_ \state ->
@@ -602,11 +594,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     ( [ HP.classes titleClasses
                       , HP.style "align-self: stretch; flex-basis: 0;"
                       , HP.title title
-                      ] <>
-                        ( if level > 0 then
-                            [ HE.onClick \_ -> JumpToNodeSection path title ]
-                          else []
-                        )
+                      ]
                     )
                     [ HH.text title ]
                 , renderSectionButtonInterface menuPath path true Section title
@@ -652,7 +640,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
           [ HP.classes innerDivBaseClasses
           , HP.style "cursor: pointer;"
           ] <>
-            ( if level > 0 then [ HE.onClick \_ -> JumpToLeafSection id title ]
+            ( if level > 0 then [ HE.onClick \_ -> JumpToLeafSection id ]
               else []
             )
       in
