@@ -1,12 +1,12 @@
+{-# HLINT ignore "Avoid lambda using `infix`" #-}
+{-# HLINT ignore "Use section" #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-
-{-# HLINT ignore "Avoid lambda using `infix`" #-}
-{-# HLINT ignore "Use section" #-}
 
 module Language.Ltml.HTML
     ( ToHtmlM (..)
@@ -21,12 +21,15 @@ import Control.Monad (join, zipWithM)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bifunctor (bimap)
+import Data.ByteString.Lazy (ByteString)
 import Data.DList (toList)
+import Data.Either (isLeft)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe, isJust)
 import qualified Data.Set as Set
 import Data.Text (Text, unpack)
 import Data.Void (Void, absurd)
+import Language.Lsd.AST.Format (HeadingFormat)
 import Language.Lsd.AST.Type.AppendixSection
     ( AppendixElementFormat (..)
     , AppendixSectionFormat (..)
@@ -57,7 +60,7 @@ import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (..))
 import Language.Ltml.AST.SimpleSection (SimpleSection (..))
 import Language.Ltml.AST.Table (Table)
 import Language.Ltml.AST.Text
-import Language.Ltml.Common (Flagged (..), Flagged')
+import Language.Ltml.Common (Flagged (..), Flagged', Parsed)
 import Language.Ltml.HTML.CSS (mainStylesheet)
 import Language.Ltml.HTML.CSS.Classes (ToCssClass (toCssClass))
 import qualified Language.Ltml.HTML.CSS.Classes as Class
@@ -67,7 +70,7 @@ import Language.Ltml.HTML.FormatString
 import Language.Ltml.HTML.References
 import Language.Ltml.HTML.Util
 import Lucid
-import Data.ByteString.Lazy (ByteString)
+import Text.Megaparsec (ParseErrorBundle, errorBundlePretty)
 
 renderSectionHtmlCss :: Node Section -> Map.Map Label Footnote -> (Html (), Css)
 renderSectionHtmlCss section fnMap =
@@ -112,7 +115,7 @@ renderTocList docContainer =
 -- | Renders a single ToC entry from Text and wraps the given Result type;
 --   The given Text is wrapped into <span> </span>
 renderTocEntry :: (ByteString -> Result ByteString) -> Text -> RenderedTocEntry
-renderTocEntry resType text = (Nothing, resType $ renderBS $ span_ $ toHtml text) 
+renderTocEntry resType text = (Nothing, resType $ renderBS $ span_ $ toHtml text)
 
 -------------------------------------------------------------------------------
 
@@ -142,7 +145,10 @@ instance ToHtmlM DocumentContainer where
 -- | This instance is used for documents inside the appendix,
 --   since the main document does not have a label.
 instance ToHtmlM (Node Document) where
-    toHtmlM (Node mLabel doc) = local (\s -> s {appendixElementMLabel = mLabel}) $ toHtmlM doc
+    toHtmlM (Node mLabel doc) = do
+        appendixDocID <- asks currentAppendixElementID
+        addMaybeLabelToState mLabel (toHtml $ show appendixDocID)
+        local (\s -> s {appendixElementMLabel = mLabel}) $ toHtmlM doc
 
 instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
@@ -209,30 +215,67 @@ instance ToHtmlM Document where
 
                 return $ introHtml <> mainHtml <> outroHtml
 
-instance ToHtmlM DocumentHeading where
-    toHtmlM (DocumentHeading headingTextTree) = do
-        titleHtml <- toHtmlM headingTextTree
+-- | Does not only produce the default error box on error,
+--   but also handles ToC entries.
+instance {-# OVERLAPPING #-} ToHtmlM (Parsed DocumentHeading) where
+    toHtmlM eErrDocumentHeading = do
+        (resType, titleHtml) <- case eErrDocumentHeading of
+            Left _ ->
+                return (Error, Now $ toHtml ("Document Heading Error!" :: Text))
+            Right (DocumentHeading headingTextTree) -> do
+                headingTextHtml <- toHtmlM headingTextTree
+                return (Success, headingTextHtml)
         -- \| Get HeadingFormat from DocumentContainer or AppendixSection
         headingFormatS <- asks documentHeadingFormat
         -- \| Here we check if we are inside an appendix, since
         --   the appendix heading format has an id and the main documents has not
-        (formattedTitle, htmlId) <- case headingFormatS of
-            Left headFormat -> do
-                -- \| Main Document Heading without Id and mangled anchor link
-                htmlId <- addTocEntry Nothing (Success titleHtml) Nothing
-                return (headingFormat headFormat <$> titleHtml, htmlId)
-            Right headFormatId -> do
-                -- \| Heading for Appendix Element (with id and toc key)
-                docId <- asks currentAppendixElementID
-                idFormat <- asks appendixElementIdFormat
-                tocFormat <- asks appendixElementTocKeyFormat
-                let (headingHtml, tocHtml) = appendixFormat idFormat docId tocFormat headFormatId titleHtml
-                -- \| Check if current document has Label and build ToC entry
-                mLabel <- asks appendixElementMLabel
-                htmlId <- addTocEntry (Just tocHtml) (Success titleHtml) mLabel
-                return (headingHtml, htmlId)
-        return $ h1_ [cssClass_ Class.DocumentTitle, id_ htmlId] <$> formattedTitle
+        (mIdHtml, formattedTitle, mLabel) <- case headingFormatS of
+            Left headFormat -> buildMainHeading titleHtml headFormat
+            Right headFormatId -> buildAppendixHeading titleHtml headFormatId
+        htmlId <- addTocEntry mIdHtml (resType titleHtml) mLabel
+        -- \| In case of a parse error, output and error box
+        return $
+            either
+                (Now . parseErrorHtml (Just htmlId))
+                (const $ h1_ [cssClass_ Class.DocumentTitle, id_ htmlId] <$> formattedTitle)
+                eErrDocumentHeading
+      where
+        -- \| Main Document Heading without Id and without Label
+        buildMainHeading
+            :: Delayed (Html ())
+            -> HeadingFormat False
+            -> ReaderStateMonad (Maybe (Html ()), Delayed (Html ()), Maybe Label)
+        buildMainHeading dTitleHtml headFormat = return (Nothing, headingFormat headFormat <$> dTitleHtml, Nothing)
 
+        -- \| Appendix Docuemnt Heading with Id and Label
+        buildAppendixHeading
+            :: Delayed (Html ())
+            -> HeadingFormat True
+            -> ReaderStateMonad (Maybe (Html ()), Delayed (Html ()), Maybe Label)
+        buildAppendixHeading dTitleHtml headFormatId = do
+            -- \| Heading for Appendix Element (with id and toc key)
+            docId <- asks currentAppendixElementID
+            idFormat <- asks appendixElementIdFormat
+            tocFormat <- asks appendixElementTocKeyFormat
+            let (headingHtml, tocHtml) = appendixFormat idFormat docId tocFormat headFormatId dTitleHtml
+            -- \| Check if current document has Label and build ToC entry
+            mLabel <- asks appendixElementMLabel
+            return (Just tocHtml, headingHtml, mLabel)
+
+-- Left headFormat -> do
+--                 -- \| Main Document Heading without Id and mangled anchor link
+--                 htmlId <- addTocEntry Nothing (resType titleHtml) Nothing
+--                 return (headingFormat headFormat <$> titleHtml, htmlId)
+-- Right headFormatId -> do
+--                 -- \| Heading for Appendix Element (with id and toc key)
+--                 docId <- asks currentAppendixElementID
+--                 idFormat <- asks appendixElementIdFormat
+--                 tocFormat <- asks appendixElementTocKeyFormat
+--                 let (headingHtml, tocHtml) = appendixFormat idFormat docId tocFormat headFormatId titleHtml
+--                 -- \| Check if current document has Label and build ToC entry
+--                 mLabel <- asks appendixElementMLabel
+--                 htmlId <- addTocEntry (Just tocHtml) (resType titleHtml) mLabel
+--                 return (headingHtml, htmlId)
 -------------------------------------------------------------------------------
 
 -- | This combined instances creates the sectionIDHtml before building the reference,
@@ -243,28 +286,31 @@ instance ToHtmlM (Node Section) where
                 mLabel
                 ( Section
                         sectionFormatS
-                        (Heading headingFormatS title)
-                        sectionBody
+                        parsedHeading
+                        eErrSectionBody
                     )
             ) = do
             globalState <- get
-            titleHtml <- toHtmlM title
             let (sectionIDGetter, incrementSectionID, sectionCssClass) =
-                    -- \| Check if we are inside a section or a super-section
-                    -- TODO: Is (SimpleLeafSectionBody [SimpleBlocks]) counted as super-section? (i think yes)
-                    if isSuper sectionBody
-                        then (currentSuperSectionID, incSuperSectionID, Class.SuperSection)
-                        else (currentSectionID, incSectionID, Class.Section)
+                    case eErrSectionBody of
+                        -- \| If SectionBody is missing => assume Section
+                        Left _ -> (currentSectionID, incSectionID, Class.Section)
+                        Right sectionBody ->
+                            -- \| Check if we are inside a section or a super-section
+                            -- TODO: Is (SimpleLeafSectionBody [SimpleBlocks]) counted as super-section? (i think yes)
+                            if isSuper sectionBody
+                                then (currentSuperSectionID, incSuperSectionID, Class.SuperSection)
+                                else (currentSectionID, incSectionID, Class.Section)
                 (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (sectionIDGetter globalState)
-                headingHtml =
-                    (h2_ <#> Class.Heading) . headingFormatId headingFormatS sectionIDHtml
-                        <$> titleHtml
              in do
                     addMaybeLabelToState mLabel sectionIDHtml
-                    -- \| Add table of contents entry for section
-                    htmlId <- addTocEntry (Just sectionTocKeyHtml) (Success titleHtml) mLabel
-                    -- \| Build heading Html with sectionID
-                    childrenHtml <- toHtmlM sectionBody
+                    -- \| Render parsed Heading, which also creates ToC Entry
+                    headingHtml <-
+                        buildHeadingHtml sectionIDHtml mLabel sectionTocKeyHtml parsedHeading
+                    -- \| If both the SectionBody and the Heading are errors,
+                    --   we only output the Heading error
+                    let bothError = isLeft parsedHeading && isLeft eErrSectionBody
+                    childrenHtml <- if bothError then return mempty else toHtmlM eErrSectionBody
                     -- \| Also render footnotes in super-sections, since their heading
                     --    could contain footnoteRefs
                     childrensGlobalState <- get
@@ -275,8 +321,31 @@ instance ToHtmlM (Node Section) where
                     incrementSectionID
 
                     return $
-                        section_ [cssClass_ sectionCssClass, id_ htmlId]
+                        section_ [cssClass_ sectionCssClass]
                             <$> (headingHtml <> childrenHtml <> footnotesHtml)
+          where
+            -- \| Also adds table of contents entry for section
+            buildHeadingHtml
+                :: Html ()
+                -> Maybe Label
+                -> Html ()
+                -> Parsed Heading
+                -> ReaderStateMonad (Delayed (Html ()))
+            buildHeadingHtml sectionIDHtml mLabelH tocKeyHtml eErrHeading =
+                case eErrHeading of
+                    Left parseErr -> do
+                        htmlId <-
+                            createTocEntryH (Error $ Now $ toHtml ("Section Heading Error!" :: Text))
+                        returnNow $ parseErrorHtml (Just htmlId) parseErr
+                    Right (Heading headingFormatS title) -> do
+                        titleHtml <- toHtmlM title
+                        htmlId <- createTocEntryH (Success titleHtml)
+                        return $
+                            h2_ [cssClass_ Class.Heading, id_ htmlId]
+                                . headingFormatId headingFormatS sectionIDHtml
+                                <$> titleHtml
+              where
+                createTocEntryH rTitle = addTocEntry (Just tocKeyHtml) rTitle mLabelH
 
 instance ToHtmlM SectionBody where
     toHtmlM sectionBody = case sectionBody of
@@ -565,6 +634,13 @@ instance (ToHtmlM a) => ToHtmlM (Flagged' a) where
         modify (\s -> s {hasFlagged = True})
         return $ if render then aHtml else mempty
 
+-- | This instance makes the rendering robust against parse errors;
+--   The @Parsed@ Type is around @DocumentContainerHeader@, @DocumentHeading@, @[SimpleSection]@, @SectionBody@, @Heading@.
+instance (ToHtmlM a) => ToHtmlM (Parsed a) where
+    toHtmlM eErrA = case eErrA of
+        Left parseErr -> returnNow $ parseErrorHtml Nothing parseErr
+        Right a -> toHtmlM a
+
 -------------------------------------------------------------------------------
 
 -- | Render current ToC from State
@@ -670,3 +746,11 @@ renderGroupedTextTree textF_ enumF_ tts =
 
 htmlError :: Text -> Html ()
 htmlError msg = span_ <#> Class.InlineError $ toHtml ("Error: " <> msg :: Text)
+
+-- | Takes Maybe HtmlId and a parse error and renders a centered parse error box
+parseErrorHtml :: Maybe Text -> ParseErrorBundle Text Void -> Html ()
+parseErrorHtml mHtmlId errBundle = do
+    div_ <#> Class.CenteredBox $
+        div_ [cssClass_ Class.ErrorBox, mTextId_ mHtmlId] $ do
+            h1_ <#> Class.DocumentTitle $ "Parsing failed!"
+            pre_ $ code_ <#> Class.LargeFontSize $ toHtml $ errorBundlePretty errBundle

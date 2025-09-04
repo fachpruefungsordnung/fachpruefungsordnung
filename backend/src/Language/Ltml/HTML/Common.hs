@@ -5,6 +5,7 @@
 
 module Language.Ltml.HTML.Common
     ( HtmlReaderState
+    , ReaderStateMonad
     , GlobalState (..)
     , ReaderState (..)
     , initGlobalState
@@ -45,20 +46,21 @@ import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label (unLabel))
 import Lucid (Html, a_, href_)
 
+-- TODO: Third ConfigState? With custom Reader Monad that is read only
+
 -- | The Reader Monad is used for local tracking (e.g. enumNestingLevel).
 --   The State Monad is used for global tracking (e.g. sectionIDs).
 --   The Delayed type is used for delaying the actual lookup of references in the GlobalState.
 --   This allows forward references, because at first a delayed object is build,
 --   which is then evaluated aterwards with the final GlobalState.
-type HtmlReaderState =
-    ReaderT ReaderState (State GlobalState) (Delayed (Html ()))
+type HtmlReaderState = ReaderStateMonad (Delayed (Html ()))
+
+type ReaderStateMonad a = ReaderT ReaderState (State GlobalState) a
 
 data GlobalState = GlobalState
     { hasFlagged :: Bool
     -- ^ Is set True at every (Flagged ...); used to determine if current Flagged
     --   has any Flagged children
-    , currentAppendixSectionID :: Int
-    -- ^ Tracks the current appendix section id
     , currentSuperSectionID :: Int
     -- ^ Tracks the current super-section number
     , currentSectionID :: Int
@@ -145,7 +147,6 @@ initGlobalState :: GlobalState
 initGlobalState =
     GlobalState
         { hasFlagged = False
-        , currentAppendixSectionID = 1
         , currentSuperSectionID = 1
         , currentSectionID = 1
         , currentParagraphID = 1
