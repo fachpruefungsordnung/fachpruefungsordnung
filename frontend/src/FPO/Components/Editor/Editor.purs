@@ -1398,16 +1398,15 @@ editor = connect selectTranslator $ H.mkComponent
 
         -- Depending on isEditorReadonly, get Comments or not
         if version /= "latest" then do
-          H.liftEffect $ log "Compare Version"
           handleAction $ ContinueChangeToSection []
         else do
           -- Get comments
-          let 
+          let
             comments = ContentDto.getWrapperComments wrapper
             -- convert markers
             markers = map ContentDto.convertToAnnotetedMarker comments
           -- update the markers into state
-          H.modify_ \st -> st 
+          H.modify_ \st -> st
             { selectedLiveMarker = Nothing
             , markerAnnoHS = empty
             , oldMarkerAnnoPos = empty
