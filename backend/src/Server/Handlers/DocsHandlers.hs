@@ -18,6 +18,7 @@ import Data.Time (UTCTime)
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 
 import Hasql.Connection (Connection)
@@ -169,6 +170,7 @@ type PostTextRevision =
         :> "text"
         :> Capture "textElementID" TextElementID
         :> "rev"
+        :> QueryParam "isAutoSave" Bool
         :> ReqBody '[JSON] CreateTextRevision
         :> Post '[JSON] ConflictStatus
 
@@ -412,9 +414,11 @@ postTextRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TextElementID
+    -> Maybe Bool
     -> CreateTextRevision
     -> Handler ConflictStatus
-postTextRevisionHandler auth docID textID revision = do
+postTextRevisionHandler auth docID textID mIsAutoSave revision = do
+    let isAutoSave = fromMaybe False mIsAutoSave  -- Default to False if not provided
     userID <- getUser auth
     withDB $
         runTransaction $
@@ -424,7 +428,7 @@ postTextRevisionHandler auth docID textID revision = do
                     (CreateTextRevision.parent revision)
                     (CreateTextRevision.content revision)
                     (CreateTextRevision.commentAnchors revision)
-                    (CreateTextRevision.isAutoSave revision)
+                    isAutoSave
 
 getTextElementRevisionHandler
     :: AuthResult Auth.Token

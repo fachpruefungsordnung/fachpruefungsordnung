@@ -19,9 +19,6 @@ data CreateTextRevision = CreateTextRevision
     { parent :: Maybe TextRevisionID
     , content :: Text
     , commentAnchors :: Vector CommentAnchor
-    , isAutoSave :: Bool
-    -- ^ Whether this is an auto-save operation. Auto-saves create drafts on conflicts,
-    -- while manual saves return conflict errors. This distinguishes the conflict resolution strategy.
     }
     deriving (Generic)
 
@@ -33,6 +30,5 @@ instance FromJSON CreateTextRevision where
             <$> o .:? "parent"
             <*> o .: "content"
             <*> (o .:? "commentAnchors" .!= Vector.empty)
-            <*> (o .:? "isAutoSave" .!= False)
 
 instance ToSchema CreateTextRevision

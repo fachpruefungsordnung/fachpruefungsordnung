@@ -40,7 +40,8 @@ import Language.Lsd.AST.Common
     )
 import Language.Lsd.AST.SimpleRegex (Disjunction (Disjunction))
 
-data NamedType t = NamedType
+data NamedType t
+    = NamedType
     { ntTypeName :: TypeName
     , ntDisplayName :: DisplayTypeName
     , unwrapNT :: t
