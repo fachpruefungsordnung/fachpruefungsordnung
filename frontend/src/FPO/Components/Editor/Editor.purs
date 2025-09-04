@@ -233,8 +233,9 @@ data Action
 
 -- We use a query to get the content of the editor
 data Query a
+  = EditorResize a
   -- = RequestContent (Array String -> a)
-  = QueryEditor a
+  | QueryEditor a
   -- | save the current content and send it to splitview
   | SaveSection a
   -- | receive the selected TOC and put its content into the editor
@@ -613,6 +614,13 @@ editor = connect selectTranslator $ H.mkComponent
           addEventListener keydown eventListen true
             (toEventTarget $ toElement container)
           session <- Editor.getSession editor_
+
+          -- Set line break
+          Editor.resize (Just true) editor_
+          Session.setUseWrapMode true session
+
+          -- remove the gray margin line
+          Editor.setShowPrintMargin false editor_
 
           -- Set the editor's theme and mode
           Editor.setTheme "ace/theme/github" editor_
@@ -1452,6 +1460,13 @@ editor = connect selectTranslator $ H.mkComponent
      . Query a
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
+
+    EditorResize a -> do
+      editor_ <- H.gets _.mEditor
+      case editor_ of
+        Nothing -> pure unit
+        Just ed -> H.liftEffect $ Editor.resize (Just true) ed
+      pure (Just a)
 
     ChangeSection entry rev a -> do
       handleAction (ChangeToSection entry rev)
