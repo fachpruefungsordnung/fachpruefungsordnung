@@ -37,6 +37,7 @@ import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class as EC
+import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -1470,6 +1471,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     ChangeSection entry rev a -> do
       handleAction (ChangeToSection entry rev)
+      H.liftEffect $ log "changedSec"
       pure (Just a)
 
     ContinueChangeSection fCs a -> do
