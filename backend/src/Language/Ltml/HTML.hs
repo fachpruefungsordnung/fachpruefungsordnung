@@ -173,16 +173,16 @@ instance ToHtmlM Document where
                             docPartsHtml <- renderDocParts
                             return (delayedTocHtml, docPartsHtml)
                         else -- \| Reset ToC temporarily to build a local ToC, then write back the global ToC
-                        withModified
-                            tableOfContents
-                            (\s a -> s {tableOfContents = a})
-                            (tableOfContents initGlobalState)
-                            $ do
-                                docPartsHtml <- renderDocParts
-                                -- \| Render ToC last so local ToC has all Headings set,
-                                --    since the local ToC uses the current State
-                                localTocHtml <- renderLocalToc mTocFormat
-                                return (localTocHtml, docPartsHtml)
+                            withModified
+                                tableOfContents
+                                (\s a -> s {tableOfContents = a})
+                                (tableOfContents initGlobalState)
+                                $ do
+                                    docPartsHtml <- renderDocParts
+                                    -- \| Render ToC last so local ToC has all Headings set,
+                                    --    since the local ToC uses the current State
+                                    localTocHtml <- renderLocalToc mTocFormat
+                                    return (localTocHtml, docPartsHtml)
 
                 -- \| Render DocumentHeading / ToC only if renderFlag was set by parent
                 return $
@@ -308,9 +308,10 @@ instance ToHtmlM (Node Paragraph) where
                     div_ [cssClass_ Class.Paragraph, mId_ mLabel]
                         -- \| If this is the only paragraph inside this section we drop the visible paragraphID
                         <$> let idHtml = if isSingleParagraph readerState then mempty else paragraphKeyHtml
-                             in return (div_ <#> Class.ParagraphID $ idHtml) <> div_
-                                    <#> Class.TextContainer
-                                        <$> childText
+                             in return (div_ <#> Class.ParagraphID $ idHtml)
+                                    <> div_
+                                        <#> Class.TextContainer
+                                    <$> childText
 
 -------------------------------------------------------------------------------
 
