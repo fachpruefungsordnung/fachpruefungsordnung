@@ -109,6 +109,7 @@ type State = FPOState
   ( docID :: DocumentID
   , mEditor :: Maybe Types.Editor
   , mTocEntry :: Maybe TOCEntry
+  , currentVersion :: String
   , mNodePath :: Maybe Path
   , mContent :: Maybe Content
   -- comments
@@ -273,6 +274,7 @@ editor = connect selectTranslator $ H.mkComponent
     , translator: fromFpoTranslator context
     , mEditor: Nothing
     , mTocEntry: Nothing
+    , currentVersion: ""
     , mNodePath: Nothing
     , mContent: Nothing
     , tmpLiveMarker: Nothing
@@ -1365,13 +1367,13 @@ editor = connect selectTranslator $ H.mkComponent
 
     ChangeToSection entry rev -> do
       state <- H.get
+      let
+        version = case rev of
+          Nothing -> "latest"
+          Just v -> show v
       -- Prevent of loading the same Section from backend again
-      when (Just entry /= state.mTocEntry) do
-        H.modify_ \st -> st { mTocEntry = Just entry }
-        let
-          version = case rev of
-            Nothing -> "latest"
-            Just v -> show v
+      when (Just entry /= state.mTocEntry || version /= state.currentVersion) do
+        H.modify_ \st -> st { mTocEntry = Just entry, currentVersion = version }
         -- Get the content from server here
         -- We need Aff for that and thus cannot go inside Eff
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
@@ -1388,20 +1390,30 @@ editor = connect selectTranslator $ H.mkComponent
             Nothing -> ContentDto.failureContentWrapper
             Just res -> res
           content = ContentDto.getWrapperContent wrapper
-          comments = ContentDto.getWrapperComments wrapper
-          -- convert markers
-          markers = map ContentDto.convertToAnnotetedMarker comments
 
         H.modify_ \st -> st
           { mContent = Just content
-          , selectedLiveMarker = Nothing
-          , markerAnnoHS = empty
-          , oldMarkerAnnoPos = empty
-          , markers = markers
           , isEditorReadonly = version /= "latest"
           }
-        -- Get comments information from Comment Child
-        H.raise (RequestComments state.docID entry.id)
+
+        -- Depending on isEditorReadonly, get Comments or not
+        if version /= "latest" then do
+          handleAction $ ContinueChangeToSection []
+        else do
+          -- Get comments
+          let
+            comments = ContentDto.getWrapperComments wrapper
+            -- convert markers
+            markers = map ContentDto.convertToAnnotetedMarker comments
+          -- update the markers into state
+          H.modify_ \st -> st
+            { selectedLiveMarker = Nothing
+            , markerAnnoHS = empty
+            , oldMarkerAnnoPos = empty
+            , markers = markers
+            }
+          -- Get comments information from Comment Child
+          H.raise (RequestComments state.docID entry.id)
       pure unit
 
     -- After getting information from from Comment
