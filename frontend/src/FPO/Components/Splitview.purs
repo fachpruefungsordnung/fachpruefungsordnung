@@ -24,7 +24,7 @@ import Data.Array
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
@@ -723,6 +723,8 @@ splitview = connect selectTranslator $ H.mkComponent
               }
 
         _ -> pure unit
+
+      when (isJust mt) (H.tell _editor 0 (Editor.EditorResize))
 
     -- Toggle actions
 
