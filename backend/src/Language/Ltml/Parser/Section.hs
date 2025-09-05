@@ -38,7 +38,7 @@ sectionP :: SectionType -> Parser () -> FootnoteParser (Node Section)
 sectionP (SectionType kw headingT fmt bodyT) succStartP = do
     (mLabel, heading) <- lift $ nonIndented $ headingP kw headingT
     body <- nonIndented $ sectionBodyP bodyT succStartP
-    return $ Node mLabel $ Section fmt (Right heading) (Right body)
+    return $ Node mLabel $ Section fmt (Right heading) body
 
 sectionBodyP :: SectionBodyType -> Parser () -> FootnoteParser SectionBody
 sectionBodyP t0 succStartP = bodyP t0
@@ -47,7 +47,9 @@ sectionBodyP t0 succStartP = bodyP t0
     bodyP (InnerSectionBodyType (Star t)) =
         InnerSectionBody
             <$> many
-                (Flagged False <$> sectionP t' (toStartP t' <|> succStartP))
+                ( Flagged False . Right
+                    <$> sectionP t' (toStartP t' <|> succStartP)
+                )
       where
         t' = unwrapNT t
     bodyP (LeafSectionBodyType (Star t)) =
