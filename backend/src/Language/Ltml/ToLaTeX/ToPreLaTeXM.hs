@@ -9,7 +9,7 @@ import Control.Monad.State (MonadState (get, put), State, modify, runState)
 import qualified Data.DList as DList
 import qualified Data.Map as Map
 import Data.Text (Text)
-import qualified Data.Text.Lazy as LT
+import qualified Data.Text as T
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Format
     ( EnumItemKeyFormat (EnumItemKeyFormat)
@@ -154,9 +154,9 @@ instance
     )
     => ToPreLaTeXM (TextTree lbrk fnref style enum special)
     where
-    toPreLaTeXM (Word t) = pure $ IText $ LT.fromStrict t
-    toPreLaTeXM Space = pure $ IText $ LT.pack " "
-    toPreLaTeXM NonBreakingSpace = pure $ IText $ LT.pack "\xA0"
+    toPreLaTeXM (Word t) = pure $ IText t
+    toPreLaTeXM Space = pure $ IText " "
+    toPreLaTeXM NonBreakingSpace = pure $ IText "\xA0"
     toPreLaTeXM (LineBreak lbrk) = toPreLaTeXM lbrk
     toPreLaTeXM (Special s) = toPreLaTeXM s
     toPreLaTeXM (Reference l) = pure $ MissingRef l
@@ -175,7 +175,7 @@ instance ToPreLaTeXM FootnoteReference where
         case Map.lookup l labelToRef of
             Nothing -> do
                 n <- GS.nextFootnote
-                GS.insertRefLabel (Just l) (LT.pack $ show n)
+                GS.insertRefLabel (Just l) (T.pack $ show n)
                 labelToFootNote <- use GS.labelToFootNote
                 case Map.lookup l labelToFootNote of
                     Nothing -> pure mempty -- TODO: maybe throw error here?
@@ -184,9 +184,9 @@ instance ToPreLaTeXM FootnoteReference where
                         pure $
                             footnote $
                                 hypertarget l mempty
-                                    <> label (LT.fromStrict lt)
+                                    <> label lt
                                     <> tt'
-            Just _ -> pure $ footref $ LT.fromStrict lt
+            Just _ -> pure $ footref lt
 
 instance ToPreLaTeXM Enumeration where
     toPreLaTeXM
@@ -215,7 +215,7 @@ instance Labelable EnumItem where
 instance ToPreLaTeXM SentenceStart where
     toPreLaTeXM (SentenceStart mLabel) = do
         n <- GS.nextSentence
-        GS.insertRefLabel mLabel (LT.pack (show n))
+        GS.insertRefLabel mLabel (T.pack (show n))
         maybe (pure mempty) toPreLaTeXM mLabel
 
 -------------------------------- Label -----------------------------------
@@ -248,7 +248,7 @@ instance Labelable Paragraph where
                     then content'
                     else
                         enumerate
-                            [ LT.pack $ "start=" <> show n
+                            [ T.pack $ "start=" <> show n
                             , getEnumStyle ident key
                             ]
                             [content']
@@ -284,7 +284,7 @@ instance Labelable Section where
                 let headingText = tt'
                     buildHeading n = do
                         createHeading fmt headingText (IText $ getIdentifier ident n)
-                    setLabel n = GS.insertRefLabel mLabel (LT.pack (show n))
+                    setLabel n = GS.insertRefLabel mLabel (T.pack (show n))
                 case nodes of
                     LeafSectionBody paragraphs -> do
                         n <- GS.nextSection
@@ -397,7 +397,7 @@ instance Labelable Document where
                 toc' <- use GS.toc
                 appendixHeaders' <- use GS.appendixHeaders
                 pure $
-                    IText (LT.fromStrict tocHeading) <> case t of
+                    IText tocHeading <> case t of
                         GS.Appendix ->
                             ISequence $ DList.toList toc'
                         GS.Main ->
@@ -417,7 +417,7 @@ instance ToPreLaTeXM AppendixSection where
             GS.counterState . GS.appendixCTR .= 0
             GS.flagState . GS.docType .= GS.Appendix
             GS.formatState . GS.appendixFormat .= elementFmt
-            GS.appendixHeaders %= (<> DList.fromList [IText (LT.fromStrict t), linebreak])
+            GS.appendixHeaders %= (<> DList.fromList [IText t, linebreak])
             nodes' <- mapM toPreLaTeXM nodes
             pure $ ISequence $ map ((newpage <> resetfootnote) <>) nodes'
 
@@ -430,7 +430,7 @@ instance ToPreLaTeXM DocumentContainer where
                 appendices
             ) = do
             {- prepare the state -}
-            GS.preDocument %= (<> setpdftitle (LT.fromStrict pdfTitle))
+            GS.preDocument %= (<> setpdftitle pdfTitle)
             GS.addHeaderFooter headerFmt footerFmt superTitle title date
             GS.formatState . GS.docHeadingFormat .= headingFmt
             GS.resetCountersHard

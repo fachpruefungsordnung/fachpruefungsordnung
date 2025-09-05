@@ -15,8 +15,6 @@ import Control.Monad.State (runState)
 import qualified Data.ByteString.Lazy as BS
 import Data.Text (Text)
 import qualified Data.Text.IO as TIO
-import qualified Data.Text.Lazy.IO as LT
-import qualified Data.Text.Lazy.IO as LTIO
 import Data.Typography
     ( FontSize (MediumFontSize, SmallFontSize)
     , FontStyle (Bold)
@@ -125,7 +123,7 @@ runTestToLaTeX = do
         Right parsedInput -> do
             let texFile = "./src/Language/Ltml/ToLaTeX/Auxiliary/test.tex"
             -- Write PreLaTeX source
-            LTIO.writeFile texFile (sectionToText parsedInput)
+            TIO.writeFile texFile (sectionToText parsedInput)
             return "everything went well!"
   where
     sectionToText (sec, labelmap) =
@@ -328,6 +326,6 @@ testingDocumentContainer =
 startTesting :: IO ()
 startTesting = do
     let (latex, gs) = testThis testingDocumentContainer
-    LT.putStrLn $
+    TIO.putStrLn $
         renderLaTeX $
             toLaTeX (view labelToRef gs) (view preDocument gs <> document latex)
