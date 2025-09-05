@@ -22,7 +22,6 @@ import Language.Lsd.AST.Type
     ( ChildrenOrder (StarOrder)
     , HasEditableHeader (HasEditableHeader)
     , NamedType
-    , NavHeadingGeneration (NavHeadingFromHtmlToc)
     , ProperNodeKind
     , RawProperNodeKind (..)
     , TreeSyntax (LeafSyntax, TreeSyntax)
@@ -53,8 +52,6 @@ instance RawProperNodeKind SectionType where
         case sectionBodyChildrenOrderMap f bodyT of
             Just co -> TreeSyntax (HasEditableHeader True) co
             Nothing -> LeafSyntax
-
-    navHeadingGenerationOfRaw _ = NavHeadingFromHtmlToc
 
 data HeadingType
     = HeadingType

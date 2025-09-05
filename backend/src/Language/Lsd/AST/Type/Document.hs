@@ -8,18 +8,22 @@ module Language.Lsd.AST.Type.Document
     , DocumentHeadingType (..)
     , DocumentBodyType (..)
     , DocumentMainBodyType (..)
+    , DocumentIntroType (..)
+    , DocumentExtroType (..)
+    , DocumentMainBodyFormat (..)
+    , DocumentIntroFormat (..)
+    , DocumentExtroFormat (..)
     )
 where
 
 import Data.Text (Text)
 import Data.Void (Void)
-import Language.Lsd.AST.Common (Keyword)
+import Language.Lsd.AST.Common (Keyword, NavTocHeading)
 import Language.Lsd.AST.SimpleRegex (Disjunction, Sequence)
 import Language.Lsd.AST.Type
     ( ChildrenOrder (SequenceOrder)
     , HasEditableHeader (HasEditableHeader)
     , NamedType
-    , NavHeadingGeneration (NavHeadingFromHtmlToc, NavHeadingStatic)
     , ProperNodeKind (..)
     , RawProperNodeKind (..)
     , TreeSyntax (LeafSyntax, TreeSyntax)
@@ -68,41 +72,72 @@ instance RawProperNodeKind DocumentType where
                 , pure $ f extroT
                 ]
 
-    navHeadingGenerationOfRaw _ = NavHeadingFromHtmlToc
-
 newtype DocumentHeadingType = DocumentHeadingType (TextType Void)
 
 data DocumentBodyType
-    = -- | document body type
-      DocumentBodyType
-        (Sequence (NamedType SimpleSectionType))
-        -- ^ intro
+    = DocumentBodyType
+        DocumentIntroType
         (Disjunction DocumentMainBodyType)
-        -- ^ main
-        (Sequence (NamedType SimpleSectionType))
-        -- ^ outro
+        DocumentExtroType
 
-newtype DocumentMainBodyType
-    = DocumentMainBodyType SectionBodyType
+data DocumentMainBodyType
+    = DocumentMainBodyType
+        DocumentMainBodyFormat
+        SectionBodyType
 
 instance ProperNodeKind DocumentMainBodyType where
     kindNameOf _ = "document-mainbody"
 
-    typeNameOf (DocumentMainBodyType t') = aux t'
+    typeNameOf (DocumentMainBodyType _ t') = aux t'
       where
         aux (InnerSectionBodyType _) = "inner"
         aux (LeafSectionBodyType _) = "leaf"
         aux (SimpleLeafSectionBodyType _) = "simple-leaf"
 
-    displayTypeNameOf (DocumentMainBodyType t') = aux t'
+    displayTypeNameOf (DocumentMainBodyType _ t') = aux t'
       where
         aux (InnerSectionBodyType _) = "nested main body"
         aux (LeafSectionBodyType _) = "textual main body"
         aux (SimpleLeafSectionBodyType _) = "simple textual main body"
 
-    treeSyntaxMap f (DocumentMainBodyType t) =
+    treeSyntaxMap f (DocumentMainBodyType _ t) =
         case sectionBodyChildrenOrderMap f t of
             Just co -> TreeSyntax (HasEditableHeader False) co
             Nothing -> LeafSyntax
 
-    navHeadingGenerationOf _ = NavHeadingStatic "(main)"
+data DocumentIntroType
+    = DocumentIntroType
+        DocumentIntroFormat
+        (Sequence (NamedType SimpleSectionType))
+
+instance ProperNodeKind DocumentIntroType where
+    kindNameOf _ = "document-intro"
+    typeNameOf _ = ""
+    displayTypeNameOf _ = "document intro"
+    treeSyntaxMap _ _ = LeafSyntax
+
+data DocumentExtroType
+    = DocumentExtroType
+        DocumentExtroFormat
+        (Sequence (NamedType SimpleSectionType))
+
+instance ProperNodeKind DocumentExtroType where
+    kindNameOf _ = "document-extro"
+    typeNameOf _ = ""
+    displayTypeNameOf _ = "document extro"
+    treeSyntaxMap _ _ = LeafSyntax
+
+newtype DocumentMainBodyFormat
+    = DocumentMainBodyFormat
+        NavTocHeading
+    deriving (Show)
+
+newtype DocumentIntroFormat
+    = DocumentIntroFormat
+        NavTocHeading
+    deriving (Show)
+
+newtype DocumentExtroFormat
+    = DocumentExtroFormat
+        NavTocHeading
+    deriving (Show)

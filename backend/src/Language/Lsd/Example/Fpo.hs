@@ -36,10 +36,19 @@ fpoT :: NamedType DocumentContainerType
 fpoT =
     NamedType "fpo-container" "Fachprüfungsordnung" $
         DocumentContainerType
-            (DocumentContainerFormat headerFormat footerFormat headingFormat)
+            ( DocumentContainerFormat
+                containerHeaderFormat
+                headerFormat
+                footerFormat
+                headingFormat
+            )
             mainDocT
             (Sequence [appendixT, attachmentT])
   where
+    containerHeaderFormat =
+        DocumentContainerHeaderFormat $
+            NavTocHeading "Header"
+
     headingFormat =
         HeadingFormat
             (Typography Centered LargeFontSize [Bold])
@@ -157,23 +166,25 @@ mainDocT =
             (DocumentFormat $ Just $ TocFormat $ TocHeading "Inhaltsübersicht")
             (DocumentHeadingType plainTextT)
             ( DocumentBodyType
-                ( Sequence
-                    [ dateSSecT
-                    , publLogSSecT
-                    , introSSecT
-                    ]
+                ( docIntroTF $
+                    Sequence
+                        [ dateSSecT
+                        , publLogSSecT
+                        , introSSecT
+                        ]
                 )
                 ( Disjunction
-                    [ DocumentMainBodyType $
+                    [ docMainBodyTF $
                         InnerSectionBodyType (Star sectionT)
-                    , DocumentMainBodyType $
+                    , docMainBodyTF $
                         InnerSectionBodyType (Star superSectionT)
                     ]
                 )
-                ( Sequence
-                    [ extroSSecT
-                    , legalLogSSecT
-                    ]
+                ( docExtroTF $
+                    Sequence
+                        [ extroSSecT
+                        , legalLogSSecT
+                        ]
                 )
             )
             (Disjunction [footnoteT])
@@ -186,15 +197,30 @@ simpleDocT =
             (DocumentFormat Nothing)
             (DocumentHeadingType plainTextT)
             ( DocumentBodyType
-                (Sequence [])
+                (docIntroTF $ Sequence [])
                 ( Disjunction
-                    [ DocumentMainBodyType $
+                    [ docMainBodyTF $
                         SimpleLeafSectionBodyType (Star simpleBlockT)
                     ]
                 )
-                (Sequence [])
+                (docExtroTF $ Sequence [])
             )
             (Disjunction [footnoteT])
+
+docMainBodyTF :: SectionBodyType -> DocumentMainBodyType
+docMainBodyTF =
+    DocumentMainBodyType
+        (DocumentMainBodyFormat $ NavTocHeading "Hauptteil")
+
+docIntroTF :: Sequence (NamedType SimpleSectionType) -> DocumentIntroType
+docIntroTF =
+    DocumentIntroType
+        (DocumentIntroFormat $ NavTocHeading "Intro")
+
+docExtroTF :: Sequence (NamedType SimpleSectionType) -> DocumentExtroType
+docExtroTF =
+    DocumentExtroType
+        (DocumentExtroFormat $ NavTocHeading "Extro")
 
 dateSSecT :: NamedType SimpleSectionType
 dateSSecT =

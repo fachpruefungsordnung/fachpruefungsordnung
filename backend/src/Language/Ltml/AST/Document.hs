@@ -2,11 +2,19 @@ module Language.Ltml.AST.Document
     ( Document (..)
     , DocumentHeading (..)
     , DocumentBody (..)
+    , DocumentMainBody (..)
+    , DocumentIntro (..)
+    , DocumentExtro (..)
     )
 where
 
 import Data.Map (Map)
-import Language.Lsd.AST.Type.Document (DocumentFormat)
+import Language.Lsd.AST.Type.Document
+    ( DocumentExtroFormat
+    , DocumentFormat
+    , DocumentIntroFormat
+    , DocumentMainBodyFormat
+    )
 import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Section (SectionBody)
@@ -31,12 +39,26 @@ newtype DocumentHeading = DocumentHeading [HeadingTextTree]
     deriving (Show)
 
 data DocumentBody
-    = -- | document body
-      DocumentBody
-        (Flagged' (Parsed [SimpleSection]))
-        -- ^ intro
-        (Flagged' (Parsed SectionBody))
-        -- ^ main
-        (Flagged' (Parsed [SimpleSection]))
-        -- ^ outro
+    = DocumentBody
+        (Flagged' (Parsed DocumentIntro))
+        (Flagged' (Parsed DocumentMainBody))
+        (Flagged' (Parsed DocumentExtro))
+    deriving (Show)
+
+data DocumentMainBody
+    = DocumentMainBody
+        DocumentMainBodyFormat
+        SectionBody
+    deriving (Show)
+
+data DocumentIntro
+    = DocumentIntro
+        DocumentIntroFormat
+        [SimpleSection]
+    deriving (Show)
+
+data DocumentExtro
+    = DocumentExtro
+        DocumentExtroFormat
+        [SimpleSection]
     deriving (Show)

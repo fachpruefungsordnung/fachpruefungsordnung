@@ -19,7 +19,6 @@ import Language.Lsd.AST.Type
     ( ChildrenOrder (StarOrder)
     , HasEditableHeader (HasEditableHeader)
     , NamedType
-    , NavHeadingGeneration (NavHeadingFromHtmlToc)
     , RawProperNodeKind (..)
     , TreeSyntax (TreeSyntax)
     )
@@ -53,5 +52,3 @@ instance RawProperNodeKind AppendixSectionType where
 
     treeSyntaxMapRaw f (AppendixSectionType _ (Star t)) =
         TreeSyntax (HasEditableHeader False) $ StarOrder $ fmap f t
-
-    navHeadingGenerationOfRaw _ = NavHeadingFromHtmlToc

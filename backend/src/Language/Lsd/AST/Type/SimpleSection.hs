@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE OverloadedStrings #-}
 
 module Language.Lsd.AST.Type.SimpleSection
     ( SimpleSectionFormat (..)
@@ -8,13 +7,8 @@ module Language.Lsd.AST.Type.SimpleSection
 where
 
 import Language.Lsd.AST.Common (Keyword)
-import Language.Lsd.AST.SimpleRegex (Sequence, Star)
-import Language.Lsd.AST.Type
-    ( NamedType
-    , NavHeadingGeneration (NavHeadingStatic)
-    , ProperNodeKind (..)
-    , TreeSyntax (LeafSyntax)
-    )
+import Language.Lsd.AST.SimpleRegex (Star)
+import Language.Lsd.AST.Type (NamedType)
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphType)
 
 newtype SimpleSectionFormat
@@ -28,10 +22,3 @@ data SimpleSectionType
         Keyword
         SimpleSectionFormat
         (Star (NamedType SimpleParagraphType))
-
-instance ProperNodeKind (Sequence (NamedType SimpleSectionType)) where
-    kindNameOf _ = "simple-section-sequence"
-    typeNameOf _ = ""
-    displayTypeNameOf _ = "simple section sequence"
-    treeSyntaxMap _ _ = LeafSyntax
-    navHeadingGenerationOf _ = NavHeadingStatic "(intro/extro)" -- TODO

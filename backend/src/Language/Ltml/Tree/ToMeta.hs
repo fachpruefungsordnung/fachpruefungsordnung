@@ -15,23 +15,17 @@ import Control.Monad.ConsumableStack
     )
 import Data.Bifunctor (first)
 import Data.List (find)
-import Data.Map (Map, lookup)
-import Data.Text (Text)
+import Data.Map (Map)
 import Language.Lsd.AST.Common (FullTypeName)
 import Language.Lsd.AST.Type
-    ( NamedType
-    , NavHeadingGeneration (NavHeadingFromHtmlToc, NavHeadingStatic)
-    , ProperTypeMeta
+    ( ProperTypeMeta
     , fullTypeNameOf
-    , navHeadingGenerationOf
-    , properTypeCollect'
     )
-import Language.Lsd.AST.Type.DocumentContainer (DocumentContainerType)
 import Language.Lsd.Example (availableLSDs)
 import Language.Lsd.ToMetaMap (buildMetaMap)
 import Language.Ltml.Common (Flagged (Flagged))
-import Language.Ltml.HTML (renderTocEntry, renderTocList)
-import Language.Ltml.HTML.Common (PhantomTocEntry, RenderedTocEntry)
+import Language.Ltml.HTML (renderTocList)
+import Language.Ltml.HTML.Common (RenderedTocEntry)
 import Language.Ltml.Tree
     ( FlaggedInputTree
     , FlaggedMetaTree
@@ -77,14 +71,13 @@ treeToMeta tree = do
 --   This does not fully check the validity of the input tree, which is done
 --   elsewhere (specifically, by 'Language.Ltml.Tree.ToLtml.treeToLtml').
 buildMeta'
-    :: [Either PhantomTocEntry RenderedTocEntry]
+    :: [RenderedTocEntry]
     -> FlaggedInputTree ident
     -> Either String (FlaggedMetaTree ident, Map FullTypeName ProperTypeMeta)
-buildMeta' hs tree = do
-    t <- getRootType tree
-    metaTree <- buildMetaTree t hs tree
-    let metaMap = buildMetaMap t
-    return (metaTree, metaMap)
+buildMeta' hs tree =
+    (,)
+        <$> buildMetaTree hs tree
+        <*> (buildMetaMap <$> getRootType tree)
   where
     getRootType (Flagged _ (TypedTree kindName typeName _)) =
         case find ((== fullTypeName) . fullTypeNameOf) availableLSDs of
@@ -99,20 +92,15 @@ newtype EitherFail a = EitherFail {runEitherFail :: Either String a}
 instance MonadFail EitherFail where
     fail = EitherFail . Left
 
-type HeadingStack =
-    ConsumableStackT (Either PhantomTocEntry RenderedTocEntry) EitherFail
+type HeadingStack = ConsumableStackT RenderedTocEntry EitherFail
 
 buildMetaTree
-    :: NamedType DocumentContainerType
-    -> [Either PhantomTocEntry RenderedTocEntry]
+    :: [RenderedTocEntry]
     -> FlaggedInputTree ident
     -> Either String (FlaggedMetaTree ident)
-buildMetaTree t hs tree0 =
+buildMetaTree hs tree0 =
     runEitherFail $ runConsumableStackT (flaggedTreeF tree0) hs
   where
-    headingGenMap :: Map FullTypeName NavHeadingGeneration
-    headingGenMap = properTypeCollect' (navHeadingGenerationOf . pure) t
-
     flaggedTreeF
         :: FlaggedInputTree ident
         -> HeadingStack (FlaggedMetaTree ident)
@@ -120,23 +108,8 @@ buildMetaTree t hs tree0 =
 
     typedTreeF :: TypedInputTree ident -> HeadingStack (TypedMetaTree ident)
     typedTreeF (TypedTree kindName typeName tree) =
-        case lookup (kindName, typeName) headingGenMap of
-            Just hg -> TypedTree kindName typeName <$> treeF hg tree
-            Nothing -> fail $ "Unknown type: " ++ show (kindName, typeName)
+        TypedTree kindName typeName <$> treeF tree
 
-    treeF
-        :: NavHeadingGeneration
-        -> InputTree ident
-        -> HeadingStack (MetaTree ident)
-    treeF hg = aux
-      where
-        aux (Tree _ trees) = Tree <$> headingF hg <*> mapM flaggedTreeF trees
-        aux (Leaf _) = Leaf <$> headingF hg
-
-    headingF :: NavHeadingGeneration -> HeadingStack RenderedTocEntry
-    headingF hg = pop >>= aux hg
-      where
-        aux NavHeadingFromHtmlToc (Right heading) = return heading
-        aux (NavHeadingStatic x) (Left phantom) =
-            return $ renderTocEntry phantom x
-        aux _ _ = fail "Mismatching navigation toc heading generation info"
+    treeF :: InputTree ident -> HeadingStack (MetaTree ident)
+    treeF (Tree _ trees) = Tree <$> pop <*> mapM flaggedTreeF trees
+    treeF (Leaf _) = Leaf <$> pop

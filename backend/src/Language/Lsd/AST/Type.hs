@@ -16,7 +16,6 @@ module Language.Lsd.AST.Type
     , TreeSyntax (..)
     , HasEditableHeader (..)
     , ChildrenOrder (..)
-    , NavHeadingGeneration (..)
     , ProperNodeKind (..)
     , RawProperNodeKind (..)
     , fullTypeNameOf
@@ -33,7 +32,6 @@ import Control.Monad.CollectionState
     )
 import Data.Map (Map)
 import Data.Proxy (Proxy (Proxy))
-import Data.Text (Text)
 import Language.Lsd.AST.Common
     ( DisplayTypeName
     , FullTypeName
@@ -78,10 +76,6 @@ data ChildrenOrder a
     | StarOrder (Disjunction a)
     deriving (Show)
 
-data NavHeadingGeneration
-    = NavHeadingStatic Text
-    | NavHeadingFromHtmlToc
-
 -- | A node in the LTML tree is proper iff it corresponds to a node in the
 --   input tree ('Language.Ltml.Tree.InputTree').
 class ProperNodeKind t where
@@ -93,11 +87,6 @@ class ProperNodeKind t where
         -> t
         -> TreeSyntax a
 
-    -- | How to generate a heading for the navigation TOC / heading-tree for
-    --   the frontend.
-    --   Note that regular TOCs generally have less headings.
-    navHeadingGenerationOf :: Proxy t -> NavHeadingGeneration
-
 -- | An LTML kind @t@ is raw-proper iff @'NamedType' t@ is proper
 --   (see 'ProperNodeKind').
 class RawProperNodeKind t where
@@ -106,14 +95,12 @@ class RawProperNodeKind t where
         :: (forall t'. (ProperNodeKind t') => t' -> a)
         -> t
         -> TreeSyntax a
-    navHeadingGenerationOfRaw :: Proxy t -> NavHeadingGeneration
 
 instance (RawProperNodeKind t) => ProperNodeKind (NamedType t) where
     kindNameOf _ = kindNameOfRaw (Proxy :: Proxy t)
     typeNameOf = ntTypeName
     displayTypeNameOf = ntDisplayName
     treeSyntaxMap f = treeSyntaxMapRaw f . unwrapNT
-    navHeadingGenerationOf _ = navHeadingGenerationOfRaw (Proxy :: Proxy t)
 
 fullTypeNameOf :: forall t. (ProperNodeKind t) => t -> FullTypeName
 fullTypeNameOf t = (kindNameOf (Proxy :: Proxy t), typeNameOf t)

@@ -6,6 +6,7 @@ module Language.Lsd.AST.Common
     , FullTypeName
     , DisplayTypeName (..)
     , Keyword (..)
+    , NavTocHeading (..)
     )
 where
 
@@ -24,3 +25,8 @@ newtype DisplayTypeName = DisplayTypeName String
     deriving (Show, IsString)
 
 newtype Keyword = Keyword Text
+
+-- | Heading for the navigation TOC in the frontend, if static (determined by
+--   type only).
+newtype NavTocHeading = NavTocHeading Text
+    deriving (Show)

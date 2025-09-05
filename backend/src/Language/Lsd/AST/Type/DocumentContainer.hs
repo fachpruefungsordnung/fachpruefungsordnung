@@ -3,6 +3,7 @@
 module Language.Lsd.AST.Type.DocumentContainer
     ( DocumentContainerFormat (..)
     , DocumentContainerType (..)
+    , DocumentContainerHeaderFormat (..)
     , HeaderFooterFormat (..)
     , HeaderFooterItemFormat (..)
     , HeaderFooterFormatAtom (..)
@@ -10,13 +11,13 @@ module Language.Lsd.AST.Type.DocumentContainer
 where
 
 import Data.Typography (FontSize, FontStyle)
+import Language.Lsd.AST.Common (NavTocHeading)
 import Language.Lsd.AST.Format (FormatString, MainHeadingFormat)
 import Language.Lsd.AST.SimpleRegex (Sequence (Sequence))
 import Language.Lsd.AST.Type
     ( ChildrenOrder (SequenceOrder)
     , HasEditableHeader (HasEditableHeader)
     , NamedType
-    , NavHeadingGeneration (NavHeadingStatic)
     , RawProperNodeKind (..)
     , TreeSyntax (TreeSyntax)
     )
@@ -26,6 +27,7 @@ import Language.Lsd.AST.Type.Document (DocumentType)
 data DocumentContainerFormat
     = -- | format
       DocumentContainerFormat
+        DocumentContainerHeaderFormat
         HeaderFooterFormat
         -- ^ header format
         HeaderFooterFormat
@@ -48,7 +50,10 @@ instance RawProperNodeKind DocumentContainerType where
             SequenceOrder $
                 pure <$> (f mainDocT : map f appSecsT)
 
-    navHeadingGenerationOfRaw _ = NavHeadingStatic "(header)"
+newtype DocumentContainerHeaderFormat
+    = DocumentContainerHeaderFormat
+        NavTocHeading
+    deriving (Show)
 
 -- | The format of a printed header/footer.
 data HeaderFooterFormat
