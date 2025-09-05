@@ -159,8 +159,7 @@ getUserHandler (Authenticated Auth.Token {..}) requestedUserID = do
                                 Right roles ->
                                     let roles' = [User.GroupRole group name role | (group, name, Just role) <- roles]
                                      in return $ User.FullUser requestedUserID userName userEmail isSuper roles'
-        else
-            throwError errSuperAdminOnly
+        else throwError errSuperAdminOnly
 getUserHandler _ _ = throwError errNotLoggedIn
 
 deleteUserHandler
@@ -173,8 +172,7 @@ deleteUserHandler (Authenticated Auth.Token {..}) requestedUserID =
             case eAction of
                 Left _ -> throwError errDatabaseAccessFailed
                 Right _ -> return NoContent
-        else
-            throwError errSuperAdminOnly
+        else throwError errSuperAdminOnly
 deleteUserHandler _ _ = throwError errNotLoggedIn
 
 patchUserHandler
@@ -193,8 +191,7 @@ patchUserHandler (Authenticated Auth.Token {..}) userID (Auth.UserUpdate {..}) =
                     Right (Just user)
                         | User.userID user == userID -> patchUser conn
                         | otherwise -> throwError errEmailAlreadyUsed
-        else
-            throwError errSuperAdminOnly
+        else throwError errSuperAdminOnly
   where
     patchUser :: Connection -> Handler NoContent
     patchUser conn = do
