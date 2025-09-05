@@ -10,8 +10,8 @@ import Control.Monad.State (runState)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Encoding as TLE
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import Language.Lsd.AST.Type (NamedType (NamedType))
 import Language.Lsd.Example.Fpo (footnoteT, sectionT)
 import Language.Ltml.Parser (Parser)
@@ -64,7 +64,7 @@ runLatex texFile workDir = do
     return (exitCode, out, err)
 
 generatePDFfromParsed
-    :: Parser a -> (a -> LT.Text) -> Text -> IO (Either String BSL.ByteString)
+    :: Parser a -> (a -> T.Text) -> Text -> IO (Either String BSL.ByteString)
 generatePDFfromParsed parser render input =
     case runParser parser "" input of
         Left err -> return $ Left (errorBundlePretty err)
@@ -76,7 +76,7 @@ generatePDFfromParsed parser render input =
 
                 -- Write LaTeX source
                 -- LTIO.writeFile texFile (render parsedInput)
-                BSL.writeFile texFile (TLE.encodeUtf8 (render parsedInput))
+                BS.writeFile texFile (TE.encodeUtf8 (render parsedInput))
 
                 -- Compile with pdflatex
                 (exitCode, stdout, _) <- runLatex texFile tmpDir

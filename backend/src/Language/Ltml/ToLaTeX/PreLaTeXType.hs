@@ -44,15 +44,15 @@ module Language.Ltml.ToLaTeX.PreLaTeXType
     , enumStyle
     ) where
 
-import qualified Data.Text.Lazy as LT
+import qualified Data.Text as T
 import Language.Ltml.AST.Label (Label (Label))
 
 data PreLaTeX
-    = IText LT.Text
-    | IRaw LT.Text -- raw unescaped PreLaTeX
-    | ICommandS LT.Text -- \command
-    | ICommand LT.Text [LT.Text] [PreLaTeX] -- \command[opts]{args}
-    | IEnvironment LT.Text [LT.Text] [PreLaTeX] -- \begin{env}[opts] ... \end{env}
+    = IText T.Text
+    | IRaw T.Text -- raw unescaped PreLaTeX
+    | ICommandS T.Text -- \command
+    | ICommand T.Text [T.Text] [PreLaTeX] -- \command[opts]{args}
+    | IEnvironment T.Text [T.Text] [PreLaTeX] -- \begin{env}[opts] ... \end{env}
     | IBraced PreLaTeX -- used for wrapping in braces
     | ISequence [PreLaTeX] -- concatenation
     {- the reason why we introduced this intermediate data type: -}
@@ -82,7 +82,7 @@ instance Monoid PreLaTeX where
 -------------------------------------------------------------------------------
 {-                                styling                                   -}
 
-text :: LT.Text -> PreLaTeX
+text :: T.Text -> PreLaTeX
 text = IText
 
 bold :: PreLaTeX -> PreLaTeX
@@ -107,36 +107,36 @@ footnote :: PreLaTeX -> PreLaTeX
 footnote = ICommand "footnote" [] . (: [])
 
 hypertarget :: Label -> PreLaTeX -> PreLaTeX
-hypertarget (Label l) latex = ICommand "hypertarget" [] [IText (LT.fromStrict l), latex]
+hypertarget (Label l) latex = ICommand "hypertarget" [] [IText l, latex]
 
 hyperlink :: Label -> PreLaTeX -> PreLaTeX
-hyperlink (Label l) latex = ICommand "hyperlink" [] [IText (LT.fromStrict l), latex]
+hyperlink (Label l) latex = ICommand "hyperlink" [] [IText l, latex]
 
-label :: LT.Text -> PreLaTeX
+label :: T.Text -> PreLaTeX
 label l = ICommand "label" [] [IText l]
 
-footref :: LT.Text -> PreLaTeX
+footref :: T.Text -> PreLaTeX
 footref r = ICommand "footref" [] [IText r]
 
 -------------------------------------------------------------------------------
 {-                             setup and metadata                             -}
 
-usepackage :: [LT.Text] -> LT.Text -> PreLaTeX
+usepackage :: [T.Text] -> T.Text -> PreLaTeX
 usepackage opts package = ICommand "usepackage" opts [IText package]
 
-documentclass :: [LT.Text] -> LT.Text -> PreLaTeX
+documentclass :: [T.Text] -> T.Text -> PreLaTeX
 documentclass opts name = ICommand "documentclass" opts [IText name]
 
-fancyhead :: [LT.Text] -> PreLaTeX -> PreLaTeX
+fancyhead :: [T.Text] -> PreLaTeX -> PreLaTeX
 fancyhead opts content = ICommand "fancyhead" opts [content]
 
-fancyfoot :: [LT.Text] -> PreLaTeX -> PreLaTeX
+fancyfoot :: [T.Text] -> PreLaTeX -> PreLaTeX
 fancyfoot opts content = ICommand "fancyfoot" opts [content]
 
 resetfootnote :: PreLaTeX
 resetfootnote = ICommand "setcounter" [] [IText "footnote", IText "0"]
 
-setpdftitle :: LT.Text -> PreLaTeX
+setpdftitle :: T.Text -> PreLaTeX
 setpdftitle title = ICommand "hypersetup" [] [IText $ "pdftitle={" <> title <> "}"]
 
 -------------------------------------------------------------------------------
@@ -157,7 +157,7 @@ hrule = ICommandS "hrule"
 -------------------------------------------------------------------------------
 {-                              environments                                 -}
 
-enumerate :: [LT.Text] -> [PreLaTeX] -> PreLaTeX
+enumerate :: [T.Text] -> [PreLaTeX] -> PreLaTeX
 enumerate opts items = IEnvironment "enumerate" opts (map (\i -> ICommand "item" [] [i]) items)
 
 itemize :: [PreLaTeX] -> PreLaTeX
@@ -172,7 +172,7 @@ flushleft = IEnvironment "flushleft" []
 flushright :: [PreLaTeX] -> PreLaTeX
 flushright = IEnvironment "flushright" []
 
-minipage :: [LT.Text] -> [PreLaTeX] -> PreLaTeX
+minipage :: [T.Text] -> [PreLaTeX] -> PreLaTeX
 minipage = IEnvironment "minipage"
 
 document :: PreLaTeX -> PreLaTeX
