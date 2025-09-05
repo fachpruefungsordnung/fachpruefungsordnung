@@ -15,7 +15,7 @@ import Language.Ltml.AST.DocumentContainer
     ( DocumentContainer (DocumentContainer)
     , DocumentContainerHeader
     )
-import Language.Ltml.Common (Flagged', Parsed)
+import Language.Ltml.Common (Flagged', NavTocHeaded (NavTocHeaded), Parsed)
 import Language.Ltml.Parser.DocumentContainer (documentContainerHeaderP)
 import Language.Ltml.Tree (FlaggedInputTree', InputTree', Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
@@ -36,10 +36,10 @@ documentContainerTP = disjNFlaggedTreePF aux
     aux _ (Leaf _) = fail "Document container node is leaf"
     aux _ (Tree _ []) = fail "Document container lacks main document child"
     aux
-        (DocumentContainerType fmt mainDocT appsT)
+        (DocumentContainerType fmt nth mainDocT appsT)
         (Tree x (mainDocTree : trees)) =
             DocumentContainer fmt
-                <$> headerTP x
+                <$> (NavTocHeaded nth <$> headerTP x)
                 <*> documentTP mainDocT mainDocTree
                 <*> appendicesTP appsT trees
 

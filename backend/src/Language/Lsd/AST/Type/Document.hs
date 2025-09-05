@@ -10,9 +10,6 @@ module Language.Lsd.AST.Type.Document
     , DocumentMainBodyType (..)
     , DocumentIntroType (..)
     , DocumentExtroType (..)
-    , DocumentMainBodyFormat (..)
-    , DocumentIntroFormat (..)
-    , DocumentExtroFormat (..)
     )
 where
 
@@ -82,7 +79,7 @@ data DocumentBodyType
 
 data DocumentMainBodyType
     = DocumentMainBodyType
-        DocumentMainBodyFormat
+        NavTocHeading
         SectionBodyType
 
 instance ProperNodeKind DocumentMainBodyType where
@@ -107,7 +104,7 @@ instance ProperNodeKind DocumentMainBodyType where
 
 data DocumentIntroType
     = DocumentIntroType
-        DocumentIntroFormat
+        NavTocHeading
         (Sequence (NamedType SimpleSectionType))
 
 instance ProperNodeKind DocumentIntroType where
@@ -118,7 +115,7 @@ instance ProperNodeKind DocumentIntroType where
 
 data DocumentExtroType
     = DocumentExtroType
-        DocumentExtroFormat
+        NavTocHeading
         (Sequence (NamedType SimpleSectionType))
 
 instance ProperNodeKind DocumentExtroType where
@@ -126,18 +123,3 @@ instance ProperNodeKind DocumentExtroType where
     typeNameOf _ = ""
     displayTypeNameOf _ = "document extro"
     treeSyntaxMap _ _ = LeafSyntax
-
-newtype DocumentMainBodyFormat
-    = DocumentMainBodyFormat
-        NavTocHeading
-    deriving (Show)
-
-newtype DocumentIntroFormat
-    = DocumentIntroFormat
-        NavTocHeading
-    deriving (Show)
-
-newtype DocumentExtroFormat
-    = DocumentExtroFormat
-        NavTocHeading
-    deriving (Show)

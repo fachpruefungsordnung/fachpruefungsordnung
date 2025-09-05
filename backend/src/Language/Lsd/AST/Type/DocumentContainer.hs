@@ -3,7 +3,6 @@
 module Language.Lsd.AST.Type.DocumentContainer
     ( DocumentContainerFormat (..)
     , DocumentContainerType (..)
-    , DocumentContainerHeaderFormat (..)
     , HeaderFooterFormat (..)
     , HeaderFooterItemFormat (..)
     , HeaderFooterFormatAtom (..)
@@ -27,7 +26,6 @@ import Language.Lsd.AST.Type.Document (DocumentType)
 data DocumentContainerFormat
     = -- | format
       DocumentContainerFormat
-        DocumentContainerHeaderFormat
         HeaderFooterFormat
         -- ^ header format
         HeaderFooterFormat
@@ -39,21 +37,19 @@ data DocumentContainerFormat
 data DocumentContainerType
     = DocumentContainerType
         DocumentContainerFormat
+        NavTocHeading
         (NamedType DocumentType)
         (Sequence (NamedType AppendixSectionType))
 
 instance RawProperNodeKind DocumentContainerType where
     kindNameOfRaw _ = "document-container"
 
-    treeSyntaxMapRaw f (DocumentContainerType _ mainDocT (Sequence appSecsT)) =
-        TreeSyntax (HasEditableHeader True) $
-            SequenceOrder $
-                pure <$> (f mainDocT : map f appSecsT)
-
-newtype DocumentContainerHeaderFormat
-    = DocumentContainerHeaderFormat
-        NavTocHeading
-    deriving (Show)
+    treeSyntaxMapRaw
+        f
+        (DocumentContainerType _ _ mainDocT (Sequence appSecsT)) =
+            TreeSyntax (HasEditableHeader True) $
+                SequenceOrder $
+                    pure <$> (f mainDocT : map f appSecsT)
 
 -- | The format of a printed header/footer.
 data HeaderFooterFormat

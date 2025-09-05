@@ -8,7 +8,7 @@ where
 import Control.Functor.Utils (Pure, sequenceEither)
 import Control.Monad.Identity (runIdentity)
 import Data.Text (Text)
-import Language.Lsd.AST.Common (Keyword)
+import Language.Lsd.AST.Common (Keyword, NavTocHeading)
 import Language.Lsd.AST.SimpleRegex (Disjunction (Disjunction), Sequence)
 import Language.Lsd.AST.Type
     ( NamedType
@@ -26,14 +26,14 @@ import Language.Lsd.AST.Type.SimpleSection (SimpleSectionType)
 import Language.Ltml.AST.Document
     ( Document (Document)
     , DocumentBody (DocumentBody)
-    , DocumentExtro (DocumentExtro)
+    , DocumentExtro
     , DocumentHeading
-    , DocumentIntro (DocumentIntro)
-    , DocumentMainBody (DocumentMainBody)
+    , DocumentIntro
+    , DocumentMainBody
     )
 import Language.Ltml.AST.Section (SectionBody)
 import Language.Ltml.AST.SimpleSection (SimpleSection)
-import Language.Ltml.Common (Flagged', Parsed)
+import Language.Ltml.Common (Flagged', NavTocHeaded (NavTocHeaded), Parsed)
 import Language.Ltml.Parser.Document (documentHeadingP)
 import Language.Ltml.Parser.Footnote (runFootnoteWriterT)
 import Language.Ltml.Parser.Section (sectionBodyP)
@@ -103,42 +103,41 @@ bodyTP _ _ = fail "Invalid number of document body children"
 introTP
     :: DocumentIntroType
     -> FlaggedInputTree'
-    -> FootnoteTreeParser (Flagged' (Parsed DocumentIntro))
+    -> FootnoteTreeParser (Flagged' (NavTocHeaded (Parsed DocumentIntro)))
 introTP = flaggedTreePF aux
   where
-    aux (DocumentIntroType fmt t) tree =
-        fmap (DocumentIntro fmt) <$> introExtroTP' "intro" t tree
+    aux (DocumentIntroType nth t) = introExtroTP' "intro" nth t
 
 extroTP
     :: DocumentExtroType
     -> FlaggedInputTree'
-    -> FootnoteTreeParser (Flagged' (Parsed DocumentExtro))
+    -> FootnoteTreeParser (Flagged' (NavTocHeaded (Parsed DocumentExtro)))
 extroTP = flaggedTreePF aux
   where
-    aux (DocumentExtroType fmt t) tree =
-        fmap (DocumentExtro fmt) <$> introExtroTP' "extro" t tree
+    aux (DocumentExtroType nth t) = introExtroTP' "extro" nth t
 
 introExtroTP'
     :: String
+    -> NavTocHeading
     -> Sequence (NamedType SimpleSectionType)
     -> InputTree'
-    -> FootnoteTreeParser (Parsed [SimpleSection])
-introExtroTP' _ t (Leaf x) =
-    leafFootnoteParser (simpleSectionSequenceP (fmap unwrapNT t) eof) x
-introExtroTP' ename _ _ = fail $ "Document " ++ ename ++ " is not leaf"
+    -> FootnoteTreeParser (NavTocHeaded (Parsed [SimpleSection]))
+introExtroTP' _ nth t (Leaf x) =
+    NavTocHeaded nth
+        <$> leafFootnoteParser (simpleSectionSequenceP (fmap unwrapNT t) eof) x
+introExtroTP' ename _ _ _ = fail $ "Document " ++ ename ++ " is not leaf"
 
 mainTP
     :: Disjunction DocumentMainBodyType
     -> FlaggedInputTree'
-    -> FootnoteTreeParser (Flagged' (Parsed DocumentMainBody))
+    -> FootnoteTreeParser (Flagged' (NavTocHeaded (Parsed DocumentMainBody)))
 mainTP = disjFlaggedTreePF aux
   where
     aux
         :: DocumentMainBodyType
         -> InputTree'
-        -> FootnoteTreeParser (Parsed DocumentMainBody)
-    aux (DocumentMainBodyType fmt t) tree =
-        fmap (DocumentMainBody fmt) <$> aux' tree
+        -> FootnoteTreeParser (NavTocHeaded (Parsed DocumentMainBody))
+    aux (DocumentMainBodyType nth t) tree = NavTocHeaded nth <$> aux' tree
       where
         aux' :: InputTree' -> FootnoteTreeParser (Parsed SectionBody)
         aux' (Leaf x) = leafFootnoteParser (sectionBodyP t eof) x

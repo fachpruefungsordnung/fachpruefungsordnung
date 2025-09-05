@@ -2,25 +2,20 @@ module Language.Ltml.AST.Document
     ( Document (..)
     , DocumentHeading (..)
     , DocumentBody (..)
-    , DocumentMainBody (..)
-    , DocumentIntro (..)
-    , DocumentExtro (..)
+    , DocumentMainBody
+    , DocumentIntro
+    , DocumentExtro
     )
 where
 
 import Data.Map (Map)
-import Language.Lsd.AST.Type.Document
-    ( DocumentExtroFormat
-    , DocumentFormat
-    , DocumentIntroFormat
-    , DocumentMainBodyFormat
-    )
+import Language.Lsd.AST.Type.Document (DocumentFormat)
 import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Section (SectionBody)
 import Language.Ltml.AST.SimpleSection (SimpleSection)
 import Language.Ltml.AST.Text (HeadingTextTree)
-import Language.Ltml.Common (Flagged', Parsed)
+import Language.Ltml.Common (Flagged', NavTocHeaded, Parsed)
 
 data Document
     = Document
@@ -40,25 +35,13 @@ newtype DocumentHeading = DocumentHeading [HeadingTextTree]
 
 data DocumentBody
     = DocumentBody
-        (Flagged' (Parsed DocumentIntro))
-        (Flagged' (Parsed DocumentMainBody))
-        (Flagged' (Parsed DocumentExtro))
+        (Flagged' (NavTocHeaded (Parsed DocumentIntro)))
+        (Flagged' (NavTocHeaded (Parsed DocumentMainBody)))
+        (Flagged' (NavTocHeaded (Parsed DocumentExtro)))
     deriving (Show)
 
-data DocumentMainBody
-    = DocumentMainBody
-        DocumentMainBodyFormat
-        SectionBody
-    deriving (Show)
+type DocumentMainBody = SectionBody
 
-data DocumentIntro
-    = DocumentIntro
-        DocumentIntroFormat
-        [SimpleSection]
-    deriving (Show)
+type DocumentIntro = [SimpleSection]
 
-data DocumentExtro
-    = DocumentExtro
-        DocumentExtroFormat
-        [SimpleSection]
-    deriving (Show)
+type DocumentExtro = [SimpleSection]

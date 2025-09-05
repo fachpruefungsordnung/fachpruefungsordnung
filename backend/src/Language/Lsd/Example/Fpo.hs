@@ -37,18 +37,14 @@ fpoT =
     NamedType "fpo-container" "Fachprüfungsordnung" $
         DocumentContainerType
             ( DocumentContainerFormat
-                containerHeaderFormat
                 headerFormat
                 footerFormat
                 headingFormat
             )
+            (NavTocHeading "Header")
             mainDocT
             (Sequence [appendixT, attachmentT])
   where
-    containerHeaderFormat =
-        DocumentContainerHeaderFormat $
-            NavTocHeading "Header"
-
     headingFormat =
         HeadingFormat
             (Typography Centered LargeFontSize [Bold])
@@ -210,17 +206,17 @@ simpleDocT =
 docMainBodyTF :: SectionBodyType -> DocumentMainBodyType
 docMainBodyTF =
     DocumentMainBodyType
-        (DocumentMainBodyFormat $ NavTocHeading "Hauptteil")
+        (NavTocHeading "Hauptteil")
 
 docIntroTF :: Sequence (NamedType SimpleSectionType) -> DocumentIntroType
 docIntroTF =
     DocumentIntroType
-        (DocumentIntroFormat $ NavTocHeading "Intro")
+        (NavTocHeading "Intro")
 
 docExtroTF :: Sequence (NamedType SimpleSectionType) -> DocumentExtroType
 docExtroTF =
     DocumentExtroType
-        (DocumentExtroFormat $ NavTocHeading "Extro")
+        (NavTocHeading "Extro")
 
 dateSSecT :: NamedType SimpleSectionType
 dateSSecT =

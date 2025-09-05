@@ -6,12 +6,14 @@ module Language.Ltml.Common
     , flagMap
     , ParseError
     , Parsed
+    , NavTocHeaded (..)
     )
 where
 
 import Control.Functor.Utils (TraversableF (traverseF))
 import Data.Text (Text)
 import Data.Void (Void)
+import Language.Lsd.AST.Common (NavTocHeading)
 import Text.Megaparsec (ParseErrorBundle)
 
 data Flagged flag a = Flagged flag a
@@ -42,3 +44,6 @@ type ParseError = ParseErrorBundle Text Void
 --   I.e., this is used with nodes that can correspond to leaf nodes in the
 --   input tree.
 type Parsed = Either ParseError
+
+data NavTocHeaded a = NavTocHeaded NavTocHeading a
+    deriving (Show)
