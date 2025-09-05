@@ -39,16 +39,19 @@ fpoT =
             ( DocumentContainerFormat
                 headerFormat
                 footerFormat
-                headingFormat
+                mainDocFormat
             )
             (NavTocHeading "Header")
             mainDocT
             (Sequence [appendixT, attachmentT])
   where
-    headingFormat =
-        HeadingFormat
-            (Typography Centered LargeFontSize [Bold])
-            (FormatString [PlaceholderAtom HeadingTextPlaceholder])
+    mainDocFormat =
+        MainDocumentFormat
+            (Fallback $ NavTocHeading "(Dokument-Titel)")
+            ( HeadingFormat
+                (Typography Centered LargeFontSize [Bold])
+                (FormatString [PlaceholderAtom HeadingTextPlaceholder])
+            )
 
     headerFormat =
         HeaderFooterFormat

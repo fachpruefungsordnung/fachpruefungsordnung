@@ -7,6 +7,7 @@ module Language.Lsd.AST.Common
     , DisplayTypeName (..)
     , Keyword (..)
     , NavTocHeading (..)
+    , Fallback (..)
     )
 where
 
@@ -29,4 +30,9 @@ newtype Keyword = Keyword Text
 -- | Heading for the navigation TOC in the frontend, if static (determined by
 --   type only).
 newtype NavTocHeading = NavTocHeading Text
+    deriving (Show)
+
+-- | A wrapper to denote values that should only be used as fallback;
+--   typically in case parsing fails.
+newtype Fallback a = Fallback a
     deriving (Show)
