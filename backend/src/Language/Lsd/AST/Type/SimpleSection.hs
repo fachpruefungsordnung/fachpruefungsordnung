@@ -16,8 +16,7 @@ import Language.Lsd.AST.Type
     )
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphType)
 
-newtype SimpleSectionFormat
-    = SimpleSectionFormat
+newtype SimpleSectionFormat = SimpleSectionFormat
     { ssHasPrecedingHorizontalBar :: Bool
     }
     deriving (Show)

@@ -172,8 +172,7 @@ instance ToHtmlM Document where
                             delayedTocHtml <- renderDelayedToc mTocFormat
                             docPartsHtml <- renderDocParts
                             return (delayedTocHtml, docPartsHtml)
-                        else
-                            -- \| Reset ToC temporarily to build a local ToC, then write back the global ToC
+                        else -- \| Reset ToC temporarily to build a local ToC, then write back the global ToC
                             withModified
                                 tableOfContents
                                 (\s a -> s {tableOfContents = a})
@@ -309,7 +308,9 @@ instance ToHtmlM (Node Paragraph) where
                     div_ [cssClass_ Class.Paragraph, mId_ mLabel]
                         -- \| If this is the only paragraph inside this section we drop the visible paragraphID
                         <$> let idHtml = if isSingleParagraph readerState then mempty else paragraphKeyHtml
-                             in return (div_ <#> Class.ParagraphID $ idHtml) <> div_ <#> Class.TextContainer
+                             in return (div_ <#> Class.ParagraphID $ idHtml)
+                                    <> div_
+                                        <#> Class.TextContainer
                                     <$> childText
 
 -------------------------------------------------------------------------------
