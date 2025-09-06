@@ -165,12 +165,13 @@ mainDocT =
             (DocumentFormat $ Just $ TocFormat $ TocHeading "Inhaltsübersicht")
             (DocumentHeadingType plainTextT)
             ( DocumentBodyType
-                ( docIntroTF $
-                    Sequence
-                        [ dateSSecT
-                        , publLogSSecT
-                        , introSSecT
-                        ]
+                ( Just $
+                    docIntroTF $
+                        Sequence
+                            [ dateSSecT
+                            , publLogSSecT
+                            , introSSecT
+                            ]
                 )
                 ( Disjunction
                     [ docMainBodyTF $
@@ -179,11 +180,12 @@ mainDocT =
                         InnerSectionBodyType (Star superSectionT)
                     ]
                 )
-                ( docExtroTF $
-                    Sequence
-                        [ extroSSecT
-                        , legalLogSSecT
-                        ]
+                ( Just $
+                    docExtroTF $
+                        Sequence
+                            [ extroSSecT
+                            , legalLogSSecT
+                            ]
                 )
             )
             (Disjunction [footnoteT])
@@ -196,13 +198,13 @@ simpleDocT =
             (DocumentFormat Nothing)
             (DocumentHeadingType plainTextT)
             ( DocumentBodyType
-                (docIntroTF $ Sequence [])
+                Nothing
                 ( Disjunction
                     [ docMainBodyTF $
                         SimpleLeafSectionBodyType (Star simpleBlockT)
                     ]
                 )
-                (docExtroTF $ Sequence [])
+                Nothing
             )
             (Disjunction [footnoteT])
 

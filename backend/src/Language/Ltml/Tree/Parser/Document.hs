@@ -6,7 +6,17 @@ module Language.Ltml.Tree.Parser.Document
 where
 
 import Control.Functor.Utils (Pure, sequenceEither)
+import Control.Monad.ConsumableStack
+    ( ConsumableStackError
+        ( ConsumableStackDepletedEarly
+        , ConsumableStackNotFullyConsumed
+        )
+    , ConsumableStackT
+    , pop
+    , runConsumableStackT
+    )
 import Control.Monad.Identity (runIdentity)
+import Control.Monad.Trans (lift)
 import Data.Text (Text)
 import Language.Lsd.AST.Common (Keyword, NavTocHeading)
 import Language.Lsd.AST.SimpleRegex (Disjunction (Disjunction), Sequence)
@@ -93,12 +103,19 @@ bodyTP
     :: DocumentBodyType
     -> [FlaggedInputTree']
     -> FootnoteTreeParser DocumentBody
-bodyTP (DocumentBodyType introT mainT extroT) [intro, main, extro] =
-    DocumentBody
-        <$> introTP introT intro
-        <*> mainTP mainT main
-        <*> extroTP extroT extro
-bodyTP _ _ = fail "Invalid number of document body children"
+bodyTP (DocumentBodyType introT mainT extroT) trees =
+    runConsumableStackT aux trees >>= either (fail . prettyError) return
+  where
+    aux :: ConsumableStackT FlaggedInputTree' FootnoteTreeParser DocumentBody
+    aux =
+        DocumentBody
+            <$> traverse (\t -> pop >>= lift . introTP t) introT
+            <*> (pop >>= lift . mainTP mainT)
+            <*> traverse (\t -> pop >>= lift . extroTP t) extroT
+
+    prettyError ConsumableStackDepletedEarly = "Too few document body children"
+    prettyError ConsumableStackNotFullyConsumed =
+        "Too many document body children"
 
 introTP
     :: DocumentIntroType

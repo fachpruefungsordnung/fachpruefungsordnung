@@ -35,9 +35,9 @@ newtype DocumentHeading = DocumentHeading [HeadingTextTree]
 
 data DocumentBody
     = DocumentBody
-        (Flagged' (NavTocHeaded (Parsed DocumentIntro)))
+        (Maybe (Flagged' (NavTocHeaded (Parsed DocumentIntro))))
         (Flagged' (NavTocHeaded (Parsed DocumentMainBody)))
-        (Flagged' (NavTocHeaded (Parsed DocumentExtro)))
+        (Maybe (Flagged' (NavTocHeaded (Parsed DocumentExtro))))
     deriving (Show)
 
 type DocumentMainBody = SectionBody

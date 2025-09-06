@@ -13,6 +13,7 @@ module Language.Lsd.AST.Type.Document
     )
 where
 
+import Data.Maybe (catMaybes)
 import Data.Text (Text)
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword, NavTocHeading)
@@ -63,19 +64,19 @@ instance RawProperNodeKind DocumentType where
         TreeSyntax (HasEditableHeader True) $ aux bodyT
       where
         aux (DocumentBodyType introT mainT extroT) =
-            SequenceOrder
-                [ pure $ f introT
-                , fmap f mainT
-                , pure $ f extroT
+            SequenceOrder . catMaybes $
+                [ pure . f <$> introT
+                , Just $ fmap f mainT
+                , pure . f <$> extroT
                 ]
 
 newtype DocumentHeadingType = DocumentHeadingType (TextType Void)
 
 data DocumentBodyType
     = DocumentBodyType
-        DocumentIntroType
+        (Maybe DocumentIntroType)
         (Disjunction DocumentMainBodyType)
-        DocumentExtroType
+        (Maybe DocumentExtroType)
 
 data DocumentMainBodyType
     = DocumentMainBodyType
