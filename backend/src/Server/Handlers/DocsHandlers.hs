@@ -418,7 +418,7 @@ postTextRevisionHandler
     -> CreateTextRevision
     -> Handler ConflictStatus
 postTextRevisionHandler auth docID textID mIsAutoSave revision = do
-    let isAutoSave = fromMaybe False mIsAutoSave  -- Default to False if not provided
+    let isAutoSave = fromMaybe False mIsAutoSave -- Default to False if not provided
     userID <- getUser auth
     withDB $
         runTransaction $
