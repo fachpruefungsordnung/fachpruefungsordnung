@@ -263,24 +263,10 @@ legalLogSSecT =
             SimpleSectionFormat {ssHasPrecedingHorizontalBar = True}
             (Star simpleParagraphT)
 
-superSectionT :: NamedType SectionType
+superSectionT :: NamedType FormattedSectionType
 superSectionT =
     NamedType "supersection" "Abschnitt" $
-        SectionType
-            (Keyword "=")
-            ( HeadingType
-                ( HeadingFormat
-                    (Typography LeftAligned MediumFontSize [Bold])
-                    ( FormatString
-                        [ StringAtom "Abschnitt "
-                        , PlaceholderAtom IdentifierPlaceholder
-                        , StringAtom " "
-                        , PlaceholderAtom HeadingTextPlaceholder
-                        ]
-                    )
-                )
-                plainTextT
-            )
+        SectionFormatted
             ( SectionFormat
                 (FormatString [PlaceholderAtom Arabic])
                 ( TocKeyFormat $
@@ -290,26 +276,28 @@ superSectionT =
                         ]
                 )
             )
-            (InnerSectionBodyType (Star sectionT))
+            ( SectionType
+                (Keyword "=")
+                ( HeadingType
+                    ( HeadingFormat
+                        (Typography LeftAligned MediumFontSize [Bold])
+                        ( FormatString
+                            [ StringAtom "Abschnitt "
+                            , PlaceholderAtom IdentifierPlaceholder
+                            , StringAtom " "
+                            , PlaceholderAtom HeadingTextPlaceholder
+                            ]
+                        )
+                    )
+                    plainTextT
+                )
+                (InnerSectionBodyType (Star sectionT))
+            )
 
-sectionT :: NamedType SectionType
+sectionT :: NamedType FormattedSectionType
 sectionT =
     NamedType "section" "Paragraph" $
-        SectionType
-            (Keyword "§")
-            ( HeadingType
-                ( HeadingFormat
-                    (Typography Centered MediumFontSize [Bold])
-                    ( FormatString
-                        [ StringAtom "§ "
-                        , PlaceholderAtom IdentifierPlaceholder
-                        , StringAtom "\n"
-                        , PlaceholderAtom HeadingTextPlaceholder
-                        ]
-                    )
-                )
-                plainTextT
-            )
+        SectionFormatted
             ( SectionFormat
                 (FormatString [PlaceholderAtom Arabic])
                 ( TocKeyFormat $
@@ -319,7 +307,23 @@ sectionT =
                         ]
                 )
             )
-            (LeafSectionBodyType (Star paragraphT))
+            ( SectionType
+                (Keyword "§")
+                ( HeadingType
+                    ( HeadingFormat
+                        (Typography Centered MediumFontSize [Bold])
+                        ( FormatString
+                            [ StringAtom "§ "
+                            , PlaceholderAtom IdentifierPlaceholder
+                            , StringAtom "\n"
+                            , PlaceholderAtom HeadingTextPlaceholder
+                            ]
+                        )
+                    )
+                    plainTextT
+                )
+                (LeafSectionBodyType (Star paragraphT))
+            )
 
 paragraphT :: NamedType ParagraphType
 paragraphT =

@@ -4,20 +4,22 @@ module Language.Ltml.Tree.Parser.Section
     )
 where
 
-import Control.Functor.Utils (sequenceEither)
+import Control.Functor.Utils (sequenceEither, traverseF)
 import Control.Monad.Trans.Class (lift)
 import Data.Text (Text)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Star (Star))
 import Language.Lsd.AST.Type (NamedType)
 import Language.Lsd.AST.Type.Section
-    ( HeadingType
+    ( FormattedSectionType
+    , HeadingType
     , SectionBodyType (InnerSectionBodyType)
     , SectionType (SectionType)
     )
 import Language.Ltml.AST.Node (Node)
 import Language.Ltml.AST.Section
-    ( Heading
+    ( FormattedSection
+    , Heading
     , Section (Section)
     , SectionBody (InnerSectionBody)
     )
@@ -33,21 +35,28 @@ import Language.Ltml.Tree.Parser
     )
 import Text.Megaparsec (eof)
 
+{-# ANN sectionTP "HLint: ignore Avoid lambda using `infix`" #-}
 sectionTP
-    :: NamedType SectionType
+    :: NamedType FormattedSectionType
     -> FlaggedInputTree'
-    -> FootnoteTreeParser (Flagged' (Parsed (Node Section)))
+    -> FootnoteTreeParser (Flagged' FormattedSection)
 sectionTP = nFlaggedTreePF sectionTP'
   where
     sectionTP'
-        :: SectionType
+        :: FormattedSectionType
         -> InputTree'
-        -> FootnoteTreeParser (Parsed (Node Section))
-    sectionTP' t (Leaf x) = leafFootnoteParser (sectionP t eof) x
-    sectionTP' (SectionType kw headingT fmt bodyT) (Tree x children) = do
-        wHeading <- lift $ sequenceEither <$> headingTP kw headingT x
-        body <- sectionBodyTP bodyT children
-        return $ Right $ fmap (\heading -> Section fmt heading body) wHeading
+        -> FootnoteTreeParser FormattedSection
+    sectionTP' t' tree = traverseF (\t -> sectionTP'' t tree) t'
+      where
+        sectionTP''
+            :: SectionType
+            -> InputTree'
+            -> FootnoteTreeParser (Parsed (Node Section))
+        sectionTP'' t (Leaf x) = leafFootnoteParser (sectionP t eof) x
+        sectionTP'' (SectionType kw headingT bodyT) (Tree x children) = do
+            wHeading <- lift $ sequenceEither <$> headingTP kw headingT x
+            body <- sectionBodyTP bodyT children
+            return $ Right $ fmap (\heading -> Section heading body) wHeading
 
 headingTP
     :: Keyword

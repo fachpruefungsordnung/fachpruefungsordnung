@@ -1,15 +1,20 @@
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Language.Lsd.AST.Type.Section
     ( SectionFormat (..)
+    , SectionFormatted (..)
     , SectionType (..)
+    , FormattedSectionType
     , HeadingType (..)
     , SectionBodyType (..)
     , sectionBodyChildrenOrderMap
     )
 where
 
+import Control.Functor.Utils (TraversableF (traverseF))
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.Format
@@ -36,19 +41,26 @@ data SectionFormat
         TocKeyFormat
     deriving (Show)
 
+data SectionFormatted a = SectionFormatted SectionFormat a
+    deriving (Show, Functor)
+
+instance TraversableF SectionFormatted where
+    traverseF f (SectionFormatted fmt x) = SectionFormatted fmt <$> f x
+
+type FormattedSectionType = SectionFormatted SectionType
+
 data SectionType
     = SectionType
         Keyword
         HeadingType
-        SectionFormat
         SectionBodyType
 
-instance RawProperNodeKind SectionType where
+instance RawProperNodeKind FormattedSectionType where
     kindNameOfRaw _ = "section"
 
     -- Note: The parser also permits super-sections as leafs in the input tree.
     --  - Ideally, this should also somehow be reflected here. (TODO)
-    treeSyntaxMapRaw f (SectionType _ _ _ bodyT) =
+    treeSyntaxMapRaw f (SectionFormatted _ (SectionType _ _ bodyT)) =
         case sectionBodyChildrenOrderMap f bodyT of
             Just co -> TreeSyntax (HasEditableHeader True) co
             Nothing -> LeafSyntax
@@ -59,7 +71,7 @@ data HeadingType
         (TextType Void)
 
 data SectionBodyType
-    = InnerSectionBodyType (Star (NamedType SectionType))
+    = InnerSectionBodyType (Star (NamedType FormattedSectionType))
     | LeafSectionBodyType (Star (NamedType ParagraphType))
     | SimpleLeafSectionBodyType (Star (NamedType SimpleBlockType))
 
