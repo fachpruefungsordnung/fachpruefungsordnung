@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.Ltml.Tree.ToMeta
     ( MetaError (..)
     , treeToMeta
@@ -9,9 +6,13 @@ where
 
 import Control.Functor.Utils (traverseF)
 import Control.Monad.ConsumableStack
-    ( ConsumableStackT
+    ( ConsumableStack
+    , ConsumableStackError
+        ( ConsumableStackDepletedEarly
+        , ConsumableStackNotFullyConsumed
+        )
     , pop
-    , runConsumableStackT
+    , runConsumableStack
     )
 import Data.Bifunctor (first)
 import Data.List (find)
@@ -86,21 +87,18 @@ buildMeta' hs tree =
       where
         fullTypeName = (kindName, typeName)
 
-newtype EitherFail a = EitherFail {runEitherFail :: Either String a}
-    deriving (Functor, Applicative, Monad)
-
-instance MonadFail EitherFail where
-    fail = EitherFail . Left
-
-type HeadingStack = ConsumableStackT RenderedTocEntry EitherFail
+type HeadingStack = ConsumableStack RenderedTocEntry
 
 buildMetaTree
     :: [RenderedTocEntry]
     -> FlaggedInputTree ident
     -> Either String (FlaggedMetaTree ident)
 buildMetaTree hs tree0 =
-    runEitherFail $ runConsumableStackT (flaggedTreeF tree0) hs
+    first prettyError $ runConsumableStack (flaggedTreeF tree0) hs
   where
+    prettyError ConsumableStackDepletedEarly = "Too few headings"
+    prettyError ConsumableStackNotFullyConsumed = "Too many headings"
+
     flaggedTreeF
         :: FlaggedInputTree ident
         -> HeadingStack (FlaggedMetaTree ident)
