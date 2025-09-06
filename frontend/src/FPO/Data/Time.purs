@@ -1,12 +1,13 @@
 module FPO.Data.Time
     ( adjustDateTime
     , getEditTimestamp
+    , formatAbsoluteTimeDetailed
     , formatRelativeTime
     ) where
 
 import Prelude
 
-import Data.DateTime (DateTime, adjust, date, day, diff, month, year)
+import Data.DateTime (DateTime, adjust, date, day, diff, hour, minute, month, second, time, year)
 import Data.Enum (fromEnum)
 import Data.Int (floor)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -23,9 +24,20 @@ adjustDateTime duration dt =
 getEditTimestamp ∷ DocumentHeader → DateTime
 getEditTimestamp = DocDate.docDateToDateTime <<< DocumentHeader.getLastEdited
 
-{- formatAbsoluteTimeDetailed :: Maybe DateTime -> String 
+formatAbsoluteTimeDetailed :: Maybe DateTime -> String 
 formatAbsoluteTimeDetailed Nothing = "Unknown"
-formatAbsoluteTimeDetailed (Just current) = -}
+formatAbsoluteTimeDetailed (Just current) =
+    let
+        d' = date current
+        t' = time current
+        y = show $ fromEnum $ year d'
+        m = padZero $ fromEnum $ month d'
+        d = padZero $ fromEnum $ day d'
+        h = padZero $ fromEnum $ hour t'
+        min = padZero $ fromEnum $ minute t'
+        s = padZero $ fromEnum $ second t'
+    in
+        y <> "." <> m <> "." <> d <> " " <> h <> ":" <> min <> ":" <> s
 
 -- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
 formatRelativeTime :: Maybe DateTime -> DateTime -> String
@@ -62,5 +74,6 @@ formatRelativeTime (Just current) updated =
       d = padZero $ fromEnum $ day d'
     in
       d <> "." <> m <> "." <> y
-    where
-    padZero n = if n < 10 then "0" <> show n else show n
+
+padZero :: Int -> String
+padZero n = if n < 10 then "0" <> show n else show n

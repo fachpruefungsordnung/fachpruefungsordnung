@@ -28,7 +28,9 @@ import Data.Array
   )
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..))
+import Data.Int (fromString)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.String as S
 import Data.String.Regex (regex, replace)
 import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
@@ -43,13 +45,14 @@ import FPO.Data.Time (formatRelativeTime)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
-import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..), TreeHeader(..))
+import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..), TreeHeader(..), findRootTree, modifyNodeRootTree)
 import FPO.Dto.PostTextDto (PostTextDto(..))
 import FPO.Dto.PostTextDto as PostTextDto
 -- import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
 import FPO.Types (TOCEntry, TOCTree)
+import FPO.UI.HTML (addField)
 import FPO.Util (isPrefixOf, prependIf)
 import Halogen as H
 import Halogen.HTML as HH
@@ -144,6 +147,8 @@ data Action
   | HighlightDropZone Path DragEvent
   | ClearDropZones
   | CompleteDrop Path
+  | UpdateSearchBarInputs Int String String
+  | ClearSearchData Int
 
 data EntityKind = Section | Paragraph
 
@@ -152,19 +157,15 @@ data Query a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
 
-{- <<<<<<< HEAD
-  | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
-
- <<<<<<< Updated upstream
-data Query a = ReceiveTOCs (TOCTree) a
-=======
-data Query a
-  = ReceiveTOCs (TOCTree) a
-  | RequestCurrentTocEntryTitle (Maybe String -> a)
-  | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
->>>>>>> Stashed changes 
-=======
->>>>>>> main -}
+type SearchData = 
+  { elementID:: Int
+  , year:: Maybe Int
+  , month:: Maybe Int
+  , day:: Maybe Int
+  , hour:: Maybe Int
+  , minute:: Maybe Int
+  , second:: Maybe Int
+  }
 
 type State = FPOState
   ( docID :: DH.DocumentID
@@ -178,6 +179,7 @@ type State = FPOState
   , versions :: Array Version
   , dragState :: Maybe { draggedId :: Path, hoveredId :: Path }
   , requestDelete :: Maybe EntityToDelete
+  , searchData :: RootTree SearchData
   )
 
 tocview
@@ -200,6 +202,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       , dragState: Nothing
       , requestDelete: Nothing
       , translator: fromFpoTranslator store.translator
+      , searchData: Empty
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -223,6 +226,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
               state.showHistoryMenu
               state.mSelectedTocEntry
               state.now
+              state.searchData
               state.tocEntries
           )
     where
@@ -267,7 +271,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -- the newest version requested in this action is assumed to be the newest version in general
     UpdateVersions ts elementID -> do
       s <- H.get
-      history <- H.liftAff $ getTextElemHistory s.docID elementID (DD.DocDate ts) 5
+      history <- H.liftAff $ getTextElemHistory s.docID elementID (DD.DocDate ts) 10
       case history of
         Nothing -> do liftEffect $ log "unable to load textElements"
         Just h -> do
@@ -290,6 +294,56 @@ tocview = connect (selectEq identity) $ H.mkComponent
               Nothing -> nV
 
           H.modify_ _ { versions = newVersions }
+
+    ClearSearchData elementID -> do
+      state <- H.get 
+      let 
+        newSearchData =
+          modifyNodeRootTree
+            (\v -> v.elementID == elementID)
+            ( \v ->
+              { elementID: v.elementID
+              , year: Nothing
+              , month: Nothing
+              , day: Nothing
+              , hour: Nothing
+              , minute: Nothing
+              , second: Nothing
+              }
+            )
+            state.searchData
+      H.modify_ _{searchData = newSearchData}
+
+    UpdateSearchBarInputs elementID label input -> do
+      state <- H.get
+      let 
+        newSearchData = 
+          modifyNodeRootTree
+            (\v -> v.elementID == elementID)
+            ( \v ->
+              { elementID: v.elementID
+              , year: case label of
+                  "year" -> (fromString input)
+                  _ -> v.year
+              , month: case label of
+                  "month" -> (fromString input) 
+                  _ -> v.month
+              , day: case label of
+                  "day" -> (fromString input) 
+                  _ -> v.day
+              , hour: case label of
+                  "hour" -> (fromString input)
+                  _ -> v.hour
+              , minute: case label of
+                  "minute" -> (fromString input) 
+                  _ -> v.minute
+              , second: case label of
+                  "second" -> (fromString input)
+                  _ -> v.second
+              }
+            )
+            state.searchData
+      H.modify_ _{searchData = newSearchData}
 
     OpenVersion elementID vID -> do
       H.raise (ModifyVersion elementID vID)
@@ -496,6 +550,20 @@ tocview = connect (selectEq identity) $ H.mkComponent
       H.modify_ \state ->
         state
           { tocEntries = entries }
+      let 
+        sData = map
+            ( \elem ->
+                { elementID: elem.id
+                , year: Nothing
+                , month: Nothing
+                , day: Nothing
+                , hour: Nothing
+                , minute: Nothing
+                , second: Nothing
+                }
+            )
+            entries
+      H.modify_ _{ searchData = sData}
       pure (Just a)
 
     RequestCurrentTocEntryTitle reply -> do
@@ -517,9 +585,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Array Int
     -> Maybe SelectedEntity
     -> Maybe DateTime
+    -> RootTree SearchData
     -> RootTree TOCEntry
     -> Array (H.ComponentHTML Action slots m)
-  rootTreeToHTML _ _ _ _ _ _ Empty = []
+  rootTreeToHTML _ _ _ _ _ _ _ Empty = []
   rootTreeToHTML
     state
     docName
@@ -527,6 +596,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     historyPath
     mSelectedTocEntry
     now
+    searchData
     (RootTree { children }) =
     [ HH.div
         [ HP.classes [ HB.bgWhite, HB.shadow ] ]
@@ -548,6 +618,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 ( \ix (Edge child) ->
                     treeToHTML state menuPath historyPath 1 mSelectedTocEntry [ ix ]
                       now
+                      searchData
                       child
                 )
                 children
@@ -564,9 +635,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Maybe SelectedEntity
     -> Array Int
     -> Maybe DateTime
+    -> RootTree SearchData
     -> Tree TOCEntry
     -> Array (H.ComponentHTML Action slots m)
-  treeToHTML state menuPath historyPath level mSelectedTocEntry path now = case _ of
+  treeToHTML state menuPath historyPath level mSelectedTocEntry path now searchData = case _ of
     Node { title, children } ->
       let
         selectedClasses =
@@ -609,6 +681,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                       mSelectedTocEntry
                       (path <> [ ix ])
                       now
+                      searchData
                       child
                 )
                 children
@@ -662,6 +735,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     now
                     title
                     id
+                    searchData
                 ]
             ]
         ]
@@ -836,6 +910,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Maybe DateTime
     -> String
     -> Int
+    -> RootTree SearchData
     -> H.ComponentHTML Action slots m
   renderParagraphButtonInterface
     historyPath
@@ -844,7 +919,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
     showHistorySubmenu
     now
     title
-    elementID =
+    elementID 
+    searchData =
     HH.div
       [ HP.classes [ HB.positionRelative ] ] $
       [ historyButton path elementID
@@ -857,9 +933,11 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     [ HB.positionAbsolute
                     , HB.bgWhite
                     , HB.border
+                    , HB.borderSecondary
                     , HB.rounded
                     , HB.shadowSm
                     , HB.py1
+                    , HB.px1
                     ]
                 , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
                 ]
@@ -870,9 +948,125 @@ tocview = connect (selectEq identity) $ H.mkComponent
     where
     -- this is a placeholder that only allows to look at the 5 last versions
     versionHistoryMenu =
+      searchBarSegment
+        <>
+          [HH.div 
+            [HP.style "overflow: auto; max-height: 16.2rem;"]
+            (map
+              (\v -> addVersionButton v)
+              versions)]
+{-     versionHistoryMenu =
       map
         (\v -> addVersionButton v)
-        versions
+        versions -}
+
+    searchBarSegment = 
+      [ HH.div 
+          [ HP.classes [ HB.dFlex, HB.flexColumn ]
+          , HP.style "border-bottom-style: solid; border-color: grey; border-width: 1px;" ] 
+          [ HH.div
+              [ HP.classes [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ] ]
+              [ 
+                (searchBar (fromMaybeToStr versionEntry.year) "year")
+              , punctuation "."
+              , (searchBar (fromMaybeToStr versionEntry.month) "month")
+              , punctuation "."
+              , (searchBar (fromMaybeToStr versionEntry.day) "day")
+              ]
+          , HH.div
+              [ HP.classes [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ] ]
+              [ 
+                (searchBar (fromMaybeToStr versionEntry.hour) "hour")
+              , punctuation ":"
+              , (searchBar (fromMaybeToStr versionEntry.minute) "minute")
+              , punctuation ":"
+              , (searchBar (fromMaybeToStr versionEntry.second) "second")
+              ] 
+          , HH.div
+              [ HP.classes [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb2 ] ]
+              [ searchBarButton
+                  (ClearSearchData elementID)
+                  "bi bi-clipboard2-minus"
+                  "clear"
+              , searchBarButton
+                  DoNothing
+                  "bi bi-search"
+                  "search"
+                {- HH.button
+                  [ HP.classes $
+                      [ HB.btn
+                      , HB.btnPrimary
+                      -- , HB.textStart
+                      , HB.w100
+                      , HB.border0
+                      -- , HB.textBody
+                      , HB.dFlex
+                      , HB.alignItemsCenter
+                      -- , HH.ClassName "toc-item"
+                      -- , HH.ClassName "active"
+                      ]
+
+                  , HE.onClick \_ -> DoNothing
+                  ]
+                  [ HH.text "clear" ]
+              ,  -}{- HH.button
+                  [ HP.classes $  
+                      [ HB.btn
+                      , HB.btnSecondary
+                      --, HB.textStart
+                      , HB.w100
+                      , HB.border0
+                      --, HB.textBody
+                      , HB.dFlex
+                      , HB.alignItemsCenter
+                      --, HH.ClassName "toc-item"
+                      -- , HH.ClassName "active"
+                      ]
+
+                  , HE.onClick \_ -> DoNothing
+                  ]
+                  [ HH.text "search" ] -}
+              ]
+          ]
+      ]
+
+    searchBarButton action biName smallText = HH.button
+      [ HP.classes  [ HB.btn, HB.btnOutlineDark, HB.w100, HB.px1, HB.py0, HB.m0 ]
+        , HP.style "white-space: nowrap;"
+        , HE.onClick \_ -> action
+        , HP.enabled true
+      ]
+      [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text smallText ]
+      , HH.i  [ HP.classes [ HB.bi, H.ClassName biName ]] []
+      ]
+    
+    punctuation str =
+      HH.div 
+      [ HP.classes [ HB.dFlex, HB.alignItemsCenter, HB.textBody, HH.ClassName "mx05" ] ]
+      [ HH.text str ]
+
+    fromMaybeToStr val = 
+      maybe
+        ""
+        show
+        val
+
+    searchBar saveVar label = addField
+      saveVar
+      (S.take 1 label)
+      HP.InputText
+      (UpdateSearchBarInputs elementID label)
+
+    versionEntry = fromMaybe
+      { elementID: -1
+      , year: Nothing
+      , month: Nothing
+      , day: Nothing
+      , hour: Nothing
+      , minute: Nothing
+      , second: Nothing
+      }
+      (findRootTree (\e -> e.elementID == elementID) searchData)
 
     -- addVersionButton :: forall slots. Version -> H.ComponentHTML Action slots m
     addVersionButton version =

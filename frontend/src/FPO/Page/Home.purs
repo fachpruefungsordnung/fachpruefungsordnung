@@ -16,7 +16,7 @@ import Prelude
 import Data.Array (filter, length, null, replicate, slice)
 -- import Data.DateTime (DateTime, adjust, date, day, diff, month, year)
 import Data.DateTime (DateTime)
--- import Data.Either (Either(..))
+import Data.Either (Either(..))
 import Data.Enum (fromEnum)
 -- import Data.Int (floor)
 -- import Data.Maybe (Maybe(..), fromMaybe)
@@ -203,6 +203,7 @@ component =
           H.tell _pagination unit $ P.SetPageQ 0
     HandleSearchInput query -> do
       H.modify_ _ { searchQuery = query }
+      -- H.liftEffect $ log query
     SetPage (P.Clicked page) -> do
       H.modify_ _ { page = page }
     DownloadPdf _ _ event -> do
