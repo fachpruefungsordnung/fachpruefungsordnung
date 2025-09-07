@@ -42,8 +42,10 @@ import qualified Data.Map as Map (empty)
 import Data.Set (Set)
 import qualified Data.Set as Set (empty)
 import Data.Text (Text, cons, pack)
+import Language.Lsd.AST.Common (Fallback, NavTocHeading)
 import Language.Lsd.AST.Format
 import Language.Lsd.AST.Type.Enum (EnumFormat)
+import Language.Lsd.AST.Type.Section (SectionFormat)
 import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label (unLabel))
 import Lucid (Html, a_, href_)
@@ -127,6 +129,11 @@ data ReaderState = ReaderState
     , documentHeadingFormat :: Either (HeadingFormat False) (HeadingFormat True)
     -- ^ Holds format for current document heading
     --   (comes from DocumentContainer or AppendixSection)
+    , documentFallbackTitle :: Fallback NavTocHeading
+    -- ^ Holds a fallback ToC title to send to the Frontend, if parsing the main
+    --   Document failes. This is set by the DocumentContainer.
+    , localSectionFormat :: SectionFormat
+    -- ^ Defines the local 'SectionFormat'; is set by the 'SectionFormatted' wrapper
     , isSingleParagraph :: Bool
     -- ^ Signals the child paragraph that it is the only child and thus should
     --   not have an visible identifier
@@ -177,6 +184,8 @@ initReaderState =
         , appendixElementTocKeyFormat = error "Undefined appendix element ToC format!"
         , appendixElementMLabel = Nothing
         , documentHeadingFormat = error "Undefined HeadingFormat!"
+        , documentFallbackTitle = error "Undefined Main Document Fallback Heading!"
+        , localSectionFormat = error "Undefined SectionFormat!"
         , isSingleParagraph = False
         , currentEnumIDFormatString = error "Undefined enum id format!"
         , footnoteMap = Map.empty
@@ -235,7 +244,9 @@ type ToC = DList (Either PhantomTocEntry TocEntry)
 
 type TocEntry = (Maybe (Html ()), Result (Delayed (Html ())), Text)
 
-type PhantomTocEntry = Result ()
+-- | Toc Entry that only exists to send info to the Frontend;
+--   It is ignored when rendering a ToC
+type PhantomTocEntry = (Maybe (Html ()), Result (Html ()))
 
 -- | Add entry to table of contents with: key Html (e.g. § 1), title Html and html anchor link id;
 --   If Label is present uses it as the anchor link id, otherwise it creates a new mangled label name;
@@ -244,7 +255,7 @@ addTocEntry
     :: Maybe (Html ())
     -> Result (Delayed (Html ()))
     -> Maybe Label
-    -> ReaderT ReaderState (State GlobalState) Text
+    -> ReaderStateMonad Text
 addTocEntry mKey title mLabel = do
     globalState <- get
     htmlId <- case mLabel of
@@ -267,8 +278,11 @@ addTocEntry mKey title mLabel = do
 --   This is only meant to be used for segments that do not have a normal Toc entry,
 --   like @SimpleSection@s.
 addPhantomTocEntry
-    :: (() -> Result ()) -> ReaderT ReaderState (State GlobalState) ()
-addPhantomTocEntry f = modify (\s -> s {tableOfContents = snoc (tableOfContents s) (Left $ f ())})
+    :: Result (Html ()) -> ReaderStateMonad ()
+addPhantomTocEntry resHtml =
+    -- \| Phantom Entries do not have an ID and are not Delayed
+    let tocEntry = (Nothing, resHtml)
+     in modify (\s -> s {tableOfContents = snoc (tableOfContents s) (Left tocEntry)})
 
 -- | Type of exported ToC Entries (especially for Frontend);
 --   @Result@ signals if the generated title was parsed successfully or not

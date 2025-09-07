@@ -210,8 +210,9 @@ classStyle ErrorBox =
 -- | Returns the html class name of given Class
 className :: Class -> Text
 className cssClass = case show cssClass of
-    [] -> error "CSS Class has \"\" as show instance!"
     (c : cs) -> pack $ toLower c : cs
+    -- \| This case can not happen with derived Show
+    [] -> error "CSS Class has \"\" as show instance!"
 
 -- | converts Class to Clay Selector and adds "." infront for css selection
 toClassSelector :: Class -> Selector
