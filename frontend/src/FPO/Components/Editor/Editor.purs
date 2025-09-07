@@ -886,7 +886,10 @@ editor = connect selectTranslator $ H.mkComponent
         newContent = ContentDto.getWrapperContent newWrapper
       -- send the new content as POST to the server
       response <- Request.postJson (ContentDto.extractNewParent newContent)
-        ("/docs/" <> show state.docID <> "/text/" <> show newEntry.id <> "/rev?isAutoSave=" <> show isAutoSave)
+        ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id
+            <> "/rev?isAutoSave="
+            <> show isAutoSave
+        )
         jsonContent
 
       -- handle errors in pos and decodeJson
