@@ -675,8 +675,8 @@ instance (ToHtmlM a) => ToHtmlM (NavTocHeaded (Parsed a)) where
                     toHtmlM a
 
 -- | "Fake" section behaviour in error case
-instance ToHtmlM (SectionFormatted (Parsed (Node Section))) where
-    toHtmlM (SectionFormatted sectionFormatS eErrNoSec) = case eErrNoSec of
+instance (ToHtmlM a) => ToHtmlM (SectionFormatted (Parsed a)) where
+    toHtmlM (SectionFormatted sectionFormatS eErrA) = case eErrA of
         Left parseErr -> do
             -- \| Count error as @Section@, to keep following
             --    @Section@s correctly numbered
@@ -686,7 +686,7 @@ instance ToHtmlM (SectionFormatted (Parsed (Node Section))) where
             let (_, tocKeyHtml) = sectionFormat sectionFormatS sectionID
             htmlID <- addTocEntry Nothing (Error $ Now tocKeyHtml) Nothing
             returnNow $ parseErrorHtml (Just htmlID) parseErr
-        Right nodeSection -> local (\s -> s {localSectionFormat = sectionFormatS}) $ toHtmlM nodeSection
+        Right a -> local (\s -> s {localSectionFormat = sectionFormatS}) $ toHtmlM a
 
 -------------------------------------------------------------------------------
 
