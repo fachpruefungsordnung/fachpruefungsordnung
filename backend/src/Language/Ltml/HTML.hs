@@ -79,7 +79,7 @@ import Language.Ltml.HTML.Util
 import Lucid
 import Text.Megaparsec (ParseErrorBundle, errorBundlePretty)
 
-renderSectionHtmlCss :: Node Section -> Map.Map Label Footnote -> (Html (), Css)
+renderSectionHtmlCss :: FormattedSection -> Map.Map Label Footnote -> (Html (), Css)
 renderSectionHtmlCss section fnMap =
     -- \| Render with given footnote context
     let readerState = initReaderState {footnoteMap = fnMap}
