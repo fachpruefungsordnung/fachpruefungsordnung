@@ -203,11 +203,11 @@ data Action
   | FontSizeDown
   | Undo
   | Redo
-  | Save
+  | Save Boolean
   -- Subsection of Save
-  | Upload TOCEntry ContentWrapper
+  | Upload TOCEntry ContentWrapper Boolean
   -- Subsection of Upload
-  | LostParentID TOCEntry ContentWrapper
+  | LostParentID TOCEntry ContentWrapper Boolean
   | SavedIcon
   -- new change in editor -> reset timer
   | AutoSaveTimer
@@ -405,7 +405,7 @@ editor = connect selectTranslator $ H.mkComponent
                 [ makeEditorToolbarButtonWithText
                     true
                     state.showButtonText
-                    Save
+                    (Save false)
                     "bi-floppy"
                     (translate (label :: _ "editor_save") state.translator)
                 , makeEditorToolbarButtonWithText
@@ -649,7 +649,7 @@ editor = connect selectTranslator $ H.mkComponent
           -- Prevent the tab from closing in a certain way
           Just true -> do
             preventDefault ev
-            HS.notify listener Save
+            HS.notify listener (Save true)
           _ -> pure unit
       H.modify_ _ { mBeforeUnloadL = Just buL }
       H.liftEffect $ addEventListener beforeunload buL false winTarget
@@ -827,7 +827,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     -- Save section
 
-    Save -> do
+    Save isAutoSave -> do
       state <- H.get
       when (not state.isEditorReadonly) $ do
         isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
@@ -877,21 +877,21 @@ editor = connect selectTranslator $ H.mkComponent
                     comments = map ContentDto.convertToCommentAnchor updatedMarkers
                     newWrapper = ContentDto.setWrapper newContent comments
                   -- Try to upload
-                  handleAction $ Upload entry newWrapper
+                  handleAction $ Upload entry newWrapper isAutoSave
 
-    Upload newEntry newWrapper -> do
+    Upload newEntry newWrapper isAutoSave -> do
       state <- H.get
       let
         jsonContent = ContentDto.encodeWrapper newWrapper
         newContent = ContentDto.getWrapperContent newWrapper
       -- send the new content as POST to the server
       response <- Request.postJson (ContentDto.extractNewParent newContent)
-        ("/docs/" <> show state.docID <> "/text/" <> show newEntry.id <> "/rev")
+        ("/docs/" <> show state.docID <> "/text/" <> show newEntry.id <> "/rev?isAutoSave=" <> show isAutoSave)
         jsonContent
 
       -- handle errors in pos and decodeJson
       case response of
-        Left _ -> handleAction $ LostParentID newEntry newWrapper
+        Left _ -> handleAction $ LostParentID newEntry newWrapper isAutoSave
         -- extract and insert new parentID into newContent
         Right updatedContent -> do
           H.raise (SavedSection newEntry)
@@ -908,7 +908,7 @@ editor = connect selectTranslator $ H.mkComponent
           for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
           pure unit
 
-    LostParentID newEntry newWrapper -> do
+    LostParentID newEntry newWrapper isAutoSave -> do
       let newContent = ContentDto.getWrapperContent newWrapper
       docID <- H.gets _.docID
       loadedContent <- H.liftAff $
@@ -925,7 +925,7 @@ editor = connect selectTranslator $ H.mkComponent
               res
             newWrapper' = ContentDto.setWrapperContent newContent' newWrapper
           in
-            handleAction $ Upload newEntry newWrapper'
+            handleAction $ Upload newEntry newWrapper' isAutoSave
 
     SavedIcon -> do
       state <- H.get
@@ -972,7 +972,7 @@ editor = connect selectTranslator $ H.mkComponent
       -- only save, if dirty
       isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.mDirtyRef
       when isDirty do
-        handleAction Save
+        handleAction $ Save true
         -- after Save: dirty false + stop timer
         mRef <- H.gets _.mDirtyRef
         for_ mRef \r -> H.liftEffect $ Ref.write false r
@@ -1496,7 +1496,7 @@ editor = connect selectTranslator $ H.mkComponent
       pure (Just a)
 
     SaveSection a -> do
-      handleAction Save
+      handleAction $ Save false
       pure (Just a)
 
     -- Because Session does not provide a way to get all lines directly,
@@ -1561,7 +1561,7 @@ editor = connect selectTranslator $ H.mkComponent
           -- Save new created comment
           -- set dirty to true to be able to save
           for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r
-          handleAction Save
+          handleAction $ Save false
         _, _, _, _ -> pure unit
       pure (Just a)
 
