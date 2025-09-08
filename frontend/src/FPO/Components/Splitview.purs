@@ -621,26 +621,23 @@ splitview = connect selectTranslator $ H.mkComponent
 
     GET -> do
       s <- H.get
-      -- TODO: Here, we can simply fetch the latest commit (head commit) of the document and
-      --       write the content into the editor. Because requests like these are very common,
-      --       we should think of a way to have a uniform and clean request handling system, especially
-      --       regarding authentification and error handling. Right now, the editor page is simply empty
-      --       if the document retrieval fails in any way.
-      maybeTree <- H.liftAff
-        $ Request.getFromJSONEndpoint DT.decodeDocument
-        $ "/docs/" <> show s.docID <> "/tree/latest"
-      let
-        finalTree = fromMaybe Empty (documentTreeToTOCTree <$> maybeTree)
-        vMapping = map
-          ( \elem ->
-              { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
-          )
-          finalTree
-      H.modify_ _
-        { tocEntries = finalTree
-        , versionMapping = vMapping
-        }
-      H.tell _toc unit (TOC.ReceiveTOCs finalTree)
+      maybeTree <- Request.getJson DT.decodeDocument
+        ("/docs/" <> show s.docID <> "/tree/latest")
+      case maybeTree of
+        Left _ -> pure unit
+        Right tree -> do
+          let
+            finalTree = documentTreeToTOCTree tree
+            vMapping = map
+              ( \elem ->
+                  { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
+              )
+              finalTree
+          H.modify_ _
+            { tocEntries = finalTree
+            , versionMapping = vMapping
+            }
+          H.tell _toc unit (TOC.ReceiveTOCs finalTree)
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
