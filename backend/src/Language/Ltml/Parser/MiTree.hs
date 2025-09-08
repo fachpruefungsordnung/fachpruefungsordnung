@@ -118,10 +118,10 @@ miForestFrom elementPF childP lvl = go False mempty
             s0 <- sp
 
             let f :: Text -> Text
-                f =
+                f s1 =
                     if miecRetainTrailingWhitespace cfg
-                        then (s0 <>)
-                        else id
+                        then (s0 <> s1)
+                        else mempty
 
                 wC :: m [a] -> m [a]
                 wC = whenAlt $ miecPermitChild cfg
