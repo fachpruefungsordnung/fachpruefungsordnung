@@ -197,8 +197,6 @@ handleAppError
   -> H.HalogenM st act slots msg m Unit
 handleAppError err = do
   s <- getStore
-  H.liftEffect $ log $ ("Handling AppError: " <> (show s.handleRequestError))
-
   when s.handleRequestError $ do
     updateStore $ Store.AddError err
     case err of
