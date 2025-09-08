@@ -13,10 +13,9 @@ module Language.Ltml.HTML.CSS.CustomClay
     , alignLeft
     , alignRight
     , displayContents
+    , autoLayout
     , gap
     , tableLayout
-    -- , fixed
-    -- , auto
     ) where
 
 import Clay hiding (a, b, s)
@@ -70,6 +69,9 @@ alignRight = other "right"
 
 displayContents :: Display
 displayContents = other "contents"
+
+autoLayout :: Position
+autoLayout = other "auto"
 
 -------------------------------------------------------------------------------
 

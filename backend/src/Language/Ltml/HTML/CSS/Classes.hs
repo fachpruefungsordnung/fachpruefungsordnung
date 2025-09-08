@@ -238,7 +238,7 @@ classStyle TableOfContents = do
 
     toClassSelector TableOfContents ? do
         width (pct 100)
-        tableLayout fixed
+        tableLayout autoLayout
     -- borderCollapse collapse
     -- boxShadow [ rgba 0 0 0 0.15 `bsColor` shadowWithBlur (px 0) (px 0) (px 20) ]
 
@@ -252,6 +252,7 @@ classStyle TableOfContents = do
         borderBottom (px 2) solid cellBorderColor
 
     toClassSelector TableOfContents |> tbody |> tr |> td ? do
+        whiteSpace nowrap
         padding (px 10) (px 10) (px 10) (px 10)
 
     toClassSelector TableOfContents |> tbody |> tr # nthOfType "odd" ? do
@@ -261,10 +262,10 @@ classStyle TableOfContents = do
         backgroundColor activeRowColor
 classStyle MinSizeColumn = do
     toClassSelector MinSizeColumn ? do
-        width auto
+        width (pct 1)
 classStyle MaxSizeColumn = do
     toClassSelector MaxSizeColumn ? do
-        width (pct 95)
+        width auto
 
 -- | Returns the html class name of given Class
 className :: Class -> Text
