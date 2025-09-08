@@ -911,14 +911,12 @@ editor = connect selectTranslator $ H.mkComponent
     LostParentID newEntry newWrapper -> do
       let newContent = ContentDto.getWrapperContent newWrapper
       docID <- H.gets _.docID
-      loadedContent <- H.liftAff $
-        Request.getFromJSONEndpoint
-          ContentDto.decodeContent
-          ("/docs/" <> show docID <> "/text/" <> show newEntry.id <> "/rev/latest")
+      loadedContent <- Request.getJson
+        ContentDto.decodeContent
+        ("/docs/" <> show docID <> "/text/" <> show newEntry.id <> "/rev/latest")
       case loadedContent of
-        -- TODO: Error handling
-        Nothing -> pure unit
-        Just res ->
+        Left _ -> pure unit
+        Right res ->
           let
             newContent' = ContentDto.setContentText
               (ContentDto.getContentText newContent)
@@ -1378,17 +1376,16 @@ editor = connect selectTranslator $ H.mkComponent
         -- We need Aff for that and thus cannot go inside Eff
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
         -- See, why and fix it
-        loadedContent <- H.liftAff $
-          Request.getFromJSONEndpoint
-            ContentDto.decodeContentWrapper
-            ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-                <> "/rev/"
-                <> version
-            )
+        loadedContent <- Request.getJson
+          ContentDto.decodeContentWrapper
+          ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+              <> "/rev/"
+              <> version
+          )
         let
           wrapper = case loadedContent of
-            Nothing -> ContentDto.failureContentWrapper
-            Just res -> res
+            Left _ -> ContentDto.failureContentWrapper
+            Right res -> res
           content = ContentDto.getWrapperContent wrapper
 
         H.modify_ \st -> st
