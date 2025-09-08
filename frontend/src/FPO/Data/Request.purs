@@ -197,6 +197,7 @@ handleAppError
   -> H.HalogenM st act slots msg m Unit
 handleAppError err = do
   s <- getStore
+  H.liftEffect $ log $ ("Handling AppError: " <> (show s.handleRequestError))
 
   when s.handleRequestError $ do
     updateStore $ Store.AddError err
@@ -530,15 +531,19 @@ getDocumentsQueryFromURL
 getDocumentsQueryFromURL url = getJson decodeJson url
 
 getTextElemHistory
-  :: DH.DocumentID
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => DH.DocumentID
   -> TE.TextElementID
   -> DD.DocDate
   -> Int
-  -> Aff (Maybe TE.FullTextElementHistory)
-getTextElemHistory dID tID date limit =
-  getFromJSONEndpoint
+  -> H.HalogenM st act slots msg m (Either AppError TE.FullTextElementHistory)
+getTextElemHistory docID tID date limit =
+  getJson
     decodeJson
-    ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history?before="
+    ( "/docs/" <> show docID <> "/text/" <> show tID <> "/history?before="
         <> DD.toStringFormat date
         <> "&limit="
         <> show limit

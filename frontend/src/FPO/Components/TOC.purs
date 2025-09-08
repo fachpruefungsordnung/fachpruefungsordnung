@@ -33,7 +33,6 @@ import Data.String.Regex (regex, replace)
 import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
 import Effect.Now (nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
@@ -266,10 +265,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -- the newest version requested in this action is assumed to be the newest version in general
     UpdateVersions ts elementID -> do
       s <- H.get
-      history <- H.liftAff $ getTextElemHistory s.docID elementID (DD.DocDate ts) 5
+      history <- getTextElemHistory s.docID elementID (DD.DocDate ts) 5
       case history of
-        Nothing -> do liftEffect $ log "unable to load textElements"
-        Just h -> do
+        Left _ -> pure unit
+        Right h -> do
           let
             nV = map
               ( \hEntry ->
