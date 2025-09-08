@@ -123,6 +123,7 @@ data Action
   | ModifyVersionMapping Int (Maybe (Maybe Int)) (Maybe (ElementData))
   | UpdateMSelectedTocEntry
   | SetComparison Int (Maybe Int)
+  | UpdateVersionMapping
 
 type State = FPOState
   ( docID :: DocumentID
@@ -732,6 +733,18 @@ splitview = connect selectTranslator $ H.mkComponent
       cToc <- H.request _toc unit TOC.RequestCurrentTocEntry
       H.modify_ _ { mSelectedTocEntry = join cToc }
 
+    UpdateVersionMapping -> do
+      state <- H.get
+      let 
+        newVersionMapping =
+          map
+            ( \e -> case (findRootTree (\v -> v.elementID == e.id) state.versionMapping) of
+                Just entry -> entry
+                Nothing -> { elementID: e.id, versionID: Nothing, comparisonData: Nothing })
+            state.tocEntries
+      H.modify_ _ { versionMapping = newVersionMapping }
+
+
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
     ToggleCommentOverview shown docID tocID -> do
@@ -1058,6 +1071,7 @@ splitview = connect selectTranslator $ H.mkComponent
         encodedTree
       -- TODO auch hier mit potentiellen Fehlern umgehen
       H.modify_ \st -> st { tocEntries = newTree }
+      handleAction UpdateVersionMapping
       H.tell _toc unit (TOC.ReceiveTOCs newTree)
 
 -- findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection

@@ -24,20 +24,25 @@ adjustDateTime duration dt =
 getEditTimestamp ∷ DocumentHeader → DateTime
 getEditTimestamp = DocDate.docDateToDateTime <<< DocumentHeader.getLastEdited
 
-formatAbsoluteTimeDetailed :: Maybe DateTime -> String 
-formatAbsoluteTimeDetailed Nothing = "Unknown"
-formatAbsoluteTimeDetailed (Just current) =
-    let
-        d' = date current
-        t' = time current
-        y = show $ fromEnum $ year d'
-        m = padZero $ fromEnum $ month d'
-        d = padZero $ fromEnum $ day d'
-        h = padZero $ fromEnum $ hour t'
-        min = padZero $ fromEnum $ minute t'
-        s = padZero $ fromEnum $ second t'
-    in
-        y <> "." <> m <> "." <> d <> " " <> h <> ":" <> min <> ":" <> s
+formatAbsoluteTimeDetailed :: forall d. Duration d => Maybe d -> DateTime -> String 
+formatAbsoluteTimeDetailed offset dateTime =
+  let
+    mDTime = case offset of
+      Just oSet -> adjust (negateDuration oSet) dateTime
+      Nothing -> Just dateTime
+    dTime = fromMaybe
+      dateTime 
+      mDTime
+    d' = date dTime
+    t' = time dTime
+    y = show $ fromEnum $ year d'
+    m = padZero $ fromEnum $ month d'
+    d = padZero $ fromEnum $ day d'
+    h = padZero $ fromEnum $ hour t'
+    min = padZero $ fromEnum $ minute t'
+    s = padZero $ fromEnum $ second t'
+  in
+    y <> "." <> m <> "." <> d <> " " <> h <> ":" <> min <> ":" <> s
 
 -- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
 formatRelativeTime :: Maybe DateTime -> DateTime -> String

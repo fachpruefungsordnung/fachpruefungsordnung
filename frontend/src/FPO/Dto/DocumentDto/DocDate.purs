@@ -102,6 +102,26 @@ instance decodeJsonDateTime :: DecodeJson DocDate where
       Left _ -> Left (UnexpectedValue json)
       Right datetime -> Right $ DocDate datetime
 
+docYear :: DocDate -> Int
+docYear d = fromEnum $ year $ date $ docDateToDateTime d
+
+docMonth :: DocDate -> Int
+docMonth d = fromEnum $ month $ date $ docDateToDateTime d
+
+docDay :: DocDate -> Int
+docDay d = fromEnum $ day $ date $ docDateToDateTime d
+
+docHour :: DocDate -> Int
+docHour d = fromEnum $ hour $ time $ docDateToDateTime d
+
+docMinute :: DocDate -> Int
+docMinute d = fromEnum $ minute $ time $ docDateToDateTime d
+
+docSecond :: DocDate -> Int
+docSecond d = fromEnum $ second $ time $ docDateToDateTime d
+
+
+
 derive newtype instance eqDocDate :: Eq DocDate
 derive newtype instance ordDocDate :: Ord DocDate
 derive newtype instance showDocDate :: Show DocDate
