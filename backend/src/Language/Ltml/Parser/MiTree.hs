@@ -16,7 +16,7 @@ where
 import Control.Alternative.Utils (whenAlt)
 import Control.Applicative (optional, (<|>))
 import Control.Applicative.Utils ((<:>))
-import Control.Monad (void, when)
+import Control.Monad (when)
 import Data.Text (Text)
 import Data.Text.FromWhitespace (FromWhitespace, fromWhitespace)
 import Language.Ltml.Parser (MonadParser)
@@ -25,7 +25,7 @@ import Language.Ltml.Parser.Common.Indent
     , nextIndentLevel
     , nli
     )
-import Language.Ltml.Parser.Common.Lexeme (sp, sp1)
+import Language.Ltml.Parser.Common.Lexeme (sp)
 import Text.Megaparsec (Pos)
 import qualified Text.Megaparsec.Char.Lexer as L (indentLevel)
 
@@ -79,24 +79,42 @@ miForest
     => (m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> m [a]
-miForest elementPF childP = L.indentLevel >>= miForestFrom elementPF childP
+miForest elementPF childP =
+    L.indentLevel >>= miForestFrom ForestDefault elementPF childP
+
+data ForestContext
+    = -- | A first element was already parsed, which has the given config.
+      --   The 'miecRetainPrecedingWhitespace' field of the 'MiElementConfig'
+      --   is ignored.
+      ForestHeaded MiElementConfig
+    | ForestBracketed
+    | ForestDefault
 
 miForestFrom
     :: forall m a
      . (MonadParser m, FromWhitespace [a])
-    => (m [a] -> m (MiElementConfig, [a]))
+    => ForestContext
+    -> (m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> Pos
     -> m [a]
-miForestFrom elementPF childP lvl = go False mempty
+miForestFrom rootCtx elementPF childP lvl = go rootCtx mempty
   where
-    go :: Bool -> Text -> m [a]
-    go isBracketed initialPrecWS = do
-        -- Permit and drop initial whitespace within brackets.
-        if isBracketed
-            then sp >> optional (nli >> checkIndent lvl) >> goE mempty
-            else goE initialPrecWS
+    go :: ForestContext -> Text -> m [a]
+    go ctx initialPrecWS =
+        case ctx of
+            ForestHeaded cfg -> goTail cfg
+            ForestBracketed ->
+                -- Permit and drop initial whitespace within brackets.
+                sp >> optional (nli >> checkIndent lvl) >> goE initialPrecWS
+            ForestDefault ->
+                goE initialPrecWS
       where
+        isBracketed =
+            case ctx of
+                ForestBracketed -> True
+                _ -> False
+
         -- `goX` vs. `goX'`:
         --  - The `goX` parsers must generally be used in-line; that is, not
         --    at the start of a line.
@@ -107,7 +125,7 @@ miForestFrom elementPF childP lvl = go False mempty
         -- Parse forest, headed by element.
         goE :: Text -> m [a]
         goE precWS = do
-            (cfg, e) <- elementPF (go True mempty)
+            (cfg, e) <- elementPF (go ForestBracketed mempty)
 
             let precWS' :: [a]
                 precWS' =
@@ -115,13 +133,24 @@ miForestFrom elementPF childP lvl = go False mempty
                         then fromWhitespace precWS
                         else []
 
+            es <- goTail cfg
+
+            return $ precWS' ++ e ++ es
+
+        -- Parse remainder of forest, after an initial element.
+        --  - In particular, takes care of separating whitespace.
+        --  - Note that the config relates to the preceding element.
+        --    - Thus, `miecRetainPrecedingWhitespace` is ignored.
+        --      - TODO: Avoid having to ignore something.
+        goTail :: MiElementConfig -> m [a]
+        goTail cfg = do
             s0 <- sp
 
             let f :: Text -> Text
-                f =
+                f s1 =
                     if miecRetainTrailingWhitespace cfg
-                        then (s0 <>)
-                        else id
+                        then s0 <> s1
+                        else mempty
 
                 wC :: m [a] -> m [a]
                 wC = whenAlt $ miecPermitChild cfg
@@ -140,9 +169,7 @@ miForestFrom elementPF childP lvl = go False mempty
                         <|> wC goC'
                         <|> wEnd goEnd'
 
-            es <- (nli >>= goAny') <|> goAny
-
-            return $ precWS' ++ e ++ es
+            (nli >>= goAny') <|> goAny
 
         goE' :: Text -> m [a]
         goE' s = checkIndent lvl *> goE s
@@ -181,9 +208,15 @@ hangingBlock
     -> m b
 hangingBlock keywordP elementPF childP = do
     lvl' <- nextIndentLevel <$> L.indentLevel
-    f <- keywordP
-    void sp1 <|> void nli <* checkIndent lvl'
-    f <$> miForestFrom elementPF childP lvl'
+    keywordP <*> miForestFrom (ForestHeaded cfg) elementPF childP lvl'
+  where
+    cfg =
+        MiElementConfig
+            { miecPermitEnd = True
+            , miecPermitChild = True
+            , miecRetainPrecedingWhitespace = False -- ignored
+            , miecRetainTrailingWhitespace = False
+            }
 
 -- | Version of 'hangingBlock' where the keyword parser may yield any value,
 --   which is paired with the parsed mi-forest.
