@@ -37,7 +37,6 @@ import Data.String.Regex.Flags (noFlags)
 import Data.Time.Duration (Minutes)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
 import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
@@ -293,7 +292,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -- the newest version requested in this action is assumed to be the newest version in general
     UpdateVersions ts elementID -> do
       s <- H.get
-      history <- getTextElemHistory s.docID elementID (DD.DocDate ts) 5
+      history <- getTextElemHistoryAll s.docID elementID (DD.DocDate ts)
       case history of
         Left _ -> pure unit
         Right h -> do
