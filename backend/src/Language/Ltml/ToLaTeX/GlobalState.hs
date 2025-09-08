@@ -60,7 +60,6 @@ import Control.Monad.State (State)
 import qualified Data.DList as DList
 import Data.Map (Map, insert)
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as LT
 import Language.Lsd.AST.Format (IdentifierFormat, KeyFormat, MainHeadingFormat)
 import Language.Lsd.AST.Type.AppendixSection (AppendixElementFormat)
 import Language.Lsd.AST.Type.DocumentContainer
@@ -96,7 +95,7 @@ data GlobalState = GlobalState
     , {- since the style of the identifier is defined globally for an
          enumeration or appendix we need to pass it to the kids -}
       {- Maps for labels -}
-      _labelToRef :: Map Label LT.Text
+      _labelToRef :: Map Label T.Text
     , _labelToFootNote :: Map Label Footnote
     , {- functional list that builds the table of contents -}
       _toc :: DList.DList PreLaTeX
@@ -196,7 +195,7 @@ descendEnumTree action = do
     enumPosition .= oldPath
     pure result
 
-insertRefLabel :: Maybe Label -> LT.Text -> State GlobalState ()
+insertRefLabel :: Maybe Label -> T.Text -> State GlobalState ()
 insertRefLabel mLabel ident =
     forM_ mLabel $ \l -> labelToRef %= insert l ident
 
@@ -239,9 +238,9 @@ addHeaderFooter
     superTitle
     title
     date = do
-        let superTitle' = IText $ LT.fromStrict superTitle
-            title' = IText $ LT.fromStrict title
-            date' = IText $ LT.fromStrict date
+        let superTitle' = IText superTitle
+            title' = IText title
+            date' = IText date
             assemble items = ISequence $ map (formatHeaderFooterItem superTitle' title' date') items
         preDocument
             %= ( <>

@@ -75,7 +75,8 @@ data Action
   | ChangeSorting TH.Output
   | HandleSearchInput String
   | SetPage P.Output
-  | DownloadPdf DocumentID String MouseEvent
+  | DownloadPdf DocumentID String MouseEvent -- Id, Projektname, Event (zum prevent default)
+  | DownloadZip DocumentID String MouseEvent -- Id, Projektname, Event (zum prevent default)
 
 type State = FPOState
   ( user :: LoadState (Maybe FullUserDto)
@@ -212,18 +213,57 @@ component =
         stopPropagation (MouseEvent.toEvent event)
       updateStore $ Store.AddWarning "Not yet implemented!"
 
-  -- renderedPDF' <- Request.postBlobOrError ("/render/pdf" <> projectId)
-  -- let filename = projectName <> ".pdf"
-  -- case renderedPDF' of
+    -- renderedZip' <- Request.postBlobOrError ("/render/pdf/" <> projectId)
+    -- let filename = projectName <> ".zip"
+    -- case renderedZip' of
+    --   Left _ -> pure unit
+    --   Right blobOrError ->
+    --     case blobOrError of
+    --       Left errMsg -> do
+    --         updateStore $ Store.AddError $ "Failed to generate ZIP: " <> errMsg
+    --       Right body -> do
+    --         -- create blobl link
+    --         url <- H.liftEffect $ createObjectURL body
+    --         -- Create an invisible link and click it to download Zip
+    --         H.liftEffect $ do
+    --           -- get window stuff
+    --           win <- window
+    --           hdoc <- document win
+    --           let doc = HTMLDocument.toDocument hdoc
+
+    --           -- create link
+    --           aEl <- Document.createElement "a" doc
+    --           case HTMLElement.fromElement aEl of
+    --             Nothing -> pure unit
+    --             Just aHtml -> do
+    --               Element.setAttribute "href" url aEl
+    --               Element.setAttribute "download" filename aEl
+    --               HTMLElement.click aHtml
+    --         -- deactivate the blob link after 1 sec
+    --         _ <- H.fork do
+    --           H.liftAff $ delay (Milliseconds 1000.0)
+    --           H.liftEffect $ revokeObjectURL url
+    --         pure unit
+
+    -- H.liftEffect $ downloadPdf projectId
+    DownloadZip _ _ event -> do
+      H.liftEffect $ do
+        preventDefault (MouseEvent.toEvent event)
+        stopPropagation (MouseEvent.toEvent event)
+      updateStore $ Store.AddWarning "Not yet implemented!"
+
+  -- renderedZip' <- Request.postBlobOrError ("/render/zip/" <> projectId)
+  -- let filename = projectName <> ".zip"
+  -- case renderedZip' of
   --   Left _ -> pure unit
   --   Right blobOrError ->
   --     case blobOrError of
   --       Left errMsg -> do
-  --         updateStore $ Store.AddError $ "Failed to generate PDF: " <> errMsg
+  --         updateStore $ Store.AddError $ "Failed to generate ZIP: " <> errMsg
   --       Right body -> do
-  --         -- create blobl link
+  --         -- create blob link
   --         url <- H.liftEffect $ createObjectURL body
-  --         -- Create an invisible link and click it to download PDF
+  --         -- Create an invisible link and click it to download ZIP
   --         H.liftEffect $ do
   --           -- get window stuff
   --           win <- window
@@ -542,9 +582,10 @@ component =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
       [ HH.colgroup_
-          [ HH.col [ HP.style "width: 60%;" ] -- 'Title' column
-          , HH.col [ HP.style "width: 30%;" ] -- 'Last Updated' column
-          , HH.col [ HP.style "width: 10%;" ] -- 'PDF' column
+          [ HH.col [ HP.style "width: 57%;" ] -- 'Title' column
+          , HH.col [ HP.style "width: 27%;" ] -- 'Last Updated' column
+          , HH.col [ HP.style "width: 8%;" ] -- 'PDF' column
+          , HH.col [ HP.style "width: 8%;" ] -- 'ZIP' column
           ]
       , HH.slot _tablehead unit TH.component
           { columns: tableCols state.translator
@@ -555,7 +596,7 @@ component =
           if null ps then
             [ HH.tr []
                 [ HH.td
-                    [ HP.colSpan 3
+                    [ HP.colSpan 4
                     , HP.classes [ HB.textCenter ]
                     ]
                     [ HH.i_
@@ -579,6 +620,9 @@ component =
         , style: Just TH.Numeric
         }
       , { title: "PDF"
+        , style: Nothing
+        }
+      , { title: "ZIP"
         , style: Nothing
         }
       ]
@@ -608,6 +652,23 @@ component =
               [ HH.i
                   [ HP.classes
                       [ HH.ClassName "bi-file-earmark-pdf"
+                      , HB.bi
+                      ]
+                  ]
+                  []
+              ]
+          ]
+      , HH.td
+          [ HP.classes [ HB.textCenter ] ]
+          [ HH.button
+              [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+              , HE.onClick $ \e -> DownloadZip (DocumentHeader.getIdentifier project)
+                  (DocumentHeader.getName project)
+                  e
+              ]
+              [ HH.i
+                  [ HP.classes
+                      [ HH.ClassName "bi-file-zip"
                       , HB.bi
                       ]
                   ]

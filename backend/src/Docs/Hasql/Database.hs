@@ -27,8 +27,7 @@ import qualified Docs.Hasql.Transactions as Transactions
 import Logging.Logs (Severity (..))
 import qualified Logging.Scope as Scope
 
-newtype HasqlSession a
-    = HasqlSession
+newtype HasqlSession a = HasqlSession
     { unHasqlSession :: Session a
     }
     deriving (Functor, Applicative, Monad)
@@ -117,8 +116,7 @@ instance HasCreateTextElement HasqlSession where
 instance HasLogMessage HasqlSession where
     logMessage = (((HasqlSession .) .) .) . Sessions.logMessage
 
-newtype HasqlTransaction a
-    = HasqlTransaction
+newtype HasqlTransaction a = HasqlTransaction
     { unHasqlTransaction :: Transaction a
     }
     deriving (Functor, Applicative, Monad)
@@ -195,6 +193,11 @@ instance HasCreateComment HasqlTransaction where
     createComment = ((HasqlTransaction .) .) . Transactions.createComment
     resolveComment = HasqlTransaction . Transactions.resolveComment
     createReply = ((HasqlTransaction .) .) . Transactions.createReply
+
+instance HasDraftTextRevision HasqlTransaction where
+    createDraftTextRevision = ((((HasqlTransaction .) .) .) .) . Transactions.createDraftTextRevision
+    getDraftTextRevision = (HasqlTransaction .) . Transactions.getDraftTextRevision
+    deleteDraftTextRevision = (HasqlTransaction .) . Transactions.deleteDraftTextRevision
 
 instance HasLogMessage HasqlTransaction where
     logMessage = (((HasqlTransaction .) .) .) . Transactions.logMessage

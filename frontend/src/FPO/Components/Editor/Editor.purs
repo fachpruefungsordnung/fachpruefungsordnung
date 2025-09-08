@@ -110,6 +110,7 @@ type State = FPOState
   ( docID :: DocumentID
   , mEditor :: Maybe Types.Editor
   , mTocEntry :: Maybe TOCEntry
+  , currentVersion :: String
   , mNodePath :: Maybe Path
   , mContent :: Maybe Content
   -- comments
@@ -204,11 +205,11 @@ data Action
   | FontSizeDown
   | Undo
   | Redo
-  | Save
+  | Save Boolean
   -- Subsection of Save
-  | Upload TOCEntry ContentWrapper
+  | Upload TOCEntry ContentWrapper Boolean
   -- Subsection of Upload
-  | LostParentID TOCEntry ContentWrapper
+  | LostParentID TOCEntry ContentWrapper Boolean
   | SavedIcon
   -- new change in editor -> reset timer
   | AutoSaveTimer
@@ -275,6 +276,7 @@ editor = connect selectTranslator $ H.mkComponent
     , translator: fromFpoTranslator context
     , mEditor: Nothing
     , mTocEntry: Nothing
+    , currentVersion: ""
     , mNodePath: Nothing
     , mContent: Nothing
     , tmpLiveMarker: Nothing
@@ -405,7 +407,7 @@ editor = connect selectTranslator $ H.mkComponent
                 [ makeEditorToolbarButtonWithText
                     true
                     state.showButtonText
-                    Save
+                    (Save false)
                     "bi-floppy"
                     (translate (label :: _ "editor_save") state.translator)
                 , makeEditorToolbarButtonWithText
@@ -677,7 +679,7 @@ editor = connect selectTranslator $ H.mkComponent
           -- Prevent the tab from closing in a certain way
           Just true -> do
             preventDefault ev
-            HS.notify listener Save
+            HS.notify listener (Save true)
           _ -> pure unit
       H.modify_ _ { mBeforeUnloadL = Just buL }
       H.liftEffect $ addEventListener beforeunload buL false winTarget
@@ -855,7 +857,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     -- Save section
 
-    Save -> do
+    Save isAutoSave -> do
       state <- H.get
       when (not state.isEditorOutdated) $ do
         isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
@@ -905,21 +907,24 @@ editor = connect selectTranslator $ H.mkComponent
                     comments = map ContentDto.convertToCommentAnchor updatedMarkers
                     newWrapper = ContentDto.setWrapper newContent comments
                   -- Try to upload
-                  handleAction $ Upload entry newWrapper
+                  handleAction $ Upload entry newWrapper isAutoSave
 
-    Upload newEntry newWrapper -> do
+    Upload newEntry newWrapper isAutoSave -> do
       state <- H.get
       let
         jsonContent = ContentDto.encodeWrapper newWrapper
         newContent = ContentDto.getWrapperContent newWrapper
       -- send the new content as POST to the server
       response <- Request.postJson (ContentDto.extractNewParent newContent)
-        ("/docs/" <> show state.docID <> "/text/" <> show newEntry.id <> "/rev")
+        ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id
+            <> "/rev?isAutoSave="
+            <> show isAutoSave
+        )
         jsonContent
 
       -- handle errors in pos and decodeJson
       case response of
-        Left _ -> handleAction $ LostParentID newEntry newWrapper
+        Left _ -> handleAction $ LostParentID newEntry newWrapper isAutoSave
         -- extract and insert new parentID into newContent
         Right updatedContent -> do
           H.raise (SavedSection newEntry)
@@ -936,7 +941,7 @@ editor = connect selectTranslator $ H.mkComponent
           for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write false r
           pure unit
 
-    LostParentID newEntry newWrapper -> do
+    LostParentID newEntry newWrapper isAutoSave -> do
       let newContent = ContentDto.getWrapperContent newWrapper
       docID <- H.gets _.docID
       loadedContent <- H.liftAff $
@@ -953,7 +958,7 @@ editor = connect selectTranslator $ H.mkComponent
               res
             newWrapper' = ContentDto.setWrapperContent newContent' newWrapper
           in
-            handleAction $ Upload newEntry newWrapper'
+            handleAction $ Upload newEntry newWrapper' isAutoSave
 
     SavedIcon -> do
       state <- H.get
@@ -1000,7 +1005,7 @@ editor = connect selectTranslator $ H.mkComponent
       -- only save, if dirty
       isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.mDirtyRef
       when isDirty do
-        handleAction Save
+        handleAction $ Save true
         -- after Save: dirty false + stop timer
         mRef <- H.gets _.mDirtyRef
         for_ mRef \r -> H.liftEffect $ Ref.write false r
@@ -1395,13 +1400,13 @@ editor = connect selectTranslator $ H.mkComponent
 
     ChangeToSection entry rev -> do
       state <- H.get
+      let
+        version = case rev of
+          Nothing -> "latest"
+          Just v -> show v
       -- Prevent of loading the same Section from backend again
-      when (Just entry /= state.mTocEntry) do
-        H.modify_ \st -> st { mTocEntry = Just entry }
-        let
-          version = case rev of
-            Nothing -> "latest"
-            Just v -> show v
+      when (Just entry /= state.mTocEntry || version /= state.currentVersion) do
+        H.modify_ \st -> st { mTocEntry = Just entry, currentVersion = version }
         -- Get the content from server here
         -- We need Aff for that and thus cannot go inside Eff
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
@@ -1418,9 +1423,6 @@ editor = connect selectTranslator $ H.mkComponent
             Nothing -> ContentDto.failureContentWrapper
             Just res -> res
           content = ContentDto.getWrapperContent wrapper
-          comments = ContentDto.getWrapperComments wrapper
-          -- convert markers
-          markers = map ContentDto.convertToAnnotetedMarker comments
 
         H.modify_ \st -> st
           { mContent = Just content
@@ -1429,9 +1431,37 @@ editor = connect selectTranslator $ H.mkComponent
           , oldMarkerAnnoPos = empty
           , markers = markers
           , isEditorOutdated = version /= "latest"
+
+{- <<<<<<< HEAD
+          , selectedLiveMarker = Nothing
+          , markerAnnoHS = empty
+          , oldMarkerAnnoPos = empty
+          , markers = markers
+          , isEditorOutdated = version /= "latest"
+=======
+          , isEditorReadonly = version /= "latest"
+>>>>>>> main -}
           }
-        -- Get comments information from Comment Child
-        H.raise (RequestComments state.docID entry.id)
+
+        -- Only secondary Editor has ElementData
+        -- Only first Editor gets to load the comments
+        if isJust state.compareToElement then do
+          handleAction $ ContinueChangeToSection []
+        else do
+          -- Get comments
+          let
+            comments = ContentDto.getWrapperComments wrapper
+            -- convert markers
+            markers = map ContentDto.convertToAnnotetedMarker comments
+          -- update the markers into state
+          H.modify_ \st -> st
+            { selectedLiveMarker = Nothing
+            , markerAnnoHS = empty
+            , oldMarkerAnnoPos = empty
+            , markers = markers
+            }
+          -- Get comments information from Comment Child
+          H.raise (RequestComments state.docID entry.id)
       pure unit
 
     -- After getting information from from Comment
@@ -1515,7 +1545,7 @@ editor = connect selectTranslator $ H.mkComponent
       pure (Just a)
 
     SaveSection a -> do
-      handleAction Save
+      handleAction $ Save false
       pure (Just a)
 
     -- Because Session does not provide a way to get all lines directly,
@@ -1580,7 +1610,7 @@ editor = connect selectTranslator $ H.mkComponent
           -- Save new created comment
           -- set dirty to true to be able to save
           for_ state.mDirtyRef \r -> H.liftEffect $ Ref.write true r
-          handleAction Save
+          handleAction $ Save false
         _, _, _, _ -> pure unit
       pure (Just a)
 

@@ -52,8 +52,7 @@ ifSuperOrAdminDo conn (Auth.Token {..}) groupID callback =
                 Right (Just role) ->
                     if role == User.Admin
                         then callback
-                        else
-                            throwError errNoAdminOfThisGroup
+                        else throwError errNoAdminOfThisGroup
 
 -- | Checks if user is Member (or Admin) in specified group or Superadmin.
 --   If so, it calls the given callback Handler;

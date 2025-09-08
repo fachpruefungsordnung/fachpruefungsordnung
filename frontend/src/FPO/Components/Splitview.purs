@@ -725,7 +725,9 @@ splitview = connect selectTranslator $ H.mkComponent
 
         _ -> pure unit
 
-      when (isJust mt) (H.tell _editor 0 (Editor.EditorResize))
+      when (isJust mt) do
+        H.tell _editor 0 (Editor.EditorResize)
+        H.tell _editor 1 (Editor.EditorResize)
 
     -- Toggle actions
 

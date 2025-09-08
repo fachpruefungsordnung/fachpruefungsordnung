@@ -58,8 +58,7 @@ instance FromHttpApiData TextElementID where
     parseUrlPiece = (TextElementID <$>) . parseUrlPiece
 
 -- | Scoped identifier for a text element
-data TextElementRef
-    = TextElementRef
+data TextElementRef = TextElementRef
     { documentID :: DocumentID
     , textElementID :: TextElementID
     }
