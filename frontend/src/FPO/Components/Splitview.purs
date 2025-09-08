@@ -820,8 +820,6 @@ splitview = connect selectTranslator $ H.mkComponent
                 case versionEntry.comparisonData of
                   Nothing -> mod
                   Just _ -> do
-                    -- Just cData -> do 
-                    -- handleAction (ModifyVersionMapping tocID Nothing cData.revID) 
                     handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
       -- open preview
       else do
@@ -857,7 +855,6 @@ splitview = connect selectTranslator $ H.mkComponent
             )
             state.versionMapping
       H.modify_ _ { versionMapping = newVersionMapping }
-      H.liftEffect $ log "Modified version"
 
     SetComparison elementID vID -> do
       state <- H.get
@@ -1009,6 +1006,23 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.ShowAllCommentsOutput docID tocID -> do
         handleAction $ ToggleCommentOverview true docID tocID
 
+      Editor.RaiseDiscard -> do
+        H.liftEffect $ log "reached discarding"
+        handleAction UpdateMSelectedTocEntry
+        state <- H.get
+        -- Only the SelLeaf case should ever occur
+        case state.mSelectedTocEntry of
+          Just (SelLeaf id) -> do
+            handleAction (ModifyVersionMapping id (Just Nothing) Nothing)
+            let
+              -- Nothing case should never occur
+              entry = case (findTOCEntry id state.tocEntries) of
+                Nothing -> emptyTOCEntry
+                Just e -> e
+            H.tell _editor 0 (Editor.ChangeSection entry Nothing)
+          _ -> do 
+            pure unit
+
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
@@ -1034,7 +1048,6 @@ splitview = connect selectTranslator $ H.mkComponent
               Nothing ->
                 { elementID: -1, versionID: Nothing, comparisonData: Nothing }
               Just elem -> elem
-        -- handleAction (ModifyVersionMapping selectedID rev)
         H.tell _editor 0 (Editor.ChangeSection entry ev.versionID)
         case ev.comparisonData of
           Nothing -> do

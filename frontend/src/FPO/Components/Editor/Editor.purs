@@ -191,6 +191,7 @@ data Output
   | RequestComments Int Int
   | SelectedCommentSection Int Int
   | ShowAllCommentsOutput Int Int
+  | RaiseDiscard
 
 data Action
   = Init
@@ -233,6 +234,7 @@ data Action
   | ToggleOutdatedInfoPopup
   | Finalize
   | Resize
+  | Discard
 
 -- We use a query to get the content of the editor
 data Query a
@@ -437,7 +439,7 @@ editor = connect selectTranslator $ H.mkComponent
                 -- toolbar
                 [ HP.classes [ HB.dFlex, HB.justifyContentCenter ]
                 , HP.style
-                    "border-top-style: solid; border-color: blue; border-width: 1px;"
+                    "border-top-style: solid; border-bottom-style: solid; border-color: blue; border-width: 1px;"
                 ]
                 if (not state.showButtons) then
                   -- keep the toolbar even though there is not space, so that the screen doesnt pop higher
@@ -455,34 +457,6 @@ editor = connect selectTranslator $ H.mkComponent
                       [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
                       [ HH.text
                           (translate (label :: _ "editor_oldVersion") state.translator)
-                      {-                   , HH.button
-                      [ HP.classes
-                          [ HB.btn
-                          , HB.btnLight
-                          , HB.btnSm
-                          , H.ClassName "bi bi-info-circle"
-                          ]
-                      , HE.onClick $ const $ ToggleOutdatedInfoPopup
-                      ]
-                      [] -}
-                      {-                   , HH.button
-                            [ HP.classes
-                                [ HB.btn
-                                , HB.btnLight
-                                , HB.btnSm
-                                ]
-                            , HE.onClick $ const $ ToggleOutdatedInfoPopup
-                            ]
-                            [HH.text "Save"]
-                      , HH.button
-                            [ HP.classes
-                                [ HB.btn
-                                , HB.btnLight
-                                , HB.btnSm
-                                ]
-                            , HE.onClick $ const $ ToggleOutdatedInfoPopup
-                            ]
-                            [HH.text "Discard"] -}
                       , makeEditorToolbarButton
                           true
                           ""
@@ -491,7 +465,7 @@ editor = connect selectTranslator $ H.mkComponent
                       , makeEditorToolbarButtonWithText
                           true
                           state.showButtonText
-                          ToggleOutdatedInfoPopup
+                          Discard
                           "bi bi-trash"
                           (translate (label :: _ "editor_discard") state.translator)
                       ]
@@ -503,7 +477,7 @@ editor = connect selectTranslator $ H.mkComponent
               -- toolbar
               [ HP.classes [ HB.dFlex, HB.justifyContentCenter ]
               , HP.style
-                  "border-top-style: solid; border-color: blue; border-width: 1px;"
+                  "border-top-style: solid; border-bottom-style: solid; border-color: blue; border-width: 1px;"
               ]
               if (not state.showButtons) then
                 -- keep the toolbar even though there is not space, so that the screen doesnt pop higher
@@ -530,84 +504,30 @@ editor = connect selectTranslator $ H.mkComponent
           , HP.classes [ HB.flexGrow1 ]
           , HP.style "min-height: 0; flex-grow: 1; flex-basis: 0"
           ]
-          [ -- Add overlay when readonly
-            if state.isEditorOutdated then
-              HH.div
-                [ HP.classes
-                    [ HB.positionAbsolute
-                    , HB.top0
-                    , HB.start0
-                    , HB.w100
-                    , HB.h100
-                    , HB.dFlex
-                    , HB.justifyContentCenter
-                    , HB.alignItemsEnd
-                    , HB.peNone
-                    ]
-                , HP.style
-                    "background: rgba(0,0,0,0.1); z-index: 20; padding-bottom: 1.5rem;"
-                ]
-                [ HH.div
-                    [ HP.classes
-                        [ HB.bgLight
-                        , HB.border
-                        , HB.rounded
-                        , HB.px3
-                        , HB.py2
-                        , HB.shadow
-                        ]
-                    , HP.style "pointer-events: auto;"
-                    ]
-                    [ HH.i
-                        [ HP.classes [ HB.bi, H.ClassName "bi-lock-fill", HB.me2 ] ]
-                        []
-                    , HH.text
-                        (translate (label :: _ "editor_readonly") state.translator)
-                    ]
-                ]
-            else
-              HH.text ""
+          [ -- Add overlay when right side
+            case state.compareToElement of
+              Just _ ->
+                HH.div
+                  [ HP.classes
+                      [ HB.positionAbsolute
+                      , HB.top0
+                      , HB.start0
+                      , HB.w100
+                      , HB.h100
+                      , HB.dFlex
+                      , HB.justifyContentCenter
+                      , HB.alignItemsEnd
+                      , HB.peNone
+                      ]
+                  , HP.style
+                      "background: rgba(0,0,0,0.1); z-index: 20; padding-bottom: 1.5rem;"
+                  ]
+                  [ ]
+              Nothing -> 
+                HH.text ""
 
           ]
-      {-           [ -- Add overlay when readonly
-        if state.isEditorReadonly then
-          HH.div
-            [ HP.classes
-                [ HB.positionAbsolute
-                , HB.top0
-                , HB.start0
-                , HB.w100
-                , HB.h100
-                , HB.dFlex
-                , HB.justifyContentCenter
-                , HB.alignItemsEnd
-                , HB.peNone
-                ]
-            , HP.style
-                "background: rgba(0,0,0,0.1); z-index: 20; padding-bottom: 1.5rem;"
-            ]
-            [ HH.div
-                [ HP.classes
-                    [ HB.bgLight
-                    , HB.border
-                    , HB.rounded
-                    , HB.px3
-                    , HB.py2
-                    , HB.shadow
-                    ]
-                , HP.style "pointer-events: auto;"
-                ]
-                [ HH.i
-                    [ HP.classes [ HB.bi, H.ClassName "bi-lock-fill", HB.me2 ] ]
-                    []
-                , HH.text
-                    (translate (label :: _ "editor_readonly") state.translator)
-                ]
-            ]
-        else
-          HH.text ""
-
-      ] -}
+      
       -- Saved Icon
       , if state.showSavedIcon then
           HH.div
@@ -658,7 +578,11 @@ editor = connect selectTranslator $ H.mkComponent
           Editor.setTheme "ace/theme/github" editor_
           Session.setMode "ace/mode/custom_mode" session
           Editor.setEnableLiveAutocompletion true editor_
-          Editor.setReadOnly state.isEditorOutdated editor_
+          case state.compareToElement of
+            Just _ -> do
+              Editor.setReadOnly true editor_
+            Nothing -> 
+              Editor.setReadOnly false editor_
 
       -- New Ref for keeping track, if the content in editor has changed
       -- since last save
@@ -776,7 +700,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     Bold -> do
       state <- H.get
-      when (not state.isEditorOutdated) $ do
+      when (state.compareToElement == Nothing) $ do
         H.gets _.mEditor >>= traverse_ \ed ->
           H.liftEffect $ do
             makeBold ed
@@ -784,7 +708,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     Italic -> do
       state <- H.get
-      when (not state.isEditorOutdated) $ do
+      when (state.compareToElement == Nothing) $ do
         H.gets _.mEditor >>= traverse_ \ed ->
           H.liftEffect $ do
             makeItalic ed
@@ -792,7 +716,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     Underline -> do
       state <- H.get
-      when (not state.isEditorOutdated) $ do
+      when (state.compareToElement == Nothing) $ do
         H.gets _.mEditor >>= traverse_ \ed ->
           H.liftEffect $ do
             underscore ed
@@ -821,7 +745,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     Undo -> do
       state <- H.get
-      when (not state.isEditorOutdated) $ do
+      when (state.compareToElement == Nothing) $ do
         H.gets _.mEditor >>= traverse_ \ed -> do
           H.liftEffect $ do
             Editor.undo ed
@@ -829,7 +753,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     Redo -> do
       state <- H.get
-      when (not state.isEditorOutdated) $ do
+      when (state.compareToElement == Nothing) $ do
         H.gets _.mEditor >>= traverse_ \ed -> do
           H.liftEffect $ do
             Editor.redo ed
@@ -839,6 +763,9 @@ editor = connect selectTranslator $ H.mkComponent
       _ <- handleQuery (QueryEditor unit)
       pure unit
 
+    Discard ->
+      H.raise RaiseDiscard
+      
     PDF -> do
       allLines <- H.gets _.mEditor >>= traverse \ed -> do
         H.liftEffect $ Editor.getSession ed
@@ -859,7 +786,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     Save isAutoSave -> do
       state <- H.get
-      when (not state.isEditorOutdated) $ do
+      when (not state.isEditorOutdated && state.compareToElement == Nothing) $ do
         isDirty <- EC.liftEffect $ Ref.read =<< case state.mDirtyRef of
           Just r -> pure r
           Nothing -> EC.liftEffect $ Ref.new false
@@ -1159,7 +1086,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     StartDrag which lm _clientX _clientY -> do
       st <- H.get
-      when (not st.isEditorOutdated) do
+      when (st.compareToElement == Nothing) do
         case st.mEditor of
           Just ed -> do
             session <- H.liftEffect $ Editor.getSession ed
@@ -1426,10 +1353,6 @@ editor = connect selectTranslator $ H.mkComponent
 
         H.modify_ \st -> st
           { mContent = Just content
-          , selectedLiveMarker = Nothing
-          , markerAnnoHS = empty
-          , oldMarkerAnnoPos = empty
-          , markers = markers
           , isEditorOutdated = version /= "latest"
 
 {- <<<<<<< HEAD
@@ -1459,6 +1382,7 @@ editor = connect selectTranslator $ H.mkComponent
             , markerAnnoHS = empty
             , oldMarkerAnnoPos = empty
             , markers = markers
+            , isEditorOutdated = version /= "latest"
             }
           -- Get comments information from Comment Child
           H.raise (RequestComments state.docID entry.id)
@@ -1485,7 +1409,7 @@ editor = connect selectTranslator $ H.mkComponent
               -- Set the content of the editor
               Document.setValue content
                 document
-              Editor.setReadOnly state.isEditorOutdated ed
+              Editor.setReadOnly (state.compareToElement /= Nothing) ed
 
               -- reset Ref, because loading new content is considered 
               -- changing the existing content, which would set the flag
