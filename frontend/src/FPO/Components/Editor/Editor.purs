@@ -1396,8 +1396,9 @@ editor = connect selectTranslator $ H.mkComponent
           , isEditorReadonly = version /= "latest"
           }
 
-        -- Depending on isEditorReadonly, get Comments or not
-        if version /= "latest" then do
+        -- Only secondary Editor has ElementData
+        -- Only first Editor gets to load the comments
+        if isJust state.compareToElement then do
           handleAction $ ContinueChangeToSection []
         else do
           -- Get comments
