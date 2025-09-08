@@ -433,7 +433,7 @@ editor = connect selectTranslator $ H.mkComponent
                 ]
             ]
       , case state.compareToElement of
-          Nothing -> 
+          Nothing ->
             if state.isEditorOutdated then
               HH.div
                 -- toolbar
@@ -456,7 +456,9 @@ editor = connect selectTranslator $ H.mkComponent
                   [ HH.div
                       [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
                       [ HH.text
-                          (translate (label :: _ "editor_oldVersion") state.translator)
+                          ( translate (label :: _ "editor_oldVersion")
+                              state.translator
+                          )
                       , makeEditorToolbarButton
                           true
                           ""
@@ -522,12 +524,12 @@ editor = connect selectTranslator $ H.mkComponent
                   , HP.style
                       "background: rgba(0,0,0,0.1); z-index: 20; padding-bottom: 1.5rem;"
                   ]
-                  [ ]
-              Nothing -> 
+                  []
+              Nothing ->
                 HH.text ""
 
           ]
-      
+
       -- Saved Icon
       , if state.showSavedIcon then
           HH.div
@@ -581,7 +583,7 @@ editor = connect selectTranslator $ H.mkComponent
           case state.compareToElement of
             Just _ -> do
               Editor.setReadOnly true editor_
-            Nothing -> 
+            Nothing ->
               Editor.setReadOnly false editor_
 
       -- New Ref for keeping track, if the content in editor has changed
@@ -765,7 +767,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     Discard ->
       H.raise RaiseDiscard
-      
+
     PDF -> do
       allLines <- H.gets _.mEditor >>= traverse \ed -> do
         H.liftEffect $ Editor.getSession ed
@@ -1355,7 +1357,7 @@ editor = connect selectTranslator $ H.mkComponent
           { mContent = Just content
           , isEditorOutdated = version /= "latest"
 
-{- <<<<<<< HEAD
+          {- <<<<<<< HEAD
           , selectedLiveMarker = Nothing
           , markerAnnoHS = empty
           , oldMarkerAnnoPos = empty

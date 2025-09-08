@@ -1,13 +1,25 @@
 module FPO.Data.Time
-    ( adjustDateTime
-    , getEditTimestamp
-    , formatAbsoluteTimeDetailed
-    , formatRelativeTime
-    ) where
+  ( adjustDateTime
+  , getEditTimestamp
+  , formatAbsoluteTimeDetailed
+  , formatRelativeTime
+  ) where
 
 import Prelude
 
-import Data.DateTime (DateTime, adjust, date, day, diff, hour, minute, month, second, time, year)
+import Data.DateTime
+  ( DateTime
+  , adjust
+  , date
+  , day
+  , diff
+  , hour
+  , minute
+  , month
+  , second
+  , time
+  , year
+  )
 import Data.Enum (fromEnum)
 import Data.Int (floor)
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -24,14 +36,14 @@ adjustDateTime duration dt =
 getEditTimestamp ∷ DocumentHeader → DateTime
 getEditTimestamp = DocDate.docDateToDateTime <<< DocumentHeader.getLastEdited
 
-formatAbsoluteTimeDetailed :: forall d. Duration d => Maybe d -> DateTime -> String 
+formatAbsoluteTimeDetailed :: forall d. Duration d => Maybe d -> DateTime -> String
 formatAbsoluteTimeDetailed offset dateTime =
   let
     mDTime = case offset of
       Just oSet -> adjust (negateDuration oSet) dateTime
       Nothing -> Just dateTime
     dTime = fromMaybe
-      dateTime 
+      dateTime
       mDTime
     d' = date dTime
     t' = time dTime

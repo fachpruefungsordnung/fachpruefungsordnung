@@ -737,15 +737,19 @@ splitview = connect selectTranslator $ H.mkComponent
 
     UpdateVersionMapping -> do
       state <- H.get
-      let 
+      let
         newVersionMapping =
           map
-            ( \e -> case (findRootTree (\v -> v.elementID == e.id) state.versionMapping) of
-                Just entry -> entry
-                Nothing -> { elementID: e.id, versionID: Nothing, comparisonData: Nothing })
+            ( \e ->
+                case
+                  (findRootTree (\v -> v.elementID == e.id) state.versionMapping)
+                  of
+                  Just entry -> entry
+                  Nothing ->
+                    { elementID: e.id, versionID: Nothing, comparisonData: Nothing }
+            )
             state.tocEntries
       H.modify_ _ { versionMapping = newVersionMapping }
-
 
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
@@ -1020,7 +1024,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 Nothing -> emptyTOCEntry
                 Just e -> e
             H.tell _editor 0 (Editor.ChangeSection entry Nothing)
-          _ -> do 
+          _ -> do
             pure unit
 
     HandlePreview _ -> pure unit

@@ -33,9 +33,9 @@ import FPO.Data.Request (LoadState(..), fromLoading, getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Data.Time
-    ( getEditTimestamp
-    , formatRelativeTime
-    )
+  ( formatRelativeTime
+  , getEditTimestamp
+  )
 import FPO.Dto.DocumentDto.DocDate as DocDate
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader, DocumentID)
 import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
@@ -204,7 +204,7 @@ component =
           H.tell _pagination unit $ P.SetPageQ 0
     HandleSearchInput query -> do
       H.modify_ _ { searchQuery = query }
-      -- H.liftEffect $ log query
+    -- H.liftEffect $ log query
     SetPage (P.Clicked page) -> do
       H.modify_ _ { page = page }
     DownloadPdf _ _ event -> do

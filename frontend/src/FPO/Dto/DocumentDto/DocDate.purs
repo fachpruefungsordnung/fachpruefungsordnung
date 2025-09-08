@@ -120,8 +120,6 @@ docMinute d = fromEnum $ minute $ time $ docDateToDateTime d
 docSecond :: DocDate -> Int
 docSecond d = fromEnum $ second $ time $ docDateToDateTime d
 
-
-
 derive newtype instance eqDocDate :: Eq DocDate
 derive newtype instance ordDocDate :: Ord DocDate
 derive newtype instance showDocDate :: Show DocDate
