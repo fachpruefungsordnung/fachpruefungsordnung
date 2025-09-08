@@ -5,6 +5,7 @@ module FPO.Dto.DocumentDto.DocumentHeader
   , getLastEdited
   , getName
   , getIdentifier
+  , getUserName
   , User
   ) where
 
@@ -37,6 +38,9 @@ derive newtype instance eqDocumentHeader :: Eq DocumentHeader
 
 getName :: DocumentHeader -> String
 getName (DH dh) = dh.name
+
+getUserName :: User -> String
+getUserName (U u) = u.name
 
 getID :: DocumentHeader -> Int
 getID (DH dh) = dh.identifier

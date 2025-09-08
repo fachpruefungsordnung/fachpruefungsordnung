@@ -182,3 +182,10 @@
   opacity: 1;
   color: #007bff;
 }
+
+/* ********** Smaller margin ********** */
+
+.mx05 {
+  margin-left: 0.0625rem !important;
+  margin-right: 0.0625rem !important;
+}
