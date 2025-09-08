@@ -123,6 +123,7 @@ data Action
   | ModifyVersionMapping Int (Maybe (Maybe Int)) (Maybe (ElementData))
   | UpdateMSelectedTocEntry
   | SetComparison Int (Maybe Int)
+  | UpdateVersionMapping
 
 type State = FPOState
   ( docID :: DocumentID
@@ -721,13 +722,31 @@ splitview = connect selectTranslator $ H.mkComponent
 
         _ -> pure unit
 
-      when (isJust mt) (H.tell _editor 0 (Editor.EditorResize))
+      when (isJust mt) do
+        H.tell _editor 0 (Editor.EditorResize)
+        H.tell _editor 1 (Editor.EditorResize)
 
     -- Toggle actions
 
     UpdateMSelectedTocEntry -> do
       cToc <- H.request _toc unit TOC.RequestCurrentTocEntry
       H.modify_ _ { mSelectedTocEntry = join cToc }
+
+    UpdateVersionMapping -> do
+      state <- H.get
+      let
+        newVersionMapping =
+          map
+            ( \e ->
+                case
+                  (findRootTree (\v -> v.elementID == e.id) state.versionMapping)
+                  of
+                  Just entry -> entry
+                  Nothing ->
+                    { elementID: e.id, versionID: Nothing, comparisonData: Nothing }
+            )
+            state.tocEntries
+      H.modify_ _ { versionMapping = newVersionMapping }
 
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
@@ -802,8 +821,6 @@ splitview = connect selectTranslator $ H.mkComponent
                 case versionEntry.comparisonData of
                   Nothing -> mod
                   Just _ -> do
-                    -- Just cData -> do 
-                    -- handleAction (ModifyVersionMapping tocID Nothing cData.revID) 
                     handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
       -- open preview
       else do
@@ -839,7 +856,6 @@ splitview = connect selectTranslator $ H.mkComponent
             )
             state.versionMapping
       H.modify_ _ { versionMapping = newVersionMapping }
-      H.liftEffect $ log "Modified version"
 
     SetComparison elementID vID -> do
       state <- H.get
@@ -991,6 +1007,23 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.ShowAllCommentsOutput docID tocID -> do
         handleAction $ ToggleCommentOverview true docID tocID
 
+      Editor.RaiseDiscard -> do
+        H.liftEffect $ log "reached discarding"
+        handleAction UpdateMSelectedTocEntry
+        state <- H.get
+        -- Only the SelLeaf case should ever occur
+        case state.mSelectedTocEntry of
+          Just (SelLeaf id) -> do
+            handleAction (ModifyVersionMapping id (Just Nothing) Nothing)
+            let
+              -- Nothing case should never occur
+              entry = case (findTOCEntry id state.tocEntries) of
+                Nothing -> emptyTOCEntry
+                Just e -> e
+            H.tell _editor 0 (Editor.ChangeSection entry Nothing)
+          _ -> do
+            pure unit
+
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
@@ -1016,7 +1049,6 @@ splitview = connect selectTranslator $ H.mkComponent
               Nothing ->
                 { elementID: -1, versionID: Nothing, comparisonData: Nothing }
               Just elem -> elem
-        -- handleAction (ModifyVersionMapping selectedID rev)
         H.tell _editor 0 (Editor.ChangeSection entry ev.versionID)
         case ev.comparisonData of
           Nothing -> do
@@ -1055,6 +1087,7 @@ splitview = connect selectTranslator $ H.mkComponent
         encodedTree
       -- TODO auch hier mit potentiellen Fehlern umgehen
       H.modify_ \st -> st { tocEntries = newTree }
+      handleAction UpdateVersionMapping
       H.tell _toc unit (TOC.ReceiveTOCs newTree)
 
 -- findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection

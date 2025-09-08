@@ -29,13 +29,14 @@ import FPO.Data.Request
   )
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
+import FPO.Data.Time (formatRelativeTime)
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto(..))
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.FullDocument as FD
 import FPO.Dto.DocumentDto.Query as DQ
 import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName)
-import FPO.Page.Home (formatRelativeTime)
+-- import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn, addModal)

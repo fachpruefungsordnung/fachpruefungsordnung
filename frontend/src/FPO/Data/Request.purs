@@ -21,6 +21,7 @@ module FPO.Data.Request
   , getJson
   , getString
   , getTextElemHistory
+  , getTextElemHistoryAll
   , getUser
   , getUserDocuments
   , getUserGroups
@@ -545,6 +546,18 @@ getTextElemHistory docID tID date limit =
         <> DD.toStringFormat date
         <> "&limit="
         <> show limit
+    )
+
+getTextElemHistoryAll
+  :: DH.DocumentID
+  -> TE.TextElementID
+  -> DD.DocDate
+  -> Aff (Maybe TE.FullTextElementHistory)
+getTextElemHistoryAll dID tID date =
+  getFromJSONEndpoint
+    decodeJson
+    ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history?before="
+        <> DD.toStringFormat date
     )
 
 getUserDocuments

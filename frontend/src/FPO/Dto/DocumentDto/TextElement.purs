@@ -36,6 +36,9 @@ getHistoryElementID (TEH teh) = teh.identifier
 getHistoryElementTimestamp :: TextElementHistory -> DocDate
 getHistoryElementTimestamp (TEH teh) = teh.timestamp
 
+getHistoryElementAuthor :: TextElementHistory -> User
+getHistoryElementAuthor (TEH teh) = teh.author
+
 getTEHsFromFTEH :: FullTextElementHistory -> Array TextElementHistory
 getTEHsFromFTEH (FTEH fteh) = fteh.history
 
