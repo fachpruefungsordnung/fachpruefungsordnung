@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- Turn incomplete pattern matches into error, so that every defined Class has to have a style
 -- This ensures that every class used in Lucid also has an entry in the css stylesheet
@@ -72,6 +73,16 @@ data Class
       CenteredBox
     | -- | Class for a centered, boxed for parsing errors
       ErrorBox
+    | -- | Styling of anchor links @<a>@
+      AnchorLink
+    | -- | Wrapper around ToC, which places the Table on the page
+      TocContainer
+    | -- | Class for <table> element of ToC
+      TableOfContents
+    | -- | Table column thats only as wide as needed
+      MinSizeColumn
+    | -- | Table column that consumes maximum space possible
+      MaxSizeColumn
     deriving (Show, Eq, Enum, Bounded)
 
 -- | maps Class to its css style definition
@@ -206,6 +217,54 @@ classStyle ErrorBox =
     toClassSelector ErrorBox ? do
         padding (em 1) (em 1) (em 1) (em 1)
         border (px 2) dashed red
+classStyle AnchorLink = do
+    toClassSelector AnchorLink ? do
+        color (rgb 0 0 100)
+        textDecoration underline
+        textDecorationColor red
+
+    toClassSelector AnchorLink # hover ? do
+        textDecoration none
+        color red
+classStyle TocContainer = do
+    toClassSelector TocContainer ? do
+        display flex
+        justifyContent center
+        marginBottom (em 2)
+classStyle TableOfContents = do
+    let darkCellColor = grayish 225
+        activeRowColor = darken 0.2 darkCellColor
+        cellBorderColor = grayish 180
+
+    toClassSelector TableOfContents ? do
+        width (pct 100)
+        tableLayout fixed
+    -- borderCollapse collapse
+    -- boxShadow [ rgba 0 0 0 0.15 `bsColor` shadowWithBlur (px 0) (px 0) (px 20) ]
+
+    toClassSelector TableOfContents |> thead |> tr |> th ? do
+        textAlign alignLeft
+
+    toClassSelector TableOfContents |> tbody |> tr ? do
+        borderBottom (px 1) solid cellBorderColor
+
+    toClassSelector TableOfContents |> tbody |> tr # lastOfType ? do
+        borderBottom (px 2) solid cellBorderColor
+
+    toClassSelector TableOfContents |> tbody |> tr |> td ? do
+        padding (px 10) (px 10) (px 10) (px 10)
+
+    toClassSelector TableOfContents |> tbody |> tr # nthOfType "odd" ? do
+        backgroundColor darkCellColor
+
+    toClassSelector TableOfContents |> tbody |> tr # hover ? do
+        backgroundColor activeRowColor
+classStyle MinSizeColumn = do
+    toClassSelector MinSizeColumn ? do
+        width auto
+classStyle MaxSizeColumn = do
+    toClassSelector MaxSizeColumn ? do
+        width (pct 95)
 
 -- | Returns the html class name of given Class
 className :: Class -> Text

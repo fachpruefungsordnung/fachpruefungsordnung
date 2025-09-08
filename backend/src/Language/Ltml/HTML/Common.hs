@@ -48,6 +48,8 @@ import Language.Lsd.AST.Type.Enum (EnumFormat)
 import Language.Lsd.AST.Type.Section (SectionFormat)
 import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label (unLabel))
+import qualified Language.Ltml.HTML.CSS.Classes as Class
+import Language.Ltml.HTML.CSS.Util (cssClass_)
 import Lucid (Html, a_, href_)
 
 -- TODO: Third ConfigState? With custom Reader Monad that is read only
@@ -190,9 +192,9 @@ initReaderState =
         , currentEnumIDFormatString = error "Undefined enum id format!"
         , footnoteMap = Map.empty
         , -- \| Default rendering method is "preview", so no anchor links
-          labelWrapperFunc = const id -- anchorLink
-        , footnoteWrapperFunc = const id
-        , tocEntryWrapperFunc = const id
+          labelWrapperFunc = anchorLink -- const id
+        , footnoteWrapperFunc = anchorLink
+        , tocEntryWrapperFunc = anchorLink
         }
 
 -------------------------------------------------------------------------------
@@ -316,7 +318,7 @@ type LabelWrapper = Label -> Html () -> Html ()
 
 -- | Converts Label into <a href = "#<label>"> for jumping to a HTML id
 anchorLink :: LabelWrapper
-anchorLink label = a_ [href_ (cons '#' $ unLabel label)]
+anchorLink label = a_ [cssClass_ Class.AnchorLink, href_ (cons '#' $ unLabel label)]
 
 -------------------------------------------------------------------------------
 

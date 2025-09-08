@@ -25,7 +25,7 @@ import Data.Bifunctor (bimap)
 import Data.DList (toList)
 import Data.Either (rights)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (isJust)
 import qualified Data.Set as Set
 import Data.Text (Text, unpack)
 import Data.Void (Void, absurd)
@@ -717,8 +717,14 @@ renderDelayedToc mTocFormat = do
 renderToc :: Maybe TocFormat -> LabelWrapper -> GlobalState -> Delayed (Html ())
 renderToc Nothing _ _ = mempty
 renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
-    let tableHead =
-            thead_ $ tr_ (th_ mempty <> th_ (toHtml title))
+    let colGroup =
+            colgroup_
+                ( col_ <#> Class.MinSizeColumn
+                    <> col_ <#> Class.MaxSizeColumn
+                    <> col_ <#> Class.MinSizeColumn
+                )
+        tableHead =
+            thead_ $ tr_ (th_ [colspan_ "3"] (toHtml title))
                 :: Html ()
 
         -- \| Build List of ToC rows
@@ -730,7 +736,8 @@ renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
 
         -- \| [Delayed (Html ())] -> Delayed [Html ()] -> Delayed (Html ())
         tableBody = tbody_ . mconcat <$> sequence tocEntries
-     in table_ <$> (pure tableHead <> tableBody)
+     in (div_ <#> Class.TocContainer) . (table_ <#> Class.TableOfContents)
+            <$> (pure colGroup <> pure tableHead <> tableBody)
   where
     -- \| Build <tr><td>id</td> <td>title</td></tr> and wrap id and title seperatly
     buildWrappedRow
@@ -740,13 +747,14 @@ renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
     buildWrappedRow wrapperFunc (mIdHtml, rTitle, htmlId) =
         let
             -- \| Draw ToC Error titles as inline errors
-            titleHtml = result id (span_ <#> Class.InlineError <$>) rTitle
             wrap = wrapperFunc (Label htmlId)
+            titleHtml = result id (span_ <#> Class.InlineError <$>) rTitle
+            titleCell = td_ . wrap <$> titleHtml
+            idCell = td_ $ maybe mempty wrap mIdHtml
+            linkButton = td_ <#> Class.Centered $ wrap $ toHtml ("↗" :: Text)
          in
-            -- TODO: Style ToC
             -- \| Nothing IdHtmls will be replaced with mempty
-            ((tr_ <$> (td_ (wrap (fromMaybe mempty mIdHtml)) <>)) . td_) . wrap
-                <$> titleHtml
+            tr_ <$> pure idCell <> titleCell <> pure linkButton
 
 -------------------------------------------------------------------------------
 
