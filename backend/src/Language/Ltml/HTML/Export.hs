@@ -1,10 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Ltml.HTML.Export () where
+module Language.Ltml.HTML.Export (exportDocument) where
 
+import Clay (render)
 import Control.Monad.Reader (ReaderT (runReaderT))
 import Control.Monad.State (runState)
-import Language.Ltml.AST.Document
+import Data.Text.IO (writeFile)
+import Language.Ltml.AST.DocumentContainer (DocumentContainer)
+import Language.Ltml.Common (Flagged')
 import Language.Ltml.HTML
 import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.HTML.Common
@@ -12,9 +15,26 @@ import Language.Ltml.HTML.Util
 import Lucid
 import System.Directory
 import System.FilePath
+import Prelude hiding (writeFile)
+import Data.Text.Lazy (toStrict)
 
 -- ReaderState felder mit wrapperFunktionen für:
 --  - <a> für Section Headings (Sprung zur Einzelansicht)
+
+-- @
+-- <path>/
+--     <mainDirectoryName>/
+--         <realtiveCssFilePath>/
+--             style.css
+--         index.html
+--         <relativeSectionDir>/
+--             section1.html
+--             section2.html
+--             ...
+-- @
+
+mainDirectoryName :: FilePath
+mainDirectoryName = "doc"
 
 -- | Path to main CSS file relative to the index.html
 relativeCssFilePath :: FilePath
@@ -27,35 +47,36 @@ relativeSectionsDir = "sections"
 -------------------------------------------------------------------------------
 
 -- | Exports document structure as HTML pages to given directory path
--- TODO: Fit export to new Document Structur (or abstract to DocumentContainer)
--- exportDocument :: Document -> FilePath -> IO ()
--- exportDocument doc@(Document format header (DocumentBody nodeSections)) path =
---     let absCssFilePath = path </> relativeCssFilePath
---         absSectionsDir = path </> relativeSectionsDir
---      in do
---             createDirectoryIfMissing True path
---             createDirectoryIfMissing True (takeDirectory absCssFilePath)
---             createDirectoryIfMissing True absSectionsDir
---             -- TODO: this has to build the final css based on the rendering
---             -- writeCss absCssFilePath
---             -- \| TODO: Add actual Document title
---             renderToFile
---                 (path </> "index.html")
---                 (addHtmlHeader "Tolles Dokument" relativeCssFilePath $ aToHtml doc)
---             mapState (exportSingleSection absSectionsDir) initGlobalState nodeSections
+exportDocument :: Flagged' DocumentContainer -> FilePath -> IO ()
+exportDocument docCon path =
+    let mainDir = path </> mainDirectoryName
+        absCssFilePath = mainDir </> relativeCssFilePath
+        absSectionsDir = mainDir </> relativeSectionsDir
+        (body, css) = renderHtmlCss docCon
+        -- TODO: Get real Doc Title
+        mainHtml = addHtmlHeader "Temp Title" relativeCssFilePath body
+     in do
+            createDirectoryIfMissing True path
+            createDirectoryIfMissing True (takeDirectory absCssFilePath)
+            createDirectoryIfMissing True absSectionsDir
+
+            writeFile absCssFilePath (toStrict $ render css)
+            renderToFile (mainDir </> "index.html") mainHtml
+
+        -- mapState (exportSingleSection absSectionsDir) initGlobalState nodeSections
 
 -- | Render section with given initial state and creates .html file
 -- in given directory; returns the final state
-exportSingleSection
-    :: (ToHtmlM a) => FilePath -> GlobalState -> a -> IO GlobalState
-exportSingleSection path globalState a =
-    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) globalState
-        body = evalDelayed delayedHtml finalState
-        sectionID = show (currentSectionID globalState)
-     in do
-            renderToFile (path </> ("section_" ++ sectionID ++ ".html")) $
-                addHtmlHeader
-                    ("Einzelansicht § " ++ sectionID)
-                    (".." </> relativeCssFilePath)
-                    body
-            return finalState
+-- exportSingleSection
+--     :: (ToHtmlM a) => FilePath -> GlobalState -> a -> IO GlobalState
+-- exportSingleSection path globalState a =
+--     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) globalState
+--         body = evalDelayed delayedHtml finalState
+--         sectionID = show (currentSectionID globalState)
+--      in do
+--             renderToFile (path </> ("section_" ++ sectionID ++ ".html")) $
+--                 addHtmlHeader
+--                     ("Einzelansicht § " ++ sectionID)
+--                     (".." </> relativeCssFilePath)
+--                     body
+--             return finalState

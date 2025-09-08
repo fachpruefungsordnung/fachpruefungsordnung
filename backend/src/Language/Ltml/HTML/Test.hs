@@ -12,6 +12,7 @@ import Language.Ltml.Tree.ToLtml (treeToLtml)
 import Lucid (renderToFile)
 import System.Directory (removeDirectoryRecursive)
 import Prelude hiding (Enum, Word, readFile)
+import Language.Ltml.HTML.Export (exportDocument)
 
 parseTest :: IO ()
 parseTest = do
@@ -30,23 +31,15 @@ parseTest = do
 
 -------------------------------------------------------------------------------
 
--- exportTest :: IO ()
--- exportTest =
---     let testDir = "src/Language/Ltml/HTML/Test/Doc"
---      in do
---             text <- testDoc
---             case runParser (sectionP superSectionT eof) "" text of
---                 Left _ -> error "parsing failed"
---                 Right nodeSection -> do
---                     exportDocument
---                         ( Document
---                             DocumentFormat
---                             (DocumentTitle "Titel")
---                             (DocumentBody [nodeSection, nodeSection])
---                         )
---                         testDir
---             _ <- getLine
---             removeDirectoryRecursive testDir
+exportTest :: IO ()
+exportTest =
+    let testDir = "src/Language/Ltml/HTML/Test/export"
+     in do
+        _ <- case treeToLtml fpoTree of
+            Left _ -> error "parsing failed"
+            Right docCon -> exportDocument docCon testDir
+        _ <- getLine
+        removeDirectoryRecursive testDir
 
 -------------------------------------------------------------------------------
 
