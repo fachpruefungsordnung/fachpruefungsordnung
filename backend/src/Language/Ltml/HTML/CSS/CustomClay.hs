@@ -14,6 +14,9 @@ module Language.Ltml.HTML.CSS.CustomClay
     , alignRight
     , displayContents
     , gap
+    , tableLayout
+    -- , fixed
+    -- , auto
     ) where
 
 import Clay hiding (a, b, s)
@@ -72,3 +75,6 @@ displayContents = other "contents"
 
 gap :: Size LengthUnit -> Css
 gap s = "gap" -: unPlain (unValue $ value s)
+
+tableLayout :: Position -> Css
+tableLayout arg = "table-layout" -: unPlain (unValue $ value arg)
