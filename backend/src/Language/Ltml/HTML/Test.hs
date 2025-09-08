@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Ltml.HTML.Test () where
+module Language.Ltml.HTML.Test (docConTest) where
 
 import Data.Map (fromList)
 import Data.Typography
@@ -101,7 +101,7 @@ parseTest = do
 docConTest :: Flagged' DocumentContainer
 docConTest =
     Flagged
-        False
+        True
         ( DocumentContainer
             ( DocumentContainerFormat
                 ( HeaderFooterFormat
@@ -638,6 +638,12 @@ docConTest =
                                                             [ Word "section"
                                                             , Space
                                                             , Word "title"
+                                                            , Space
+                                                            , Word "in"
+                                                            , Space
+                                                            , Word "an"
+                                                            , Space
+                                                            , Word "appendix"
                                                             ]
                                                         )
                                                         ( LeafSectionBody
@@ -660,9 +666,9 @@ docConTest =
                                                                     , Space
                                                                     , Word "is"
                                                                     , Space
-                                                                    , Word "a"
+                                                                    , Word "an"
                                                                     , Space
-                                                                    , Word "simple"
+                                                                    , Word "appendix"
                                                                     , Space
                                                                     , Word "paragraph"
                                                                     , Word "."
@@ -688,6 +694,8 @@ docConTest =
                                                                     , Word "is"
                                                                     , Space
                                                                     , Word "another"
+                                                                    , Space
+                                                                    , Word "appendix"
                                                                     , Space
                                                                     , Word "paragraph,"
                                                                     , Space
@@ -791,7 +799,7 @@ docConTest =
                                                                     , Space
                                                                     , Word "labeled"
                                                                     , Space
-                                                                    , Word "paragraph,"
+                                                                    , Word "appendix-paragraph,"
                                                                     , Space
                                                                     , Word "referencing"
                                                                     , Space

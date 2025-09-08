@@ -112,6 +112,7 @@ data CounterState = CounterState
     , _sentenceCTR :: Int
     , _footnoteCTR :: Int
     , _appendixCTR :: Int
+    , _documentCTR :: Int
     }
     deriving (Show)
 
@@ -168,6 +169,7 @@ resetCountersHard :: State GlobalState ()
 resetCountersHard = do
     counterState . supersectionCTR .= 0
     counterState . sectionCTR .= 0
+    counterState . paragraphCTR .= 0
     counterState . footnoteCTR .= 0
     counterState . appendixCTR .= 0
 
@@ -175,6 +177,7 @@ resetCountersSoft :: State GlobalState ()
 resetCountersSoft = do
     counterState . supersectionCTR .= 0
     counterState . sectionCTR .= 0
+    counterState . paragraphCTR .= 0
     counterState . footnoteCTR .= 0
 
 -- Get the next label at the current depth
@@ -269,6 +272,7 @@ initialGlobalState =
 initialCounterState :: CounterState
 initialCounterState =
     CounterState
+        0
         0
         0
         0

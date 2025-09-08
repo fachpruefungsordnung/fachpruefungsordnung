@@ -95,7 +95,7 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     , linebreak
     , newpage
     , resetfootnote
-    , setpdftitle
+    , setpdftitle, bold
     )
 
 class ToPreLaTeXM a where
@@ -397,7 +397,7 @@ instance Labelable Document where
                 toc' <- use GS.toc
                 appendixHeaders' <- use GS.appendixHeaders
                 pure $
-                    IText tocHeading <> case t of
+                    bold (IText tocHeading) <> linebreak <> case t of
                         GS.Appendix ->
                             ISequence $ DList.toList toc'
                         GS.Main ->
@@ -417,7 +417,7 @@ instance ToPreLaTeXM AppendixSection where
             GS.counterState . GS.appendixCTR .= 0
             GS.flagState . GS.docType .= GS.Appendix
             GS.formatState . GS.appendixFormat .= elementFmt
-            GS.appendixHeaders %= (<> DList.fromList [IText t, linebreak])
+            GS.appendixHeaders %= (<> DList.fromList [bold $ IText t, linebreak])
             nodes' <- mapM toPreLaTeXM nodes
             pure $ ISequence $ map ((newpage <> resetfootnote) <>) nodes'
 
