@@ -50,6 +50,26 @@ addColumn val str placeholder bi for act =
             ]
         ]
 
+-- Similar to AddColumn but creates textfields tailored towards the Version history dropdown.
+addField
+  :: forall w a
+   . String -- ^ value
+  -> String -- ^ placeholder
+  -> InputType -- ^ input type
+  -> (String -> a) -- ^ action (parametrized with the value)
+  -> HH.HTML w a
+addField val placeholder for act =
+  HH.div [ HP.classes [ HB.inputGroup, HB.inputGroupSm ] ]
+    [ HH.input
+        [ HP.type_ for
+        , HP.classes [ HB.formControl, HB.formControlSm ]
+        , HP.placeholder placeholder
+        , HP.value val
+        , HE.onValueInput act
+        ]
+
+    ]
+
 -- | Creates a button with an icon.
 addButton
   :: forall w a
