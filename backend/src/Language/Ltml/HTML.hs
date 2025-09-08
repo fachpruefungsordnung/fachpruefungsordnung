@@ -12,6 +12,7 @@ module Language.Ltml.HTML
     ( ToHtmlM (..)
     , renderSectionHtmlCss
     , renderHtmlCss
+    , renderHtmlCssWith
     , renderTocList
     , renderTocEntry
     ) where
@@ -89,10 +90,16 @@ renderSectionHtmlCss section fnMap =
         finalState' = addUsedFootnoteLabels finalState
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
 
+-- | Render a @Flagged' DocumentContainer@ to HTML and CSS
 renderHtmlCss :: Flagged' DocumentContainer -> (Html (), Css)
-renderHtmlCss docContainer =
-    -- \| Render with given footnote context
-    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) initReaderState) initGlobalState
+renderHtmlCss = renderHtmlCssWith initReaderState initGlobalState 
+
+-- | Render a @Flagged' DocumentContainer@ to HTML and CSS with a given
+--   initial 'ReaderState' and 'GlobalState'
+renderHtmlCssWith :: ReaderState -> GlobalState -> Flagged' DocumentContainer -> (Html (), Css)
+renderHtmlCssWith readerState globalState docContainer = 
+     -- \| Render with given footnote context
+    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) readerState) globalState
         -- \| Add footnote labes for "normal" (non-footnote) references
         finalState' = addUsedFootnoteLabels finalState
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))

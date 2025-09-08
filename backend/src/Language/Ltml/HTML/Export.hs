@@ -3,9 +3,8 @@
 module Language.Ltml.HTML.Export (exportDocument) where
 
 import Clay (render)
-import Control.Monad.Reader (ReaderT (runReaderT))
-import Control.Monad.State (runState)
 import Data.Text.IO (writeFile)
+import Data.Text.Lazy (toStrict)
 import Language.Ltml.AST.DocumentContainer (DocumentContainer)
 import Language.Ltml.Common (Flagged')
 import Language.Ltml.HTML
@@ -16,7 +15,6 @@ import Lucid
 import System.Directory
 import System.FilePath
 import Prelude hiding (writeFile)
-import Data.Text.Lazy (toStrict)
 
 -- ReaderState felder mit wrapperFunktionen für:
 --  - <a> für Section Headings (Sprung zur Einzelansicht)
@@ -44,15 +42,24 @@ relativeCssFilePath = "css" </> "style.css"
 relativeSectionsDir :: FilePath
 relativeSectionsDir = "sections"
 
+exportReaderState :: ReaderState
+exportReaderState =
+    initReaderState
+        { shouldRender = True
+        , labelWrapperFunc = anchorLink
+        , tocEntryWrapperFunc = anchorLink
+        , footnoteWrapperFunc = anchorLink
+        }
+
 -------------------------------------------------------------------------------
 
--- | Exports document structure as HTML pages to given directory path
+-- | Exports WHOLE document structure as HTML pages to given directory path
 exportDocument :: Flagged' DocumentContainer -> FilePath -> IO ()
 exportDocument docCon path =
     let mainDir = path </> mainDirectoryName
         absCssFilePath = mainDir </> relativeCssFilePath
         absSectionsDir = mainDir </> relativeSectionsDir
-        (body, css) = renderHtmlCss docCon
+        (body, css) = renderHtmlCssWith exportReaderState initGlobalState docCon
         -- TODO: Get real Doc Title
         mainHtml = addHtmlHeader "Temp Title" relativeCssFilePath body
      in do
@@ -63,7 +70,7 @@ exportDocument docCon path =
             writeFile absCssFilePath (toStrict $ render css)
             renderToFile (mainDir </> "index.html") mainHtml
 
-        -- mapState (exportSingleSection absSectionsDir) initGlobalState nodeSections
+-- mapState (exportSingleSection absSectionsDir) initGlobalState nodeSections
 
 -- | Render section with given initial state and creates .html file
 -- in given directory; returns the final state
