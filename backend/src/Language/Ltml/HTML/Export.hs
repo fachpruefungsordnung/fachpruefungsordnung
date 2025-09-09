@@ -1,10 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Ltml.HTML.Export (exportDocument) where
+module Language.Ltml.HTML.Export (exportDocument, renderZip) where
 
 import Clay (render)
+import Codec.Archive.Zip
+import Data.ByteString.Lazy (ByteString)
+import Data.Text (pack)
 import Data.Text.IO (writeFile)
 import Data.Text.Lazy (toStrict)
+import Data.Text.Lazy.Encoding (encodeUtf8)
+import Data.Time.Clock.POSIX (getPOSIXTime)
 import Language.Ltml.AST.DocumentContainer (DocumentContainer)
 import Language.Ltml.Common (Flagged')
 import Language.Ltml.HTML
@@ -47,8 +52,9 @@ exportReaderState =
     initReaderState
         { shouldRender = True
         , labelWrapperFunc = anchorLink
-        , tocEntryWrapperFunc = anchorLink
         , footnoteWrapperFunc = anchorLink
+        , tocEntryWrapperFunc = anchorLink
+        , tocButtonWrapperFunc = pageLink (pack relativeSectionsDir)
         }
 
 -------------------------------------------------------------------------------
@@ -69,6 +75,26 @@ exportDocument docCon path =
 
             writeFile absCssFilePath (toStrict $ render css)
             renderToFile (mainDir </> "index.html") mainHtml
+
+-- | Renders WHOLE document structure as HTML pages to zip archive (as 'ByteString')
+renderZip :: Flagged' DocumentContainer -> IO ByteString
+renderZip docCon =
+    let (body, css) = renderHtmlCssWith exportReaderState initGlobalState docCon
+        -- TODO: Get real Doc Title
+        mainHtml = addHtmlHeader "Temp Title" relativeCssFilePath body
+        mainBS = renderBS mainHtml
+        stylesheetBS = encodeUtf8 $ render css
+        files =
+            [ (mainBS, "index.html")
+            , (stylesheetBS, relativeCssFilePath)
+            ]
+     in do
+            currentTime <- round <$> getPOSIXTime
+            let entries = map (\(bs, path) -> toEntry path currentTime bs) files
+                archive = foldr addEntryToArchive emptyArchive entries
+            return $ fromArchive archive
+
+----------------------------------------------------------------------------------------------
 
 -- mapState (exportSingleSection absSectionsDir) initGlobalState nodeSections
 

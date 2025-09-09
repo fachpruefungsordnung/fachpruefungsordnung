@@ -27,6 +27,7 @@ module Language.Ltml.HTML.Common
     , EnumStyleMap
     , LabelWrapper
     , anchorLink
+    , pageLink
     , Delayed (..)
     , evalDelayed
     , returnNow
@@ -152,6 +153,8 @@ data ReaderState = ReaderState
     -- ^ Wrapper around Footnote reference Html inside the TextTree (e.g. for adding anchor links)
     , tocEntryWrapperFunc :: LabelWrapper
     -- ^ Wrapper around an ToC entry (e.g. for adding anchor links)
+    , tocButtonWrapperFunc :: LabelWrapper
+    -- ^ Wrapper around the button in the right column of the ToC (e.g. for adding page links)
     }
 
 initGlobalState :: GlobalState
@@ -192,9 +195,10 @@ initReaderState =
         , currentEnumIDFormatString = error "Undefined enum id format!"
         , footnoteMap = Map.empty
         , -- \| Default rendering method is "preview", so no anchor links
-          labelWrapperFunc = anchorLink -- const id
-        , footnoteWrapperFunc = anchorLink
-        , tocEntryWrapperFunc = anchorLink
+          labelWrapperFunc = const id -- anchorLink
+        , footnoteWrapperFunc = const id
+        , tocEntryWrapperFunc = const id
+        , tocButtonWrapperFunc = const id
         }
 
 -------------------------------------------------------------------------------
@@ -316,9 +320,17 @@ type EnumStyleMap = [(EnumFormat, Text)]
 --   e.g. for adding anchor links
 type LabelWrapper = Label -> Html () -> Html ()
 
--- | Converts Label into <a href = "#<label>"> for jumping to a HTML id
+-- | Converts 'Label' into @<a href = "#<label>">@ for jumping to a HTML id
 anchorLink :: LabelWrapper
 anchorLink label = a_ [cssClass_ Class.AnchorLink, href_ (cons '#' $ unLabel label)]
+
+-- | Converts 'Label' into @<a href = "<path>/<label>.html">@ for jumping to another page
+pageLink
+    :: Text
+    -- ^ Path prefix
+    -> LabelWrapper
+pageLink path label =
+    a_ [cssClass_ Class.AnchorLink, href_ (path <> "/" <> unLabel label <> ".html")]
 
 -------------------------------------------------------------------------------
 

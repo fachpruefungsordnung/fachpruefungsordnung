@@ -2,17 +2,18 @@
 
 module Language.Ltml.HTML.Test () where
 
+import Data.ByteString.Lazy (writeFile)
 import Language.Ltml.HTML
 import Language.Ltml.HTML.CSS (writeCss)
 import Language.Ltml.HTML.CSS.Util (addHtmlHeader)
+import Language.Ltml.HTML.Export (exportDocument, renderZip)
 import Language.Ltml.Pretty (prettyPrint)
 import Language.Ltml.Tree.Example.Fpo (fpoTree)
 import Language.Ltml.Tree.Parser (TreeError (..))
 import Language.Ltml.Tree.ToLtml (treeToLtml)
 import Lucid (renderToFile)
 import System.Directory (removeDirectoryRecursive)
-import Prelude hiding (Enum, Word, readFile)
-import Language.Ltml.HTML.Export (exportDocument)
+import Prelude hiding (writeFile)
 
 parseTest :: IO ()
 parseTest = do
@@ -35,11 +36,19 @@ exportTest :: IO ()
 exportTest =
     let testDir = "src/Language/Ltml/HTML/Test/export"
      in do
-        _ <- case treeToLtml fpoTree of
-            Left _ -> error "parsing failed"
-            Right docCon -> exportDocument docCon testDir
-        _ <- getLine
-        removeDirectoryRecursive testDir
+            _ <- case treeToLtml fpoTree of
+                Left _ -> error "parsing failed"
+                Right docCon -> exportDocument docCon testDir
+            _ <- getLine
+            removeDirectoryRecursive testDir
+
+zipTest :: IO ()
+zipTest = do
+    case treeToLtml fpoTree of
+        Left _ -> error "parsing failed"
+        Right docCon -> do
+            bs <- renderZip docCon
+            writeFile "src/Language/Ltml/HTML/Test/export.zip" bs
 
 -------------------------------------------------------------------------------
 

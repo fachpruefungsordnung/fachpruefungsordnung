@@ -92,13 +92,14 @@ renderSectionHtmlCss section fnMap =
 
 -- | Render a @Flagged' DocumentContainer@ to HTML and CSS
 renderHtmlCss :: Flagged' DocumentContainer -> (Html (), Css)
-renderHtmlCss = renderHtmlCssWith initReaderState initGlobalState 
+renderHtmlCss = renderHtmlCssWith initReaderState initGlobalState
 
 -- | Render a @Flagged' DocumentContainer@ to HTML and CSS with a given
 --   initial 'ReaderState' and 'GlobalState'
-renderHtmlCssWith :: ReaderState -> GlobalState -> Flagged' DocumentContainer -> (Html (), Css)
-renderHtmlCssWith readerState globalState docContainer = 
-     -- \| Render with given footnote context
+renderHtmlCssWith
+    :: ReaderState -> GlobalState -> Flagged' DocumentContainer -> (Html (), Css)
+renderHtmlCssWith readerState globalState docContainer =
+    -- \| Render with given footnote context
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) readerState) globalState
         -- \| Add footnote labes for "normal" (non-footnote) references
         finalState' = addUsedFootnoteLabels finalState
@@ -701,22 +702,32 @@ instance (ToHtmlM a) => ToHtmlM (SectionFormatted (Parsed a)) where
 renderLocalToc :: Maybe TocFormat -> HtmlReaderState
 renderLocalToc mTocFormat = do
     globalState <- get
-    tocFunc <- asks tocEntryWrapperFunc
-    return $ renderToc mTocFormat tocFunc globalState
+    entryFunc <- asks tocEntryWrapperFunc
+    buttonFunc <- asks tocButtonWrapperFunc
+    return $ renderToc mTocFormat entryFunc buttonFunc globalState
 
 -- | Returns a Later which takes a GlobalState to render a delayed ToC
 renderDelayedToc :: Maybe TocFormat -> HtmlReaderState
 renderDelayedToc mTocFormat = do
-    tocFunc <- asks tocEntryWrapperFunc
+    entryFunc <- asks tocEntryWrapperFunc
+    buttonFunc <- asks tocButtonWrapperFunc
+
     -- \| Return Later to delay ToC generation to the end;
     --    Join Delayed (Delayed (Html ())) together,
     --    since the ToC itself contains Delayed (Html ()) too
-    return $ join $ Later $ \globalState -> renderToc mTocFormat tocFunc globalState
+    return $ join $ Later $ \globalState -> renderToc mTocFormat entryFunc buttonFunc globalState
 
 -- | Helper function for rendering a ToC from the given  GlobalState
-renderToc :: Maybe TocFormat -> LabelWrapper -> GlobalState -> Delayed (Html ())
-renderToc Nothing _ _ = mempty
-renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
+renderToc
+    :: Maybe TocFormat
+    -> LabelWrapper
+    -- ^ Wrapper for Toc entry text
+    -> LabelWrapper
+    -- ^ Wrapper for Toc button
+    -> GlobalState
+    -> Delayed (Html ())
+renderToc Nothing _ _ _ = mempty
+renderToc (Just (TocFormat (TocHeading title))) entryFunc buttonFunc globalState =
     let colGroup =
             colgroup_
                 ( col_ <#> Class.MinSizeColumn
@@ -732,7 +743,7 @@ renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
         tocEntries =
             -- \| @rights@ filters all phantom entries and unpacks real ones
             let tupleList = rights $ toList $ tableOfContents globalState
-             in map (buildWrappedRow tocFunc) tupleList
+             in map (buildWrappedRow entryFunc buttonFunc) tupleList
 
         -- \| [Delayed (Html ())] -> Delayed [Html ()] -> Delayed (Html ())
         tableBody = tbody_ . mconcat <$> sequence tocEntries
@@ -742,16 +753,18 @@ renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
     -- \| Build <tr><td>id</td> <td>title</td></tr> and wrap id and title seperatly
     buildWrappedRow
         :: LabelWrapper
+        -> LabelWrapper
         -> (Maybe (Html ()), Result (Delayed (Html ())), Text)
         -> Delayed (Html ())
-    buildWrappedRow wrapperFunc (mIdHtml, rTitle, htmlId) =
+    buildWrappedRow entryWrapper buttonWrapper (mIdHtml, rTitle, htmlId) =
         let
             -- \| Draw ToC Error titles as inline errors
-            wrap = wrapperFunc (Label htmlId)
+            entryWrap = entryWrapper (Label htmlId)
+            buttonWrap = buttonWrapper (Label htmlId)
             titleHtml = result id (span_ <#> Class.InlineError <$>) rTitle
-            titleCell = td_ . wrap <$> titleHtml
-            idCell = td_ $ maybe mempty wrap mIdHtml
-            linkButton = td_ <#> Class.Centered $ wrap $ toHtml ("↗" :: Text)
+            titleCell = td_ . entryWrap <$> titleHtml
+            idCell = td_ $ maybe mempty entryWrap mIdHtml
+            linkButton = td_ <#> Class.Centered $ buttonWrap $ toHtml ("↗" :: Text)
          in
             -- \| Nothing IdHtmls will be replaced with mempty
             tr_ <$> pure idCell <> titleCell <> pure linkButton
