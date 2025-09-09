@@ -824,8 +824,10 @@ splitview = connect selectTranslator $ H.mkComponent
           { previewRatio = st.lastExpandedPreviewRatio
           , previewShown = true
           }
+        -- only resize second editor, when visible
+        H.tell _editor 1 (Editor.EditorResize)
+      -- always resize main editor for each call
       H.tell _editor 0 (Editor.EditorResize)
-      H.tell _editor 1 (Editor.EditorResize)
 
     ModifyVersionMapping tocID vID cData -> do
       state <- H.get
