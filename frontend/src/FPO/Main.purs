@@ -13,12 +13,11 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console (log)
 import FPO.AppM (runAppM)
 import FPO.Components.AppToasts as AppToasts
 import FPO.Components.Navbar as Navbar
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Route (Route(..), routeCodec, routeToString)
+import FPO.Data.Route (Route(..), routeCodec)
 import FPO.Data.Store (loadLanguage)
 import FPO.Data.Store as Store
 import FPO.Page.Admin.Group.AddMembers as GroupAddMembers
@@ -60,7 +59,6 @@ import Prelude
   , (/=)
   , (<$>)
   , (<<<)
-  , (<>)
   , (==)
   )
 import Routing.Duplex as RD
@@ -169,9 +167,7 @@ component =
   handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
   handleAction = case _ of
     Initialize -> do
-      initialHash <- liftEffect getHash
       initialRoute <- hush <<< (RD.parse routeCodec) <$> liftEffect getHash
-      log initialHash
       navigate $ fromMaybe Home initialRoute
     HandleProfile profileOutput -> case profileOutput of
       Profile.ChangedUsername -> do
@@ -233,7 +229,6 @@ main = HA.runHalogenAff do
   void $ liftEffect $ matchesWith (RD.parse routeCodec) \old new ->
     when (old /= Just new) $ launchAff_ do
       _response <- halogenIO.query $ H.mkTell $ NavigateQ new
-      log $ "Navigated to: " <> routeToString new
       pure unit
 
   void $ liftEffect setupTruncationListener

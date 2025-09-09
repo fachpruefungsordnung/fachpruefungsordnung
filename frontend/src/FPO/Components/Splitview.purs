@@ -28,7 +28,6 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -1007,7 +1006,6 @@ splitview = connect selectTranslator $ H.mkComponent
         handleAction $ ToggleCommentOverview true docID tocID
 
       Editor.RaiseDiscard -> do
-        H.liftEffect $ log "reached discarding"
         handleAction UpdateMSelectedTocEntry
         state <- H.get
         -- Only the SelLeaf case should ever occur

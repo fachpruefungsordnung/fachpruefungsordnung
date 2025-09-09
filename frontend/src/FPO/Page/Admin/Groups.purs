@@ -14,7 +14,6 @@ import Data.Maybe (Maybe(..))
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Data.Navigate (class Navigate, navigate)
@@ -39,7 +38,6 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addButton, addCard, addColumn, addError, addModal, emptyEntryGen)
 import FPO.UI.Style as Style
-import Halogen (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -284,7 +282,6 @@ component =
                           <> (show err)
                     }
                 Right _ -> do
-                  liftEffect $ log $ "Deleted group: " <> groupName
                   H.modify_ _
                     { error = Nothing
                     , groups = Loaded $ filter
