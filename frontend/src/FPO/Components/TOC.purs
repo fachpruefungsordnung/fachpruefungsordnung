@@ -235,20 +235,23 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
   render :: State -> forall slots. H.ComponentHTML Action slots m
   render state =
-    HH.div_ $
-      renderDeleteModal
-        <>
-          ( rootTreeToHTML
-              state
-              state.documentName
-              state.showAddMenu
-              state.showHistoryMenu
-              state.mSelectedTocEntry
-              state.now
-              state.filteredTree
-              state.searchData
-              state.tocEntries
-          )
+    HH.div
+    [ HP.classes [ HH.ClassName "leftscrollbar" ] ]
+    [ HH.div_ $
+        renderDeleteModal
+          <>
+            ( rootTreeToHTML
+                state
+                state.documentName
+                state.showAddMenu
+                state.showHistoryMenu
+                state.mSelectedTocEntry
+                state.now
+                state.filteredTree
+                state.searchData
+                state.tocEntries
+            )
+    ]
     where
     renderDeleteModal = case state.requestDelete of
       Nothing -> []
