@@ -30,7 +30,6 @@ import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class as EC
-import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -205,8 +204,6 @@ data Action
   | Save Boolean
   -- Subsection of Save
   | Upload TOCEntry ContentWrapper Boolean
-  -- Subsection of Upload
-  | LostParentID TOCEntry ContentWrapper Boolean
   | SavedIcon
   -- new change in editor -> reset timer
   | AutoSaveTimer
@@ -761,7 +758,8 @@ editor = connect selectTranslator $ H.mkComponent
 
       -- handle errors in pos and decodeJson
       case response of
-        Left _ -> handleAction $ LostParentID newEntry newWrapper isAutoSave
+        -- if error, try to Save again (Maybe ParentID is lost?)
+        Left _ -> handleAction (Save isAutoSave)
         -- extract and insert new parentID into newContent
         Right updatedContent -> do
           H.raise (SavedSection newEntry)
@@ -777,23 +775,6 @@ editor = connect selectTranslator $ H.mkComponent
           -- mDirtyRef := false
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
           pure unit
-
-    LostParentID newEntry newWrapper isAutoSave -> do
-      let newContent = ContentDto.getWrapperContent newWrapper
-      docID <- H.gets _.docID
-      loadedContent <- Request.getJson
-        ContentDto.decodeContent
-        ("/docs/" <> show docID <> "/text/" <> show newEntry.id <> "/rev/latest")
-      case loadedContent of
-        Left _ -> pure unit
-        Right res ->
-          let
-            newContent' = ContentDto.setContentText
-              (ContentDto.getContentText newContent)
-              res
-            newWrapper' = ContentDto.setWrapperContent newContent' newWrapper
-          in
-            handleAction $ Upload newEntry newWrapper' isAutoSave
 
     SavedIcon -> do
       mSavedIconF <- H.gets _.saveState.mSavedIconF
@@ -1174,7 +1155,6 @@ editor = connect selectTranslator $ H.mkComponent
               newEntry = insert lm.markerText (oldValue + 1) entry
             in
               insert startRow newEntry commentState.markerAnnoHS
-      H.liftEffect $ log $ "markerAnnoHS: " <> show (size commentState.markerAnnoHS)
       H.modify_ \st -> st
         { commentState = st.commentState
             { markerAnnoHS = newMarkerAnnoHS
@@ -1387,7 +1367,6 @@ editor = connect selectTranslator $ H.mkComponent
 
     ChangeSection entry rev a -> do
       handleAction (ChangeToSection entry rev)
-      H.liftEffect $ log "changedSec"
       pure (Just a)
 
     ContinueChangeSection fCs a -> do

@@ -28,7 +28,6 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -716,7 +715,9 @@ splitview = connect selectTranslator $ H.mkComponent
 
         _ -> pure unit
 
-      when (isJust mt) (H.tell _editor 0 (Editor.EditorResize))
+      when (isJust mt) do
+        H.tell _editor 0 (Editor.EditorResize)
+        H.tell _editor 1 (Editor.EditorResize)
 
     -- Toggle actions
 
@@ -776,6 +777,7 @@ splitview = connect selectTranslator $ H.mkComponent
           { sidebarRatio = st.lastExpandedSidebarRatio
           , sidebarShown = true
           }
+      H.tell _editor 0 (Editor.EditorResize)
 
     -- Toggle the preview area
     TogglePreview -> do
@@ -821,6 +823,10 @@ splitview = connect selectTranslator $ H.mkComponent
           { previewRatio = st.lastExpandedPreviewRatio
           , previewShown = true
           }
+        -- only resize second editor, when visible
+        H.tell _editor 1 (Editor.EditorResize)
+      -- always resize main editor for each call
+      H.tell _editor 0 (Editor.EditorResize)
 
     ModifyVersionMapping tocID vID cData -> do
       state <- H.get
@@ -1000,7 +1006,6 @@ splitview = connect selectTranslator $ H.mkComponent
         handleAction $ ToggleCommentOverview true docID tocID
 
       Editor.RaiseDiscard -> do
-        H.liftEffect $ log "reached discarding"
         handleAction UpdateMSelectedTocEntry
         state <- H.get
         -- Only the SelLeaf case should ever occur

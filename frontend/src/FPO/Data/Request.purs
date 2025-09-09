@@ -58,7 +58,6 @@ import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
 import FPO.Data.AppError (AppError(..), printAjaxError)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..))
@@ -226,7 +225,6 @@ handleJsonRequest' decode url requestAction = do
     Right json -> do
       case decode json of
         Left err -> do
-          liftEffect $ log $ "JSON decode error: " <> show err
           pure $ Left $ DataError $ "Invalid data format: " <> show err
         Right val ->
           pure $ Right val
@@ -252,8 +250,7 @@ getFromJSONEndpoint decode url = do
       pure Nothing
     Right res -> do
       case decode (res.body) of
-        Left err -> do
-          liftEffect $ log $ "Error Decoding: " <> show err
+        Left _ -> do
           pure Nothing
         Right val -> do
           pure $ Just val
