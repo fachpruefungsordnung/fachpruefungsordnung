@@ -716,7 +716,9 @@ splitview = connect selectTranslator $ H.mkComponent
 
         _ -> pure unit
 
-      when (isJust mt) (H.tell _editor 0 (Editor.EditorResize))
+      when (isJust mt) do
+        H.tell _editor 0 (Editor.EditorResize)
+        H.tell _editor 1 (Editor.EditorResize)
 
     -- Toggle actions
 
@@ -776,6 +778,7 @@ splitview = connect selectTranslator $ H.mkComponent
           { sidebarRatio = st.lastExpandedSidebarRatio
           , sidebarShown = true
           }
+      H.tell _editor 0 (Editor.EditorResize)
 
     -- Toggle the preview area
     TogglePreview -> do
@@ -821,6 +824,8 @@ splitview = connect selectTranslator $ H.mkComponent
           { previewRatio = st.lastExpandedPreviewRatio
           , previewShown = true
           }
+      H.tell _editor 0 (Editor.EditorResize)
+      H.tell _editor 1 (Editor.EditorResize)
 
     ModifyVersionMapping tocID vID cData -> do
       state <- H.get
