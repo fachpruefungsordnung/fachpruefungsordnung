@@ -236,22 +236,22 @@ tocview = connect (selectEq identity) $ H.mkComponent
   render :: State -> forall slots. H.ComponentHTML Action slots m
   render state =
     HH.div
-    [ HP.classes [ HH.ClassName "leftscrollbar" ] ]
-    [ HH.div_ $
-        renderDeleteModal
-          <>
-            ( rootTreeToHTML
-                state
-                state.documentName
-                state.showAddMenu
-                state.showHistoryMenu
-                state.mSelectedTocEntry
-                state.now
-                state.filteredTree
-                state.searchData
-                state.tocEntries
-            )
-    ]
+      [ HP.classes [ HH.ClassName "leftscrollbar" ] ]
+      [ HH.div_ $
+          renderDeleteModal
+            <>
+              ( rootTreeToHTML
+                  state
+                  state.documentName
+                  state.showAddMenu
+                  state.showHistoryMenu
+                  state.mSelectedTocEntry
+                  state.now
+                  state.filteredTree
+                  state.searchData
+                  state.tocEntries
+              )
+      ]
     where
     renderDeleteModal = case state.requestDelete of
       Nothing -> []
@@ -849,10 +849,11 @@ tocview = connect (selectEq identity) $ H.mkComponent
           [ HP.classes innerDivBaseClasses
           , HP.style "cursor: pointer;"
           ] <>
-          -- Stop to be able to click, if alredy selected (prevent spamming post requests)
-            ( if level > 0 && mSelectedTocEntry /= Just (SelLeaf id) then [
-                HE.onClick \_ -> JumpToLeafSection id path ]
-              else 
+            -- Stop to be able to click, if alredy selected (prevent spamming post requests)
+            ( if level > 0 && mSelectedTocEntry /= Just (SelLeaf id) then
+                [ HE.onClick \_ -> JumpToLeafSection id path
+                ]
+              else
                 []
             )
       in
