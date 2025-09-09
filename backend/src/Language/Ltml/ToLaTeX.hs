@@ -99,18 +99,19 @@ generatePDFfromParsed parser render input =
 --          in renderLaTeX (labelToRef gs) latexDoc
 
 generatePDFFromSection :: Text -> IO (Either String BSL.ByteString)
-generatePDFFromSection input =
-    let NamedType _ _ sectionT' = sectionT
-        NamedType _ _ footnoteT' = footnoteT
-     in generatePDFfromParsed
-            (nSc *> runFootnoteWriterT (sectionP sectionT' eof) [footnoteT'])
-            sectionToText
-            (input <> "\n")
-  where
-    sectionToText (sec, labelmap) =
-        let (latexSection, gs) = runState (toPreLaTeXM sec) $ initialGlobalState & labelToFootNote .~ labelmap
-         in renderLaTeX $
-                toLaTeX (view labelToRef gs) (view preDocument gs <> document latexSection)
+generatePDFFromSection input = undefined
+
+--     let NamedType _ _ sectionT' = sectionT
+--         NamedType _ _ footnoteT' = footnoteT
+--      in generatePDFfromParsed
+--             (nSc *> runFootnoteWriterT (sectionP sectionT' eof) [footnoteT'])
+--             sectionToText
+--             (input <> "\n")
+--   where
+--     sectionToText (sec, labelmap) =
+--         let (latexSection, gs) = runState (toPreLaTeXM sec) $ initialGlobalState & labelToFootNote .~ labelmap
+--          in renderLaTeX $
+--                 toLaTeX (view labelToRef gs) (view preDocument gs <> document latexSection)
 
 -- mkPDF :: FilePath -> IO (Either String BS.ByteString)
 -- mkPDF filename = do

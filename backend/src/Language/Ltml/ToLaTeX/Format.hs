@@ -7,6 +7,7 @@ module Language.Ltml.ToLaTeX.Format
     , emptyIdentifierFormat
     , emptyAppendixFormat
     , emptyHeadingFormat
+    , emptySectionFormat
     , formatHeading
     , formatKey
     , staticDocumentFormat
@@ -42,6 +43,7 @@ import Language.Lsd.AST.Type.DocumentContainer
     ( HeaderFooterFormatAtom (..)
     , HeaderFooterItemFormat (HeaderFooterItemFormat)
     )
+import Language.Lsd.AST.Type.Section (SectionFormat (SectionFormat))
 import Language.Ltml.ToLaTeX.PreLaTeXType
     ( PreLaTeX (IRaw, ISequence, IText)
     , bold
@@ -102,6 +104,9 @@ emptyTocKeyFormat = TocKeyFormat emptyKeyFormat
 emptyAppendixFormat :: AppendixElementFormat
 emptyAppendixFormat =
     AppendixElementFormat emptyIdentifierFormat emptyTocKeyFormat emptyHeadingFormat
+
+emptySectionFormat :: SectionFormat
+emptySectionFormat = SectionFormat emptyIdentifierFormat emptyTocKeyFormat
 
 formatHeading
     :: FormatString (HeadingPlaceholderAtom b) -> PreLaTeX -> PreLaTeX -> PreLaTeX

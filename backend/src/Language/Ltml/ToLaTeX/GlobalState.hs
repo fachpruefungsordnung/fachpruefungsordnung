@@ -37,6 +37,7 @@ module Language.Ltml.ToLaTeX.GlobalState
     , enumIdentifierFormat
     , appendixFormat
     , docHeadingFormat
+    , sectionFormat
     , onlyOneParagraph
     , isSupersection
     , flaggedParent
@@ -66,12 +67,14 @@ import Language.Lsd.AST.Type.AppendixSection (AppendixElementFormat)
 import Language.Lsd.AST.Type.DocumentContainer
     ( HeaderFooterFormat (HeaderFooterFormat)
     )
+import Language.Lsd.AST.Type.Section (SectionFormat)
 import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label)
 import Language.Ltml.ToLaTeX.Format
     ( emptyAppendixFormat
     , emptyHeadingFormat
     , emptyIdentifierFormat
+    , emptySectionFormat
     , formatHeaderFooterItem
     , formatKey
     , getIdentifier
@@ -132,6 +135,7 @@ data FormatState = FormatState
     { _docHeadingFormat :: MainHeadingFormat
     , _appendixFormat :: AppendixElementFormat
     , _enumIdentifierFormat :: IdentifierFormat
+    , _sectionFormat :: SectionFormat
     }
     deriving (Show)
 
@@ -292,3 +296,4 @@ initialFormatState =
         emptyHeadingFormat
         emptyAppendixFormat
         emptyIdentifierFormat
+        emptySectionFormat

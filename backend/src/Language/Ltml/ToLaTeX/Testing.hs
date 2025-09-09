@@ -5,7 +5,6 @@ module Language.Ltml.ToLaTeX.Testing
     , readText
     , runTestToPDF
     , runTestToLaTeX
-    , testingDocumentContainer
     , startTesting
     )
 where
@@ -113,21 +112,22 @@ runTestToPDF = do
         Right pdf -> BS.writeFile "./src/Language/Ltml/ToLaTeX/Auxiliary/test.pdf" pdf
 
 runTestToLaTeX :: IO String
-runTestToLaTeX = do
-    let input = readText "./src/Language/Ltml/ToLaTeX/Auxiliary/test.txt"
-        NamedType _ _ sectionT' = sectionT
-        NamedType _ _ footnoteT' = footnoteT
-    case runParser
-        (nSc *> runFootnoteWriterT (sectionP sectionT' eof) [footnoteT'])
-        ""
-        (input <> "\n") of
-        Left err -> return (errorBundlePretty err)
-        Right parsedInput -> do
-            let texFile = "./src/Language/Ltml/ToLaTeX/Auxiliary/test.tex"
-            -- Write PreLaTeX source
-            LTIO.writeFile texFile (sectionToText parsedInput)
-            return "everything went well!"
+runTestToLaTeX = do undefined
   where
+    -- let input = readText "./src/Language/Ltml/ToLaTeX/Auxiliary/test.txt"
+    --     NamedType _ _ sectionT' = sectionT
+    --     NamedType _ _ footnoteT' = footnoteT
+    -- case runParser
+    --     (nSc *> runFootnoteWriterT (sectionP sectionT' eof) [footnoteT'])
+    --     ""
+    --     (input <> "\n") of
+    --     Left err -> return (errorBundlePretty err)
+    --     Right parsedInput -> do
+    --         let texFile = "./src/Language/Ltml/ToLaTeX/Auxiliary/test.tex"
+    --         -- Write PreLaTeX source
+    --         LTIO.writeFile texFile (sectionToText parsedInput)
+    --         return "everything went well!"
+
     sectionToText (sec, labelmap) =
         let (latexSection, gs) = runState (toPreLaTeXM sec) $ initialGlobalState {_labelToFootNote = labelmap}
          in renderLaTeX $
@@ -161,173 +161,174 @@ testingParagraph =
         , Space
         ]
 
-testingSection :: Section
-testingSection =
-    Section
-        ( SectionFormat
-            (FormatString [PlaceholderAtom Arabic])
-            ( TocKeyFormat $
-                FormatString [StringAtom "§ ", PlaceholderAtom KeyIdentifierPlaceholder]
-            )
-        )
-        ( Heading
-            ( HeadingFormat
-                (Typography Centered MediumFontSize [Bold])
-                ( FormatString
-                    [ PlaceholderAtom IdentifierPlaceholder
-                    , StringAtom " - "
-                    , PlaceholderAtom HeadingTextPlaceholder
-                    ]
-                )
-            )
-            [ Word "This"
-            , Space
-            , Word "is"
-            , Space
-            , Word "a"
-            , Space
-            , Word "random"
-            , Space
-            , Word "section"
-            ]
-        )
-        (LeafSectionBody [Node Nothing testingParagraph])
+-- testingSection :: Section
+-- testingSection =
+--     Section
+--         ( SectionFormat
+--             (FormatString [PlaceholderAtom Arabic])
+--             ( TocKeyFormat $
+--                 FormatString [StringAtom "§ ", PlaceholderAtom KeyIdentifierPlaceholder]
+--             )
+--         )
+--         ( Heading
+--             ( HeadingFormat
+--                 (Typography Centered MediumFontSize [Bold])
+--                 ( FormatString
+--                     [ PlaceholderAtom IdentifierPlaceholder
+--                     , StringAtom " - "
+--                     , PlaceholderAtom HeadingTextPlaceholder
+--                     ]
+--                 )
+--             )
+--             [ Word "This"
+--             , Space
+--             , Word "is"
+--             , Space
+--             , Word "a"
+--             , Space
+--             , Word "random"
+--             , Space
+--             , Word "section"
+--             ]
+--         )
+--         (LeafSectionBody [Node Nothing testingParagraph])
 
-testingDocument :: Document
-testingDocument =
-    Document
-        (DocumentFormat $ Just $ TocFormat $ TocHeading "Inhaltsverzeichnis")
-        ( DocumentHeading
-            [ Word "This"
-            , Space
-            , Word "is"
-            , Space
-            , Word "a"
-            , Space
-            , Word "random"
-            , Space
-            , Word "document"
-            ]
-        )
-        ( DocumentBody
-            (Flagged False [])
-            (Flagged False $ InnerSectionBody [Flagged True $ Node Nothing testingSection])
-            (Flagged False [])
-        )
-        mempty
+-- testingDocument :: Document
+-- testingDocument =
+--     Document
+--         (DocumentFormat $ Just $ TocFormat $ TocHeading "Inhaltsverzeichnis")
+--         ( DocumentHeading
+--             [ Word "This"
+--             , Space
+--             , Word "is"
+--             , Space
+--             , Word "a"
+--             , Space
+--             , Word "random"
+--             , Space
+--             , Word "document"
+--             ]
+--         )
+--         ( DocumentBody
+--             (Flagged False [])
+--             (Flagged False $ InnerSectionBody [Flagged True $ Node Nothing testingSection])
+--             (Flagged False [])
+--         )
+--         mempty
 
-testingAppendixSection :: AppendixSection
-testingAppendixSection =
-    AppendixSection
-        ( AppendixSectionFormat
-            (AppendixSectionTitle "\nAppendices")
-            ( AppendixElementFormat
-                (FormatString [PlaceholderAtom AlphabeticUpper])
-                ( TocKeyFormat $
-                    FormatString [StringAtom "Appendix ", PlaceholderAtom KeyIdentifierPlaceholder]
-                )
-                ( HeadingFormat
-                    (Typography LeftAligned MediumFontSize [Bold])
-                    ( FormatString
-                        [ PlaceholderAtom IdentifierPlaceholder
-                        , StringAtom " - "
-                        , PlaceholderAtom HeadingTextPlaceholder
-                        ]
-                    )
-                )
-            )
-        )
-        [Flagged False $ Node Nothing doc, Flagged False $ Node Nothing doc]
-  where
-    doc =
-        Document
-            (DocumentFormat Nothing)
-            ( DocumentHeading
-                [ Word "This"
-                , Space
-                , Word "is"
-                , Space
-                , Word "a"
-                , Space
-                , Word "random"
-                , Space
-                , Word "appendix"
-                ]
-            )
-            ( DocumentBody
-                (Flagged False [])
-                ( Flagged False $
-                    InnerSectionBody
-                        [ Flagged False $ Node Nothing testingSection
-                        , Flagged False $ Node Nothing testingSection
-                        , Flagged False $ Node Nothing testingSection
-                        ]
-                )
-                (Flagged False [])
-            )
-            mempty
+-- testingAppendixSection :: AppendixSection
+-- testingAppendixSection =
+--     AppendixSection
+--         ( AppendixSectionFormat
+--             (AppendixSectionTitle "\nAppendices")
+--             ( AppendixElementFormat
+--                 (FormatString [PlaceholderAtom AlphabeticUpper])
+--                 ( TocKeyFormat $
+--                     FormatString [StringAtom "Appendix ", PlaceholderAtom KeyIdentifierPlaceholder]
+--                 )
+--                 ( HeadingFormat
+--                     (Typography LeftAligned MediumFontSize [Bold])
+--                     ( FormatString
+--                         [ PlaceholderAtom IdentifierPlaceholder
+--                         , StringAtom " - "
+--                         , PlaceholderAtom HeadingTextPlaceholder
+--                         ]
+--                     )
+--                 )
+--             )
+--         )
+--         [Flagged False $ Node Nothing doc, Flagged False $ Node Nothing doc]
+--   where
+--     doc =
+--         Document
+--             (DocumentFormat Nothing)
+--             ( DocumentHeading
+--                 [ Word "This"
+--                 , Space
+--                 , Word "is"
+--                 , Space
+--                 , Word "a"
+--                 , Space
+--                 , Word "random"
+--                 , Space
+--                 , Word "appendix"
+--                 ]
+--             )
+--             ( DocumentBody
+--                 (Flagged False [])
+--                 ( Flagged False $
+--                     InnerSectionBody
+--                         [ Flagged False $ Node Nothing testingSection
+--                         , Flagged False $ Node Nothing testingSection
+--                         , Flagged False $ Node Nothing testingSection
+--                         ]
+--                 )
+--                 (Flagged False [])
+--             )
+--             mempty
 
-testingDocumentContainer :: DocumentContainer
-testingDocumentContainer =
-    DocumentContainer
-        ( DocumentContainerFormat
-            ( HeaderFooterFormat
-                [ HeaderFooterItemFormat
-                    MediumFontSize
-                    [Bold]
-                    (FormatString [PlaceholderAtom HeaderFooterSuperTitleAtom, StringAtom "\n"])
-                , HeaderFooterItemFormat
-                    MediumFontSize
-                    []
-                    (FormatString [PlaceholderAtom HeaderFooterTitleAtom])
-                ]
-                []
-                [ HeaderFooterItemFormat
-                    SmallFontSize
-                    []
-                    (FormatString [StringAtom "(Keine amtliche Bekanntmachung)"])
-                ]
-            )
-            ( HeaderFooterFormat
-                [ HeaderFooterItemFormat
-                    MediumFontSize
-                    []
-                    (FormatString [PlaceholderAtom HeaderFooterDateAtom])
-                ]
-                [ HeaderFooterItemFormat
-                    MediumFontSize
-                    []
-                    (FormatString [StringAtom "centered text"])
-                ]
-                [ HeaderFooterItemFormat
-                    SmallFontSize
-                    []
-                    ( FormatString
-                        [ StringAtom "Seite "
-                        , PlaceholderAtom HeaderFooterCurPageNumAtom
-                        , StringAtom "/"
-                        , PlaceholderAtom HeaderFooterLastPageNumAtom
-                        ]
-                    )
-                ]
-            )
-            ( HeadingFormat
-                (Typography Centered MediumFontSize [Bold])
-                (FormatString [PlaceholderAtom HeadingTextPlaceholder])
-            )
-        )
-        ( DocumentContainerHeader
-            "pdftitle"
-            "This is a random document container"
-            "Made with Love"
-            "August 22, 2023"
-        )
-        (Flagged False testingDocument)
-        [Flagged False testingAppendixSection]
+-- testingDocumentContainer :: DocumentContainer
+-- testingDocumentContainer =
+--     DocumentContainer
+--         ( DocumentContainerFormat
+--             ( HeaderFooterFormat
+--                 [ HeaderFooterItemFormat
+--                     MediumFontSize
+--                     [Bold]
+--                     (FormatString [PlaceholderAtom HeaderFooterSuperTitleAtom, StringAtom "\n"])
+--                 , HeaderFooterItemFormat
+--                     MediumFontSize
+--                     []
+--                     (FormatString [PlaceholderAtom HeaderFooterTitleAtom])
+--                 ]
+--                 []
+--                 [ HeaderFooterItemFormat
+--                     SmallFontSize
+--                     []
+--                     (FormatString [StringAtom "(Keine amtliche Bekanntmachung)"])
+--                 ]
+--             )
+--             ( HeaderFooterFormat
+--                 [ HeaderFooterItemFormat
+--                     MediumFontSize
+--                     []
+--                     (FormatString [PlaceholderAtom HeaderFooterDateAtom])
+--                 ]
+--                 [ HeaderFooterItemFormat
+--                     MediumFontSize
+--                     []
+--                     (FormatString [StringAtom "centered text"])
+--                 ]
+--                 [ HeaderFooterItemFormat
+--                     SmallFontSize
+--                     []
+--                     ( FormatString
+--                         [ StringAtom "Seite "
+--                         , PlaceholderAtom HeaderFooterCurPageNumAtom
+--                         , StringAtom "/"
+--                         , PlaceholderAtom HeaderFooterLastPageNumAtom
+--                         ]
+--                     )
+--                 ]
+--             )
+--             ( HeadingFormat
+--                 (Typography Centered MediumFontSize [Bold])
+--                 (FormatString [PlaceholderAtom HeadingTextPlaceholder])
+--             )
+--         )
+--         ( DocumentContainerHeader
+--             "pdftitle"
+--             "This is a random document container"
+--             "Made with Love"
+--             "August 22, 2023"
+--         )
+--         (Flagged False testingDocument)
+--         [Flagged False testingAppendixSection]
 
 startTesting :: IO ()
-startTesting = do
-    let (latex, gs) = testThis testingDocumentContainer
-    LT.putStrLn $
-        renderLaTeX $
-            toLaTeX (view labelToRef gs) (view preDocument gs <> document latex)
+startTesting = do undefined
+
+--     let (latex, gs) = testThis testingDocumentContainer
+--     LT.putStrLn $
+--         renderLaTeX $
+--             toLaTeX (view labelToRef gs) (view preDocument gs <> document latex)
