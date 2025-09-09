@@ -33,6 +33,7 @@ import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
 import FPO.Components.Editor as Editor
+import FPO.Components.Editor.Types (ElementData)
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC (Path, SelectedEntity(..))
 import FPO.Components.TOC as TOC
@@ -91,8 +92,6 @@ derive instance eqDragTarget :: Eq DragTarget
 type Output = Unit
 type Input = DocumentID
 
-type ElementData = Editor.ElementData
-
 data Query a = UnitQuery a
 
 data Action
@@ -147,11 +146,6 @@ type State = FPOState
   , lastExpandedSidebarRatio :: Number
   , lastExpandedPreviewRatio :: Number
 
-  -- There are 2 ways to send content to preview:
-  -- 1. This editorContent is sent through the slot in renderPreview
-  -- 2. Throuth QueryEditor of the Editor, where the editor collects its content and sends it
-  --   to the preview component.
-  -- TODO: Which one to use?
   , renderedHtml :: Maybe (LoadState String)
   , testDownload :: String
 
@@ -722,9 +716,7 @@ splitview = connect selectTranslator $ H.mkComponent
 
         _ -> pure unit
 
-      when (isJust mt) do
-        H.tell _editor 0 (Editor.EditorResize)
-        H.tell _editor 1 (Editor.EditorResize)
+      when (isJust mt) (H.tell _editor 0 (Editor.EditorResize))
 
     -- Toggle actions
 
