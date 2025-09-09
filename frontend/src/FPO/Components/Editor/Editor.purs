@@ -760,7 +760,7 @@ editor = connect selectTranslator $ H.mkComponent
       -- handle errors in pos and decodeJson
       case response of
         -- if error, try to Save again (Maybe ParentID is lost?)
-        Left _ -> handleAction (Sace isAutoSave)
+        Left _ -> handleAction (Save isAutoSave)
         -- extract and insert new parentID into newContent
         Right updatedContent -> do
           H.raise (SavedSection newEntry)

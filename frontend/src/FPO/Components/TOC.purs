@@ -437,9 +437,11 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
     JumpToLeafSection id path -> do
       handleAction (ToggleHistoryMenuOff path)
-      H.modify_ \state ->
-        state { mSelectedTocEntry = Just $ SelLeaf id }
-      H.raise (ChangeToLeaf id)
+      mSelectedTocEntry <- H.gets _.mSelectedTocEntry
+      when (mSelectedTocEntry /= Just (SelLeaf id)) do
+        H.modify_ \state ->
+          state { mSelectedTocEntry = Just $ SelLeaf id }
+        H.raise (ChangeToLeaf id)
 
     ToggleAddMenu path -> do
       H.modify_ \state ->
@@ -844,8 +846,11 @@ tocview = connect (selectEq identity) $ H.mkComponent
           [ HP.classes innerDivBaseClasses
           , HP.style "cursor: pointer;"
           ] <>
-            ( if level > 0 then [ HE.onClick \_ -> JumpToLeafSection id path ]
-              else []
+          -- Stop to be able to click, if alredy selected (prevent spamming post requests)
+            ( if level > 0 && mSelectedTocEntry /= Just (SelLeaf id) then [
+                HE.onClick \_ -> JumpToLeafSection id path ]
+              else 
+                []
             )
       in
         [ HH.div
@@ -1094,10 +1099,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
                   versions
               )
           ]
-    {-     versionHistoryMenu =
-    map
-      (\v -> addVersionButton v)
-      versions -}
 
     searchBarSegment =
       [ HH.div
@@ -1134,40 +1135,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
                   (SearchVersions elementID)
                   "bi bi-search"
                   "search"
-              {- HH.button
-                  [ HP.classes $
-                      [ HB.btn
-                      , HB.btnPrimary
-                      -- , HB.textStart
-                      , HB.w100
-                      , HB.border0
-                      -- , HB.textBody
-                      , HB.dFlex
-                      , HB.alignItemsCenter
-                      -- , HH.ClassName "toc-item"
-                      -- , HH.ClassName "active"
-                      ]
-
-                  , HE.onClick \_ -> DoNothing
-                  ]
-                  [ HH.text "clear" ]
-              ,  -} {- HH.button
-              [ HP.classes $  
-                  [ HB.btn
-                  , HB.btnSecondary
-                  --, HB.textStart
-                  , HB.w100
-                  , HB.border0
-                  --, HB.textBody
-                  , HB.dFlex
-                  , HB.alignItemsCenter
-                  --, HH.ClassName "toc-item"
-                  -- , HH.ClassName "active"
-                  ]
-
-              , HE.onClick \_ -> DoNothing
-              ]
-              [ HH.text "search" ] -}
               ]
           ]
       ]
