@@ -12,6 +12,7 @@ module Language.Ltml.HTML
     ( ToHtmlM (..)
     , renderSectionHtmlCss
     , renderHtmlCss
+    , renderHtmlCssBS
     , renderTocList
     , renderTocEntry
     ) where
@@ -21,6 +22,7 @@ import Control.Monad (join, zipWithM)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bifunctor (bimap)
+import Data.ByteString.Lazy (ByteString)
 import Data.DList (toList)
 import Data.Either (rights)
 import qualified Data.Map as Map
@@ -96,6 +98,12 @@ renderHtmlCss docContainer =
         -- \| Add footnote labes for "normal" (non-footnote) references
         finalState' = addUsedFootnoteLabels finalState
      in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
+
+-- | Renders a @Flagged' DocumentContainer@ to HTML 'ByteString' with inlined CSS
+renderHtmlCssBS :: Flagged' DocumentContainer -> ByteString
+renderHtmlCssBS docCon =
+    let (body, css) = renderHtmlCss docCon
+     in renderBS $ addInlineCssHeader "Generated Document Preview" css body
 
 -- | Renders a global ToC (including appendices) as a list of
 --   either (@Maybe@ idHtml, @Result@ titleHtml) or a phantom result type
