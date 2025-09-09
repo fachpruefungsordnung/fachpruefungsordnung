@@ -316,24 +316,24 @@ instance Labelable Section where
                         n <- GS.nextSection
                         setLabel n
                         GS.flagState . GS.onlyOneParagraph .= (length paragraphs == 1)
-                        GS.addTOCEntry n keyident ident headingText
+                        tocAnchor <- GS.addTOCEntry n keyident ident headingText
                         headingDoc <- buildHeading n
                         content' <- toPreLaTeXM paragraphs
-                        let anchor = maybe headingDoc (`hypertarget` headingDoc) mLabel
-                        pure $ anchor <> content'
+                        let refAnchor = maybe headingDoc (`hypertarget` headingDoc) mLabel
+                        pure $ tocAnchor <> refAnchor <> content'
                     InnerSectionBody subsections -> do
                         n <- GS.nextSupersection
                         setLabel n
                         GS.flagState . GS.isSupersection .= True
                         GS.counterState . GS.supersectionCTR .= 0
-                        GS.addTOCEntry n keyident ident headingText
+                        tocAnchor <- GS.addTOCEntry n keyident ident headingText
                         headingDoc <- buildHeading n
                         content' <- toPreLaTeXM subsections
                         GS.flagState . GS.isSupersection .= False
                         GS.counterState . GS.supersectionCTR .= n
-                        let anchor =
+                        let refAnchor =
                                 maybe (headingDoc <> linebreak) (`hypertarget` (headingDoc <> linebreak)) mLabel
-                        pure $ anchor <> content'
+                        pure $ tocAnchor <> refAnchor <> content'
                     SimpleLeafSectionBody simpleblocks -> do
                         toPreLaTeXM simpleblocks
 
@@ -409,9 +409,10 @@ instance Labelable Document where
                             use (GS.formatState . GS.appendixFormat)
                         let iText = getIdentifier ident n
                         GS.insertRefLabel mLabel iText
-                        GS.addTOCEntry n key ident tt'
+                        tocAnchor <- GS.addTOCEntry n key ident tt'
                         GS.addAppendixHeaderEntry n key ident tt'
-                        createHeading fmt tt' (IText iText)
+                        heading <- createHeading fmt tt' (IText iText)
+                        pure $ tocAnchor <> heading
                     GS.Main -> do
                         fmt <- use (GS.formatState . GS.docHeadingFormat)
                         createHeading fmt tt' (IText " ")
