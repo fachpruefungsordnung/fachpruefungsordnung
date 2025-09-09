@@ -24,7 +24,6 @@ import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), contains, toLower)
 -- import Data.Time.Duration (class Duration, Seconds(..), negateDuration, toDuration)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console (log)
 import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
@@ -164,7 +163,6 @@ component =
                 }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
-      log $ "Routing to editor for project " <> (DocumentHeader.getName project)
       navigate (Editor { docID: DocumentHeader.getID project })
     NavLogin -> do
       updateStore $ Store.SetLoginRedirect (Just Home)
@@ -204,7 +202,6 @@ component =
           H.tell _pagination unit $ P.SetPageQ 0
     HandleSearchInput query -> do
       H.modify_ _ { searchQuery = query }
-    -- H.liftEffect $ log query
     SetPage (P.Clicked page) -> do
       H.modify_ _ { page = page }
     DownloadPdf _ _ event -> do
