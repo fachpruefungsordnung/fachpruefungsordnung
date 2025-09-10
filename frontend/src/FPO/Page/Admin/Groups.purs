@@ -36,14 +36,14 @@ import FPO.Dto.GroupDto
 import FPO.Dto.UserDto (isAdmin)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addButton, addCard, addColumn, addError, addModal, emptyEntryGen)
+import FPO.UI.HTML (addButton, addCard, addColumn, addModal, emptyEntryGen)
 import FPO.UI.Style as Style
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
@@ -81,8 +81,7 @@ data Action
   | NavigateToGroupDocuments GroupID
 
 type State = FPOState
-  ( error :: Maybe String
-  , page :: Int
+  ( page :: Int
   , groups :: LoadState (Array GroupOverview)
   , filteredGroups :: Array GroupOverview
   , groupNameCreate :: String
@@ -124,7 +123,6 @@ component =
     , groupNameFilter: ""
     , groupDescriptionCreate: ""
     , filteredGroups: []
-    , error: Nothing
     , requestDelete: Nothing
     , requestCreate: Nothing
     , waiting: false
@@ -147,7 +145,6 @@ component =
               Nothing -> []
         ) <>
           [ renderGroupManagement state
-          , addError state.error
           ]
 
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
@@ -171,7 +168,7 @@ component =
     SetPage (P.Clicked p) -> do
       H.modify_ _ { page = p }
     ChangeFilterGroupName group -> do
-      H.modify_ _ { groupNameFilter = group, error = Nothing }
+      H.modify_ _ { groupNameFilter = group }
       handleAction Filter
     Filter -> do
       s <- H.get
@@ -183,24 +180,22 @@ component =
               gs
           H.modify_ _ { filteredGroups = filteredGroups }
         Loading -> do
-          H.modify_ _
-            { error = Just $
-                (translate (label :: _ "admin_groups_stillLoading") s.translator)
-            }
+          updateStore $ Store.AddWarning
+            (translate (label :: _ "admin_groups_stillLoading") s.translator)
     ChangeCreateGroupName group -> do
-      H.modify_ _ { groupNameCreate = group, error = Nothing }
+      H.modify_ _ { groupNameCreate = group }
     ChangeCreateGroupDescription desc -> do
-      H.modify_ _ { groupDescriptionCreate = desc, error = Nothing }
+      H.modify_ _ { groupDescriptionCreate = desc }
     RequestCreateGroup groupName -> do
-      H.modify_ _ { requestCreate = Just groupName, error = Nothing }
+      H.modify_ _ { requestCreate = Just groupName }
     ConfirmCreateGroup -> do
       -- Close modal
       H.modify_ _ { requestCreate = Nothing }
 
       newGroupName <- H.gets _.groupNameCreate
       s <- H.get
-      if newGroupName == "" then H.modify_ _
-        { error = Just (translate (label :: _ "admin_groups_notEmpty") s.translator) }
+      if newGroupName == "" then updateStore $ Store.AddWarning
+        (translate (label :: _ "admin_groups_notEmpty") s.translator)
       else do
         case s.groups of
           Loaded gs -> do
@@ -211,17 +206,10 @@ component =
               }
 
             case response of
-              Left err -> do
-                H.modify_ _
-                  { error = Just $
-                      ( translate (label :: _ "admin_groups_errCreatingGroup")
-                          s.translator
-                      ) <> show err
-                  }
+              Left _ -> pure unit
               Right newID ->
                 H.modify_ _
-                  { error = Nothing
-                  , groups = Loaded $
+                  { groups = Loaded $
                       GroupOverview
                         { groupOverviewName: newGroupName
                         , groupOverviewID: newID
@@ -231,16 +219,13 @@ component =
                   }
             handleAction Filter
           Loading -> do
-            H.modify_ _
-              { error = Just
-                  (translate (label :: _ "admin_groups_stillLoading") s.translator)
-              }
+            updateStore $ Store.AddWarning
+              (translate (label :: _ "admin_groups_stillLoading") s.translator)
 
       setWaiting false
     CancelCreateGroup -> do
       H.modify_ _
-        { error = Nothing
-        , groupDescriptionCreate = ""
+        { groupDescriptionCreate = ""
         , waiting = false
         , requestCreate = Nothing
         }
@@ -248,8 +233,7 @@ component =
       H.modify_ _ { requestDelete = Just groupName }
     CancelDeleteGroup -> do
       H.modify_ _
-        { error = Nothing
-        , requestDelete = Nothing
+        { requestDelete = Nothing
         }
     ConfirmDeleteGroup groupName -> do
       -- Close modal
@@ -265,36 +249,23 @@ component =
 
           case groupId of
             Nothing -> do
-              H.modify_ _
-                { error = Just $ translate (label :: _ "admin_groups_errNotFound")
-                    s.translator
-                }
+              updateStore $ Store.AddWarning
+                (translate (label :: _ "admin_groups_errNotFound") s.translator)
             Just gId -> do
               setWaiting true
               res <- deleteIgnore $ "/groups/" <> show gId
               case res of
-                Left err -> do
-                  H.modify_ _
-                    { error = Just $
-                        ( translate (label :: _ "admin_groups_errDeletingGroup")
-                            s.translator
-                        )
-                          <> (show err)
-                    }
+                Left _ -> pure unit
                 Right _ -> do
                   H.modify_ _
-                    { error = Nothing
-                    , groups = Loaded $ filter
+                    { groups = Loaded $ filter
                         (\g -> getGroupOverviewName g /= groupName)
                         gs
                     }
               setWaiting false
           handleAction Filter
-        Loading -> do
-          H.modify_ _
-            { error = Just
-                (translate (label :: _ "admin_groups_stillLoading") s.translator)
-            }
+        Loading -> updateStore $ Store.AddWarning
+          (translate (label :: _ "admin_groups_stillLoading") s.translator)
     NavigateToGroupDocuments gID -> do
       navigate $ ViewGroupDocuments { groupID: gID }
 
