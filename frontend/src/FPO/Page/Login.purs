@@ -40,7 +40,6 @@ data Action
   | NavigateToPasswordReset
   | UpdateEmail String
   | UpdatePassword String
-  | EmitError String
   | DoLogin LoginDto Event
   | Receive (Connected FPOTranslator Input)
 
@@ -50,7 +49,6 @@ toLoginDto state = { loginEmail: state.email, loginPassword: state.password }
 type State = FPOState
   ( email :: String
   , password :: String
-  , error :: Maybe String
   )
 
 -- | Login component.
@@ -68,7 +66,6 @@ component =
     { initialState: \{ context } ->
         { email: ""
         , password: ""
-        , error: Nothing
         , translator: fromFpoTranslator context
         }
     , render
@@ -84,12 +81,6 @@ component =
     HH.div
       [ HP.classes [ HB.row, HB.justifyContentCenter, HB.my5 ] ]
       [ renderLoginForm state
-      , HH.div [ HP.classes [ HB.textCenter ] ]
-          [ case state.error of
-              Just err -> HH.div [ HP.classes [ HB.alert, HB.alertDanger ] ]
-                [ HH.text err ]
-              Nothing -> HH.text ""
-          ]
       ]
 
   handleAction :: MonadAff m => Action -> H.HalogenM State Action () output m Unit
@@ -103,20 +94,17 @@ component =
         initialState =
           { email: store.inputMail
           , password: ""
-          , error: Nothing
           , translator: fromFpoTranslator store.translator
           }
       H.put initialState
     UpdateEmail email -> do
-      H.modify_ \state -> state { email = email, error = Nothing }
+      H.modify_ \state -> state { email = email }
       -- In this example, we are simply storing the user's email in our
       -- store, every time the user clicks on the button (either login or
       -- register).
       updateStore $ Store.SetMail email
     UpdatePassword password -> do
-      H.modify_ \state -> state { password = password, error = Nothing }
-    EmitError error -> do
-      H.modify_ \state -> state { error = Just error }
+      H.modify_ \state -> state { password = password }
     NavigateToPasswordReset -> do
       navigate (PasswordReset { token: Nothing })
     DoLogin loginDto event -> do
@@ -125,7 +113,7 @@ component =
       -- we show the error response that comes back from the backend
       loginResponse <- Request.postString "/login" (encodeJson loginDto)
       case loginResponse of
-        Left err -> handleAction (EmitError (show err))
+        Left _ -> pure unit
         Right _ -> handleLoginRedirect
       pure unit
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
