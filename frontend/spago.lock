@@ -12,7 +12,6 @@
             "argonaut-codecs",
             "argonaut-core",
             "arrays",
-            "console",
             "control",
             "datetime",
             "dom-indexed",
@@ -163,8 +162,14 @@
           ]
         },
         "test": {
-          "dependencies": [],
-          "build_plan": []
+          "dependencies": [
+            "console"
+          ],
+          "build_plan": [
+            "console",
+            "effect",
+            "prelude"
+          ]
         }
       }
     },

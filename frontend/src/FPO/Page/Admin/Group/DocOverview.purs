@@ -14,7 +14,6 @@ import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console (log)
 import Effect.Now (nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
@@ -471,7 +470,6 @@ component =
       if newDocName == "" then
         H.modify_ _ { error = Just "Document name cannot be empty." }
       else do
-        log ("Trying to create new document with name \"" <> newDocName <> "\"")
         let
           dto = NewDocumentCreateDto
             { groupID: s.groupID
@@ -485,7 +483,6 @@ component =
           Left err -> setModalError $ show err
           Right h -> do
             H.modify_ _ { modalState = NoModal, newDocumentName = "" }
-            log "Created Document"
             now <- H.liftEffect nowDateTime
 
             let header = FD.getHeader h
@@ -521,7 +518,6 @@ component =
           H.modify_ \s -> s
             { error = Just (show err) }
         Right _ -> do
-          log "Deleted Document"
           s <- H.get
           documents <- getDocumentsQueryFromURL
             ("/docs?group=" <> show s.groupID)
@@ -533,7 +529,6 @@ component =
                 , modalState = NoModal
                 }
             Left _ -> do -- TODO error handling
-              log "No Document Found."
               handleAction DoNothing
       -- navigate Login
       handleAction Filter
@@ -541,7 +536,6 @@ component =
       s <- H.get
       case s.modalState of
         NoModal -> do
-          log ("Routing to editor for project " <> ((docNameFromID s) documentID))
           navigate (Editor { docID: documentID })
         _ ->
           pure unit
@@ -571,7 +565,6 @@ component =
     DoNothing ->
       pure unit
     NavigateToMembers -> do
-      log "Routing to member overview"
       s <- H.get
       navigate (ViewGroupMembers { groupID: s.groupID })
 
