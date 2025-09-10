@@ -36,7 +36,7 @@ import FPO.Dto.UserDto (UserID, getUserID, isUserSuperadmin)
 import FPO.Dto.UserOverviewDto as UOD
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addButton, addCard, addColumn, addError)
+import FPO.UI.HTML (addButton, addCard, addColumn)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -73,8 +73,7 @@ data Action
   | CreateUser
 
 type State = FPOState
-  ( error :: Maybe String
-  , createUserDto :: CreateUserDto
+  ( createUserDto :: CreateUserDto
   , requestDeleteUser :: Maybe UOD.UserOverviewDto
   -- | The ID of the user that is currently viewing the page.
   , userID :: Maybe UserID
@@ -101,7 +100,6 @@ component =
   initialState :: Connected FPOTranslator Unit -> State
   initialState { context } =
     { translator: fromFpoTranslator context
-    , error: Nothing
     , createUserDto: CreateUserDto.empty
     , requestDeleteUser: Nothing
     , userID: Nothing
@@ -114,7 +112,6 @@ component =
       ]
       [ renderDeleteModal state
       , renderUserManagement state
-      , addError state.error
       ]
 
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
@@ -144,17 +141,12 @@ component =
     PerformDeleteUser userId -> do
       response <- deleteIgnore ("/users/" <> userId)
       case response of
-        Left err -> do
-          s <- H.get
+        Left _ -> do
           H.modify_ _
-            { error = Just
-                ( translate (label :: _ "admin_users_failedToDeleteUser")
-                    s.translator <> ": " <> (show err)
-                )
-            , requestDeleteUser = Nothing
+            { requestDeleteUser = Nothing
             }
         Right _ -> do
-          H.modify_ _ { error = Nothing, requestDeleteUser = Nothing }
+          H.modify_ _ { requestDeleteUser = Nothing }
           H.tell _userlist unit UserList.ReloadUsersQ
     CloseDeleteModal -> do H.modify_ _ { requestDeleteUser = Nothing }
     GetUser userId -> do
@@ -177,8 +169,7 @@ component =
       -- instead, but this doesnt work as the user list component
       -- must be rendered in the scene in order to exist and do it's work :)
       pure unit
-    HandleUserList (UserList.Error err) -> do
-      H.modify_ _ { error = Just err }
+    HandleUserList (UserList.Error _) -> pure unit
     CreateUser -> do
       state <- H.get
       response <- postString "/register" (encodeJson state.createUserDto) -- could be a postIgnore
