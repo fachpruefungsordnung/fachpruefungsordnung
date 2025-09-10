@@ -13,9 +13,10 @@ where
 
 import Control.Lens (view)
 import Control.Monad.State (runState)
+import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
-import Language.Ltml.HTML.Test (docConTest) 
+import qualified Data.Text.Encoding as TE
 import qualified Data.Text.IO as TIO
 import Data.Typography
     ( FontSize (MediumFontSize, SmallFontSize)
@@ -23,6 +24,7 @@ import Data.Typography
     , TextAlignment (Centered, LeftAligned)
     , Typography (Typography)
     )
+import GHC.IO.Handle (hClose)
 import Language.Lsd.AST.Format
     ( EnumStyle (AlphabeticUpper, Arabic)
     , FormatAtom (PlaceholderAtom, StringAtom)
@@ -78,6 +80,7 @@ import Language.Ltml.AST.Section
     )
 import Language.Ltml.AST.Text (TextTree (Space, Word))
 import Language.Ltml.Common (Flagged (Flagged))
+import Language.Ltml.HTML.Test (docConTest)
 import Language.Ltml.Parser.Common.Lexeme (nSc)
 import Language.Ltml.Parser.Footnote (runFootnoteWriterT)
 import Language.Ltml.Parser.Section (sectionP)
@@ -92,13 +95,10 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
 import Language.Ltml.ToLaTeX.Renderer (renderLaTeX)
 import Language.Ltml.ToLaTeX.ToLaTeX (toLaTeX)
 import Language.Ltml.ToLaTeX.ToPreLaTeXM (ToPreLaTeXM (toPreLaTeXM))
-import System.IO.Unsafe (unsafePerformIO)
-import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
-import qualified Data.ByteString.Char8 as BS
-import qualified Data.Text.Encoding as TE
 import System.Exit (ExitCode (..))
 import System.FilePath ((</>))
 import System.IO.Temp (withSystemTempDirectory)
+import System.IO.Unsafe (unsafePerformIO)
 import System.Process
     ( CreateProcess (cwd, std_err, std_in, std_out)
     , StdStream (CreatePipe)
@@ -106,7 +106,7 @@ import System.Process
     , proc
     , waitForProcess
     )
-import GHC.IO.Handle (hClose)
+import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 
 readText :: String -> Text
 readText filename = unsafePerformIO $ TIO.readFile filename
@@ -120,54 +120,57 @@ testThis a =
 testGeneratePDF
     :: IO (Either String (Text, BSL.ByteString))
 testGeneratePDF =
-            withSystemTempDirectory "latex-temp" $ \tmpDir -> do
-                let texFile = tmpDir </> "input.tex"
-                    pdfFile = tmpDir </> "input.pdf"
-                -- cmd = "pdflatex -interaction=nonstopmode -halt-on-error input.tex"
+    withSystemTempDirectory "latex-temp" $ \tmpDir -> do
+        let texFile = tmpDir </> "input.tex"
+            pdfFile = tmpDir </> "input.pdf"
+        -- cmd = "pdflatex -interaction=nonstopmode -halt-on-error input.tex"
 
-                let (res,gs) = testThis docConTest 
-                    res' = renderLaTeX $ toLaTeX (view labelToRef gs) (view preDocument gs <> document res)
-                -- Write LaTeX source
-                -- LTIO.writeFile texFile (render parsedInput)
-                BS.writeFile texFile (TE.encodeUtf8 res')
+        let (res, gs) = testThis docConTest
+            res' =
+                renderLaTeX $ toLaTeX (view labelToRef gs) (view preDocument gs <> document res)
+        -- Write LaTeX source
+        -- LTIO.writeFile texFile (render parsedInput)
+        BS.writeFile texFile (TE.encodeUtf8 res')
 
-                -- Compile with pdflatex
-                (exitCode, stdout, _) <- runLatex texFile tmpDir
+        -- Compile with pdflatex
+        (exitCode, stdout, _) <- runLatex texFile tmpDir
 
-                case exitCode of
-                    ExitFailure _ -> do
-                        -- let cleanErr = drop 3094 stdout -- omitting the preambel of the pdflatex output here.
-                        -- could be different on another system and thus maybe revert later
-                        return $ Left $ BS.unpack stdout
-                    ExitSuccess -> do
-                        pdf <- BSL.readFile pdfFile
-                        return $ Right (res',pdf)
-    where
-        runLatex :: FilePath -> FilePath -> IO (ExitCode, BS.ByteString, BS.ByteString)
-        runLatex texFile workDir = do
-            (Just hin, Just hout, Just herr, ph) <-
-                createProcess
-                    (proc "latexmk" ["-pdf", "-interaction=nonstopmode", "-halt-on-error", texFile])
-                        { cwd = Just workDir
-                        , std_in = CreatePipe
-                        , std_out = CreatePipe
-                        , std_err = CreatePipe
-                        }
-            hClose hin
-            out <- BS.hGetContents hout
-            err <- BS.hGetContents herr
-            exitCode <- waitForProcess ph
-            return (exitCode, out, err)
-
+        case exitCode of
+            ExitFailure _ -> do
+                -- let cleanErr = drop 3094 stdout -- omitting the preambel of the pdflatex output here.
+                -- could be different on another system and thus maybe revert later
+                return $ Left $ BS.unpack stdout
+            ExitSuccess -> do
+                pdf <- BSL.readFile pdfFile
+                return $ Right (res', pdf)
+  where
+    runLatex :: FilePath -> FilePath -> IO (ExitCode, BS.ByteString, BS.ByteString)
+    runLatex texFile workDir = do
+        (Just hin, Just hout, Just herr, ph) <-
+            createProcess
+                (proc "latexmk" ["-pdf", "-interaction=nonstopmode", "-halt-on-error", texFile])
+                    { cwd = Just workDir
+                    , std_in = CreatePipe
+                    , std_out = CreatePipe
+                    , std_err = CreatePipe
+                    }
+        hClose hin
+        out <- BS.hGetContents hout
+        err <- BS.hGetContents herr
+        exitCode <- waitForProcess ph
+        return (exitCode, out, err)
 
 runDocConTest :: IO ()
 runDocConTest = do
-    eRes <- testGeneratePDF 
+    eRes <- testGeneratePDF
     case eRes of
         Left err -> error err
-        Right (tex, pdf) -> putStrLn "success" 
-                         >> BS.writeFile "./src/Language/Ltml/ToLaTeX/Auxiliary/docConTest.tex" (TE.encodeUtf8 tex)
-                         >> BSL.writeFile "./src/Language/Ltml/ToLaTeX/Auxiliary/docConTest.pdf" pdf
+        Right (tex, pdf) ->
+            putStrLn "success"
+                >> BS.writeFile
+                    "./src/Language/Ltml/ToLaTeX/Auxiliary/docConTest.tex"
+                    (TE.encodeUtf8 tex)
+                >> BSL.writeFile "./src/Language/Ltml/ToLaTeX/Auxiliary/docConTest.pdf" pdf
 
 runTestToPDF :: IO ()
 runTestToPDF = do

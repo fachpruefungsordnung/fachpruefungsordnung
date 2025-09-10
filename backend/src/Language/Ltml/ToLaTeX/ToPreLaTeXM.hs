@@ -85,6 +85,7 @@ import Language.Ltml.ToLaTeX.Format
 import qualified Language.Ltml.ToLaTeX.GlobalState as GS
 import Language.Ltml.ToLaTeX.PreLaTeXType
     ( PreLaTeX (ISequence, IText, MissingRef)
+    , bold
     , enumerate
     , footnote
     , footref
@@ -95,7 +96,7 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     , linebreak
     , newpage
     , resetfootnote
-    , setpdftitle, bold
+    , setpdftitle
     )
 
 class ToPreLaTeXM a where
