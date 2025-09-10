@@ -154,7 +154,7 @@ renderTocList docContainer =
             map
                 ( either
                     (bimap ((<$>) span_) ((<$>) span_))
-                    ( \(mId, rDt, _) -> (span_ <$> mId, span_ . evalDelayed finalState' <$> rDt)
+                    ( \(mId, rDt, _, _) -> (span_ <$> mId, span_ . evalDelayed finalState' <$> rDt)
                     )
                 )
                 tocList
@@ -304,7 +304,7 @@ instance ToHtmlM (Parsed DocumentHeading) where
         (mIdHtml, formattedTitle, mLabel) <- case headingFormatS of
             Left headFormat -> buildMainHeading titleHtml headFormat
             Right headFormatId -> buildAppendixHeading titleHtml headFormatId
-        htmlId <- addTocEntry mIdHtml (resType titleHtml) mLabel
+        htmlId <- addTocEntry mIdHtml (resType titleHtml) mLabel Other
         -- \| In case of a parse error, output and error box
         return $
             either
@@ -349,12 +349,12 @@ instance ToHtmlM (Node Section) where
             ) = do
             globalState <- get
             sectionFormatS <- asks localSectionFormat
-            let (sectionIDGetter, incrementSectionID, sectionCssClass, maybeCollectSection) =
+            let (sectionIDGetter, incrementSectionID, sectionCssClass) =
                     -- \| Check if we are inside a section or a super-section
                     -- TODO: Is (SimpleLeafSectionBody [SimpleBlocks]) counted as super-section? (i think yes)
                     if isSuper sectionBody
-                        then (currentSuperSectionID, incSuperSectionID, Class.SuperSection, nothingA2)
-                        else (currentSectionID, incSectionID, Class.Section, collectExportSection)
+                        then (currentSuperSectionID, incSuperSectionID, Class.SuperSection)
+                        else (currentSectionID, incSectionID, Class.Section)
                 (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (sectionIDGetter globalState)
              in do
                     addMaybeLabelToState mLabel sectionIDHtml
@@ -375,7 +375,7 @@ instance ToHtmlM (Node Section) where
                             section_ [cssClass_ sectionCssClass]
                                 <$> (headingHtml <> childrenHtml <> footnotesHtml)
                     -- \| Collects all non-super Sections for possible export
-                    maybeCollectSection tocId sectionHtml
+                    collectExportSection tocId sectionHtml
                     return sectionHtml
           where
             -- \| Also adds table of contents entry for section
@@ -403,7 +403,7 @@ instance ToHtmlM (Node Section) where
                             , htmlId
                             )
               where
-                createTocEntryH mIdHtml rTitle = addTocEntry mIdHtml rTitle mLabelH
+                createTocEntryH mIdHtml rTitle = addTocEntry mIdHtml rTitle mLabelH SomeSection
 
 instance ToHtmlM SectionBody where
     toHtmlM sectionBody = case sectionBody of
@@ -653,7 +653,7 @@ instance ToHtmlM AppendixSection where
             ) = do
             -- \| Add Entry to ToC but without ID
             htmlId <-
-                addTocEntry Nothing (Success $ Now $ toHtml appendixSectionTitle) Nothing
+                addTocEntry Nothing (Success $ Now $ toHtml appendixSectionTitle) Nothing Other
             -- \| Give each Document the corresponding appendix Id
             let zipFunc i nDoc = local (\s -> s {currentAppendixElementID = i}) $ toHtmlM nDoc
             documentHtmls <-
@@ -721,7 +721,7 @@ instance (ToHtmlM a) => ToHtmlM (SectionFormatted (Parsed a)) where
             incSectionID
             -- \| Since we dont have a title we set the tocID as title
             let (_, tocKeyHtml) = sectionFormat sectionFormatS sectionID
-            htmlID <- addTocEntry Nothing (Error $ Now tocKeyHtml) Nothing
+            htmlID <- addTocEntry Nothing (Error $ Now tocKeyHtml) Nothing SomeSection
             returnNow $ parseErrorHtml (Just htmlID) parseErr
         Right a -> local (\s -> s {localSectionFormat = sectionFormatS}) $ toHtmlM a
 
@@ -749,9 +749,9 @@ renderDelayedToc mTocFormat = do
 -- | Helper function for rendering a ToC from the given  GlobalState
 renderToc
     :: Maybe TocFormat
-    -> LabelWrapper
+    -> TocEntryWrapper
     -- ^ Wrapper for Toc entry text
-    -> LabelWrapper
+    -> TocEntryWrapper
     -- ^ Wrapper for Toc button
     -> GlobalState
     -> Delayed (Html ())
@@ -781,15 +781,15 @@ renderToc (Just (TocFormat (TocHeading title))) entryFunc buttonFunc globalState
   where
     -- \| Build <tr><td>id</td> <td>title</td></tr> and wrap id and title seperatly
     buildWrappedRow
-        :: LabelWrapper
-        -> LabelWrapper
-        -> (Maybe (Html ()), Result (Delayed (Html ())), Text)
+        :: TocEntryWrapper
+        -> TocEntryWrapper
+        -> TocEntry
         -> Delayed (Html ())
-    buildWrappedRow entryWrapper buttonWrapper (mIdHtml, rTitle, htmlId) =
+    buildWrappedRow entryWrapper buttonWrapper (mIdHtml, rTitle, htmlId, category) =
         let
             -- \| Draw ToC Error titles as inline errors
-            entryWrap = entryWrapper (Label htmlId)
-            buttonWrap = buttonWrapper (Label htmlId)
+            entryWrap = entryWrapper category (Label htmlId)
+            buttonWrap = buttonWrapper category (Label htmlId)
             titleHtml = result id (span_ <#> Class.InlineError <$>) rTitle
             titleCell = td_ . entryWrap <$> titleHtml
             idCell = td_ $ maybe mempty entryWrap mIdHtml

@@ -18,6 +18,8 @@ module Language.Ltml.HTML.Common
     , FootnoteSet
     , NumLabel (..)
     , ToC
+    , TocEntry
+    , TocCategory (..)
     , addTocEntry
     , addPhantomTocEntry
     , PhantomTocEntry
@@ -26,6 +28,7 @@ module Language.Ltml.HTML.Common
     , result
     , EnumStyleMap
     , LabelWrapper
+    , TocEntryWrapper
     , anchorLink
     , pageLink
     , collectExportSection
@@ -97,8 +100,10 @@ data GlobalState = GlobalState
     -- ^ Holds all labels and the Html element that should be displayed when this label is referenced
     , tableOfContents :: ToC
     -- ^ Holds all entries for the table of contents as (Maybe key (e.g. § 1),
-    --   title, HTML id as anchor link). The title is wrapped into 'Result'.
+    --   title, HTML id as anchor link, category). The title is wrapped into 'Result'.
     --   In case of an parse error this title will be set to an Error title.
+    --   The 'Left' constructor holds metadata for the Frontend,
+    --   which is ignored when rendering the 'ToC'.
     , mangledLabelName :: Text
     -- ^ Mangled prefix name for generating new label names that do not exist in source language
     , mangledLabelID :: Int
@@ -154,9 +159,9 @@ data ReaderState = ReaderState
     -- ^ Wrapper around the Reference Html inside the TextTree (e.g. for adding anchor links)
     , footnoteWrapperFunc :: LabelWrapper
     -- ^ Wrapper around Footnote reference Html inside the TextTree (e.g. for adding anchor links)
-    , tocEntryWrapperFunc :: LabelWrapper
+    , tocEntryWrapperFunc :: TocEntryWrapper
     -- ^ Wrapper around an ToC entry (e.g. for adding anchor links)
-    , tocButtonWrapperFunc :: LabelWrapper
+    , tocButtonWrapperFunc :: TocEntryWrapper
     -- ^ Wrapper around the button in the right column of the ToC (e.g. for adding page links)
     }
 
@@ -201,7 +206,7 @@ initReaderState =
         , -- \| Default rendering method is "preview", so no anchor links
           labelWrapperFunc = const id -- anchorLink
         , footnoteWrapperFunc = const id
-        , tocEntryWrapperFunc = const id
+        , tocEntryWrapperFunc = const $ const id
         , tocButtonWrapperFunc = pageLink "sections"
         }
 
@@ -252,7 +257,9 @@ instance Ord NumLabel where
 --   since the list is evaluated only ones when building the ToC Html at the end of rendering.
 type ToC = DList (Either PhantomTocEntry TocEntry)
 
-type TocEntry = (Maybe (Html ()), Result (Delayed (Html ())), Text)
+type TocEntry = (Maybe (Html ()), Result (Delayed (Html ())), Text, TocCategory)
+
+data TocCategory = SomeSection | Other
 
 -- | Toc Entry that only exists to send info to the Frontend;
 --   It is ignored when rendering a ToC
@@ -265,8 +272,9 @@ addTocEntry
     :: Maybe (Html ())
     -> Result (Delayed (Html ()))
     -> Maybe Label
+    -> TocCategory
     -> ReaderStateMonad Text
-addTocEntry mKey title mLabel = do
+addTocEntry mKey title mLabel cat = do
     globalState <- get
     htmlId <- case mLabel of
         -- \| Create new mangled name for non existing label
@@ -279,7 +287,10 @@ addTocEntry mKey title mLabel = do
                     return mangledLabel
         Just label -> return $ unLabel label
     modify
-        ( \s -> s {tableOfContents = snoc (tableOfContents s) (Right (mKey, title, htmlId))}
+        ( \s ->
+            s
+                { tableOfContents = snoc (tableOfContents s) (Right (mKey, title, htmlId, cat))
+                }
         )
     return htmlId
 
@@ -324,6 +335,8 @@ type EnumStyleMap = [(EnumFormat, Text)]
 --   e.g. for adding anchor links
 type LabelWrapper = Label -> Html () -> Html ()
 
+type TocEntryWrapper = TocCategory -> LabelWrapper
+
 -- | Converts 'Label' into @<a href = "#<label>">@ for jumping to a HTML id
 anchorLink :: LabelWrapper
 anchorLink label = a_ [cssClass_ Class.AnchorLink, href_ (cons '#' $ unLabel label)]
@@ -332,8 +345,9 @@ anchorLink label = a_ [cssClass_ Class.AnchorLink, href_ (cons '#' $ unLabel lab
 pageLink
     :: Text
     -- ^ Path prefix
-    -> LabelWrapper
-pageLink path label =
+    -> TocEntryWrapper
+pageLink _ Other _ = const mempty
+pageLink path _ label =
     a_ [cssClass_ Class.AnchorLink, href_ (path <> "/" <> unLabel label <> ".html")]
 
 -------------------------------------------------------------------------------

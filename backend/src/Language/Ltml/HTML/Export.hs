@@ -54,7 +54,7 @@ exportReaderState =
         { shouldRender = True
         , labelWrapperFunc = anchorLink
         , footnoteWrapperFunc = anchorLink
-        , tocEntryWrapperFunc = anchorLink
+        , tocEntryWrapperFunc = const anchorLink -- ignore category
         , tocButtonWrapperFunc = pageLink (pack relativeSectionsDir)
         }
 
