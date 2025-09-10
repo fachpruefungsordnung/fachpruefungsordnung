@@ -100,10 +100,10 @@ elementPF
     -> m (MiElementConfig, [TextTree lbrk fnref style enum special])
 elementPF p =
     fmap (maybeToList . fmap Special) <$> specialP -- must come first
-        <|> rs (Word <$> wordP (Proxy :: Proxy special))
         <|> rs (NonBreakingSpace <$ char '~')
-        <|> char '{' *> bracedP <* char '}'
-        <|> rs (Styled <$ char '<' <*> styleP <*> p <* char '>')
+        <|> try (char '{' *> bracedP <* char '}')
+        <|> rs (try (Styled <$ char '<' <*> styleP) <*> p <* char '>')
+        <|> rs (Word <$> wordP (Proxy :: Proxy special)) -- must come last
   where
     bracedP =
         fmap (singleton . LineBreak) <$> bracedLineBreakP
@@ -347,13 +347,12 @@ isWordChar ' ' = False
 isWordChar c = not $ Char.isControl c
 
 isWordSemiSpecialChar :: Char -> Bool
-isWordSemiSpecialChar = isLineCommentPrefixFirstChar
+isWordSemiSpecialChar '{' = True
+isWordSemiSpecialChar '<' = True
+isWordSemiSpecialChar c = isLineCommentPrefixFirstChar c
 
 isWordSpecialChar :: Char -> Bool
 isWordSpecialChar '\\' = True
-isWordSpecialChar '{' = True
-isWordSpecialChar '}' = True
-isWordSpecialChar '<' = True
 isWordSpecialChar '>' = True
 isWordSpecialChar '~' = True
 isWordSpecialChar _ = False
