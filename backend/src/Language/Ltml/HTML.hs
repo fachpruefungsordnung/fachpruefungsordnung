@@ -124,7 +124,11 @@ renderHtmlCssExport readerState globalState docCon =
         finalState' = addUsedFootnoteLabels finalState
         mainHtml = evalDelayed finalState' delayedHtml
         css = mainStylesheet (enumStyles finalState')
-        sections = map (second (evalDelayed finalState')) (exportSections finalState')
+        mainDocTitle = mainDocumentTitle finalState'
+        sections =
+            map
+                (second (evalDelayed finalState' . (mainDocTitle <>)))
+                (exportSections finalState')
      in (mainHtml, css, sections)
 
 -------------------------------------------------------------------------------
@@ -313,11 +317,15 @@ instance ToHtmlM (Parsed DocumentHeading) where
                 eErrDocumentHeading
       where
         -- \| Main Document Heading without Id and without Label
+        --    This should only be called once
         buildMainHeading
             :: Delayed (Html ())
             -> HeadingFormat False
             -> ReaderStateMonad (Maybe (Html ()), Delayed (Html ()), Maybe Label)
-        buildMainHeading dTitleHtml headFormat = return (Nothing, headingFormat headFormat <$> dTitleHtml, Nothing)
+        buildMainHeading dTitleHtml headFormat = do
+            let formattedTitle = headingFormat headFormat <$> dTitleHtml
+            modify (\s -> s {mainDocumentTitle = formattedTitle})
+            return (Nothing, formattedTitle, Nothing)
 
         -- \| Appendix Docuemnt Heading with Id and Label
         buildAppendixHeading

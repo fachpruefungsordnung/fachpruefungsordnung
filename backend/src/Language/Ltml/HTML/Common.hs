@@ -116,6 +116,8 @@ data GlobalState = GlobalState
     -- ^ Holds postfix id which makes enum counter class name unique
     , exportSections :: [(Text, Delayed (Html ()))]
     -- ^ Collects all (non-super) sections as their 'Html' and their @htmlID@
+    , mainDocumentTitle :: Delayed (Html ())
+    -- ^ Styled title of the main Document for building exported sections
     }
 
 data ReaderState = ReaderState
@@ -185,6 +187,7 @@ initGlobalState =
         , mangledEnumCounterName = "_ENUM_STYLE_"
         , mangledEnumCounterID = 0
         , exportSections = []
+        , mainDocumentTitle = mempty
         }
 
 initReaderState :: ReaderState
@@ -207,7 +210,7 @@ initReaderState =
           labelWrapperFunc = const id -- anchorLink
         , footnoteWrapperFunc = const id
         , tocEntryWrapperFunc = const $ const id
-        , tocButtonWrapperFunc = pageLink "sections"
+        , tocButtonWrapperFunc = const anchorLink
         }
 
 -------------------------------------------------------------------------------
