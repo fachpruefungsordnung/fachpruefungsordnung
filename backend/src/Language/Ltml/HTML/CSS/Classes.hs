@@ -20,6 +20,7 @@ import Data.String (fromString)
 import Data.Text (Text, pack, unpack)
 import qualified Data.Typography as Ltml
 import Data.Void (Void, absurd)
+import qualified Language.Ltml.HTML.CSS.Color as Color
 import Language.Ltml.HTML.CSS.CustomClay
 
 data Class
@@ -75,6 +76,8 @@ data Class
       ErrorBox
     | -- | Styling of anchor links @<a>@
       AnchorLink
+    | -- | Link @<a>@ that looks not like a link but more like a button
+      ButtonLink
     | -- | Wrapper around ToC, which places the Table on the page
       TocContainer
     | -- | Class for <table> element of ToC
@@ -203,7 +206,7 @@ classStyle Underlined = do
         textDecoration underline
 classStyle InlineError =
     toClassSelector InlineError ? do
-        fontColor red
+        fontColor Color.errorText
         fontWeight bold
 classStyle CenteredBox =
     toClassSelector CenteredBox ? do
@@ -216,26 +219,33 @@ classStyle CenteredBox =
 classStyle ErrorBox =
     toClassSelector ErrorBox ? do
         padding (em 1) (em 1) (em 1) (em 1)
-        border (px 2) dashed red
+        border (px 2) dashed Color.errorBoxBorder
 classStyle AnchorLink = do
     toClassSelector AnchorLink ? do
-        color (rgb 0 0 100)
+        color Color.linkText
         textDecoration underline
-        textDecorationColor red
+        textDecorationColor Color.linkUnderline
 
     toClassSelector AnchorLink # hover ? do
         textDecoration none
-        color red
+        color Color.linkTextHover
+classStyle ButtonLink = do
+    toClassSelector ButtonLink ? do
+        padding (px 0) (px 6) (px 3) (px 6)
+        borderRadius (px 10) (px 10) (px 10) (px 10)
+        textDecoration none
+        fontSize (em 1.5)
+        color Color.linkText
+
+    toClassSelector ButtonLink # hover ? do
+        color Color.linkTextHover
+        backgroundColor Color.tableDarkCell
 classStyle TocContainer = do
     toClassSelector TocContainer ? do
         display flex
         justifyContent center
         marginBottom (em 2)
 classStyle TableOfContents = do
-    let darkCellColor = grayish 225
-        activeRowColor = darken 0.2 darkCellColor
-        cellBorderColor = grayish 180
-
     toClassSelector TableOfContents ? do
         width (pct 100)
         tableLayout autoLayout
@@ -246,20 +256,20 @@ classStyle TableOfContents = do
         textAlign alignLeft
 
     toClassSelector TableOfContents |> tbody |> tr ? do
-        borderBottom (px 1) solid cellBorderColor
+        borderBottom (px 1) solid Color.tableCellBorder
 
     toClassSelector TableOfContents |> tbody |> tr # lastOfType ? do
-        borderBottom (px 2) solid cellBorderColor
+        borderBottom (px 2) solid Color.tableCellBorder
 
     toClassSelector TableOfContents |> tbody |> tr |> td ? do
         whiteSpace nowrap
         padding (px 10) (px 10) (px 10) (px 10)
 
     toClassSelector TableOfContents |> tbody |> tr # nthOfType "odd" ? do
-        backgroundColor darkCellColor
+        backgroundColor Color.tableDarkCell
 
     toClassSelector TableOfContents |> tbody |> tr # hover ? do
-        backgroundColor activeRowColor
+        backgroundColor Color.tableActiveRow
 classStyle MinSizeColumn = do
     toClassSelector MinSizeColumn ? do
         width (pct 1)

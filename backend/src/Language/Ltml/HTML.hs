@@ -28,7 +28,7 @@ import Data.Either (rights)
 import qualified Data.Map as Map
 import Data.Maybe (isJust)
 import qualified Data.Set as Set
-import Data.Text (Text, unpack)
+import Data.Text (Text, pack, unpack)
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Common (Fallback (..), NavTocHeading (..))
 import Language.Lsd.AST.Format (HeadingFormat)
@@ -106,8 +106,12 @@ renderHtmlCssWith readerState globalState docContainer =
         finalState' = addUsedFootnoteLabels finalState
      in (evalDelayed finalState' delayedHtml, mainStylesheet (enumStyles finalState))
 
+-- | Render a @Flagged' DocumentContainer@ with given states to main HTML, main CSS,
+--   and list of exported sections.
 renderHtmlCssExport
-    :: ReaderState
+    :: FilePath
+    -- ^ Path from exported Sections to main HTML
+    -> ReaderState
     -> GlobalState
     -> Flagged' DocumentContainer
     -> ( Html ()
@@ -117,7 +121,7 @@ renderHtmlCssExport
          [(Text, Html ())]
          -- \^ Exported sections Html with id
        )
-renderHtmlCssExport readerState globalState docCon =
+renderHtmlCssExport backPath readerState globalState docCon =
     -- \| Render with given footnote context
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docCon) readerState) globalState
         -- \| Add footnote labes for "normal" (non-footnote) references
@@ -125,9 +129,12 @@ renderHtmlCssExport readerState globalState docCon =
         mainHtml = evalDelayed finalState' delayedHtml
         css = mainStylesheet (enumStyles finalState')
         mainDocTitle = mainDocumentTitle finalState'
+        backButton =
+            div_ $
+                a_ [cssClass_ Class.ButtonLink, href_ $ pack backPath] (toHtml ("←" :: Text))
         sections =
             map
-                (second (evalDelayed finalState' . (mainDocTitle <>)))
+                (second (evalDelayed finalState' . ((pure backButton <> mainDocTitle) <>)))
                 (exportSections finalState')
      in (mainHtml, css, sections)
 

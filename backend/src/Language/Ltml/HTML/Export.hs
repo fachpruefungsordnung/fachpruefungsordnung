@@ -80,7 +80,9 @@ exportDocument docCon path =
 -- | Renders WHOLE document structure as HTML pages to zip archive (as 'ByteString')
 renderZip :: Flagged' DocumentContainer -> IO ByteString
 renderZip docCon =
-    let (mainBody, css, sectionBodies) = renderHtmlCssExport exportReaderState initGlobalState docCon
+    let relativeHomePath = disjointRelative relativeSectionsDir "index.html"
+        (mainBody, css, sectionBodies) =
+            renderHtmlCssExport relativeHomePath exportReaderState initGlobalState docCon
         -- TODO: Get real Doc Title
         mainHtml = addHtmlHeader "Temp Title" relativeCssFilePath mainBody
         mainBS = renderBS mainHtml

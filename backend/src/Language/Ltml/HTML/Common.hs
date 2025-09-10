@@ -351,7 +351,7 @@ pageLink
     -> TocEntryWrapper
 pageLink _ Other _ = const mempty
 pageLink path _ label =
-    a_ [cssClass_ Class.AnchorLink, href_ (path <> "/" <> unLabel label <> ".html")]
+    a_ [cssClass_ Class.ButtonLink, href_ (path <> "/" <> unLabel label <> ".html")]
 
 -------------------------------------------------------------------------------
 
