@@ -28,6 +28,7 @@ module Language.Ltml.HTML.Common
     , LabelWrapper
     , anchorLink
     , pageLink
+    , collectExportSection
     , Delayed (..)
     , evalDelayed
     , returnNow
@@ -108,6 +109,8 @@ data GlobalState = GlobalState
     -- ^ Holds prefix for generating new css class names for enum counter styles
     , mangledEnumCounterID :: Int
     -- ^ Holds postfix id which makes enum counter class name unique
+    , exportSections :: [(Text, Delayed (Html ()))]
+    -- ^ Collects all (non-super) sections as their 'Html' and their @htmlID@
     }
 
 data ReaderState = ReaderState
@@ -176,12 +179,13 @@ initGlobalState =
         , enumStyles = []
         , mangledEnumCounterName = "_ENUM_STYLE_"
         , mangledEnumCounterID = 0
+        , exportSections = []
         }
 
 initReaderState :: ReaderState
 initReaderState =
     ReaderState
-        { shouldRender = False
+        { shouldRender = True
         , hasGlobalToC = False
         , appendixHasGlobalToC = False
         , currentAppendixElementID = 1
@@ -198,7 +202,7 @@ initReaderState =
           labelWrapperFunc = const id -- anchorLink
         , footnoteWrapperFunc = const id
         , tocEntryWrapperFunc = const id
-        , tocButtonWrapperFunc = const id
+        , tocButtonWrapperFunc = pageLink "sections"
         }
 
 -------------------------------------------------------------------------------
@@ -334,11 +338,18 @@ pageLink path label =
 
 -------------------------------------------------------------------------------
 
+-- | Adds a 'Section' with @htmlId@ to 'GlobalState'
+collectExportSection :: Text -> Delayed (Html ()) -> ReaderStateMonad ()
+collectExportSection htmlId sectionHtml =
+    modify (\s -> s {exportSections = (htmlId, sectionHtml) : exportSections s})
+
+-------------------------------------------------------------------------------
+
 data Delayed a = Now a | Later (GlobalState -> a)
 
-evalDelayed :: Delayed a -> GlobalState -> a
-evalDelayed (Now a) _ = a
-evalDelayed (Later fa) s = fa s
+evalDelayed :: GlobalState -> Delayed a -> a
+evalDelayed _ (Now a) = a
+evalDelayed s (Later fa) = fa s
 
 returnNow :: Html () -> HtmlReaderState
 returnNow = return . Now

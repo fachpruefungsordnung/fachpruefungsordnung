@@ -4,8 +4,9 @@ module Language.Ltml.HTML.Export (exportDocument, renderZip) where
 
 import Clay (render)
 import Codec.Archive.Zip
+import Data.Bifunctor (bimap)
 import Data.ByteString.Lazy (ByteString)
-import Data.Text (pack)
+import Data.Text (pack, unpack)
 import Data.Text.IO (writeFile)
 import Data.Text.Lazy (toStrict)
 import Data.Text.Lazy.Encoding (encodeUtf8)
@@ -18,7 +19,7 @@ import Language.Ltml.HTML.Common
 import Language.Ltml.HTML.Util
 import Lucid
 import System.Directory
-import System.FilePath
+import System.FilePath.Posix
 import Prelude hiding (writeFile)
 
 -- ReaderState felder mit wrapperFunktionen für:
@@ -79,18 +80,28 @@ exportDocument docCon path =
 -- | Renders WHOLE document structure as HTML pages to zip archive (as 'ByteString')
 renderZip :: Flagged' DocumentContainer -> IO ByteString
 renderZip docCon =
-    let (body, css) = renderHtmlCssWith exportReaderState initGlobalState docCon
+    let (mainBody, css, sectionBodies) = renderHtmlCssExport exportReaderState initGlobalState docCon
         -- TODO: Get real Doc Title
-        mainHtml = addHtmlHeader "Temp Title" relativeCssFilePath body
+        mainHtml = addHtmlHeader "Temp Title" relativeCssFilePath mainBody
         mainBS = renderBS mainHtml
         stylesheetBS = encodeUtf8 $ render css
+        sectionRelativeCssPath = disjointRelative relativeSectionsDir relativeCssFilePath
+        -- TODO get real Section Title
+        sectionPathBS =
+            map
+                ( bimap
+                    (\tocId -> relativeSectionsDir </> unpack tocId <> ".html")
+                    (renderBS . addHtmlHeader "Section Title" sectionRelativeCssPath)
+                )
+                sectionBodies
         files =
-            [ (mainBS, "index.html")
-            , (stylesheetBS, relativeCssFilePath)
+            [ ("index.html", mainBS)
+            , (relativeCssFilePath, stylesheetBS)
             ]
+                ++ sectionPathBS
      in do
             currentTime <- round <$> getPOSIXTime
-            let entries = map (\(bs, path) -> toEntry path currentTime bs) files
+            let entries = map (\(path, bs) -> toEntry path currentTime bs) files
                 archive = foldr addEntryToArchive emptyArchive entries
             return $ fromArchive archive
 

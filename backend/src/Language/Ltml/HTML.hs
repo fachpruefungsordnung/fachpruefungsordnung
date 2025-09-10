@@ -13,6 +13,7 @@ module Language.Ltml.HTML
     , renderSectionHtmlCss
     , renderHtmlCss
     , renderHtmlCssWith
+    , renderHtmlCssExport
     , renderTocList
     , renderTocEntry
     ) where
@@ -21,7 +22,7 @@ import Clay (Css)
 import Control.Monad (join, zipWithM)
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.Bifunctor (bimap)
+import Data.Bifunctor (bimap, second)
 import Data.DList (toList)
 import Data.Either (rights)
 import qualified Data.Map as Map
@@ -88,7 +89,7 @@ renderSectionHtmlCss section fnMap =
         (delayedHtml, finalState) = runState (runReaderT (toHtmlM section) readerState) initGlobalState
         -- \| Add footnote labes for "normal" (non-footnote) references
         finalState' = addUsedFootnoteLabels finalState
-     in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
+     in (evalDelayed finalState' delayedHtml, mainStylesheet (enumStyles finalState))
 
 -- | Render a @Flagged' DocumentContainer@ to HTML and CSS
 renderHtmlCss :: Flagged' DocumentContainer -> (Html (), Css)
@@ -103,7 +104,30 @@ renderHtmlCssWith readerState globalState docContainer =
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) readerState) globalState
         -- \| Add footnote labes for "normal" (non-footnote) references
         finalState' = addUsedFootnoteLabels finalState
-     in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
+     in (evalDelayed finalState' delayedHtml, mainStylesheet (enumStyles finalState))
+
+renderHtmlCssExport
+    :: ReaderState
+    -> GlobalState
+    -> Flagged' DocumentContainer
+    -> ( Html ()
+       , -- \^ HTML of whole Document
+         Css
+       , -- \^ Main Stylesheet
+         [(Text, Html ())]
+         -- \^ Exported sections Html with id
+       )
+renderHtmlCssExport readerState globalState docCon =
+    -- \| Render with given footnote context
+    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docCon) readerState) globalState
+        -- \| Add footnote labes for "normal" (non-footnote) references
+        finalState' = addUsedFootnoteLabels finalState
+        mainHtml = evalDelayed finalState' delayedHtml
+        css = mainStylesheet (enumStyles finalState')
+        sections = map (second (evalDelayed finalState')) (exportSections finalState')
+     in (mainHtml, css, sections)
+
+-------------------------------------------------------------------------------
 
 -- | Renders a global ToC (including appendices) as a list of
 --   either (@Maybe@ idHtml, @Result@ titleHtml) or a phantom result type
@@ -130,7 +154,7 @@ renderTocList docContainer =
             map
                 ( either
                     (bimap ((<$>) span_) ((<$>) span_))
-                    ( \(mId, rDt, _) -> (span_ <$> mId, span_ . flip evalDelayed finalState' <$> rDt)
+                    ( \(mId, rDt, _) -> (span_ <$> mId, span_ . evalDelayed finalState' <$> rDt)
                     )
                 )
                 tocList
@@ -325,17 +349,17 @@ instance ToHtmlM (Node Section) where
             ) = do
             globalState <- get
             sectionFormatS <- asks localSectionFormat
-            let (sectionIDGetter, incrementSectionID, sectionCssClass) =
+            let (sectionIDGetter, incrementSectionID, sectionCssClass, maybeCollectSection) =
                     -- \| Check if we are inside a section or a super-section
                     -- TODO: Is (SimpleLeafSectionBody [SimpleBlocks]) counted as super-section? (i think yes)
                     if isSuper sectionBody
-                        then (currentSuperSectionID, incSuperSectionID, Class.SuperSection)
-                        else (currentSectionID, incSectionID, Class.Section)
+                        then (currentSuperSectionID, incSuperSectionID, Class.SuperSection, nothingA2)
+                        else (currentSectionID, incSectionID, Class.Section, collectExportSection)
                 (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (sectionIDGetter globalState)
              in do
                     addMaybeLabelToState mLabel sectionIDHtml
                     -- \| Render parsed Heading, which also creates ToC Entry
-                    headingHtml <-
+                    (headingHtml, tocId) <-
                         buildHeadingHtml sectionIDHtml mLabel sectionTocKeyHtml parsedHeading
                     childrenHtml <- toHtmlM sectionBody
                     -- \| Also render footnotes in super-sections, since their heading
@@ -347,9 +371,12 @@ instance ToHtmlM (Node Section) where
                     -- \| increment (super)SectionID for next section
                     incrementSectionID
 
-                    return $
-                        section_ [cssClass_ sectionCssClass]
-                            <$> (headingHtml <> childrenHtml <> footnotesHtml)
+                    let sectionHtml =
+                            section_ [cssClass_ sectionCssClass]
+                                <$> (headingHtml <> childrenHtml <> footnotesHtml)
+                    -- \| Collects all non-super Sections for possible export
+                    maybeCollectSection tocId sectionHtml
+                    return sectionHtml
           where
             -- \| Also adds table of contents entry for section
             buildHeadingHtml
@@ -357,7 +384,7 @@ instance ToHtmlM (Node Section) where
                 -> Maybe Label
                 -> Html ()
                 -> Parsed Heading
-                -> ReaderStateMonad (Delayed (Html ()))
+                -> ReaderStateMonad (Delayed (Html ()), Text)
             buildHeadingHtml sectionIDHtml mLabelH tocKeyHtml eErrHeading =
                 case eErrHeading of
                     Left parseErr -> do
@@ -365,14 +392,16 @@ instance ToHtmlM (Node Section) where
                             -- In case of a Heading failure
                             -- we simply display the ID as the title
                             createTocEntryH Nothing (Error $ Now tocKeyHtml)
-                        returnNow $ parseErrorHtml (Just htmlId) parseErr
+                        return (Now $ parseErrorHtml (Just htmlId) parseErr, htmlId)
                     Right (Heading headingFormatS title) -> do
                         titleHtml <- toHtmlM title
                         htmlId <- createTocEntryH (Just tocKeyHtml) (Success titleHtml)
-                        return $
-                            h2_ [cssClass_ Class.Heading, id_ htmlId]
+                        return
+                            ( h2_ [cssClass_ Class.Heading, id_ htmlId]
                                 . headingFormatId headingFormatS sectionIDHtml
                                 <$> titleHtml
+                            , htmlId
+                            )
               where
                 createTocEntryH mIdHtml rTitle = addTocEntry mIdHtml rTitle mLabelH
 

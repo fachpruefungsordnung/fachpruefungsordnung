@@ -11,11 +11,13 @@ module Language.Ltml.HTML.Util
     , whenJust
     , mapState
     , withModified
+    , nothingA2
     , convertNewLine
     , mId_
     , mTextId_
     , getNextRawTextTree
     , isSuper
+    , disjointRelative
     ) where
 
 import Control.Monad.State (MonadState, gets, modify)
@@ -26,6 +28,7 @@ import Language.Ltml.AST.Section (SectionBody (InnerSectionBody))
 import Language.Ltml.AST.Text (TextTree (..))
 import Language.Ltml.HTML.Common (GlobalState)
 import Lucid
+import System.FilePath.Posix (splitDirectories, (</>))
 
 -- | Converts Int to corresponding lowercase letter in the alphabet.
 --   If Int is (<= 0) or (>= 27), it returns "?"
@@ -76,6 +79,11 @@ withModified getter setter newValue action = do
     modify (\s -> setter s saved)
     return res
 
+-- | Ignores both arguments and does nothing;
+--   except returning '()'
+nothingA2 :: (Monad m) => a -> b -> m ()
+nothingA2 = const $ const $ pure ()
+
 -------------------------------------------------------------------------------
 
 -- | Replaces every '\n' with HTML <br> while maintaining toHtml input sanitization
@@ -118,3 +126,14 @@ getNextRawTextTree =
 isSuper :: SectionBody -> Bool
 isSuper (InnerSectionBody _) = True
 isSuper _ = False
+
+-------------------------------------------------------------------------------
+
+-- | Creates relative path from base to target; Will introduce @".."@ and
+--   should only be used for disjoint base and target paths;
+--   otherwise use 'makeRelative'
+disjointRelative :: FilePath -> FilePath -> FilePath
+disjointRelative base target =
+    let dirs = length $ splitDirectories base
+        prefix = foldr (</>) "" $ replicate dirs ".."
+     in prefix </> target
