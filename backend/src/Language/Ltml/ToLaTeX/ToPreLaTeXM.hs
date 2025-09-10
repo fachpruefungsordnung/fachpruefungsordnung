@@ -423,7 +423,7 @@ instance Labelable Document where
                 toc' <- use GS.toc
                 appendixHeaders' <- use GS.appendixHeaders
                 pure $
-                    IText (LT.fromStrict tocHeading) <> case t of
+                    IText (LT.fromStrict tocHeading) <> linebreak <> case t of
                         GS.Appendix ->
                             ISequence $ DList.toList toc'
                         GS.Main ->
@@ -440,12 +440,15 @@ instance ToPreLaTeXM AppendixSection where
                     )
                 nodes
             ) = do
-            GS.counterState . GS.appendixCTR .= 0
-            GS.flagState . GS.docType .= GS.Appendix
-            GS.formatState . GS.appendixFormat .= elementFmt
-            GS.appendixHeaders %= (<> DList.fromList [IText (LT.fromStrict t), linebreak])
-            nodes' <- mapM toPreLaTeXM nodes
-            pure $ ISequence $ map ((newpage <> resetfootnote) <>) nodes'
+            if null nodes
+                then pure mempty
+                else do
+                    GS.counterState . GS.appendixCTR .= 0
+                    GS.flagState . GS.docType .= GS.Appendix
+                    GS.formatState . GS.appendixFormat .= elementFmt
+                    GS.appendixHeaders %= (<> DList.fromList [IText (LT.fromStrict t), linebreak])
+                    nodes' <- mapM toPreLaTeXM nodes
+                    pure $ ISequence $ map ((newpage <> resetfootnote) <>) nodes'
 
 -------------------------------- DocumentContainer -----------------------------------
 

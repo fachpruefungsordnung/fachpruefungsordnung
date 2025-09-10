@@ -142,11 +142,7 @@ staticDocumentFormat =
             , "marginparwidth=1.75cm"
             ]
             "geometry"
-        , usepackage
-            [ "colorlinks=true"
-            , "allcolors=red"
-            ]
-            "hyperref"
+        , usepackage [] "hyperref"
         , usepackage [] "enumitem"
         , usepackage [] "tabularx"
         , usepackage ["T1"] "fontenc"
