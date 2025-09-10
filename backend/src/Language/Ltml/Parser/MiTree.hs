@@ -57,14 +57,18 @@ data MiElementConfig = MiElementConfig
 --   This expects that the next character is not an (ASCII) space.
 --
 --   'elementPF' is expected to be a simple bracketing wrapper around its
---   argument @p@, and not to consume (ASCII) spaces or newlines, unlike @p@.
+--   second argument @p@, and not to consume (ASCII) spaces or newlines,
+--   unlike @p@.
 --   For leaf nodes, 'elementPF' may simply ignore @p@.
---   @'elementPF' p@ is further generally expected to not accept the empty
+--   @'elementPF' b p@ is further generally expected to not accept the empty
 --   input.  Exceptions are permitted when
 --   (a) sufficiently repeated application eventually halts
 --       (i.e. @'Text.Megaparsec.many' ('elementPF' p)@ halts), and
 --   (b) @'elementPF' p@ does not succeed on an empty input line (possibly
 --       with indentation / (ASCII) spaces).
+--
+--   The first argument to 'elementPF' signifies whether it is run in a
+--   bracketed context.
 --
 --   Unlike 'elementPF', 'childP' is expected to take care of indentation
 --   itself--except at the very beginning, where it may expect that any
@@ -76,7 +80,7 @@ data MiElementConfig = MiElementConfig
 miForest
     :: forall m a
      . (MonadParser m, FromWhitespace [a])
-    => (m [a] -> m (MiElementConfig, [a]))
+    => (Bool -> m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> m [a]
 miForest elementPF childP =
@@ -94,7 +98,7 @@ miForestFrom
     :: forall m a
      . (MonadParser m, FromWhitespace [a])
     => ForestContext
-    -> (m [a] -> m (MiElementConfig, [a]))
+    -> (Bool -> m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> Pos
     -> m [a]
@@ -125,7 +129,7 @@ miForestFrom rootCtx elementPF childP lvl = go rootCtx mempty
         -- Parse forest, headed by element.
         goE :: Text -> m [a]
         goE precWS = do
-            (cfg, e) <- elementPF (go ForestBracketed mempty)
+            (cfg, e) <- elementPF isBracketed (go ForestBracketed mempty)
 
             let precWS' :: [a]
                 precWS' =
@@ -203,7 +207,7 @@ miForestFrom rootCtx elementPF childP lvl = go rootCtx mempty
 hangingBlock
     :: (MonadParser m, FromWhitespace [a])
     => m ([a] -> b)
-    -> (m [a] -> m (MiElementConfig, [a]))
+    -> (Bool -> m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> m b
 hangingBlock keywordP elementPF childP = do
@@ -223,7 +227,7 @@ hangingBlock keywordP elementPF childP = do
 hangingBlock'
     :: (MonadParser m, FromWhitespace [a])
     => m b
-    -> (m [a] -> m (MiElementConfig, [a]))
+    -> (Bool -> m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> m (b, [a])
 hangingBlock' = hangingBlock . fmap (,)
@@ -233,7 +237,7 @@ hangingBlock' = hangingBlock . fmap (,)
 hangingBlock_
     :: (MonadParser m, FromWhitespace [a])
     => m ()
-    -> (m [a] -> m (MiElementConfig, [a]))
+    -> (Bool -> m [a] -> m (MiElementConfig, [a]))
     -> m a
     -> m [a]
 hangingBlock_ = hangingBlock . fmap (const id)

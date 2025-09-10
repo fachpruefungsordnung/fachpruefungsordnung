@@ -16,6 +16,7 @@ module Language.Ltml.Parser.Text
     )
 where
 
+import Control.Alternative.Utils (whenAlt)
 import Control.Applicative (empty, (<|>))
 import Control.Applicative.Combinators (choice)
 import Control.Monad.Identity (Identity (Identity), runIdentity)
@@ -96,14 +97,16 @@ elementPF
        , StyleP style
        , SpecialP m special
        )
-    => m [TextTree lbrk fnref style enum special]
+    => Bool
+    -> m [TextTree lbrk fnref style enum special]
     -> m (MiElementConfig, [TextTree lbrk fnref style enum special])
-elementPF p =
+elementPF isBracketed p =
     fmap (maybeToList . fmap Special) <$> specialP -- must come first
         <|> rs (NonBreakingSpace <$ char '~')
         <|> try (char '{' *> bracedP <* char '}')
         <|> rs (try (Styled <$ char '<' <*> styleP) <*> p <* char '>')
-        <|> rs (Word <$> wordP (Proxy :: Proxy special)) -- must come last
+        <|> rs (whenAlt (not isBracketed) (Word . Text.singleton <$> char '>'))
+        <|> rs (Word <$> wordP (Proxy :: Proxy special))
   where
     bracedP =
         fmap (singleton . LineBreak) <$> bracedLineBreakP
