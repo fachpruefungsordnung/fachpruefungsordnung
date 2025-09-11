@@ -12,6 +12,6 @@
 
 /* `no-hover` class disables the hover effect of table rows, useful for
    specific rows that are not meant to be interactive. */
-tr.noHover {
+tr.no-hover {
     pointer-events: none;
 }

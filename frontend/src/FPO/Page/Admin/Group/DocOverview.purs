@@ -35,7 +35,6 @@ import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.FullDocument as FD
 import FPO.Dto.DocumentDto.Query as DQ
 import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName)
--- import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn, addModal)
@@ -302,7 +301,7 @@ component =
   -- Renders an empty project row for padding.
   emptyDocumentRow :: forall w. State -> HH.HTML w Action
   emptyDocumentRow state =
-    HH.tr []
+    HH.tr [ HP.class_ $ H.ClassName "no-hover" ]
       [ HH.td
           [ HP.colSpan 3
           , HP.classes [ HB.textCenter ]
