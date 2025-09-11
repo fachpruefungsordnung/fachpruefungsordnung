@@ -868,8 +868,6 @@ splitview = connect selectTranslator $ H.mkComponent
         ( ModifyVersionMapping elementID Nothing
             (Just (Just { tocEntry: tocEntry, revID: vID, title: title }))
         )
-      {-       H.modify_ _
-      { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } } -}
       H.tell _editor 1
         (Editor.ChangeSection tocEntry vID)
 

@@ -3,7 +3,7 @@ module FPO.Dto.DocumentDto.DocDate where
 import Prelude
 
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson)
-import Data.Date (Date(..), canonicalDate)
+import Data.Date (Date, canonicalDate)
 import Data.DateTime
   ( DateTime(..)
   , date
