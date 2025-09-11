@@ -25,7 +25,7 @@ parseTest = do
                     mapM_ print $ renderTocList markedDocCon
                     renderToFile
                         "src/Language/Ltml/HTML/Test/out.html"
-                        (addHtmlHeader "Generated Document Preview" "out.css" body)
+                        (addHtmlHeader ("Generated Document Preview" :: String) "out.css" body)
                     writeCss css "src/Language/Ltml/HTML/Test/out.css"
 
 -- prettyPrint markedDocCon

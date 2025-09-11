@@ -114,10 +114,12 @@ data GlobalState = GlobalState
     -- ^ Holds prefix for generating new css class names for enum counter styles
     , mangledEnumCounterID :: Int
     -- ^ Holds postfix id which makes enum counter class name unique
-    , exportSections :: [(Text, Delayed (Html ()))]
-    -- ^ Collects all (non-super) sections as their 'Html' and their @htmlID@
-    , mainDocumentTitle :: Delayed (Html ())
+    , exportSections :: [(Text, Delayed Text, Delayed (Html ()))]
+    -- ^ Collects all (non-super) sections as their their @htmlID@, their 'Html' and their title
+    , mainDocumentTitleHtml :: Delayed (Html ())
     -- ^ Styled title of the main Document for building exported sections
+    , mainDocumentTitle :: Delayed Text
+    -- ^ Raw title of the main Document for building HTML headers
     }
 
 data ReaderState = ReaderState
@@ -187,6 +189,7 @@ initGlobalState =
         , mangledEnumCounterName = "_ENUM_STYLE_"
         , mangledEnumCounterID = 0
         , exportSections = []
+        , mainDocumentTitleHtml = mempty
         , mainDocumentTitle = mempty
         }
 
@@ -355,10 +358,12 @@ pageLink path _ label =
 
 -------------------------------------------------------------------------------
 
--- | Adds a 'Section' with @htmlId@ to 'GlobalState'
-collectExportSection :: Text -> Delayed (Html ()) -> ReaderStateMonad ()
-collectExportSection htmlId sectionHtml =
-    modify (\s -> s {exportSections = (htmlId, sectionHtml) : exportSections s})
+-- | Adds a 'Section' with @htmlId@ and HTML @title@ to 'GlobalState'
+collectExportSection
+    :: Text -> Delayed Text -> Delayed (Html ()) -> ReaderStateMonad ()
+collectExportSection htmlId title sectionHtml =
+    modify
+        (\s -> s {exportSections = (htmlId, title, sectionHtml) : exportSections s})
 
 -------------------------------------------------------------------------------
 

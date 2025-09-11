@@ -118,9 +118,12 @@ renderHtmlCssExport
        , -- \^ HTML of whole Document
          Css
        , -- \^ Main Stylesheet
-         [(Text, Html ())]
-         -- \^ Exported sections Html with id
+         [(Text, Text, Html ())]
+       , -- \^ Exported sections Html with id and title
+         Text
        )
+-- \^ Raw textual title of the main document
+
 renderHtmlCssExport backPath readerState globalState docCon =
     -- \| Render with given footnote context
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docCon) readerState) globalState
@@ -128,15 +131,21 @@ renderHtmlCssExport backPath readerState globalState docCon =
         finalState' = addUsedFootnoteLabels finalState
         mainHtml = evalDelayed finalState' delayedHtml
         css = mainStylesheet (enumStyles finalState')
-        mainDocTitle = mainDocumentTitle finalState'
+        mainDocTitleHtml = mainDocumentTitleHtml finalState'
+        rawMainDocTitle = evalDelayed finalState' $ mainDocumentTitle finalState'
         backButton =
             div_ $
                 a_ [cssClass_ Class.ButtonLink, href_ $ pack backPath] (toHtml ("←" :: Text))
         sections =
             map
-                (second (evalDelayed finalState' . ((pure backButton <> mainDocTitle) <>)))
+                ( \(htmlId, dTitle, dHtml) ->
+                    ( htmlId
+                    , evalDelayed finalState' dTitle
+                    , evalDelayed finalState' . ((pure backButton <> mainDocTitleHtml) <>) $ dHtml
+                    )
+                )
                 (exportSections finalState')
-     in (mainHtml, css, sections)
+     in (mainHtml, css, sections, rawMainDocTitle)
 
 -------------------------------------------------------------------------------
 
@@ -307,6 +316,8 @@ instance ToHtmlM (Parsed DocumentHeading) where
                 return (Error, failedHeadingTextHtml)
             Right (DocumentHeading headingTextTree) -> do
                 headingTextHtml <- toHtmlM headingTextTree
+                -- \| Used for setting HTML title
+                modify (\s -> s {mainDocumentTitle = headingText headingTextTree})
                 return (Success, headingTextHtml)
         -- \| Get HeadingFormat from DocumentContainer or AppendixSection
         headingFormatS <- asks documentHeadingFormat
@@ -331,7 +342,8 @@ instance ToHtmlM (Parsed DocumentHeading) where
             -> ReaderStateMonad (Maybe (Html ()), Delayed (Html ()), Maybe Label)
         buildMainHeading dTitleHtml headFormat = do
             let formattedTitle = headingFormat headFormat <$> dTitleHtml
-            modify (\s -> s {mainDocumentTitle = formattedTitle})
+            -- \| Used for adding title to exported sections
+            modify (\s -> s {mainDocumentTitleHtml = formattedTitle})
             return (Nothing, formattedTitle, Nothing)
 
         -- \| Appendix Docuemnt Heading with Id and Label
@@ -374,7 +386,7 @@ instance ToHtmlM (Node Section) where
              in do
                     addMaybeLabelToState mLabel sectionIDHtml
                     -- \| Render parsed Heading, which also creates ToC Entry
-                    (headingHtml, tocId) <-
+                    (headingHtml, tocId, rawTitle) <-
                         buildHeadingHtml sectionIDHtml mLabel sectionTocKeyHtml parsedHeading
                     childrenHtml <- toHtmlM sectionBody
                     -- \| Also render footnotes in super-sections, since their heading
@@ -390,7 +402,7 @@ instance ToHtmlM (Node Section) where
                             section_ [cssClass_ sectionCssClass]
                                 <$> (headingHtml <> childrenHtml <> footnotesHtml)
                     -- \| Collects all non-super Sections for possible export
-                    collectExportSection tocId sectionHtml
+                    collectExportSection tocId rawTitle sectionHtml
                     return sectionHtml
           where
             -- \| Also adds table of contents entry for section
@@ -399,7 +411,15 @@ instance ToHtmlM (Node Section) where
                 -> Maybe Label
                 -> Html ()
                 -> Parsed Heading
-                -> ReaderStateMonad (Delayed (Html ()), Text)
+                -> ReaderStateMonad
+                    ( Delayed (Html ())
+                    , -- \^ Formatted title
+                      Text
+                    , -- \^ html id
+                      Delayed Text
+                    )
+            -- \^ raw textual title
+
             buildHeadingHtml sectionIDHtml mLabelH tocKeyHtml eErrHeading =
                 case eErrHeading of
                     Left parseErr -> do
@@ -407,15 +427,17 @@ instance ToHtmlM (Node Section) where
                             -- In case of a Heading failure
                             -- we simply display the ID as the title
                             createTocEntryH Nothing (Error $ Now tocKeyHtml)
-                        return (Now $ parseErrorHtml (Just htmlId) parseErr, htmlId)
+                        return (Now $ parseErrorHtml (Just htmlId) parseErr, htmlId, mempty)
                     Right (Heading headingFormatS title) -> do
                         titleHtml <- toHtmlM title
+                        let rawTitleText = headingText title
                         htmlId <- createTocEntryH (Just tocKeyHtml) (Success titleHtml)
                         return
                             ( h2_ [cssClass_ Class.Heading, id_ htmlId]
                                 . headingFormatId headingFormatS sectionIDHtml
                                 <$> titleHtml
                             , htmlId
+                            , rawTitleText
                             )
               where
                 createTocEntryH mIdHtml rTitle = addTocEntry mIdHtml rTitle mLabelH SomeSection

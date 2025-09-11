@@ -18,15 +18,18 @@ module Language.Ltml.HTML.Util
     , getNextRawTextTree
     , isSuper
     , disjointRelative
+    , headingText
     ) where
 
 import Control.Monad.State (MonadState, gets, modify)
 import Data.Char (chr)
 import Data.Text (Text)
+import Data.Text.Lazy (toStrict)
+import Data.Void (absurd)
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Section (SectionBody (InnerSectionBody))
-import Language.Ltml.AST.Text (TextTree (..))
-import Language.Ltml.HTML.Common (GlobalState)
+import Language.Ltml.AST.Text (HeadingTextTree, TextTree (..))
+import Language.Ltml.HTML.Common (Delayed (..), GlobalState (..))
 import Lucid
 import System.FilePath.Posix (splitDirectories, (</>))
 
@@ -137,3 +140,30 @@ disjointRelative base target =
     let dirs = length $ splitDirectories base
         prefix = foldr (</>) "" $ replicate dirs ".."
      in prefix </> target
+
+-------------------------------------------------------------------------------
+
+-- | Generate raw textual title from 'HeadingTextTree';
+--   Note: Footnotes are skipped and check for undefined Labels
+--         before using this function.
+headingText :: [HeadingTextTree] -> Delayed Text
+headingText = foldr ((<>) . translate) (Now "")
+  where
+    translate :: HeadingTextTree -> Delayed Text
+    translate htt = case htt of
+        Word text -> Now text
+        Space -> Now " "
+        NonBreakingSpace -> Now " "
+        LineBreak void -> absurd void
+        Special void -> absurd void
+        Reference label -> Later $ \globalState ->
+            case lookup label $ labels globalState of
+                -- \| Label was not found in GlobalState;
+                --    Since this function is only used for export,
+                --    no errors will occur
+                Nothing -> ""
+                Just labelHtml -> toStrict $ renderText labelHtml
+        Styled void _ -> absurd void
+        Enum void -> absurd void
+        -- \| Note this: Footnotes are skipped
+        FootnoteRef _ -> Now ""

@@ -60,6 +60,8 @@ exportReaderState =
 
 -------------------------------------------------------------------------------
 
+-- TODO: Maybe for instantly self hosting
+
 -- | Exports WHOLE document structure as HTML pages to given directory path
 exportDocument :: Flagged' DocumentContainer -> FilePath -> IO ()
 exportDocument docCon path =
@@ -68,7 +70,7 @@ exportDocument docCon path =
         absSectionsDir = mainDir </> relativeSectionsDir
         (body, css) = renderHtmlCssWith exportReaderState initGlobalState docCon
         -- TODO: Get real Doc Title
-        mainHtml = addHtmlHeader "Temp Title" relativeCssFilePath body
+        mainHtml = addHtmlHeader ("Temp Title" :: String) relativeCssFilePath body
      in do
             createDirectoryIfMissing True path
             createDirectoryIfMissing True (takeDirectory absCssFilePath)
@@ -80,20 +82,22 @@ exportDocument docCon path =
 -- | Renders WHOLE document structure as HTML pages to zip archive (as 'ByteString')
 renderZip :: Flagged' DocumentContainer -> IO ByteString
 renderZip docCon =
+    -- TODO: Check if errors occured and give back Either
+    --       also check if Label "errors" occured not only parse erros
+    -- TODO: outgoing anchor links on seperate sections do not work
     let relativeHomePath = disjointRelative relativeSectionsDir "index.html"
-        (mainBody, css, sectionBodies) =
+        (mainBody, css, sectionBodies, rawTitle) =
             renderHtmlCssExport relativeHomePath exportReaderState initGlobalState docCon
-        -- TODO: Get real Doc Title
-        mainHtml = addHtmlHeader "Temp Title" relativeCssFilePath mainBody
+        mainHtml = addHtmlHeader rawTitle relativeCssFilePath mainBody
         mainBS = renderBS mainHtml
         stylesheetBS = encodeUtf8 $ render css
         sectionRelativeCssPath = disjointRelative relativeSectionsDir relativeCssFilePath
-        -- TODO get real Section Title
         sectionPathBS =
             map
-                ( bimap
-                    (\tocId -> relativeSectionsDir </> unpack tocId <> ".html")
-                    (renderBS . addHtmlHeader "Section Title" sectionRelativeCssPath)
+                ( \(tocId, title, html) ->
+                    ( relativeSectionsDir </> unpack tocId <> ".html"
+                    , renderBS $ addHtmlHeader title sectionRelativeCssPath html
+                    )
                 )
                 sectionBodies
         files =
