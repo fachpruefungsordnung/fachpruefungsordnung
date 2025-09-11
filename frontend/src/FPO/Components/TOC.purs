@@ -36,7 +36,6 @@ import Data.String.Regex.Flags (noFlags)
 import Data.Time.Duration (Minutes)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
 import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
@@ -366,7 +365,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
     -- isFrom determines whehter the from date or the to date is being updated
     ModifyDateInput isFrom elementID input -> do
-      H.liftEffect $ log input
       state <- H.get
       result <- runParserT input DD.shortDateParser
       let
