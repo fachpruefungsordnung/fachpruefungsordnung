@@ -27,7 +27,8 @@ import Data.Array
   , uncons
   , unsnoc
   )
-import Data.DateTime (DateTime)
+import Data.Date (Date)
+import Data.DateTime (DateTime, date)
 import Data.Either (Either(..))
 import Data.Int (fromString)
 import Data.Maybe (Maybe(..), fromMaybe, maybe)
@@ -37,6 +38,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.Time.Duration (Minutes)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
+import Effect.Console (log)
 import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
@@ -70,6 +72,7 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
+import Parsing (runParserT)
 import Prelude
   ( class Eq
   , Unit
@@ -91,9 +94,11 @@ import Prelude
   , (/=)
   , (<)
   , (<<<)
+  , (<=)
   , (<>)
   , (==)
   , (>)
+  , (>=)
   , (||)
   )
 import Simple.I18n.Translator (label, translate)
@@ -156,10 +161,11 @@ data Action
   | HighlightDropZone Path DragEvent
   | ClearDropZones
   | CompleteDrop Path
-  | UpdateSearchBarInputs Int String String
-  | ClearSearchData Int
+  --| UpdateSearchBarInputs Int String String
+  --| ClearSearchData Int
   | FilterVersions
   | SearchVersions Int
+  | ModifyDateInput Boolean Int String
 
 data EntityKind = Section | Paragraph
 
@@ -168,14 +174,22 @@ data Query a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
 
+{- type SearchData =
+{ elementID :: Int
+, year :: Maybe Int
+, month :: Maybe Int
+, day :: Maybe Int
+, hour :: Maybe Int
+, minute :: Maybe Int
+, second :: Maybe Int
+} -}
+
 type SearchData =
   { elementID :: Int
-  , year :: Maybe Int
-  , month :: Maybe Int
-  , day :: Maybe Int
-  , hour :: Maybe Int
-  , minute :: Maybe Int
-  , second :: Maybe Int
+  , fromDate :: Maybe Date
+  , fromStringDate :: String
+  , toDate :: Maybe Date
+  , toStringDate :: String
   }
 
 type State = FPOState
@@ -323,6 +337,34 @@ tocview = connect (selectEq identity) $ H.mkComponent
           H.modify_ _ { versions = newVersions }
           handleAction FilterVersions
 
+    {-     FilterVersions -> do
+    state <- H.get
+    let
+      tocID = case state.mSelectedTocEntry of
+        Just (SelLeaf id) -> id
+        _ -> -1
+      versionEntry = fromMaybe
+        { elementID: -1
+        , year: Nothing
+        , month: Nothing
+        , day: Nothing
+        , hour: Nothing
+        , minute: Nothing
+        , second: Nothing
+        }
+        (findRootTree (\e -> e.elementID == tocID) state.searchData)
+      filteredVersions =
+        filter
+          ( \v -> maybe true ((==) (DD.docYear v.timestamp)) versionEntry.year
+              && maybe true ((==) (DD.docMonth v.timestamp)) versionEntry.month
+              && maybe true ((==) (DD.docDay v.timestamp)) versionEntry.day
+              && maybe true ((==) (DD.docHour v.timestamp)) versionEntry.hour
+              && maybe true ((==) (DD.docMinute v.timestamp)) versionEntry.minute
+              && maybe true ((==) (DD.docSecond v.timestamp)) versionEntry.second
+          )
+          state.versions
+    H.modify_ _ { filteredVersions = filteredVersions } -}
+
     FilterVersions -> do
       state <- H.get
       let
@@ -331,22 +373,19 @@ tocview = connect (selectEq identity) $ H.mkComponent
           _ -> -1
         versionEntry = fromMaybe
           { elementID: -1
-          , year: Nothing
-          , month: Nothing
-          , day: Nothing
-          , hour: Nothing
-          , minute: Nothing
-          , second: Nothing
+          , fromDate: Nothing
+          , fromStringDate: ""
+          , toDate: Nothing
+          , toStringDate: ""
           }
           (findRootTree (\e -> e.elementID == tocID) state.searchData)
         filteredVersions =
           filter
-            ( \v -> maybe true ((==) (DD.docYear v.timestamp)) versionEntry.year
-                && maybe true ((==) (DD.docMonth v.timestamp)) versionEntry.month
-                && maybe true ((==) (DD.docDay v.timestamp)) versionEntry.day
-                && maybe true ((==) (DD.docHour v.timestamp)) versionEntry.hour
-                && maybe true ((==) (DD.docMinute v.timestamp)) versionEntry.minute
-                && maybe true ((==) (DD.docSecond v.timestamp)) versionEntry.second
+            ( \v ->
+                maybe true ((>=) (date $ DD.docDateToDateTime v.timestamp))
+                  versionEntry.fromDate
+                  && maybe true ((<=) (date $ DD.docDateToDateTime v.timestamp))
+                    versionEntry.toDate
             )
             state.versions
       H.modify_ _ { filteredVersions = filteredVersions }
@@ -366,7 +405,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
             state.filteredTree
       H.modify_ _ { filteredTree = modifyFiltered }
 
-    ClearSearchData elementID -> do
+    {-     ClearSearchData elementID -> do
       state <- H.get
       let
         newSearchData =
@@ -427,7 +466,97 @@ tocview = connect (selectEq identity) $ H.mkComponent
             )
             state.searchData
       -- H.liftEffect $ log (show $ "updated" <> label)
-      H.modify_ _ { searchData = newSearchData }
+      H.modify_ _ { searchData = newSearchData } -}
+
+    {-     ModifyFromInput elementID input -> do
+    state <- H.get
+    result <- runParserT input DD.shortDateParser 
+    let 
+      newData = 
+        case result of
+          Left _ -> Nothing
+          Right date -> Just date
+      newSearchTree = 
+        modifyNodeRootTree
+          (\v -> v.elementID == elementID)
+          ( \v ->
+              { elementID: v.elementID
+              , fromDate: newData
+              , fromStringDate: input
+              , toDate: v.toDate
+              , toStringDate: v.toStringDate
+              }
+          )
+          state.searchData
+    H.modify_ _ { searchData = newSearchTree}
+    pure unit -}
+
+    -- isFrom determines whehter the from date or the to date is being updated
+    ModifyDateInput isFrom elementID input -> do
+      H.liftEffect $ log input
+      state <- H.get
+      result <- runParserT input DD.shortDateParser
+      let
+        newData =
+          case result of
+            Left _ -> Nothing
+            Right date -> Just date
+        newSearchTree =
+          if isFrom then
+            modifyNodeRootTree
+              (\v -> v.elementID == elementID)
+              ( \v ->
+                  { elementID: v.elementID
+                  , fromDate: newData
+                  , fromStringDate: input
+                  , toDate: v.toDate
+                  , toStringDate: v.toStringDate
+                  }
+              )
+              state.searchData
+          else
+            modifyNodeRootTree
+              (\v -> v.elementID == elementID)
+              ( \v ->
+                  { elementID: v.elementID
+                  , fromDate: v.fromDate
+                  , fromStringDate: v.fromStringDate
+                  , toDate: newData
+                  , toStringDate: input
+                  }
+              )
+              state.searchData
+      H.modify_ _ { searchData = newSearchTree }
+      pure unit
+
+    {-     ClearSearchData elementID -> do
+    state <- H.get
+    let
+      newSearchData =
+        modifyNodeRootTree
+          (\v -> v.elementID == elementID)
+          ( \v ->
+              { elementID: v.elementID
+              , fromDate: Nothing
+              , fromStringDate: ""
+              , toDate: Nothing
+              , toStringDate: ""
+              }
+          )
+          state.searchData
+      modifyFiltered =
+        modifyNodeRootTree
+          (\v -> v.elementID == elementID)
+          ( \v ->
+              { elementID: v.elementID
+              , filtered: false
+              }
+          )
+          state.filteredTree
+    H.modify_ _
+      { searchData = newSearchData
+      , filteredTree = modifyFiltered
+      } -}
 
     OpenVersion elementID vID -> do
       H.raise (ModifyVersion elementID vID)
@@ -643,6 +772,50 @@ tocview = connect (selectEq identity) $ H.mkComponent
      . Query a
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
+    {-     ReceiveTOCs entries a -> do
+    state <- H.get
+    H.modify_ _ { tocEntries = entries }
+    let
+      sData = map
+        ( \elem ->
+            case (findRootTree (\s -> s.elementID == elem.id) state.searchData) of
+              Just d -> d
+              Nothing ->
+                { elementID: elem.id
+                , year: Nothing
+                , month: Nothing
+                , day: Nothing
+                , hour: Nothing
+                , minute: Nothing
+                , second: Nothing
+                }
+        )
+        entries
+      filteredTree = map
+        ( \elem ->
+            case (findRootTree (\f -> f.elementID == elem.id) state.filteredTree) of
+              Just f -> f
+              Nothing ->
+                { elementID: elem.id
+                , filtered: false
+                }
+        )
+        entries
+    H.modify_ _
+      { searchData = sData
+      , filteredTree = filteredTree
+      }
+    case state.mSelectedTocEntry of
+      Just (SelLeaf id) ->
+        if state.showHistoryMenu /= [ -1 ] then do
+          now <- liftEffect nowDateTime
+          handleAction $ UpdateVersions now id
+        else do
+          pure unit
+      _ -> do
+        pure unit
+    pure (Just a) -}
+
     ReceiveTOCs entries a -> do
       state <- H.get
       H.modify_ _ { tocEntries = entries }
@@ -653,12 +826,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 Just d -> d
                 Nothing ->
                   { elementID: elem.id
-                  , year: Nothing
-                  , month: Nothing
-                  , day: Nothing
-                  , hour: Nothing
-                  , minute: Nothing
-                  , second: Nothing
+                  , fromDate: Nothing
+                  , fromStringDate: ""
+                  , toDate: Nothing
+                  , toStringDate: ""
                   }
           )
           entries
@@ -1105,43 +1276,97 @@ tocview = connect (selectEq identity) $ H.mkComponent
           ]
 
     searchBarSegment =
-      [ HH.div
-          [ HP.classes [ HB.dFlex, HB.flexColumn ]
-          , HP.style
-              "border-bottom-style: solid; border-color: grey; border-width: 1px;"
-          ]
-          [ HH.div
-              [ HP.classes [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
-              ]
-              [ (searchBar (fromMaybeToStr versionEntry.year) "year")
-              , punctuation "."
-              , (searchBar (fromMaybeToStr versionEntry.month) "month")
-              , punctuation "."
-              , (searchBar (fromMaybeToStr versionEntry.day) "day")
-              ]
-          , HH.div
-              [ HP.classes [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
-              ]
-              [ (searchBar (fromMaybeToStr versionEntry.hour) "hour")
-              , punctuation ":"
-              , (searchBar (fromMaybeToStr versionEntry.minute) "minute")
-              , punctuation ":"
-              , (searchBar (fromMaybeToStr versionEntry.second) "second")
-              ]
-          , HH.div
-              [ HP.classes [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb2 ]
-              ]
-              [ searchBarButton
+      let
+        fromDate =
+          case (findRootTree (\e -> e.elementID == elementID) searchData) of
+            Nothing -> ""
+            Just sd -> sd.fromStringDate
+        toDate =
+          case (findRootTree (\e -> e.elementID == elementID) searchData) of
+            Nothing -> ""
+            Just sd -> sd.toStringDate
+      in
+        [ HH.div
+            [ HP.classes [ HB.dFlex, HB.flexColumn ]
+            , HP.style
+                "border-bottom-style: solid; border-color: grey; border-width: 1px;"
+            ]
+            [ HH.div
+                [ HP.classes
+                    [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
+                ]
+                [ punctuation "from: "
+                , HH.input
+                    [ HP.type_ HP.InputDate
+                    , HP.value fromDate
+                    , HE.onValueInput (ModifyDateInput true elementID)
+                    ]
+                ]
+            , HH.div
+                [ HP.classes
+                    [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
+                ]
+                [ punctuation "to:   "
+                , HH.input
+                    [ HP.type_ HP.InputDate
+                    , HP.value toDate
+                    , HE.onValueInput (ModifyDateInput false elementID)
+                    ]
+                ]
+            , HH.div
+                [ HP.classes
+                    [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb2 ]
+                ]
+                [ {- searchBarButton
                   (ClearSearchData elementID)
                   "bi bi-clipboard2-minus"
                   "clear"
-              , searchBarButton
-                  (SearchVersions elementID)
-                  "bi bi-search"
-                  "search"
-              ]
-          ]
-      ]
+              ,  -} searchBarButton
+                    (SearchVersions elementID)
+                    "bi bi-search"
+                    "search"
+                ]
+            ]
+        ]
+
+    {-     searchBarSegment =
+    [ HH.div
+        [ HP.classes [ HB.dFlex, HB.flexColumn ]
+        , HP.style
+            "border-bottom-style: solid; border-color: grey; border-width: 1px;"
+        ]
+        [ HH.div
+            [ HP.classes [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
+            ]
+            [ (searchBar (fromMaybeToStr versionEntry.year) "year")
+            , punctuation "."
+            , (searchBar (fromMaybeToStr versionEntry.month) "month")
+            , punctuation "."
+            , (searchBar (fromMaybeToStr versionEntry.day) "day")
+            ]
+        , HH.div
+            [ HP.classes [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
+            ]
+            [ (searchBar (fromMaybeToStr versionEntry.hour) "hour")
+            , punctuation ":"
+            , (searchBar (fromMaybeToStr versionEntry.minute) "minute")
+            , punctuation ":"
+            , (searchBar (fromMaybeToStr versionEntry.second) "second")
+            ]
+        , HH.div
+            [ HP.classes [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb2 ]
+            ]
+            [ searchBarButton
+                (ClearSearchData elementID)
+                "bi bi-clipboard2-minus"
+                "clear"
+            , searchBarButton
+                (SearchVersions elementID)
+                "bi bi-search"
+                "search"
+            ]
+        ]
+    ] -}
 
     searchBarButton action biName smallText = HH.button
       [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.w100, HB.px1, HB.py0, HB.m0 ]
@@ -1160,28 +1385,35 @@ tocview = connect (selectEq identity) $ H.mkComponent
         ]
         [ HH.text str ]
 
-    fromMaybeToStr val =
-      maybe
-        ""
-        show
-        val
+    {-     fromMaybeToStr val =
+    maybe
+      ""
+      show
+      val -}
 
-    searchBar saveVar label = addField
-      saveVar
-      (S.take 1 label)
-      HP.InputText
-      (UpdateSearchBarInputs elementID label)
+    {-     searchBar saveVar label = addField
+    saveVar
+    (S.take 1 label)
+    HP.InputText
+    (UpdateSearchBarInputs elementID label) -}
 
-    versionEntry = fromMaybe
-      { elementID: -1
-      , year: Nothing
-      , month: Nothing
-      , day: Nothing
-      , hour: Nothing
-      , minute: Nothing
-      , second: Nothing
-      }
-      (findRootTree (\e -> e.elementID == elementID) searchData)
+    {-     versionEntry = fromMaybe
+    { elementID: -1
+    , date: Nothing
+    , stringDate: ""
+    }
+    (findRootTree (\e -> e.elementID == elementID) searchData) -}
+
+    {-     versionEntry = fromMaybe
+    { elementID: -1
+    , year: Nothing
+    , month: Nothing
+    , day: Nothing
+    , hour: Nothing
+    , minute: Nothing
+    , second: Nothing
+    }
+    (findRootTree (\e -> e.elementID == elementID) searchData) -}
 
     filteredEntry = fromMaybe
       { elementID: -1
