@@ -225,7 +225,7 @@ emptyEntryGen content =
 -- | Creates an empty table entry for padding (`tr`).
 emptyTableRow :: forall w a. Int -> Int -> HH.HTML w a
 emptyTableRow height cols =
-  HH.tr [ HP.classes [ H.ClassName "noHover" ] ]
+  HH.tr [ HP.classes [ H.ClassName "no-hover" ] ]
     [ HH.td
         [ HP.colSpan cols
         , HP.style $ "height: " <> show height <> "px;"
