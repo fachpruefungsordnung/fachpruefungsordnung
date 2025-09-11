@@ -107,23 +107,23 @@ renderHtmlCssWith readerState globalState docContainer =
      in (evalDelayed finalState' delayedHtml, mainStylesheet (enumStyles finalState))
 
 -- | Render a @Flagged' DocumentContainer@ with given states to main HTML, main CSS,
---   and list of exported sections.
+--   and list of exported sections. Fails, if any parse errors occur.
 renderHtmlCssExport
     :: FilePath
     -- ^ Path from exported Sections to main HTML
     -> ReaderState
     -> GlobalState
     -> Flagged' DocumentContainer
-    -> ( Html ()
-       , -- \^ HTML of whole Document
-         Css
-       , -- \^ Main Stylesheet
-         [(Text, Text, Html ())]
-       , -- \^ Exported sections Html with id and title
-         Text
-       )
--- \^ Raw textual title of the main document
-
+    -> Maybe
+        ( Html ()
+        , -- \^ HTML of whole Document
+          Css
+        , -- \^ Main Stylesheet
+          [(Text, Text, Html ())]
+        , -- \^ Exported sections Html with id and title
+          Text
+          -- \^ Raw textual title of the main document
+        )
 renderHtmlCssExport backPath readerState globalState docCon =
     -- \| Render with given footnote context
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docCon) readerState) globalState
@@ -145,7 +145,9 @@ renderHtmlCssExport backPath readerState globalState docCon =
                     )
                 )
                 (exportSections finalState')
-     in (mainHtml, css, sections, rawMainDocTitle)
+     in if hasErrors finalState'
+            then Nothing
+            else Just (mainHtml, css, sections, rawMainDocTitle)
 
 -------------------------------------------------------------------------------
 
@@ -311,6 +313,7 @@ instance ToHtmlM (Parsed DocumentHeading) where
         fallbackTitle <- asks documentFallbackTitle
         (resType, titleHtml) <- case eErrDocumentHeading of
             Left _ -> do
+                setHasErrors
                 failedHeadingTextHtml <- toHtmlM fallbackTitle
                 return (Error, failedHeadingTextHtml)
             Right (DocumentHeading headingTextTree) -> do
@@ -422,6 +425,7 @@ instance ToHtmlM (Node Section) where
             buildHeadingHtml sectionIDHtml mLabelH tocKeyHtml eErrHeading =
                 case eErrHeading of
                     Left parseErr -> do
+                        setHasErrors
                         htmlId <-
                             -- In case of a Heading failure
                             -- we simply display the ID as the title
@@ -517,7 +521,7 @@ instance ToHtmlM SimpleParagraph where
 -------------------------------------------------------------------------------
 
 instance ToHtmlM Table where
-    toHtmlM table =
+    toHtmlM _ =
         returnNow $ htmlError "Tables are not implemented yet :("
 
 -------------------------------------------------------------------------------
@@ -741,6 +745,7 @@ instance (ToHtmlM a) => ToHtmlM (NavTocHeaded (Parsed a)) where
         let titleHtml = toHtml title
          in case eErrA of
                 Left parseError -> do
+                    setHasErrors
                     addPhantomTocEntry (Error titleHtml)
                     returnNow $ parseErrorHtml Nothing parseError
                 Right a -> do
@@ -751,6 +756,7 @@ instance (ToHtmlM a) => ToHtmlM (NavTocHeaded (Parsed a)) where
 instance (ToHtmlM a) => ToHtmlM (SectionFormatted (Parsed a)) where
     toHtmlM (SectionFormatted sectionFormatS eErrA) = case eErrA of
         Left parseErr -> do
+            setHasErrors
             -- \| Count error as @Section@, to keep following
             --    @Section@s correctly numbered
             sectionID <- gets currentSectionID

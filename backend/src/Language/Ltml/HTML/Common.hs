@@ -32,6 +32,7 @@ module Language.Ltml.HTML.Common
     , anchorLink
     , pageLink
     , collectExportSection
+    , setHasErrors
     , Delayed (..)
     , evalDelayed
     , returnNow
@@ -120,6 +121,9 @@ data GlobalState = GlobalState
     -- ^ Styled title of the main Document for building exported sections
     , mainDocumentTitle :: Delayed Text
     -- ^ Raw title of the main Document for building HTML headers
+    , hasErrors :: Bool
+    -- ^ True if any error occured while parsing;
+    --   Note: "soft" errors like undefined labels are not catched
     }
 
 data ReaderState = ReaderState
@@ -191,6 +195,7 @@ initGlobalState =
         , exportSections = []
         , mainDocumentTitleHtml = mempty
         , mainDocumentTitle = mempty
+        , hasErrors = False
         }
 
 initReaderState :: ReaderState
@@ -364,6 +369,10 @@ collectExportSection
 collectExportSection htmlId title sectionHtml =
     modify
         (\s -> s {exportSections = (htmlId, title, sectionHtml) : exportSections s})
+
+-- | Sets the 'hasErrors' flag to @True@
+setHasErrors :: ReaderStateMonad ()
+setHasErrors = modify (\s -> s {hasErrors = True})
 
 -------------------------------------------------------------------------------
 

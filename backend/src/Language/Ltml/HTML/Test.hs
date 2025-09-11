@@ -47,8 +47,10 @@ zipTest = do
     case treeToLtml fpoTree of
         Left _ -> error "parsing failed"
         Right docCon -> do
-            bs <- renderZip docCon
-            writeFile "src/Language/Ltml/HTML/Test/export.zip" bs
+            mBs <- renderZip docCon
+            case mBs of
+                Nothing -> putStrLn "AST has errors! No ZIP"
+                Just bs -> writeFile "src/Language/Ltml/HTML/Test/export.zip" bs
 
 -------------------------------------------------------------------------------
 

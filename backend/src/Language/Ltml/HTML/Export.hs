@@ -78,54 +78,39 @@ exportDocument docCon path =
             writeFile absCssFilePath (toStrict $ render css)
             renderToFile (mainDir </> "index.html") mainHtml
 
--- | Renders WHOLE document structure as HTML pages to zip archive (as 'ByteString')
-renderZip :: Flagged' DocumentContainer -> IO ByteString
+-- | Renders WHOLE document structure as HTML pages to zip archive (as 'ByteString');
+--   Returns @Nothing@, if AST contains any parse errors.
+renderZip :: Flagged' DocumentContainer -> IO (Maybe ByteString)
 renderZip docCon =
-    -- TODO: Check if errors occured and give back Either
-    --       also check if Label "errors" occured not only parse erros
+    -- TODO: check if Label "errors" occured not only parse erros
     -- TODO: outgoing anchor links on seperate sections do not work
     let relativeHomePath = disjointRelative relativeSectionsDir "index.html"
-        (mainBody, css, sectionBodies, rawTitle) =
+        mHtmlCssParts =
             renderHtmlCssExport relativeHomePath exportReaderState initGlobalState docCon
-        mainHtml = addHtmlHeader rawTitle relativeCssFilePath mainBody
-        mainBS = renderBS mainHtml
-        stylesheetBS = encodeUtf8 $ render css
-        sectionRelativeCssPath = disjointRelative relativeSectionsDir relativeCssFilePath
-        sectionPathBS =
-            map
-                ( \(tocId, title, html) ->
-                    ( relativeSectionsDir </> unpack tocId <> ".html"
-                    , renderBS $ addHtmlHeader title sectionRelativeCssPath html
+     in maybe (return Nothing) (fmap Just . buildZip) mHtmlCssParts
+  where
+    buildZip (mainBody, css, sectionBodies, rawTitle) =
+        let
+            mainHtml = addHtmlHeader rawTitle relativeCssFilePath mainBody
+            mainBS = renderBS mainHtml
+            stylesheetBS = encodeUtf8 $ render css
+            sectionRelativeCssPath = disjointRelative relativeSectionsDir relativeCssFilePath
+            sectionPathBS =
+                map
+                    ( \(tocId, title, html) ->
+                        ( relativeSectionsDir </> unpack tocId <> ".html"
+                        , renderBS $ addHtmlHeader title sectionRelativeCssPath html
+                        )
                     )
-                )
-                sectionBodies
-        files =
-            [ ("index.html", mainBS)
-            , (relativeCssFilePath, stylesheetBS)
-            ]
-                ++ sectionPathBS
-     in do
-            currentTime <- round <$> getPOSIXTime
-            let entries = map (\(path, bs) -> toEntry path currentTime bs) files
-                archive = foldr addEntryToArchive emptyArchive entries
-            return $ fromArchive archive
-
-----------------------------------------------------------------------------------------------
-
--- mapState (exportSingleSection absSectionsDir) initGlobalState nodeSections
-
--- | Render section with given initial state and creates .html file
--- in given directory; returns the final state
--- exportSingleSection
---     :: (ToHtmlM a) => FilePath -> GlobalState -> a -> IO GlobalState
--- exportSingleSection path globalState a =
---     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) globalState
---         body = evalDelayed delayedHtml finalState
---         sectionID = show (currentSectionID globalState)
---      in do
---             renderToFile (path </> ("section_" ++ sectionID ++ ".html")) $
---                 addHtmlHeader
---                     ("Einzelansicht § " ++ sectionID)
---                     (".." </> relativeCssFilePath)
---                     body
---             return finalState
+                    sectionBodies
+            files =
+                [ ("index.html", mainBS)
+                , (relativeCssFilePath, stylesheetBS)
+                ]
+                    ++ sectionPathBS
+         in
+            do
+                currentTime <- round <$> getPOSIXTime
+                let entries = map (\(path, bs) -> toEntry path currentTime bs) files
+                    archive = foldr addEntryToArchive emptyArchive entries
+                return $ fromArchive archive
