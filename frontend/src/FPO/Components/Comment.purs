@@ -8,7 +8,6 @@ import Data.Array (elem, find, snoc)
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..), maybe)
-import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request as Request
@@ -451,7 +450,7 @@ commentview = connect selectTranslator $ H.mkComponent
 
     SelectingCommentSection markerID -> do
       if markerID == -360 then do
-        H.modify_ \st -> st
+        H.modify_ _
           { markerID = -360
           , mCommentSection = Nothing
           , newComment = true
@@ -463,16 +462,16 @@ commentview = connect selectTranslator $ H.mkComponent
           case (find (\cs -> cs.markerID == markerID) commentSections) of
             Nothing -> pure unit
             Just section -> do
-              H.modify_ \st -> st
+              H.modify_ _
                 { markerID = markerID
                 , mCommentSection = Just section
                 }
 
     RequestModal mode -> do
-      H.modify_ \st -> st { requestModal = Just mode }
+      H.modify_ _ { requestModal = Just mode }
 
     CancelModal -> do
-      H.modify_ \st -> st { requestModal = Nothing }
+      H.modify_ _ { requestModal = Nothing }
 
   handleQuery
     :: forall slots a
@@ -484,20 +483,18 @@ commentview = connect selectTranslator $ H.mkComponent
       -- load comments, when section was changed
       state <- H.get
       when (state.docID /= docID || tocID /= state.tocID) do
-        recComs <- H.liftAff
-          $ Request.getFromJSONEndpoint CD.decodeCommentSection
-          $ "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
+        recComs <- Request.getCommentSections docID tocID
         let
           commentSections = case recComs of
-            Nothing -> []
-            Just cms -> map sectionDtoToCS $ CD.getCommentSections cms
-        H.modify_ \st -> st
+            Left _ -> []
+            Right cms -> map sectionDtoToCS $ CD.getCommentSections cms
+        H.modify_ _
           { docID = docID
           , tocID = tocID
           , commentSections = commentSections
           }
       -- Always set this
-      H.modify_ \st -> st
+      H.modify_ _
         { markerID = -360
         , mCommentSection = Nothing
         , newComment = true
@@ -517,8 +514,8 @@ commentview = connect selectTranslator $ H.mkComponent
     RequestComments docID tocID a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
-        commentSections <- H.liftAff $ fetchCommentSections docID tocID
-        H.modify_ \st -> st
+        commentSections <- fetchCommentSections docID tocID
+        H.modify_ _
           { docID = docID, tocID = tocID, commentSections = commentSections }
         let cs = map extractFirst commentSections
         H.raise (SendAbstractedComments cs)
@@ -532,8 +529,8 @@ commentview = connect selectTranslator $ H.mkComponent
     SelectedCommentSection docID tocID markerID a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
-        commentSections <- H.liftAff $ fetchCommentSections docID tocID
-        H.modify_ \st -> st
+        commentSections <- fetchCommentSections docID tocID
+        H.modify_ _
           { docID = docID, tocID = tocID, commentSections = commentSections }
         handleAction $ SelectingCommentSection markerID
       else do
@@ -543,8 +540,8 @@ commentview = connect selectTranslator $ H.mkComponent
     Overview docID tocID a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
-        commentSections <- H.liftAff $ fetchCommentSections docID tocID
-        H.modify_ \st -> st
+        commentSections <- fetchCommentSections docID tocID
+        H.modify_ _
           { docID = docID, tocID = tocID, commentSections = commentSections }
         let cs = map extractFirst commentSections
         H.raise (CommentOverview state.tocID cs)
@@ -555,12 +552,19 @@ commentview = connect selectTranslator $ H.mkComponent
         H.raise (CommentOverview state.tocID cs)
       pure (Just a)
 
-  fetchCommentSections :: Int -> Int -> Aff (Array CommentSection)
-  fetchCommentSections docID tocID =
-    (maybe [] (map sectionDtoToCS <<< CD.getCommentSections))
-      <$> Request.getFromJSONEndpoint CD.decodeCommentSection url
-    where
-    url = "/docs/" <> show docID <> "/text/" <> show tocID <> "/comments"
+  -- Retrieves the comment sections for a given document ID and TOC ID. If
+  -- the request fails, an empty array is returned.
+  fetchCommentSections
+    :: forall slots
+     . Int
+    -> Int
+    -> H.HalogenM State Action slots Output m (Array CommentSection)
+  fetchCommentSections docID tocID = do
+    cs <- Request.getCommentSections docID tocID
+    case cs of
+      Left _ -> pure []
+      Right cms ->
+        pure $ map sectionDtoToCS $ CD.getCommentSections cms
 
   updateCommentSection
     :: CommentSection -> Array CommentSection -> Array CommentSection

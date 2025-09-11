@@ -8,15 +8,16 @@ module FPO.Components.UI.UserList where
 
 import Prelude
 
-import Data.Argonaut (decodeJson)
 import Data.Array (filter, length, replicate, slice)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), contains)
 import Data.String as String
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Pagination as P
 import FPO.Components.UI.UserFilter as Filter
-import FPO.Data.Request as R
+import FPO.Data.Navigate (class Navigate)
+import FPO.Data.Request (getUsers)
 import FPO.Data.Store as Store
 import FPO.Dto.UserOverviewDto (UserOverviewDto)
 import FPO.Dto.UserOverviewDto as UserOverviewDto
@@ -122,6 +123,7 @@ component
   :: forall m ba
    . MonadAff m
   => MonadStore Store.Action Store.Store m
+  => Navigate m
   => H.Component Query (Input ba) (Output ba) m
 component = connect selectTranslator $ H.mkComponent
   { initialState
@@ -285,13 +287,13 @@ component = connect selectTranslator $ H.mkComponent
     :: H.HalogenM (State ba) (Action ba) Slots (Output ba) m Unit
   fetchAndLoadUsers = do
     setLoading true
-    maybeUsers <- H.liftAff $ R.getFromJSONEndpoint decodeJson "/users"
+    maybeUsers <- getUsers
     case maybeUsers of
-      Nothing -> do
+      Left _ -> do
         state <- H.get
         H.raise $ Error $ translate (label :: _ "admin_users_failedToLoadUsers")
           state.translator
-      Just users -> do
+      Right users -> do
         H.modify_ _ { users = users, filteredUsers = users }
 
     setLoading false
