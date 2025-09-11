@@ -60,7 +60,6 @@ import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
 import FPO.Data.AppError (AppError(..), printAjaxError)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..))
@@ -222,7 +221,6 @@ handleJsonRequest'
   -> Aff (Either Error (Response Json))
   -> H.HalogenM st act slots msg m (Either AppError a)
 handleJsonRequest' decode url requestAction = do
-  liftEffect $ log url
   result <- handleRequest' url requestAction
   case result of
     Left appError -> pure $ Left appError

@@ -36,6 +36,7 @@ import Data.String.Regex.Flags (noFlags)
 import Data.Time.Duration (Minutes)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
+{- import Effect.Console (log) -}
 import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
@@ -312,6 +313,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       case history of
         Left _ -> pure unit
         Right h -> do
+
           let
             nV = map
               ( \hEntry ->
