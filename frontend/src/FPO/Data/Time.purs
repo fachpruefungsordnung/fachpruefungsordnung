@@ -3,12 +3,16 @@ module FPO.Data.Time
   , getEditTimestamp
   , formatAbsoluteTimeDetailed
   , formatRelativeTime
+  , dateToDatetime
   ) where
 
 import Prelude
 
+{- import Data.Bounded (bottom) -}
 import Data.DateTime
-  ( DateTime
+  ( Date
+  , DateTime(..) 
+  , Time(..)
   , adjust
   , date
   , day
@@ -28,6 +32,8 @@ import FPO.Dto.DocumentDto.DocDate as DocDate
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader)
 import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 
+dateToDatetime :: Date -> DateTime 
+dateToDatetime d = DateTime d (Time bottom bottom bottom bottom)
 -- | Helper function to adjust a DateTime by a duration (subtract from current time)
 adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime
 adjustDateTime duration dt =

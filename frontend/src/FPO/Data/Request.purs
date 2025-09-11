@@ -38,7 +38,8 @@ module FPO.Data.Request
   , putIgnore
   , putJson
   , removeUser
-  ) where
+  )
+  where
 
 import Prelude
 
@@ -54,10 +55,12 @@ import Data.Argonaut.Decode.Decoders (decodeArray)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
+import Data.String (null, drop)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (liftEffect)
+import Effect.Console (log)
 import FPO.Data.AppError (AppError(..), printAjaxError)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..))
@@ -219,6 +222,7 @@ handleJsonRequest'
   -> Aff (Either Error (Response Json))
   -> H.HalogenM st act slots msg m (Either AppError a)
 handleJsonRequest' decode url requestAction = do
+  liftEffect $ log url
   result <- handleRequest' url requestAction
   case result of
     Left appError -> pure $ Left appError
@@ -548,14 +552,36 @@ getTextElemHistory
   => Navigate m
   => DH.DocumentID
   -> TE.TextElementID
-  -> DD.DocDate
+  -> Maybe DD.DocDate
+  -> Maybe DD.DocDate
+  -> Maybe Int
   -> H.HalogenM st act slots msg m (Either AppError TE.FullTextElementHistory)
-getTextElemHistory dID tID date =
+getTextElemHistory dID tID before after limit =
+  let 
+    beforeString = 
+      case before of
+        Nothing -> ""
+        Just dVal -> "&before=" <> DD.toStringFormat dVal
+    afterString = 
+      case after of
+        Nothing -> ""
+        Just dVal -> "&after=" <> DD.toStringFormat dVal
+    limitString = 
+      case limit of
+        Nothing -> ""
+        Just l -> "&limit=" <> show l
+    conc = beforeString <> afterString <> limitString
+    queryData = 
+      if null conc then 
+        ""
+      else 
+        "?" <> (drop 1 conc)
+  in
   getJson
     decodeJson
-    ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history?before="
-        <> DD.toStringFormat date
+    ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history" <> queryData
     )
+
 
 getUserDocuments
   :: forall st act slots msg m
