@@ -20,7 +20,7 @@ module FPO.Data.Request
   , getIgnore
   , getJson
   , getString
-  , getTextElemHistoryAll
+  , getTextElemHistory
   , getUser
   , getUserDocuments
   , getUserGroups
@@ -525,7 +525,7 @@ getDocumentsQueryFromURL
   -> H.HalogenM st act slots msg m (Either AppError DQ.DocumentQuery)
 getDocumentsQueryFromURL url = getJson decodeJson url
 
-getTextElemHistoryAll
+{- getTextElemHistoryAll
   :: forall st act slots msg m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
@@ -535,6 +535,22 @@ getTextElemHistoryAll
   -> DD.DocDate
   -> H.HalogenM st act slots msg m (Either AppError TE.FullTextElementHistory)
 getTextElemHistoryAll dID tID date =
+  getJson
+    decodeJson
+    ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history?before="
+        <> DD.toStringFormat date
+    ) -}
+
+getTextElemHistory
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => DH.DocumentID
+  -> TE.TextElementID
+  -> DD.DocDate
+  -> H.HalogenM st act slots msg m (Either AppError TE.FullTextElementHistory)
+getTextElemHistory dID tID date =
   getJson
     decodeJson
     ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history?before="

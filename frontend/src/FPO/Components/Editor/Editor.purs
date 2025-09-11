@@ -386,7 +386,7 @@ editor = connect selectTranslator $ H.mkComponent
                 -- toolbar
                 [ HP.classes [ HB.dFlex, HB.justifyContentCenter ]
                 , HP.style
-                    "border-top-style: solid; border-bottom-style: solid; border-color: blue; border-width: 1px;"
+                    "border-top-style: solid; border-bottom-style: solid; border-color: blue; border-width: 1px; background-color:rgba(255, 238, 164, 1);"
                 ]
                 if (not state.showButtons) then
                   -- keep the toolbar even though there is not space, so that the screen doesnt pop higher

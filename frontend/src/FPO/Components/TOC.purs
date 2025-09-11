@@ -39,7 +39,7 @@ import Effect.Class (liftEffect)
 import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
-import FPO.Data.Request (getDocumentHeader, getTextElemHistoryAll, postJson)
+import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postJson)
 import FPO.Data.Store as Store
 import FPO.Data.Time (formatAbsoluteTimeDetailed, formatRelativeTime)
 import FPO.Dto.DocumentDto.DocDate as DD
@@ -295,7 +295,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -- the newest version requested in this action is assumed to be the newest version in general
     UpdateVersions ts elementID -> do
       s <- H.get
-      history <- getTextElemHistoryAll s.docID elementID (DD.DocDate ts)
+      history <- getTextElemHistory s.docID elementID (DD.DocDate ts)
       case history of
         Left _ -> pure unit
         Right h -> do
