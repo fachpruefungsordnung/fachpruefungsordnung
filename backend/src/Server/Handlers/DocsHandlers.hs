@@ -218,6 +218,7 @@ type GetTextHistory =
         :> "text"
         :> Capture "textElementID" TextElementID
         :> "history"
+        :> QueryParam "after" UTCTime
         :> QueryParam "before" UTCTime
         :> QueryParam "limit" Docs.Limit
         :> Get '[JSON] TextRevisionHistory
@@ -485,15 +486,17 @@ getTextHistoryHandler
     -> DocumentID
     -> TextElementID
     -> Maybe UTCTime
+    -> Maybe UTCTime
     -> Maybe Docs.Limit
     -> Handler TextRevisionHistory
-getTextHistoryHandler auth docID textID before limit = do
+getTextHistoryHandler auth docID textID after before limit = do
     userID <- getUser auth
     withDB $
         run $
             Docs.getTextHistory
                 userID
                 (TextElementRef docID textID)
+                after
                 before
                 limit
 
