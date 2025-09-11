@@ -158,9 +158,13 @@ getTree rootHash = do
             (TreeEdgeToNode hash header) -> fromHeader hash header <&> Tree.Tree
 
 getTextRevisionHistory
-    :: TextElementRef -> Maybe UTCTime -> Int64 -> Session TextRevisionHistory
-getTextRevisionHistory ref before limit =
-    statement (ref, before, limit) Statements.getTextRevisionHistory
+    :: TextElementRef
+    -> Maybe UTCTime
+    -> Maybe UTCTime
+    -> Int64
+    -> Session TextRevisionHistory
+getTextRevisionHistory ref after before limit =
+    statement (ref, after, before, limit) Statements.getTextRevisionHistory
         <&> TextRevisionHistory ref . Vector.toList
 
 getTreeRevisionHistory

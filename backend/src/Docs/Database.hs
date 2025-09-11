@@ -109,7 +109,11 @@ class
 
 class (HasCheckPermission m, HasExistsTextElement m) => HasGetTextHistory m where
     getTextHistory
-        :: TextElementRef -> Maybe UTCTime -> Int64 -> m TextRevisionHistory
+        :: TextElementRef
+        -> Maybe UTCTime
+        -> Maybe UTCTime
+        -> Int64
+        -> m TextRevisionHistory
 
 class (HasCheckPermission m, HasExistsDocument m) => HasGetTreeHistory m where
     getTreeHistory :: DocumentID -> Maybe UTCTime -> Int64 -> m TreeRevisionHistory
