@@ -22,7 +22,7 @@ import Clay (Css)
 import Control.Monad (join, zipWithM)
 import Control.Monad.Reader
 import Control.Monad.State
-import Data.Bifunctor (bimap, second)
+import Data.Bifunctor (bimap)
 import Data.DList (toList)
 import Data.Either (rights)
 import qualified Data.Map as Map
@@ -269,13 +269,15 @@ instance ToHtmlM Document where
                 -- \| If current Document has a local ToC its Sections
                 --   should NOT appear in global ToC, thats why we save the current global ToC
                 hasGlobalToc <- asks hasGlobalToC
-                (tocHtml, documentPartsHtml) <-
+                (tocHtml, introHtml, mainHtml, outroHtml) <-
                     if hasGlobalToc
                         then do
                             -- \| Render ToC but as a Later to use the final GlobalState
                             delayedTocHtml <- renderDelayedToc mTocFormat
-                            docPartsHtml <- renderDocParts
-                            return (delayedTocHtml, docPartsHtml)
+                            introHtml <- toHtmlM introSSections
+                            mainHtml <- toHtmlM sectionBody
+                            outroHtml <- toHtmlM outroSSections
+                            return (delayedTocHtml, introHtml, mainHtml, outroHtml)
                         else
                             -- \| Reset ToC temporarily to build a local ToC, then write back the global ToC
                             withModified
@@ -283,26 +285,23 @@ instance ToHtmlM Document where
                                 (\s a -> s {tableOfContents = a})
                                 (tableOfContents initGlobalState)
                                 $ do
-                                    docPartsHtml <- renderDocParts
+                                    introHtml <- toHtmlM introSSections
+                                    mainHtml <- toHtmlM sectionBody
+                                    outroHtml <- toHtmlM outroSSections
                                     -- \| Render ToC last so local ToC has all Headings set,
                                     --    since the local ToC uses the current State
                                     localTocHtml <- renderLocalToc mTocFormat
-                                    return (localTocHtml, docPartsHtml)
+                                    return (localTocHtml, introHtml, mainHtml, outroHtml)
 
                 -- \| Render DocumentHeading / ToC only if renderFlag was set by parent
                 return $
                     div_
-                        <$> ( (if renderToC then tocHtml else mempty)
-                                <> (if renderDoc then titleHtml else mempty)
-                                <> documentPartsHtml
+                        <$> ( (if renderDoc then titleHtml else mempty)
+                                <> introHtml
+                                <> (if renderToC then tocHtml else mempty)
+                                <> mainHtml
+                                <> outroHtml
                             )
-          where
-            renderDocParts = do
-                introHtml <- toHtmlM introSSections
-                mainHtml <- toHtmlM sectionBody
-                outroHtml <- toHtmlM outroSSections
-
-                return $ introHtml <> mainHtml <> outroHtml
 
 -- | Does not only produce the default error box on error,
 --   but also handles ToC entries.

@@ -4,7 +4,6 @@ module Language.Ltml.HTML.Export (exportDocument, renderZip) where
 
 import Clay (render)
 import Codec.Archive.Zip
-import Data.Bifunctor (bimap)
 import Data.ByteString.Lazy (ByteString)
 import Data.Text (pack, unpack)
 import Data.Text.IO (writeFile)
