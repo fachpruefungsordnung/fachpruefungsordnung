@@ -868,8 +868,6 @@ splitview = connect selectTranslator $ H.mkComponent
         ( ModifyVersionMapping elementID Nothing
             (Just (Just { tocEntry: tocEntry, revID: vID, title: title }))
         )
-      {-       H.modify_ _
-      { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } } -}
       H.tell _editor 1
         (Editor.ChangeSection tocEntry vID)
 
@@ -1026,7 +1024,11 @@ splitview = connect selectTranslator $ H.mkComponent
     HandleTOC output -> case output of
 
       TOC.ModifyVersion elementID mVID -> do
+        state <- H.get
         handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
+        case (findTOCEntry elementID state.tocEntries) of
+          Nothing -> pure unit
+          Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
 
       TOC.CompareTo elementID vID -> do
         handleAction (SetComparison elementID vID)

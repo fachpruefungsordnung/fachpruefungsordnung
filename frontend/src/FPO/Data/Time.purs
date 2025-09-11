@@ -54,7 +54,7 @@ formatAbsoluteTimeDetailed offset dateTime =
     min = padZero $ fromEnum $ minute t'
     s = padZero $ fromEnum $ second t'
   in
-    y <> "." <> m <> "." <> d <> " " <> h <> ":" <> min <> ":" <> s
+    d <> "." <> m <> "." <> y <> " " <> h <> ":" <> min <> ":" <> s
 
 -- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
 formatRelativeTime :: Maybe DateTime -> DateTime -> String
