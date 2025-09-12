@@ -53,7 +53,7 @@ import Language.Ltml.Tree (FlaggedInputTree', InputTree', Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
     ( FootnoteTreeParser
     , TreeParser
-    , disjFlaggedTreePF
+    , disjNFlaggedTreePF
     , flaggedTreePF
     , leafFootnoteParser
     , leafParser
@@ -145,10 +145,10 @@ introExtroTP' _ nth t (Leaf x) =
 introExtroTP' ename _ _ _ = fail $ "Document " ++ ename ++ " is not leaf"
 
 mainTP
-    :: Disjunction DocumentMainBodyType
+    :: Disjunction (NamedType DocumentMainBodyType)
     -> FlaggedInputTree'
     -> FootnoteTreeParser (Flagged' (NavTocHeaded (Parsed DocumentMainBody)))
-mainTP = disjFlaggedTreePF aux
+mainTP = disjNFlaggedTreePF aux
   where
     aux
         :: DocumentMainBodyType
