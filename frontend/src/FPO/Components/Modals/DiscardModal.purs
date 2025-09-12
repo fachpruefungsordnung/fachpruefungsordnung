@@ -2,7 +2,6 @@ module FPO.Components.Modals.DiscardModal where
 
 import Prelude
 
-import Data.Array (singleton)
 import FPO.Translations.Labels (Labels)
 import FPO.UI.HTML (addModal)
 import Halogen.HTML as HH
