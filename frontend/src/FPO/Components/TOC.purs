@@ -16,7 +16,6 @@ import Data.Array
   ( concat
   , cons
   , drop
-  , filter
   , head
   , last
   , length
@@ -28,12 +27,12 @@ import Data.Array
   , unsnoc
   )
 import Data.Date (Date)
-import Data.DateTime (DateTime, date)
+import Data.DateTime (DateTime, adjust)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe, maybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.Regex (regex, replace)
 import Data.String.Regex.Flags (noFlags)
-import Data.Time.Duration (Minutes)
+import Data.Time.Duration (Minutes, Days(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 {- import Effect.Console (log) -}
@@ -42,7 +41,7 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postJson)
 import FPO.Data.Store as Store
-import FPO.Data.Time (formatAbsoluteTimeDetailed, formatRelativeTime, dateToDatetime)
+import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed, formatRelativeTime)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
@@ -91,11 +90,9 @@ import Prelude
   , (/=)
   , (<)
   , (<<<)
-  , (<=)
   , (<>)
   , (==)
   , (>)
-  , (>=)
   , (||)
   )
 import Simple.I18n.Translator (label, translate)
@@ -198,6 +195,7 @@ type State = FPOState
   , requestDelete :: Maybe EntityToDelete
   , searchData :: RootTree SearchData
   , timezoneOffset :: Maybe Minutes
+  , upToDateVersion :: Maybe Version
   )
 
 type Filtered = { elementID :: Int, filtered :: Boolean }
@@ -226,6 +224,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       , searchData: Empty
       , filteredTree: Empty
       , timezoneOffset: Nothing
+      , upToDateVersion: Nothing
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -307,13 +306,15 @@ tocview = connect (selectEq identity) $ H.mkComponent
         before = 
           case mBefore of
             Nothing -> Nothing
-            Just val -> Just (DD.DocDate $ dateToDatetime val)
+            -- dateToDateTime assumed a time of 0:00, so we shift by 1 day to include the entire day.
+            {- Just val -> Just (DD.DocDate $ adjustDateTime (dateToDatetime val)) -}
+            Just val -> Just (DD.DocDate $ fromMaybe (dateToDatetime val) $ adjust (Days 1.0) (dateToDatetime val))
       s <- H.get
-      history <- getTextElemHistory s.docID elementID after before Nothing
+      history <- getTextElemHistory s.docID elementID before after Nothing
+      -- if this is nothing something went wrong as every element should have a hsitory
       case history of
         Left _ -> pure unit
         Right h -> do
-
           let
             nV = map
               ( \hEntry ->
@@ -323,23 +324,65 @@ tocview = connect (selectEq identity) $ H.mkComponent
                   }
               )
               (TE.getTEHsFromFTEH h)
+
+        {- we want to detect which version is the up to date one as soon as we can. If we set before to something
+          we can't be sure which one is the up to date one (at least until we try something like saving) as such
+          we send a second request, this time only asking for the newest version. While this causes 2 requests,
+          it helps against potentially unreasonably large requests down the road -}
+          upToDate <- case before of
+            Just _ -> do
+              temp <- getTextElemHistory s.docID elementID Nothing Nothing (Just 1)
+              case temp of
+                Left _ -> 
+                  pure              
+                    { identifier: Nothing
+                    , timestamp: DD.genericDocDate
+                    , author: DH.U { identifier: "", name: "" }
+                    }
+                Right e -> 
+                  case head (TE.getTEHsFromFTEH e) of 
+                    Nothing -> 
+                      pure              
+                        { identifier: Nothing
+                        , timestamp: DD.genericDocDate
+                        , author: DH.U { identifier: "", name: "" }
+                        }
+                    Just val -> 
+                      pure 
+                        { identifier: Just (TE.getHistoryElementID val)
+                        , timestamp: TE.getHistoryElementTimestamp val
+                        , author: TE.getHistoryElementAuthor val
+                        }
+
+            Nothing -> case head nV of
+              Just entry -> pure entry
+              Nothing -> 
+                pure                
+                  { identifier: Nothing
+                  , timestamp: DD.genericDocDate
+                  , author: DH.U { identifier: "", name: "" }
+                  }
+          let 
             -- used to correctly identify which one is the newest version
+            -- Nothing signifies that it's the newest version
             -- neither of the Nothing cases should ever occur
             newVersions = case head nV of
-              Just entry -> case tail nV of
-                Just entries -> cons
-                  { identifier: Nothing
-                  , timestamp: entry.timestamp
-                  , author: entry.author
-                  }
-                  entries
-                Nothing -> nV
+              Just entry -> 
+                if upToDate /= entry then 
+                  nV
+                else
+                  case tail nV of
+                  Just entries -> cons
+                    { identifier: Nothing
+                    , timestamp: entry.timestamp
+                    , author: entry.author
+                    }
+                    entries
+                  Nothing -> nV
               Nothing -> nV
-          H.modify_ _ { filteredVersions = nV }
-          case before of 
-            Nothing -> 
-              H.modify_ _ { versions = newVersions }
-            Just _ -> pure unit
+
+          H.modify_ _ { versions = newVersions
+                      , upToDateVersion = Just upToDate }
 {-           handleAction FilterVersions -}
 
 {-     FilterVersions -> do
@@ -876,7 +919,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     ]
                     [ HH.text $ prettyTitle title ]
                 , renderParagraphButtonInterface historyPath path
-                    state.filteredVersions
+                    state.versions
                     state.showHistorySubmenu
                     now
                     title

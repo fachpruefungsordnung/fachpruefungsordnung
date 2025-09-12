@@ -31,12 +31,9 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (LoadState(..), fromLoading, getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Data.Time
-  ( formatRelativeTime
-  , getEditTimestamp
-  )
+import FPO.Data.Time  ( formatRelativeTime )
 import FPO.Dto.DocumentDto.DocDate as DocDate
-import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader, DocumentID)
+import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader, DocumentID, getEditTimestamp)
 import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)

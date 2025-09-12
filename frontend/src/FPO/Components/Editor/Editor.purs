@@ -66,6 +66,7 @@ import FPO.Components.Editor.Types
   , updateMarkers
   )
 import FPO.Components.Modals.InfoModal (infoModal)
+import FPO.Components.Modals.DiscardModal (discardModal)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
@@ -176,6 +177,7 @@ type State = FPOState
   , compareToElement :: ElementData
   , isEditorOutdated :: Boolean
   , outdatedInfoPopup :: Boolean
+  , discardPopup :: Boolean
   )
 
 type Input = { docID :: DocumentID, elementData :: ElementData }
@@ -226,6 +228,8 @@ data Action
   | Finalize
   | Resize
   | Discard
+  | CancelDiscardAction
+  | ConfirmDiscardAction
 
 -- We use a query to get the content of the editor
 data Query a
@@ -268,7 +272,8 @@ editor = connect selectTranslator $ H.mkComponent
       , HP.style "min-height: 0;"
       ] $
       [ renderAll state ] <>
-        renderInfoModal
+        renderInfoModal <> 
+        renderDiscardModal
     where
     renderInfoModal = case state.outdatedInfoPopup of
       false -> []
@@ -276,6 +281,15 @@ editor = connect selectTranslator $ H.mkComponent
         [ infoModal
             state.translator
             ToggleOutdatedInfoPopup
+        ]
+    renderDiscardModal = case state.discardPopup of 
+      false -> []
+      true -> 
+        [ discardModal
+            state.translator
+            CancelDiscardAction
+            ConfirmDiscardAction
+
         ]
 
   renderAll :: State -> H.ComponentHTML Action () m
@@ -301,23 +315,35 @@ editor = connect selectTranslator $ H.mkComponent
           else
             [ HH.div
                 [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
-                [ makeEditorToolbarButton
-                    true
-                    (translate (label :: _ "editor_textBold") state.translator)
-                    (Font makeBold)
-                    "bi-type-bold"
-                , makeEditorToolbarButton
-                    true
-                    (translate (label :: _ "editor_textItalic") state.translator)
-                    (Font makeItalic)
-                    "bi-type-italic"
-                , makeEditorToolbarButton
-                    true
-                    (translate (label :: _ "editor_textUnderline") state.translator)
-                    (Font underscore)
-                    "bi-type-underline"
+                [ case state.compareToElement of
+                    Just _ -> HH.text ""
+                    Nothing -> 
+                      makeEditorToolbarButton
+                        true
+                        (translate (label :: _ "editor_textBold") state.translator)
+                        (Font makeBold)
+                        "bi-type-bold"
+                , case state.compareToElement of
+                    Just _ -> HH.text ""
+                    Nothing -> 
+                      makeEditorToolbarButton
+                        true
+                        (translate (label :: _ "editor_textItalic") state.translator)
+                        (Font makeItalic)
+                        "bi-type-italic"
+                , case state.compareToElement of
+                    Just _ -> HH.text ""
+                    Nothing -> 
+                      makeEditorToolbarButton
+                        true
+                        (translate (label :: _ "editor_textUnderline") state.translator)
+                        (Font underscore)
+                        "bi-type-underline"
 
-                , buttonDivisor
+                , case state.compareToElement of
+                    Just _ -> HH.text ""
+                    Nothing -> 
+                      buttonDivisor 
                 , makeEditorToolbarButton
                     true
                     (translate (label :: _ "editor_fontSizeUp") state.translator)
@@ -329,55 +355,73 @@ editor = connect selectTranslator $ H.mkComponent
                     (FontSize (\x -> x - 2))
                     "bi-dash-square"
 
-                , buttonDivisor
-                , makeEditorToolbarButton
-                    true
-                    (translate (label :: _ "editor_undo") state.translator)
-                    (History HUndo)
-                    "bi-arrow-counterclockwise"
-                , makeEditorToolbarButton
-                    true
-                    (translate (label :: _ "editor_redo") state.translator)
-                    (History HRedo)
-                    "bi-arrow-clockwise"
+                , case state.compareToElement of
+                    Just _ -> HH.text ""
+                    Nothing -> 
+                      buttonDivisor
+                , case state.compareToElement of
+                    Just _ -> HH.text ""
+                    Nothing -> 
+                      makeEditorToolbarButton
+                        true
+                        (translate (label :: _ "editor_undo") state.translator)
+                        (History HUndo)
+                        "bi-arrow-counterclockwise"
+                , case state.compareToElement of
+                    Just _ -> HH.text ""
+                    Nothing -> 
+                      makeEditorToolbarButton
+                        true
+                        (translate (label :: _ "editor_redo") state.translator)
+                        (History HRedo)
+                        "bi-arrow-clockwise"
 
-                , buttonDivisor
-                , makeEditorToolbarButton
-                    fullFeatures
-                    (translate (label :: _ "editor_comment") state.translator)
-                    Comment
-                    "bi-chat-square-text"
+                , case state.compareToElement of
+                    Just _ -> HH.text ""
+                    Nothing -> 
+                      buttonDivisor
+                , case state.compareToElement of
+                    Just _ -> HH.text ""
+                    Nothing -> 
+                      makeEditorToolbarButton
+                        fullFeatures
+                        (translate (label :: _ "editor_comment") state.translator)
+                        Comment
+                        "bi-chat-square-text"
 
                 ]
-            , HH.div
-                [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ]
-                , HP.style "min-width: 0;"
-                ]
-                [ makeEditorToolbarButtonWithText
-                    true
-                    state.showButtonText
-                    (Save false)
-                    "bi-floppy"
-                    (translate (label :: _ "editor_save") state.translator)
-                , makeEditorToolbarButtonWithText
-                    true
-                    state.showButtonText
-                    (Render RenderHTML)
-                    "bi-file-richtext"
-                    (translate (label :: _ "editor_preview") state.translator)
-                , makeEditorToolbarButtonWithText
-                    true
-                    state.showButtonText
-                    (Render RenderPDF)
-                    "bi-filetype-pdf"
-                    (translate (label :: _ "editor_pdf") state.translator)
-                , makeEditorToolbarButtonWithText
-                    fullFeatures
-                    state.showButtonText
-                    ShowAllComments
-                    "bi-chat-square"
-                    (translate (label :: _ "editor_allComments") state.translator)
-                ]
+            , case state.compareToElement of
+                Just _ -> HH.text ""
+                Nothing -> 
+                  HH.div
+                    [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ]
+                    , HP.style "min-width: 0;"
+                    ]
+                    [ makeEditorToolbarButtonWithText
+                        true
+                        state.showButtonText
+                        (Save false)
+                        "bi-floppy"
+                        (translate (label :: _ "editor_save") state.translator)
+                    , makeEditorToolbarButtonWithText
+                        true
+                        state.showButtonText
+                        (Render RenderHTML)
+                        "bi-file-richtext"
+                        (translate (label :: _ "editor_preview") state.translator)
+                    , makeEditorToolbarButtonWithText
+                        true
+                        state.showButtonText
+                        (Render RenderPDF)
+                        "bi-filetype-pdf"
+                        (translate (label :: _ "editor_pdf") state.translator)
+                    , makeEditorToolbarButtonWithText
+                        fullFeatures
+                        state.showButtonText
+                        ShowAllComments
+                        "bi-chat-square"
+                        (translate (label :: _ "editor_allComments") state.translator)
+                    ]
             ]
       , case state.compareToElement of
           Nothing ->
@@ -441,7 +485,7 @@ editor = connect selectTranslator $ H.mkComponent
                 ]
               else
                 [ HH.div
-                    [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+                    [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ]]
                     [ HH.text
                         (translate (label :: _ "editor_readonly") state.translator)
                     ]
@@ -629,6 +673,14 @@ editor = connect selectTranslator $ H.mkComponent
           Nothing -> pure unit
           Just e ->
             _resize e
+    
+    CancelDiscardAction -> do
+      H.modify_ _ { discardPopup = false}
+
+    
+    ConfirmDiscardAction -> do
+      H.modify_ _ { discardPopup = false}
+      H.raise RaiseDiscard
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -667,7 +719,7 @@ editor = connect selectTranslator $ H.mkComponent
             Editor.focus ed
 
     Discard ->
-      H.raise RaiseDiscard
+      H.modify_ _{ discardPopup = true}
 
     Render renderType -> do
       allLines <- H.gets _.mEditor >>= traverse \ed -> do
@@ -1642,6 +1694,7 @@ initialState { context, input } =
   , compareToElement: input.elementData
   , isEditorOutdated: false
   , outdatedInfoPopup: false
+  , discardPopup: false
   }
 
 makeEditorToolbarButton

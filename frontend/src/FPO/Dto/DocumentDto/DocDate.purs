@@ -1,3 +1,6 @@
+-- purescript does noe like defining instances for types outside of the file defining either the type or the class.
+-- as such, a new type DocDate wrapping DateTime is designed here in order to define an instance for DecodeJson.
+-- Other functions for this newtype are also here.
 module FPO.Dto.DocumentDto.DocDate where
 
 import Prelude
@@ -24,10 +27,16 @@ import Data.String.CodePoints (length)
 import Data.String.Utils (repeat)
 import Data.Time (Time(..))
 import Data.Tuple (fst)
+import FPO.Data.Time (genericDatetime)
 import Parsing (ParserT, fail, runParserT)
 import Parsing.String (anyTill, char, rest)
 
 newtype DocDate = DocDate DateTime
+
+-- for cases that need to be handled even though one case cannot happen. This Data is a placeholder that can be used in 
+-- such places
+genericDocDate :: DocDate 
+genericDocDate = DocDate genericDatetime
 
 -- Date format example: "2025-08-14T17:24:55.895359Z"
 toStringFormat :: DocDate -> String
