@@ -341,7 +341,10 @@ instance ToHtmlM (Parsed DocumentHeading) where
         return $
             either
                 (Now . parseErrorHtml (Just htmlId))
-                (const $ h1_ [cssClass_ Class.DocumentTitle, id_ htmlId] <$> formattedTitle)
+                ( const $
+                    h1_ [cssClass_ Class.DocumentTitle, cssClass_ Class.Anchor, id_ htmlId]
+                        <$> formattedTitle
+                )
                 eErrDocumentHeading
       where
         -- \| Main Document Heading without Id and without Label
@@ -449,7 +452,7 @@ instance ToHtmlM (Node Section) where
                         let rawTitleText = headingText title
                         htmlId <- createTocEntryH (Just tocKeyHtml) (Success titleHtml)
                         return
-                            ( h2_ [cssClass_ Class.Heading, id_ htmlId]
+                            ( h2_ [cssClass_ Class.Heading, cssClass_ Class.Anchor, id_ htmlId]
                                 . headingFormatId headingFormatS sectionIDHtml
                                 <$> titleHtml
                             , htmlId
@@ -495,7 +498,7 @@ instance ToHtmlM (Node Paragraph) where
                 modify (\s -> s {currentSentenceID = 0})
                 readerState <- ask
                 return $
-                    div_ [cssClass_ Class.Paragraph, mId_ mLabel]
+                    div_ [cssClass_ Class.Paragraph, cssClass_ Class.Anchor, mId_ mLabel]
                         -- \| If this is the only paragraph inside this section we drop the visible paragraphID
                         <$> let idHtml = if isSingleParagraph readerState then mempty else paragraphKeyHtml
                              in return (div_ <#> Class.ParagraphID $ idHtml) <> div_ <#> Class.TextContainer
@@ -574,7 +577,7 @@ instance ToHtmlM SentenceStart where
         addMaybeLabelToState mLabel (toHtml $ show (currentSentenceID globalState))
         case mLabel of
             Nothing -> returnNow mempty
-            Just label -> returnNow $ span_ [id_ (unLabel label)] mempty
+            Just label -> returnNow $ span_ [cssClass_ Class.Anchor, id_ (unLabel label)] mempty
 
 instance ToHtmlM Enumeration where
     toHtmlM (Enumeration enumFormatS@(EnumFormat (EnumItemFormat idFormat _)) enumItems) = do
@@ -605,7 +608,8 @@ instance ToHtmlM (Node EnumItem) where
         -- \| Increment enumItemID for next enumItem
         modify (\s -> s {currentEnumItemID = enumItemID + 1})
         return $
-            div_ [cssClass_ Class.TextContainer, mId_ mLabel] <$> enumItemHtml
+            div_ [cssClass_ Class.TextContainer, cssClass_ Class.Anchor, mId_ mLabel]
+                <$> enumItemHtml
 
 instance ToHtmlM FootnoteReference where
     toHtmlM (FootnoteReference label) = do
@@ -686,7 +690,7 @@ instance ToHtmlM FootnoteSet where
                 Just (_, idHtml, delayedTextHtml) ->
                     -- \| <div> <sup>id</sup> <span>text</span> </div>
                     return
-                        ( ( div_ [cssClass_ Class.Footnote, id_ (unLabel label)]
+                        ( ( div_ [cssClass_ Class.Footnote, cssClass_ Class.Anchor, id_ (unLabel label)]
                                 <$> ((sup_ <#> Class.FootnoteID) idHtml <>)
                           )
                             . span_
@@ -722,7 +726,8 @@ instance ToHtmlM AppendixSection where
                     $ zipWithM zipFunc [1 ..] nodeDocuments
             -- \| Wrap all appendix documents into one <div>
             return $
-                div_ [cssClass_ Class.AppendixSection, id_ htmlId] <$> mconcat documentHtmls
+                div_ [cssClass_ Class.AppendixSection, cssClass_ Class.Anchor, id_ htmlId]
+                    <$> mconcat documentHtmls
 
 -------------------------------------------------------------------------------
 
@@ -914,6 +919,6 @@ htmlError msg = span_ <#> Class.InlineError $ toHtml ("Error: " <> msg :: Text)
 parseErrorHtml :: Maybe Text -> ParseErrorBundle Text Void -> Html ()
 parseErrorHtml mHtmlId errBundle = do
     div_ <#> Class.CenteredBox $
-        div_ [cssClass_ Class.ErrorBox, mTextId_ mHtmlId] $ do
+        div_ [cssClass_ Class.ErrorBox, cssClass_ Class.Anchor, mTextId_ mHtmlId] $ do
             h1_ <#> Class.DocumentTitle $ "Parsing failed!"
             pre_ $ code_ <#> Class.LargeFontSize $ toHtml $ errorBundlePretty errBundle

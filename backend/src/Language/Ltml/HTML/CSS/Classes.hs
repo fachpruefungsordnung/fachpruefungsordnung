@@ -80,6 +80,8 @@ data Class
       ButtonLink
     | -- | Link with some extra vertical spacing
       ExportLink
+    | -- | Class for elements that have HTML anchors (adds scroll-margin)
+      Anchor
     | -- | Wrapper around ToC, which places the Table on the page
       TocContainer
     | -- | Class for <table> element of ToC
@@ -113,7 +115,6 @@ classStyle DocumentTitle =
         marginTop (em 0)
         marginBottom (em 0)
         fontSize (em 1.5)
-        scrollMarginTop (em 2)
 classStyle SuperSection =
     toClassSelector SuperSection ? do
         display flex
@@ -133,7 +134,6 @@ classStyle Heading =
         marginTop (em 0)
         marginBottom (em 0)
         fontSize (em 1)
-        scrollMarginTop (em 2)
 classStyle Paragraph =
     toClassSelector Paragraph ? do
         display flex
@@ -248,6 +248,9 @@ classStyle ExportLink =
     toClassSelector ExportLink ? do
         marginTop (em 1)
         marginBottom (em 2)
+classStyle Anchor =
+    toClassSelector Anchor ? do
+        scrollMarginTop (em 2)
 classStyle TocContainer = do
     toClassSelector TocContainer ? do
         display flex
