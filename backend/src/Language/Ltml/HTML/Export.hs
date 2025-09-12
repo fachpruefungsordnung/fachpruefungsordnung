@@ -57,6 +57,13 @@ exportReaderState =
         , tocButtonWrapperFunc = pageLink (pack relativeSectionsDir)
         }
 
+exportSectionReaderState :: ReaderState
+exportSectionReaderState =
+    exportReaderState
+        { labelWrapperFunc =
+            mainPageAnchorLink (pack $ disjointRelative relativeSectionsDir "index.html")
+        }
+
 -------------------------------------------------------------------------------
 
 -- TODO: Maybe for instantly self hosting
@@ -83,10 +90,14 @@ exportDocument docCon path =
 renderZip :: Flagged' DocumentContainer -> IO (Maybe ByteString)
 renderZip docCon =
     -- TODO: check if Label "errors" occured not only parse erros
-    -- TODO: outgoing anchor links on seperate sections do not work
     let relativeHomePath = disjointRelative relativeSectionsDir "index.html"
         mHtmlCssParts =
-            renderHtmlCssExport relativeHomePath exportReaderState initGlobalState docCon
+            renderHtmlCssExport
+                relativeHomePath
+                exportReaderState
+                initGlobalState
+                exportSectionReaderState
+                docCon
      in maybe (return Nothing) (fmap Just . buildZip) mHtmlCssParts
   where
     buildZip (mainBody, css, sectionBodies, rawTitle) =

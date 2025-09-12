@@ -6,6 +6,7 @@
 module Language.Ltml.HTML.Common
     ( HtmlReaderState
     , ReaderStateMonad
+    , runReaderState
     , GlobalState (..)
     , ReaderState (..)
     , initGlobalState
@@ -31,6 +32,7 @@ module Language.Ltml.HTML.Common
     , TocEntryWrapper
     , anchorLink
     , pageLink
+    , mainPageAnchorLink
     , collectExportSection
     , setHasErrors
     , Delayed (..)
@@ -38,8 +40,8 @@ module Language.Ltml.HTML.Common
     , returnNow
     ) where
 
-import Control.Monad.Reader (ReaderT)
-import Control.Monad.State (State, get, modify)
+import Control.Monad.Reader (ReaderT, runReaderT)
+import Control.Monad.State (State, get, modify, runState)
 import Data.ByteString.Lazy (ByteString)
 import Data.DList (DList, snoc)
 import qualified Data.DList as DList (empty)
@@ -68,6 +70,12 @@ import Lucid (Html, a_, href_)
 type HtmlReaderState = ReaderStateMonad (Delayed (Html ()))
 
 type ReaderStateMonad a = ReaderT ReaderState (State GlobalState) a
+
+runReaderState
+    :: ReaderStateMonad a -> ReaderState -> GlobalState -> (a, GlobalState)
+runReaderState ma readerState = runState (runReaderT ma readerState)
+
+-------------------------------------------------------------------------------
 
 data GlobalState = GlobalState
     { hasFlagged :: Bool
@@ -360,6 +368,10 @@ pageLink
 pageLink _ Other _ = const mempty
 pageLink path _ label =
     a_ [cssClass_ Class.ButtonLink, href_ (path <> "/" <> unLabel label <> ".html")]
+
+-- | Converts 'Label' into @<a href = "<path>#<label>">@ for jumping to another pages anchor
+mainPageAnchorLink :: Text -> LabelWrapper
+mainPageAnchorLink path label = a_ [cssClass_ Class.AnchorLink, href_ (path <> "#" <> unLabel label)]
 
 -------------------------------------------------------------------------------
 

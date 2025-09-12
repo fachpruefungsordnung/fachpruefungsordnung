@@ -112,7 +112,10 @@ renderHtmlCssExport
     :: FilePath
     -- ^ Path from exported Sections to main HTML
     -> ReaderState
+    -- ^ Used for document container
     -> GlobalState
+    -> ReaderState
+    -- ^ Used for exported sections
     -> Flagged' DocumentContainer
     -> Maybe
         ( Html ()
@@ -124,7 +127,7 @@ renderHtmlCssExport
           Text
           -- \^ Raw textual title of the main document
         )
-renderHtmlCssExport backPath readerState globalState docCon =
+renderHtmlCssExport backPath readerState globalState exportReaderState docCon =
     -- \| Render with given footnote context
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docCon) readerState) globalState
         -- \| Add footnote labes for "normal" (non-footnote) references
@@ -133,6 +136,10 @@ renderHtmlCssExport backPath readerState globalState docCon =
         css = mainStylesheet (enumStyles finalState')
         mainDocTitleHtml = mainDocumentTitleHtml finalState'
         rawMainDocTitle = evalDelayed finalState' $ mainDocumentTitle finalState'
+        -- \| Second render for exported sections
+        -- TODO: get rid of second render run (its only because of the different labelWrapperFuncs)
+        (_, finalExportState) = runReaderState (toHtmlM docCon) exportReaderState globalState
+        finalExportState' = addUsedFootnoteLabels finalExportState
         backButton =
             div_ $
                 a_ [cssClass_ Class.ButtonLink, href_ $ pack backPath] (toHtml ("←" :: Text))
@@ -140,11 +147,12 @@ renderHtmlCssExport backPath readerState globalState docCon =
             map
                 ( \(htmlId, dTitle, dHtml) ->
                     ( htmlId
-                    , evalDelayed finalState' dTitle
-                    , evalDelayed finalState' . ((pure backButton <> mainDocTitleHtml) <>) $ dHtml
+                    , evalDelayed finalExportState' dTitle
+                    , evalDelayed finalExportState' . ((pure backButton <> mainDocTitleHtml) <>) $
+                        dHtml
                     )
                 )
-                (exportSections finalState')
+                (exportSections finalExportState')
      in if hasErrors finalState'
             then Nothing
             else Just (mainHtml, css, sections, rawMainDocTitle)
