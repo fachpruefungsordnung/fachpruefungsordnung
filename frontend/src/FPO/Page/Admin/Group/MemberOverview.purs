@@ -90,8 +90,7 @@ data ModalState
   | RemoveMemberModal UserID
 
 type State = FPOState
-  ( error :: Maybe String
-  , page :: Int
+  ( page :: Int
   , groupID :: GroupID
   , group :: Maybe GroupDto
   , filteredMembers :: Array GroupMemberDto
@@ -124,7 +123,6 @@ component =
     , groupID: input
     , filteredMembers: []
     , modalState: NoModal
-    , error: Nothing
     , group: Nothing
     , isAdmin: false
     , memberNameFilter: ""
@@ -150,13 +148,6 @@ component =
             _ -> []
         ) <>
           [ renderMemberManagement state
-          , HH.div [ HP.classes [ HB.textCenter ] ]
-              [ case state.error of
-                  Just err -> HH.div
-                    [ HP.classes [ HB.alert, HB.alertDanger, HB.mt5 ] ]
-                    [ HH.text err ]
-                  Nothing -> HH.text ""
-              ]
           ]
 
   renderMemberManagement :: State -> H.ComponentHTML Action Slots m
@@ -400,23 +391,20 @@ component =
       H.modify_ _ { modalState = RemoveMemberModal memberID }
     CancelModal -> do
       H.modify_ \s -> s
-        { error = Nothing
-        , modalState = NoModal
+        { modalState = NoModal
         }
     ConfirmRemoveMember memberID -> do
       s <- H.get
       deleteResponse <- deleteIgnore
         ("/roles/" <> show s.groupID <> "/" <> memberID)
       case deleteResponse of
-        Left err -> do
+        Left _ -> do
           H.modify_ _
-            { error = Just (show err)
-            , modalState = NoModal
+            { modalState = NoModal
             }
         Right _ -> do
           H.modify_ _
-            { error = Nothing
-            , modalState = NoModal
+            { modalState = NoModal
             }
 
       handleAction ReloadGroupMembers
@@ -450,10 +438,9 @@ component =
       let userID = getUserInfoID member
       response <- changeRole s.groupID userID role
       case response of
-        Left err -> do
+        Left _ -> do
           H.modify_ _
-            { error = Just (show err)
-            , modalState = NoModal
+            { modalState = NoModal
             }
         Right _ -> do
           handleAction ReloadGroupMembers
