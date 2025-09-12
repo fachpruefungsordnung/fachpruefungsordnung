@@ -438,10 +438,9 @@ component =
       let userID = getUserInfoID member
       response <- changeRole s.groupID userID role
       case response of
-        Left err -> do
+        Left _ -> do
           H.modify_ _
-            { error = Just (show err)
-            , modalState = NoModal
+            { modalState = NoModal
             }
         Right _ -> do
           handleAction ReloadGroupMembers
