@@ -1,15 +1,21 @@
 module FPO.Data.Time
   ( adjustDateTime
-  , getEditTimestamp
+  {-   , getEditTimestamp -}
   , formatAbsoluteTimeDetailed
   , formatRelativeTime
+  , dateToDatetime
+  , genericDatetime
   ) where
 
 import Prelude
 
+{- import Data.Bounded (bottom) -}
 import Data.DateTime
-  ( DateTime
+  ( Date
+  , DateTime(..)
+  , Time(..)
   , adjust
+  , canonicalDate
   , date
   , day
   , diff
@@ -24,17 +30,32 @@ import Data.Enum (fromEnum)
 import Data.Int (floor)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Time.Duration (class Duration, Seconds(..), negateDuration, toDuration)
-import FPO.Dto.DocumentDto.DocDate as DocDate
-import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader)
-import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
+
+{- import FPO.Dto.DocumentDto.DocDate as DocDate -}
+{- import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader)
+import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader -}
+
+-- for cases that need to be handled even though one case cannot happen. This Data is a placeholder that can be used in 
+-- such places
+genericDatetime :: DateTime
+genericDatetime = DateTime genericDate genericTime
+
+genericDate :: Date
+genericDate = canonicalDate bottom bottom bottom
+
+genericTime :: Time
+genericTime = Time bottom bottom bottom bottom
+
+dateToDatetime :: Date -> DateTime
+dateToDatetime d = DateTime d (Time bottom bottom bottom bottom)
 
 -- | Helper function to adjust a DateTime by a duration (subtract from current time)
 adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime
 adjustDateTime duration dt =
   fromMaybe dt $ adjust (negateDuration duration) dt
 
-getEditTimestamp ∷ DocumentHeader → DateTime
-getEditTimestamp = DocDate.docDateToDateTime <<< DocumentHeader.getLastEdited
+{- getEditTimestamp ∷ DocumentHeader → DateTime
+getEditTimestamp = DocDate.docDateToDateTime <<< DocumentHeader.getLastEdited -}
 
 formatAbsoluteTimeDetailed :: forall d. Duration d => Maybe d -> DateTime -> String
 formatAbsoluteTimeDetailed offset dateTime =

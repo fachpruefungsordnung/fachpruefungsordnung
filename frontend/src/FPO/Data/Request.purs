@@ -20,7 +20,7 @@ module FPO.Data.Request
   , getIgnore
   , getJson
   , getString
-  , getTextElemHistoryAll
+  , getTextElemHistory
   , getUser
   , getUserDocuments
   , getUserGroups
@@ -55,6 +55,7 @@ import Data.Argonaut.Decode.Decoders (decodeArray)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
+import Data.String (drop, null)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
@@ -533,7 +534,7 @@ getDocumentsQueryFromURL
   -> H.HalogenM st act slots msg m (Either AppError DQ.DocumentQuery)
 getDocumentsQueryFromURL url = getJson decodeJson url
 
-getTextElemHistoryAll
+{- getTextElemHistoryAll
   :: forall st act slots msg m
    . MonadAff m
   => MonadStore Store.Action Store.Store m
@@ -547,7 +548,44 @@ getTextElemHistoryAll dID tID date =
     decodeJson
     ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history?before="
         <> DD.toStringFormat date
-    )
+    ) -}
+
+getTextElemHistory
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => DH.DocumentID
+  -> TE.TextElementID
+  -> Maybe DD.DocDate
+  -> Maybe DD.DocDate
+  -> Maybe Int
+  -> H.HalogenM st act slots msg m (Either AppError TE.FullTextElementHistory)
+getTextElemHistory dID tID before after limit =
+  let
+    beforeString =
+      case before of
+        Nothing -> ""
+        Just dVal -> "&before=" <> DD.toStringFormat dVal
+    afterString =
+      case after of
+        Nothing -> ""
+        Just dVal -> "&after=" <> DD.toStringFormat dVal
+    limitString =
+      case limit of
+        Nothing -> ""
+        Just l -> "&limit=" <> show l
+    conc = beforeString <> afterString <> limitString
+    queryData =
+      if null conc then
+        ""
+      else
+        "?" <> (drop 1 conc)
+  in
+    getJson
+      decodeJson
+      ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history" <> queryData
+      )
 
 getUserDocuments
   :: forall st act slots msg m

@@ -1009,6 +1009,8 @@ splitview = connect selectTranslator $ H.mkComponent
         -- Only the SelLeaf case should ever occur
         case state.mSelectedTocEntry of
           Just (SelLeaf id) -> do
+            _ <- Request.deleteIgnore
+              ("/docs/" <> show state.docID <> "/text/" <> show id <> "/draft")
             handleAction (ModifyVersionMapping id (Just Nothing) Nothing)
             let
               -- Nothing case should never occur
