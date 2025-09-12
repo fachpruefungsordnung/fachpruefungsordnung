@@ -7,7 +7,6 @@ import Language.Ltml.HTML
 import Language.Ltml.HTML.CSS (writeCss)
 import Language.Ltml.HTML.CSS.Util (addHtmlHeader)
 import Language.Ltml.HTML.Export (exportDocument, renderZip)
-import Language.Ltml.Pretty (prettyPrint)
 import Language.Ltml.Tree.Example.Fpo (fpoTree)
 import Language.Ltml.Tree.Parser (TreeError (..))
 import Language.Ltml.Tree.ToLtml (treeToLtml)
@@ -45,7 +44,7 @@ exportTest =
 zipTest :: IO ()
 zipTest = do
     case treeToLtml fpoTree of
-        Left _ -> error "parsing failed"
+        Left (TreeError errMsg) -> error errMsg
         Right docCon -> do
             mBs <- renderZip docCon
             case mBs of
