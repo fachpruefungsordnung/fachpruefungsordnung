@@ -15,6 +15,7 @@ module Language.Ltml.HTML.CSS.CustomClay
     , displayContents
     , autoLayout
     , gap
+    , scrollMarginTop
     , tableLayout
     ) where
 
@@ -77,6 +78,9 @@ autoLayout = other "auto"
 
 gap :: Size LengthUnit -> Css
 gap s = "gap" -: unPlain (unValue $ value s)
+
+scrollMarginTop :: Size LengthUnit -> Css
+scrollMarginTop s = "scroll-margin-top" -: unPlain (unValue $ value s)
 
 tableLayout :: Position -> Css
 tableLayout arg = "table-layout" -: unPlain (unValue $ value arg)

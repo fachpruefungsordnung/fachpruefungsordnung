@@ -113,6 +113,7 @@ classStyle DocumentTitle =
         marginTop (em 0)
         marginBottom (em 0)
         fontSize (em 1.5)
+        scrollMarginTop (em 2)
 classStyle SuperSection =
     toClassSelector SuperSection ? do
         display flex
@@ -132,6 +133,7 @@ classStyle Heading =
         marginTop (em 0)
         marginBottom (em 0)
         fontSize (em 1)
+        scrollMarginTop (em 2)
 classStyle Paragraph =
     toClassSelector Paragraph ? do
         display flex
@@ -245,7 +247,7 @@ classStyle ButtonLink = do
 classStyle ExportLink =
     toClassSelector ExportLink ? do
         marginTop (em 1)
-        marginBottom (em 1)
+        marginBottom (em 2)
 classStyle TocContainer = do
     toClassSelector TocContainer ? do
         display flex
