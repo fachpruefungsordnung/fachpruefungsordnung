@@ -239,20 +239,6 @@ emptyListEntry height =
   HH.li [ HP.style $ "height: " <> show height <> "px;" ]
     []
 
--- | Adds an error message to the page.
-addError
-  :: forall w i
-   . Maybe String -- ^ error message
-  -> HH.HTML w i
-addError msg =
-  HH.div [ HP.classes [ HB.textCenter ] ]
-    [ case msg of
-        Just err -> HH.div
-          [ HP.classes [ HB.alert, HB.alertDanger, HB.mt5 ] ]
-          [ HH.text err ]
-        Nothing -> HH.text ""
-    ]
-
 loadingSpinner :: forall w i. HH.HTML w i
 loadingSpinner =
   HH.div [ HP.classes [ HB.textCenter, HB.my5 ] ]
