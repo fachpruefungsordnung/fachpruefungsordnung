@@ -1,18 +1,20 @@
 module FPO.Dto.DocumentDto.DocumentHeader
   ( DocumentHeader
   , DocumentID
+  , getEditTimestamp
   , getID
   , getLastEdited
   , getName
   , getIdentifier
   , getUserName
-  , User
+  , User(..)
   ) where
 
 import Prelude
 
 import Data.Argonaut (class DecodeJson)
-import FPO.Dto.DocumentDto.DocDate (DocDate)
+import Data.DateTime (DateTime)
+import FPO.Dto.DocumentDto.DocDate (DocDate, docDateToDateTime)
 
 type DocumentID = Int
 
@@ -35,6 +37,10 @@ newtype DocumentHeader = DH
   }
 
 derive newtype instance eqDocumentHeader :: Eq DocumentHeader
+
+-- seems like it should be in one of the time files, but as it uses getLastEdited from here it would cause a dependency cycle if it were
+getEditTimestamp ∷ DocumentHeader → DateTime
+getEditTimestamp = docDateToDateTime <<< getLastEdited
 
 getName :: DocumentHeader -> String
 getName (DH dh) = dh.name

@@ -153,7 +153,6 @@ setAnnotations
   -> Maybe Types.Editor
   -> Effect Unit
 setAnnotations markerAnnoHS mEditor = do
-  -- log $ "markerAnnoHS size: " <> show (size markerAnnoHS)
   for_ mEditor \ed -> do
     session <- Editor.getSession ed
     let

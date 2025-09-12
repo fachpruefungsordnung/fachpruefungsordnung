@@ -151,7 +151,7 @@ type Result a = Either Error a
 type Limit = Int64
 
 defaultHistoryLimit :: Limit
-defaultHistoryLimit = 20
+defaultHistoryLimit = 200
 
 squashRevisionsWithinMinutes :: Float
 squashRevisionsWithinMinutes = 15
@@ -442,13 +442,14 @@ getTextHistory
     => UserID
     -> TextElementRef
     -> Maybe UTCTime
+    -> Maybe UTCTime
     -> Maybe Limit
     -> m (Result TextRevisionHistory)
-getTextHistory userID ref@(TextElementRef docID _) time limit = logged userID Scope.docsText $
+getTextHistory userID ref@(TextElementRef docID _) from to limit = logged userID Scope.docsText $
     runExceptT $ do
         guardPermission Read docID userID
         guardExistsTextElement ref
-        lift $ DB.getTextHistory ref time $ fromMaybe defaultHistoryLimit limit
+        lift $ DB.getTextHistory ref from to $ fromMaybe defaultHistoryLimit limit
 
 getTreeHistory
     :: (HasGetTreeHistory m, HasLogMessage m)

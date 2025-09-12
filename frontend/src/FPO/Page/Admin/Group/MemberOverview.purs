@@ -19,7 +19,6 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console (log)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
@@ -404,7 +403,6 @@ component =
             { modalState = NoModal
             }
         Right _ -> do
-          log "Removed member successfully"
           H.modify_ _
             { modalState = NoModal
             }
@@ -429,7 +427,6 @@ component =
             , page = 0
             }
     NavigateToDocuments -> do
-      log "Routing to document overview"
       s <- H.get
       navigate (ViewGroupDocuments { groupID: s.groupID })
     SetUserRole member role -> do
@@ -439,19 +436,16 @@ component =
       --       result.
       s <- H.get
       let userID = getUserInfoID member
-      if getUserInfoRole member == role then
-        log "User already has this role, ignoring"
-      else do
-        response <- changeRole s.groupID userID role
-        case response of
-          Left _ -> do
-            H.modify_ _
-              { modalState = NoModal
-              }
-          Right _ -> do
-            log "Changed user role successfully"
-            handleAction ReloadGroupMembers
-            handleAction (FilterForMember "")
+      response <- changeRole s.groupID userID role
+      case response of
+        Left err -> do
+          H.modify_ _
+            { error = Just (show err)
+            , modalState = NoModal
+            }
+        Right _ -> do
+          handleAction ReloadGroupMembers
+          handleAction (FilterForMember "")
       handleAction ReloadGroupMembers
       handleAction (FilterForMember "")
     NavigateToUserAdder -> do
