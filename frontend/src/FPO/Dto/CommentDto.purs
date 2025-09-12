@@ -71,13 +71,13 @@ derive newtype instance showSection :: Show Section
 derive newtype instance showCommentSections :: Show CommentSections
 
 decodeComment :: Json -> Either JsonDecodeError CommentT
-decodeComment json = decodeJson json
+decodeComment = decodeJson
 
 decodeSection :: Json -> Either JsonDecodeError Section
-decodeSection json = decodeJson json
+decodeSection = decodeJson
 
 decodeCommentSection :: Json -> Either JsonDecodeError CommentSections
-decodeCommentSection json = decodeJson json
+decodeCommentSection = decodeJson
 
 getName :: Author -> String
 getName (Author { name }) = name

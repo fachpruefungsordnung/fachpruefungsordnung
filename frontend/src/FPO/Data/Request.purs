@@ -11,10 +11,10 @@ module FPO.Data.Request
   , fromLoading
   , getAuthorizedUser
   , getBlob
+  , getCommentSections
   , getDocument
   , getDocumentHeader
   , getDocumentsQueryFromURL
-  , getFromJSONEndpoint
   , getGroup
   , getGroups
   , getIgnore
@@ -25,6 +25,7 @@ module FPO.Data.Request
   , getUserDocuments
   , getUserGroups
   , getUserWithId
+  , getUsers
   , patchJson
   , patchString
   , postBlob
@@ -64,6 +65,7 @@ import FPO.Data.AppError (AppError(..), printAjaxError)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
+import FPO.Dto.CommentDto (CommentSections)
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
@@ -85,6 +87,7 @@ import FPO.Dto.UserDto
   , isAdminOf
   , isUserSuperadmin
   )
+import FPO.Dto.UserOverviewDto (UserOverviewDto)
 import FPO.Dto.UserRoleDto (Role)
 import FPO.Translations.Translator (fromFpoTranslator)
 import Halogen as H
@@ -242,20 +245,6 @@ handleUnitRequest
   -> Aff (Either Error (Response Unit))
   -> H.HalogenM st act slots msg m (Either AppError Unit)
 handleUnitRequest = handleRequest'
-
-getFromJSONEndpoint
-  :: forall a. (Json -> Either JsonDecodeError a) -> String -> Aff (Maybe a)
-getFromJSONEndpoint decode url = do
-  response <- getJson' url
-  case response of
-    Left _ ->
-      pure Nothing
-    Right res -> do
-      case decode (res.body) of
-        Left _ -> do
-          pure Nothing
-        Right val -> do
-          pure $ Just val
 
 -- | Simplified Error-Handling HTTP Methods ----------------------------------
 
@@ -429,6 +418,17 @@ getAuthorizedUser groupID = do
         user
       else pure $ Right Nothing
 
+getCommentSections
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => DH.DocumentID
+  -> Int
+  -> H.HalogenM st act slots msg m (Either AppError CommentSections)
+getCommentSections docID tocID = getJson decodeJson
+  ("/docs/" <> show docID <> "/text/" <> show tocID <> "/comments")
+
 getGroups
   :: forall st act slots msg m
    . MonadAff m
@@ -458,6 +458,14 @@ getUser
   => Navigate m
   => H.HalogenM st act slots msg m (Either AppError FullUserDto)
 getUser = getJson decodeJson "/me"
+
+getUsers
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => H.HalogenM st act slots msg m (Either AppError (Array UserOverviewDto))
+getUsers = getJson decodeJson "/users"
 
 getUserWithId
   :: forall st act slots msg m

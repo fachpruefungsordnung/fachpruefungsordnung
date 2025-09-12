@@ -660,7 +660,7 @@ getTextRevisionHistory =
                 WHERE
                     te.document = $1 :: int8
                     AND tr.text_element = $2 :: int8
-                    AND tr.creation_ts > COALESCE($3 :: TIMESTAMPTZ?, NOW())
+                    AND tr.creation_ts > COALESCE($3 :: TIMESTAMPTZ?, '1900-01-01 00:00:00+00'::TIMESTAMPTZ)
                     AND tr.creation_ts < COALESCE($4 :: TIMESTAMPTZ?, NOW())
                 ORDER BY
                     tr.creation_ts DESC
