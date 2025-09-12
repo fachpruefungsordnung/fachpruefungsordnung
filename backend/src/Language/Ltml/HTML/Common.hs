@@ -34,6 +34,7 @@ module Language.Ltml.HTML.Common
     , pageLink
     , mainPageAnchorLink
     , collectExportSection
+    , buildExportLink
     , setHasErrors
     , Delayed (..)
     , evalDelayed
@@ -57,8 +58,8 @@ import Language.Lsd.AST.Type.Section (SectionFormat)
 import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label (unLabel))
 import qualified Language.Ltml.HTML.CSS.Classes as Class
-import Language.Ltml.HTML.CSS.Util (cssClass_)
-import Lucid (Html, a_, href_)
+import Language.Ltml.HTML.CSS.Util (cssClass_, (<#>))
+import Lucid (Html, a_, div_, href_, toHtml)
 
 -- TODO: Third ConfigState? With custom Reader Monad that is read only
 
@@ -179,6 +180,8 @@ data ReaderState = ReaderState
     -- ^ Wrapper around an ToC entry (e.g. for adding anchor links)
     , tocButtonWrapperFunc :: TocEntryWrapper
     -- ^ Wrapper around the button in the right column of the ToC (e.g. for adding page links)
+    , exportLinkWrapper :: LabelWrapper
+    -- ^ Wrapper around the ID of a section at the end of it (e.g. for adding export links)
     }
 
 initGlobalState :: GlobalState
@@ -223,10 +226,12 @@ initReaderState =
         , currentEnumIDFormatString = error "Undefined enum id format!"
         , footnoteMap = Map.empty
         , -- \| Default rendering method is "preview", so no anchor links
+          --    and no export links at all
           labelWrapperFunc = const id -- anchorLink
         , footnoteWrapperFunc = const id
         , tocEntryWrapperFunc = const $ const id
         , tocButtonWrapperFunc = const anchorLink
+        , exportLinkWrapper = const mempty
         }
 
 -------------------------------------------------------------------------------
@@ -360,18 +365,32 @@ type TocEntryWrapper = TocCategory -> LabelWrapper
 anchorLink :: LabelWrapper
 anchorLink label = a_ [cssClass_ Class.AnchorLink, href_ (cons '#' $ unLabel label)]
 
--- | Converts 'Label' into @<a href = "<path>/<label>.html">@ for jumping to another page
+-- | Converts 'Label' into @<a href = "<path>/<label>.html">@ for jumping
+--   to another page
 pageLink
-    :: Text
+    :: FilePath
     -- ^ Path prefix
     -> TocEntryWrapper
 pageLink _ Other _ = const mempty
 pageLink path _ label =
-    a_ [cssClass_ Class.ButtonLink, href_ (path <> "/" <> unLabel label <> ".html")]
+    a_ [cssClass_ Class.ButtonLink, href_ (labelPath path label)]
 
--- | Converts 'Label' into @<a href = "<path>#<label>">@ for jumping to another pages anchor
-mainPageAnchorLink :: Text -> LabelWrapper
-mainPageAnchorLink path label = a_ [cssClass_ Class.AnchorLink, href_ (path <> "#" <> unLabel label)]
+-- | Converts 'Label' into @<a href = "<path>#<label>">@ for jumping
+--   to another pages anchor
+mainPageAnchorLink :: FilePath -> LabelWrapper
+mainPageAnchorLink path label = a_ [cssClass_ Class.AnchorLink, href_ (pack path <> "#" <> unLabel label)]
+
+-- | Builds a link with 'labelPath', prefix "Zur Einzelansicht"
+--   and adds some vertical spacing
+buildExportLink :: FilePath -> LabelWrapper
+buildExportLink path label =
+    (div_ <#> Class.ExportLink)
+        . a_ [cssClass_ Class.AnchorLink, href_ (labelPath path label)]
+        . (toHtml ("zur Einselansicht " :: Text) <>)
+
+-- | Builds "<path>/<label>.html"
+labelPath :: FilePath -> Label -> Text
+labelPath path label = pack path <> "/" <> unLabel label <> ".html"
 
 -------------------------------------------------------------------------------
 

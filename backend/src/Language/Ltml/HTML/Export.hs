@@ -5,7 +5,7 @@ module Language.Ltml.HTML.Export (exportDocument, renderZip) where
 import Clay (render)
 import Codec.Archive.Zip
 import Data.ByteString.Lazy (ByteString)
-import Data.Text (pack, unpack)
+import Data.Text (unpack)
 import Data.Text.IO (writeFile)
 import Data.Text.Lazy (toStrict)
 import Data.Text.Lazy.Encoding (encodeUtf8)
@@ -54,14 +54,15 @@ exportReaderState =
         , labelWrapperFunc = anchorLink
         , footnoteWrapperFunc = anchorLink
         , tocEntryWrapperFunc = const anchorLink -- ignore category
-        , tocButtonWrapperFunc = pageLink (pack relativeSectionsDir)
+        , tocButtonWrapperFunc = pageLink relativeSectionsDir
+        , exportLinkWrapper = buildExportLink relativeSectionsDir
         }
 
 exportSectionReaderState :: ReaderState
 exportSectionReaderState =
     exportReaderState
         { labelWrapperFunc =
-            mainPageAnchorLink (pack $ disjointRelative relativeSectionsDir "index.html")
+            mainPageAnchorLink (disjointRelative relativeSectionsDir "index.html")
         }
 
 -------------------------------------------------------------------------------

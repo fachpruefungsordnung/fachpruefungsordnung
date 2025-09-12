@@ -78,6 +78,8 @@ data Class
       AnchorLink
     | -- | Link @<a>@ that looks not like a link but more like a button
       ButtonLink
+    | -- | Link with some extra vertical spacing
+      ExportLink
     | -- | Wrapper around ToC, which places the Table on the page
       TocContainer
     | -- | Class for <table> element of ToC
@@ -240,6 +242,10 @@ classStyle ButtonLink = do
     toClassSelector ButtonLink # hover ? do
         color Color.linkTextHover
         backgroundColor Color.tableDarkCell
+classStyle ExportLink =
+    toClassSelector ExportLink ? do
+        marginTop (em 1)
+        marginBottom (em 1)
 classStyle TocContainer = do
     toClassSelector TocContainer ? do
         display flex
