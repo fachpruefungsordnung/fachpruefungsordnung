@@ -49,7 +49,8 @@ enCommon = fromRecord
   , common_deletePhraseA: "Are you sure you want to delete "
   , common_deletePhraseB: "?"
   , common_discard: "Discard"
-  , common_discardPhrase: "Are you sure you want to discard the current changes to this text element?"
+  , common_discardPhrase:
+      "Are you sure you want to discard the current changes to this text element?"
   , common_email: "Email"
   , common_emailAddress: "Email address"
   , common_filterBy: "Filter by"
@@ -106,7 +107,8 @@ deCommon = fromRecord
   , common_deletePhraseA: "Sind Sie sicher, dass Sie "
   , common_deletePhraseB: " löschen möchten?"
   , common_discard: "Verwerfen"
-  , common_discardPhrase: "Sind sie sicher, dass sie die Änderungen an diesem Textelement verwerfen möchten?"
+  , common_discardPhrase:
+      "Sind sie sicher, dass sie die Änderungen an diesem Textelement verwerfen möchten?"
   , common_email: "E-Mail"
   , common_emailAddress: "E-Mail-Addresse"
   , common_filterBy: "Filtern nach"
@@ -118,8 +120,10 @@ deCommon = fromRecord
   , common_mergingInfo: "Veraltete Versionen bearbeiten"
   , common_mergingInfoText: "Sie bearbeiten aktuell eine veraltete Version. \n\n"
       <> "Woher kommt das? \n"
-      <> "Da diese Webseite es erlaubt, mehreren Nutzer/-innen gleichzeitig ein Dokument bearbeiten zu lassen, "
-      <> "ist es möglich, dass eine anderere Person gerade die gleiche Textstelle bearbeitet"
+      <>
+        "Da diese Webseite es erlaubt, mehreren Nutzer/-innen gleichzeitig ein Dokument bearbeiten zu lassen, "
+      <>
+        "ist es möglich, dass eine anderere Person gerade die gleiche Textstelle bearbeitet"
       <>
         "und ihre Version gespeichert hat. Möglicherweise haben sie auch einfach über die Textabschnittsauswahl links "
       <> "eine alte Version geöffnet.\n\n"

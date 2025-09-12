@@ -39,8 +39,7 @@ module FPO.Data.Request
   , putIgnore
   , putJson
   , removeUser
-  )
-  where
+  ) where
 
 import Prelude
 
@@ -56,7 +55,7 @@ import Data.Argonaut.Decode.Decoders (decodeArray)
 import Data.Either (Either(..))
 import Data.HTTP.Method (Method(..))
 import Data.Maybe (Maybe(..))
-import Data.String (null, drop)
+import Data.String (drop, null)
 import Effect (Effect)
 import Effect.Aff (Aff)
 import Effect.Aff.Class (class MonadAff, liftAff)
@@ -563,31 +562,30 @@ getTextElemHistory
   -> Maybe Int
   -> H.HalogenM st act slots msg m (Either AppError TE.FullTextElementHistory)
 getTextElemHistory dID tID before after limit =
-  let 
-    beforeString = 
+  let
+    beforeString =
       case before of
         Nothing -> ""
         Just dVal -> "&before=" <> DD.toStringFormat dVal
-    afterString = 
+    afterString =
       case after of
         Nothing -> ""
         Just dVal -> "&after=" <> DD.toStringFormat dVal
-    limitString = 
+    limitString =
       case limit of
         Nothing -> ""
         Just l -> "&limit=" <> show l
     conc = beforeString <> afterString <> limitString
-    queryData = 
-      if null conc then 
+    queryData =
+      if null conc then
         ""
-      else 
+      else
         "?" <> (drop 1 conc)
   in
-  getJson
-    decodeJson
-    ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history" <> queryData
-    )
-
+    getJson
+      decodeJson
+      ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history" <> queryData
+      )
 
 getUserDocuments
   :: forall st act slots msg m

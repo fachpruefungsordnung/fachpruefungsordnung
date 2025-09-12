@@ -32,7 +32,7 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.Regex (regex, replace)
 import Data.String.Regex.Flags (noFlags)
-import Data.Time.Duration (Minutes, Days(..))
+import Data.Time.Duration (Days(..), Minutes)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 {- import Effect.Console (log) -}
@@ -157,7 +157,7 @@ data Action
   | CompleteDrop Path
   --| UpdateSearchBarInputs Int String String
   --| ClearSearchData Int
-{-   | FilterVersions -}
+  {-   | FilterVersions -}
   | SearchVersions Int
   | ModifyDateInput Boolean Int String
 
@@ -187,8 +187,8 @@ type State = FPOState
   , showHistorySubmenu :: Maybe (Maybe Int)
   , versions :: Array Version
   {- using a second array for filtered Versions used to be needed but is kind of redundant now. 
-     instead simply storing the ID of the up to date version would be better, but as we are low on
-     time i will keep it like this (for now at least)-}
+  instead simply storing the ID of the up to date version would be better, but as we are low on
+  time i will keep it like this (for now at least)-}
   , filteredVersions :: Array Version
   , filteredTree :: RootTree Filtered
   , dragState :: Maybe { draggedId :: Path, hoveredId :: Path }
@@ -298,17 +298,20 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -- the newest version requested in this action is assumed to be the newest version in general
     UpdateVersions mAfter mBefore elementID -> do
       {- now <- liftEffect nowDateTime -}
-      let 
+      let
         after =
           case mAfter of
             Nothing -> Nothing
             Just val -> Just (DD.DocDate $ dateToDatetime val)
-        before = 
+        before =
           case mBefore of
             Nothing -> Nothing
             -- dateToDateTime assumed a time of 0:00, so we shift by 1 day to include the entire day.
             {- Just val -> Just (DD.DocDate $ adjustDateTime (dateToDatetime val)) -}
-            Just val -> Just (DD.DocDate $ fromMaybe (dateToDatetime val) $ adjust (Days 1.0) (dateToDatetime val))
+            Just val -> Just
+              ( DD.DocDate $ fromMaybe (dateToDatetime val) $ adjust (Days 1.0)
+                  (dateToDatetime val)
+              )
       s <- H.get
       history <- getTextElemHistory s.docID elementID before after Nothing
       -- if this is nothing something went wrong as every element should have a hsitory
@@ -325,7 +328,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
               )
               (TE.getTEHsFromFTEH h)
 
-        {- we want to detect which version is the up to date one as soon as we can. If we set before to something
+          {- we want to detect which version is the up to date one as soon as we can. If we set before to something
           we can't be sure which one is the up to date one (at least until we try something like saving) as such
           we send a second request, this time only asking for the newest version. While this causes 2 requests,
           it helps against potentially unreasonably large requests down the road -}
@@ -333,22 +336,22 @@ tocview = connect (selectEq identity) $ H.mkComponent
             Just _ -> do
               temp <- getTextElemHistory s.docID elementID Nothing Nothing (Just 1)
               case temp of
-                Left _ -> 
-                  pure              
+                Left _ ->
+                  pure
                     { identifier: Nothing
                     , timestamp: DD.genericDocDate
                     , author: DH.U { identifier: "", name: "" }
                     }
-                Right e -> 
-                  case head (TE.getTEHsFromFTEH e) of 
-                    Nothing -> 
-                      pure              
+                Right e ->
+                  case head (TE.getTEHsFromFTEH e) of
+                    Nothing ->
+                      pure
                         { identifier: Nothing
                         , timestamp: DD.genericDocDate
                         , author: DH.U { identifier: "", name: "" }
                         }
-                    Just val -> 
-                      pure 
+                    Just val ->
+                      pure
                         { identifier: Just (TE.getHistoryElementID val)
                         , timestamp: TE.getHistoryElementTimestamp val
                         , author: TE.getHistoryElementAuthor val
@@ -356,66 +359,68 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
             Nothing -> case head nV of
               Just entry -> pure entry
-              Nothing -> 
-                pure                
+              Nothing ->
+                pure
                   { identifier: Nothing
                   , timestamp: DD.genericDocDate
                   , author: DH.U { identifier: "", name: "" }
                   }
-          let 
+          let
             -- used to correctly identify which one is the newest version
             -- Nothing signifies that it's the newest version
             -- neither of the Nothing cases should ever occur
             newVersions = case head nV of
-              Just entry -> 
-                if upToDate /= entry then 
+              Just entry ->
+                if upToDate /= entry then
                   nV
                 else
                   case tail nV of
-                  Just entries -> cons
-                    { identifier: Nothing
-                    , timestamp: entry.timestamp
-                    , author: entry.author
-                    }
-                    entries
-                  Nothing -> nV
+                    Just entries -> cons
+                      { identifier: Nothing
+                      , timestamp: entry.timestamp
+                      , author: entry.author
+                      }
+                      entries
+                    Nothing -> nV
               Nothing -> nV
 
-          H.modify_ _ { versions = newVersions
-                      , upToDateVersion = Just upToDate }
-{-           handleAction FilterVersions -}
+          H.modify_ _
+            { versions = newVersions
+            , upToDateVersion = Just upToDate
+            }
+    {-           handleAction FilterVersions -}
 
-{-     FilterVersions -> do
-      state <- H.get
-      let
-        tocID = case state.mSelectedTocEntry of
-          Just (SelLeaf id) -> id
-          _ -> -1
-        versionEntry = fromMaybe
-          { elementID: -1
-          , fromDate: Nothing
-          , fromStringDate: ""
-          , toDate: Nothing
-          , toStringDate: ""
-          }
-          (findRootTree (\e -> e.elementID == tocID) state.searchData)
-        filteredVersions =
-          filter
-            ( \v ->
-                maybe true ((>=) (date $ DD.docDateToDateTime v.timestamp))
-                  versionEntry.fromDate
-                  && maybe true ((<=) (date $ DD.docDateToDateTime v.timestamp))
-                    versionEntry.toDate
-            )
-            state.versions
-      H.modify_ _ { filteredVersions = filteredVersions } -}
+    {-     FilterVersions -> do
+    state <- H.get
+    let
+      tocID = case state.mSelectedTocEntry of
+        Just (SelLeaf id) -> id
+        _ -> -1
+      versionEntry = fromMaybe
+        { elementID: -1
+        , fromDate: Nothing
+        , fromStringDate: ""
+        , toDate: Nothing
+        , toStringDate: ""
+        }
+        (findRootTree (\e -> e.elementID == tocID) state.searchData)
+      filteredVersions =
+        filter
+          ( \v ->
+              maybe true ((>=) (date $ DD.docDateToDateTime v.timestamp))
+                versionEntry.fromDate
+                && maybe true ((<=) (date $ DD.docDateToDateTime v.timestamp))
+                  versionEntry.toDate
+          )
+          state.versions
+    H.modify_ _ { filteredVersions = filteredVersions } -}
 
     SearchVersions elementID -> do
       state <- H.get
       case (findRootTree (\e -> e.elementID == elementID) state.searchData) of
         Nothing -> pure unit
         Just sd -> handleAction (UpdateVersions sd.fromDate sd.toDate elementID)
-{-       handleAction FilterVersions -}
+      {-       handleAction FilterVersions -}
       let
         modifyFiltered =
           modifyNodeRootTree
@@ -492,7 +497,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
     ToggleHistoryMenu path elementID -> do
       state <- H.get
-      let 
+      let
         sData =
           case (findRootTree (\s -> s.elementID == elementID) state.searchData) of
             Just d -> d
@@ -724,10 +729,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
       case state.mSelectedTocEntry of
         Just (SelLeaf id) ->
           if state.showHistoryMenu /= [ -1 ] then do
-{-             now <- liftEffect nowDateTime -}
+            {-             now <- liftEffect nowDateTime -}
             case (findRootTree (\s -> s.elementID == id) sData) of
-              Just d -> do 
-                handleAction $ UpdateVersions d.fromDate d.toDate id  
+              Just d -> do
+                handleAction $ UpdateVersions d.fromDate d.toDate id
               Nothing -> do
                 pure unit
           else do

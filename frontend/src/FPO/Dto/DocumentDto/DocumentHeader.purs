@@ -11,8 +11,9 @@ module FPO.Dto.DocumentDto.DocumentHeader
   ) where
 
 import Prelude
-import Data.DateTime (DateTime)
+
 import Data.Argonaut (class DecodeJson)
+import Data.DateTime (DateTime)
 import FPO.Dto.DocumentDto.DocDate (DocDate, docDateToDateTime)
 
 type DocumentID = Int

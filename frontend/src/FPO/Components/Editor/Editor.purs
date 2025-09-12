@@ -65,8 +65,8 @@ import FPO.Components.Editor.Types
   , showHandlesFor
   , updateMarkers
   )
-import FPO.Components.Modals.InfoModal (infoModal)
 import FPO.Components.Modals.DiscardModal (discardModal)
+import FPO.Components.Modals.InfoModal (infoModal)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
@@ -271,9 +271,10 @@ editor = connect selectTranslator $ H.mkComponent
       [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ]
       , HP.style "min-height: 0;"
       ] $
-      [ renderAll state ] <>
-        renderInfoModal <> 
-        renderDiscardModal
+      [ renderAll state ]
+        <> renderInfoModal
+        <>
+          renderDiscardModal
     where
     renderInfoModal = case state.outdatedInfoPopup of
       false -> []
@@ -282,9 +283,9 @@ editor = connect selectTranslator $ H.mkComponent
             state.translator
             ToggleOutdatedInfoPopup
         ]
-    renderDiscardModal = case state.discardPopup of 
+    renderDiscardModal = case state.discardPopup of
       false -> []
-      true -> 
+      true ->
         [ discardModal
             state.translator
             CancelDiscardAction
@@ -317,7 +318,7 @@ editor = connect selectTranslator $ H.mkComponent
                 [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
                 [ case state.compareToElement of
                     Just _ -> HH.text ""
-                    Nothing -> 
+                    Nothing ->
                       makeEditorToolbarButton
                         true
                         (translate (label :: _ "editor_textBold") state.translator)
@@ -325,7 +326,7 @@ editor = connect selectTranslator $ H.mkComponent
                         "bi-type-bold"
                 , case state.compareToElement of
                     Just _ -> HH.text ""
-                    Nothing -> 
+                    Nothing ->
                       makeEditorToolbarButton
                         true
                         (translate (label :: _ "editor_textItalic") state.translator)
@@ -333,17 +334,19 @@ editor = connect selectTranslator $ H.mkComponent
                         "bi-type-italic"
                 , case state.compareToElement of
                     Just _ -> HH.text ""
-                    Nothing -> 
+                    Nothing ->
                       makeEditorToolbarButton
                         true
-                        (translate (label :: _ "editor_textUnderline") state.translator)
+                        ( translate (label :: _ "editor_textUnderline")
+                            state.translator
+                        )
                         (Font underscore)
                         "bi-type-underline"
 
                 , case state.compareToElement of
                     Just _ -> HH.text ""
-                    Nothing -> 
-                      buttonDivisor 
+                    Nothing ->
+                      buttonDivisor
                 , makeEditorToolbarButton
                     true
                     (translate (label :: _ "editor_fontSizeUp") state.translator)
@@ -357,11 +360,11 @@ editor = connect selectTranslator $ H.mkComponent
 
                 , case state.compareToElement of
                     Just _ -> HH.text ""
-                    Nothing -> 
+                    Nothing ->
                       buttonDivisor
                 , case state.compareToElement of
                     Just _ -> HH.text ""
-                    Nothing -> 
+                    Nothing ->
                       makeEditorToolbarButton
                         true
                         (translate (label :: _ "editor_undo") state.translator)
@@ -369,7 +372,7 @@ editor = connect selectTranslator $ H.mkComponent
                         "bi-arrow-counterclockwise"
                 , case state.compareToElement of
                     Just _ -> HH.text ""
-                    Nothing -> 
+                    Nothing ->
                       makeEditorToolbarButton
                         true
                         (translate (label :: _ "editor_redo") state.translator)
@@ -378,11 +381,11 @@ editor = connect selectTranslator $ H.mkComponent
 
                 , case state.compareToElement of
                     Just _ -> HH.text ""
-                    Nothing -> 
+                    Nothing ->
                       buttonDivisor
                 , case state.compareToElement of
                     Just _ -> HH.text ""
-                    Nothing -> 
+                    Nothing ->
                       makeEditorToolbarButton
                         fullFeatures
                         (translate (label :: _ "editor_comment") state.translator)
@@ -392,7 +395,7 @@ editor = connect selectTranslator $ H.mkComponent
                 ]
             , case state.compareToElement of
                 Just _ -> HH.text ""
-                Nothing -> 
+                Nothing ->
                   HH.div
                     [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ]
                     , HP.style "min-width: 0;"
@@ -485,7 +488,7 @@ editor = connect selectTranslator $ H.mkComponent
                 ]
               else
                 [ HH.div
-                    [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ]]
+                    [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
                     [ HH.text
                         (translate (label :: _ "editor_readonly") state.translator)
                     ]
@@ -673,13 +676,12 @@ editor = connect selectTranslator $ H.mkComponent
           Nothing -> pure unit
           Just e ->
             _resize e
-    
-    CancelDiscardAction -> do
-      H.modify_ _ { discardPopup = false}
 
-    
+    CancelDiscardAction -> do
+      H.modify_ _ { discardPopup = false }
+
     ConfirmDiscardAction -> do
-      H.modify_ _ { discardPopup = false}
+      H.modify_ _ { discardPopup = false }
       H.raise RaiseDiscard
 
     Receive { context } -> do
@@ -719,7 +721,7 @@ editor = connect selectTranslator $ H.mkComponent
             Editor.focus ed
 
     Discard ->
-      H.modify_ _{ discardPopup = true}
+      H.modify_ _ { discardPopup = true }
 
     Render renderType -> do
       allLines <- H.gets _.mEditor >>= traverse \ed -> do

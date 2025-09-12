@@ -35,7 +35,7 @@ newtype DocDate = DocDate DateTime
 
 -- for cases that need to be handled even though one case cannot happen. This Data is a placeholder that can be used in 
 -- such places
-genericDocDate :: DocDate 
+genericDocDate :: DocDate
 genericDocDate = DocDate genericDatetime
 
 -- Date format example: "2025-08-14T17:24:55.895359Z"
