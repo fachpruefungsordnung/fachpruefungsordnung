@@ -55,7 +55,7 @@ exportReaderState =
         , footnoteWrapperFunc = anchorLink
         , tocEntryWrapperFunc = const anchorLink -- ignore category
         , tocButtonWrapperFunc = pageLink relativeSectionsDir
-        , exportLinkWrapper = buildExportLink relativeSectionsDir
+        , exportLinkWrapper = exportLink relativeSectionsDir
         }
 
 exportSectionReaderState :: ReaderState

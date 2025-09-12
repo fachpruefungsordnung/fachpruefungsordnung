@@ -414,9 +414,11 @@ instance ToHtmlM (Node Section) where
                     -- \| Collects all non-super Sections for possible export
                     collectExportSection tocId rawTitle sectionHtml
                     exportLinkFunc <- asks exportLinkWrapper
-                    let exportLink = exportLinkFunc (Label tocId) sectionTocKeyHtml
+                    let rawdTitleHtml = toHtml . (" " <>) <$> rawTitle
+                        exportLinkHtml =
+                            exportLinkFunc (Label tocId) <$> (pure sectionTocKeyHtml <> rawdTitleHtml)
 
-                    return $ sectionHtml <> pure exportLink
+                    return $ sectionHtml <> exportLinkHtml
           where
             -- \| Also adds table of contents entry for section
             buildHeadingHtml

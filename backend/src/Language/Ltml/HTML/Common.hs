@@ -34,7 +34,7 @@ module Language.Ltml.HTML.Common
     , pageLink
     , mainPageAnchorLink
     , collectExportSection
-    , buildExportLink
+    , exportLink
     , setHasErrors
     , Delayed (..)
     , evalDelayed
@@ -382,11 +382,11 @@ mainPageAnchorLink path label = a_ [cssClass_ Class.AnchorLink, href_ (pack path
 
 -- | Builds a link with 'labelPath', prefix "Zur Einzelansicht"
 --   and adds some vertical spacing
-buildExportLink :: FilePath -> LabelWrapper
-buildExportLink path label =
+exportLink :: FilePath -> LabelWrapper
+exportLink path label =
     (div_ <#> Class.ExportLink)
         . a_ [cssClass_ Class.AnchorLink, href_ (labelPath path label)]
-        . (toHtml ("zur Einselansicht " :: Text) <>)
+        . (toHtml ("↗ " :: Text) <>)
 
 -- | Builds "<path>/<label>.html"
 labelPath :: FilePath -> Label -> Text
