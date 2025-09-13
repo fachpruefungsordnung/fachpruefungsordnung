@@ -419,17 +419,18 @@ instance ToHtmlM (Node Section) where
                     -- \| increment (super)SectionID for next section
                     incrementSectionID
 
-                    let sectionHtml =
-                            section_ [cssClass_ sectionCssClass]
-                                <$> (headingHtml <> childrenHtml <> footnotesHtml)
-                    -- \| Collects all non-super Sections for possible export
-                    collectExportSection tocId rawTitle sectionHtml
                     exportLinkFunc <- asks exportLinkWrapper
                     let rawdTitleHtml = toHtml . (" " <>) <$> rawTitle
                         exportLinkHtml =
                             exportLinkFunc (Label tocId) <$> (pure sectionTocKeyHtml <> rawdTitleHtml)
 
-                    return $ sectionHtml <> exportLinkHtml
+                        sectionHtml =
+                            section_ [cssClass_ sectionCssClass]
+                                <$> (headingHtml <> childrenHtml <> footnotesHtml <> exportLinkHtml)
+                    -- \| Collects all sections for possible export
+                    collectExportSection tocId rawTitle sectionHtml
+
+                    return sectionHtml
           where
             -- \| Also adds table of contents entry for section
             buildHeadingHtml

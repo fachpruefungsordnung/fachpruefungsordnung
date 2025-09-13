@@ -59,7 +59,7 @@ import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label (unLabel))
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util (cssClass_, (<#>))
-import Lucid (Html, a_, div_, href_, toHtml)
+import Lucid (Html, a_, div_, href_, span_, toHtml)
 
 -- TODO: Third ConfigState? With custom Reader Monad that is read only
 
@@ -384,9 +384,9 @@ mainPageAnchorLink path label = a_ [cssClass_ Class.AnchorLink, href_ (pack path
 --   and adds some vertical spacing
 exportLink :: FilePath -> LabelWrapper
 exportLink path label =
-    (div_ <#> Class.ExportLink)
+    div_
         . a_ [cssClass_ Class.AnchorLink, href_ (labelPath path label)]
-        . (toHtml ("↗ " :: Text) <>)
+        . ((span_ <#> Class.LargeFontSize $ toHtml ("↗ " :: Text)) <>)
 
 -- | Builds "<path>/<label>.html"
 labelPath :: FilePath -> Label -> Text

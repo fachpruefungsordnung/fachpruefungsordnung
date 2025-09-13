@@ -63,6 +63,7 @@ exportSectionReaderState =
     exportReaderState
         { labelWrapperFunc =
             mainPageAnchorLink (disjointRelative relativeSectionsDir "index.html")
+        , exportLinkWrapper = const mempty -- no export links in exported view
         }
 
 -------------------------------------------------------------------------------

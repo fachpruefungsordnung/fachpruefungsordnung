@@ -78,8 +78,6 @@ data Class
       AnchorLink
     | -- | Link @<a>@ that looks not like a link but more like a button
       ButtonLink
-    | -- | Link with some extra vertical spacing
-      ExportLink
     | -- | Class for elements that have HTML anchors (adds scroll-margin)
       Anchor
     | -- | Wrapper around ToC, which places the Table on the page
@@ -244,10 +242,6 @@ classStyle ButtonLink = do
     toClassSelector ButtonLink # hover ? do
         color Color.linkTextHover
         backgroundColor Color.tableDarkCell
-classStyle ExportLink =
-    toClassSelector ExportLink ? do
-        marginTop (em 1)
-        marginBottom (em 2)
 classStyle Anchor =
     toClassSelector Anchor ? do
         scrollMarginTop (em 2)
