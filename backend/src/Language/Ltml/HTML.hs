@@ -409,11 +409,13 @@ instance ToHtmlM (Node Section) where
                     -- \| Render parsed Heading, which also creates ToC Entry
                     (headingHtml, tocId, rawTitle) <-
                         buildHeadingHtml sectionIDHtml mLabel sectionTocKeyHtml parsedHeading
+                    headingState <- get
                     childrenHtml <- toHtmlM sectionBody
                     -- \| Also render footnotes in super-sections, since their heading
                     --    could contain footnoteRefs
                     childrensGlobalState <- get
-                    footnotesHtml <- toHtmlM (locallyUsedFootnotes childrensGlobalState)
+                    let footNoteState = addUsedFootnotes childrensGlobalState headingState
+                    footnotesHtml <- toHtmlM (locallyUsedFootnotes footNoteState)
                     -- \| Reset locally used set to inital value
                     modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
                     -- \| increment (super)SectionID for next section

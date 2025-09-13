@@ -114,7 +114,7 @@ classStyle Document =
     toClassSelector Document ? do
         display flex
         flexDirection column
-        -- | gap between document childs
+        -- \| gap between document childs
         gap (em 3)
 classStyle DocumentTitle =
     toClassSelector DocumentTitle ? do

@@ -16,6 +16,7 @@ module Language.Ltml.HTML.Common
     , FootnoteMap
     , convertLabelMap
     , addUsedFootnoteLabels
+    , addUsedFootnotes
     , FootnoteSet
     , NumLabel (..)
     , ToC
@@ -259,6 +260,18 @@ addUsedFootnoteLabels :: GlobalState -> GlobalState
 addUsedFootnoteLabels globalState =
     let usedFootnotes = convertLabelMap $ usedFootnoteMap globalState
      in globalState {labels = usedFootnotes ++ labels globalState}
+
+-- | Adds used footnotes of base state to add state (appends at the front)
+addUsedFootnotes
+    :: GlobalState
+    -- ^ Base State
+    -> GlobalState
+    -- ^ Add State
+    -> GlobalState
+addUsedFootnotes base add =
+    base
+        { locallyUsedFootnotes = locallyUsedFootnotes add <> locallyUsedFootnotes base
+        }
 
 -------------------------------------------------------------------------------
 
