@@ -28,6 +28,8 @@ data Class
       Body
     | -- | Class for spacing and alignment of and inside of an appendix section
       AppendixSection
+    | -- | Class for alignment inside of a document
+      Document
     | -- | Class for styling and aligning document title <h1>
       DocumentTitle
     | -- | Class for spacing and alignment of and inside of a super-section
@@ -108,6 +110,12 @@ classStyle AppendixSection =
         flexDirection column
         -- \| gap between documents inside an appendix section
         gap (em 10)
+classStyle Document =
+    toClassSelector Document ? do
+        display flex
+        flexDirection column
+        -- | gap between document childs
+        gap (em 3)
 classStyle DocumentTitle =
     toClassSelector DocumentTitle ? do
         marginTop (em 0)
@@ -118,7 +126,7 @@ classStyle SuperSection =
         display flex
         flexDirection column
         -- \| gap between sections
-        gap (em 3)
+        gap (em 2)
 classStyle Section =
     toClassSelector Section ? do
         display flex
@@ -249,7 +257,6 @@ classStyle TocContainer = do
     toClassSelector TocContainer ? do
         display flex
         justifyContent center
-        marginBottom (em 2)
 classStyle TableOfContents = do
     toClassSelector TableOfContents ? do
         width (pct 100)

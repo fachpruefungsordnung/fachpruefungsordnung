@@ -313,7 +313,7 @@ instance ToHtmlM Document where
 
                 -- \| Render DocumentHeading / ToC only if renderFlag was set by parent
                 return $
-                    div_
+                    div_ <#> Class.Document
                         <$> ( (if renderDoc then titleHtml else mempty)
                                 <> introHtml
                                 <> (if renderToC then tocHtml else mempty)
