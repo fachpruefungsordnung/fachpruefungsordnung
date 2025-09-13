@@ -61,7 +61,7 @@ treeToLtmlInputTree (Tree node) = nodeToLtmlInputTree node
 treeToLtmlInputTree (Leaf textElementRevision@TextElementRevision {textElement, revision}) =
     let kind = LSD.KindName $ Text.unpack $ TextElement.textElementKind textElement
         type_ = LSD.TypeName $ Text.unpack $ TextElement.textElementType textElement
-        content = maybe "" TextRevision.content revision
+        content = maybe "" TextRevision.content revision -- TODO: no revison -> empty text?
      in LTML.Flagged (Just textElementRevision) $
             LTML.TypedTree kind type_ $
                 LTML.Leaf content
