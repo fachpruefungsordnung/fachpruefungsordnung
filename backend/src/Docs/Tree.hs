@@ -5,9 +5,9 @@
 
 module Docs.Tree
     ( Tree (..)
+    , Edge (..)
     , Node (..)
     , NodeHeader (..)
-    , WithTitle (..)
     , treeMapM
     , withTextRevisions
     , filterMapNode
@@ -71,7 +71,7 @@ instance ToSchema NodeHeader
 -- | A node of a tree.
 data Node a = Node
     { header :: NodeHeader
-    , children :: [Tree a]
+    , children :: [Edge a]
     }
     deriving (Generic)
 
@@ -136,6 +136,19 @@ instance (ToSchema a) => ToSchema (Tree a) where
         withTypeName s = Text.pack $ s ++ " " ++ typeName
         typeName = show $ typeRep (Proxy :: Proxy a)
 
+-- | An edge (from a node) to a node or leaf.
+data Edge a = Edge
+    { title :: Text
+    , content :: Tree a
+    }
+    deriving (Generic)
+
+instance (ToJSON a) => ToJSON (Edge a)
+
+instance (FromJSON a) => FromJSON (Edge a)
+
+instance (ToSchema a) => ToSchema (Edge a)
+
 instance Functor Node where
     fmap f (Node nodeHeader edge) = Node nodeHeader $ (f <$>) <$> edge
 
@@ -143,12 +156,21 @@ instance Functor Tree where
     fmap f (Tree node) = Tree $ f <$> node
     fmap f (Leaf x) = Leaf $ f x
 
+instance Functor Edge where
+    fmap f (Edge label tree) = Edge label $ f <$> tree
+
+instance Foldable Edge where
+    foldMap f (Edge _ tree) = foldMap f tree
+
 instance Foldable Node where
     foldMap f (Node _ edges) = foldMap (foldMap f) edges
 
 instance Foldable Tree where
     foldMap f (Leaf a) = f a
     foldMap f (Tree node) = foldMap f node
+
+instance Traversable Edge where
+    traverse f (Edge label tree) = Edge label <$> traverse f tree
 
 instance Traversable Node where
     traverse f (Node label edges) = Node label <$> traverse (traverse f) edges
@@ -169,12 +191,12 @@ withTextRevisions
     -- ^ document structure tree with concrete text revisions
 withTextRevisions getTextRevision = withTextRevisions'
   where
-    withTextRevisions' (Node metaData children') =
-        mapM treeWithTextRevisions children' <&> Node metaData
+    withTextRevisions' (Node metaData edges) = mapM mapEdge edges <&> Node metaData
     treeWithTextRevisions (Tree node) = withTextRevisions' node <&> Tree
     treeWithTextRevisions (Leaf textElement) =
         getTextRevision (TextElement.identifier textElement)
             <&> Leaf . TextElementRevision textElement
+    mapEdge (Edge label tree) = treeWithTextRevisions tree <&> Edge label
 
 treeMapM
     :: (Monad m)
@@ -183,27 +205,18 @@ treeMapM
     -> m (Node b)
 treeMapM getTextRevision = withTextRevisions'
   where
-    withTextRevisions' (Node metaData children') =
-        mapM treeWithTextRevisions children' <&> Node metaData
+    withTextRevisions' (Node metaData edges) = mapM mapEdge edges <&> Node metaData
     treeWithTextRevisions (Tree node) = withTextRevisions' node <&> Tree
     treeWithTextRevisions (Leaf x) =
         getTextRevision x
             <&> Leaf
+    mapEdge (Edge label tree) = treeWithTextRevisions tree <&> Edge label
 
 filterMapNode :: (a -> Maybe b) -> Node a -> Node b
-filterMapNode f (Node header' children') = Node header' $ mapMaybe tree children'
+filterMapNode f (Node header' children') = Node header' $ mapMaybe edge children'
   where
+    edge (Edge title' child) = case tree child of
+        Just x' -> Just $ Edge title' x'
+        Nothing -> Nothing
     tree (Tree n) = Just $ Tree $ filterMapNode f n
     tree (Leaf l) = Leaf <$> f l
-
-data WithTitle a = WithTitle
-    { title :: Text
-    , content :: a
-    }
-    deriving (Generic)
-
-instance (ToJSON a) => ToJSON (WithTitle a)
-
-instance (FromJSON a) => FromJSON (WithTitle a)
-
-instance (ToSchema a) => ToSchema (WithTitle a)

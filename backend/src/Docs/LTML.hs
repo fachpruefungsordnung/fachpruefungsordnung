@@ -2,13 +2,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Docs.LTML
-    ( treeRevisionToLtmlInputTree
+    ( treeRevisionToLtmlIntpuTree
     , nodeToLtmlInputTree
     , nodeToLtmlInputTree'
     , treeToLtmlInputTree
     ) where
 
-import Data.Text (Text)
 import qualified Data.Text as Text
 
 import Docs.TextElement (TextElement)
@@ -27,19 +26,10 @@ import qualified Language.Ltml.Common as LTML
 import Language.Ltml.Tree (FlaggedInputTree)
 import qualified Language.Ltml.Tree as LTML
 
-data MetaFlag
-    = MetaTree (Maybe Text)
-    | MetaLeaf TextElementRevision
-
-treeFromFlaggedMetaTree
-    :: LTML.FlaggedMetaTree MetaFlag
-    -> Tree TextElementRevision
-treeFromFlaggedMetaTree = undefined
-
-treeRevisionToLtmlInputTree
+treeRevisionToLtmlIntpuTree
     :: TreeRevision TextElementRevision
     -> FlaggedInputTree (Maybe TextElementRevision)
-treeRevisionToLtmlInputTree (TreeRevision _ node) = nodeToLtmlInputTree node
+treeRevisionToLtmlIntpuTree (TreeRevision _ node) = nodeToLtmlInputTree node
 
 nodeToLtmlInputTree'
     :: Node TextElementRevision
@@ -58,10 +48,11 @@ nodeToLtmlInputTree (Node {Tree.header, Tree.children}) =
     let kind = LSD.KindName $ Text.unpack $ Tree.headerKind header
         type_ = LSD.TypeName $ Text.unpack $ Tree.headerType header
         heading = Tree.heading header
+        xs = Tree.content <$> children -- TODO: Docs.Tree.Edge will disappear, so this will become obsolete
      in LTML.Flagged Nothing $
             LTML.TypedTree kind type_ $
                 LTML.Tree heading $
-                    treeToLtmlInputTree <$> children
+                    treeToLtmlInputTree <$> xs
 
 treeToLtmlInputTree
     :: Tree TextElementRevision

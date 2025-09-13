@@ -112,7 +112,7 @@ import Docs.TextRevision
     , TextRevisionRef (..)
     )
 import qualified Docs.TextRevision as TextRevision
-import Docs.Tree (Node (Node), Tree, filterMapNode)
+import Docs.Tree (Edge (Edge), Node (Node), Tree, filterMapNode)
 import qualified Docs.Tree as Tree
 import Docs.TreeRevision
     ( TreeRevision
@@ -615,7 +615,9 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
                         Tree.Tree $
                             Tree.Node
                                 (Tree.NodeHeader (Text.pack kind) (Text.pack type_) heading)
-                                emplacedChildren
+                                ( (\c -> Edge (fromMaybe "" (throwTogetherTitle c)) c)
+                                    <$> emplacedChildren
+                                )
                 (LTML.Leaf text) -> do
                     textElement <-
                         ExceptT $
@@ -654,7 +656,14 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
         Tree.Leaf _ -> throwError $ Custom "Root is leaf :/"
 
 nodeWithTitle :: Node TextElementRevision -> Node TextElementRevision
-nodeWithTitle (Node content children) = Node content children
+nodeWithTitle (Node content children) = Node content (edgeWithTitle <$> children)
+
+edgeWithTitle :: Edge TextElementRevision -> Edge TextElementRevision
+edgeWithTitle edge =
+    edge
+        { Tree.title =
+            fromMaybe (Tree.title edge) $ throwTogetherTitle $ Tree.content edge
+        }
 
 -- Temporary function to get a somewhat usable title.
 -- Should be replaced by a function provided by the language team later on.

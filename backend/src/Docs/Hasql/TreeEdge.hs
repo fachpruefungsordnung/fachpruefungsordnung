@@ -4,6 +4,7 @@ module Docs.Hasql.TreeEdge
     , TreeEdgeChild (..)
     ) where
 
+import Data.Text (Text)
 import GHC.Int (Int64)
 
 import Docs.Hash (Hash, Hashable (..))
@@ -26,6 +27,7 @@ instance Hashable TreeEdgeChildRef where
 data TreeEdge = TreeEdge
     { parentHash :: Hash
     , position :: Int64
+    , title :: Text
     , child :: TreeEdgeChildRef
     }
 
@@ -34,4 +36,5 @@ instance Hashable TreeEdge where
       where
         updateHash' edge =
             flip updateHash (position edge)
+                . flip updateHash (title edge)
                 . flip updateHash (child edge)

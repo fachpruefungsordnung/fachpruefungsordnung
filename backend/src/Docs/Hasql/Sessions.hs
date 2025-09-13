@@ -64,7 +64,7 @@ import Docs.TextRevision
     , TextRevisionHistory (TextRevisionHistory)
     , TextRevisionRef
     )
-import Docs.Tree (Node (Node), NodeHeader, Tree)
+import Docs.Tree (Edge (Edge), Node (Node), NodeHeader)
 import qualified Docs.Tree as Tree
 import Docs.TreeRevision
     ( TreeRevision
@@ -156,9 +156,9 @@ getTree rootHash = do
         children <- statement hash Statements.getTreeEdgesByParent
         edges <- mapM edgeSelector children
         return $ Node header $ Vector.toList edges
-    edgeSelector :: TreeEdgeChild -> Session (Tree TextElement)
-    edgeSelector edge =
-        case edge of
+    edgeSelector :: (Text, TreeEdgeChild) -> Session (Edge TextElement)
+    edgeSelector (title, edge) =
+        Edge title <$> case edge of
             (TreeEdgeToTextElement textElement) -> return $ Tree.Leaf textElement
             (TreeEdgeToNode hash header) -> fromHeader hash header <&> Tree.Tree
 

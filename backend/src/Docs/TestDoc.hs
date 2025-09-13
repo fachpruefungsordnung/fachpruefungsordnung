@@ -19,7 +19,7 @@ import Docs.TextRevision
     , NewTextRevision (NewTextRevision)
     )
 import qualified Docs.TextRevision as TextRevision
-import Docs.Tree (Node (..), NodeHeader (..), Tree (..))
+import Docs.Tree (Edge (..), Node (..), NodeHeader (..), Tree (..))
 
 createTestDocument :: Connection -> IO ()
 createTestDocument db = do
@@ -52,20 +52,23 @@ createTestDocument db = do
     let tree =
             Node
                 (NodeHeader "BodyNode" "DocumentRoot" (Just "Fachprüfungsordnung"))
-                [ Leaf (TextElement.identifier paragraph1)
-                , Leaf (TextElement.identifier paragraph2)
-                , Leaf (TextElement.identifier paragraph3)
-                , Leaf (TextElement.identifier paragraph4)
-                , Leaf (TextElement.identifier paragraph5)
-                , Tree
-                    ( Node
-                        (NodeHeader "BodyNode" "Attachements" (Just "Anlagen"))
-                        [ Leaf (TextElement.identifier anlage1)
-                        , Leaf (TextElement.identifier anlage2)
-                        , Leaf (TextElement.identifier anlage3)
-                        , Leaf (TextElement.identifier anlage4)
-                        , Leaf (TextElement.identifier anlage5)
-                        ]
+                [ Edge "§ 1" (Leaf (TextElement.identifier paragraph1))
+                , Edge "§ 2" (Leaf (TextElement.identifier paragraph2))
+                , Edge "§ 3" (Leaf (TextElement.identifier paragraph3))
+                , Edge "§ 4" (Leaf (TextElement.identifier paragraph4))
+                , Edge "§ 5" (Leaf (TextElement.identifier paragraph5))
+                , Edge
+                    "Anlagen"
+                    ( Tree
+                        ( Node
+                            (NodeHeader "BodyNode" "Attachements" (Just "Anlagen"))
+                            [ Edge "Thomann" (Leaf (TextElement.identifier anlage1))
+                            , Edge "LD Systems" (Leaf (TextElement.identifier anlage2))
+                            , Edge "Beyerdynamic" (Leaf (TextElement.identifier anlage3))
+                            , Edge "Seeburg TSM 15" (Leaf (TextElement.identifier anlage4))
+                            , Edge "Audionate" (Leaf (TextElement.identifier anlage5))
+                            ]
+                        )
                     )
                 ]
     _ <- withDB $ runTransaction $ createTreeRevision userID docID tree
