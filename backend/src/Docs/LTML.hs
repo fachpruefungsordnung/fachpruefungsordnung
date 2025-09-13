@@ -1,15 +1,16 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Docs.Util
+module Docs.LTML
     ( treeRevisionToLtmlIntpuTree
     , nodeToLtmlInputTree
+    , nodeToLtmlInputTree'
     , treeToLtmlInputTree
     ) where
 
 import qualified Data.Text as Text
 
-import Docs.TextElement (TextElementID)
+import Docs.TextElement (TextElement)
 import Docs.TextRevision
     ( TextElementRevision (TextElementRevision, revision, textElement)
     )
@@ -27,12 +28,22 @@ import qualified Language.Ltml.Tree as LTML
 
 treeRevisionToLtmlIntpuTree
     :: TreeRevision TextElementRevision
-    -> FlaggedInputTree (Maybe TextElementID)
+    -> FlaggedInputTree (Maybe TextElementRevision)
 treeRevisionToLtmlIntpuTree (TreeRevision _ node) = nodeToLtmlInputTree node
+
+nodeToLtmlInputTree'
+    :: Node TextElementRevision
+    -> FlaggedInputTree (Maybe TextElement)
+nodeToLtmlInputTree' =
+    LTML.flaggedTreeMap
+        ((\(TextElementRevision te _) -> te) <$>)
+        id
+        id
+        . nodeToLtmlInputTree
 
 nodeToLtmlInputTree
     :: Node TextElementRevision
-    -> FlaggedInputTree (Maybe TextElementID)
+    -> FlaggedInputTree (Maybe TextElementRevision)
 nodeToLtmlInputTree (Node {Tree.header, Tree.children}) =
     let kind = LSD.KindName $ Text.unpack $ Tree.headerKind header
         type_ = LSD.TypeName $ Text.unpack $ Tree.headerType header
@@ -45,11 +56,12 @@ nodeToLtmlInputTree (Node {Tree.header, Tree.children}) =
 
 treeToLtmlInputTree
     :: Tree TextElementRevision
-    -> FlaggedInputTree (Maybe TextElementID)
+    -> FlaggedInputTree (Maybe TextElementRevision)
 treeToLtmlInputTree (Tree node) = nodeToLtmlInputTree node
-treeToLtmlInputTree (Leaf (TextElementRevision {textElement, revision})) =
-    let id_ = Just $ TextElement.identifier textElement
-        kind = LSD.KindName $ Text.unpack $ TextElement.textElementKind textElement
+treeToLtmlInputTree (Leaf textElementRevision@TextElementRevision {textElement, revision}) =
+    let kind = LSD.KindName $ Text.unpack $ TextElement.textElementKind textElement
         type_ = LSD.TypeName $ Text.unpack $ TextElement.textElementType textElement
         content = maybe "" TextRevision.content revision
-     in LTML.Flagged id_ $ LTML.TypedTree kind type_ $ LTML.Leaf content
+     in LTML.Flagged (Just textElementRevision) $
+            LTML.TypedTree kind type_ $
+                LTML.Leaf content
