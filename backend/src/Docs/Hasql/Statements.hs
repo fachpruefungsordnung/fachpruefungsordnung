@@ -114,6 +114,7 @@ import Docs.TextElement
     , TextElementID (..)
     , TextElementKind
     , TextElementRef (..)
+    , TextElementType
     )
 import qualified Docs.TextElement as TextElement
 import Docs.TextRevision
@@ -413,29 +414,31 @@ getDocumentsBy =
                 last_edited DESC
         |]
 
-uncurryTextElement :: (Int64, Text) -> TextElement
-uncurryTextElement (id_, kind) =
+uncurryTextElement :: (Int64, Text, Text) -> TextElement
+uncurryTextElement (id_, kind, type_) =
     TextElement
         { TextElement.identifier = TextElementID id_
-        , TextElement.kind = kind
+        , TextElement.textElementKind = kind
+        , TextElement.textElementType = type_
         }
 
-createTextElement :: Statement (DocumentID, Text) TextElement
+createTextElement :: Statement (DocumentID, Text, Text) TextElement
 createTextElement =
     lmap mapInput $
         rmap
             uncurryTextElement
             [singletonStatement|
             insert into doc_text_elements
-                (document, kind)
+                (document, kind, type)
             values
-                ($1 :: int8, $2 :: text)
+                ($1 :: int8, $2 :: text, $3 :: text)
             returning
                 id :: int8,
-                kind :: text
+                kind :: text,
+                type :: text
         |]
   where
-    mapInput (docID, kind) = (unDocumentID docID, kind)
+    mapInput (docID, kind, type_) = (unDocumentID docID, kind, type_)
 
 getTextElement :: Statement TextElementID (Maybe TextElement)
 getTextElement =
@@ -446,7 +449,8 @@ getTextElement =
             [maybeStatement|
                 select
                     id :: int8,
-                    kind :: text
+                    kind :: text,
+                    type :: text
                 from
                     doc_text_elements
                 where
@@ -480,6 +484,7 @@ uncurryTextElementRevision
     :: (Monad m)
     => ( Int64
        , TextElementKind
+       , TextElementType
        , Maybe Int64
        , Maybe UTCTime
        , Maybe UUID
@@ -489,14 +494,15 @@ uncurryTextElementRevision
     -> (TextRevisionID -> m (Vector CommentAnchor))
     -> m TextElementRevision
 uncurryTextElementRevision
-    (id_, kind, revisionID, timestamp, authorID, authorName, content)
+    (id_, kind, type_, revisionID, timestamp, authorID, authorName, content)
     getAnchors = do
         anchors <- mapM (getAnchors . TextRevisionID) revisionID
         return
             $ TextElementRevision
                 TextElement
                     { TextElement.identifier = TextElementID id_
-                    , TextElement.kind = kind
+                    , TextElement.textElementKind = kind
+                    , TextElement.textElementType = type_
                     }
             $ do
                 trRevisionID <- revisionID
@@ -709,6 +715,7 @@ getTextElementRevision =
                 select
                     te.id :: int8,
                     te.kind :: text,
+                    te.type :: text,
                     tr.id :: int8?,
                     tr.creation_ts :: timestamptz?,
                     tr.author :: uuid?,
@@ -821,9 +828,10 @@ uncurryTreeEdgeChild
        , Maybe Text
        , Maybe Int64
        , Maybe Text
+       , Maybe Text
        )
     -> Maybe (Text, TreeEdgeChild)
-uncurryTreeEdgeChild (title, nodeHash, nodeKind, nodeType, nodeHeading, textID, textKind) =
+uncurryTreeEdgeChild (title, nodeHash, nodeKind, nodeType, nodeHeading, textID, textKind, textType) =
     (title,) <$> (maybeNode <|> maybeText)
   where
     maybeNode = do
@@ -841,11 +849,13 @@ uncurryTreeEdgeChild (title, nodeHash, nodeKind, nodeType, nodeHeading, textID, 
     maybeText = do
         id_ <- textID
         kind <- textKind
+        type_ <- textType
         return $
             TreeEdgeToTextElement
                 TextElement
                     { TextElement.identifier = TextElementID id_
-                    , TextElement.kind = kind
+                    , TextElement.textElementKind = kind
+                    , TextElement.textElementType = type_
                     }
 
 getTreeEdgesByParent :: Statement Hash (Vector (Text, TreeEdgeChild))
@@ -862,7 +872,8 @@ getTreeEdgesByParent =
                     n.type :: text?,
                     n.heading :: text?,
                     t.id :: int8?,
-                    t.kind :: text?
+                    t.kind :: text?,
+                    t.type :: text?
                 from
                     doc_tree_edges e
                     left join doc_tree_nodes n on e.child_node = n.hash

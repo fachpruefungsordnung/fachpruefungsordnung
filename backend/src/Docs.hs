@@ -100,6 +100,7 @@ import Docs.TextElement
     , TextElementID
     , TextElementKind
     , TextElementRef (..)
+    , TextElementType
     )
 import qualified Docs.TextElement as TextElement
 import Docs.TextRevision
@@ -229,11 +230,14 @@ createTextElement
     => UserID
     -> DocumentID
     -> TextElementKind
+    -> TextElementType
     -> m (Result TextElement)
-createTextElement userID docID kind = logged userID Scope.docsText $ runExceptT $ do
-    guardPermission Edit docID userID
-    guardExistsDocument docID
-    lift $ DB.createTextElement docID kind
+createTextElement userID docID kind type_ =
+    logged userID Scope.docsText $
+        runExceptT $ do
+            guardPermission Edit docID userID
+            guardExistsDocument docID
+            lift $ DB.createTextElement docID kind type_
 
 -- | Create a new 'TextRevision' in the Database.
 --
@@ -617,8 +621,11 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
                 (LTML.Leaf text) -> do
                     textElement <-
                         ExceptT $
-                            createTextElement userID docID $
-                                Text.pack kind
+                            createTextElement
+                                userID
+                                docID
+                                (Text.pack kind)
+                                (Text.pack type_)
                     let textID = TextElement.identifier textElement
                     let textRev = TextElementRef docID textID
                     textRevision <-

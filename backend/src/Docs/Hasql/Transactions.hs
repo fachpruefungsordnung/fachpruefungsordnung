@@ -59,6 +59,7 @@ import Docs.TextElement
     , TextElementID
     , TextElementKind
     , TextElementRef (..)
+    , TextElementType
     )
 import Docs.TextRevision
     ( DraftRevision
@@ -86,8 +87,12 @@ createDocument :: Text -> GroupID -> UserID -> Transaction Document
 createDocument name group user =
     statement (name, group, user) Statements.createDocument
 
-createTextElement :: DocumentID -> TextElementKind -> Transaction TextElement
-createTextElement = curry (`statement` Statements.createTextElement)
+createTextElement
+    :: DocumentID
+    -> TextElementKind
+    -> TextElementType
+    -> Transaction TextElement
+createTextElement docID kind type_ = statement (docID, kind, type_) Statements.createTextElement
 
 existsTextRevision :: TextRevisionRef -> Transaction Bool
 existsTextRevision = flip statement Statements.existsTextRevision

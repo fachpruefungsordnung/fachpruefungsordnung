@@ -28,17 +28,27 @@ createTestDocument db = do
     doc <- withDB $ run $ createDocument userID groupID "Test Document"
     let docID = Document.identifier doc
     -- paragraphen
-    paragraph1 <- withDB $ run $ createTextElement userID docID "paragraph"
-    paragraph2 <- withDB $ run $ createTextElement userID docID "paragraph"
-    paragraph3 <- withDB $ run $ createTextElement userID docID "paragraph"
-    paragraph4 <- withDB $ run $ createTextElement userID docID "paragraph"
-    paragraph5 <- withDB $ run $ createTextElement userID docID "paragraph"
+    paragraph1 <-
+        withDB $ run $ createTextElement userID docID "paragraph" "paragraph"
+    paragraph2 <-
+        withDB $ run $ createTextElement userID docID "paragraph" "paragraph"
+    paragraph3 <-
+        withDB $ run $ createTextElement userID docID "paragraph" "paragraph"
+    paragraph4 <-
+        withDB $ run $ createTextElement userID docID "paragraph" "paragraph"
+    paragraph5 <-
+        withDB $ run $ createTextElement userID docID "paragraph" "paragraph"
     -- anlagen
-    anlage1 <- withDB $ run $ createTextElement userID docID "attachement"
-    anlage2 <- withDB $ run $ createTextElement userID docID "attachement"
-    anlage3 <- withDB $ run $ createTextElement userID docID "attachement"
-    anlage4 <- withDB $ run $ createTextElement userID docID "attachement"
-    anlage5 <- withDB $ run $ createTextElement userID docID "attachement"
+    anlage1 <-
+        withDB $ run $ createTextElement userID docID "attachement" "attachement"
+    anlage2 <-
+        withDB $ run $ createTextElement userID docID "attachement" "attachement"
+    anlage3 <-
+        withDB $ run $ createTextElement userID docID "attachement" "attachement"
+    anlage4 <-
+        withDB $ run $ createTextElement userID docID "attachement" "attachement"
+    anlage5 <-
+        withDB $ run $ createTextElement userID docID "attachement" "attachement"
     let tree =
             Node
                 (NodeHeader "BodyNode" "DocumentRoot" (Just "Fachprüfungsordnung"))

@@ -56,6 +56,7 @@ import Docs.TextElement
     , TextElementID
     , TextElementKind
     , TextElementRef (TextElementRef)
+    , TextElementType
     )
 import Docs.TextRevision
     ( TextElementRevision
@@ -98,8 +99,12 @@ getDocuments = (`statement` Statements.getDocuments)
 getDocumentsBy :: Maybe UserID -> Maybe GroupID -> Session (Vector Document)
 getDocumentsBy = curry (`statement` Statements.getDocumentsBy)
 
-createTextElement :: DocumentID -> TextElementKind -> Session TextElement
-createTextElement = curry (`statement` Statements.createTextElement)
+createTextElement
+    :: DocumentID
+    -> TextElementKind
+    -> TextElementType
+    -> Session TextElement
+createTextElement docID kind type_ = statement (docID, kind, type_) Statements.createTextElement
 
 createTextRevision
     :: UserID

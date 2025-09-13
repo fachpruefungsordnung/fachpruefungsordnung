@@ -111,7 +111,7 @@ instance HasCreateDocument HasqlSession where
     createDocument = ((HasqlSession .) .) . Sessions.createDocument
 
 instance HasCreateTextElement HasqlSession where
-    createTextElement = (HasqlSession .) . Sessions.createTextElement
+    createTextElement = ((HasqlSession .) .) . Sessions.createTextElement
 
 instance HasLogMessage HasqlSession where
     logMessage = (((HasqlSession .) .) .) . Sessions.logMessage
@@ -206,4 +206,4 @@ instance HasCreateDocument HasqlTransaction where
     createDocument = ((HasqlTransaction .) .) . Transactions.createDocument
 
 instance HasCreateTextElement HasqlTransaction where
-    createTextElement = (HasqlTransaction .) . Transactions.createTextElement
+    createTextElement = ((HasqlTransaction .) .) . Transactions.createTextElement

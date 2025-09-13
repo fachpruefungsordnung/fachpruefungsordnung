@@ -417,6 +417,7 @@ postTextElementHandler auth docID element = do
                 userID
                 docID
                 (CreateTextElement.kind element)
+                (CreateTextElement.type_ element)
 
 postTextRevisionHandler
     :: AuthResult Auth.Token

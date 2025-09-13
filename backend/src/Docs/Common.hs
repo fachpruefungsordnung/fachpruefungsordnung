@@ -10,7 +10,7 @@ nodeWithoutText (Node header children) =
 
 treeWithoutText :: Tree TextElementRevision -> Tree TextElementID
 treeWithoutText (Tree node) = Tree $ nodeWithoutText node
-treeWithoutText (Leaf (TextElementRevision (TextElement id_ _) _)) = Leaf id_
+treeWithoutText (Leaf (TextElementRevision (TextElement id_ _ _) _)) = Leaf id_
 
 edgeWithoutText :: Edge TextElementRevision -> Edge TextElementID
 edgeWithoutText edge = edge {content = treeWithoutText $ content edge}
