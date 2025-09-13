@@ -1,26 +1,22 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-module Language.Ltml.ToLaTeX
-    ( generatePDFFromSection
+module Language.Ltml.ToLaTeX.PDFGenerator
+    ( generatePDFFromSection -- deprecated, use 'generatePDF' instead
+    , generatePDF
     --   generatePDFFromDocument
     ) where
 
-import Control.Lens (view, (&), (.~))
+import Control.Exception (Exception (displayException), SomeException, try)
+import Control.Lens (view)
 import Control.Monad.State (runState)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as TLE
-import Language.Lsd.AST.Type (NamedType (NamedType))
-import Language.Lsd.Example.Fpo (footnoteT, sectionT)
-import Language.Ltml.Parser (Parser)
-import Language.Ltml.Parser.Common.Lexeme (nSc)
-import Language.Ltml.Parser.Footnote (runFootnoteWriterT)
-import Language.Ltml.Parser.Section (sectionP)
 import Language.Ltml.ToLaTeX.GlobalState
     ( initialGlobalState
-    , labelToFootNote
     , labelToRef
     , preDocument
     )
@@ -39,19 +35,54 @@ import System.Process
     , proc
     , waitForProcess
     )
-import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 
--- withTempIn :: FilePath -> String -> (FilePath -> IO a) -> IO a
--- withTempIn parent template =
---     bracket
---         (createTempDirectory parent template)
---         removeDirectoryRecursive
+-------------------------------- Public -----------------------------------
+
+generatePDF
+    :: (ToPreLaTeXM a) => a -> IO (Either String BSL.ByteString)
+generatePDF input = do
+    res <- try $ compilePDF input
+    case res of
+        Left (e :: SomeException) -> return $ Left (displayException e)
+        Right pdf -> return $ Right pdf
+
+-------------------------------- Pipeline -----------------------------------
+
+compilePDF
+    :: (ToPreLaTeXM p) => p -> IO BSL.ByteString
+compilePDF input =
+    withSystemTempDirectory "latex-temp" $ \tmpDir -> do
+        let texFile = tmpDir </> "input.tex"
+            pdfFile = tmpDir </> "input.pdf"
+
+        -- Generate LaTeX source from input
+        let latexSource = generateLaTeX input
+
+        -- Write LaTeX source
+        BSL.writeFile texFile (TLE.encodeUtf8 latexSource)
+
+        -- Compile with pdflatex
+        (exitCode, stdout, _) <- runLatex texFile tmpDir
+
+        case exitCode of
+            ExitFailure _ -> failLatex stdout
+            ExitSuccess -> BSL.readFile pdfFile
+
+-------------------------------- Helpers -----------------------------------
+
+generateLaTeX :: (ToPreLaTeXM a) => a -> LT.Text
+generateLaTeX input =
+    let (res, gs) = runState (toPreLaTeXM input) initialGlobalState
+     in renderLaTeX $
+            toLaTeX
+                (view labelToRef gs)
+                (view preDocument gs <> document res)
 
 runLatex :: FilePath -> FilePath -> IO (ExitCode, BS.ByteString, BS.ByteString)
 runLatex texFile workDir = do
     (Just hin, Just hout, Just herr, ph) <-
         createProcess
-            (proc "pdflatex" ["-interaction=nonstopmode", "-halt-on-error", texFile])
+            (proc "latexmk" ["-pdf", "-interaction=nonstopmode", "-halt-on-error", texFile])
                 { cwd = Just workDir
                 , std_in = CreatePipe
                 , std_out = CreatePipe
@@ -63,43 +94,15 @@ runLatex texFile workDir = do
     exitCode <- waitForProcess ph
     return (exitCode, out, err)
 
-generatePDFfromParsed
-    :: Parser a -> (a -> LT.Text) -> Text -> IO (Either String BSL.ByteString)
-generatePDFfromParsed parser render input =
-    case runParser parser "" input of
-        Left err -> return $ Left (errorBundlePretty err)
-        Right parsedInput ->
-            withSystemTempDirectory "latex-temp" $ \tmpDir -> do
-                let texFile = tmpDir </> "input.tex"
-                    pdfFile = tmpDir </> "input.pdf"
-                -- cmd = "pdflatex -interaction=nonstopmode -halt-on-error input.tex"
+failLatex :: BS.ByteString -> IO a
+failLatex stdout =
+    -- TODO: maybe drop preambel here
+    fail (BS.unpack stdout)
 
-                -- Write LaTeX source
-                -- LTIO.writeFile texFile (render parsedInput)
-                BSL.writeFile texFile (TLE.encodeUtf8 (render parsedInput))
-
-                -- Compile with pdflatex
-                (exitCode, stdout, _) <- runLatex texFile tmpDir
-
-                case exitCode of
-                    ExitFailure _ -> do
-                        -- let cleanErr = drop 3094 stdout -- omitting the preambel of the pdflatex output here.
-                        -- could be different on another system and thus maybe revert later
-                        return $ Left $ BS.unpack stdout
-                    ExitSuccess -> do
-                        pdf <- BSL.readFile pdfFile
-                        return $ Right pdf
-
--- generatePDFFromDocument :: Text -> IO (Either String BS.ByteString)
--- generatePDFFromDocument =
---     generatePDFfromParsed (documentP superSectionT empty) documentToText
---   where
---     documentToText doc =
---         let (latexDoc, gs) = runState (toLaTeXM doc) initialGlobalState
---          in renderLaTeX (labelToRef gs) latexDoc
+-------------------------------- Deprecated -----------------------------------
 
 generatePDFFromSection :: Text -> IO (Either String BSL.ByteString)
-generatePDFFromSection input = undefined
+generatePDFFromSection = undefined
 
 --     let NamedType _ _ sectionT' = sectionT
 --         NamedType _ _ footnoteT' = footnoteT
@@ -134,3 +137,9 @@ generatePDFFromSection input = undefined
 --             putStrLn "LaTeX compilation failed."
 --             return $ Left $ drop 3094 stdout -- omitting the preambel of the pdflatex output here.
 --             -- could be different on another system and thus maybe revert later
+
+-- withTempIn :: FilePath -> String -> (FilePath -> IO a) -> IO a
+-- withTempIn parent template =
+--     bracket
+--         (createTempDirectory parent template)
+--         removeDirectoryRecursive

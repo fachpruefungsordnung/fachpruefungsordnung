@@ -174,10 +174,14 @@ mainDocT =
                             ]
                 )
                 ( Disjunction
-                    [ docMainBodyTF $
-                        InnerSectionBodyType (Star sectionT)
-                    , docMainBodyTF $
-                        InnerSectionBodyType (Star superSectionT)
+                    [ NamedType "fpo-mainbody-simple" "Hauptteil (einfach)" $
+                        docMainBodyTF $
+                            InnerSectionBodyType (Star sectionT)
+                    , NamedType
+                        "fpo-mainbody-structured"
+                        "Hauptteil (mit Abschnitten)"
+                        $ docMainBodyTF
+                        $ InnerSectionBodyType (Star superSectionT)
                     ]
                 )
                 ( Just $
@@ -200,8 +204,9 @@ simpleDocT =
             ( DocumentBodyType
                 Nothing
                 ( Disjunction
-                    [ docMainBodyTF $
-                        SimpleLeafSectionBodyType (Star simpleBlockT)
+                    [ NamedType "simpledoc-mainbody" "Hauptteil" $
+                        docMainBodyTF $
+                            SimpleLeafSectionBodyType (Star simpleBlockT)
                     ]
                 )
                 Nothing

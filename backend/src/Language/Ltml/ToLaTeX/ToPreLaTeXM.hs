@@ -4,8 +4,8 @@
 module Language.Ltml.ToLaTeX.ToPreLaTeXM (ToPreLaTeXM (..))
 where
 
-import Control.Lens (use, (%=), (.=), (.~))
-import Control.Monad.State (MonadState (get, put), State, modify, runState)
+import Control.Lens (use, (%=), (.=))
+import Control.Monad.State (State)
 import qualified Data.DList as DList
 import qualified Data.Map as Map
 import Data.Text (Text)
@@ -143,9 +143,7 @@ instance (ToPreLaTeXM a) => ToPreLaTeXM (Flagged' a) where
         (GS.flagState . GS.flaggedParent) .= (b || b0)
         (GS.flagState . GS.flaggedChildren) .= False
         {- run the state to build the globalstate and get the potential result -}
-        gs <- get
-        let (res, gs') = runState (toPreLaTeXM content) gs
-        put gs'
+        res <- toPreLaTeXM content
         {- reset the scope -}
         (GS.flagState . GS.flaggedParent) .= b0
         isParent <- use (GS.flagState . GS.flaggedChildren)
@@ -318,25 +316,24 @@ instance Labelable Section where
                         n <- GS.nextSection
                         setLabel n
                         GS.flagState . GS.onlyOneParagraph .= (length paragraphs == 1)
-                        GS.addTOCEntry n keyident ident headingText
+                        tocAnchor <- GS.addTOCEntry n keyident ident headingText
                         headingDoc <- buildHeading n
                         content' <- toPreLaTeXM paragraphs
-                        let anchor = maybe headingDoc (`hypertarget` headingDoc) mLabel
-                        pure $ anchor <> content'
+                        let refAnchor = maybe headingDoc (`hypertarget` headingDoc) mLabel
+                        pure $ tocAnchor <> refAnchor <> content'
                     InnerSectionBody subsections -> do
                         n <- GS.nextSupersection
                         setLabel n
                         GS.flagState . GS.isSupersection .= True
                         GS.counterState . GS.supersectionCTR .= 0
-                        GS.addTOCEntry n keyident ident headingText
+                        tocAnchor <- GS.addTOCEntry n keyident ident headingText
                         headingDoc <- buildHeading n
                         content' <- toPreLaTeXM subsections
-                        modify $
-                            {-  -} (GS.flagState . GS.isSupersection .~ False)
-                                . (GS.counterState . GS.supersectionCTR .~ n)
-                        let anchor =
+                        GS.flagState . GS.isSupersection .= False
+                        GS.counterState . GS.supersectionCTR .= n
+                        let refAnchor =
                                 maybe (headingDoc <> linebreak) (`hypertarget` (headingDoc <> linebreak)) mLabel
-                        pure $ anchor <> content'
+                        pure $ tocAnchor <> refAnchor <> content'
                     SimpleLeafSectionBody simpleblocks -> do
                         toPreLaTeXM simpleblocks
 
@@ -412,9 +409,10 @@ instance Labelable Document where
                             use (GS.formatState . GS.appendixFormat)
                         let iText = getIdentifier ident n
                         GS.insertRefLabel mLabel iText
-                        GS.addTOCEntry n key ident tt'
+                        tocAnchor <- GS.addTOCEntry n key ident tt'
                         GS.addAppendixHeaderEntry n key ident tt'
-                        createHeading fmt tt' (IText iText)
+                        heading <- createHeading fmt tt' (IText iText)
+                        pure $ tocAnchor <> heading
                     GS.Main -> do
                         fmt <- use (GS.formatState . GS.docHeadingFormat)
                         createHeading fmt tt' (IText " ")
@@ -425,7 +423,7 @@ instance Labelable Document where
                 toc' <- use GS.toc
                 appendixHeaders' <- use GS.appendixHeaders
                 pure $
-                    IText (LT.fromStrict tocHeading) <> case t of
+                    IText (LT.fromStrict tocHeading) <> linebreak <> case t of
                         GS.Appendix ->
                             ISequence $ DList.toList toc'
                         GS.Main ->
@@ -442,12 +440,15 @@ instance ToPreLaTeXM AppendixSection where
                     )
                 nodes
             ) = do
-            GS.counterState . GS.appendixCTR .= 0
-            GS.flagState . GS.docType .= GS.Appendix
-            GS.formatState . GS.appendixFormat .= elementFmt
-            GS.appendixHeaders %= (<> DList.fromList [IText (LT.fromStrict t), linebreak])
-            nodes' <- mapM toPreLaTeXM nodes
-            pure $ ISequence $ map ((newpage <> resetfootnote) <>) nodes'
+            if null nodes
+                then pure mempty
+                else do
+                    GS.counterState . GS.appendixCTR .= 0
+                    GS.flagState . GS.docType .= GS.Appendix
+                    GS.formatState . GS.appendixFormat .= elementFmt
+                    GS.appendixHeaders %= (<> DList.fromList [IText (LT.fromStrict t), linebreak])
+                    nodes' <- mapM toPreLaTeXM nodes
+                    pure $ ISequence $ map ((newpage <> resetfootnote) <>) nodes'
 
 -------------------------------- DocumentContainer -----------------------------------
 
