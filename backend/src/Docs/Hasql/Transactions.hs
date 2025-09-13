@@ -68,7 +68,7 @@ import Docs.TextRevision
     , TextRevisionID
     , TextRevisionRef
     )
-import Docs.Tree (Edge (Edge), Node (Node), Tree (Leaf, Tree))
+import Docs.Tree (Node (Node), Tree (Leaf, Tree))
 import Docs.TreeRevision (TreeRevision, TreeRevisionRef (TreeRevisionRef))
 import qualified Docs.TreeRevision as TreeRevision
 import Logging.Logs (LogMessage, Scope, Severity)
@@ -162,28 +162,25 @@ createTreeRevision authorID docID rootNode = do
 
 putTree :: Node TextElementID -> Transaction Hash
 putTree (Node metaData children) = do
-    childRefs <- mapM putChild children
+    childRefs <- mapM putSubTree children
     let ownHash =
             Hash $
                 SHA1.finalize $
                     foldr
-                        (flip updateHash . fst)
+                        (flip updateHash)
                         (updateHash SHA1.init metaData)
                         childRefs
     statement (ownHash, metaData) Statements.putTreeNode
-    let toEdge (ref, label) idx =
+    let toEdge ref idx =
             TreeEdge
                 { TreeEdge.parentHash = ownHash
                 , TreeEdge.position = idx
-                , TreeEdge.title = label
                 , TreeEdge.child = ref
                 }
     let edges = zipWith toEdge childRefs [0 ..]
     mapM_ (`statement` Statements.putTreeEdge) edges
     return ownHash
   where
-    putChild :: Edge TextElementID -> Transaction (TreeEdgeChildRef, Text)
-    putChild (Edge label node) = putSubTree node <&> (,label)
     putSubTree :: Tree TextElementID -> Transaction TreeEdgeChildRef
     putSubTree (Leaf id_) = return $ TreeEdgeRefToTextElement id_
     putSubTree (Tree node) = putTree node <&> TreeEdgeRefToNode

@@ -781,11 +781,10 @@ putTreeNode =
 
 uncurryTreeEdge
     :: TreeEdge
-    -> (ByteString, Int64, Text, Maybe ByteString, Maybe Int64)
+    -> (ByteString, Int64, Maybe ByteString, Maybe Int64)
 uncurryTreeEdge edge =
     ( unHash (TreeEdge.parentHash edge)
     , TreeEdge.position edge
-    , TreeEdge.title edge
     , childNode
     , childTextElement
     )
@@ -805,24 +804,20 @@ putTreeEdge =
             insert into doc_tree_edges
                 ( parent
                 , position
-                , title
                 , child_node
                 , child_text_element
                 )
             values
                 ( $1 :: bytea
                 , $2 :: int8
-                , $3 :: text
-                , $4 :: bytea?
-                , $5 :: int8?
+                , $3 :: bytea?
+                , $4 :: int8?
                 )
-            on conflict (parent, position) do update
-            set title = EXCLUDED.title
+            on conflict (parent, position) do nothing
         |]
 
 uncurryTreeEdgeChild
-    :: ( Text
-       , Maybe ByteString
+    :: ( Maybe ByteString
        , Maybe Text
        , Maybe Text
        , Maybe Text
@@ -830,9 +825,9 @@ uncurryTreeEdgeChild
        , Maybe Text
        , Maybe Text
        )
-    -> Maybe (Text, TreeEdgeChild)
-uncurryTreeEdgeChild (title, nodeHash, nodeKind, nodeType, nodeHeading, textID, textKind, textType) =
-    (title,) <$> (maybeNode <|> maybeText)
+    -> Maybe TreeEdgeChild
+uncurryTreeEdgeChild (nodeHash, nodeKind, nodeType, nodeHeading, textID, textKind, textType) =
+    maybeNode <|> maybeText
   where
     maybeNode = do
         hash <- nodeHash
@@ -858,7 +853,7 @@ uncurryTreeEdgeChild (title, nodeHash, nodeKind, nodeType, nodeHeading, textID, 
                     , TextElement.textElementType = type_
                     }
 
-getTreeEdgesByParent :: Statement Hash (Vector (Text, TreeEdgeChild))
+getTreeEdgesByParent :: Statement Hash (Vector TreeEdgeChild)
 getTreeEdgesByParent =
     lmap
         unHash
@@ -866,7 +861,6 @@ getTreeEdgesByParent =
             (mapMaybe uncurryTreeEdgeChild)
             [vectorStatement|
                 select
-                    e.title :: text,
                     n.hash :: bytea?,
                     n.kind :: text?,
                     n.type :: text?,
