@@ -861,7 +861,7 @@ renderToc (Just (TocFormat (TocHeading title))) entryFunc buttonFunc globalState
             buttonWrap = buttonWrapper category (Label htmlId)
             titleHtml = result id (span_ <#> Class.InlineError <$>) rTitle
             titleCell = td_ . entryWrap <$> titleHtml
-            idCell = td_ $ maybe mempty entryWrap mIdHtml
+            idCell = td_ <#> Class.Centered $ maybe mempty entryWrap mIdHtml
             linkButton = td_ <#> Class.Centered $ buttonWrap $ toHtml ("↗" :: Text)
          in
             -- \| Nothing IdHtmls will be replaced with mempty
