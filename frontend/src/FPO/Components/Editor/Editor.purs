@@ -91,7 +91,7 @@ import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, enabled, ref, style, title) as HP
 import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
@@ -110,6 +110,7 @@ import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
+import FPO.Data.AppError (AppError(..))
 
 foreign import _resize :: Types.Editor -> Effect Unit
 
@@ -746,7 +747,7 @@ editor = connect selectTranslator $ H.mkComponent
 
     Save isAutoSave -> do
       state <- H.get
-      when (not state.isEditorOutdated && state.compareToElement == Nothing) $ do
+      when (state.compareToElement == Nothing) $ do
         isDirty <- EC.liftEffect $ Ref.read =<< case state.saveState.mDirtyRef of
           Just r -> pure r
           Nothing -> EC.liftEffect $ Ref.new false
@@ -813,7 +814,7 @@ editor = connect selectTranslator $ H.mkComponent
       -- handle errors in pos and decodeJson
       case response of
         -- if error, try to Save again (Maybe ParentID is lost?)
-        Left _ -> handleAction (Save isAutoSave)
+        Left _ -> updateStore $ Store.AddError $ DataError "There was a problem with Upload"
         -- extract and insert new parentID into newContent
         Right updatedContent -> do
           H.raise (SavedSection newEntry)
