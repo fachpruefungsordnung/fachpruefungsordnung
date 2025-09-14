@@ -157,9 +157,12 @@ type Labels =
 
       -- | Editor Page
       ::: "editor_allComments"
+      ::: "editor_changeVersion"
       ::: "editor_comment"
       ::: "editor_compareVersion"
+      ::: "editor_confirmSwitch"
       ::: "editor_deleteComment"
+      ::: "editor_dirtySwitch"
       ::: "editor_discard"
       ::: "editor_fontSizeDown"
       ::: "editor_fontSizeUp"

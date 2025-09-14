@@ -9,9 +9,12 @@ import Simple.I18n.Translation (Translation, fromRecord)
 
 type EditorLabels =
   ( "editor_allComments"
+      ::: "editor_changeVersion"
       ::: "editor_comment"
       ::: "editor_compareVersion"
+      ::: "editor_confirmSwitch"
       ::: "editor_deleteComment"
+      ::: "editor_dirtySwitch"
       ::: "editor_discard"
       ::: "editor_fontSizeDown"
       ::: "editor_fontSizeUp"
@@ -34,9 +37,12 @@ type EditorLabels =
 enEditor :: Translation EditorLabels
 enEditor = fromRecord
   { editor_allComments: "All comments"
+  , editor_changeVersion: "Change Version"
+  , editor_confirmSwitch: "Switching Version"
   , editor_comment: "Comment"
   , editor_compareVersion: "Compare Version"
   , editor_deleteComment: "Delete comment"
+  , editor_dirtySwitch: "You currently have unsaved changes made to the current version. Switching between versions now will discard these changes."
   , editor_discard: "discard"
   , editor_fontSizeDown: "Font size down"
   , editor_fontSizeUp: "Font size up"
@@ -78,9 +84,12 @@ enEditor = fromRecord
 deEditor :: Translation EditorLabels
 deEditor = fromRecord
   { editor_allComments: "Alle Kommentare"
+  , editor_changeVersion: "Version Wechseln"
+  , editor_confirmSwitch: "Version Wechseln"
   , editor_comment: "Kommentar"
   , editor_compareVersion: "Version vergleichen"
   , editor_deleteComment: "Kommentar löschen"
+  , editor_dirtySwitch: "Der aktuelle Abschnitt beinhält ungespeicherte Änderungen. Diese werden beim Wechseln der Version verworfen."
   , editor_discard: "verwerfen"
   , editor_fontSizeDown: "Schrift verkleinern"
   , editor_fontSizeUp: "Schrift vergrößern"

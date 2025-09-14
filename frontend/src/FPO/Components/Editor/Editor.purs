@@ -178,6 +178,8 @@ type State = FPOState
   , isEditorOutdated :: Boolean
   , outdatedInfoPopup :: Boolean
   , discardPopup :: Boolean
+  -- similar to mDirtyRef, but for Drafts. causes popup is user tries changing version with open draft, as that would discard the draft.
+  , mDirtyVersion :: Maybe (Ref Boolean)
   )
 
 type Input = { docID :: DocumentID, elementData :: ElementData }
@@ -244,6 +246,8 @@ data Query a
   | UpdateComment CommentSection a
   | SelectCommentSection Int a
   | ToDeleteComment a
+  | RequestDirtyVersion (Boolean -> a)
+  | ResetDirtyVersion a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -273,8 +277,7 @@ editor = connect selectTranslator $ H.mkComponent
       ] $
       [ renderAll state ]
         <> renderInfoModal
-        <>
-          renderDiscardModal
+        <> renderDiscardModal
     where
     renderInfoModal = case state.outdatedInfoPopup of
       false -> []
@@ -582,8 +585,10 @@ editor = connect selectTranslator $ H.mkComponent
               Editor.setReadOnly false editor_
 
       -- New Ref for keeping track, if the content in editor has changed
-      -- since last save
+      -- 1. since last save
+      -- 2. since opening version
       dref <- H.liftEffect $ Ref.new false
+      vref <- H.liftEffect $ Ref.new false
 
       win <- H.liftEffect window
       let
@@ -606,6 +611,7 @@ editor = connect selectTranslator $ H.mkComponent
             { mDirtyRef = Just dref
             , mBeforeUnloadL = Just buL
             }
+        , mDirtyVersion = Just vref
         }
       H.liftEffect $ addEventListener beforeunload buL false winTarget
 
@@ -632,7 +638,7 @@ editor = connect selectTranslator $ H.mkComponent
       H.gets _.mEditor >>= traverse_ \ed -> do
 
         -- change Editor content listener
-        H.liftEffect $ addChangeListenerWithRef ed dref listener
+        H.liftEffect $ addChangeListenerWithRef ed dref vref listener
         container <- H.liftEffect $ Editor.getContainer ed
 
         -- Mouse events
@@ -1381,6 +1387,7 @@ editor = connect selectTranslator $ H.mkComponent
               -- reset Ref, because loading new content is considered 
               -- changing the existing content, which would set the flag
               for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
+              for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
 
               -- Reset Undo history
               undoMgr <- Session.getUndoManager session
@@ -1550,6 +1557,16 @@ editor = connect selectTranslator $ H.mkComponent
         _, _ -> pure unit
       pure (Just a)
 
+    RequestDirtyVersion reply -> do
+      isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+        _.mDirtyVersion
+      pure (Just (reply isDirty))
+
+    ResetDirtyVersion a -> do
+      state <- H.get
+      for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+      pure (Just a)
+
 -- | Change listener for the editor.
 --
 --   This function should implement stuff like parsing and syntax analysis,
@@ -1560,9 +1577,10 @@ editor = connect selectTranslator $ H.mkComponent
 addChangeListenerWithRef
   :: Types.Editor
   -> Ref Boolean
+  -> Ref Boolean
   -> HS.Listener Action
   -> Effect Unit
-addChangeListenerWithRef editor_ dref listener = do
+addChangeListenerWithRef editor_ dref vref listener = do
   session <- Editor.getSession editor_
   -- in order to prevent an ifinite loop with this listener
   guardRef <- Ref.new false
@@ -1570,6 +1588,7 @@ addChangeListenerWithRef editor_ dref listener = do
     do
       -- set dirty flag
       Ref.write true dref
+      Ref.write true vref
       HS.notify listener AutoSaveTimer
 
       -- '#' → '  #' at beginning of a line with Reentrancy-Guard
@@ -1697,6 +1716,7 @@ initialState { context, input } =
   , isEditorOutdated: false
   , outdatedInfoPopup: false
   , discardPopup: false
+  , mDirtyVersion: Nothing
   }
 
 makeEditorToolbarButton

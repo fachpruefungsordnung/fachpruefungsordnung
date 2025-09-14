@@ -28,11 +28,13 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
 import FPO.Components.Editor as Editor
 import FPO.Components.Editor.Types (ElementData)
+import FPO.Components.Modals.DirtyVersionModal (dirtyVersionModal)
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC (Path, SelectedEntity(..))
 import FPO.Components.TOC as TOC
@@ -122,6 +124,10 @@ data Action
   | UpdateMSelectedTocEntry
   | SetComparison Int (Maybe Int)
   | UpdateVersionMapping
+  | UpdateDirtyVersion
+  | HideDirtyVersionModal
+  -- continues ModifyVersion when approved through the modal
+  | ModifyVersionFromModal Int (Maybe Int)
 
 type State = FPOState
   ( docID :: DocumentID
@@ -167,6 +173,8 @@ type State = FPOState
   -- , compareToElement :: ElementData
   -- this value is updated from the same value in TOC
   , mSelectedTocEntry :: Maybe SelectedEntity
+  , dirtyVersion :: Boolean
+  , modalData :: Maybe { elementID :: Int, versionID :: Maybe Int}
   )
 
 type ElemVersion =
@@ -225,12 +233,26 @@ splitview = connect selectTranslator $ H.mkComponent
     , commentShown: false
     , previewShown: true
     , mSelectedTocEntry: Nothing
+    , dirtyVersion: false
+    , modalData: Nothing
     }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
-    HH.div_
+    HH.div_ $
       [ renderSplit state ]
+        <> renderDirtyVersionModal
+    where
+      renderDirtyVersionModal = case state.modalData of
+        Nothing -> []
+        Just { elementID: eID, versionID: mVID } ->
+          [ dirtyVersionModal
+              state.translator
+              HideDirtyVersionModal
+              ModifyVersionFromModal
+              eID
+              mVID
+          ]
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
   renderSplit state =
@@ -605,6 +627,25 @@ splitview = connect selectTranslator $ H.mkComponent
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
+
+    UpdateDirtyVersion -> do
+      isDirty <- H.request _editor 0 Editor.RequestDirtyVersion
+      case isDirty of
+        Just dirty -> do
+          H.modify_ _ {dirtyVersion = dirty}
+        Nothing -> pure unit
+
+    HideDirtyVersionModal -> do
+      H.modify_ _{ modalData = Nothing }
+
+    ModifyVersionFromModal elementID mVID -> do
+      H.modify_ _{ modalData = Nothing }
+      H.tell _editor 0 Editor.ResetDirtyVersion
+      state <- H.get
+      handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
+      case (findTOCEntry elementID state.tocEntries) of
+        Nothing -> pure unit
+        Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
 
     -- API Actions
 
@@ -1026,11 +1067,22 @@ splitview = connect selectTranslator $ H.mkComponent
     HandleTOC output -> case output of
 
       TOC.ModifyVersion elementID mVID -> do
+        handleAction UpdateDirtyVersion
         state <- H.get
-        handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
-        case (findTOCEntry elementID state.tocEntries) of
-          Nothing -> pure unit
-          Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
+        let 
+          currentVersion = 
+            case findRootTree (\e -> e.elementID == elementID) state.versionMapping of 
+              Nothing -> Nothing 
+              Just version -> version.versionID
+        if state.dirtyVersion && currentVersion /= Nothing then do
+          H.liftEffect $ log (show mVID) 
+          H.modify_ _ { modalData = Just {elementID: elementID, versionID: mVID}}
+        else do
+          handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
+          case (findTOCEntry elementID state.tocEntries) of
+            Nothing -> pure unit
+            Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
+
 
       TOC.CompareTo elementID vID -> do
         handleAction (SetComparison elementID vID)

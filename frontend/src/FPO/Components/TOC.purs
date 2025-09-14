@@ -157,7 +157,6 @@ data Action
   | CompleteDrop Path
   --| UpdateSearchBarInputs Int String String
   --| ClearSearchData Int
-  {-   | FilterVersions -}
   | SearchVersions Int
   | ModifyDateInput Boolean Int String
 
@@ -287,7 +286,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
     -- the newest version requested in this action is assumed to be the newest version in general
     UpdateVersions mAfter mBefore elementID -> do
-      {- now <- liftEffect nowDateTime -}
       let
         after =
           case mAfter of
@@ -297,7 +295,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
           case mBefore of
             Nothing -> Nothing
             -- dateToDateTime assumed a time of 0:00, so we shift by 1 day to include the entire day.
-            {- Just val -> Just (DD.DocDate $ adjustDateTime (dateToDatetime val)) -}
             Just val -> Just
               ( DD.DocDate $ fromMaybe (dateToDatetime val) $ adjust (Days 1.0)
                   (dateToDatetime val)
@@ -670,7 +667,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
       case state.mSelectedTocEntry of
         Just (SelLeaf id) ->
           if state.showHistoryMenu /= [ -1 ] then do
-            {-             now <- liftEffect nowDateTime -}
             case (findRootTree (\s -> s.elementID == id) sData) of
               Just d -> do
                 handleAction $ UpdateVersions d.fromDate d.toDate id
