@@ -128,6 +128,7 @@ data Action
   | HideDirtyVersionModal
   -- continues ModifyVersion when approved through the modal
   | ModifyVersionFromModal Int (Maybe Int)
+  | DeleteDraft
 
 type State = FPOState
   ( docID :: DocumentID
@@ -642,6 +643,7 @@ splitview = connect selectTranslator $ H.mkComponent
       H.modify_ _{ modalData = Nothing }
       H.tell _editor 0 Editor.ResetDirtyVersion
       state <- H.get
+      handleAction DeleteDraft
       handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
       case (findTOCEntry elementID state.tocEntries) of
         Nothing -> pure unit
@@ -1061,6 +1063,19 @@ splitview = connect selectTranslator $ H.mkComponent
             H.tell _editor 0 (Editor.ChangeSection entry Nothing)
           _ -> do
             pure unit
+
+    DeleteDraft -> do 
+      handleAction UpdateMSelectedTocEntry
+      state <- H.get
+      -- Only the SelLeaf case should ever occur
+      case state.mSelectedTocEntry of
+        Just (SelLeaf id) -> do
+          _ <- Request.deleteIgnore
+            ("/docs/" <> show state.docID <> "/text/" <> show id <> "/draft")
+          pure unit
+        _ -> do
+          pure unit
+
 
     HandlePreview _ -> pure unit
 
