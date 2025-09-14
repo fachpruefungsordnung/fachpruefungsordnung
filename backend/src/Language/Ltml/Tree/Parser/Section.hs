@@ -5,7 +5,6 @@ module Language.Ltml.Tree.Parser.Section
 where
 
 import Control.Functor.Utils (sequenceEither, traverseF)
-import Control.Monad.Trans.Class (lift)
 import Data.Text (Text)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Star (Star))
@@ -28,9 +27,7 @@ import Language.Ltml.Parser.Section (headingP, sectionP)
 import Language.Ltml.Tree (FlaggedInputTree', InputTree', Tree (Leaf, Tree))
 import Language.Ltml.Tree.Parser
     ( FootnoteTreeParser
-    , TreeParser
     , leafFootnoteParser
-    , leafParser
     , nFlaggedTreePF
     )
 import Text.Megaparsec (eof)
@@ -54,7 +51,7 @@ sectionTP = nFlaggedTreePF sectionTP'
             -> FootnoteTreeParser (Parsed (Node Section))
         sectionTP'' t (Leaf x) = leafFootnoteParser (sectionP t eof) x
         sectionTP'' (SectionType kw headingT bodyT) (Tree x children) = do
-            wHeading <- lift $ sequenceEither <$> headingTP kw headingT x
+            wHeading <- sequenceEither <$> headingTP kw headingT x
             body <- sectionBodyTP bodyT children
             return $ Right $ fmap (\heading -> Section heading body) wHeading
 
@@ -62,8 +59,8 @@ headingTP
     :: Keyword
     -> HeadingType
     -> Maybe Text
-    -> TreeParser (Parsed (Node Heading))
-headingTP kw t (Just x) = leafParser (headingP kw t) x
+    -> FootnoteTreeParser (Parsed (Node Heading))
+headingTP kw t (Just x) = leafFootnoteParser (headingP kw t) x
 headingTP _ _ Nothing = fail "Section lacks heading"
 
 sectionBodyTP

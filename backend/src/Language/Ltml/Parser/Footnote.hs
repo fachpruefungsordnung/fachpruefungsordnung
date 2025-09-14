@@ -5,6 +5,7 @@
 
 module Language.Ltml.Parser.Footnote
     ( FootnoteParser
+    , FootnoteMap
     , FootnoteWriterT
     , runFootnoteWriterT
     , mapFootnoteWriterT
