@@ -51,9 +51,11 @@ import qualified Language.Ltml.Tree as LTML
 
 import Data.Aeson (FromJSON, ToJSON)
 import Data.Bifunctor (Bifunctor (bimap))
+import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (fromMaybe)
 import Data.OpenApi (ToSchema)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as TE
 import qualified Data.Vector as Vector
 import Docs.Comment (Comment, CommentRef (CommentRef), Message)
 import qualified Docs.Comment as Comment
@@ -107,6 +109,7 @@ import Docs.TextRevision
     ( ConflictStatus
     , DraftRevision
     , NewTextRevision (..)
+    , Rendered (Rendered)
     , TextElementRevision (TextElementRevision)
     , TextRevisionHistory
     , TextRevisionRef (..)
@@ -123,6 +126,7 @@ import qualified Docs.TreeRevision as TreeRevision
 import qualified Docs.UserRef as UserRef
 import GHC.Generics (Generic)
 import GHC.Int (Int64)
+import Language.Ltml.HTML.Pipeline (htmlPipeline)
 import Logging.Logs (LogMessage, Severity (Warning))
 import Logging.Scope (Scope)
 import qualified Logging.Scope as Scope
@@ -255,7 +259,7 @@ createTextRevision
        )
     => UserID
     -> NewTextRevision
-    -> m (Result ConflictStatus)
+    -> m (Result (Rendered ConflictStatus))
 createTextRevision userID revision = logged userID Scope.docsTextRevision $
     runExceptT $ do
         let ref@(TextElementRef docID _) = newTextRevisionElement revision
@@ -280,13 +284,15 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                     (newTextRevisionCommentAnchors revision)
         lift $ do
             now <- DB.now
+            let render = rendered $ Just $ newTextRevisionContent revision
             case latestRevision of
                 -- first revision
-                Nothing -> createRevision <&> TextRevision.NoConflict
+                Nothing ->
+                    render . TextRevision.NoConflict <$> createRevision
                 Just latest
                     -- content has not changed? -> return latest
                     | TextRevision.contentsNotChanged latest revision ->
-                        return $ TextRevision.NoConflict latest
+                        return $ render $ TextRevision.NoConflict latest
                     -- no conflict, and can update? -> update (squash)
                     | latestRevisionID == parentRevisionID && shouldUpdate now latest -> do
                         newRevision <-
@@ -294,10 +300,10 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                                 (identifier latest)
                                 (newTextRevisionContent revision)
                                 (newTextRevisionCommentAnchors revision)
-                        return $ TextRevision.NoConflict newRevision
+                        return $ render $ TextRevision.NoConflict newRevision
                     -- no conflict, but can not update? -> create new
                     | latestRevisionID == parentRevisionID ->
-                        TextRevision.NoConflict <$> createRevision
+                        render . TextRevision.NoConflict <$> createRevision
                     -- conflict
                     | otherwise ->
                         if newTextRevisionIsAutoSave revision
@@ -311,13 +317,15 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                                         (newTextRevisionContent revision)
                                         (newTextRevisionCommentAnchors revision)
                                 return $
-                                    TextRevision.DraftCreated
-                                        draftRevision
-                                        (identifier latest)
+                                    render $
+                                        TextRevision.DraftCreated
+                                            draftRevision
+                                            (identifier latest)
                             else -- For manual save conflicts, return conflict
                                 return $
-                                    TextRevision.Conflict $
-                                        identifier latest
+                                    render $
+                                        TextRevision.Conflict $
+                                            identifier latest
   where
     header = TextRevision.header
     identifier = TextRevision.identifier . header
@@ -338,13 +346,33 @@ getTextElementRevision
     :: (HasGetTextElementRevision m, HasLogMessage m)
     => UserID
     -> TextRevisionRef
-    -> m (Result (Maybe TextElementRevision))
+    -> m (Result (Maybe (Rendered TextElementRevision)))
 getTextElementRevision userID ref = logged userID Scope.docsTextRevision $
     runExceptT $ do
         let (TextRevisionRef (TextElementRef docID _) _) = ref
         guardPermission Read docID userID
         guardExistsTextRevision True ref
-        lift $ DB.getTextElementRevision ref
+        revision <- lift $ DB.getTextElementRevision ref
+        return $ renderTextElementRevision <$> revision
+
+renderTextElementRevision
+    :: TextElementRevision
+    -> Rendered TextElementRevision
+renderTextElementRevision rev = rendered content rev
+  where
+    content = TextRevision.content <$> TextRevision.revision rev
+
+rendered :: Maybe Text -> a -> Rendered a
+rendered content element =
+    Rendered
+        { TextRevision.element = element
+        , TextRevision.html = fromMaybe "" html
+        }
+  where
+    -- TODO: use correct HTML pipeline.
+    html =
+        content
+            >>= (either (const Nothing) Just . TE.decodeUtf8' . BL.toStrict) . htmlPipeline
 
 getDocumentRevisionText
     :: (HasGetTextElementRevision m, HasGetRevisionKey m, HasLogMessage m)
@@ -647,7 +675,7 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
                                     , newTextRevisionCommentAnchors = Vector.empty
                                     , newTextRevisionIsAutoSave = False -- Document creation is not autosave
                                     }
-                    case textRevision of
+                    case TextRevision.element textRevision of
                         TextRevision.NoConflict revision ->
                             return $ Tree.Leaf $ TextElementRevision textElement $ Just revision
                         _ ->
@@ -795,7 +823,7 @@ publishDraftTextRevision
        )
     => UserID
     -> TextElementRef
-    -> m (Result ConflictStatus)
+    -> m (Result (Rendered ConflictStatus))
 publishDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Scope.docsTextRevision $ runExceptT $ do
     guardPermission Edit docID userID
     guardExistsTextElement ref
@@ -821,7 +849,7 @@ publishDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Sco
             result <- ExceptT $ createTextRevision userID newRevision
 
             -- If successful, delete the draft
-            case result of
+            case TextRevision.element result of
                 TextRevision.NoConflict _ -> do
                     lift $ DB.deleteDraftTextRevision userID ref
                     return result

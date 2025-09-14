@@ -66,6 +66,7 @@ import Docs.TextRevision
     ( ConflictStatus
     , DraftRevision
     , NewTextRevision (..)
+    , Rendered
     , TextElementRevision
     , TextRevisionHistory
     , TextRevisionRef (..)
@@ -180,7 +181,7 @@ type PostTextRevision =
         :> "rev"
         :> QueryParam "isAutoSave" Bool
         :> ReqBody '[JSON] CreateTextRevision
-        :> Post '[JSON] ConflictStatus
+        :> Post '[JSON] (Rendered ConflictStatus)
 
 type GetTextElementRevision =
     Auth AuthMethod Auth.Token
@@ -189,7 +190,7 @@ type GetTextElementRevision =
         :> Capture "textElementID" TextElementID
         :> "rev"
         :> Capture "textRevision" TextRevisionSelector
-        :> Get '[JSON] (Maybe TextElementRevision)
+        :> Get '[JSON] (Maybe (Rendered TextElementRevision))
 
 type PostTreeRevision =
     Auth AuthMethod Auth.Token
@@ -326,7 +327,7 @@ type PublishDraftTextRevision =
         :> Capture "textElementID" TextElementID
         :> "draft"
         :> "publish"
-        :> Post '[JSON] ConflictStatus
+        :> Post '[JSON] (Rendered ConflictStatus)
 
 type DiscardDraftTextRevision =
     Summary "Discard draft text revision"
@@ -426,7 +427,7 @@ postTextRevisionHandler
     -> TextElementID
     -> Maybe Bool
     -> CreateTextRevision
-    -> Handler ConflictStatus
+    -> Handler (Rendered ConflictStatus)
 postTextRevisionHandler auth docID textID mIsAutoSave revision = do
     let isAutoSave = fromMaybe False mIsAutoSave -- Default to False if not provided
     userID <- getUser auth
@@ -445,7 +446,7 @@ getTextElementRevisionHandler
     -> DocumentID
     -> TextElementID
     -> TextRevisionSelector
-    -> Handler (Maybe TextElementRevision)
+    -> Handler (Maybe (Rendered TextElementRevision))
 getTextElementRevisionHandler auth docID textID revision = do
     userID <- getUser auth
     withDB $
@@ -750,7 +751,7 @@ publishDraftTextRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TextElementID
-    -> Handler ConflictStatus
+    -> Handler (Rendered ConflictStatus)
 publishDraftTextRevisionHandler auth docID textID = do
     userID <- getUser auth
     withDB $
