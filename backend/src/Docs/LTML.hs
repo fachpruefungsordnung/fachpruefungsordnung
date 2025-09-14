@@ -3,6 +3,7 @@
 
 module Docs.LTML
     ( treeToMeta
+    , treeToMeta'
     , treeRevisionToLtmlInputTree
     , nodeToLtmlInputTree
     , nodeToLtmlInputTree'
@@ -40,12 +41,18 @@ import Language.Ltml.Tree (FlaggedInputTree)
 import qualified Language.Ltml.Tree as LTML
 import qualified Language.Ltml.Tree.ToMeta as LTML
 
+treeToMeta'
+    :: Node TextElementRevision
+    -> Either LTML.MetaError (TreeWithMetaData TextElement)
+treeToMeta' input = (TextRevision.textElement <$>) <$> treeToMeta input
+
 treeToMeta
     :: Node TextElementRevision
     -> Either LTML.MetaError (TreeWithMetaData TextElementRevision)
 treeToMeta input =
     let ltmlMeta =
-            first treeFromFlaggedMetaTree <$> LTML.treeToMeta (nodeToLtmlInputTree input)
+            first treeFromFlaggedMetaTree
+                <$> LTML.treeToMeta (nodeToLtmlInputTree input)
      in case ltmlMeta of
             Left err -> Left err
             Right (Just tree, metaMap) ->

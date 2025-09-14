@@ -22,6 +22,9 @@ data TreeWithMetaData a
     , metaMap :: String -- TODO!
     }
 
+instance Functor TreeWithMetaData where
+    fmap f tree' = tree' {root = f <$> root tree'}
+
 data MetaNode a
     = MetaNode
     { header :: NodeHeader
