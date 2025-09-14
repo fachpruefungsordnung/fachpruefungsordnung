@@ -6,7 +6,6 @@ where
 import Database (getConnection, migrate)
 import Docs (logMessage)
 import Docs.Hasql.Database (run)
-import Docs.TestDoc (createTestDocument)
 import Logging.Logs (Severity (Info))
 import qualified Logging.Scope as Scope
 import Mail (testMail)
@@ -21,6 +20,6 @@ someFunc = do
             logMessage Info Nothing Scope.server "Starting Server..."
     -- Datenbank zumüllen :))
     testMail
-    createTestDocument connection
+    -- createTestDocument connection
     runServer
     return ()
