@@ -75,7 +75,7 @@ newtype DocumentHeadingType = DocumentHeadingType (TextType Void)
 data DocumentBodyType
     = DocumentBodyType
         (Maybe DocumentIntroType)
-        (Disjunction DocumentMainBodyType)
+        (Disjunction (NamedType DocumentMainBodyType))
         (Maybe DocumentExtroType)
 
 data DocumentMainBodyType
@@ -83,22 +83,10 @@ data DocumentMainBodyType
         NavTocHeading
         SectionBodyType
 
-instance ProperNodeKind DocumentMainBodyType where
-    kindNameOf _ = "document-mainbody"
+instance RawProperNodeKind DocumentMainBodyType where
+    kindNameOfRaw _ = "document-mainbody"
 
-    typeNameOf (DocumentMainBodyType _ t') = aux t'
-      where
-        aux (InnerSectionBodyType _) = "inner"
-        aux (LeafSectionBodyType _) = "leaf"
-        aux (SimpleLeafSectionBodyType _) = "simple-leaf"
-
-    displayTypeNameOf (DocumentMainBodyType _ t') = aux t'
-      where
-        aux (InnerSectionBodyType _) = "nested main body"
-        aux (LeafSectionBodyType _) = "textual main body"
-        aux (SimpleLeafSectionBodyType _) = "simple textual main body"
-
-    treeSyntaxMap f (DocumentMainBodyType _ t) =
+    treeSyntaxMapRaw f (DocumentMainBodyType _ t) =
         case sectionBodyChildrenOrderMap f t of
             Just co -> TreeSyntax (HasEditableHeader False) co
             Nothing -> LeafSyntax
