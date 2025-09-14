@@ -1,9 +1,12 @@
+-- purescript does noe like defining instances for types outside of the file defining either the type or the class.
+-- as such, a new type DocDate wrapping DateTime is designed here in order to define an instance for DecodeJson.
+-- Other functions for this newtype are also here.
 module FPO.Dto.DocumentDto.DocDate where
 
 import Prelude
 
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson)
-import Data.Date (canonicalDate)
+import Data.Date (Date, canonicalDate)
 import Data.DateTime
   ( DateTime(..)
   , date
@@ -24,10 +27,16 @@ import Data.String.CodePoints (length)
 import Data.String.Utils (repeat)
 import Data.Time (Time(..))
 import Data.Tuple (fst)
+import FPO.Data.Time (genericDatetime)
 import Parsing (ParserT, fail, runParserT)
 import Parsing.String (anyTill, char, rest)
 
 newtype DocDate = DocDate DateTime
+
+-- for cases that need to be handled even though one case cannot happen. This Data is a placeholder that can be used in 
+-- such places
+genericDocDate :: DocDate
+genericDocDate = DocDate genericDatetime
 
 -- Date format example: "2025-08-14T17:24:55.895359Z"
 toStringFormat :: DocDate -> String
@@ -80,6 +89,24 @@ timeParser c = do
       Nothing -> fail "not valid"
       Just a -> pure a
 
+timeEndParser :: forall m a. BoundedEnum a => Monad m => ParserT String m a
+timeEndParser = do
+  res <- rest
+  h res
+  where
+  h string = case fromString $ string of
+    Nothing -> fail "can't parse number"
+    Just num -> case toEnum num of
+      Nothing -> fail "not valid"
+      Just a -> pure a
+
+shortDateParser :: forall m. Monad m => ParserT String m Date
+shortDateParser = do
+  year <- timeParser '-'
+  month <- timeParser '-'
+  day <- timeEndParser
+  pure $ canonicalDate year month day
+
 dateParser :: forall m. Monad m => ParserT String m DateTime
 dateParser = do
   year <- timeParser '-'
@@ -101,6 +128,33 @@ instance decodeJsonDateTime :: DecodeJson DocDate where
     case result of
       Left _ -> Left (UnexpectedValue json)
       Right datetime -> Right $ DocDate datetime
+
+getYear :: DocDate -> Int
+getYear d = fromEnum $ year $ date $ docDateToDateTime d
+
+getMonth :: DocDate -> Int
+getMonth d = fromEnum $ month $ date $ docDateToDateTime d
+
+getDay :: DocDate -> Int
+getDay d = fromEnum $ day $ date $ docDateToDateTime d
+
+docYear :: DocDate -> Int
+docYear d = fromEnum $ year $ date $ docDateToDateTime d
+
+docMonth :: DocDate -> Int
+docMonth d = fromEnum $ month $ date $ docDateToDateTime d
+
+docDay :: DocDate -> Int
+docDay d = fromEnum $ day $ date $ docDateToDateTime d
+
+docHour :: DocDate -> Int
+docHour d = fromEnum $ hour $ time $ docDateToDateTime d
+
+docMinute :: DocDate -> Int
+docMinute d = fromEnum $ minute $ time $ docDateToDateTime d
+
+docSecond :: DocDate -> Int
+docSecond d = fromEnum $ second $ time $ docDateToDateTime d
 
 derive newtype instance eqDocDate :: Eq DocDate
 derive newtype instance ordDocDate :: Ord DocDate

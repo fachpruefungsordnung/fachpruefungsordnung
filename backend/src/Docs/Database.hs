@@ -24,6 +24,7 @@ module Docs.Database
     , HasGetLogs (..)
     , HasLogMessage (..)
     , HasGetRevisionKey (..)
+    , HasDraftTextRevision (..)
     ) where
 
 import Data.Text (Text)
@@ -46,7 +47,8 @@ import Docs.TextElement
     , TextElementRef
     )
 import Docs.TextRevision
-    ( TextElementRevision
+    ( DraftRevision
+    , TextElementRevision
     , TextRevision
     , TextRevisionHistory
     , TextRevisionID
@@ -107,7 +109,11 @@ class
 
 class (HasCheckPermission m, HasExistsTextElement m) => HasGetTextHistory m where
     getTextHistory
-        :: TextElementRef -> Maybe UTCTime -> Int64 -> m TextRevisionHistory
+        :: TextElementRef
+        -> Maybe UTCTime
+        -> Maybe UTCTime
+        -> Int64
+        -> m TextRevisionHistory
 
 class (HasCheckPermission m, HasExistsDocument m) => HasGetTreeHistory m where
     getTreeHistory :: DocumentID -> Maybe UTCTime -> Int64 -> m TreeRevisionHistory
@@ -166,6 +172,20 @@ class (HasCheckPermission m, HasExistsComment m) => HasCreateComment m where
     createComment :: UserID -> TextElementID -> Text -> m Comment
     resolveComment :: CommentID -> m ()
     createReply :: UserID -> CommentID -> Text -> m Message
+
+class
+    (HasCheckPermission m, HasExistsTextElement m) =>
+    HasDraftTextRevision m
+    where
+    createDraftTextRevision
+        :: UserID
+        -> TextElementRef
+        -> TextRevisionID
+        -> Text
+        -> Vector CommentAnchor
+        -> m DraftRevision
+    getDraftTextRevision :: UserID -> TextElementRef -> m (Maybe DraftRevision)
+    deleteDraftTextRevision :: UserID -> TextElementRef -> m ()
 
 class (Monad m) => HasLogMessage m where
     logMessage

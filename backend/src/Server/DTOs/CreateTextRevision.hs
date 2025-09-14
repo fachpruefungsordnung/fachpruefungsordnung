@@ -15,8 +15,7 @@ import qualified Data.Vector as Vector
 import Docs.Comment (CommentAnchor)
 import Docs.TextRevision (TextRevisionID)
 
-data CreateTextRevision
-    = CreateTextRevision
+data CreateTextRevision = CreateTextRevision
     { parent :: Maybe TextRevisionID
     , content :: Text
     , commentAnchors :: Vector CommentAnchor

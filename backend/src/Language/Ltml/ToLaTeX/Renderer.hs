@@ -5,53 +5,56 @@ module Language.Ltml.ToLaTeX.Renderer
     ) where
 
 import Data.Int (Int64)
+import qualified Data.Text as T
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as B
 import Language.Ltml.ToLaTeX.LaTeXType (LaTeX (..))
 
-renderLaTeX :: LaTeX -> LT.Text
-renderLaTeX = B.toLazyText . go 0
+renderLaTeX :: LaTeX -> T.Text
+renderLaTeX = LT.toStrict . B.toLazyText . go 0
   where
     go :: Int64 -> LaTeX -> B.Builder
     go _ (Text t) = escape t
-    go _ (Raw t) = B.fromLazyText t
+    go _ (Raw t) = B.fromText t
     go _ (CommandS name) =
-        "\\"
-            <> B.fromLazyText name
+        "\\" <> B.fromText name
     go n (Command name opts args) =
         "\\"
-            <> B.fromLazyText name
+            <> B.fromText name
             <> renderOpts opts
             <> mconcat (map (wrapInBraces . go n) args)
     go n (Environment name opts body) =
         "\n"
-            <> B.fromLazyText (LT.replicate n "\t")
+            <> B.fromText (T.replicate (fromIntegral n) "\t")
             <> "\\begin{"
-            <> B.fromLazyText name
+            <> B.fromText name
             <> "}"
             <> renderOpts opts
             <> "\n"
             <> mconcat
                 ( map
-                    ((B.fromLazyText (LT.replicate (n + 1) "\t") <>) . (<> "\n") . go (n + 1))
+                    ( (B.fromText (T.replicate (fromIntegral (n + 1)) "\t") <>)
+                        . (<> "\n")
+                        . go (n + 1)
+                    )
                     body
                 )
-            <> B.fromLazyText (LT.replicate n "\t")
+            <> B.fromText (T.replicate (fromIntegral n) "\t")
             <> "\\end{"
-            <> B.fromLazyText name
+            <> B.fromText name
             <> "}\n"
     go n (Braced latex) = wrapInBraces (go n latex)
     go n (Sequence xs) = mconcat (map (go n) xs)
 
-    renderOpts :: [LT.Text] -> B.Builder
+    renderOpts :: [T.Text] -> B.Builder
     renderOpts [] = mempty
-    renderOpts os = "[" <> B.fromLazyText (LT.intercalate "," os) <> "]"
+    renderOpts os = "[" <> B.fromText (T.intercalate "," os) <> "]"
 
     wrapInBraces :: B.Builder -> B.Builder
     wrapInBraces b = "{" <> b <> "}"
 
-    escape :: LT.Text -> B.Builder
-    escape = LT.foldr escapeChar mempty
+    escape :: T.Text -> B.Builder
+    escape = T.foldr escapeChar mempty
 
     escapeChar :: Char -> B.Builder -> B.Builder
     escapeChar '#' acc = "\\#" <> acc

@@ -8,7 +8,6 @@ package:
     - argonaut-codecs
     - argonaut-core
     - arrays
-    - console
     - control
     - datetime
     - dom-indexed
@@ -53,7 +52,8 @@ package:
     - web-uievents
   test:
     main: Test.Main
-    dependencies: []
+    dependencies:
+      - console
 workspace:
   packageSet:
     registry: 64.6.0

@@ -11,12 +11,9 @@ import Data.Argonaut
   , JsonDecodeError
   , decodeJson
   , encodeJson
-  , stringify
   , (.:)
   )
 import Data.Either (Either)
-import Effect.Console (log)
-import Effect.Unsafe (unsafePerformEffect)
 import FPO.Dto.DocumentDto.NodeHeader as NH
 import FPO.Dto.DocumentDto.TextElementRevision (TextElementRevision)
 import FPO.Dto.DocumentDto.TreeDto (RootTree)
@@ -35,10 +32,10 @@ decodeDocument
   :: forall a. DecodeJson a => Json -> Either JsonDecodeError (DocumentTree a)
 decodeDocument json = do
   obj <- decodeJson json
-  let _ = unsafePerformEffect $ log $ "Full JSON: " <> stringify json
   -- TODO: We are ignoring `header` for now, but we might need it later.
   root <- obj .: "root"
   decodeJson root
 
+-- | Encodes a `DocumentTree NodeHeader` as a `DocumentTree TextElementID`.
 encodeDocumentTree :: DocumentTree NH.NodeHeader -> Json
 encodeDocumentTree = encodeJson <<< map NH.getId

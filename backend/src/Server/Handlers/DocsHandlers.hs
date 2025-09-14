@@ -18,12 +18,16 @@ import Data.Time (UTCTime)
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
 
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 
 import Servant
     ( Capture
+    , Delete
+    , Description
     , Get
     , Handler
     , JSON
@@ -31,6 +35,7 @@ import Servant
     , QueryParam
     , ReqBody
     , Server
+    , Summary
     , err400
     , err403
     , err500
@@ -59,6 +64,7 @@ import Docs.TextElement
     )
 import Docs.TextRevision
     ( ConflictStatus
+    , DraftRevision
     , NewTextRevision (..)
     , TextElementRevision
     , TextRevisionHistory
@@ -129,21 +135,31 @@ type DocsAPI =
                 :<|> GetDocumentRevision
                 :<|> GetDocumentRevisionTree
                 :<|> GetDocumentRevisionText
+                :<|> GetDraftTextRevision
+                :<|> PublishDraftTextRevision
+                :<|> DiscardDraftTextRevision
                 :<|> RenderAPI
            )
 
 type PostDocument =
-    Auth AuthMethod Auth.Token
+    Summary "Create a new document"
+        :> Description "Create a new document with default content"
+        :> Auth AuthMethod Auth.Token
         :> ReqBody '[JSON] CreateDocument
         :> Post '[JSON] FullDocument
 
 type GetDocument =
-    Auth AuthMethod Auth.Token
+    Summary "Get metadata for a document"
+        :> Description "Obtain a documents metadat"
+        :> Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> Get '[JSON] Document
 
 type GetDocuments =
-    Auth AuthMethod Auth.Token
+    Summary "Get all documents"
+        :> Description
+            "Get all documents visible for the user. For super admins, this does not contain all visible documents, as a super admin can see all documents."
+        :> Auth AuthMethod Auth.Token
         :> QueryParam "user" UserID
         :> QueryParam "group" GroupID
         :> Get '[JSON] Documents
@@ -161,6 +177,7 @@ type PostTextRevision =
         :> "text"
         :> Capture "textElementID" TextElementID
         :> "rev"
+        :> QueryParam "isAutoSave" Bool
         :> ReqBody '[JSON] CreateTextRevision
         :> Post '[JSON] ConflictStatus
 
@@ -201,6 +218,7 @@ type GetTextHistory =
         :> "text"
         :> Capture "textElementID" TextElementID
         :> "history"
+        :> QueryParam "after" UTCTime
         :> QueryParam "before" UTCTime
         :> QueryParam "limit" Docs.Limit
         :> Get '[JSON] TextRevisionHistory
@@ -286,6 +304,40 @@ type GetDocumentRevisionText =
         :> Capture "textElementID" TextElementID
         :> Get '[JSON] (Maybe TextElementRevision)
 
+type GetDraftTextRevision =
+    Summary "Get draft text revision"
+        :> Description
+            "Retrieve the user's draft text revision for a specific text element, if it exists"
+        :> Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "draft"
+        :> Get '[JSON] (Maybe DraftRevision)
+
+type PublishDraftTextRevision =
+    Summary "Publish draft text revision"
+        :> Description
+            "Publish the user's draft text revision to the main revision tree, potentially creating conflicts"
+        :> Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "draft"
+        :> "publish"
+        :> Post '[JSON] ConflictStatus
+
+type DiscardDraftTextRevision =
+    Summary "Discard draft text revision"
+        :> Description
+            "Delete the user's draft text revision, discarding all unsaved changes"
+        :> Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "draft"
+        :> Delete '[JSON] ()
+
 docsServer :: Server DocsAPI
 docsServer =
     {-    -} postDocumentHandler
@@ -307,6 +359,9 @@ docsServer =
         :<|> getDocumentRevisionHandler
         :<|> getDocumentRevisionTreeHandler
         :<|> getDocumentRevisionTextHandler
+        :<|> getDraftTextRevisionHandler
+        :<|> publishDraftTextRevisionHandler
+        :<|> discardDraftTextRevisionHandler
         :<|> renderServer
 
 postDocumentHandler
@@ -367,9 +422,11 @@ postTextRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TextElementID
+    -> Maybe Bool
     -> CreateTextRevision
     -> Handler ConflictStatus
-postTextRevisionHandler auth docID textID revision = do
+postTextRevisionHandler auth docID textID mIsAutoSave revision = do
+    let isAutoSave = fromMaybe False mIsAutoSave -- Default to False if not provided
     userID <- getUser auth
     withDB $
         runTransaction $
@@ -379,6 +436,7 @@ postTextRevisionHandler auth docID textID revision = do
                     (CreateTextRevision.parent revision)
                     (CreateTextRevision.content revision)
                     (CreateTextRevision.commentAnchors revision)
+                    isAutoSave
 
 getTextElementRevisionHandler
     :: AuthResult Auth.Token
@@ -428,15 +486,17 @@ getTextHistoryHandler
     -> DocumentID
     -> TextElementID
     -> Maybe UTCTime
+    -> Maybe UTCTime
     -> Maybe Docs.Limit
     -> Handler TextRevisionHistory
-getTextHistoryHandler auth docID textID before limit = do
+getTextHistoryHandler auth docID textID after before limit = do
     userID <- getUser auth
     withDB $
         run $
             Docs.getTextHistory
                 userID
                 (TextElementRef docID textID)
+                after
                 before
                 limit
 
@@ -663,3 +723,48 @@ guardDocsResult (Left err) = throwError $ mapErr err
                         ++ prettyPrintCommentRef ref
                         ++ " not found!\n"
             }
+    mapErr (Docs.Custom msg) =
+        err400
+            { errBody =
+                LBS.pack $
+                    T.unpack msg ++ "\n"
+            }
+
+-- | Get draft text revision for current user
+getDraftTextRevisionHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> Handler (Maybe DraftRevision)
+getDraftTextRevisionHandler auth docID textID = do
+    userID <- getUser auth
+    withDB $
+        runTransaction $
+            Docs.getDraftTextRevision userID $
+                TextElementRef docID textID
+
+-- | Publish draft text revision to main revision tree
+publishDraftTextRevisionHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> Handler ConflictStatus
+publishDraftTextRevisionHandler auth docID textID = do
+    userID <- getUser auth
+    withDB $
+        runTransaction $
+            Docs.publishDraftTextRevision userID $
+                TextElementRef docID textID
+
+-- | Discard draft text revision
+discardDraftTextRevisionHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> Handler ()
+discardDraftTextRevisionHandler auth docID textID = do
+    userID <- getUser auth
+    withDB $
+        runTransaction $
+            Docs.discardDraftTextRevision userID $
+                TextElementRef docID textID

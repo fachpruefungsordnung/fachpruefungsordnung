@@ -1,7 +1,6 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -64,7 +63,7 @@ loginHandler cookieSett jwtSett Auth.UserLoginData {..} = do
         Right (Just (uid, pwhash)) -> do
             let passwordCheck = checkPassword (mkPassword loginPassword) (PasswordHash pwhash)
             case passwordCheck of
-                PasswordCheckFail -> throwError $ err401 {errBody = "email or password incorrect\n"}
+                PasswordCheckFail -> throwError errWrongLoginCredentials
                 PasswordCheckSuccess -> do
                     eSuperadmin <- liftIO $ Session.run (Sessions.checkSuperadmin uid) conn
                     case eSuperadmin of
@@ -73,9 +72,9 @@ loginHandler cookieSett jwtSett Auth.UserLoginData {..} = do
                             mLoginAccepted <-
                                 liftIO $ acceptLogin cookieSett jwtSett (Auth.Token uid isSuperadmin)
                             case mLoginAccepted of
-                                Nothing -> throwError $ err401 {errBody = "login failed! Please try again!\n"}
+                                Nothing -> throwError errLoginFailed
                                 Just addHeaders -> return $ addHeaders NoContent
-        Right Nothing -> throwError errUserNotFound
+        Right Nothing -> throwError errWrongLoginCredentials
         Left _ -> throwError errDatabaseAccessFailed
 
 logoutHandler

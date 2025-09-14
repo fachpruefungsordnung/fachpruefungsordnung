@@ -28,7 +28,6 @@ import Language.Ltml.AST.Section
     )
 import Language.Ltml.Common (Flagged (Flagged))
 import Language.Ltml.Parser (Parser)
-import Language.Ltml.Parser.Common.Indent (nonIndented)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
 import Language.Ltml.Parser.Footnote (FootnoteParser)
 import Language.Ltml.Parser.Footnote.Combinators (manyWithFootnotesTillSucc)
@@ -40,8 +39,8 @@ import Text.Megaparsec (many)
 
 sectionP :: SectionType -> Parser () -> FootnoteParser (Node Section)
 sectionP (SectionType kw headingT bodyT) succStartP = do
-    (mLabel, heading) <- lift $ nonIndented $ headingP kw headingT
-    body <- nonIndented $ sectionBodyP bodyT succStartP
+    (mLabel, heading) <- lift $ headingP kw headingT
+    body <- sectionBodyP bodyT succStartP
     return $ Node mLabel $ Section (Right heading) body
 
 sectionP'

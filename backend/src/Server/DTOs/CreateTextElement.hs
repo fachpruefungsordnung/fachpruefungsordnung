@@ -10,8 +10,7 @@ import Data.OpenApi (ToSchema)
 
 import Docs.TextElement (TextElementKind)
 
-newtype CreateTextElement
-    = CreateTextElement
+newtype CreateTextElement = CreateTextElement
     { kind :: TextElementKind
     }
     deriving (Generic)

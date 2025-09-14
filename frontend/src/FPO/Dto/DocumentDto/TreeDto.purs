@@ -198,15 +198,14 @@ findTitleTree predicate (Leaf { title, node }) =
 modifyNodeRootTree
   :: forall a
    . (a -> Boolean)
-  -> (String -> String)
   -> (a -> a)
   -> RootTree a
   -> RootTree a
-modifyNodeRootTree _ _ _ Empty = Empty
-modifyNodeRootTree predicate newTitle newNode (RootTree { children, header }) =
+modifyNodeRootTree _ _ Empty = Empty
+modifyNodeRootTree predicate newNode (RootTree { children, header }) =
   let
     newChildren =
-      map (\(Edge child) -> Edge $ modifyNodeTree predicate newTitle newNode child)
+      map (\(Edge child) -> Edge $ modifyNodeTree predicate newNode child)
         children
   in
     RootTree { children: newChildren, header }
@@ -214,19 +213,18 @@ modifyNodeRootTree predicate newTitle newNode (RootTree { children, header }) =
 modifyNodeTree
   :: forall a
    . (a -> Boolean)
-  -> (String -> String)
   -> (a -> a)
   -> Tree a
   -> Tree a
-modifyNodeTree pred newTitle newNode (Leaf { title, node }) =
+modifyNodeTree pred newNode (Leaf { title, node }) =
   if pred node then
-    Leaf { title: (newTitle title), node: (newNode node) }
+    Leaf { title, node: (newNode node) }
   else
     Leaf { title, node }
-modifyNodeTree pred newTitle newNode (Node { title, children, header }) =
+modifyNodeTree pred newNode (Node { title, children, header }) =
   let
     newChildren =
-      map (\(Edge child) -> Edge $ modifyNodeTree pred newTitle newNode child)
+      map (\(Edge child) -> Edge $ modifyNodeTree pred newNode child)
         children
   in
     Node { title, children: newChildren, header }
@@ -234,10 +232,9 @@ modifyNodeTree pred newTitle newNode (Node { title, children, header }) =
 replaceNodeRootTree
   :: forall a
    . (a -> Boolean)
-  -> String
   -> a
   -> RootTree a
   -> RootTree a
-replaceNodeRootTree predicate newTitle newNode tree =
-  modifyNodeRootTree predicate (const newTitle) (const newNode) tree
+replaceNodeRootTree predicate newNode tree =
+  modifyNodeRootTree predicate (const newNode) tree
 

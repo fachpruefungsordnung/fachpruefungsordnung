@@ -19,7 +19,6 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console (log)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
@@ -91,8 +90,7 @@ data ModalState
   | RemoveMemberModal UserID
 
 type State = FPOState
-  ( error :: Maybe String
-  , page :: Int
+  ( page :: Int
   , groupID :: GroupID
   , group :: Maybe GroupDto
   , filteredMembers :: Array GroupMemberDto
@@ -125,7 +123,6 @@ component =
     , groupID: input
     , filteredMembers: []
     , modalState: NoModal
-    , error: Nothing
     , group: Nothing
     , isAdmin: false
     , memberNameFilter: ""
@@ -151,13 +148,6 @@ component =
             _ -> []
         ) <>
           [ renderMemberManagement state
-          , HH.div [ HP.classes [ HB.textCenter ] ]
-              [ case state.error of
-                  Just err -> HH.div
-                    [ HP.classes [ HB.alert, HB.alertDanger, HB.mt5 ] ]
-                    [ HH.text err ]
-                  Nothing -> HH.text ""
-              ]
           ]
 
   renderMemberManagement :: State -> H.ComponentHTML Action Slots m
@@ -401,24 +391,20 @@ component =
       H.modify_ _ { modalState = RemoveMemberModal memberID }
     CancelModal -> do
       H.modify_ \s -> s
-        { error = Nothing
-        , modalState = NoModal
+        { modalState = NoModal
         }
     ConfirmRemoveMember memberID -> do
       s <- H.get
       deleteResponse <- deleteIgnore
         ("/roles/" <> show s.groupID <> "/" <> memberID)
       case deleteResponse of
-        Left err -> do
+        Left _ -> do
           H.modify_ _
-            { error = Just (show err)
-            , modalState = NoModal
+            { modalState = NoModal
             }
         Right _ -> do
-          log "Removed member successfully"
           H.modify_ _
-            { error = Nothing
-            , modalState = NoModal
+            { modalState = NoModal
             }
 
       handleAction ReloadGroupMembers
@@ -441,7 +427,6 @@ component =
             , page = 0
             }
     NavigateToDocuments -> do
-      log "Routing to document overview"
       s <- H.get
       navigate (ViewGroupDocuments { groupID: s.groupID })
     SetUserRole member role -> do
@@ -451,20 +436,15 @@ component =
       --       result.
       s <- H.get
       let userID = getUserInfoID member
-      if getUserInfoRole member == role then
-        log "User already has this role, ignoring"
-      else do
-        response <- changeRole s.groupID userID role
-        case response of
-          Left err -> do
-            H.modify_ _
-              { error = Just (show err)
-              , modalState = NoModal
-              }
-          Right _ -> do
-            log "Changed user role successfully"
-            handleAction ReloadGroupMembers
-            handleAction (FilterForMember "")
+      response <- changeRole s.groupID userID role
+      case response of
+        Left _ -> do
+          H.modify_ _
+            { modalState = NoModal
+            }
+        Right _ -> do
+          handleAction ReloadGroupMembers
+          handleAction (FilterForMember "")
       handleAction ReloadGroupMembers
       handleAction (FilterForMember "")
     NavigateToUserAdder -> do

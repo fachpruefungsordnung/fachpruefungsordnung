@@ -50,6 +50,26 @@ addColumn val str placeholder bi for act =
             ]
         ]
 
+-- Similar to AddColumn but creates textfields tailored towards the Version history dropdown.
+addField
+  :: forall w a
+   . String -- ^ value
+  -> String -- ^ placeholder
+  -> InputType -- ^ input type
+  -> (String -> a) -- ^ action (parametrized with the value)
+  -> HH.HTML w a
+addField val placeholder for act =
+  HH.div [ HP.classes [ HB.inputGroup, HB.inputGroupSm ] ]
+    [ HH.input
+        [ HP.type_ for
+        , HP.classes [ HB.formControl, HB.formControlSm ]
+        , HP.placeholder placeholder
+        , HP.value val
+        , HE.onValueInput act
+        ]
+
+    ]
+
 -- | Creates a button with an icon.
 addButton
   :: forall w a
@@ -202,19 +222,22 @@ emptyEntryGen content =
         content
     ]
 
--- | Adds an error message to the page.
-addError
-  :: forall w i
-   . Maybe String -- ^ error message
-  -> HH.HTML w i
-addError msg =
-  HH.div [ HP.classes [ HB.textCenter ] ]
-    [ case msg of
-        Just err -> HH.div
-          [ HP.classes [ HB.alert, HB.alertDanger, HB.mt5 ] ]
-          [ HH.text err ]
-        Nothing -> HH.text ""
+-- | Creates an empty table entry for padding (`tr`).
+emptyTableRow :: forall w a. Int -> Int -> HH.HTML w a
+emptyTableRow height cols =
+  HH.tr [ HP.classes [ H.ClassName "no-hover" ] ]
+    [ HH.td
+        [ HP.colSpan cols
+        , HP.style $ "height: " <> show height <> "px;"
+        ]
+        []
     ]
+
+-- | Creates an empty list entry for padding (`li`).
+emptyListEntry :: forall w a. Int -> HH.HTML w a
+emptyListEntry height =
+  HH.li [ HP.style $ "height: " <> show height <> "px;" ]
+    []
 
 loadingSpinner :: forall w i. HH.HTML w i
 loadingSpinner =
