@@ -49,7 +49,6 @@ import Docs.DocumentHistory (DocumentHistory (..))
 import Docs.Hash (Hash)
 import qualified Docs.Hasql.Statements as Statements
 import qualified Docs.Hasql.Transactions as Transactions
-import Docs.Hasql.TreeEdge (TreeEdgeChild (..))
 import Docs.Revision (RevisionKey, RevisionRef (RevisionRef))
 import Docs.TextElement
     ( TextElement
@@ -64,8 +63,7 @@ import Docs.TextRevision
     , TextRevisionHistory (TextRevisionHistory)
     , TextRevisionRef
     )
-import Docs.Tree (Node (Node), NodeHeader, Tree)
-import qualified Docs.Tree as Tree
+import Docs.Tree (Node)
 import Docs.TreeRevision
     ( TreeRevision
     , TreeRevisionHistory (TreeRevisionHistory)
@@ -136,31 +134,18 @@ createTreeRevision authorID docID rootNode =
 getTreeRevision
     :: TreeRevisionRef
     -> Session (Maybe (TreeRevision TextElement))
-getTreeRevision ref = do
-    revision <- getRevision
-    case revision of
-        Just (rootHash, treeRevision) -> do
-            root <- getTree rootHash
-            return $ Just $ treeRevision root
-        Nothing -> return Nothing
-  where
-    getRevision = statement ref Statements.getTreeRevision
+getTreeRevision =
+    transaction
+        Serializable
+        Write
+        . Transactions.getTreeRevision
 
 getTree :: Hash -> Session (Node TextElement)
-getTree rootHash = do
-    rootHeader <- statement rootHash Statements.getTreeNode
-    fromHeader rootHash rootHeader
-  where
-    fromHeader :: Hash -> NodeHeader -> Session (Node TextElement)
-    fromHeader hash header = do
-        children <- statement hash Statements.getTreeEdgesByParent
-        edges <- mapM edgeSelector children
-        return $ Node header $ Vector.toList edges
-    edgeSelector :: TreeEdgeChild -> Session (Tree TextElement)
-    edgeSelector edge =
-        case edge of
-            (TreeEdgeToTextElement textElement) -> return $ Tree.Leaf textElement
-            (TreeEdgeToNode hash header) -> fromHeader hash header <&> Tree.Tree
+getTree =
+    transaction
+        Serializable
+        Write
+        . Transactions.getTree
 
 getTextRevisionHistory
     :: TextElementRef

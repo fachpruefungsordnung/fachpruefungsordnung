@@ -196,7 +196,7 @@ type PostTreeRevision =
         :> Capture "documentID" DocumentID
         :> "tree"
         :> ReqBody '[JSON] (Node TextElementID)
-        :> Post '[JSON] (TreeRevision TextElementID)
+        :> Post '[JSON] (TreeRevisionWithMetaData TextElementID)
 
 type GetTreeRevision =
     Auth AuthMethod Auth.Token
@@ -457,7 +457,7 @@ postTreeRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> Node TextElementID
-    -> Handler (TreeRevision TextElementID)
+    -> Handler (TreeRevisionWithMetaData TextElementID)
 postTreeRevisionHandler auth docID node = do
     userID <- getUser auth
     withDB $ runTransaction $ Docs.createTreeRevision userID docID node

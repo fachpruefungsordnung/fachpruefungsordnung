@@ -176,6 +176,12 @@ instance HasGetTextElementRevision HasqlTransaction where
 instance HasGetTextElement HasqlTransaction where
     getTextElement = HasqlTransaction . Transactions.getTextElement
 
+instance HasGetTreeRevision HasqlTransaction where
+    getTreeRevision = HasqlTransaction . Transactions.getTreeRevision
+
+instance HasExistsTreeRevision HasqlTransaction where
+    existsTreeRevision = HasqlTransaction . Transactions.existsTreeRevision
+
 -- create
 
 instance HasCreateTextRevision HasqlTransaction where
