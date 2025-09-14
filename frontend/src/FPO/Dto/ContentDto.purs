@@ -165,10 +165,15 @@ failureContentWrapper = Wrapper { content: failureContent, comments: [] }
 extractNewParent :: Content -> Json -> Either JsonDecodeError Content
 extractNewParent (Content cont) json = do
   obj <- decodeJson json
-  newRev <- obj .: "newRevision"
-  header <- newRev .: "header"
-  newPar <- header .: "identifier"
-  pure $ Content $ cont { parent = newPar }
+  typ <- obj .: "type" :: Either JsonDecodeError String
+  case typ of
+    "noConflict" -> do
+      newRev <- obj .: "newRevision"
+      hdr <- newRev .: "header"
+      pid <- hdr .: "identifier"
+      pure $ Content $ cont { parent = pid }
+    _ ->
+      pure (Content cont)
 
 convertToAnnotetedMarker
   :: CommentAnchor
