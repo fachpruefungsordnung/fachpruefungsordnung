@@ -196,6 +196,7 @@ data Output
 
 data Action
   = Init
+  | DoNothing
   | Comment
   | ChangeToSection TOCEntry (Maybe Int)
   | ContinueChangeToSection (Array FirstComment)
@@ -282,6 +283,7 @@ editor = connect selectTranslator $ H.mkComponent
         [ infoModal
             state.translator
             ToggleOutdatedInfoPopup
+            DoNothing
         ]
     renderDiscardModal = case state.discardPopup of
       false -> []
@@ -290,7 +292,7 @@ editor = connect selectTranslator $ H.mkComponent
             state.translator
             CancelDiscardAction
             ConfirmDiscardAction
-
+            DoNothing
         ]
 
   renderAll :: State -> H.ComponentHTML Action () m
@@ -668,6 +670,9 @@ editor = connect selectTranslator $ H.mkComponent
           HS.notify listener EndDrag
         H.liftEffect $ addEventListener (EventType "mouseup") upL true
           (toEventTarget $ toElement container)
+
+    DoNothing -> do
+      pure unit
 
     Resize -> do
       state <- H.get

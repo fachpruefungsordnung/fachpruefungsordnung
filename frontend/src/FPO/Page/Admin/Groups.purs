@@ -38,6 +38,7 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addButton, addCard, addColumn, addModal, emptyEntryGen)
 import FPO.UI.Style as Style
+import FPO.Util as Util
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -57,6 +58,7 @@ type Slots =
 data Action
   = Initialize
   | Receive (Connected FPOTranslator Unit)
+  | DoNothing
   | SetPage P.Output
   | ChangeFilterGroupName String
   | ChangeCreateGroupName String
@@ -128,6 +130,15 @@ component =
     , waiting: false
     }
 
+  -- Reference to the delete button in the delete group modal.
+  modalDeleteRef :: H.RefLabel
+  modalDeleteRef = H.RefLabel "modal-delete-group"
+
+  -- Reference to the group name input field in the create group modal.
+  -- Used to focus the input field when the modal is opened.
+  groupCreateRef :: H.RefLabel
+  groupCreateRef = H.RefLabel "modal-group-create-name"
+
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
@@ -138,6 +149,8 @@ component =
               [ deleteConfirmationModal state.translator groupName (const groupName)
                   CancelDeleteGroup
                   ConfirmDeleteGroup
+                  DoNothing
+                  (Just modalDeleteRef)
                   (translate (label :: _ "common_theGroup") state.translator)
               ]
             Nothing -> case state.requestCreate of
@@ -165,6 +178,8 @@ component =
           pure unit
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
+    DoNothing -> do
+      pure unit
     SetPage (P.Clicked p) -> do
       H.modify_ _ { page = p }
     ChangeFilterGroupName group -> do
@@ -188,6 +203,8 @@ component =
       H.modify_ _ { groupDescriptionCreate = desc }
     RequestCreateGroup groupName -> do
       H.modify_ _ { requestCreate = Just groupName }
+
+      Util.focusRef groupCreateRef
     ConfirmCreateGroup -> do
       -- Close modal
       H.modify_ _ { requestCreate = Nothing }
@@ -231,6 +248,8 @@ component =
         }
     RequestDeleteGroup groupName -> do
       H.modify_ _ { requestDelete = Just groupName }
+
+      Util.focusRef modalDeleteRef
     CancelDeleteGroup -> do
       H.modify_ _
         { requestDelete = Nothing
@@ -393,7 +412,8 @@ component =
   createGroupModal :: forall w. State -> String -> HH.HTML w Action
   createGroupModal state groupName =
     addModal (translate (label :: _ "admin_groups_createGroup") state.translator)
-      (const CancelCreateGroup) $
+      CancelCreateGroup
+      DoNothing $
       [ HH.div
           [ HP.classes [ HB.modalBody ] ]
           [ HH.div
@@ -414,6 +434,7 @@ component =
                       state.translator
                   , HP.value groupName
                   , HP.required true
+                  , HP.ref groupCreateRef
                   , HE.onValueInput ChangeCreateGroupName
                   ]
               ]

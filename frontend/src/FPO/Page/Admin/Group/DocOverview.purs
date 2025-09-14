@@ -19,7 +19,13 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (createNewDocument, deleteIgnore, getAuthorizedUser, getDocumentsQueryFromURL, getGroup)
+import FPO.Data.Request
+  ( createNewDocument
+  , deleteIgnore
+  , getAuthorizedUser
+  , getDocumentsQueryFromURL
+  , getGroup
+  )
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Data.Time (formatRelativeTime)
@@ -33,6 +39,7 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn, addModal)
 import FPO.UI.Style as Style
+import FPO.Util (focusRef, handleKeyDown, singletonIf)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -42,8 +49,6 @@ import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
-import Web.HTML.HTMLElement as WHE
-import Web.UIEvent.KeyboardEvent as KE
 
 _tablehead = Proxy :: Proxy "tablehead"
 _pagination = Proxy :: Proxy "pagination"
@@ -134,8 +139,13 @@ component =
     , group: Nothing
     }
 
+  -- Reference to the input field in the "create document" modal.
   modalInputRef :: H.RefLabel
   modalInputRef = H.RefLabel "modal-input"
+
+  -- Reference to the delete button in the "delete document" modal.
+  modalDeleteRef :: H.RefLabel
+  modalDeleteRef = H.RefLabel "modal-delete"
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
@@ -148,6 +158,8 @@ component =
                   (docNameFromID state)
                   CancelModal
                   ConfirmDeleteDocument
+                  DoNothing
+                  (Just modalDeleteRef)
                   (translate (label :: _ "common_project") state.translator)
               ]
             CreateDocumentModal ms ->
@@ -343,10 +355,14 @@ component =
     :: forall w. CreateDocumentModalState -> State -> HH.HTML w Action
   createDocumentModal ms state =
     addModal (translate (label :: _ "gp_createNewProject") state.translator)
-      (const CancelModal) $
+      CancelModal
+      DoNothing $
       [ HH.div
           [ HP.classes [ HB.modalBody ]
-          , HE.onKeyDown handleKeyDown
+          , HE.onKeyDown $ handleKeyDown
+              CancelModal
+              ConfirmCreateDocument
+              DoNothing
           , HP.tabIndex 0
           ]
           [ HH.div
@@ -373,12 +389,10 @@ component =
           ]
       , HH.div
           [ HP.classes [ HB.modalFooter ] ]
-          ( ( if ms.waiting then
-                [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary, HB.me5 ] ]
+          ( ( singletonIf ms.waiting
+                ( HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary, HB.me5 ] ]
                     []
-                ]
-              else
-                []
+                )
             )
               <>
                 [ HH.button
@@ -404,11 +418,6 @@ component =
                 ]
           )
       ]
-    where
-    handleKeyDown event
-      | KE.key event == "Enter" = ConfirmCreateDocument
-      | KE.key event == "Escape" = CancelModal
-      | otherwise = DoNothing
 
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
@@ -456,10 +465,8 @@ component =
         { newDocumentName = ""
         , modalState = CreateDocumentModal defaultCreateDocumentModalState
         }
-      
-      H.getHTMLElementRef modalInputRef >>= case _ of
-        Just element -> H.liftEffect $ WHE.focus element
-        Nothing -> pure unit
+
+      focusRef modalInputRef
     ConfirmCreateDocument -> do
       s <- H.get
       let newDocName = s.newDocumentName
@@ -501,6 +508,8 @@ component =
       pure unit
     RequestDeleteDocument documentID -> do
       H.modify_ _ { modalState = DeleteDocumentModal documentID }
+
+      focusRef modalDeleteRef
     CancelModal -> do
       H.modify_ \s -> s
         { modalState = NoModal
