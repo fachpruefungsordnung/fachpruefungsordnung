@@ -642,7 +642,7 @@ newDefaultDocument
     -> GroupID
     -> Text
     -> LTML.FlaggedInputTree'
-    -> m (Result (FullDocument TextElementRevision))
+    -> m (Result (FullDocument (Rendered TextElementRevision)))
 newDefaultDocument userID groupID title tree = runExceptT $ do
     doc <- ExceptT $ createDocument userID groupID title
     let docID = Document.identifier doc
@@ -677,7 +677,11 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
                                     }
                     case TextRevision.element textRevision of
                         TextRevision.NoConflict revision ->
-                            return $ Tree.Leaf $ TextElementRevision textElement $ Just revision
+                            return $
+                                Tree.Leaf $
+                                    Rendered
+                                        (TextElementRevision textElement $ Just revision)
+                                        (TextRevision.html textRevision)
                         _ ->
                             throwError $ Custom "Text Revision Conflict During Initial Document Creation."
     root <- emplaceTexts tree
@@ -688,7 +692,9 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
                     createTreeRevision
                         userID
                         docID
-                        (TextElement.identifier . TextRevision.textElement <$> node)
+                        ( (TextElement.identifier . TextRevision.textElement) . TextRevision.element
+                            <$> node
+                        )
             return $ FullDocument doc $ Just $ TreeRevision.TreeRevision header node
         Tree.Leaf _ -> throwError $ Custom "Root is leaf :/"
 

@@ -148,7 +148,7 @@ type PostDocument =
         :> Description "Create a new document with default content"
         :> Auth AuthMethod Auth.Token
         :> ReqBody '[JSON] CreateDocument
-        :> Post '[JSON] (FullDocument TextElementRevision)
+        :> Post '[JSON] (FullDocument (Rendered TextElementRevision))
 
 type GetDocument =
     Summary "Get metadata for a document"
@@ -369,7 +369,7 @@ docsServer =
 postDocumentHandler
     :: AuthResult Auth.Token
     -> CreateDocument
-    -> Handler (FullDocument TextElementRevision)
+    -> Handler (FullDocument (Rendered TextElementRevision))
 postDocumentHandler auth doc = do
     userID <- getUser auth
     withDB $
