@@ -23,12 +23,7 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request
-  ( changeRole
-  , deleteIgnore
-  , getGroup
-  , getUser
-  )
+import FPO.Data.Request (changeRole, deleteIgnore, getGroup, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.GroupDto
@@ -48,6 +43,7 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn)
 import FPO.UI.Style as Style
+import FPO.Util as Util
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -72,6 +68,7 @@ type Input = GroupID
 data Action
   = Initialize
   | Receive (Connected FPOTranslator Input)
+  | DoNothing
   | SetPage P.Output
   | FilterForMember String
   | ChangeSorting TH.Output
@@ -128,6 +125,9 @@ component =
     , memberNameFilter: ""
     }
 
+  modalRemoveRef :: H.RefLabel
+  modalRemoveRef = H.RefLabel "modal-remove-member"
+
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
@@ -143,6 +143,8 @@ component =
                       (const $ getUserInfoName member)
                       CancelModal
                       ConfirmRemoveMember
+                      DoNothing
+                      (Just modalRemoveRef)
                       (translate (label :: _ "common_member") state.translator)
                   ]
             _ -> []
@@ -375,6 +377,8 @@ component =
       handleAction $ FilterForMember ""
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
+    DoNothing -> do
+      pure unit
     SetPage (P.Clicked p) -> do
       H.modify_ _ { page = p }
     FilterForMember mn -> do
@@ -389,6 +393,8 @@ component =
         { filteredMembers = filteredMembers, page = 0, memberNameFilter = mn }
     RequestRemoveMember memberID -> do
       H.modify_ _ { modalState = RemoveMemberModal memberID }
+
+      Util.focusRef modalRemoveRef
     CancelModal -> do
       H.modify_ \s -> s
         { modalState = NoModal

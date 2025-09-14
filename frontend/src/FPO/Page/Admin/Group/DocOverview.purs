@@ -39,6 +39,7 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn, addModal)
 import FPO.UI.Style as Style
+import FPO.Util (focusRef, handleKeyDown, singletonIf)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -138,6 +139,14 @@ component =
     , group: Nothing
     }
 
+  -- Reference to the input field in the "create document" modal.
+  modalInputRef :: H.RefLabel
+  modalInputRef = H.RefLabel "modal-input"
+
+  -- Reference to the delete button in the "delete document" modal.
+  modalDeleteRef :: H.RefLabel
+  modalDeleteRef = H.RefLabel "modal-delete"
+
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
@@ -149,6 +158,8 @@ component =
                   (docNameFromID state)
                   CancelModal
                   ConfirmDeleteDocument
+                  DoNothing
+                  (Just modalDeleteRef)
                   (translate (label :: _ "common_project") state.translator)
               ]
             CreateDocumentModal ms ->
@@ -344,9 +355,16 @@ component =
     :: forall w. CreateDocumentModalState -> State -> HH.HTML w Action
   createDocumentModal ms state =
     addModal (translate (label :: _ "gp_createNewProject") state.translator)
-      (const CancelModal) $
+      CancelModal
+      DoNothing $
       [ HH.div
-          [ HP.classes [ HB.modalBody ] ]
+          [ HP.classes [ HB.modalBody ]
+          , HE.onKeyDown $ handleKeyDown
+              CancelModal
+              ConfirmCreateDocument
+              DoNothing
+          , HP.tabIndex 0
+          ]
           [ HH.div
               [ HP.classes [ HB.mb3 ] ]
               [ HH.label
@@ -360,6 +378,7 @@ component =
                   [ HP.type_ HP.InputText
                   , HP.classes [ HH.ClassName "form-control" ]
                   , HP.id "docName"
+                  , HP.ref modalInputRef
                   , HP.placeholder $ translate
                       (label :: _ "gp_enterDocumentName")
                       state.translator
@@ -370,12 +389,10 @@ component =
           ]
       , HH.div
           [ HP.classes [ HB.modalFooter ] ]
-          ( ( if ms.waiting then
-                [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary, HB.me5 ] ]
+          ( ( singletonIf ms.waiting
+                ( HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary, HB.me5 ] ]
                     []
-                ]
-              else
-                []
+                )
             )
               <>
                 [ HH.button
@@ -448,6 +465,8 @@ component =
         { newDocumentName = ""
         , modalState = CreateDocumentModal defaultCreateDocumentModalState
         }
+
+      focusRef modalInputRef
     ConfirmCreateDocument -> do
       s <- H.get
       let newDocName = s.newDocumentName
@@ -489,6 +508,8 @@ component =
       pure unit
     RequestDeleteDocument documentID -> do
       H.modify_ _ { modalState = DeleteDocumentModal documentID }
+
+      focusRef modalDeleteRef
     CancelModal -> do
       H.modify_ \s -> s
         { modalState = NoModal

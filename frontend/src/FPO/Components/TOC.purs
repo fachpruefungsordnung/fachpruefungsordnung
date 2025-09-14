@@ -35,7 +35,6 @@ import Data.String.Regex.Flags (noFlags)
 import Data.Time.Duration (Days(..), Minutes)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-{- import Effect.Console (log) -}
 import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
@@ -55,11 +54,11 @@ import FPO.Dto.DocumentDto.TreeDto
   )
 import FPO.Dto.PostTextDto (PostTextDto(..))
 import FPO.Dto.PostTextDto as PostTextDto
--- import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
 import FPO.Types (TOCEntry, TOCTree)
 import FPO.Util (isPrefixOf, prependIf)
+import FPO.Util as Util
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -235,6 +234,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
       }
   }
   where
+  -- Reference to the delete button in the "delete entry" modal.
+  modalDeleteRef :: H.RefLabel
+  modalDeleteRef = H.RefLabel "modal-delete"
 
   render :: State -> forall slots. H.ComponentHTML Action slots m
   render state =
@@ -265,6 +267,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
             (const title)
             CancelDeleteSection
             ConfirmDeleteSection
+            DoNothing
+            (Just modalDeleteRef)
             (kindToString kind)
         ]
 
@@ -573,6 +577,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
     RequestDeleteSection entity -> do
       H.modify_ _ { requestDelete = Just entity }
 
+      Util.focusRef modalDeleteRef
+
     CancelDeleteSection -> do
       H.modify_ _ { requestDelete = Nothing }
 
@@ -627,8 +633,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
       -- we need to adjust the path accordingly to keep it up-to-date with the editor.
       --
       -- Because we really only want to allow these sections at top-level in the future (no nested sections),
-      -- we could simplify the logic a bunch, but for now we keep it as is, given that it seems to be reliable
-      -- (hopefully ^^).
+      -- we could simplify the logic a bunch, but for now we keep it as is, given that the implementation
+      -- is robust.
       adjustPathAfterMove :: Path -> Path -> Path
       adjustPathAfterMove oldPath draggedId
         | oldPath == draggedId = adjustTargetForSelfMove draggedId -- Moving the selected entity itself
