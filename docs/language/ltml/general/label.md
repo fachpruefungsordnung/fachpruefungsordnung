@@ -18,8 +18,8 @@ of lower-case ASCII letters, ASCII digits, `_`, and `-`.
 A labeled node is written as `KEYWORD{LABEL:} CONTENT`, where
 
 * `KEYWORD` is empty if the respective node does not have a keyword, and
-* `CONTENT` is separated from the labeling by either a newline character (plus
-  indentation), or a non-empty sequence of ASCII spaces.
+* `CONTENT` is separated from the labeling by any amount of whitespace, which
+  generally may contain at most one newline.
 
 Special rules apply for [paragraphs](../paragraph.md#labeling) and
 [sentences](../paragraph.md#sentences).

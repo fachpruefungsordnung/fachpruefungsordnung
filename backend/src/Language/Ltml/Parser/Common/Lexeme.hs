@@ -40,12 +40,12 @@ symbol = void . L.symbol (void sp)
 -- | Space parser (accepts any number of ASCII spaces and, optionally, a final
 --   line comment).
 sp :: (MonadParser m) => m Text
-sp = takeWhileP (Just "spaces") (== ' ') <* optional lineCommentP
+sp = takeWhileP (Just "space") (== ' ') <* optional lineCommentP
 
 -- | Space parser (accepts one or more ASCII spaces and, optionally, a final
 --   line comment).
 sp1 :: (MonadParser m) => m Text
-sp1 = takeWhile1P (Just "spaces") (== ' ') <* optional lineCommentP
+sp1 = takeWhile1P (Just "space") (== ' ') <* optional lineCommentP
 
 -- | Lexeme parser combinator that permits newlines, ASCII spaces, and line
 --   comments.
