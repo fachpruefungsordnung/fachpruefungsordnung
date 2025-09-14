@@ -18,7 +18,7 @@ References are always permitted.
 
 ## Line breaks & Whitespace
 
-Text may be spread over several lines---maintaining indentation if any.
+Text may be spread over several lines---all with the same minimum indentation.
 Such input lines form a single logical line, joined by whitespace.
 Text is terminated by a final newline character.
 
@@ -39,8 +39,9 @@ Note, however, that empty lines may be used to split up
 In some contexts (e.g., [enumerations](./enumeration.md)), text is headed by a
 [keyword](general/identifier.md#input-identifiers).
 
-In this case, one level of [indentation](general/indentation.md) is implicitly
-added.
+In this case, in order to belong to the headed text, any input line following
+the first must be indented more than that first line, but not necessarily by
+the same amount.
 
 The first line may generally be written right after the keyword (in the same
 line, separated by at least one ASCII space); otherwise, it starts on the
@@ -117,9 +118,10 @@ Text nodes (e.g., headings, sentences) generally permit in-line children.
 That is, at any point in such a text node, certain child nodes may be inserted.
 This requires breaking the line where the children are to be inserted.
 
-Text children must be [indented](general/indentation.md) one level from the
-current context (text); that is, two levels from the textual node's keyword,
-if any.
+Child nodes need not be indented further than the context, but this is deemed
+good practice.
+Similarly, they should not appear before any regular text, but this is not
+prohibited.
 
 There is currently one kind of text children, [enumeration](./enumeration.md)
 items.

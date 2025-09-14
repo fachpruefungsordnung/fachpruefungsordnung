@@ -16,9 +16,9 @@ module Language.Ltml.Parser.Text
     )
 where
 
-import Control.Alternative.Utils (whenAlt)
 import Control.Applicative (empty, (<|>))
 import Control.Applicative.Combinators (choice)
+import Control.Monad (guard, void)
 import Control.Monad.Identity (Identity (Identity), runIdentity)
 import Control.Monad.State (StateT, get, put)
 import Control.Monad.Trans.Class (lift)
@@ -53,15 +53,20 @@ import Language.Ltml.Parser
 import Language.Ltml.Parser.Common.Indent (someIndented)
 import Language.Ltml.Parser.Common.Lexeme (isLineCommentPrefixFirstChar)
 import Language.Ltml.Parser.Keyword (keywordP, lKeywordP, mlKeywordP)
-import Language.Ltml.Parser.Label (labelP, labelingP)
+import Language.Ltml.Parser.Label (bracedLabelingP, labelP)
 import Language.Ltml.Parser.MiTree
-    ( MiElementConfig (..)
+    ( InlineParser (BracketingParser, LeafParser)
+    , MiElementConfig (..)
+    , Restricted
     , hangingBlock'
     , hangingBlock_
     , miForest
+    , unbracketed
+    , unrestricted
     )
 import Text.Megaparsec
-    ( notFollowedBy
+    ( Pos
+    , optional
     , satisfy
     , some
     , takeWhile1P
@@ -87,9 +92,15 @@ textForestP
        )
     => TextType enumType
     -> m [TextTree lbrk fnref style enum special]
-textForestP t = miForest elementPF (childPF t)
+textForestP t = miForest inlinePs (blockPF t)
 
-elementPF
+-- Note on sentence start tokens (SSTs):
+--  * Labeled SSTs are permitted anywhere, while unlabeled SSTs are only
+--    permitted in certain places.
+--     - In particular, in case of styling, the default (empty) SST is parsed
+--       after the opening styling tag, but can be forced before by a labeled
+--       SST.
+inlinePs
     :: forall m lbrk fnref style enum special
      . ( MonadParser m
        , LineBreakP lbrk
@@ -97,41 +108,64 @@ elementPF
        , StyleP style
        , SpecialP m special
        )
-    => Bool
-    -> m [TextTree lbrk fnref style enum special]
-    -> m (MiElementConfig, [TextTree lbrk fnref style enum special])
-elementPF isBracketed p =
-    fmap (maybeToList . fmap Special) <$> specialP -- must come first
-        <|> rs (NonBreakingSpace <$ char '~')
-        <|> try (char '{' *> bracedP <* char '}')
-        <|> rs (try (Styled <$ char '<' <*> styleP) <*> p <* char '>')
-        <|> rs (whenAlt (not isBracketed) (Word . Text.singleton <$> char '>'))
-        <|> rs (Word <$> wordP (Proxy :: Proxy special))
+    => [Restricted (InlineParser m (TextTree lbrk fnref style enum special))]
+inlinePs =
+    [ unrestricted $ LeafParser $ mkXP_ (NonBreakingSpace <$ char '~')
+    , unrestricted $ LeafParser $ try (char '{' *> bracedP <* char '}')
+    , unrestricted styledElementP
+    , unrestricted $ LeafParser $ mkP (Word <$> wordP (Proxy :: Proxy special))
+    , unbracketed $ LeafParser $ mkP (Word . Text.singleton <$> char '>')
+    ]
   where
+    -- This should not be expensive, it is indirectly wrapped in `try`.
     bracedP =
-        fmap (singleton . LineBreak) <$> bracedLineBreakP
-            <|> rs (Reference <$ char ':' <*> labelP)
-            <|> rs (FootnoteRef <$> footnoteRefP)
+        mkP (Reference <$ char ':' <*> labelP)
+            <|> mkP (FootnoteRef <$> bracedFootnoteRefP)
+            <|> fmap (singleton . LineBreak) <$> bracedLineBreakP
+            <|> fmap (maybeToList . fmap Special) <$> bracedSpecialP
 
-    -- Note: Using this repeatedly instead of grouping by cfg is maybe less
-    --   efficient, but IMHO better readable.
-    rs = fmap ((regularCfg,) . singleton)
+    styledElementP =
+        BracketingParser
+            (try $ mkP_' $ Styled <$ char '<' <*> styleP)
+            (void $ char '>')
       where
-        regularCfg =
-            MiElementConfig
-                { miecPermitEnd = True
-                , miecPermitChild = True
-                , miecRetainPrecedingWhitespace = True
-                , miecRetainTrailingWhitespace = True
-                }
+        mkP_' :: m (a -> b) -> m (a -> (MiElementConfig, [b]))
+        mkP_' = fmap (((regularCfg,) . singleton) .)
 
-childPF
+    -- Note: Using mkP and mkXP_ repeatedly instead of grouping appropriately
+    --   is maybe less efficient, but IMHO better readable.
+
+    -- Make a simple parser, permitting preceding empty SST.
+    mkP p =
+        (regularCfg,) <$> do
+            mSst <- optional $ Special <$> emptySentenceStartP
+            x <- p
+            return $ maybe id (:) mSst [x]
+
+    -- Make a simple parser, not permitting preceding empty SST, and dropping
+    -- surrounding whitespace.
+    mkXP_ = fmap ((specialCfg,) . singleton)
+
+    regularCfg =
+        MiElementConfig
+            { miecRetainPrecedingWhitespace = True
+            , miecRetainTrailingWhitespace = True
+            }
+
+    specialCfg =
+        MiElementConfig
+            { miecRetainPrecedingWhitespace = False
+            , miecRetainTrailingWhitespace = False
+            }
+
+blockPF
     :: forall m lbrk fnref style enumType enum special
      . (ParserWrapper m, EnumP enumType enum, SpecialP m special)
     => TextType enumType
+    -> Maybe Pos
     -> m (TextTree lbrk fnref style enum special)
-childPF (TextType (Disjunction enumTypes)) =
-    wrapParser (Enum <$> choice (map (enumP . unwrapNT) enumTypes))
+blockPF (TextType (Disjunction enumTypes)) lvl =
+    wrapParser (Enum <$> choice (map (enumP lvl . unwrapNT) enumTypes))
         <* postEnumP (Proxy :: Proxy special)
 
 -- TODO: Unused.
@@ -163,16 +197,16 @@ class (Functor f) => HangingTextP f where
 
 instance HangingTextP Identity where
     hangingTextP' kw t =
-        Identity <$> hangingBlock_ (keywordP kw) elementPF (childPF t)
+        Identity <$> hangingBlock_ (keywordP kw) inlinePs (blockPF t)
 
 instance HangingTextP Node where
     hangingTextP' kw t = uncurry Node <$> hangingTextP' kw t
 
 instance HangingTextP ((,) Label) where
-    hangingTextP' kw t = hangingBlock' (lKeywordP kw) elementPF (childPF t)
+    hangingTextP' kw t = hangingBlock' (lKeywordP kw) inlinePs (blockPF t)
 
 instance HangingTextP ((,) (Maybe Label)) where
-    hangingTextP' kw t = hangingBlock' (mlKeywordP kw) elementPF (childPF t)
+    hangingTextP' kw t = hangingBlock' (mlKeywordP kw) inlinePs (blockPF t)
 
 class LineBreakP lbrk where
     bracedLineBreakP :: (MonadParser m) => m (MiElementConfig, lbrk)
@@ -185,9 +219,7 @@ instance LineBreakP HardLineBreak where
       where
         cfg =
             MiElementConfig
-                { miecPermitEnd = True
-                , miecPermitChild = True
-                , miecRetainPrecedingWhitespace = False
+                { miecRetainPrecedingWhitespace = False
                 , miecRetainTrailingWhitespace = False
                 }
 
@@ -204,89 +236,56 @@ instance StyleP FontStyle where
             <|> Underlined <$ char '_'
 
 class EnumP enumType enum where
-    enumP :: enumType -> Parser enum
+    enumP :: Maybe Pos -> enumType -> Parser enum
 
 instance EnumP Void Void where
-    enumP = const empty
+    enumP _ _ = empty
 
 instance EnumP EnumType Enumeration where
-    enumP (EnumType kw fmt tt) = Enumeration fmt <$> someIndented enumItemP
+    enumP lvl (EnumType kw fmt tt) =
+        Enumeration fmt <$> someIndented lvl enumItemP
       where
         enumItemP = uncurry Node . fmap EnumItem <$> hangingTextP' kw tt
 
 class SpecialP m special | special -> m where
-    specialP :: m (MiElementConfig, Maybe special)
+    emptySentenceStartP :: m special
+    bracedSpecialP :: m (MiElementConfig, Maybe special)
     wordP :: Proxy special -> m Text
     postEnumP :: Proxy special -> m ()
 
 instance SpecialP Parser Void where
-    specialP = empty
+    emptySentenceStartP = empty
+
+    bracedSpecialP = empty
 
     wordP _ = gWordP isWordChar isWordSemiSpecialChar isWordSpecialChar
 
     postEnumP _ = pure ()
 
-instance SpecialP ParagraphParser SentenceStart where
-    specialP =
-        fmap (specialCfg,) $
-            Nothing <$ continueP
-                <|> Just <$> sentenceStartP
-      where
-        -- Sentence start tokens (SSTs) must be followed by a regular element;
-        -- that is, they must not occur at the end of their parent element
-        -- (particularly, a paragraph), or directly preceding a text child.
-        --  - This is enforced via `specialCfg`.
-        --  - Note that unlabeled (i.e., empty) SSTs
-        --    - are impossible before text children and at a paragraph's end
-        --      anyways (unless on their own (empty) line, see below), and
-        --    - could also be appropriately restricted by ensuring they are
-        --      not followed by `>` or `\n`.
-        --      - (Note that `miForest` does not permit EOF line ends.)
-        --
-        -- Further, unlabeled SSTs must not occur as only element of an input
-        -- line (for that input line would be empty).
-        --  - We prohibit this by checking for a succeeding newline character.
-        --  - (Again, note that `miForest` does not permit EOF line ends.)
-        --
-        -- Otherwise, labeled SSTs may occur whenever the state permits,
-        -- while unlabeled SSTs are not permitted before an opening styling
-        -- tag (`<X` for some `X`).
-        --  - Parsing an unlabeled SST is delayed until after the opening
-        --    styling tag, while a labeled SST may occur either before or
-        --    after an opening styling tag.
+-- | Parse iff the paragraph state permits an SST and reset the state if
+--   parsing successful.
+--   Unrelated to 'try'.
+sspTry :: ParagraphParser a -> ParagraphParser a
+sspTry p = get >>= guard >> (p <* put False)
 
+instance SpecialP ParagraphParser SentenceStart where
+    emptySentenceStartP = sspTry $ pure $ SentenceStart Nothing
+
+    bracedSpecialP =
+        fmap (specialCfg,) $
+            sspTry $
+                Nothing <$ continueP
+                    <|> Just <$> labeledSSP
+      where
         specialCfg =
             MiElementConfig
-                { miecPermitEnd = False
-                , miecPermitChild = False
-                , miecRetainPrecedingWhitespace = True
+                { miecRetainPrecedingWhitespace = True
                 , miecRetainTrailingWhitespace = False
                 }
 
-        sentenceStartP = do
-            isSentenceStartExpected <- get
-            if isSentenceStartExpected
-                then (labeledSSP <|> unlabeledSSP) <* put False
-                else empty
-          where
-            -- TODO: Avoid `try`.
-            labeledSSP :: ParagraphParser SentenceStart
-            labeledSSP = SentenceStart . Just <$> try labelingP
+        labeledSSP = SentenceStart . Just <$> bracedLabelingP
 
-            unlabeledSSP :: ParagraphParser SentenceStart
-            unlabeledSSP =
-                SentenceStart Nothing <$ notFollowedBy (char '\n' <|> char '<')
-
-        -- The `{>}` token means to continue the current sentence.
-        --  - It is meant to be used after an enumeration, but can be used
-        --    anywhere where a sentence start is permitted.
-        --  - The same rules as for labeled SSTs apply w.r.t. placement.
-        continueP = do
-            isSentenceStartExpected <- get
-            _ <- string "{>}"
-            if isSentenceStartExpected
-                then put False
-                else fail "Unexpected sentence continuation token."
+        continueP = void (char '>')
 
     wordP _ = sentenceWordP <|> sentenceEndP
       where
@@ -297,17 +296,17 @@ instance SpecialP ParagraphParser SentenceStart where
         sentenceEndP :: ParagraphParser Text
         sentenceEndP = Text.singleton <$> satisfy isSentenceEndChar <* put True
 
-    -- An enumeration child ends a sentence.
+    -- An enumeration ends a sentence.
     postEnumP _ = put True
 
 class FootnoteRefP fnref where
-    footnoteRefP :: (MonadParser m) => m fnref
+    bracedFootnoteRefP :: (MonadParser m) => m fnref
 
 instance FootnoteRefP Void where
-    footnoteRefP = empty
+    bracedFootnoteRefP = empty
 
 instance FootnoteRefP FootnoteReference where
-    footnoteRefP = FootnoteReference <$ string "^:" <*> labelP
+    bracedFootnoteRefP = FootnoteReference <$ string "^:" <*> labelP
 
 -- | Construct a word parser.
 --
@@ -330,7 +329,7 @@ gWordP isValid isSemiSpecial isSpecial =
     mconcat <$> some (regularWordP <|> escapedCharP) <|> semiSpecialCharP
   where
     regularWordP :: (MonadParser m) => m Text
-    regularWordP = takeWhile1P Nothing isRegular
+    regularWordP = takeWhile1P (Just "regular character") isRegular
       where
         isRegular :: Char -> Bool
         isRegular c = isValid c && not (isSemiSpecial c || isSpecial c)
@@ -342,7 +341,7 @@ gWordP isValid isSemiSpecial isSpecial =
     escapedCharP = Text.singleton <$ char '\\' <*> satisfy isValid
 
 rawWordP :: (MonadParser m) => m Text
-rawWordP = takeWhile1P Nothing isWordChar
+rawWordP = takeWhile1P (Just "word character") isWordChar
 
 -- NOTE: isControl '\n' == True
 isWordChar :: Char -> Bool
