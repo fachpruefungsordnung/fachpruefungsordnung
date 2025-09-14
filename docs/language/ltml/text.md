@@ -26,12 +26,24 @@ Any internal whitespace---either from a single linebreak as described above,
 or a non-empty sequence of ASCII spaces, but neither initial nor final---is
 treated the same: as a word separator, which is generally rendered as a single
 space character.
-In particular, it is impossible to encode a line break; lines are
-automatically broken in the output whenever an output line is full.
+Normally, lines in the output are automatically broken when full.
+
+A hard line break can be encoded as `{nl}`, and a non-breaking space as `~`.
 
 Empty lines are disallowed within text.
 Note, however, that empty lines may be used to split up
 [paragraphs](./paragraph.md), which are otherwise basically just text.
+
+
+## Escaping
+
+Any non-whitespace character that is generally valid may be escaped by
+prepending a backslash (`\`), yielding the respective literal character.
+This is useful for characters with special meaning.
+In particular, a literal backslash can be encoded as `\\`.
+
+All Unicode characters except Unicode control characters
+(`Cc`; e.g., `U+007F` - `DEL`) are generally valid.
 
 
 ## Keyword-headed text
@@ -54,11 +66,10 @@ See [enumerations](./enumeration.md) for example input.
 
 * Some (but not all) node kinds permit styled text.
 * Specifically, text may be `<*bold>`, `</in italics>`, or `<_underlined>`.
-* Different style tags may be nested (e.g., `<*bold </and italics/>*>`).
-    * However, a style tag may not be (transitively) nested within itself
-      (e.g., `<*bold <*again*>*>` is illegal).
-        * Note: This restriction is not yet implemented and might be removed
-          later.
+* Different style tags may be nested (e.g., `<*bold </and italics>>`).
+    * Nesting the same style tag within itself is possible but of little use.
+        * E.g., `<*bold <*again>>` is visually equivalent to `<*bold again>`
+          in the output.
 * ```
   <*Styled text can
   span multiple lines,
