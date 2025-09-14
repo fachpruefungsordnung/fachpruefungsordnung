@@ -19,13 +19,7 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request
-  ( createNewDocument
-  , deleteIgnore
-  , getAuthorizedUser
-  , getDocumentsQueryFromURL
-  , getGroup
-  )
+import FPO.Data.Request (createNewDocument, deleteIgnore, getAuthorizedUser, getDocumentsQueryFromURL, getGroup)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Data.Time (formatRelativeTime)
@@ -48,6 +42,8 @@ import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
+import Web.HTML.HTMLElement as WHE
+import Web.UIEvent.KeyboardEvent as KE
 
 _tablehead = Proxy :: Proxy "tablehead"
 _pagination = Proxy :: Proxy "pagination"
@@ -137,6 +133,9 @@ component =
     , newDocumentName: ""
     , group: Nothing
     }
+
+  modalInputRef :: H.RefLabel
+  modalInputRef = H.RefLabel "modal-input"
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
@@ -346,7 +345,10 @@ component =
     addModal (translate (label :: _ "gp_createNewProject") state.translator)
       (const CancelModal) $
       [ HH.div
-          [ HP.classes [ HB.modalBody ] ]
+          [ HP.classes [ HB.modalBody ]
+          , HE.onKeyDown handleKeyDown
+          , HP.tabIndex 0
+          ]
           [ HH.div
               [ HP.classes [ HB.mb3 ] ]
               [ HH.label
@@ -360,6 +362,7 @@ component =
                   [ HP.type_ HP.InputText
                   , HP.classes [ HH.ClassName "form-control" ]
                   , HP.id "docName"
+                  , HP.ref modalInputRef
                   , HP.placeholder $ translate
                       (label :: _ "gp_enterDocumentName")
                       state.translator
@@ -401,6 +404,11 @@ component =
                 ]
           )
       ]
+    where
+    handleKeyDown event
+      | KE.key event == "Enter" = ConfirmCreateDocument
+      | KE.key event == "Escape" = CancelModal
+      | otherwise = DoNothing
 
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
@@ -448,6 +456,10 @@ component =
         { newDocumentName = ""
         , modalState = CreateDocumentModal defaultCreateDocumentModalState
         }
+      
+      H.getHTMLElementRef modalInputRef >>= case _ of
+        Just element -> H.liftEffect $ WHE.focus element
+        Nothing -> pure unit
     ConfirmCreateDocument -> do
       s <- H.get
       let newDocName = s.newDocumentName
