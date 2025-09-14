@@ -66,6 +66,7 @@ import Language.Ltml.Parser.MiTree
     )
 import Text.Megaparsec
     ( Pos
+    , lookAhead
     , optional
     , satisfy
     , some
@@ -313,6 +314,8 @@ instance FootnoteRefP FootnoteReference where
 --   The first predicate determines valid characters, the second semi-special
 --   characters, and the third special characters.
 --
+--   ASCII spaces and newlines must not count as valid.
+--
 --   Only valid characters are permitted in a word.
 --
 --   All valid characters may be escaped.
@@ -338,10 +341,22 @@ gWordP isValid isSemiSpecial isSpecial =
     semiSpecialCharP = Text.singleton <$> satisfy isSemiSpecial
 
     escapedCharP :: (MonadParser m) => m Text
-    escapedCharP = Text.singleton <$ char '\\' <*> satisfy isValid
+    escapedCharP =
+        Text.singleton
+            <$ char '\\'
+            <*> ( satisfy isValid
+                    -- The lookAhead is purely for better error messages.
+                    <|> '\\' <$ lookAhead (satisfy isWordSepChar)
+                )
 
+-- TODO?: Handle `/`.
 rawWordP :: (MonadParser m) => m Text
 rawWordP = takeWhile1P (Just "word character") isWordChar
+
+isWordSepChar :: Char -> Bool
+isWordSepChar ' ' = True
+isWordSepChar '\n' = True
+isWordSepChar _ = False
 
 -- NOTE: isControl '\n' == True
 isWordChar :: Char -> Bool
