@@ -11,6 +11,7 @@ module FPO.Components.Editor
 
 import Prelude
 
+import Data.Argonaut.Core (jsonEmptyObject)
 import Ace (ace, editNode) as Ace
 import Ace.Anchor as Anchor
 import Ace.Document as Document
@@ -110,7 +111,6 @@ import Web.HTML.Window as Win
 import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
-import FPO.Data.AppError (AppError(..))
 
 foreign import _resize :: Types.Editor -> Effect Unit
 
@@ -190,7 +190,6 @@ data Output
   | ClickedQuery (Array String)
   | DeletedComment TOCEntry (Array Int)
   | PostPDF String
-  | SavedSection TOCEntry
   | RenamedNode String Path
   | RequestComments Int Int
   | SelectedCommentSection Int Int
@@ -757,7 +756,9 @@ editor = connect selectTranslator $ H.mkComponent
         isDirty <- EC.liftEffect $ Ref.read =<< case state.saveState.mDirtyRef of
           Just r -> pure r
           Nothing -> EC.liftEffect $ Ref.new false
-        when isDirty $ do
+        -- Only save, when dirty flag is true or we are in older version
+        -- TODO: Add another flag instead of using isEditorOutdated
+        when (isDirty || state.isEditorOutdated) $ do
           allLines <- H.gets _.mEditor >>= traverse \ed -> do
             H.liftEffect $ Editor.getSession ed
               >>= Session.getDocument
@@ -820,18 +821,45 @@ editor = connect selectTranslator $ H.mkComponent
       -- handle errors in pos and decodeJson
       case response of
         -- if error, try to Save again (Maybe ParentID is lost?)
-        Left _ -> updateStore $ Store.AddError $ DataError "There was a problem with Upload"
+        Left err -> updateStore $ Store.AddError $ err
         -- extract and insert new parentID into newContent
         Right updatedContent -> do
-          H.raise (SavedSection newEntry)
 
-          H.modify_ _
-            { mTocEntry = Just newEntry
-            , mContent = Just updatedContent
-            }
+          H.modify_ _ { mContent = Just updatedContent }
 
-          -- Show saved icon
-          handleAction SavedIcon
+          -- Show saved icon or toast
+          case isAutoSave, state.isEditorOutdated of
+            -- auto save interaction
+            true, _ -> do
+              H.modify_ _ { mContent = Just updatedContent }
+              handleAction SavedIcon
+            -- manuell saving and working in latest version
+            false, false -> do
+              H.modify_ _ { mContent = Just updatedContent }
+              updateStore $ Store.AddSuccess "Saved successfully"
+            -- manuell saving, draft mode => publish
+            false, true -> do
+              res <- Request.postJson (ContentDto.extractDraft updatedContent)
+                ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id
+                    <> "/draft/publish"
+                )
+                jsonEmptyObject
+              
+              case res of
+                Left err' -> updateStore $ Store.AddError $ err'
+                Right upCon -> do
+                  H.modify_ _ { mContent = Just upCon }
+                  -- Put merged content into editor
+                  H.gets _.mEditor >>= traverse_ \ed -> do
+                    H.liftEffect do
+                      session <- Editor.getSession ed
+                      document <- Session.getDocument session
+                      Document.setValue (ContentDto.getContentText upCon) document
+                      -- reset Ref, because loading new content is considered 
+                      -- changing the existing content, which would set the flag
+                      for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+                  updateStore $ Store.AddSuccess "Saved and Merged successfully."
+                  pure unit
 
           -- mDirtyRef := false
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r

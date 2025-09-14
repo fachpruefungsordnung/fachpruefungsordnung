@@ -61,7 +61,6 @@ import FPO.Types
   , emptyTOCEntry
   , findTOCEntry
   , findTitleTOCEntry
-  , replaceTOCEntry
   , timeStampsVersions
   , tocTreeToDocumentTree
   )
@@ -1017,14 +1016,6 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Editor.RequestComments docID entryID -> do
         H.tell _comment unit (Comment.RequestComments docID entryID)
-
-      Editor.SavedSection tocEntry -> do
-        state <- H.get
-        let
-          newTOCTree = replaceTOCEntry tocEntry.id tocEntry state.tocEntries
-        H.modify_ _ { tocEntries = newTOCTree }
-        H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
-        handleAction POST
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get

@@ -175,6 +175,24 @@ extractNewParent (Content cont) json = do
     _ ->
       pure (Content cont)
 
+extractDraft :: Content -> Json -> Either JsonDecodeError Content
+extractDraft (Content cont) json = do
+  obj <- decodeJson json
+  typ <- obj .: "type" :: Either JsonDecodeError String
+  case typ of
+    "noConflict" -> do
+      newRev <- obj .: "newRevision"
+      hdr <- newRev .: "header"
+      pid <- hdr .: "identifier"
+      pure $ Content $ cont { parent = pid }
+    "draftCreated" -> do
+      -- TODO update Commentmarkers
+      draft <- obj .: "draft"
+      newCon <- draft .: "draftContent"
+      pure $ Content $ cont { content = newCon }
+    _ ->
+      pure (Content cont)
+
 convertToAnnotetedMarker
   :: CommentAnchor
   -> AnnotatedMarker
