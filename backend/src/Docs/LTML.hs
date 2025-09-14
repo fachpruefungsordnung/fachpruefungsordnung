@@ -8,6 +8,7 @@ module Docs.LTML
     , nodeToLtmlInputTree
     , nodeToLtmlInputTree'
     , treeToLtmlInputTree
+    , treeRevisionToMeta
     ) where
 
 import Data.Bifunctor (first)
@@ -29,6 +30,7 @@ import Docs.MetaTree
     , MetaNode (MetaNode)
     , MetaTree (MetaLeaf, MetaTree)
     , TocEntry (TocEntry)
+    , TreeRevisionWithMetaData (TreeRevisionWithMetaData)
     , TreeWithMetaData (TreeWithMetaData)
     )
 import qualified Docs.MetaTree as MetaTree
@@ -40,6 +42,12 @@ import qualified Language.Ltml.Common as LTML
 import Language.Ltml.Tree (FlaggedInputTree)
 import qualified Language.Ltml.Tree as LTML
 import qualified Language.Ltml.Tree.ToMeta as LTML
+
+treeRevisionToMeta
+    :: TreeRevision TextElementRevision
+    -> Either LTML.MetaError (TreeRevisionWithMetaData TextElementRevision)
+treeRevisionToMeta (TreeRevision header root) =
+    TreeRevisionWithMetaData header <$> treeToMeta root
 
 treeToMeta'
     :: Node TextElementRevision

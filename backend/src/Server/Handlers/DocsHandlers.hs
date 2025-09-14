@@ -89,6 +89,7 @@ import Docs.Comment
     , prettyPrintCommentRef
     )
 import Docs.FullDocument (FullDocument)
+import Docs.MetaTree (TreeRevisionWithMetaData)
 import Docs.Revision
     ( RevisionRef (RevisionRef)
     , RevisionSelector
@@ -202,7 +203,7 @@ type GetTreeRevision =
         :> Capture "documentID" DocumentID
         :> "tree"
         :> Capture "treeRevision" TreeRevisionSelector
-        :> Get '[JSON] (Maybe (TreeRevision TextElement))
+        :> Get '[JSON] (Maybe (TreeRevisionWithMetaData TextElement))
 
 type GetTreeRevisionFull =
     Auth AuthMethod Auth.Token
@@ -210,7 +211,7 @@ type GetTreeRevisionFull =
         :> "tree"
         :> Capture "treeRevision" TreeRevisionSelector
         :> "full"
-        :> Get '[JSON] (Maybe (TreeRevision TextElementRevision))
+        :> Get '[JSON] (Maybe (TreeRevisionWithMetaData TextElementRevision))
 
 type GetTextHistory =
     Auth AuthMethod Auth.Token
@@ -465,19 +466,19 @@ getTreeRevisionFullHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TreeRevisionSelector
-    -> Handler (Maybe (TreeRevision TextElementRevision))
+    -> Handler (Maybe (TreeRevisionWithMetaData TextElementRevision))
 getTreeRevisionFullHandler auth docID revision = do
     userID <- getUser auth
     withDB $
         run $
-            Docs.getTreeWithLatestTexts userID $
+            Docs.getFullTreeRevision userID $
                 TreeRevisionRef docID revision
 
 getTreeRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TreeRevisionSelector
-    -> Handler (Maybe (TreeRevision TextElement))
+    -> Handler (Maybe (TreeRevisionWithMetaData TextElement))
 getTreeRevisionHandler auth docID revision = do
     userID <- getUser auth
     withDB $ run $ Docs.getTreeRevision userID $ TreeRevisionRef docID revision

@@ -17,10 +17,10 @@ module Docs
     , getTreeRevision
     , getDocumentRevisionTree
     , createTreeRevision
+    , getFullTreeRevision
     , getTextHistory
     , getTreeHistory
     , getDocumentHistory
-    , getTreeWithLatestTexts
     , getDocumentRevision
     , createComment
     , getComments
@@ -51,6 +51,7 @@ import qualified Language.Ltml.Tree as LTML
 
 import Control.Applicative ((<|>))
 import Data.Aeson (FromJSON, ToJSON)
+import Data.Bifunctor (Bifunctor (bimap))
 import Data.Maybe (fromMaybe)
 import Data.OpenApi (ToSchema)
 import qualified Data.Text as Text
@@ -90,6 +91,8 @@ import qualified Docs.Document as Document
 import Docs.DocumentHistory (DocumentHistory)
 import Docs.FullDocument (FullDocument (FullDocument))
 import qualified Docs.FullDocument as FullDocument
+import Docs.LTML (treeRevisionToMeta)
+import Docs.MetaTree (TreeRevisionWithMetaData)
 import Docs.Revision
     ( RevisionRef (RevisionRef)
     , textRevisionRefFor
@@ -414,17 +417,27 @@ createTreeRevision userID docID root = logged userID Scope.docsTreeRevision $
                 return $ flip TextElementRevision Nothing <$> textElement
             Just _ -> return bla
 
-getTreeRevision
-    :: (HasGetTreeRevision m, HasLogMessage m)
+getFullTreeRevision
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
     => UserID
     -> TreeRevisionRef
-    -> m (Result (Maybe (TreeRevision TextElement)))
-getTreeRevision userID ref@(TreeRevisionRef docID _) =
+    -> m (Result (Maybe (TreeRevisionWithMetaData TextElementRevision)))
+getFullTreeRevision userID ref =
     logged userID Scope.docsTreeRevision $
         runExceptT $ do
-            guardPermission Read docID userID
-            guardExistsTreeRevision True ref
-            lift $ DB.getTreeRevision ref
+            fullTree <- getTreeWithLatestTexts userID ref
+            ExceptT . pure $ case fullTree of
+                Just tree -> bimap (Custom . Text.pack . show) Just (treeRevisionToMeta tree)
+                Nothing -> Right Nothing
+
+getTreeRevision
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
+    => UserID
+    -> TreeRevisionRef
+    -> m (Result (Maybe (TreeRevisionWithMetaData TextElement)))
+getTreeRevision userID ref =
+    -- ich möchte nicht drüber reden.
+    (((TextRevision.textElement <$>) <$>) <$>) <$> getFullTreeRevision userID ref
 
 getDocumentRevisionTree
     :: (HasGetTreeRevision m, HasGetRevisionKey m, HasLogMessage m)
@@ -485,8 +498,9 @@ getTreeWithLatestTexts
     :: (HasGetTreeRevision m, HasGetTextElementRevision m, HasLogMessage m)
     => UserID
     -> TreeRevisionRef
-    -> m (Result (Maybe (TreeRevision TextElementRevision)))
-getTreeWithLatestTexts userID revision = logged userID Scope.docs $ runExceptT $ do
+    -- -> m (Result (Maybe (TreeRevision TextElementRevision)))
+    -> ExceptT Error m (Maybe (TreeRevision TextElementRevision))
+getTreeWithLatestTexts userID revision = do
     guardPermission Read docID userID
     guardExistsDocument docID
     guardExistsTreeRevision True revision

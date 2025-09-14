@@ -6,6 +6,7 @@ module Docs.MetaTree
     , Meta (..)
     , TocEntry (..)
     , TreeWithMetaData (..)
+    , TreeRevisionWithMetaData (..)
     ) where
 
 import Data.Text (Text)
@@ -15,12 +16,36 @@ import GHC.Generics (Generic)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
 import Docs.Tree (NodeHeader)
+import Docs.TreeRevision (TreeRevisionHeader)
+
+data TreeRevisionWithMetaData a
+    = TreeRevisionWithMetaData
+    { revisionHeader :: TreeRevisionHeader
+    , revision :: TreeWithMetaData a
+    }
+    deriving (Generic)
+
+instance (ToJSON a) => ToJSON (TreeRevisionWithMetaData a)
+
+instance (FromJSON a) => FromJSON (TreeRevisionWithMetaData a)
+
+instance (ToSchema a) => ToSchema (TreeRevisionWithMetaData a)
+
+instance Functor TreeRevisionWithMetaData where
+    fmap f rev = rev {revision = f <$> revision rev}
 
 data TreeWithMetaData a
     = TreeWithMetaData
     { root :: Meta a
     , metaMap :: String -- TODO!
     }
+    deriving (Generic)
+
+instance (ToJSON a) => ToJSON (TreeWithMetaData a)
+
+instance (FromJSON a) => FromJSON (TreeWithMetaData a)
+
+instance (ToSchema a) => ToSchema (TreeWithMetaData a)
 
 instance Functor TreeWithMetaData where
     fmap f tree' = tree' {root = f <$> root tree'}
