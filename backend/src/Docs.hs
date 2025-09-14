@@ -550,7 +550,7 @@ getDocumentRevision
        )
     => UserID
     -> RevisionRef
-    -> m (Result FullDocument)
+    -> m (Result (FullDocument TextElementRevision))
 getDocumentRevision userID ref@(RevisionRef docID _) =
     logged userID Scope.docs $ runExceptT $ do
         guardPermission Read docID userID
@@ -642,7 +642,7 @@ newDefaultDocument
     -> GroupID
     -> Text
     -> LTML.FlaggedInputTree'
-    -> m (Result FullDocument)
+    -> m (Result (FullDocument TextElementRevision))
 newDefaultDocument userID groupID title tree = runExceptT $ do
     doc <- ExceptT $ createDocument userID groupID title
     let docID = Document.identifier doc

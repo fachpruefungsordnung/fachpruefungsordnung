@@ -148,7 +148,7 @@ type PostDocument =
         :> Description "Create a new document with default content"
         :> Auth AuthMethod Auth.Token
         :> ReqBody '[JSON] CreateDocument
-        :> Post '[JSON] FullDocument
+        :> Post '[JSON] (FullDocument TextElementRevision)
 
 type GetDocument =
     Summary "Get metadata for a document"
@@ -287,7 +287,7 @@ type GetDocumentRevision =
         :> Capture "documentID" DocumentID
         :> "rev"
         :> Capture "revision" RevisionSelector
-        :> Get '[JSON] FullDocument
+        :> Get '[JSON] (FullDocument TextElementRevision)
 
 type GetDocumentRevisionTree =
     Auth AuthMethod Auth.Token
@@ -369,7 +369,7 @@ docsServer =
 postDocumentHandler
     :: AuthResult Auth.Token
     -> CreateDocument
-    -> Handler FullDocument
+    -> Handler (FullDocument TextElementRevision)
 postDocumentHandler auth doc = do
     userID <- getUser auth
     withDB $
@@ -586,7 +586,7 @@ getDocumentRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> RevisionSelector
-    -> Handler FullDocument
+    -> Handler (FullDocument TextElementRevision)
 getDocumentRevisionHandler auth docID rev = do
     userID <- getUser auth
     withDB $ run $ Docs.getDocumentRevision userID (RevisionRef docID rev)
