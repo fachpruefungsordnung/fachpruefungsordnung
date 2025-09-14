@@ -8,7 +8,6 @@ where
 import Control.Applicative ((<|>))
 import Control.Functor.Utils (traverseF)
 import Control.Monad (void)
-import Control.Monad.Trans.Class (lift)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Star (Star))
 import Language.Lsd.AST.Type (unwrapNT)
