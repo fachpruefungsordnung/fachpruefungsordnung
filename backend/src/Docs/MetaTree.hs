@@ -4,6 +4,8 @@ module Docs.MetaTree
     ( MetaNode (..)
     , MetaTree (..)
     , Meta (..)
+    , TocEntry (..)
+    , TreeWithMetaData (..)
     ) where
 
 import Data.Text (Text)
@@ -13,6 +15,12 @@ import GHC.Generics (Generic)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
 import Docs.Tree (NodeHeader)
+
+data TreeWithMetaData a
+    = TreeWithMetaData
+    { root :: Meta a
+    , metaMap :: String -- TODO!
+    }
 
 data MetaNode a
     = MetaNode
@@ -27,8 +35,20 @@ instance (FromJSON a) => FromJSON (MetaNode a)
 
 instance (ToSchema a) => ToSchema (MetaNode a)
 
+data TocEntry = TocEntry
+    { label :: Maybe Text
+    , title :: Maybe Text
+    }
+    deriving (Generic)
+
+instance ToJSON TocEntry
+
+instance FromJSON TocEntry
+
+instance ToSchema TocEntry
+
 data Meta a = Meta
-    { title :: Text
+    { meta :: TocEntry
     , tree :: MetaTree a
     }
     deriving (Generic)
@@ -58,7 +78,7 @@ instance Functor MetaTree where
     fmap f (MetaLeaf x) = MetaLeaf $ f x
 
 instance Functor Meta where
-    fmap f (Meta label tree') = Meta label $ f <$> tree'
+    fmap f (Meta label' tree') = Meta label' $ f <$> tree'
 
 instance Foldable Meta where
     foldMap f (Meta _ tree') = foldMap f tree'
@@ -71,10 +91,10 @@ instance Foldable MetaTree where
     foldMap f (MetaTree node) = foldMap f node
 
 instance Traversable Meta where
-    traverse f (Meta label tree') = Meta label <$> traverse f tree'
+    traverse f (Meta label' tree') = Meta label' <$> traverse f tree'
 
 instance Traversable MetaNode where
-    traverse f (MetaNode label edges) = MetaNode label <$> traverse (traverse f) edges
+    traverse f (MetaNode label' edges) = MetaNode label' <$> traverse (traverse f) edges
 
 instance Traversable MetaTree where
     traverse f (MetaLeaf a) = MetaLeaf <$> f a
