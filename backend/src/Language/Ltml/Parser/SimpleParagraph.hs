@@ -8,9 +8,8 @@ import Language.Lsd.AST.Type.SimpleParagraph
     )
 import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (SimpleParagraph))
 import Language.Ltml.Parser (Parser)
-import Language.Ltml.Parser.Common.Indent (nonIndented)
 import Language.Ltml.Parser.Text (textForestP)
 
 simpleParagraphP :: SimpleParagraphType -> Parser SimpleParagraph
 simpleParagraphP (SimpleParagraphType fmt tt) =
-    SimpleParagraph fmt <$> nonIndented (textForestP tt)
+    SimpleParagraph fmt <$> textForestP tt
