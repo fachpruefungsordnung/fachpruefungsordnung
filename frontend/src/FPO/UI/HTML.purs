@@ -251,3 +251,10 @@ loadingSpinner =
   HH.div [ HP.classes [ HB.textCenter, HB.my5 ] ]
     [ HH.span [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] []
     ]
+
+-- Use a data attribute to store the HTML
+rawHtml :: forall w i. String -> HH.HTML w i
+rawHtml html =
+  HH.element (H.ElemName "raw-html")
+    [ HP.attr (HH.AttrName "html") html ]
+    []

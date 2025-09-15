@@ -867,7 +867,14 @@ editor = connect selectTranslator $ H.mkComponent
       -- handle errors in pos and decodeJson
       case response of
         -- if error, try to Save again (Maybe ParentID is lost?)
+
+        Left err -> updateStore $ Store.AddError err
+
+        {- <<<<<<< HEAD
         Left err -> updateStore $ Store.AddError $ err
+=======
+        Left err -> updateStore $ Store.AddError err
+>>>>>>> main -}
         -- extract and insert new parentID into newContent
         Right { content: updatedContent, typ: typ } -> do
 
@@ -1751,8 +1758,8 @@ addChangeListenerWithRef editor_ dref vref listener = do
           when (not busy) do
             Ref.write true guardRef
             let sRow = Types.getRow start
-            range <- Range.create sRow sCol sRow (sCol + 1)
-            Session.replace range "  #" session
+            range <- Range.create sRow sCol sRow (sCol)
+            Session.replace range "  " session
             Ref.write false guardRef
 
 addAnchor

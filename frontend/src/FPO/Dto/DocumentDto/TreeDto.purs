@@ -1,24 +1,28 @@
 module FPO.Dto.DocumentDto.TreeDto
   ( Edge(..)
+  , Meta(..)
   , RootTree(..)
   , Tree(..)
   , TreeHeader(..)
   , findRootTree
   , findTitleRootTree
   , getEdgeTree
-  , replaceNodeRootTree
+  , getFullTitle
+  , getShortTitle
   , modifyNodeRootTree
+  , replaceNodeRootTree
   ) where
 
 import Prelude
 
 import Control.Alt ((<|>))
 import Control.Monad.Except (throwError)
-import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), (.:?))
 import Data.Argonaut.Decode.Error (JsonDecodeError(TypeMismatch))
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Foldable (foldr)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.String (length, splitAt)
 import Data.Traversable (traverse)
 
 newtype TreeHeader = TreeHeader
@@ -26,6 +30,43 @@ newtype TreeHeader = TreeHeader
   , headerType :: String
   , heading :: String
   }
+
+-- | Metadata for a tree node. `title` is a html-escaped string that represents
+-- | the title of the node. `label` is an optional html-escaped string that
+-- | represents the label of the node (e.g. "§x", etc.).
+-- | It can be `Nothing` if the node has no label.
+-- |
+-- | Note: Altough the label and title are html-escaped strings, they should not
+-- |       contain any html tags except for <span> and </span>. Because there is no convenient
+-- |       way to insert raw html into Halogen rendering, we can drop these tags before
+-- |       rendering (using, e.g., `getFullTitle`). This isn't a perfect solution, 
+-- |       but easier than other approaches. We could use `FPO.UI.HTML.rawHtml`, but
+-- |       this would not work for tooltips...
+newtype Meta = Meta
+  { label :: Maybe String
+  , title :: String
+  }
+
+-- | Returns the full title of the node, including the label if it exists.
+-- | Removes HTML tags.
+getFullTitle :: Meta -> String
+getFullTitle (Meta { label, title }) =
+  case label of
+    Just l -> removeHTMLTags l <> " " <> removeHTMLTags title
+    Nothing -> removeHTMLTags title
+
+-- | Returns the short title of the node, i.e. the title without the label.
+-- | Removes HTML tags.
+getShortTitle :: Meta -> String
+getShortTitle (Meta { title }) = removeHTMLTags title
+
+-- | Drops the <span> and </span> tags from a string, if they exist.
+-- | Otherwise, the string is returned unchanged.
+removeHTMLTags :: String -> String
+removeHTMLTags str = if a == "<span>" && c == "</span>" then middle else str
+  where
+  { before: a, after: b } = splitAt 6 str
+  { before: middle, after: c } = splitAt (length b - 7) b
 
 data RootTree a
   = Empty
@@ -35,22 +76,17 @@ data RootTree a
       }
 
 data Tree a
-  = Node { title :: String, children :: Array (Edge a), header :: TreeHeader }
-  | Leaf { title :: String, node :: a }
+  = Node { meta :: Meta, children :: Array (Edge a), header :: TreeHeader }
+  | Leaf { meta :: Meta, node :: a }
 
 data Edge a = Edge (Tree a)
 
 getEdgeTree :: forall a. Edge a -> Tree a
 getEdgeTree (Edge tree) = tree
 
--- automatically derive instances for Functor
-
 derive instance functorRootTree :: Functor RootTree
 derive instance functorTree :: Functor Tree
 derive instance functorEdge :: Functor Edge
-
--- derive instance newtypeTree :: Newtype (Tree a) _
--- derive instance newtypeEdge :: Newtype (Edge a) _
 
 -- DecodeJson instances
 
@@ -66,8 +102,10 @@ instance decodeJsonTreeHeader :: DecodeJson TreeHeader where
 instance decodeJsonRootTree :: DecodeJson a => DecodeJson (RootTree a) where
   decodeJson json = do
     obj <- decodeJson json
-    header <- obj .: "header"
-    childrenArr <- obj .: "children"
+    tree <- obj .: "tree"
+    con <- tree .: "contents"
+    childrenArr <- con .: "children"
+    header <- con .: "header"
     children <- traverse (map Edge <<< decodeJson) childrenArr
     pure $ RootTree { children, header }
 
@@ -77,24 +115,30 @@ instance decodeJsonEdge :: DecodeJson a => DecodeJson (Edge a) where
 instance decodeJsonTree :: DecodeJson a => DecodeJson (Tree a) where
   decodeJson json = do
     obj <- decodeJson json
-    title <- obj .: "title"
-    content <- obj .: "content"
-    typ <- content .: "type"
+    meta <- obj .: "meta"
+    tree <- obj .: "tree"
+    contents <- tree .: "contents"
+    tag <- tree .: "tag"
 
-    case typ of
-      "leaf" -> do
-        leafVal <- content .: "leaf"
-        node <- decodeJson leafVal
-        pure $ Leaf { title, node }
+    case tag of
+      "MetaLeaf" -> do
+        node <- decodeJson (encodeJson contents)
+        pure $ Leaf { meta, node }
 
-      "tree" -> do
-        node <- content .: "node"
-        childrenArr <- node .: "children"
+      "MetaTree" -> do
+        childrenArr <- contents .: "children"
         children <- traverse (map Edge <<< decodeJson) childrenArr
-        header <- node .: "header"
-        pure $ Node { title, children, header }
+        header <- contents .: "header"
+        pure $ Node { meta, children, header }
 
-      _ -> throwError $ TypeMismatch $ "Unknown node type: " <> typ
+      _ -> throwError $ TypeMismatch $ "Unknown node type: " <> tag
+
+instance decodeJsonMeta :: DecodeJson Meta where
+  decodeJson json = do
+    obj <- decodeJson json
+    label <- obj .:? "label"
+    title <- obj .:? "title"
+    pure $ Meta { label, title: fromMaybe "" title }
 
 -- EncodeJson instances
 
@@ -114,24 +158,18 @@ instance encodeJsonEdge :: EncodeJson a => EncodeJson (Edge a) where
   encodeJson (Edge child) = encodeJson child
 
 instance encodeJsonTree :: EncodeJson a => EncodeJson (Tree a) where
-  encodeJson (Node { title, children, header }) =
+  encodeJson (Node { children, header }) =
     encodeJson
-      { title
-      , content:
-          { type: "tree"
-          , node:
-              { children: map encodeJson children
-              , header: encodeJson header
-              }
+      { type: "tree"
+      , node:
+          { children: map encodeJson children
+          , header: encodeJson header
           }
       }
-  encodeJson (Leaf { title, node }) =
+  encodeJson (Leaf { node }) =
     encodeJson
-      { title
-      , content:
-          { type: "leaf"
-          , leaf: node
-          }
+      { type: "leaf"
+      , leaf: node
       }
 
 -- Show instances
@@ -153,10 +191,14 @@ instance showEdge :: Show a => Show (Edge a) where
     "Edge { child: " <> show child <> " }"
 
 instance showTree :: Show a => Show (Tree a) where
-  show (Node { title, children }) =
-    "Tree { title: " <> title <> ", children: " <> show children <> " }"
-  show (Leaf { title, node }) =
-    "Tree { title: " <> title <> ", node: " <> show node <> " }"
+  show (Node { meta, children }) =
+    "Tree { meta: " <> show meta <> ", children: " <> show children <> " }"
+  show (Leaf { meta, node }) =
+    "Tree { meta: " <> show meta <> ", node: " <> show node <> " }"
+
+instance showMeta :: Show Meta where
+  show (Meta { label, title }) =
+    "Meta { label: " <> show label <> ", title: " <> title <> " }"
 
 -- TODO: DFS. Maybe use a different search method? But maybe not necessary,
 -- because the document tree may never be that large to notice.
@@ -192,8 +234,8 @@ findTitleTree predicate (Node { children }) =
     (\(Edge child) acc -> acc <|> findTitleTree predicate child)
     Nothing
     children
-findTitleTree predicate (Leaf { title, node }) =
-  if predicate node then Just title else Nothing
+findTitleTree predicate (Leaf { meta: Meta meta, node }) =
+  if predicate node then Just meta.title else Nothing
 
 modifyNodeRootTree
   :: forall a
@@ -216,18 +258,18 @@ modifyNodeTree
   -> (a -> a)
   -> Tree a
   -> Tree a
-modifyNodeTree pred newNode (Leaf { title, node }) =
+modifyNodeTree pred newNode (Leaf { meta, node }) =
   if pred node then
-    Leaf { title, node: (newNode node) }
+    Leaf { meta, node: (newNode node) }
   else
-    Leaf { title, node }
-modifyNodeTree pred newNode (Node { title, children, header }) =
+    Leaf { meta, node }
+modifyNodeTree pred newNode (Node { meta, children, header }) =
   let
     newChildren =
       map (\(Edge child) -> Edge $ modifyNodeTree pred newNode child)
         children
   in
-    Node { title, children: newChildren, header }
+    Node { meta, children: newChildren, header }
 
 replaceNodeRootTree
   :: forall a
