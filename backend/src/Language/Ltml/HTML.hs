@@ -715,9 +715,16 @@ instance ToHtmlM AppendixSection where
                     )
                 nodeDocuments
             ) = do
+            -- \| Empty appendices are dropped from HTML structure and ToC
+            let isEmpty = null nodeDocuments
             -- \| Add Entry to ToC but without ID
             htmlId <-
-                addTocEntry Nothing (Success $ Now $ toHtml appendixSectionTitle) Nothing Other
+                if isEmpty
+                    then
+                        -- \| If appendix is dropped htmlId is unused and set to @mempty@
+                        addPhantomTocEntry (Success $ toHtml appendixSectionTitle) >> return mempty
+                    else
+                        addTocEntry Nothing (Success $ Now $ toHtml appendixSectionTitle) Nothing Other
             -- \| Give each Document the corresponding appendix Id
             let zipFunc i nDoc = local (\s -> s {currentAppendixElementID = i}) $ toHtmlM nDoc
             documentHtmls <-
@@ -733,8 +740,11 @@ instance ToHtmlM AppendixSection where
                     $ zipWithM zipFunc [1 ..] nodeDocuments
             -- \| Wrap all appendix documents into one <div>
             return $
-                div_ [cssClass_ Class.AppendixSection, cssClass_ Class.Anchor, id_ htmlId]
-                    <$> mconcat documentHtmls
+                if isEmpty
+                    then mempty
+                    else
+                        div_ [cssClass_ Class.AppendixSection, cssClass_ Class.Anchor, id_ htmlId]
+                            <$> mconcat documentHtmls
 
 -------------------------------------------------------------------------------
 
