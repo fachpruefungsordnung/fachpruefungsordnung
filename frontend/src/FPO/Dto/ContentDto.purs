@@ -63,7 +63,8 @@ instance decodeJsonContent :: DecodeJson Content where
 instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
   decodeJson json = do
     obj <- decodeJson json
-    rev <- obj .: "revision"
+    ele <- obj .: "element"
+    rev <- ele .: "revision"
     con <- decodeJson (fromObject rev)
     coms <- rev .: "commentAnchors"
     pure $ Wrapper { content: con, comments: coms }
@@ -165,7 +166,8 @@ failureContentWrapper = Wrapper { content: failureContent, comments: [] }
 extractNewParent :: Content -> Json -> Either JsonDecodeError Content
 extractNewParent (Content cont) json = do
   obj <- decodeJson json
-  newRev <- obj .: "newRevision"
+  ele <- obj .: "element"
+  newRev <- ele .: "newRevision"
   header <- newRev .: "header"
   newPar <- header .: "identifier"
   pure $ Content $ cont { parent = newPar }

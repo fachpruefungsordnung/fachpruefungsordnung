@@ -9,18 +9,7 @@ module FPO.Component.Splitview where
 import Prelude
 
 import Data.Argonaut (fromString)
-import Data.Array
-  ( cons
-  , deleteAt
-  , head
-  , insertAt
-  , mapWithIndex
-  , null
-  , snoc
-  , uncons
-  , updateAt
-  , (!!)
-  )
+import Data.Array (cons, deleteAt, head, insertAt, null, snoc, uncons, updateAt, (!!))
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
@@ -44,6 +33,7 @@ import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
 import FPO.Dto.DocumentDto.TreeDto
   ( Edge(..)
+  , Meta(..)
   , RootTree(..)
   , Tree(..)
   , TreeHeader(..)
@@ -68,7 +58,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
@@ -623,7 +613,7 @@ splitview = connect selectTranslator $ H.mkComponent
       maybeTree <- Request.getJson DT.decodeDocument
         ("/docs/" <> show s.docID <> "/tree/latest")
       case maybeTree of
-        Left _ -> pure unit
+        Left err -> updateStore $ Store.AddError err
         Right tree -> do
           let
             finalTree = documentTreeToTOCTree tree
@@ -996,9 +986,10 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _comment unit
           (Comment.SelectedCommentSection state.docID tocID markerID)
 
-      Editor.RenamedNode newName path -> do
-        s <- H.get
-        updateTree $ changeNodeName path newName s.tocEntries
+      Editor.RenamedNode _ _ -> do
+        -- s <- H.get
+        -- updateTree $ changeNodeName path newName s.tocEntries
+        pure unit
 
       Editor.ShowAllCommentsOutput docID tocID -> do
         handleAction $ ToggleCommentOverview true docID tocID
@@ -1073,9 +1064,10 @@ splitview = connect selectTranslator $ H.mkComponent
         s <- H.get
         updateTree $ reorderTocEntries from to s.tocEntries
 
-      TOC.RenameNode { path, newName } -> do
-        s <- H.get
-        updateTree $ changeNodeName path newName s.tocEntries
+      TOC.RenameNode _ -> do
+        -- s <- H.get
+        -- updateTree $ changeNodeName path newName s.tocEntries
+        pure unit
 
     where
     -- Communicates tree changes to the server and TOC component.
@@ -1121,7 +1113,13 @@ addRootNode path entry (RootTree { children, header }) =
       let
         child =
           fromMaybe
-            (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+            ( Edge
+                ( Leaf
+                    { meta: Meta { label: Nothing, title: "Error" }
+                    , node: emptyTOCEntry
+                    }
+                )
+            )
             (children !! head)
         newChildren =
           case updateAt head (addNode tail entry child) children of
@@ -1135,26 +1133,32 @@ addNode
   -> Tree TOCEntry
   -> Edge TOCEntry
   -> Edge TOCEntry
-addNode _ _ (Edge (Leaf { title, node })) =
-  Edge (Leaf { title, node }) -- Cannot add to a leaf
-addNode [] entry (Edge (Node { title, children, header })) =
-  Edge (Node { title, children: snoc children (Edge entry), header })
-addNode path entry (Edge (Node { title, children, header })) =
+addNode _ _ (Edge (Leaf { meta, node })) =
+  Edge (Leaf { meta, node }) -- Cannot add to a leaf
+addNode [] entry (Edge (Node { meta, children, header })) =
+  Edge (Node { meta, children: snoc children (Edge entry), header })
+addNode path entry (Edge (Node { meta, children, header })) =
   case uncons path of
     Nothing ->
-      Edge (Node { title, children: snoc children (Edge entry), header })
+      Edge (Node { meta, children: snoc children (Edge entry), header })
     Just { head, tail } ->
       let
         child =
           fromMaybe
-            (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+            ( Edge
+                ( Leaf
+                    { meta: Meta { label: Nothing, title: "Error" }
+                    , node: emptyTOCEntry
+                    }
+                )
+            )
             (children !! head)
         newChildren' =
           case updateAt head (addNode tail entry child) children of
             Nothing -> children
             Just res -> res
       in
-        Edge (Node { title, children: newChildren', header })
+        Edge (Node { meta, children: newChildren', header })
 
 deleteRootNode
   :: Array Int
@@ -1176,7 +1180,13 @@ deleteRootNode path (RootTree { children, header }) =
         let
           child =
             fromMaybe
-              (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+              ( Edge
+                  ( Leaf
+                      { meta: Meta { label: Nothing, title: "Error" }
+                      , node: emptyTOCEntry
+                      }
+                  )
+              )
               (children !! head)
           newChildren =
             case updateAt head (deleteNode tail child) children of
@@ -1195,27 +1205,33 @@ deleteNode [] e =
   -- If path is empty, delete this node entirely is handled by parent
   -- so this case should not normally be reached.
   e
-deleteNode path (Edge (Node { title, children, header })) =
+deleteNode path (Edge (Node { meta, children, header })) =
   case uncons path of
     Nothing ->
-      Edge (Node { title, children, header })
+      Edge (Node { meta, children, header })
     Just { head, tail } ->
       if null tail then
         case deleteAt head children of
-          Nothing -> Edge (Node { title, children, header })
-          Just newChildren -> Edge (Node { title, children: newChildren, header })
+          Nothing -> Edge (Node { meta, children, header })
+          Just newChildren -> Edge (Node { meta, children: newChildren, header })
       else
         let
           child =
             fromMaybe
-              (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+              ( Edge
+                  ( Leaf
+                      { meta: Meta { label: Nothing, title: "Error" }
+                      , node: emptyTOCEntry
+                      }
+                  )
+              )
               (children !! head)
           newChildren' =
             case updateAt head (deleteNode tail child) children of
               Nothing -> children
               Just res -> res
         in
-          Edge (Node { title, children: newChildren', header })
+          Edge (Node { meta, children: newChildren', header })
 
 -- Reorder TOC entries by moving a node from `sourcePath` to `targetPath`.
 -- The node at sourcePath takes the place of the node at targetPath,
@@ -1344,25 +1360,25 @@ insertNodeAtPosition path node (RootTree { children, header }) =
 insertNodeIntoEdgeAtPosition
   :: Path -> Tree TOCEntry -> Edge TOCEntry -> Edge TOCEntry
 insertNodeIntoEdgeAtPosition _ _ edge@(Edge (Leaf _)) = edge -- Cannot insert into leaf
-insertNodeIntoEdgeAtPosition [] node (Edge (Node { title, children, header })) =
+insertNodeIntoEdgeAtPosition [] node (Edge (Node { meta, children, header })) =
   -- Insert at end of children
-  Edge (Node { title, children: snoc children (Edge node), header })
-insertNodeIntoEdgeAtPosition path node (Edge (Node { title, children, header })) =
+  Edge (Node { meta, children: snoc children (Edge node), header })
+insertNodeIntoEdgeAtPosition path node (Edge (Node { meta, children, header })) =
   case uncons path of
-    Nothing -> Edge (Node { title, children: snoc children (Edge node), header })
+    Nothing -> Edge (Node { meta, children: snoc children (Edge node), header })
     Just { head, tail } ->
       if null tail then
         -- Insert exactly at position `head`, pushing existing elements down
         case insertAt head (Edge node) children of
           Nothing ->
             -- If insertion fails (index out of bounds), append to end
-            Edge (Node { title, children: snoc children (Edge node), header })
+            Edge (Node { meta, children: snoc children (Edge node), header })
           Just result ->
-            Edge (Node { title, children: result, header })
+            Edge (Node { meta, children: result, header })
       else
         -- Navigate deeper
         case children !! head of
-          Nothing -> Edge (Node { title, children, header })
+          Nothing -> Edge (Node { meta, children, header })
           Just childEdge ->
             let
               newChild = insertNodeIntoEdgeAtPosition tail node childEdge
@@ -1370,43 +1386,45 @@ insertNodeIntoEdgeAtPosition path node (Edge (Node { title, children, header }))
                 Nothing -> children
                 Just res -> res
             in
-              Edge (Node { title, children: newChildren, header })
+              Edge (Node { meta, children: newChildren, header })
 
 -- Changes the name of a node in the TOC root tree.
-changeNodeName
-  :: Path -> String -> TOCTree -> TOCTree
-changeNodeName _ _ Empty = Empty
-changeNodeName path newName (RootTree { children, header }) =
-  let
-    newChildren = mapWithIndex
-      ( \ix (Edge child) ->
-          case uncons path of
-            Just { head, tail } | ix == head ->
-              Edge $ changeNodeName' tail newName child
-            _ -> Edge child
-      )
-      children
-  in
-    RootTree { children: newChildren, header }
+-- TODO: Do we need this? This should be done in the text element associated
+--       with the node..
+-- changeNodeName
+--   :: Path -> String -> TOCTree -> TOCTree
+-- changeNodeName _ _ Empty = Empty
+-- changeNodeName path newName (RootTree { children, header }) =
+--   let
+--     newChildren = mapWithIndex
+--       ( \ix (Edge child) ->
+--           case uncons path of
+--             Just { head, tail } | ix == head ->
+--               Edge $ changeNodeName' tail newName child
+--             _ -> Edge child
+--       )
+--       children
+--   in
+--     RootTree { children: newChildren, header }
 
--- Changes the name of a node in the TOC tree.
-changeNodeName' :: Path -> String -> Tree TOCEntry -> Tree TOCEntry
-changeNodeName' path newName tree = case path of
-  [] -> case tree of
-    Node record -> Node record { title = newName }
-    leaf -> leaf
-  _ -> case tree of
-    Node { title, children, header } ->
-      case uncons path of
-        Just { head: index, tail } ->
-          let
-            newChildren = mapWithIndex
-              ( \ix (Edge child) ->
-                  if ix == index then Edge $ changeNodeName' tail newName child
-                  else Edge child
-              )
-              children
-          in
-            Node { title, children: newChildren, header }
-        Nothing -> Node { title, children, header }
-    leaf -> leaf
+-- -- Changes the name of a node in the TOC tree.
+-- changeNodeName' :: Path -> String -> Tree TOCEntry -> Tree TOCEntry
+-- changeNodeName' path newName tree = case path of
+--   [] -> case tree of
+--     Node record -> Node record { title = newName }
+--     leaf -> leaf
+--   _ -> case tree of
+--     Node { title, children, header } ->
+--       case uncons path of
+--         Just { head: index, tail } ->
+--           let
+--             newChildren = mapWithIndex
+--               ( \ix (Edge child) ->
+--                   if ix == index then Edge $ changeNodeName' tail newName child
+--                   else Edge child
+--               )
+--               children
+--           in
+--             Node { title, children: newChildren, header }
+--         Nothing -> Node { title, children, header }
+--     leaf -> leaf
