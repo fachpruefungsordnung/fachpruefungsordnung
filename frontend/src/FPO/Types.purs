@@ -189,7 +189,7 @@ nodeHeaderToTOCEntry nh =
 
 tocEntryToNodeHeader :: TOCEntry -> NH.NodeHeader
 tocEntryToNodeHeader { id, name } =
-  NH.NodeHeader { identifier: id, kind: name }
+  NH.NodeHeader { identifier: id, textElementKind: name }
 
 documentTreeToTOCTree :: DT.DocumentTreeTE -> TOCTree
 documentTreeToTOCTree = map nodeHeaderToTOCEntry

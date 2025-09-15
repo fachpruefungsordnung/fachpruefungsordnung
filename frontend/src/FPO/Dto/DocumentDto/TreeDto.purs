@@ -14,11 +14,11 @@ import Prelude
 
 import Control.Alt ((<|>))
 import Control.Monad.Except (throwError)
-import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:))
+import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), (.:?))
 import Data.Argonaut.Decode.Error (JsonDecodeError(TypeMismatch))
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Foldable (foldr)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Traversable (traverse)
 
 newtype TreeHeader = TreeHeader
@@ -66,8 +66,10 @@ instance decodeJsonTreeHeader :: DecodeJson TreeHeader where
 instance decodeJsonRootTree :: DecodeJson a => DecodeJson (RootTree a) where
   decodeJson json = do
     obj <- decodeJson json
-    header <- obj .: "header"
-    childrenArr <- obj .: "children"
+    tree <- obj .: "tree"
+    con <- tree .: "contents"
+    childrenArr <- con .: "children"
+    header <- con .: "header"
     children <- traverse (map Edge <<< decodeJson) childrenArr
     pure $ RootTree { children, header }
 
@@ -77,24 +79,24 @@ instance decodeJsonEdge :: DecodeJson a => DecodeJson (Edge a) where
 instance decodeJsonTree :: DecodeJson a => DecodeJson (Tree a) where
   decodeJson json = do
     obj <- decodeJson json
-    title <- obj .: "title"
-    content <- obj .: "content"
-    typ <- content .: "type"
+    meta <- obj .: "meta"
+    title <- meta .:? "title"
+    tree <- obj .: "tree"
+    contents <- tree .: "contents"
+    tag <- tree .: "tag"
 
-    case typ of
-      "leaf" -> do
-        leafVal <- content .: "leaf"
-        node <- decodeJson leafVal
-        pure $ Leaf { title, node }
+    case tag of
+      "MetaLeaf" -> do
+        node <- decodeJson (encodeJson contents)
+        pure $ Leaf { title: fromMaybe "" title, node }
 
-      "tree" -> do
-        node <- content .: "node"
-        childrenArr <- node .: "children"
+      "MetaTree" -> do
+        childrenArr <- contents .: "children"
         children <- traverse (map Edge <<< decodeJson) childrenArr
-        header <- node .: "header"
-        pure $ Node { title, children, header }
+        header <- contents .: "header"
+        pure $ Node { title: fromMaybe "" title, children, header }
 
-      _ -> throwError $ TypeMismatch $ "Unknown node type: " <> typ
+      _ -> throwError $ TypeMismatch $ "Unknown node type: " <> tag
 
 -- EncodeJson instances
 

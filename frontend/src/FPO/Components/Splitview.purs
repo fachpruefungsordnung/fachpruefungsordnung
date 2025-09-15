@@ -68,7 +68,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
@@ -623,7 +623,7 @@ splitview = connect selectTranslator $ H.mkComponent
       maybeTree <- Request.getJson DT.decodeDocument
         ("/docs/" <> show s.docID <> "/tree/latest")
       case maybeTree of
-        Left _ -> pure unit
+        Left err -> updateStore $ Store.AddError err
         Right tree -> do
           let
             finalTree = documentTreeToTOCTree tree

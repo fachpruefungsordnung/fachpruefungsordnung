@@ -19,12 +19,12 @@ instance decodeJsonPostTextDto :: DecodeJson PostTextDto where
   decodeJson json = do
     obj <- decodeJson json
     id <- obj .: "identifier"
-    kind <- obj .: "kind"
-    pure $ PostTextDto { identifier: id, kind: kind }
+    kind <- obj .: "textElementKind"
+    pure $ PostTextDto { identifier: id, kind }
 
 instance encodeJsonPostTextDto :: EncodeJson PostTextDto where
   encodeJson (PostTextDto { kind }) =
-    encodeJson { kind: kind }
+    encodeJson { textElementKind: kind }
 
 instance showPostTextDto :: Show PostTextDto where
   show (PostTextDto { identifier, kind }) =
