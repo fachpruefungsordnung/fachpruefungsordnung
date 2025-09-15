@@ -29,7 +29,7 @@ someFunc = do
     let userID = fromMaybe undefined $ fromString "7f59659a-9a46-4ba0-a911-09698107a6ea"
     let groupID = 1
     let title = "Test Document"
-    Right result <-
+    result <-
         flip
             runTransaction
             connection
@@ -40,6 +40,8 @@ someFunc = do
                 exampleTree
 
     _ <- case result of
+        Right (Right err) ->
+            flip run connection $ logMessage Error Nothing Scope.server err
         Right err ->
             flip run connection $ logMessage Error Nothing Scope.server err
         _ ->
