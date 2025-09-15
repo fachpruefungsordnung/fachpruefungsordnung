@@ -149,8 +149,11 @@ renderHtmlCssExport backPath readerState globalState exportReaderState docCon =
                 ( \(htmlId, dTitle, dHtml) ->
                     ( htmlId
                     , evalDelayed finalExportState' dTitle
-                    , evalDelayed finalExportState' . ((pure backButton <> mainDocTitleHtml) <>) $
-                        dHtml
+                    , evalDelayed finalExportState'
+                        . ( fmap (pure backButton <> div_ <#> Class.Document)
+                                . (mainDocTitleHtml <>)
+                          )
+                        $ dHtml
                     )
                 )
                 (exportSections finalExportState')
