@@ -150,6 +150,7 @@ staticDocumentFormat =
         , usepackage [] "lastpage"
         , IRaw "\\pagestyle{fancy}"
         , IRaw "\\fancyhf{}"
+        , IRaw "\\setlist[enumerate]{align=left}"
         , setlistdepth
         , renewlist
         ]
