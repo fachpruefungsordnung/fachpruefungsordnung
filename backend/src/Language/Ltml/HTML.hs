@@ -14,7 +14,6 @@ module Language.Ltml.HTML
     , renderHtmlCss
     , renderHtmlCssBS
     , renderTocList
-    , renderTocEntry
     ) where
 
 import Clay (Css)
@@ -136,11 +135,6 @@ renderTocList docContainer =
                 tocList
      in -- \| Render Maybe Html and Result Html to ByteString
         map (bimap (fmap renderBS) (fmap renderBS)) htmlTitleList
-
--- | Renders a single ToC entry from Text and wraps the given Result type;
---   The given Text is wrapped into <span> </span>
-renderTocEntry :: Result () -> Text -> RenderedTocEntry
-renderTocEntry resUnit text = (Nothing, renderBS (span_ $ toHtml text) <$ resUnit)
 
 -------------------------------------------------------------------------------
 
