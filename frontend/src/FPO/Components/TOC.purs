@@ -41,7 +41,7 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postJson)
 import FPO.Data.Store as Store
-import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed, formatRelativeTime)
+import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed{-, formatRelativeTime -})
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
@@ -159,6 +159,7 @@ data Action
   --| ClearSearchData Int
   | SearchVersions Int
   | ModifyDateInput Boolean Int String
+  | UpdateUpToDateVersion
 
 data EntityKind = Section | Paragraph
 
@@ -166,6 +167,7 @@ data Query a
   = ReceiveTOCs (TOCTree) a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
+  | RequestUpToDateVersion (Maybe Version -> a)
 
 type SearchData =
   { elementID :: Int
@@ -189,6 +191,7 @@ type State = FPOState
   , requestDelete :: Maybe EntityToDelete
   , searchData :: RootTree SearchData
   , timezoneOffset :: Maybe Minutes
+  -- temporarily used, might be outdated at times and thus to be updated when needed.
   , upToDateVersion :: Maybe Version
   )
 
@@ -283,6 +286,35 @@ tocview = connect (selectEq identity) $ H.mkComponent
     Both act1 act2 -> do
       handleAction act1
       handleAction act2
+
+    UpdateUpToDateVersion -> do 
+      s <- H.get
+      case s.mSelectedTocEntry of
+        Just (SelLeaf elementID) -> do
+          temp <- getTextElemHistory s.docID elementID Nothing Nothing (Just 1)
+          let 
+            upToDate =
+              case temp of
+                Left _ ->
+                  { identifier: Nothing
+                  , timestamp: DD.genericDocDate
+                  , author: DH.U { identifier: "", name: "" }
+                  }
+                Right e ->
+                  case head (TE.getTEHsFromFTEH e) of
+                    Nothing ->
+                      { identifier: Nothing
+                      , timestamp: DD.genericDocDate
+                      , author: DH.U { identifier: "", name: "" }
+                      }
+                    Just val ->
+                      { identifier: Just (TE.getHistoryElementID val)
+                      , timestamp: TE.getHistoryElementTimestamp val
+                      , author: TE.getHistoryElementAuthor val
+                      }
+          H.modify_ _ {upToDateVersion = Just upToDate}
+        _ -> pure unit
+
 
     -- the newest version requested in this action is assumed to be the newest version in general
     UpdateVersions mAfter mBefore elementID -> do
@@ -688,6 +720,11 @@ tocview = connect (selectEq identity) $ H.mkComponent
     RequestCurrentTocEntry reply -> do
       state <- H.get
       pure (Just (reply state.mSelectedTocEntry))
+
+    RequestUpToDateVersion reply -> do
+      handleAction UpdateUpToDateVersion 
+      state <- H.get
+      pure (Just (reply state.upToDateVersion))
 
   rootTreeToHTML
     :: forall slots
