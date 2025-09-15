@@ -105,10 +105,10 @@ treeFromFlaggedMetaTree
         _ -> Nothing -- Something went terribly wrong, aber ich hab jetzt auch keine lust auf error handling (`.ok()`). diesen case hätte man einfach durch striktere typen verhindern können.
       where
         toTocEntry tocEntry =
-            let toText bs =
-                    bs >>= either (const Nothing) Just . TE.decodeUtf8' . BL.toStrict
-                label = toText $ tocEntry >>= fst
-                title = toText $ snd <$> tocEntry
+            let toText =
+                    either (const Nothing) Just . TE.decodeUtf8' . BL.toStrict
+                label = fst tocEntry >>= toText
+                title = toText <$> snd tocEntry
              in TocEntry
                     { MetaTree.label = label
                     , MetaTree.title = title

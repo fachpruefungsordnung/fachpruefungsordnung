@@ -68,6 +68,10 @@ data Class
       Underlined
     | -- | Class which inlines a red bold error text
       InlineError
+    | -- | Class for centering blocks
+      CenteredBox
+    | -- | Class for a centered, boxed for parsing errors
+      ErrorBox
     deriving (Show, Eq, Enum, Bounded)
 
 -- | maps Class to its css style definition
@@ -136,6 +140,30 @@ classStyle TextContainer =
         -- \| gap between text and enumerations
         gap (em 0.5)
         textAlign justify
+classStyle Enumeration =
+    let enumClassName = className Enumeration
+     in do
+            ol # byClass enumClassName ? do
+                counterReset "item"
+                marginLeft (em 0)
+                -- \| Enum indentation
+                paddingLeft (em 1)
+                marginTop (em 0)
+                marginBottom (em 0)
+                -- \| enums items are also spaced via flex environment
+                display flex
+                flexDirection column
+                -- \| gap between two enum items
+                gap (em 0.5)
+
+            ol # byClass enumClassName |> li ? do
+                counterIncrement "item"
+                display grid
+                gridTemplateColumns [auto, fr 1]
+                -- \| gap between enum item id and enum text
+                gap (em 0.55)
+                marginTop (em 0)
+                marginBottom (em 0)
 classStyle FootnoteContainer =
     toClassSelector FootnoteContainer ? do
         marginTop (em 1)
@@ -166,36 +194,25 @@ classStyle InlineError =
     toClassSelector InlineError ? do
         fontColor red
         fontWeight bold
-classStyle Enumeration =
-    let enumClassName = className Enumeration
-     in do
-            ol # byClass enumClassName ? do
-                counterReset "item"
-                marginLeft (em 0)
-                -- \| Enum indentation
-                paddingLeft (em 1)
-                marginTop (em 0)
-                marginBottom (em 0)
-                -- \| enums items are also spaced via flex environment
-                display flex
-                flexDirection column
-                -- \| gap between two enum items
-                gap (em 0.5)
-
-            ol # byClass enumClassName |> li ? do
-                counterIncrement "item"
-                display grid
-                gridTemplateColumns [auto, fr 1]
-                -- \| gap between enum item id and enum text
-                gap (em 0.55)
-                marginTop (em 0)
-                marginBottom (em 0)
+classStyle CenteredBox =
+    toClassSelector CenteredBox ? do
+        marginTop (em 2)
+        marginBottom (em 2)
+        display inlineGrid
+        alignItems center
+        justifyContent center
+        width (pct 100)
+classStyle ErrorBox =
+    toClassSelector ErrorBox ? do
+        padding (em 1) (em 1) (em 1) (em 1)
+        border (px 2) dashed red
 
 -- | Returns the html class name of given Class
 className :: Class -> Text
 className cssClass = case show cssClass of
-    [] -> error "CSS Class has \"\" as show instance!"
     (c : cs) -> pack $ toLower c : cs
+    -- \| This case can not happen with derived Show
+    [] -> error "CSS Class has \"\" as show instance!"
 
 -- | converts Class to Clay Selector and adds "." infront for css selection
 toClassSelector :: Class -> Selector

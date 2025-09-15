@@ -107,16 +107,16 @@ footnote :: PreLaTeX -> PreLaTeX
 footnote = ICommand "footnote" [] . (: [])
 
 hypertarget :: Label -> PreLaTeX -> PreLaTeX
-hypertarget (Label l) latex = ICommand "hypertarget" [] [IText l, latex]
+hypertarget (Label l) latex = ICommand "hypertarget" [] [IRaw l, latex]
 
 hyperlink :: Label -> PreLaTeX -> PreLaTeX
-hyperlink (Label l) latex = ICommand "hyperlink" [] [IText l, latex]
+hyperlink (Label l) latex = ICommand "hyperlink" [] [IRaw l, latex]
 
 label :: T.Text -> PreLaTeX
-label l = ICommand "label" [] [IText l]
+label l = ICommand "label" [] [IRaw l]
 
 footref :: T.Text -> PreLaTeX
-footref r = ICommand "footref" [] [IText r]
+footref r = ICommand "footref" [] [IRaw r]
 
 -------------------------------------------------------------------------------
 {-                             setup and metadata                             -}

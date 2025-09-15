@@ -36,14 +36,22 @@ fpoT :: NamedType DocumentContainerType
 fpoT =
     NamedType "fpo-container" "Fachprüfungsordnung" $
         DocumentContainerType
-            (DocumentContainerFormat headerFormat footerFormat headingFormat)
+            ( DocumentContainerFormat
+                headerFormat
+                footerFormat
+                mainDocFormat
+            )
+            (NavTocHeading "Header")
             mainDocT
             (Sequence [appendixT, attachmentT])
   where
-    headingFormat =
-        HeadingFormat
-            (Typography Centered LargeFontSize [Bold])
-            (FormatString [PlaceholderAtom HeadingTextPlaceholder])
+    mainDocFormat =
+        MainDocumentFormat
+            (Fallback $ NavTocHeading "(Dokument-Titel)")
+            ( HeadingFormat
+                (Typography Centered LargeFontSize [Bold])
+                (FormatString [PlaceholderAtom HeadingTextPlaceholder])
+            )
 
     headerFormat =
         HeaderFooterFormat
@@ -157,23 +165,31 @@ mainDocT =
             (DocumentFormat $ Just $ TocFormat $ TocHeading "Inhaltsübersicht")
             (DocumentHeadingType plainTextT)
             ( DocumentBodyType
-                ( Sequence
-                    [ dateSSecT
-                    , publLogSSecT
-                    , introSSecT
-                    ]
+                ( Just $
+                    docIntroTF $
+                        Sequence
+                            [ dateSSecT
+                            , publLogSSecT
+                            , introSSecT
+                            ]
                 )
                 ( Disjunction
-                    [ DocumentMainBodyType $
-                        InnerSectionBodyType (Star sectionT)
-                    , DocumentMainBodyType $
-                        InnerSectionBodyType (Star superSectionT)
+                    [ NamedType "fpo-mainbody-simple" "Hauptteil (einfach)" $
+                        docMainBodyTF $
+                            InnerSectionBodyType (Star sectionT)
+                    , NamedType
+                        "fpo-mainbody-structured"
+                        "Hauptteil (mit Abschnitten)"
+                        $ docMainBodyTF
+                        $ InnerSectionBodyType (Star superSectionT)
                     ]
                 )
-                ( Sequence
-                    [ extroSSecT
-                    , legalLogSSecT
-                    ]
+                ( Just $
+                    docExtroTF $
+                        Sequence
+                            [ extroSSecT
+                            , legalLogSSecT
+                            ]
                 )
             )
             (Disjunction [footnoteT])
@@ -186,15 +202,31 @@ simpleDocT =
             (DocumentFormat Nothing)
             (DocumentHeadingType plainTextT)
             ( DocumentBodyType
-                (Sequence [])
+                Nothing
                 ( Disjunction
-                    [ DocumentMainBodyType $
-                        SimpleLeafSectionBodyType (Star simpleBlockT)
+                    [ NamedType "simpledoc-mainbody" "Hauptteil" $
+                        docMainBodyTF $
+                            SimpleLeafSectionBodyType (Star simpleBlockT)
                     ]
                 )
-                (Sequence [])
+                Nothing
             )
             (Disjunction [footnoteT])
+
+docMainBodyTF :: SectionBodyType -> DocumentMainBodyType
+docMainBodyTF =
+    DocumentMainBodyType
+        (NavTocHeading "Hauptteil")
+
+docIntroTF :: Sequence (NamedType SimpleSectionType) -> DocumentIntroType
+docIntroTF =
+    DocumentIntroType
+        (NavTocHeading "Intro")
+
+docExtroTF :: Sequence (NamedType SimpleSectionType) -> DocumentExtroType
+docExtroTF =
+    DocumentExtroType
+        (NavTocHeading "Extro")
 
 dateSSecT :: NamedType SimpleSectionType
 dateSSecT =
@@ -236,24 +268,10 @@ legalLogSSecT =
             SimpleSectionFormat {ssHasPrecedingHorizontalBar = True}
             (Star simpleParagraphT)
 
-superSectionT :: NamedType SectionType
+superSectionT :: NamedType FormattedSectionType
 superSectionT =
     NamedType "supersection" "Abschnitt" $
-        SectionType
-            (Keyword "=")
-            ( HeadingType
-                ( HeadingFormat
-                    (Typography LeftAligned MediumFontSize [Bold])
-                    ( FormatString
-                        [ StringAtom "Abschnitt "
-                        , PlaceholderAtom IdentifierPlaceholder
-                        , StringAtom " "
-                        , PlaceholderAtom HeadingTextPlaceholder
-                        ]
-                    )
-                )
-                plainTextT
-            )
+        SectionFormatted
             ( SectionFormat
                 (FormatString [PlaceholderAtom Arabic])
                 ( TocKeyFormat $
@@ -263,26 +281,28 @@ superSectionT =
                         ]
                 )
             )
-            (InnerSectionBodyType (Star sectionT))
+            ( SectionType
+                (Keyword "=")
+                ( HeadingType
+                    ( HeadingFormat
+                        (Typography LeftAligned MediumFontSize [Bold])
+                        ( FormatString
+                            [ StringAtom "Abschnitt "
+                            , PlaceholderAtom IdentifierPlaceholder
+                            , StringAtom " "
+                            , PlaceholderAtom HeadingTextPlaceholder
+                            ]
+                        )
+                    )
+                    plainTextT
+                )
+                (InnerSectionBodyType (Star sectionT))
+            )
 
-sectionT :: NamedType SectionType
+sectionT :: NamedType FormattedSectionType
 sectionT =
     NamedType "section" "Paragraph" $
-        SectionType
-            (Keyword "§")
-            ( HeadingType
-                ( HeadingFormat
-                    (Typography Centered MediumFontSize [Bold])
-                    ( FormatString
-                        [ StringAtom "§ "
-                        , PlaceholderAtom IdentifierPlaceholder
-                        , StringAtom "\n"
-                        , PlaceholderAtom HeadingTextPlaceholder
-                        ]
-                    )
-                )
-                plainTextT
-            )
+        SectionFormatted
             ( SectionFormat
                 (FormatString [PlaceholderAtom Arabic])
                 ( TocKeyFormat $
@@ -292,7 +312,23 @@ sectionT =
                         ]
                 )
             )
-            (LeafSectionBodyType (Star paragraphT))
+            ( SectionType
+                (Keyword "§")
+                ( HeadingType
+                    ( HeadingFormat
+                        (Typography Centered MediumFontSize [Bold])
+                        ( FormatString
+                            [ StringAtom "§ "
+                            , PlaceholderAtom IdentifierPlaceholder
+                            , StringAtom "\n"
+                            , PlaceholderAtom HeadingTextPlaceholder
+                            ]
+                        )
+                    )
+                    plainTextT
+                )
+                (LeafSectionBodyType (Star paragraphT))
+            )
 
 paragraphT :: NamedType ParagraphType
 paragraphT =

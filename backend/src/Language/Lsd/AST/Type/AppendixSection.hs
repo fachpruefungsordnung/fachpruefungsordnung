@@ -52,5 +52,3 @@ instance RawProperNodeKind AppendixSectionType where
 
     treeSyntaxMapRaw f (AppendixSectionType _ (Star t)) =
         TreeSyntax (HasEditableHeader False) $ StarOrder $ fmap f t
-
-    kindHasTocHeadingRaw _ = True

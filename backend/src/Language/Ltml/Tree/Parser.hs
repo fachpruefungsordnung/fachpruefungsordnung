@@ -9,8 +9,6 @@ module Language.Ltml.Tree.Parser
     , runTreeParser
     , MonadTreeParser (treeParser)
     , TreeError (..)
-    , treeError
-    , leafError
     , leafParser
     , leafFootnoteParser
     , flaggedTreePF
@@ -22,10 +20,9 @@ where
 
 import Control.Functor.Utils (traverseF)
 import Control.Monad.Trans.Class (lift)
-import Data.List (find, singleton)
+import Data.List (find)
 import Data.Proxy (Proxy (Proxy))
 import Data.Text (Text)
-import Data.Void (Void)
 import Language.Lsd.AST.Common (TypeName)
 import Language.Lsd.AST.SimpleRegex (Disjunction (Disjunction))
 import Language.Lsd.AST.Type
@@ -34,16 +31,16 @@ import Language.Lsd.AST.Type
     , RawProperNodeKind
     , unwrapNT
     )
-import Language.Ltml.Common (Flagged)
+import Language.Ltml.Common (Flagged, Parsed)
 import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (nSc)
 import Language.Ltml.Parser.Footnote
     ( FootnoteParser
     , FootnoteWriterT
-    , mapFootnoteWriterT
+    , eitherMapFootnoteWriterT
     )
 import Language.Ltml.Tree (FlaggedTree, Tree, TypedTree (TypedTree))
-import Text.Megaparsec (ParseErrorBundle, runParser)
+import Text.Megaparsec (eof, runParser)
 
 newtype TreeParser a = TreeParser (Either TreeError a)
     deriving (Functor, Applicative, Monad)
@@ -51,21 +48,19 @@ newtype TreeParser a = TreeParser (Either TreeError a)
 runTreeParser :: TreeParser a -> Either TreeError a
 runTreeParser (TreeParser x) = x
 
-class (Monad m) => MonadTreeParser m where
+class (MonadFail m) => MonadTreeParser m where
     treeParser :: Either TreeError a -> m a
+
+instance MonadFail TreeParser where
+    fail = TreeParser . Left . TreeError
 
 instance MonadTreeParser TreeParser where
     treeParser = TreeParser
 
--- | An error that occurred parsing a tree.
-data TreeError
-    = -- | An error that occurred parsing a leaf.
-      --   Such an error should always be a user error.
-      LeafError (ParseErrorBundle Text Void)
-    | -- | An error that occurred parsing the tree's structure.
-      --   The frontend should prohibit such errors, and thus treat such errors
-      --   as internal / as bugs.
-      TreeError [String]
+-- | An error that occurred parsing a tree's structure (not input text).
+--   The frontend should prohibit such errors, and thus treat such errors as
+--   internal / as bugs.
+newtype TreeError = TreeError String
     deriving (Show)
 
 type FootnoteTreeParser = FootnoteWriterT TreeParser
@@ -73,24 +68,18 @@ type FootnoteTreeParser = FootnoteWriterT TreeParser
 instance (MonadTreeParser m) => MonadTreeParser (FootnoteWriterT m) where
     treeParser = lift . treeParser
 
-treeError :: (MonadTreeParser m) => String -> m a
-treeError = treeParser . Left . TreeError . singleton
+parseLeaf :: Parser a -> Text -> Parsed a
+parseLeaf p x = runParser (nSc *> p <* eof) "" (x <> "\n")
 
-leafError :: (MonadTreeParser m) => ParseErrorBundle Text Void -> m a
-leafError = treeParser . Left . LeafError
-
-leafParser :: Parser a -> Text -> TreeParser a
-leafParser p x =
-    case runParser (nSc *> p) "" (x <> "\n") of
-        Left e -> leafError e
-        Right y -> return y
+leafParser :: Parser a -> Text -> TreeParser (Parsed a)
+leafParser p x = return $ parseLeaf p x
 
 {-# ANN
     leafFootnoteParser
     ("HLint: ignore Avoid lambda using `infix`" :: String)
     #-}
-leafFootnoteParser :: FootnoteParser a -> Text -> FootnoteTreeParser a
-leafFootnoteParser p x = mapFootnoteWriterT (\p' -> leafParser p' x) p
+leafFootnoteParser :: FootnoteParser a -> Text -> FootnoteTreeParser (Parsed a)
+leafFootnoteParser p x = eitherMapFootnoteWriterT (\p' -> parseLeaf p' x) p
 
 flaggedTreePF'
     :: (MonadTreeParser m, ProperNodeKind t)
@@ -102,9 +91,9 @@ flaggedTreePF' f kind = traverseF aux
   where
     aux (TypedTree kindName typeName tree) =
         if kindName /= kindNameOf kind
-            then treeError "Invalid kind"
+            then fail "Invalid kind"
             else case f typeName of
-                Nothing -> treeError "Invalid type"
+                Nothing -> fail "Invalid type"
                 Just f' -> f' tree
 
 flaggedTreePF

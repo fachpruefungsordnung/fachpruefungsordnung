@@ -53,17 +53,17 @@ mainDocTree =
 
     introTree =
         Flagged False $
-            TypedTree "simple-section-sequence" "" $
+            TypedTree "document-intro" "" $
                 Leaf introText
 
     mainBodyTree =
         Flagged False $
-            TypedTree "document-mainbody" "inner" $
+            TypedTree "document-mainbody" "fpo-mainbody-simple" $
                 Tree Nothing [Flagged True sampleSectionTree]
 
     extroTree =
         Flagged False $
-            TypedTree "simple-section-sequence" "" $
+            TypedTree "document-extro" "" $
                 Leaf extroText
 
 appTrees :: [FlaggedInputTree']

@@ -87,12 +87,6 @@ class ProperNodeKind t where
         -> t
         -> TreeSyntax a
 
-    -- | Whether a kind has a heading that can be displayed in a TOC.
-    --   Used only for the main navigation TOC / heading-tree in the frontend;
-    --   other TOCs generally only include part of the full TOC.
-    --   Not to be confused with whether a node has an editable header.
-    kindHasTocHeading :: Proxy t -> Bool
-
 -- | An LTML kind @t@ is raw-proper iff @'NamedType' t@ is proper
 --   (see 'ProperNodeKind').
 class RawProperNodeKind t where
@@ -101,14 +95,12 @@ class RawProperNodeKind t where
         :: (forall t'. (ProperNodeKind t') => t' -> a)
         -> t
         -> TreeSyntax a
-    kindHasTocHeadingRaw :: Proxy t -> Bool
 
 instance (RawProperNodeKind t) => ProperNodeKind (NamedType t) where
     kindNameOf _ = kindNameOfRaw (Proxy :: Proxy t)
     typeNameOf = ntTypeName
     displayTypeNameOf = ntDisplayName
     treeSyntaxMap f = treeSyntaxMapRaw f . unwrapNT
-    kindHasTocHeading _ = kindHasTocHeadingRaw (Proxy :: Proxy t)
 
 fullTypeNameOf :: forall t. (ProperNodeKind t) => t -> FullTypeName
 fullTypeNameOf t = (kindNameOf (Proxy :: Proxy t), typeNameOf t)

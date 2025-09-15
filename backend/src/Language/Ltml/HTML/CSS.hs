@@ -11,7 +11,7 @@ import Prelude hiding (writeFile)
 writeCss :: Css -> FilePath -> IO ()
 writeCss css path = writeFile path (render css)
 
--- | List of all Css Classes defined in Language.Ltml.HTML.CSS.Classes
+-- | List of all @Css@ Classes defined in 'Language.Ltml.HTML.CSS.Classes'
 cssClasses :: [Css]
 cssClasses = map classStyle [minBound .. maxBound]
 

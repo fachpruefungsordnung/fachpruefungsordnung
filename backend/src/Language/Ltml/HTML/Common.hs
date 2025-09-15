@@ -1,10 +1,12 @@
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
 module Language.Ltml.HTML.Common
     ( HtmlReaderState
+    , ReaderStateMonad
     , GlobalState (..)
     , ReaderState (..)
     , initGlobalState
@@ -18,7 +20,11 @@ module Language.Ltml.HTML.Common
     , NumLabel (..)
     , ToC
     , addTocEntry
+    , addPhantomTocEntry
+    , PhantomTocEntry
     , RenderedTocEntry
+    , Result (..)
+    , result
     , EnumStyleMap
     , LabelWrapper
     , anchorLink
@@ -29,34 +35,40 @@ module Language.Ltml.HTML.Common
 
 import Control.Monad.Reader (ReaderT)
 import Control.Monad.State (State, get, modify)
+import Data.Aeson (FromJSON, ToJSON)
 import Data.ByteString.Lazy (ByteString)
 import Data.DList (DList, snoc)
 import qualified Data.DList as DList (empty)
 import Data.Map (Map)
 import qualified Data.Map as Map (empty)
+import Data.OpenApi (ToSchema)
 import Data.Set (Set)
 import qualified Data.Set as Set (empty)
 import Data.Text (Text, cons, pack)
+import GHC.Generics (Generic)
+import Language.Lsd.AST.Common (Fallback, NavTocHeading)
 import Language.Lsd.AST.Format
 import Language.Lsd.AST.Type.Enum (EnumFormat)
+import Language.Lsd.AST.Type.Section (SectionFormat)
 import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label (unLabel))
 import Lucid (Html, a_, href_)
+
+-- TODO: Third ConfigState? With custom Reader Monad that is read only
 
 -- | The Reader Monad is used for local tracking (e.g. enumNestingLevel).
 --   The State Monad is used for global tracking (e.g. sectionIDs).
 --   The Delayed type is used for delaying the actual lookup of references in the GlobalState.
 --   This allows forward references, because at first a delayed object is build,
 --   which is then evaluated aterwards with the final GlobalState.
-type HtmlReaderState =
-    ReaderT ReaderState (State GlobalState) (Delayed (Html ()))
+type HtmlReaderState = ReaderStateMonad (Delayed (Html ()))
+
+type ReaderStateMonad a = ReaderT ReaderState (State GlobalState) a
 
 data GlobalState = GlobalState
     { hasFlagged :: Bool
     -- ^ Is set True at every (Flagged ...); used to determine if current Flagged
     --   has any Flagged children
-    , currentAppendixSectionID :: Int
-    -- ^ Tracks the current appendix section id
     , currentSuperSectionID :: Int
     -- ^ Tracks the current super-section number
     , currentSectionID :: Int
@@ -84,7 +96,9 @@ data GlobalState = GlobalState
     , labels :: [(Label, Html ())]
     -- ^ Holds all labels and the Html element that should be displayed when this label is referenced
     , tableOfContents :: ToC
-    -- ^ Holds all entries for the table of contents as (Maybe key (e.g. § 1), title, HTML id as anchor link).
+    -- ^ Holds all entries for the table of contents as (Maybe key (e.g. § 1),
+    --   title, HTML id as anchor link). The title is wrapped into 'Result'.
+    --   In case of an parse error this title will be set to an Error title.
     , mangledLabelName :: Text
     -- ^ Mangled prefix name for generating new label names that do not exist in source language
     , mangledLabelID :: Int
@@ -119,6 +133,11 @@ data ReaderState = ReaderState
     , documentHeadingFormat :: Either (HeadingFormat False) (HeadingFormat True)
     -- ^ Holds format for current document heading
     --   (comes from DocumentContainer or AppendixSection)
+    , documentFallbackTitle :: Fallback NavTocHeading
+    -- ^ Holds a fallback ToC title to send to the Frontend, if parsing the main
+    --   Document failes. This is set by the DocumentContainer.
+    , localSectionFormat :: SectionFormat
+    -- ^ Defines the local 'SectionFormat'; is set by the 'SectionFormatted' wrapper
     , isSingleParagraph :: Bool
     -- ^ Signals the child paragraph that it is the only child and thus should
     --   not have an visible identifier
@@ -141,7 +160,6 @@ initGlobalState :: GlobalState
 initGlobalState =
     GlobalState
         { hasFlagged = False
-        , currentAppendixSectionID = 1
         , currentSuperSectionID = 1
         , currentSectionID = 1
         , currentParagraphID = 1
@@ -170,6 +188,8 @@ initReaderState =
         , appendixElementTocKeyFormat = error "Undefined appendix element ToC format!"
         , appendixElementMLabel = Nothing
         , documentHeadingFormat = error "Undefined HeadingFormat!"
+        , documentFallbackTitle = error "Undefined Main Document Fallback Heading!"
+        , localSectionFormat = error "Undefined SectionFormat!"
         , isSingleParagraph = False
         , currentEnumIDFormatString = error "Undefined enum id format!"
         , footnoteMap = Map.empty
@@ -224,16 +244,22 @@ instance Ord NumLabel where
 
 -- | The ToC uses a difference list to get constant time appending at the end, which has no speed draw backs,
 --   since the list is evaluated only ones when building the ToC Html at the end of rendering.
-type ToC = DList (Maybe (Html ()), Delayed (Html ()), Text)
+type ToC = DList (Either PhantomTocEntry TocEntry)
+
+type TocEntry = (Maybe (Html ()), Result (Delayed (Html ())), Text)
+
+-- | Toc Entry that only exists to send info to the Frontend;
+--   It is ignored when rendering a ToC
+type PhantomTocEntry = (Maybe (Html ()), Result (Html ()))
 
 -- | Add entry to table of contents with: key Html (e.g. § 1), title Html and html anchor link id;
 --   If Label is present uses it as the anchor link id, otherwise it creates a new mangled label name;
 --   the used label name is returned;
 addTocEntry
     :: Maybe (Html ())
-    -> Delayed (Html ())
+    -> Result (Delayed (Html ()))
     -> Maybe Label
-    -> ReaderT ReaderState (State GlobalState) Text
+    -> ReaderStateMonad Text
 addTocEntry mKey title mLabel = do
     globalState <- get
     htmlId <- case mLabel of
@@ -247,11 +273,44 @@ addTocEntry mKey title mLabel = do
                     return mangledLabel
         Just label -> return $ unLabel label
     modify
-        (\s -> s {tableOfContents = snoc (tableOfContents s) (mKey, title, htmlId)})
+        ( \s -> s {tableOfContents = snoc (tableOfContents s) (Right (mKey, title, htmlId))}
+        )
     return htmlId
 
--- | Type of exported ToC Entries (especially for Frontend)
-type RenderedTocEntry = (Maybe ByteString, ByteString)
+-- | Adds a phantom entry into the table of contents, which is ignored when rendering.
+--   Its only purpose is to tell the frontend if a parse error occured in this segment.
+--   This is only meant to be used for segments that do not have a normal Toc entry,
+--   like @SimpleSection@s.
+addPhantomTocEntry
+    :: Result (Html ()) -> ReaderStateMonad ()
+addPhantomTocEntry resHtml =
+    -- \| Phantom Entries do not have an ID and are not Delayed
+    let tocEntry = (Nothing, resHtml)
+     in modify (\s -> s {tableOfContents = snoc (tableOfContents s) (Left tocEntry)})
+
+-- | Type of exported ToC Entries (especially for Frontend);
+--   @Result@ signals if the generated title was parsed successfully or not
+type RenderedTocEntry = (Maybe ByteString, Result ByteString)
+
+data Result a = Success a | Error a
+    deriving (Show, Generic)
+
+instance (ToJSON a) => ToJSON (Result a)
+
+instance (FromJSON a) => FromJSON (Result a)
+
+instance (ToSchema a) => ToSchema (Result a)
+
+-- | Takes a @Result a@, a success function and an error function.
+--   Applies one of the two functions depending on the 'Result' constructor.
+result :: (a -> b) -> (a -> b) -> Result a -> b
+result fSuc fErr res = case res of
+    Success a -> fSuc a
+    Error a -> fErr a
+
+instance Functor Result where
+    fmap f (Success a) = Success (f a)
+    fmap f (Error a) = Error (f a)
 
 -------------------------------------------------------------------------------
 
