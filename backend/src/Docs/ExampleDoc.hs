@@ -59,8 +59,8 @@ mainDocTree =
                 Tree
                     Nothing
                     [ Flagged True sectionOne
-                    -- , Flagged True sectionTwo
-                    -- , Flagged True sectionThree
+                    , Flagged True sectionTwo
+                    , Flagged True sectionThree
                     ]
 
     extroTree =
