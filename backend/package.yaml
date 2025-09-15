@@ -20,62 +20,60 @@ description: Please see the README on GitHub at
   <https://github.com/fachpruefungsordnung/fachpruefungsordnung>
 
 dependencies:
-  - Cabal
+  - aeson
   - base >= 4.7 && < 5
-  - insert-ordered-containers
-  - scientific
-  - smtp-mail
-  - mime-mail
-  - network
-  - tuple
-  - lens
-  - profunctors
-  - containers
-  - hasql
-  - hasql-th
-  - hasql-pool
-  - hasql-transaction
-  - hasql-migration
-  - vector
-  - bytestring
-  - text
-  - zlib
-  - cryptohash-sha1
-  - containers
   - base64-bytestring
-  - time
+  - bytestring
+  - Cabal
+  - clay
+  - containers
+  - cryptohash-sha1
+  - directory
+  - dlist
+  - filepath
+  - hasql
+  - hasql-migration
+  - hasql-pool
+  - hasql-th
+  - hasql-transaction
+  - http-api-data
+  - http-media
+  - http-types
+  - insert-ordered-containers
+  - jose
+  - lens
+  - lucid2
+  - megaparsec
+  - mime-mail
+  - mtl
+  - network
+  - openapi3
+  - pandoc-types
+  - parser-combinators
+  - password
+  - pretty-simple
+  - process
+  - profunctors
+  - scientific
   - servant
-  - servant-server
   - servant-auth-server
   - servant-openapi3
-  - openapi3
-  - http-api-data
+  - servant-server
+  - smtp-mail
   - tagged
+  - template-haskell
+  - temporary
+  - text
+  - time
+  - transformers
+  - tuple
+  - uuid
+  - vector
   - wai
   - wai-app-static
   - warp
-  - http-types
-  - http-media
-  - aeson
-  - template-haskell
-  - filepath
-  - directory
-  - text
-  - dlist
-  - lucid2
-  - clay
   - zip-archive
-  - password
-  - jose
-  - uuid
-  - megaparsec
-  - parser-combinators
-  - mtl
-  - transformers
-  - pretty-simple
-  - pandoc-types
-  - process
-  - temporary
+  - zlib
 
 ghc-options:
   - -Wall
