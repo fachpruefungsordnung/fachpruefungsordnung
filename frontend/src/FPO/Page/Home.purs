@@ -31,12 +31,13 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (LoadState(..), fromLoading, getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
-import FPO.Data.Time
-  ( formatRelativeTime
+import FPO.Data.Time (formatRelativeTime)
+import FPO.Dto.DocumentDto.DocDate as DocDate
+import FPO.Dto.DocumentDto.DocumentHeader
+  ( DocumentHeader
+  , DocumentID
   , getEditTimestamp
   )
-import FPO.Dto.DocumentDto.DocDate as DocDate
-import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader, DocumentID)
 import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
@@ -74,8 +75,8 @@ data Action
   | ChangeSorting TH.Output
   | HandleSearchInput String
   | SetPage P.Output
-  | DownloadPdf DocumentID String MouseEvent -- Id, Projektname, Event (zum prevent default)
-  | DownloadZip DocumentID String MouseEvent -- Id, Projektname, Event (zum prevent default)
+  | DownloadPdf DocumentID String MouseEvent -- Id, Project Name, Event (used for prevent default)
+  | DownloadZip DocumentID String MouseEvent -- Id, Project Name, Event (used for prevent default)
 
 type State = FPOState
   ( user :: LoadState (Maybe FullUserDto)
@@ -605,7 +606,7 @@ component =
             ]
           else
             ( map (renderProjectRow state) ps
-                <> replicate (5 - length ps) (emptyTableRow 48 3)
+                <> replicate (5 - length ps) (emptyTableRow 48 4)
             ) -- Fill up to 5 rows
       ]
     where
@@ -656,7 +657,7 @@ component =
               ]
           ]
       , HH.td
-          [ HP.classes [ HB.textCenter ] ]
+          [ HP.classes [ HB.textCenter, HB.alignMiddle ] ]
           [ HH.button
               [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
               , HE.onClick $ \e -> DownloadZip (DocumentHeader.getIdentifier project)
@@ -679,49 +680,3 @@ component =
     filter
       (\p -> contains (Pattern $ toLower query) (toLower $ DocumentHeader.getName p))
       projects
-
-{- -- | Helper function to adjust a DateTime by a duration (subtract from current time)
-adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime
-adjustDateTime duration dt =
-  fromMaybe dt $ adjust (negateDuration duration) dt
-
-getEditTimestamp ∷ DocumentHeader → DateTime
-getEditTimestamp = DocDate.docDateToDateTime <<< DocumentHeader.getLastEdited
-
--- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
-formatRelativeTime :: Maybe DateTime -> DateTime -> String
-formatRelativeTime Nothing _ = "Unknown"
-formatRelativeTime (Just current) updated =
-  let
-    timeDiff =
-      if current > updated then diff current updated else diff updated current
-
-    (Seconds seconds) = toDuration timeDiff :: Seconds
-    totalMinutes = floor (seconds / 60.0)
-    totalHours = floor (seconds / 3600.0)
-    totalDays = floor (seconds / 86400.0)
-  in
-    if totalDays > 7 then
-      formatAbsoluteDate updated
-    else if totalDays >= 1 then
-      show totalDays <> if totalDays == 1 then " day ago" else " days ago"
-    else if totalHours >= 1 then
-      show totalHours <> if totalHours == 1 then " hour ago" else " hours ago"
-    else if totalMinutes >= 1 then
-      show totalMinutes <>
-        if totalMinutes == 1 then " minute ago" else " minutes ago"
-    else
-      "Just now"
-  where
-  -- Format DateTime as absolute date (YYYY-MM-DD)
-  formatAbsoluteDate :: DateTime -> String
-  formatAbsoluteDate dt =
-    let
-      d' = date dt
-      y = show $ fromEnum $ year d'
-      m = padZero $ fromEnum $ month d'
-      d = padZero $ fromEnum $ day d'
-    in
-      d <> "." <> m <> "." <> y
-    where
-    padZero n = if n < 10 then "0" <> show n else show n -}

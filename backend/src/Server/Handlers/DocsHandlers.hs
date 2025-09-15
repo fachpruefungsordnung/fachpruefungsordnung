@@ -142,17 +142,24 @@ type DocsAPI =
            )
 
 type PostDocument =
-    Auth AuthMethod Auth.Token
+    Summary "Create a new document"
+        :> Description "Create a new document with default content"
+        :> Auth AuthMethod Auth.Token
         :> ReqBody '[JSON] CreateDocument
         :> Post '[JSON] FullDocument
 
 type GetDocument =
-    Auth AuthMethod Auth.Token
+    Summary "Get metadata for a document"
+        :> Description "Obtain a documents metadat"
+        :> Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> Get '[JSON] Document
 
 type GetDocuments =
-    Auth AuthMethod Auth.Token
+    Summary "Get all documents"
+        :> Description
+            "Get all documents visible for the user. For super admins, this does not contain all visible documents, as a super admin can see all documents."
+        :> Auth AuthMethod Auth.Token
         :> QueryParam "user" UserID
         :> QueryParam "group" GroupID
         :> Get '[JSON] Documents
@@ -211,6 +218,7 @@ type GetTextHistory =
         :> "text"
         :> Capture "textElementID" TextElementID
         :> "history"
+        :> QueryParam "after" UTCTime
         :> QueryParam "before" UTCTime
         :> QueryParam "limit" Docs.Limit
         :> Get '[JSON] TextRevisionHistory
@@ -478,15 +486,17 @@ getTextHistoryHandler
     -> DocumentID
     -> TextElementID
     -> Maybe UTCTime
+    -> Maybe UTCTime
     -> Maybe Docs.Limit
     -> Handler TextRevisionHistory
-getTextHistoryHandler auth docID textID before limit = do
+getTextHistoryHandler auth docID textID after before limit = do
     userID <- getUser auth
     withDB $
         run $
             Docs.getTextHistory
                 userID
                 (TextElementRef docID textID)
+                after
                 before
                 limit
 

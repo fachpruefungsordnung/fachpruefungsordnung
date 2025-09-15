@@ -7,10 +7,13 @@ import Simple.I18n.Translation (Translation, fromRecord)
 type CommonLabels =
   ( "common_cancel"
       ::: "common_confirmDelete"
+      ::: "common_confirmDiscard"
       ::: "common_create"
       ::: "common_delete"
       ::: "common_deletePhraseA"
       ::: "common_deletePhraseB"
+      ::: "common_discard"
+      ::: "common_discardPhrase"
       ::: "common_email"
       ::: "common_emailAddress"
       ::: "common_filterBy"
@@ -40,10 +43,14 @@ enCommon :: Translation CommonLabels
 enCommon = fromRecord
   { common_cancel: "Cancel"
   , common_confirmDelete: "Confirm Delete"
+  , common_confirmDiscard: "Confirm Discard"
   , common_create: "Create"
   , common_delete: "Delete"
   , common_deletePhraseA: "Are you sure you want to delete "
   , common_deletePhraseB: "?"
+  , common_discard: "Discard"
+  , common_discardPhrase:
+      "Are you sure you want to discard the current changes to this text element?"
   , common_email: "Email"
   , common_emailAddress: "Email address"
   , common_filterBy: "Filter by"
@@ -72,7 +79,7 @@ enCommon = fromRecord
       <>
         "and copy over any changes you want to keep. Once you are done, you can save again, at which point you will be up to date again.\n\n"
       <>
-        "If you do not wish to save your currently opened version, you can click on \"discard\" to discard them and open the current version."
+        "If you do not wish to save your currently opened version, you can click on \"Discard\" to discard them and open the current version."
   , common_password: "Password"
   , common_passwordUpdated: "Password updated"
   , common_project: "project"
@@ -94,10 +101,14 @@ deCommon :: Translation CommonLabels
 deCommon = fromRecord
   { common_cancel: "Abbrechen"
   , common_confirmDelete: "Löschen bestätigen"
+  , common_confirmDiscard: "Verwerfen bestätigen"
   , common_create: "Erstellen"
   , common_delete: "Löschen"
   , common_deletePhraseA: "Sind Sie sicher, dass Sie "
   , common_deletePhraseB: " löschen möchten?"
+  , common_discard: "Verwerfen"
+  , common_discardPhrase:
+      "Sind sie sicher, dass sie die Änderungen an diesem Textelement verwerfen möchten?"
   , common_email: "E-Mail"
   , common_emailAddress: "E-Mail-Addresse"
   , common_filterBy: "Filtern nach"
@@ -107,26 +118,30 @@ deCommon = fromRecord
   , common_members: "Mitglieder"
   , common_membersOf: "Mitglieder von "
   , common_mergingInfo: "Veraltete Versionen bearbeiten"
-  , common_mergingInfoText: "You are currently editing an outdated version. \n\n"
-      <> "How was this caused? \n"
-      <> "As this website supports editing by multiple people simultaneously, "
-      <> "it is possible that someone else started editing the same part of this "
+  , common_mergingInfoText: "Sie bearbeiten aktuell eine veraltete Version. \n\n"
+      <> "Woher kommt das? \n"
       <>
-        "file as you and saved their version. Alternatively, You may have simply openend "
-      <> "an old version.\n\n"
-      <> "What does this mean for you?\n"
+        "Da diese Webseite es erlaubt, mehreren Nutzer/-innen gleichzeitig ein Dokument bearbeiten zu lassen, "
       <>
-        "You can keep editing this text element as usual, but once you are done and want to save your changes, you will need to "
+        "ist es möglich, dass eine anderere Person gerade die gleiche Textstelle bearbeitet"
       <>
-        "merge your changes with the current version so you can ensure that no changes get lost. "
+        "und ihre Version gespeichert hat. Möglicherweise haben sie auch einfach über die Textabschnittsauswahl links "
+      <> "eine alte Version geöffnet.\n\n"
+      <> "Was bedeutet das?\n"
       <>
-        "Otherwise, either your changes or the changes of the current file would get lost.\n"
+        "Sie können diesen Textabschnitt weiterhin wie gewohnt bearbeiten, aber wenn sie fertig sind mit diesem Abschnitt müssen sie ihre Änderungen"
       <>
-        "Once you choose to save, the current version will be opened on the left side of your screen so you can compare the changes made "
+        "mit denen der aktuellen Version zusammenführen, damit keine änderungen verloren gehen. "
       <>
-        "and copy over any changes you want to keep. Once you are done, you can save again, at which point you will be up to date again.\n\n"
+        "Andernfalls würden entweder ihre Änderungen oder jene der aktuellen Version verloren gehen.\n"
       <>
-        "If you do not wish to save your currently opened version, you can click on \"discard\" to discard them and open the current version."
+        "Sobald sie ihre Änderungen speichern wird sich rechts die aktuelle Version öffnen. Editieren Sie ihre Version auf der linken Seite dann"
+      <>
+        "so, dass alle gewünschten änderungen beider Version in ihr enthalten sind. Sobald sie damit fertig sind, können sie durch ein weiteres"
+      <>
+        "klicken auf \"speichern\" ihre Änderungen speichern\n\n"
+      <>
+        "Falls sie wünschen, ihre aktuellen änderungen zu verwerfen, so könne sie auf \"Verwerfen\" klicken um sie zu verwerfen und zur aktuellen Version zurückzukehren."
   , common_password: "Passwort"
   , common_passwordUpdated: "Passwort aktualisiert"
   , common_project: "Projekt"

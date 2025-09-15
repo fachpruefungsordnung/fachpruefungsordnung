@@ -123,10 +123,13 @@ type Labels =
       -- | Common Phrases
       ::: "common_cancel"
       ::: "common_confirmDelete"
+      ::: "common_confirmDiscard"
       ::: "common_create"
       ::: "common_delete"
       ::: "common_deletePhraseA"
       ::: "common_deletePhraseB"
+      ::: "common_discard"
+      ::: "common_discardPhrase"
       ::: "common_email"
       ::: "common_emailAddress"
       ::: "common_filterBy"

@@ -639,7 +639,9 @@ getTextRevision =
         )
 
 getTextRevisionHistory
-    :: Statement (TextElementRef, Maybe UTCTime, Int64) (Vector TextRevisionHeader)
+    :: Statement
+        (TextElementRef, Maybe UTCTime, Maybe UTCTime, Int64)
+        (Vector TextRevisionHeader)
 getTextRevisionHistory =
     lmap
         mapInput
@@ -658,15 +660,16 @@ getTextRevisionHistory =
                 WHERE
                     te.document = $1 :: int8
                     AND tr.text_element = $2 :: int8
-                    AND tr.creation_ts < COALESCE($3 :: TIMESTAMPTZ?, NOW())
+                    AND tr.creation_ts > COALESCE($3 :: TIMESTAMPTZ?, '1900-01-01 00:00:00+00'::TIMESTAMPTZ)
+                    AND tr.creation_ts < COALESCE($4 :: TIMESTAMPTZ?, NOW())
                 ORDER BY
                     tr.creation_ts DESC
                 LIMIT
-                    $4 :: int8
+                    $5 :: int8
             |]
   where
-    mapInput (TextElementRef docID textID, maybeTimestamp, limit) =
-        (unDocumentID docID, unTextElementID textID, maybeTimestamp, limit)
+    mapInput (TextElementRef docID textID, maybeFrom, maybeTo, limit) =
+        (unDocumentID docID, unTextElementID textID, maybeFrom, maybeTo, limit)
 
 getLatestTextRevisionID :: Statement TextElementRef (Maybe TextRevisionID)
 getLatestTextRevisionID =

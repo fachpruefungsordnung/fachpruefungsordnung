@@ -3,6 +3,7 @@
 module Language.Ltml.Parser.Label
     ( labelP
     , labelingP
+    , bracedLabelingP
     )
 where
 
@@ -22,4 +23,7 @@ labelP = Label <$> (Text.cons <$> headP <*> tailP) <?> "label"
     tailP = takeWhileP (Just "label character") isLater
 
 labelingP :: (MonadParser m) => m Label
-labelingP = char '{' *> labelP <* char ':' <* char '}'
+labelingP = char '{' *> bracedLabelingP <* char '}'
+
+bracedLabelingP :: (MonadParser m) => m Label
+bracedLabelingP = labelP <* char ':'

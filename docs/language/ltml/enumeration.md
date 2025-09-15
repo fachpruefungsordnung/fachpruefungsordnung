@@ -8,8 +8,8 @@ each headed by a keyword that is specific to the enumeration type.
 ## Enumeration text
 
 Enumeration text permits [styling](./text.md#styling),
-[footnote references](./text.md#footnote-references), and enumeration
-[text children](./text.md#child-nodes).
+[footnote references](./text.md#footnote-references), and (nested)
+enumerations.
 
 
 ## Enumeration identifiers
@@ -27,7 +27,7 @@ The enumeration identifiers can always be produced by
 ## Nesting
 
 Enumerations may indirectly contain sub-enumerations:
-the text within an enumeration may contain an enumeration (as text children).
+the text within an enumeration may contain an enumeration.
 
 
 ## Example

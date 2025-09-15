@@ -35,17 +35,17 @@ import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.FullDocument as FD
 import FPO.Dto.DocumentDto.Query as DQ
 import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName)
--- import FPO.Page.Home (formatRelativeTime)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn, addModal)
 import FPO.UI.Style as Style
+import FPO.Util (focusRef, handleKeyDown, singletonIf)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
@@ -89,15 +89,13 @@ data ModalState
 -- | Local state of the "create document" modal.
 type CreateDocumentModalState =
   { waiting :: Boolean
-  , error :: Maybe String
   }
 
 defaultCreateDocumentModalState :: CreateDocumentModalState
-defaultCreateDocumentModalState = { waiting: false, error: Nothing }
+defaultCreateDocumentModalState = { waiting: false }
 
 type State = FPOState
-  ( error :: Maybe String
-  , page :: Int
+  ( page :: Int
   , groupID :: GroupID
   , group :: Maybe GroupDto
   , documents :: Array DH.DocumentHeader
@@ -135,12 +133,19 @@ component =
     , documents: []
     , documentNameFilter: ""
     , filteredDocuments: []
-    , error: Nothing
     , modalState: NoModal
     , currentTime: Nothing
     , newDocumentName: ""
     , group: Nothing
     }
+
+  -- Reference to the input field in the "create document" modal.
+  modalInputRef :: H.RefLabel
+  modalInputRef = H.RefLabel "modal-input"
+
+  -- Reference to the delete button in the "delete document" modal.
+  modalDeleteRef :: H.RefLabel
+  modalDeleteRef = H.RefLabel "modal-delete"
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
@@ -153,6 +158,8 @@ component =
                   (docNameFromID state)
                   CancelModal
                   ConfirmDeleteDocument
+                  DoNothing
+                  (Just modalDeleteRef)
                   (translate (label :: _ "common_project") state.translator)
               ]
             CreateDocumentModal ms ->
@@ -161,13 +168,6 @@ component =
             _ -> []
         ) <>
           [ renderDocumentManagement state
-          , HH.div [ HP.classes [ HB.textCenter ] ]
-              [ case state.error of
-                  Just err -> HH.div
-                    [ HP.classes [ HB.alert, HB.alertDanger, HB.mt5 ] ]
-                    [ HH.text err ]
-                  Nothing -> HH.text ""
-              ]
           ]
 
   renderDocumentManagement :: State -> H.ComponentHTML Action Slots m
@@ -302,7 +302,7 @@ component =
   -- Renders an empty project row for padding.
   emptyDocumentRow :: forall w. State -> HH.HTML w Action
   emptyDocumentRow state =
-    HH.tr []
+    HH.tr [ HP.class_ $ H.ClassName "no-hover" ]
       [ HH.td
           [ HP.colSpan 3
           , HP.classes [ HB.textCenter ]
@@ -355,9 +355,16 @@ component =
     :: forall w. CreateDocumentModalState -> State -> HH.HTML w Action
   createDocumentModal ms state =
     addModal (translate (label :: _ "gp_createNewProject") state.translator)
-      (const CancelModal) $
+      CancelModal
+      DoNothing $
       [ HH.div
-          [ HP.classes [ HB.modalBody ] ]
+          [ HP.classes [ HB.modalBody ]
+          , HE.onKeyDown $ handleKeyDown
+              CancelModal
+              ConfirmCreateDocument
+              DoNothing
+          , HP.tabIndex 0
+          ]
           [ HH.div
               [ HP.classes [ HB.mb3 ] ]
               [ HH.label
@@ -371,6 +378,7 @@ component =
                   [ HP.type_ HP.InputText
                   , HP.classes [ HH.ClassName "form-control" ]
                   , HP.id "docName"
+                  , HP.ref modalInputRef
                   , HP.placeholder $ translate
                       (label :: _ "gp_enterDocumentName")
                       state.translator
@@ -381,17 +389,10 @@ component =
           ]
       , HH.div
           [ HP.classes [ HB.modalFooter ] ]
-          ( ( if ms.waiting then
-                [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary, HB.me5 ] ]
+          ( ( singletonIf ms.waiting
+                ( HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary, HB.me5 ] ]
                     []
-                ]
-              else
-                case ms.error of
-                  Just err ->
-                    [ HH.div [ HP.classes [ HB.alert, HB.alertDanger, HB.w100 ] ]
-                        [ HH.text err ]
-                    ]
-                  Nothing -> []
+                )
             )
               <>
                 [ HH.button
@@ -443,7 +444,7 @@ component =
                 , documents = DQ.getDocuments docs
                 , currentTime = Just now
                 }
-            Left _ -> pure unit -- TODO error handling
+            Left _ -> pure unit
       handleAction Filter
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -464,11 +465,13 @@ component =
         { newDocumentName = ""
         , modalState = CreateDocumentModal defaultCreateDocumentModalState
         }
+
+      focusRef modalInputRef
     ConfirmCreateDocument -> do
       s <- H.get
       let newDocName = s.newDocumentName
       if newDocName == "" then
-        H.modify_ _ { error = Just "Document name cannot be empty." }
+        updateStore $ Store.AddWarning "Document name cannot be empty."
       else do
         let
           dto = NewDocumentCreateDto
@@ -480,7 +483,7 @@ component =
 
         createResponse <- createNewDocument dto
         case createResponse of
-          Left err -> setModalError $ show err
+          Left _ -> pure unit
           Right h -> do
             H.modify_ _ { modalState = NoModal, newDocumentName = "" }
             now <- H.liftEffect nowDateTime
@@ -492,6 +495,7 @@ component =
               , filteredDocuments = header : s'.filteredDocuments
               , currentTime = Just now
               }
+            updateStore $ Store.AddSuccess "Successfully created document"
 
             -- Reset the page view
             H.modify_ _ { documentNameFilter = "" }
@@ -504,19 +508,18 @@ component =
       pure unit
     RequestDeleteDocument documentID -> do
       H.modify_ _ { modalState = DeleteDocumentModal documentID }
+
+      focusRef modalDeleteRef
     CancelModal -> do
       H.modify_ \s -> s
-        { error = Nothing
-        , modalState = NoModal
+        { modalState = NoModal
         }
     ChangeCreateDocumentName docName -> do
       H.modify_ _ { newDocumentName = docName }
     ConfirmDeleteDocument docID -> do
       deleteResponse <- deleteIgnore ("/documents/" <> show docID)
       case deleteResponse of
-        Left err -> do
-          H.modify_ \s -> s
-            { error = Just (show err) }
+        Left _ -> pure unit
         Right _ -> do
           s <- H.get
           documents <- getDocumentsQueryFromURL
@@ -524,11 +527,10 @@ component =
           case documents of
             Right docs -> do
               H.modify_ _
-                { error = Nothing
-                , documents = DQ.getDocuments docs
+                { documents = DQ.getDocuments docs
                 , modalState = NoModal
                 }
-            Left _ -> do -- TODO error handling
+            Left _ -> do
               handleAction DoNothing
       -- navigate Login
       handleAction Filter
@@ -575,15 +577,6 @@ component =
     H.modify_ \s -> s
       { modalState = case s.modalState of
           CreateDocumentModal ms -> CreateDocumentModal ms { waiting = w }
-          _ -> s.modalState
-      }
-
-  -- | Sets an error message in the modal state if the current modal supports error messages.
-  setModalError :: String -> H.HalogenM State Action Slots output m Unit
-  setModalError err = do
-    H.modify_ \s -> s
-      { modalState = case s.modalState of
-          CreateDocumentModal ms -> CreateDocumentModal ms { error = Just err }
           _ -> s.modalState
       }
 

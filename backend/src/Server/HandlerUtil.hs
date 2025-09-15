@@ -21,6 +21,8 @@ module Server.HandlerUtil
     , errEmailAlreadyUsed
     , errDocumentDoesNotExist
     , errNoPermission
+    , errWrongLoginCredentials
+    , errLoginFailed
     ) where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -182,3 +184,9 @@ errDocumentDoesNotExist = err404 {errBody = "\"Document not found.\""}
 
 errNoPermission :: ServerError
 errNoPermission = err403 {errBody = "\"Insufficient permission to perform this action.\""}
+
+errWrongLoginCredentials :: ServerError
+errWrongLoginCredentials = err401 {errBody = "\"Incorrect login credentials.\""}
+
+errLoginFailed :: ServerError
+errLoginFailed = err500 {errBody = "\"Login failed! Please try again!\""}

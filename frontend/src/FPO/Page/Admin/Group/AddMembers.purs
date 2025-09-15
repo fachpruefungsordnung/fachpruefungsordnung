@@ -23,7 +23,6 @@ import FPO.Dto.UserOverviewDto (getID)
 import FPO.Dto.UserRoleDto (Role(..))
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addError)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -53,8 +52,7 @@ data Action
   | ReloadGroup
 
 type State = FPOState
-  ( error :: Maybe String
-  , group :: Maybe GroupDto
+  ( group :: Maybe GroupDto
   , groupID :: GroupID
   )
 
@@ -81,7 +79,6 @@ component =
   initialState :: Connected FPOTranslator Input -> State
   initialState { context, input } =
     { translator: fromFpoTranslator context
-    , error: Nothing
     , group: Nothing
     , groupID: input
     }
@@ -93,7 +90,6 @@ component =
         [ HP.classes [ HB.containerXl, HB.my5 ]
         ]
         [ renderMemberManagement state g
-        , addError state.error
         ]
       Nothing -> HH.div [ HP.classes [ HB.textCenter, HB.my5 ] ]
         [ HH.h1 []
@@ -107,7 +103,7 @@ component =
       state <- H.get
       userWithError <- getAuthorizedUser state.groupID
       case userWithError of
-        Left _ -> pure unit -- TODO error
+        Left _ -> pure unit
         Right maybeUser ->
           case maybeUser of
             Nothing -> do
@@ -128,29 +124,19 @@ component =
       H.tell _userlist unit (UserList.HandleFilterQ f)
     HandleUserList (UserList.Loading _) -> do
       pure unit
-    HandleUserList (UserList.Error err) -> do
-      H.modify_ _ { error = Just err }
+    HandleUserList (UserList.Error _) -> pure unit
     HandleUserList (UserList.ButtonPressed userOverviewDto effect) -> do
       s <- H.get
       case effect of
         EffectAddUser -> do
           response <- changeRole s.groupID (getID userOverviewDto) Member
           case response of
-            Left appError -> H.modify_ _
-              { error = Just $
-                  translate (label :: _ "gmam_failedToAdd") s.translator <> ": " <>
-                    (show appError)
-              }
+            Left _ -> pure unit
             Right _ -> handleAction ReloadGroup
         EffectRemoveUser -> do
           response <- removeUser s.groupID (getID userOverviewDto)
           case response of
-            Left appError -> H.modify_ _
-              { error
-                  = Just $
-                  translate (label :: _ "gmam_failedToRemove") s.translator <> ": "
-                    <> (show appError)
-              }
+            Left _ -> pure unit
             Right _ -> handleAction ReloadGroup
     ReloadGroup -> do
       s <- H.get
@@ -160,10 +146,7 @@ component =
           H.modify_ _
             { group = Just group
             }
-        Left _ -> do
-          H.modify_ _
-            { error = Just $ translate (label :: _ "gmam_groupNotFound") s.translator
-            }
+        Left _ -> pure unit
 
   renderMemberManagement :: State -> GroupDto -> H.ComponentHTML Action Slots m
   renderMemberManagement state group =
