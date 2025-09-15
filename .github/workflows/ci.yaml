@@ -72,6 +72,7 @@ jobs:
         with:
           working-directory: backend
           stack-build-arguments: --no-test --fast
+          cache-prefix: v1
           test: false
           upgrade-stack: false
 
