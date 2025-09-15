@@ -127,6 +127,7 @@ data Action
   -- continues ModifyVersion when approved through the modal
   | ModifyVersionFromModal Int (Maybe Int)
   | DeleteDraft
+  | DoNothing
 
 type State = FPOState
   ( docID :: DocumentID
@@ -254,6 +255,7 @@ splitview = connect selectTranslator $ H.mkComponent
             ModifyVersionFromModal
             eID
             mVID
+            DoNothing
         ]
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
@@ -823,6 +825,9 @@ splitview = connect selectTranslator $ H.mkComponent
           , sidebarShown = true
           }
       H.tell _editor 0 (Editor.EditorResize)
+
+    DoNothing -> do
+      pure unit
 
     -- Toggle the preview area
     TogglePreview -> do
