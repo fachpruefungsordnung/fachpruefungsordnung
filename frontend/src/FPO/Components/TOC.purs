@@ -30,8 +30,6 @@ import Data.Date (Date)
 import Data.DateTime (DateTime, adjust)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.String.Regex (regex, replace)
-import Data.String.Regex.Flags (noFlags)
 import Data.Time.Duration (Days(..), Minutes)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
@@ -46,10 +44,13 @@ import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
 import FPO.Dto.DocumentDto.TreeDto
   ( Edge(..)
+  , Meta(..)
   , RootTree(..)
   , Tree(..)
   , TreeHeader(..)
   , findRootTree
+  , getFullTitle
+  , getShortTitle
   , modifyNodeRootTree
   )
 import FPO.Dto.PostTextDto (PostTextDto(..))
@@ -553,7 +554,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
           let
             newEntry =
               Leaf
-                { title: "New Subsection"
+                { meta: Meta
+                    { label: Nothing
+                    , title: "New Subsection"
+                    }
                 , node:
                     { id: PostTextDto.getID dto
                     , name: "New Subsection"
@@ -567,7 +571,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
         st { showAddMenu = [ -1 ] }
       let
         newEntry = Node
-          { title: "New Section"
+          { meta: Meta
+              { label: Nothing
+              , title: "New Section"
+              }
           , children: []
           , header: TreeHeader
               { headerKind: "section", headerType: "section", heading: "" }
@@ -833,7 +840,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     now
     filteredTree
     searchData = case _ of
-    Node { title, children } ->
+    Node { meta, children } ->
       let
         selectedClasses =
           if selectedNodeHasPath path then
@@ -860,11 +867,12 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 , HH.span
                     ( [ HP.classes titleClasses
                       , HP.style "align-self: stretch; flex-basis: 0;"
-                      , HP.title title
+                      , HP.title $ getFullTitle meta
                       ]
                     )
-                    [ HH.text title ]
-                , renderSectionButtonInterface menuPath path true Section title
+                    [ HH.text $ getFullTitle meta ]
+                , renderSectionButtonInterface menuPath path true Section
+                    (getFullTitle meta)
                 ]
             ]
         ]
@@ -892,7 +900,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
         Just (SelNode selectedPath _) -> selectedPath == p
         _ -> false
 
-    Leaf { title, node: { id, paraID: _, name: _ } } ->
+    Leaf { meta, node: { id, paraID: _, name: _ } } ->
       let
         selectedClasses =
           if Just (SelLeaf id) == mSelectedTocEntry then
@@ -900,7 +908,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
           else []
         containerProps =
           ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <> selectedClasses
-            , HP.title ("Jump to section " <> prettyTitle title)
+            , HP.title ("Jump to section " <> getShortTitle meta)
             ] <> dragProps true
           )
         innerDivBaseClasses =
@@ -928,12 +936,12 @@ tocview = connect (selectEq identity) $ H.mkComponent
                         [ HB.textTruncate, HB.flexGrow1, HB.fwNormal, HB.fs6 ]
                     , HP.style "align-self: stretch; flex-basis: 0;"
                     ]
-                    [ HH.text $ prettyTitle title ]
+                    [ HH.text $ getFullTitle meta ]
                 , renderParagraphButtonInterface historyPath path
                     state.versions
                     state.showHistorySubmenu
                     now
-                    title
+                    (getFullTitle meta)
                     id
                     filteredTree
                     searchData
@@ -956,13 +964,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
       , HP.style ("margin-left: " <> show level <> "rem;")
       ]
       [ HH.text "⋮⋮" ]
-
-  -- If the title is of shape "§{<label>:} Name", change it to "§ Name".
-  prettyTitle :: String -> String
-  prettyTitle title =
-    case regex "§\\{[^}]+:\\}\\s*" noFlags of
-      Left _err -> title -- fallback - if regex fails, just return the input
-      Right pattern -> replace pattern "§ " title
 
   -- Helper to check if the current path is the active dropzone.
   -- This is used to highlight the dropzone when dragging an item.
@@ -1130,7 +1131,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     HH.div
       [ HP.classes [ HB.positionRelative ] ] $
       [ historyButton path elementID
-      , deleteSectionButton path Paragraph (prettyTitle title)
+      , deleteSectionButton path Paragraph title
       ]
         <>
           [ if historyPath == path then
@@ -1414,7 +1415,7 @@ findLeafTitleInChildren targetId children =
 
 findLeafTitleInTree :: Int -> Tree TOCEntry -> Maybe String
 findLeafTitleInTree targetId = case _ of
-  Leaf { title, node: { id } } ->
-    if id == targetId then Just title else Nothing
+  Leaf { meta: Meta meta, node: { id } } ->
+    if id == targetId then Just meta.title else Nothing
   Node { children } ->
     findLeafTitleInChildren targetId children
