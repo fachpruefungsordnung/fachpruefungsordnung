@@ -1586,8 +1586,8 @@ addChangeListenerWithRef editor_ dref listener = do
           when (not busy) do
             Ref.write true guardRef
             let sRow = Types.getRow start
-            range <- Range.create sRow sCol sRow (sCol + 1)
-            Session.replace range "  #" session
+            range <- Range.create sRow sCol sRow (sCol)
+            Session.replace range "  " session
             Ref.write false guardRef
 
 addAnchor
