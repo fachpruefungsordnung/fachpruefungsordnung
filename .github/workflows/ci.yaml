@@ -71,8 +71,9 @@ jobs:
         uses: freckle/stack-action@v5
         with:
           working-directory: backend
+          stack-arguments: --cabal-verbose
           stack-build-arguments: --no-test --fast --allow-newer
-          cache-prefix: v1/
+          cache-prefix: v2/
           test: false
           upgrade-stack: false
 
