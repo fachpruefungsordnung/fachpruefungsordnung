@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "*"
+    tags-ignore:
+      - "prod"
   pull_request:
     branches:
       - "**"
