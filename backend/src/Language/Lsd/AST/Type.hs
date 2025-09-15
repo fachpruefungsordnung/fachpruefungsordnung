@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -30,8 +31,11 @@ import Control.Monad.CollectionState
     , collect
     , execCollectionState
     )
+import Data.Aeson (FromJSON (parseJSON), ToJSON (toJSON))
 import Data.Map (Map)
+import Data.OpenApi (ToSchema (declareNamedSchema))
 import Data.Proxy (Proxy (Proxy))
+import GHC.Generics (Generic)
 import Language.Lsd.AST.Common
     ( DisplayTypeName
     , FullTypeName
@@ -54,7 +58,13 @@ data ProperTypeMeta
     = ProperTypeMeta
         DisplayTypeName
         (TreeSyntax FullTypeName)
-    deriving (Show)
+    deriving (Show, Generic)
+
+instance ToJSON ProperTypeMeta
+
+instance FromJSON ProperTypeMeta
+
+instance ToSchema ProperTypeMeta
 
 -- | Syntax of an input tree ('Language.Ltml.Tree.FlaggedInputTree').
 --   This information is duplicated in the input tree parser (and, arguably,
@@ -64,17 +74,38 @@ data TreeSyntax a
     | TreeSyntax
         HasEditableHeader
         (ChildrenOrder a)
-    deriving (Show)
+    deriving (Show, Generic)
+
+instance (ToJSON a) => ToJSON (TreeSyntax a)
+
+instance (FromJSON a) => FromJSON (TreeSyntax a)
+
+instance (ToSchema a) => ToSchema (TreeSyntax a)
 
 newtype HasEditableHeader = HasEditableHeader Bool
     deriving (Show)
+
+instance ToJSON HasEditableHeader where
+    toJSON (HasEditableHeader hasEditableHeader) = toJSON hasEditableHeader
+
+instance FromJSON HasEditableHeader where
+    parseJSON = fmap HasEditableHeader . parseJSON
+
+instance ToSchema HasEditableHeader where
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Bool)
 
 -- | Information on permitted proper (see 'ProperNodeKind') children of proper
 --   nodes and their order.
 data ChildrenOrder a
     = SequenceOrder [Disjunction a]
     | StarOrder (Disjunction a)
-    deriving (Show)
+    deriving (Show, Generic)
+
+instance (ToJSON a) => ToJSON (ChildrenOrder a)
+
+instance (FromJSON a) => FromJSON (ChildrenOrder a)
+
+instance (ToSchema a) => ToSchema (ChildrenOrder a)
 
 -- | A node in the LTML tree is proper iff it corresponds to a node in the
 --   input tree ('Language.Ltml.Tree.InputTree').
