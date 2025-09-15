@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+
+{-# HLINT ignore "Functor law" #-}
 module Language.Ltml.Tree.Parser.DocumentContainer
     ( documentContainerTP
     )
