@@ -35,10 +35,10 @@ dirtyVersionModal
   cancelAction
   confirmAction
   elementID
-  versionID 
+  versionID
   doNothingAction =
   addModal (translate (label :: _ "editor_confirmSwitch") translator)
-    cancelAction 
+    cancelAction
     doNothingAction $
     [ HH.div
         [ HP.classes [ HB.modalBody ] ]
