@@ -67,7 +67,7 @@ treeToMeta input =
                 Right $
                     TreeWithMetaData
                         { MetaTree.root = tree
-                        , MetaTree.metaMap = show metaMap
+                        , MetaTree.metaMap = metaMap
                         }
             Right (Nothing, _) -> Left $ LTML.MetaBug "Wurzel ist nich da :/"
 

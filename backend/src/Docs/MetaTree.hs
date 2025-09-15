@@ -14,9 +14,12 @@ import Data.Text (Text)
 import GHC.Generics (Generic)
 
 import Data.Aeson (FromJSON, ToJSON)
+import Data.Map (Map)
 import Data.OpenApi (ToSchema)
 import Docs.Tree (NodeHeader)
 import Docs.TreeRevision (TreeRevisionHeader)
+import qualified Language.Lsd.AST.Common as LSD
+import qualified Language.Lsd.AST.Type as LSD
 import qualified Language.Ltml.HTML.Common as HTML
 
 data TreeRevisionWithMetaData a
@@ -38,7 +41,7 @@ instance Functor TreeRevisionWithMetaData where
 data TreeWithMetaData a
     = TreeWithMetaData
     { root :: Meta a
-    , metaMap :: String -- TODO!
+    , metaMap :: Map LSD.FullTypeName LSD.ProperTypeMeta
     }
     deriving (Generic)
 
