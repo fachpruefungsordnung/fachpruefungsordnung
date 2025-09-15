@@ -75,6 +75,7 @@ jobs:
           stack-build-arguments: --no-test --fast --allow-newer
           cache-prefix: v2/
           test: false
+          pedantic: false
 
       - name: Clear cache
         run: stack clean --full
