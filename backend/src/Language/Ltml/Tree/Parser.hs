@@ -91,9 +91,9 @@ flaggedTreePF' f kind = traverseF aux
   where
     aux (TypedTree kindName typeName tree) =
         if kindName /= kindNameOf kind
-            then fail "Invalid kind"
+            then fail $ "Invalid kind " ++ show kindName
             else case f typeName of
-                Nothing -> fail "Invalid type"
+                Nothing -> fail $ "Invalid type " ++ show typeName
                 Just f' -> f' tree
 
 flaggedTreePF
