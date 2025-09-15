@@ -15,17 +15,21 @@ import Simple.I18n.Translator (Translator, label, translate)
 -- |
 -- | Requires:
 -- |  1. a translator for the UI texts
--- |  4. an action to close the modal
+-- |  2. an action to close the modal
+-- |  3. a no-op action as a default do-nothing action
 infoModal
   :: forall w action
    . Translator Labels
   -> action
+  -> action
   -> HH.HTML w action
 infoModal
   translator
-  cancelAction =
+  cancelAction
+  doNothingAction =
   addModal (translate (label :: _ "common_mergingInfo") translator)
-    (const cancelAction) $
+    cancelAction
+    doNothingAction $
     [ HH.div
         [ HP.classes [ HB.modalBody ], HP.style "white-space: pre-line;" ]
         [ HH.text $

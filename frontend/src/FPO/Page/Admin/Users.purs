@@ -1,8 +1,4 @@
 -- | Admin user overview and management page.
--- |
--- | TODO:
--- | - Implement the `goToProfilePage` funcionality
--- |   (for users other than the one logged in).
 
 module FPO.Page.Admin.Users (component) where
 
@@ -37,6 +33,7 @@ import FPO.Dto.UserOverviewDto as UOD
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addButton, addCard, addColumn)
+import FPO.Util as Util
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
@@ -61,6 +58,7 @@ type Slots =
 data Action
   = Initialize
   | Receive (Connected FPOTranslator Unit)
+  | DoNothing
   | ChangeCreateUsername String
   | ChangeCreateEmail String
   | ChangeCreatePassword String
@@ -105,6 +103,9 @@ component =
     , userID: Nothing
     }
 
+  modalDeleteRef :: H.RefLabel
+  modalDeleteRef = H.RefLabel "modal-delete-user"
+
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
@@ -127,17 +128,22 @@ component =
       H.tell _userlist unit UserList.ReloadUsersQ
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
+    DoNothing -> do
+      pure unit
     ChangeCreateUsername username -> do
       state <- H.get
       H.modify_ _ { createUserDto = withName username state.createUserDto }
     ChangeCreateEmail email -> do
       state <- H.get
+
       H.modify_ _ { createUserDto = withEmail email state.createUserDto }
     ChangeCreatePassword password -> do
       state <- H.get
       H.modify_ _ { createUserDto = withPassword password state.createUserDto }
-    RequestDeleteUser userOverviewDto -> H.modify_ _
-      { requestDeleteUser = Just userOverviewDto }
+    RequestDeleteUser userOverviewDto -> do
+      H.modify_ _ { requestDeleteUser = Just userOverviewDto }
+
+      Util.focusRef modalDeleteRef
     PerformDeleteUser userId -> do
       response <- deleteIgnore ("/users/" <> userId)
       case response of
@@ -191,7 +197,7 @@ component =
           H.tell _userlist unit UserList.ReloadUsersQ
     HandleUserList (UserList.ButtonPressed userOverviewDto effect) -> do
       case effect of
-        EffectDeleteUser -> H.modify_ _ { requestDeleteUser = Just userOverviewDto }
+        EffectDeleteUser -> handleAction $ RequestDeleteUser userOverviewDto
         EffectGoToProfilePage -> do
           handleAction $ GetUser $ UOD.getID userOverviewDto
 
@@ -279,17 +285,19 @@ component =
           ]
       ]
 
-renderDeleteModal :: forall m. State -> HH.HTML m Action
-renderDeleteModal state =
-  case state.requestDeleteUser of
-    Nothing -> HH.div [ HP.classes [ HB.dNone ] ] []
-    Just userOverviewDto -> deleteConfirmationModal
-      state.translator
-      userOverviewDto
-      UOD.getName
-      CloseDeleteModal
-      (PerformDeleteUser <<< UOD.getID)
-      (translate (label :: _ "admin_users_theUser") state.translator)
+  renderDeleteModal :: ∀ m'. State -> HH.HTML m' Action
+  renderDeleteModal state =
+    case state.requestDeleteUser of
+      Nothing -> HH.div [ HP.classes [ HB.dNone ] ] []
+      Just userOverviewDto -> deleteConfirmationModal
+        state.translator
+        userOverviewDto
+        UOD.getName
+        CloseDeleteModal
+        (PerformDeleteUser <<< UOD.getID)
+        DoNothing
+        (Just modalDeleteRef)
+        (translate (label :: _ "admin_users_theUser") state.translator)
 
 isCreateUserFormValid :: CreateUserDto -> Boolean
 isCreateUserFormValid createUserDto =

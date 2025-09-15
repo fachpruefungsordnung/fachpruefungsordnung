@@ -15,3 +15,11 @@
 tr.no-hover {
     pointer-events: none;
 }
+
+/* Force-highlight the deletion button, if in focus. This
+   is needed because bootstrap doesnt respond to the
+   `HTMLElement.focus` event */
+.btn.btn-danger:focus {
+  box-shadow: var(--bs-btn-focus-box-shadow);
+  background-color: var(--bs-btn-active-bg);
+}

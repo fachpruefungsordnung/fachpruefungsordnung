@@ -3,21 +3,20 @@
 module Docs.FullDocument (FullDocument (..)) where
 
 import Docs.Document (Document)
-import Docs.TextRevision (TextElementRevision)
 import Docs.TreeRevision (TreeRevision)
 
 import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
 import GHC.Generics (Generic)
 
-data FullDocument = FullDocument
+data FullDocument a = FullDocument
     { header :: Document
-    , body :: Maybe (TreeRevision TextElementRevision)
+    , body :: Maybe (TreeRevision a)
     }
     deriving (Generic)
 
-instance ToJSON FullDocument
+instance (ToJSON a) => ToJSON (FullDocument a)
 
-instance FromJSON FullDocument
+instance (FromJSON a) => FromJSON (FullDocument a)
 
-instance ToSchema FullDocument
+instance (ToSchema a) => ToSchema (FullDocument a)

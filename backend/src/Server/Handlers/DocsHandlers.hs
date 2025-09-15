@@ -66,6 +66,7 @@ import Docs.TextRevision
     ( ConflictStatus
     , DraftRevision
     , NewTextRevision (..)
+    , Rendered
     , TextElementRevision
     , TextRevisionHistory
     , TextRevisionRef (..)
@@ -89,6 +90,7 @@ import Docs.Comment
     , prettyPrintCommentRef
     )
 import Docs.FullDocument (FullDocument)
+import Docs.MetaTree (TreeRevisionWithMetaData)
 import Docs.Revision
     ( RevisionRef (RevisionRef)
     , RevisionSelector
@@ -146,7 +148,7 @@ type PostDocument =
         :> Description "Create a new document with default content"
         :> Auth AuthMethod Auth.Token
         :> ReqBody '[JSON] CreateDocument
-        :> Post '[JSON] FullDocument
+        :> Post '[JSON] (FullDocument (Rendered TextElementRevision))
 
 type GetDocument =
     Summary "Get metadata for a document"
@@ -179,7 +181,7 @@ type PostTextRevision =
         :> "rev"
         :> QueryParam "isAutoSave" Bool
         :> ReqBody '[JSON] CreateTextRevision
-        :> Post '[JSON] ConflictStatus
+        :> Post '[JSON] (Rendered ConflictStatus)
 
 type GetTextElementRevision =
     Auth AuthMethod Auth.Token
@@ -188,21 +190,21 @@ type GetTextElementRevision =
         :> Capture "textElementID" TextElementID
         :> "rev"
         :> Capture "textRevision" TextRevisionSelector
-        :> Get '[JSON] (Maybe TextElementRevision)
+        :> Get '[JSON] (Maybe (Rendered TextElementRevision))
 
 type PostTreeRevision =
     Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> "tree"
         :> ReqBody '[JSON] (Node TextElementID)
-        :> Post '[JSON] (TreeRevision TextElementID)
+        :> Post '[JSON] (TreeRevisionWithMetaData TextElementID)
 
 type GetTreeRevision =
     Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> "tree"
         :> Capture "treeRevision" TreeRevisionSelector
-        :> Get '[JSON] (Maybe (TreeRevision TextElement))
+        :> Get '[JSON] (Maybe (TreeRevisionWithMetaData TextElement))
 
 type GetTreeRevisionFull =
     Auth AuthMethod Auth.Token
@@ -210,7 +212,7 @@ type GetTreeRevisionFull =
         :> "tree"
         :> Capture "treeRevision" TreeRevisionSelector
         :> "full"
-        :> Get '[JSON] (Maybe (TreeRevision TextElementRevision))
+        :> Get '[JSON] (Maybe (TreeRevisionWithMetaData TextElementRevision))
 
 type GetTextHistory =
     Auth AuthMethod Auth.Token
@@ -285,7 +287,7 @@ type GetDocumentRevision =
         :> Capture "documentID" DocumentID
         :> "rev"
         :> Capture "revision" RevisionSelector
-        :> Get '[JSON] FullDocument
+        :> Get '[JSON] (FullDocument TextElementRevision)
 
 type GetDocumentRevisionTree =
     Auth AuthMethod Auth.Token
@@ -325,7 +327,7 @@ type PublishDraftTextRevision =
         :> Capture "textElementID" TextElementID
         :> "draft"
         :> "publish"
-        :> Post '[JSON] ConflictStatus
+        :> Post '[JSON] (Rendered ConflictStatus)
 
 type DiscardDraftTextRevision =
     Summary "Discard draft text revision"
@@ -367,7 +369,7 @@ docsServer =
 postDocumentHandler
     :: AuthResult Auth.Token
     -> CreateDocument
-    -> Handler FullDocument
+    -> Handler (FullDocument (Rendered TextElementRevision))
 postDocumentHandler auth doc = do
     userID <- getUser auth
     withDB $
@@ -417,6 +419,7 @@ postTextElementHandler auth docID element = do
                 userID
                 docID
                 (CreateTextElement.kind element)
+                (CreateTextElement.type_ element)
 
 postTextRevisionHandler
     :: AuthResult Auth.Token
@@ -424,7 +427,7 @@ postTextRevisionHandler
     -> TextElementID
     -> Maybe Bool
     -> CreateTextRevision
-    -> Handler ConflictStatus
+    -> Handler (Rendered ConflictStatus)
 postTextRevisionHandler auth docID textID mIsAutoSave revision = do
     let isAutoSave = fromMaybe False mIsAutoSave -- Default to False if not provided
     userID <- getUser auth
@@ -443,7 +446,7 @@ getTextElementRevisionHandler
     -> DocumentID
     -> TextElementID
     -> TextRevisionSelector
-    -> Handler (Maybe TextElementRevision)
+    -> Handler (Maybe (Rendered TextElementRevision))
 getTextElementRevisionHandler auth docID textID revision = do
     userID <- getUser auth
     withDB $
@@ -455,7 +458,7 @@ postTreeRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> Node TextElementID
-    -> Handler (TreeRevision TextElementID)
+    -> Handler (TreeRevisionWithMetaData TextElementID)
 postTreeRevisionHandler auth docID node = do
     userID <- getUser auth
     withDB $ runTransaction $ Docs.createTreeRevision userID docID node
@@ -464,19 +467,19 @@ getTreeRevisionFullHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TreeRevisionSelector
-    -> Handler (Maybe (TreeRevision TextElementRevision))
+    -> Handler (Maybe (TreeRevisionWithMetaData TextElementRevision))
 getTreeRevisionFullHandler auth docID revision = do
     userID <- getUser auth
     withDB $
         run $
-            Docs.getTreeWithLatestTexts userID $
+            Docs.getFullTreeRevision userID $
                 TreeRevisionRef docID revision
 
 getTreeRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TreeRevisionSelector
-    -> Handler (Maybe (TreeRevision TextElement))
+    -> Handler (Maybe (TreeRevisionWithMetaData TextElement))
 getTreeRevisionHandler auth docID revision = do
     userID <- getUser auth
     withDB $ run $ Docs.getTreeRevision userID $ TreeRevisionRef docID revision
@@ -583,7 +586,7 @@ getDocumentRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> RevisionSelector
-    -> Handler FullDocument
+    -> Handler (FullDocument TextElementRevision)
 getDocumentRevisionHandler auth docID rev = do
     userID <- getUser auth
     withDB $ run $ Docs.getDocumentRevision userID (RevisionRef docID rev)
@@ -748,7 +751,7 @@ publishDraftTextRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TextElementID
-    -> Handler ConflictStatus
+    -> Handler (Rendered ConflictStatus)
 publishDraftTextRevisionHandler auth docID textID = do
     userID <- getUser auth
     withDB $

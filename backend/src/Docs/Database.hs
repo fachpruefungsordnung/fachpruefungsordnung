@@ -45,6 +45,7 @@ import Docs.TextElement
     , TextElementID
     , TextElementKind
     , TextElementRef
+    , TextElementType
     )
 import Docs.TextRevision
     ( DraftRevision
@@ -145,7 +146,11 @@ class (HasIsGroupAdmin m) => HasCreateDocument m where
     createDocument :: Text -> GroupID -> UserID -> m Document
 
 class (HasCheckPermission m, HasExistsDocument m) => HasCreateTextElement m where
-    createTextElement :: DocumentID -> TextElementKind -> m TextElement
+    createTextElement
+        :: DocumentID
+        -> TextElementKind
+        -> TextElementType
+        -> m TextElement
 
 class
     (HasCheckPermission m, HasExistsTextElement m, HasNow m) =>

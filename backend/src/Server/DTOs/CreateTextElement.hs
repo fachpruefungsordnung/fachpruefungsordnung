@@ -8,10 +8,11 @@ import Data.Aeson (FromJSON, ToJSON)
 
 import Data.OpenApi (ToSchema)
 
-import Docs.TextElement (TextElementKind)
+import Docs.TextElement (TextElementKind, TextElementType)
 
-newtype CreateTextElement = CreateTextElement
+data CreateTextElement = CreateTextElement
     { kind :: TextElementKind
+    , type_ :: TextElementType
     }
     deriving (Generic)
 

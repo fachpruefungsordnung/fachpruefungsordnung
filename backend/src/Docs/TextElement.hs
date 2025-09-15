@@ -4,6 +4,7 @@ module Docs.TextElement
     ( TextElementID (..)
     , TextElement (..)
     , TextElementKind
+    , TextElementType
     , TextElementRef (..)
     , prettyPrintTextElementRef
     ) where
@@ -78,10 +79,13 @@ instance ToSchema TextElementRef
 
 type TextElementKind = Text
 
+type TextElementType = Text
+
 -- | Contains metadata about a text element.
 data TextElement = TextElement
     { identifier :: TextElementID
-    , kind :: TextElementKind
+    , textElementKind :: TextElementKind
+    , textElementType :: TextElementType
     }
     deriving (Generic)
 
