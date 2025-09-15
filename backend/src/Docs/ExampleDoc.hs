@@ -55,7 +55,7 @@ mainDocTree =
 
     mainBodyTree =
         Flagged False $
-            TypedTree "document-mainbody" "inner" $
+            TypedTree "document-mainbody" "fpo-mainbody-simple" $
                 Tree
                     Nothing
                     [ Flagged True sectionOne
