@@ -36,14 +36,15 @@ import FPO.Dto.GroupDto
 import FPO.Dto.UserDto (isAdmin)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addButton, addCard, addColumn, addError, addModal, emptyEntryGen)
+import FPO.UI.HTML (addButton, addCard, addColumn, addModal, emptyEntryGen)
 import FPO.UI.Style as Style
+import FPO.Util as Util
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
@@ -57,6 +58,7 @@ type Slots =
 data Action
   = Initialize
   | Receive (Connected FPOTranslator Unit)
+  | DoNothing
   | SetPage P.Output
   | ChangeFilterGroupName String
   | ChangeCreateGroupName String
@@ -81,8 +83,7 @@ data Action
   | NavigateToGroupDocuments GroupID
 
 type State = FPOState
-  ( error :: Maybe String
-  , page :: Int
+  ( page :: Int
   , groups :: LoadState (Array GroupOverview)
   , filteredGroups :: Array GroupOverview
   , groupNameCreate :: String
@@ -124,11 +125,19 @@ component =
     , groupNameFilter: ""
     , groupDescriptionCreate: ""
     , filteredGroups: []
-    , error: Nothing
     , requestDelete: Nothing
     , requestCreate: Nothing
     , waiting: false
     }
+
+  -- Reference to the delete button in the delete group modal.
+  modalDeleteRef :: H.RefLabel
+  modalDeleteRef = H.RefLabel "modal-delete-group"
+
+  -- Reference to the group name input field in the create group modal.
+  -- Used to focus the input field when the modal is opened.
+  groupCreateRef :: H.RefLabel
+  groupCreateRef = H.RefLabel "modal-group-create-name"
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
@@ -140,6 +149,8 @@ component =
               [ deleteConfirmationModal state.translator groupName (const groupName)
                   CancelDeleteGroup
                   ConfirmDeleteGroup
+                  DoNothing
+                  (Just modalDeleteRef)
                   (translate (label :: _ "common_theGroup") state.translator)
               ]
             Nothing -> case state.requestCreate of
@@ -147,7 +158,6 @@ component =
               Nothing -> []
         ) <>
           [ renderGroupManagement state
-          , addError state.error
           ]
 
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
@@ -168,10 +178,12 @@ component =
           pure unit
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
+    DoNothing -> do
+      pure unit
     SetPage (P.Clicked p) -> do
       H.modify_ _ { page = p }
     ChangeFilterGroupName group -> do
-      H.modify_ _ { groupNameFilter = group, error = Nothing }
+      H.modify_ _ { groupNameFilter = group }
       handleAction Filter
     Filter -> do
       s <- H.get
@@ -183,24 +195,24 @@ component =
               gs
           H.modify_ _ { filteredGroups = filteredGroups }
         Loading -> do
-          H.modify_ _
-            { error = Just $
-                (translate (label :: _ "admin_groups_stillLoading") s.translator)
-            }
+          updateStore $ Store.AddWarning
+            (translate (label :: _ "admin_groups_stillLoading") s.translator)
     ChangeCreateGroupName group -> do
-      H.modify_ _ { groupNameCreate = group, error = Nothing }
+      H.modify_ _ { groupNameCreate = group }
     ChangeCreateGroupDescription desc -> do
-      H.modify_ _ { groupDescriptionCreate = desc, error = Nothing }
+      H.modify_ _ { groupDescriptionCreate = desc }
     RequestCreateGroup groupName -> do
-      H.modify_ _ { requestCreate = Just groupName, error = Nothing }
+      H.modify_ _ { requestCreate = Just groupName }
+
+      Util.focusRef groupCreateRef
     ConfirmCreateGroup -> do
       -- Close modal
       H.modify_ _ { requestCreate = Nothing }
 
       newGroupName <- H.gets _.groupNameCreate
       s <- H.get
-      if newGroupName == "" then H.modify_ _
-        { error = Just (translate (label :: _ "admin_groups_notEmpty") s.translator) }
+      if newGroupName == "" then updateStore $ Store.AddWarning
+        (translate (label :: _ "admin_groups_notEmpty") s.translator)
       else do
         case s.groups of
           Loaded gs -> do
@@ -211,17 +223,10 @@ component =
               }
 
             case response of
-              Left err -> do
-                H.modify_ _
-                  { error = Just $
-                      ( translate (label :: _ "admin_groups_errCreatingGroup")
-                          s.translator
-                      ) <> show err
-                  }
+              Left _ -> pure unit
               Right newID ->
                 H.modify_ _
-                  { error = Nothing
-                  , groups = Loaded $
+                  { groups = Loaded $
                       GroupOverview
                         { groupOverviewName: newGroupName
                         , groupOverviewID: newID
@@ -231,25 +236,23 @@ component =
                   }
             handleAction Filter
           Loading -> do
-            H.modify_ _
-              { error = Just
-                  (translate (label :: _ "admin_groups_stillLoading") s.translator)
-              }
+            updateStore $ Store.AddWarning
+              (translate (label :: _ "admin_groups_stillLoading") s.translator)
 
       setWaiting false
     CancelCreateGroup -> do
       H.modify_ _
-        { error = Nothing
-        , groupDescriptionCreate = ""
+        { groupDescriptionCreate = ""
         , waiting = false
         , requestCreate = Nothing
         }
     RequestDeleteGroup groupName -> do
       H.modify_ _ { requestDelete = Just groupName }
+
+      Util.focusRef modalDeleteRef
     CancelDeleteGroup -> do
       H.modify_ _
-        { error = Nothing
-        , requestDelete = Nothing
+        { requestDelete = Nothing
         }
     ConfirmDeleteGroup groupName -> do
       -- Close modal
@@ -265,36 +268,23 @@ component =
 
           case groupId of
             Nothing -> do
-              H.modify_ _
-                { error = Just $ translate (label :: _ "admin_groups_errNotFound")
-                    s.translator
-                }
+              updateStore $ Store.AddWarning
+                (translate (label :: _ "admin_groups_errNotFound") s.translator)
             Just gId -> do
               setWaiting true
               res <- deleteIgnore $ "/groups/" <> show gId
               case res of
-                Left err -> do
-                  H.modify_ _
-                    { error = Just $
-                        ( translate (label :: _ "admin_groups_errDeletingGroup")
-                            s.translator
-                        )
-                          <> (show err)
-                    }
+                Left _ -> pure unit
                 Right _ -> do
                   H.modify_ _
-                    { error = Nothing
-                    , groups = Loaded $ filter
+                    { groups = Loaded $ filter
                         (\g -> getGroupOverviewName g /= groupName)
                         gs
                     }
               setWaiting false
           handleAction Filter
-        Loading -> do
-          H.modify_ _
-            { error = Just
-                (translate (label :: _ "admin_groups_stillLoading") s.translator)
-            }
+        Loading -> updateStore $ Store.AddWarning
+          (translate (label :: _ "admin_groups_stillLoading") s.translator)
     NavigateToGroupDocuments gID -> do
       navigate $ ViewGroupDocuments { groupID: gID }
 
@@ -422,7 +412,8 @@ component =
   createGroupModal :: forall w. State -> String -> HH.HTML w Action
   createGroupModal state groupName =
     addModal (translate (label :: _ "admin_groups_createGroup") state.translator)
-      (const CancelCreateGroup) $
+      CancelCreateGroup
+      DoNothing $
       [ HH.div
           [ HP.classes [ HB.modalBody ] ]
           [ HH.div
@@ -443,6 +434,7 @@ component =
                       state.translator
                   , HP.value groupName
                   , HP.required true
+                  , HP.ref groupCreateRef
                   , HE.onValueInput ChangeCreateGroupName
                   ]
               ]

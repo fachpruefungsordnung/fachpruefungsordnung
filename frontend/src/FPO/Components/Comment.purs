@@ -45,6 +45,7 @@ data Output
 data Action
   = Init
   | Receive (Connected FPOTranslator Input)
+  | DoNothing
   | UpdateDraft String
   | SendComment
   | ResolveComment
@@ -321,7 +322,8 @@ commentview = connect selectTranslator $ H.mkComponent
         in
           [ addModal
               titel
-              (const CancelModal)
+              CancelModal
+              DoNothing
               [ HH.div
                   [ HP.classes [ HB.modalBody ] ]
                   [ HH.text phrase ]
@@ -358,6 +360,9 @@ commentview = connect selectTranslator $ H.mkComponent
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
+
+    DoNothing -> do
+      pure unit
 
     UpdateDraft draft -> do
       H.modify_ \state ->

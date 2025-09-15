@@ -7,6 +7,7 @@ module Language.Ltml.ToLaTeX.Format
     , emptyIdentifierFormat
     , emptyAppendixFormat
     , emptyHeadingFormat
+    , emptySectionFormat
     , formatHeading
     , formatKey
     , staticDocumentFormat
@@ -42,6 +43,7 @@ import Language.Lsd.AST.Type.DocumentContainer
     ( HeaderFooterFormatAtom (..)
     , HeaderFooterItemFormat (HeaderFooterItemFormat)
     )
+import Language.Lsd.AST.Type.Section (SectionFormat (SectionFormat))
 import Language.Ltml.ToLaTeX.PreLaTeXType
     ( PreLaTeX (IRaw, ISequence, IText)
     , bold
@@ -103,6 +105,9 @@ emptyAppendixFormat :: AppendixElementFormat
 emptyAppendixFormat =
     AppendixElementFormat emptyIdentifierFormat emptyTocKeyFormat emptyHeadingFormat
 
+emptySectionFormat :: SectionFormat
+emptySectionFormat = SectionFormat emptyIdentifierFormat emptyTocKeyFormat
+
 formatHeading
     :: FormatString (HeadingPlaceholderAtom b) -> PreLaTeX -> PreLaTeX -> PreLaTeX
 formatHeading (FormatString []) _ _ = mempty
@@ -137,11 +142,7 @@ staticDocumentFormat =
             , "marginparwidth=1.75cm"
             ]
             "geometry"
-        , usepackage
-            [ "colorlinks=true"
-            , "allcolors=red"
-            ]
-            "hyperref"
+        , usepackage [] "hyperref"
         , usepackage [] "enumitem"
         , usepackage [] "tabularx"
         , usepackage ["T1"] "fontenc"

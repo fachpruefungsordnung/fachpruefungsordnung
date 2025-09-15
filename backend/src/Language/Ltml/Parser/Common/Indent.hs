@@ -8,10 +8,8 @@
 --   after any whitespace.)
 module Language.Ltml.Parser.Common.Indent
     ( nli
-    , nextIndentLevel
-    , nonIndented
     , someIndented
-    , checkIndent
+    , checkIndentGT
     )
 where
 
@@ -23,7 +21,6 @@ import Language.Ltml.Parser (MonadParser)
 import Language.Ltml.Parser.Common.Lexeme (lineCommentP)
 import Text.Megaparsec
     ( Pos
-    , mkPos
     , sepBy1
     , takeWhileP
     )
@@ -32,10 +29,6 @@ import qualified Text.Megaparsec.Char.Lexer as L
     ( incorrectIndent
     , indentLevel
     )
-import Text.Megaparsec.Pos (pos1)
-
-nextIndentLevel :: Pos -> Pos
-nextIndentLevel = (<> mkPos 2)
 
 -- | Parse a newline character, any number of comment lines, and any
 --   subsequent indentation (ASCII spaces).
@@ -53,18 +46,20 @@ indentationP = void $ sepBy1 indP (lineCommentP >> char '\n')
   where
     indP = takeWhileP (Just "indentation") (== ' ')
 
--- | Given a parser, adapt it to parse non-indented data (only).
-nonIndented :: (MonadParser m) => m a -> m a
-nonIndented p = checkIndent pos1 *> p
+-- | Parse some (>= 1) items, all indented further than the provided reference
+--   indentation level, but not necessarily the same amount.
+--   For the first item, the indentation is not checked, and should thus be
+--   checked by the caller.
+--
+--   The argument parser must not accept the empty input and must only succeed
+--   after a final newline plus any trailing indentation.
+someIndented :: (MonadParser m) => Maybe Pos -> m a -> m [a]
+someIndented lvl p = p `sepBy1` checkIndentGT lvl
 
--- | Parse some (>= 1) indented items, all with the same indentation level.
---   The argument parser is expected to consume any trailing indentation.
-someIndented :: (MonadParser m) => m a -> m [a]
-someIndented p = L.indentLevel >>= (\lvl -> p `sepBy1` checkIndent lvl)
-
--- | Check whether the current actual indentation matches the current required
---   indentation level.
-checkIndent :: (MonadParser m) => Pos -> m ()
-checkIndent lvl = do
+-- | Check whether the current actual indentation is greater than the supplied
+--   reference indentation level.
+checkIndentGT :: (MonadParser m) => Maybe Pos -> m ()
+checkIndentGT Nothing = return ()
+checkIndentGT (Just lvl) = do
     pos <- L.indentLevel
-    guard (pos == lvl) <|> L.incorrectIndent EQ lvl pos
+    guard (pos > lvl) <|> L.incorrectIndent GT lvl pos

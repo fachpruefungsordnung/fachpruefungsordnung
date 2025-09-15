@@ -16,18 +16,22 @@ import Simple.I18n.Translator (Translator, label, translate)
 -- |  1. a translator for the UI texts
 -- |  2. an action to cancel discarding
 -- |  3. an action to proceed discarding
+-- |  4. a no-op action as a default do-nothing action
 discardModal
   :: forall w action
    . Translator Labels
+  -> action
   -> action
   -> action
   -> HH.HTML w action
 discardModal
   translator
   cancelAction
-  confirmAction =
+  confirmAction
+  doNothingAction =
   addModal (translate (label :: _ "common_confirmDiscard") translator)
-    (const cancelAction) $
+    cancelAction
+    doNothingAction $
     [ HH.div
         [ HP.classes [ HB.modalBody ] ]
         [ HH.text $ translate (label :: _ "common_discardPhrase") translator

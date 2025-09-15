@@ -2,6 +2,9 @@ module Language.Ltml.AST.Document
     ( Document (..)
     , DocumentHeading (..)
     , DocumentBody (..)
+    , DocumentMainBody
+    , DocumentIntro
+    , DocumentExtro
     )
 where
 
@@ -12,12 +15,12 @@ import Language.Ltml.AST.Label (Label)
 import Language.Ltml.AST.Section (SectionBody)
 import Language.Ltml.AST.SimpleSection (SimpleSection)
 import Language.Ltml.AST.Text (HeadingTextTree)
-import Language.Ltml.Common (Flagged')
+import Language.Ltml.Common (Flagged', NavTocHeaded, Parsed)
 
 data Document
     = Document
         DocumentFormat
-        DocumentHeading
+        (Parsed DocumentHeading)
         DocumentBody
         (Map Label Footnote)
     deriving (Show)
@@ -31,12 +34,14 @@ newtype DocumentHeading = DocumentHeading [HeadingTextTree]
     deriving (Show)
 
 data DocumentBody
-    = -- | document body
-      DocumentBody
-        (Flagged' [SimpleSection])
-        -- ^ intro
-        (Flagged' SectionBody)
-        -- ^ main
-        (Flagged' [SimpleSection])
-        -- ^ outro
+    = DocumentBody
+        (Maybe (Flagged' (NavTocHeaded (Parsed DocumentIntro))))
+        (Flagged' (NavTocHeaded (Parsed DocumentMainBody)))
+        (Maybe (Flagged' (NavTocHeaded (Parsed DocumentExtro))))
     deriving (Show)
+
+type DocumentMainBody = SectionBody
+
+type DocumentIntro = [SimpleSection]
+
+type DocumentExtro = [SimpleSection]

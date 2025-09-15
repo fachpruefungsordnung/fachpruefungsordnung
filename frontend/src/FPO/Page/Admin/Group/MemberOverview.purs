@@ -23,12 +23,7 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request
-  ( changeRole
-  , deleteIgnore
-  , getGroup
-  , getUser
-  )
+import FPO.Data.Request (changeRole, deleteIgnore, getGroup, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.GroupDto
@@ -48,6 +43,7 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn)
 import FPO.UI.Style as Style
+import FPO.Util as Util
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -72,6 +68,7 @@ type Input = GroupID
 data Action
   = Initialize
   | Receive (Connected FPOTranslator Input)
+  | DoNothing
   | SetPage P.Output
   | FilterForMember String
   | ChangeSorting TH.Output
@@ -90,8 +87,7 @@ data ModalState
   | RemoveMemberModal UserID
 
 type State = FPOState
-  ( error :: Maybe String
-  , page :: Int
+  ( page :: Int
   , groupID :: GroupID
   , group :: Maybe GroupDto
   , filteredMembers :: Array GroupMemberDto
@@ -124,11 +120,13 @@ component =
     , groupID: input
     , filteredMembers: []
     , modalState: NoModal
-    , error: Nothing
     , group: Nothing
     , isAdmin: false
     , memberNameFilter: ""
     }
+
+  modalRemoveRef :: H.RefLabel
+  modalRemoveRef = H.RefLabel "modal-remove-member"
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
@@ -145,18 +143,13 @@ component =
                       (const $ getUserInfoName member)
                       CancelModal
                       ConfirmRemoveMember
+                      DoNothing
+                      (Just modalRemoveRef)
                       (translate (label :: _ "common_member") state.translator)
                   ]
             _ -> []
         ) <>
           [ renderMemberManagement state
-          , HH.div [ HP.classes [ HB.textCenter ] ]
-              [ case state.error of
-                  Just err -> HH.div
-                    [ HP.classes [ HB.alert, HB.alertDanger, HB.mt5 ] ]
-                    [ HH.text err ]
-                  Nothing -> HH.text ""
-              ]
           ]
 
   renderMemberManagement :: State -> H.ComponentHTML Action Slots m
@@ -384,6 +377,8 @@ component =
       handleAction $ FilterForMember ""
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
+    DoNothing -> do
+      pure unit
     SetPage (P.Clicked p) -> do
       H.modify_ _ { page = p }
     FilterForMember mn -> do
@@ -398,25 +393,24 @@ component =
         { filteredMembers = filteredMembers, page = 0, memberNameFilter = mn }
     RequestRemoveMember memberID -> do
       H.modify_ _ { modalState = RemoveMemberModal memberID }
+
+      Util.focusRef modalRemoveRef
     CancelModal -> do
       H.modify_ \s -> s
-        { error = Nothing
-        , modalState = NoModal
+        { modalState = NoModal
         }
     ConfirmRemoveMember memberID -> do
       s <- H.get
       deleteResponse <- deleteIgnore
         ("/roles/" <> show s.groupID <> "/" <> memberID)
       case deleteResponse of
-        Left err -> do
+        Left _ -> do
           H.modify_ _
-            { error = Just (show err)
-            , modalState = NoModal
+            { modalState = NoModal
             }
         Right _ -> do
           H.modify_ _
-            { error = Nothing
-            , modalState = NoModal
+            { modalState = NoModal
             }
 
       handleAction ReloadGroupMembers
@@ -450,10 +444,9 @@ component =
       let userID = getUserInfoID member
       response <- changeRole s.groupID userID role
       case response of
-        Left err -> do
+        Left _ -> do
           H.modify_ _
-            { error = Just (show err)
-            , modalState = NoModal
+            { modalState = NoModal
             }
         Right _ -> do
           handleAction ReloadGroupMembers

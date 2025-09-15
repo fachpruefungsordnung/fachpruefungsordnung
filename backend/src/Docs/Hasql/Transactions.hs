@@ -2,6 +2,9 @@
 
 module Docs.Hasql.Transactions
     ( now
+    , getTreeRevision
+    , existsTreeRevision
+    , getTree
     , createDocument
     , createTextElement
     , getTextElementRevision
@@ -52,13 +55,18 @@ import Docs.Hash
     , Hashable (..)
     )
 import qualified Docs.Hasql.Statements as Statements
-import Docs.Hasql.TreeEdge (TreeEdge (TreeEdge), TreeEdgeChildRef (..))
+import Docs.Hasql.TreeEdge
+    ( TreeEdge (TreeEdge)
+    , TreeEdgeChild (TreeEdgeToNode, TreeEdgeToTextElement)
+    , TreeEdgeChildRef (..)
+    )
 import qualified Docs.Hasql.TreeEdge as TreeEdge
 import Docs.TextElement
     ( TextElement
     , TextElementID
     , TextElementKind
     , TextElementRef (..)
+    , TextElementType
     )
 import Docs.TextRevision
     ( DraftRevision
@@ -67,7 +75,8 @@ import Docs.TextRevision
     , TextRevisionID
     , TextRevisionRef
     )
-import Docs.Tree (Edge (Edge), Node (Node), Tree (Leaf, Tree))
+import Docs.Tree (Node (Node), NodeHeader, Tree (Leaf, Tree))
+import qualified Docs.Tree as Tree
 import Docs.TreeRevision (TreeRevision, TreeRevisionRef (TreeRevisionRef))
 import qualified Docs.TreeRevision as TreeRevision
 import Logging.Logs (LogMessage, Scope, Severity)
@@ -86,8 +95,12 @@ createDocument :: Text -> GroupID -> UserID -> Transaction Document
 createDocument name group user =
     statement (name, group, user) Statements.createDocument
 
-createTextElement :: DocumentID -> TextElementKind -> Transaction TextElement
-createTextElement = curry (`statement` Statements.createTextElement)
+createTextElement
+    :: DocumentID
+    -> TextElementKind
+    -> TextElementType
+    -> Transaction TextElement
+createTextElement docID kind type_ = statement (docID, kind, type_) Statements.createTextElement
 
 existsTextRevision :: TextRevisionRef -> Transaction Bool
 existsTextRevision = flip statement Statements.existsTextRevision
@@ -157,28 +170,25 @@ createTreeRevision authorID docID rootNode = do
 
 putTree :: Node TextElementID -> Transaction Hash
 putTree (Node metaData children) = do
-    childRefs <- mapM putChild children
+    childRefs <- mapM putSubTree children
     let ownHash =
             Hash $
                 SHA1.finalize $
                     foldr
-                        (flip updateHash . fst)
+                        (flip updateHash)
                         (updateHash SHA1.init metaData)
                         childRefs
     statement (ownHash, metaData) Statements.putTreeNode
-    let toEdge (ref, label) idx =
+    let toEdge ref idx =
             TreeEdge
                 { TreeEdge.parentHash = ownHash
                 , TreeEdge.position = idx
-                , TreeEdge.title = label
                 , TreeEdge.child = ref
                 }
     let edges = zipWith toEdge childRefs [0 ..]
     mapM_ (`statement` Statements.putTreeEdge) edges
     return ownHash
   where
-    putChild :: Edge TextElementID -> Transaction (TreeEdgeChildRef, Text)
-    putChild (Edge label node) = putSubTree node <&> (,label)
     putSubTree :: Tree TextElementID -> Transaction TreeEdgeChildRef
     putSubTree (Leaf id_) = return $ TreeEdgeRefToTextElement id_
     putSubTree (Tree node) = putTree node <&> TreeEdgeRefToNode
@@ -257,3 +267,35 @@ getDraftTextRevision userID (TextElementRef _ textID) = do
 deleteDraftTextRevision :: UserID -> TextElementRef -> Transaction ()
 deleteDraftTextRevision userID (TextElementRef _ textID) =
     statement (textID, userID) Statements.deleteDraftTextRevision
+
+getTreeRevision
+    :: TreeRevisionRef
+    -> Transaction (Maybe (TreeRevision TextElement))
+getTreeRevision ref = do
+    revision <- getRevision
+    case revision of
+        Just (rootHash, treeRevision) -> do
+            root <- getTree rootHash
+            return $ Just $ treeRevision root
+        Nothing -> return Nothing
+  where
+    getRevision = statement ref Statements.getTreeRevision
+
+getTree :: Hash -> Transaction (Node TextElement)
+getTree rootHash = do
+    rootHeader <- statement rootHash Statements.getTreeNode
+    fromHeader rootHash rootHeader
+  where
+    fromHeader :: Hash -> NodeHeader -> Transaction (Node TextElement)
+    fromHeader hash' header = do
+        children <- statement hash' Statements.getTreeEdgesByParent
+        edges <- mapM edgeSelector children
+        return $ Node header $ Vector.toList edges
+    edgeSelector :: TreeEdgeChild -> Transaction (Tree TextElement)
+    edgeSelector edge =
+        case edge of
+            (TreeEdgeToTextElement textElement) -> return $ Tree.Leaf textElement
+            (TreeEdgeToNode hash' header) -> fromHeader hash' header <&> Tree.Tree
+
+existsTreeRevision :: TreeRevisionRef -> Transaction Bool
+existsTreeRevision = flip statement Statements.existsTreeRevision

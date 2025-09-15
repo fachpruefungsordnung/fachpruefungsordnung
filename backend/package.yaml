@@ -64,6 +64,7 @@ dependencies:
   - dlist
   - lucid2
   - clay
+  - zip-archive
   - password
   - jose
   - uuid

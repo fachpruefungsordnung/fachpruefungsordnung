@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-
 module Language.Ltml.Tree.ToMeta
     ( MetaError (..)
     , treeToMeta
@@ -9,22 +6,22 @@ where
 
 import Control.Functor.Utils (traverseF)
 import Control.Monad.ConsumableStack
-    ( ConsumableStackT
+    ( ConsumableStack
+    , ConsumableStackError
+        ( ConsumableStackDepletedEarly
+        , ConsumableStackNotFullyConsumed
+        )
     , pop
-    , runConsumableStackT
+    , runConsumableStack
     )
 import Data.Bifunctor (first)
 import Data.List (find)
-import Data.Map (Map, lookup)
+import Data.Map (Map)
 import Language.Lsd.AST.Common (FullTypeName)
 import Language.Lsd.AST.Type
-    ( NamedType
-    , ProperTypeMeta
+    ( ProperTypeMeta
     , fullTypeNameOf
-    , kindHasTocHeading
-    , properTypeCollect'
     )
-import Language.Lsd.AST.Type.DocumentContainer (DocumentContainerType)
 import Language.Lsd.Example (availableLSDs)
 import Language.Lsd.ToMetaMap (buildMetaMap)
 import Language.Ltml.Common (Flagged (Flagged))
@@ -78,11 +75,10 @@ buildMeta'
     :: [RenderedTocEntry]
     -> FlaggedInputTree ident
     -> Either String (FlaggedMetaTree ident, Map FullTypeName ProperTypeMeta)
-buildMeta' hs tree = do
-    t <- getRootType tree
-    metaTree <- buildMetaTree t hs tree
-    let metaMap = buildMetaMap t
-    return (metaTree, metaMap)
+buildMeta' hs tree =
+    (,)
+        <$> buildMetaTree hs tree
+        <*> (buildMetaMap <$> getRootType tree)
   where
     getRootType (Flagged _ (TypedTree kindName typeName _)) =
         case find ((== fullTypeName) . fullTypeNameOf) availableLSDs of
@@ -91,24 +87,17 @@ buildMeta' hs tree = do
       where
         fullTypeName = (kindName, typeName)
 
-newtype EitherFail a = EitherFail {runEitherFail :: Either String a}
-    deriving (Functor, Applicative, Monad)
-
-instance MonadFail EitherFail where
-    fail = EitherFail . Left
-
-type HeadingStack = ConsumableStackT RenderedTocEntry EitherFail
+type HeadingStack = ConsumableStack RenderedTocEntry
 
 buildMetaTree
-    :: NamedType DocumentContainerType
-    -> [RenderedTocEntry]
+    :: [RenderedTocEntry]
     -> FlaggedInputTree ident
     -> Either String (FlaggedMetaTree ident)
-buildMetaTree t hs tree0 =
-    runEitherFail $ runConsumableStackT (flaggedTreeF tree0) hs
+buildMetaTree hs tree0 =
+    first prettyError $ runConsumableStack (flaggedTreeF tree0) hs
   where
-    hasHeadingMap :: Map FullTypeName Bool
-    hasHeadingMap = properTypeCollect' (kindHasTocHeading . pure) t
+    prettyError ConsumableStackDepletedEarly = "Too few headings"
+    prettyError ConsumableStackNotFullyConsumed = "Too many headings"
 
     flaggedTreeF
         :: FlaggedInputTree ident
@@ -117,16 +106,8 @@ buildMetaTree t hs tree0 =
 
     typedTreeF :: TypedInputTree ident -> HeadingStack (TypedMetaTree ident)
     typedTreeF (TypedTree kindName typeName tree) =
-        case lookup (kindName, typeName) hasHeadingMap of
-            Just b -> TypedTree kindName typeName <$> treeF b tree
-            Nothing -> fail $ "Unknown type: " ++ show (kindName, typeName)
+        TypedTree kindName typeName <$> treeF tree
 
-    treeF :: Bool -> InputTree ident -> HeadingStack (MetaTree ident)
-    treeF hasHeading = aux
-      where
-        aux (Tree _ trees) =
-            Tree <$> headingF hasHeading <*> mapM flaggedTreeF trees
-        aux (Leaf _) = Leaf <$> headingF hasHeading
-
-        headingF True = Just <$> pop
-        headingF False = pure Nothing
+    treeF :: InputTree ident -> HeadingStack (MetaTree ident)
+    treeF (Tree _ trees) = Tree <$> pop <*> mapM flaggedTreeF trees
+    treeF (Leaf _) = Leaf <$> pop

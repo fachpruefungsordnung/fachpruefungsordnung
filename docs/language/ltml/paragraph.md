@@ -79,6 +79,11 @@ Note that adding multiple enumerations to a sentence requires either using
 continuation tokens (see above) or using enumerations of different types in
 direct succession.
 
+Further, enumerations generally don't start sentences, but this can be
+enforced by prepending a sentence labeling (in a separate line).
+In particular, if a paragraph starts with an enumeration, that enumeration
+does normally not belong to any sentence.
+
 
 ## Example
 

@@ -1,3 +1,6 @@
+{-# HLINT ignore "Avoid lambda using `infix`" #-}
+{-# HLINT ignore "Use section" #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -5,12 +8,13 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
-{-# HLINT ignore "Avoid lambda using `infix`" #-}
-
 module Language.Ltml.HTML
     ( ToHtmlM (..)
     , renderSectionHtmlCss
     , renderHtmlCss
+    , renderHtmlCssWith
+    , renderHtmlCssExport
+    , renderHtmlCssBS
     , renderTocList
     ) where
 
@@ -19,12 +23,16 @@ import Control.Monad (join, zipWithM)
 import Control.Monad.Reader
 import Control.Monad.State
 import Data.Bifunctor (bimap)
+import Data.ByteString.Lazy (ByteString)
 import Data.DList (toList)
+import Data.Either (rights)
 import qualified Data.Map as Map
-import Data.Maybe (fromMaybe, isJust)
+import Data.Maybe (isJust)
 import qualified Data.Set as Set
-import Data.Text (Text, unpack)
+import Data.Text (Text, pack, unpack)
 import Data.Void (Void, absurd)
+import Language.Lsd.AST.Common (Fallback (..), NavTocHeading (..))
+import Language.Lsd.AST.Format (HeadingFormat)
 import Language.Lsd.AST.Type.AppendixSection
     ( AppendixElementFormat (..)
     , AppendixSectionFormat (..)
@@ -35,16 +43,23 @@ import Language.Lsd.AST.Type.Document
     , TocFormat (..)
     , TocHeading (..)
     )
-import Language.Lsd.AST.Type.DocumentContainer (DocumentContainerFormat (..))
+import Language.Lsd.AST.Type.DocumentContainer
+    ( DocumentContainerFormat (..)
+    , MainDocumentFormat (..)
+    )
 import Language.Lsd.AST.Type.Enum (EnumFormat (..), EnumItemFormat (..))
 import Language.Lsd.AST.Type.Footnote
     ( FootnoteFormat (SuperscriptFootnoteFormat)
     )
+import Language.Lsd.AST.Type.Section (SectionFormatted (..))
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
 import Language.Lsd.AST.Type.SimpleSection (SimpleSectionFormat (..))
 import Language.Ltml.AST.AppendixSection (AppendixSection (..))
 import Language.Ltml.AST.Document
-import Language.Ltml.AST.DocumentContainer (DocumentContainer (..))
+import Language.Ltml.AST.DocumentContainer
+    ( DocumentContainer (..)
+    , DocumentContainerHeader (..)
+    )
 import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Node (Node (..))
@@ -55,7 +70,7 @@ import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (..))
 import Language.Ltml.AST.SimpleSection (SimpleSection (..))
 import Language.Ltml.AST.Table (Table)
 import Language.Ltml.AST.Text
-import Language.Ltml.Common (Flagged (..), Flagged')
+import Language.Ltml.Common (Flagged (..), Flagged', NavTocHeaded (..), Parsed)
 import Language.Ltml.HTML.CSS (mainStylesheet)
 import Language.Ltml.HTML.CSS.Classes (ToCssClass (toCssClass))
 import qualified Language.Ltml.HTML.CSS.Classes as Class
@@ -65,26 +80,102 @@ import Language.Ltml.HTML.FormatString
 import Language.Ltml.HTML.References
 import Language.Ltml.HTML.Util
 import Lucid
+import Text.Megaparsec (ParseErrorBundle, errorBundlePretty)
 
-renderSectionHtmlCss :: Node Section -> Map.Map Label Footnote -> (Html (), Css)
+renderSectionHtmlCss
+    :: FormattedSection -> Map.Map Label Footnote -> (Html (), Css)
 renderSectionHtmlCss section fnMap =
     -- \| Render with given footnote context
     let readerState = initReaderState {footnoteMap = fnMap}
         (delayedHtml, finalState) = runState (runReaderT (toHtmlM section) readerState) initGlobalState
         -- \| Add footnote labes for "normal" (non-footnote) references
         finalState' = addUsedFootnoteLabels finalState
-     in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
+     in (evalDelayed finalState' delayedHtml, mainStylesheet (enumStyles finalState))
 
+-- | Render a @Flagged' DocumentContainer@ to HTML and CSS
 renderHtmlCss :: Flagged' DocumentContainer -> (Html (), Css)
-renderHtmlCss docContainer =
+renderHtmlCss = renderHtmlCssWith initReaderState initGlobalState
+
+-- | Render a @Flagged' DocumentContainer@ to HTML and CSS with a given
+--   initial 'ReaderState' and 'GlobalState'
+renderHtmlCssWith
+    :: ReaderState -> GlobalState -> Flagged' DocumentContainer -> (Html (), Css)
+renderHtmlCssWith readerState globalState docContainer =
     -- \| Render with given footnote context
-    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) initReaderState) initGlobalState
+    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) readerState) globalState
         -- \| Add footnote labes for "normal" (non-footnote) references
         finalState' = addUsedFootnoteLabels finalState
-     in (evalDelayed delayedHtml finalState', mainStylesheet (enumStyles finalState))
+     in (evalDelayed finalState' delayedHtml, mainStylesheet (enumStyles finalState))
 
--- | Renders a global ToC (including appendices) as a list of (Maybe idHtml, titleHtml)
-renderTocList :: Flagged' DocumentContainer -> [RenderedTocEntry]
+-- | Render a @Flagged' DocumentContainer@ with given states to main HTML, main CSS,
+--   and list of exported sections. Fails, if any parse errors occur.
+renderHtmlCssExport
+    :: FilePath
+    -- ^ Path from exported Sections to main HTML
+    -> ReaderState
+    -- ^ Used for document container
+    -> GlobalState
+    -> ReaderState
+    -- ^ Used for exported sections
+    -> Flagged' DocumentContainer
+    -> Maybe
+        ( Html ()
+        , -- \^ HTML of whole Document
+          Css
+        , -- \^ Main Stylesheet
+          [(Text, Text, Html ())]
+        , -- \^ Exported sections Html with id and title
+          Text
+          -- \^ Raw textual title of the main document
+        )
+renderHtmlCssExport backPath readerState globalState exportReaderState docCon =
+    -- \| Render with given footnote context
+    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docCon) readerState) globalState
+        -- \| Add footnote labes for "normal" (non-footnote) references
+        finalState' = addUsedFootnoteLabels finalState
+        mainHtml = evalDelayed finalState' delayedHtml
+        css = mainStylesheet (enumStyles finalState')
+        mainDocTitleHtml = mainDocumentTitleHtml finalState'
+        rawMainDocTitle = evalDelayed finalState' $ mainDocumentTitle finalState'
+        -- \| Second render for exported sections
+        -- TODO: get rid of second render run (its only because of the different labelWrapperFuncs)
+        (_, finalExportState) = runReaderState (toHtmlM docCon) exportReaderState globalState
+        finalExportState' = addUsedFootnoteLabels finalExportState
+        backButton =
+            div_ $
+                a_ [cssClass_ Class.ButtonLink, href_ $ pack backPath] (toHtml ("←" :: Text))
+        sections =
+            map
+                ( \(htmlId, dTitle, dHtml) ->
+                    ( htmlId
+                    , evalDelayed finalExportState' dTitle
+                    , evalDelayed finalExportState'
+                        . ( fmap (pure backButton <> div_ <#> Class.Document)
+                                . (mainDocTitleHtml <>)
+                          )
+                        $ dHtml
+                    )
+                )
+                (exportSections finalExportState')
+     in if hasErrors finalState'
+            then Nothing
+            else Just (mainHtml, css, sections, rawMainDocTitle)
+
+-------------------------------------------------------------------------------
+
+-- | Renders a @Flagged' DocumentContainer@ to HTML 'ByteString' with inlined CSS
+renderHtmlCssBS :: Flagged' DocumentContainer -> ByteString
+renderHtmlCssBS docCon =
+    let (body, css) = renderHtmlCss docCon
+     in renderBS $ addInlineCssHeader "Generated Document Preview" css body
+
+-- | Renders a global ToC (including appendices) as a list of
+--   either (@Maybe@ idHtml, @Result@ titleHtml) or a phantom result type
+--   for @SimpleSection@s which do not have a @Heading@.
+--   The @Result@ type signals the Frontend if an error occured while
+--   parsing the segment.
+renderTocList
+    :: Flagged' DocumentContainer -> [RenderedTocEntry]
 renderTocList docContainer =
     -- \| Create global ToC with Footnote context
     let (_, finalState) =
@@ -97,13 +188,18 @@ renderTocList docContainer =
         -- \| Add footnote labes for "normal" (non-footnote) references
         finalState' = addUsedFootnoteLabels finalState
         tocList = toList $ tableOfContents finalState'
-        -- \| Produce (Just <span>id</span>, <span>title</span>)
+        -- \| Produce (Just <span>id</span>, Success <span>title</span>);
+        --    This creates one homogeneous list without Either
         htmlTitleList =
             map
-                (\(mId, dt, _) -> (span_ <$> mId, span_ $ evalDelayed dt finalState'))
+                ( either
+                    (bimap ((<$>) span_) ((<$>) span_))
+                    ( \(mId, rDt, _, _) -> (span_ <$> mId, span_ . evalDelayed finalState' <$> rDt)
+                    )
+                )
                 tocList
-     in -- \| Render Maybe Html and Html to ByteString
-        map (bimap (fmap renderBS) renderBS) htmlTitleList
+     in -- \| Render Maybe Html and Result Html to ByteString
+        map (bimap (fmap renderBS) (fmap renderBS)) htmlTitleList
 
 -------------------------------------------------------------------------------
 
@@ -111,29 +207,52 @@ class ToHtmlM a where
     toHtmlM :: a -> HtmlReaderState
 
 instance ToHtmlM DocumentContainer where
-    -- TODO: ingore header since its only pdf stuff?
     toHtmlM
         ( DocumentContainer
-                (DocumentContainerFormat _ _ docHeadingFormat)
-                header
+                ( DocumentContainerFormat
+                        _
+                        _
+                        (MainDocumentFormat fallbackDocHeading docHeadingFormat)
+                    )
+                navTocParsedHeader
                 doc
                 appendices
             ) = do
+            -- \| Header is rendered to mempty, but this might generate an error box
+            headerHtml <- toHtmlM navTocParsedHeader
             -- \| Main Document has a global ToC, appendices typically do not
             mainDocHtml <-
                 local
-                    (\s -> s {hasGlobalToC = True, documentHeadingFormat = Left docHeadingFormat})
+                    ( \s ->
+                        s
+                            { hasGlobalToC = True
+                            , documentHeadingFormat = Left docHeadingFormat
+                            , documentFallbackTitle = fallbackDocHeading
+                            }
+                    )
                     $ toHtmlM doc
             readerState <- ask
             appendicesHtml <-
                 local (\s -> s {hasGlobalToC = appendixHasGlobalToC readerState}) $
                     toHtmlM appendices
-            return $ mainDocHtml <> appendicesHtml
+            -- Render Header only if whole DocumentContainer should be rendered
+            render <- asks shouldRender
+            return $
+                (if render then headerHtml else mempty)
+                    <> mainDocHtml
+                    <> appendicesHtml
+
+-- | Ignore Header since it only defines PDF related stuff
+instance ToHtmlM DocumentContainerHeader where
+    toHtmlM _ = returnNow mempty
 
 -- | This instance is used for documents inside the appendix,
 --   since the main document does not have a label.
 instance ToHtmlM (Node Document) where
-    toHtmlM (Node mLabel doc) = local (\s -> s {appendixElementMLabel = mLabel}) $ toHtmlM doc
+    toHtmlM (Node mLabel doc) = do
+        appendixDocID <- asks currentAppendixElementID
+        addMaybeLabelToState mLabel (toHtml $ show appendixDocID)
+        local (\s -> s {appendixElementMLabel = mLabel}) $ toHtmlM doc
 
 instance ToHtmlM Document where
     -- \| builds Lucid 2 HTML from a Ltml Document AST
@@ -165,63 +284,100 @@ instance ToHtmlM Document where
                 -- \| If current Document has a local ToC its Sections
                 --   should NOT appear in global ToC, thats why we save the current global ToC
                 hasGlobalToc <- asks hasGlobalToC
-                (tocHtml, documentPartsHtml) <-
+                (tocHtml, introHtml, mainHtml, outroHtml) <-
                     if hasGlobalToc
                         then do
                             -- \| Render ToC but as a Later to use the final GlobalState
                             delayedTocHtml <- renderDelayedToc mTocFormat
-                            docPartsHtml <- renderDocParts
-                            return (delayedTocHtml, docPartsHtml)
-                        else -- \| Reset ToC temporarily to build a local ToC, then write back the global ToC
+                            introHtml <- toHtmlM introSSections
+                            mainHtml <- toHtmlM sectionBody
+                            outroHtml <- toHtmlM outroSSections
+                            return (delayedTocHtml, introHtml, mainHtml, outroHtml)
+                        else
+                            -- \| Reset ToC temporarily to build a local ToC, then write back the global ToC
                             withModified
                                 tableOfContents
                                 (\s a -> s {tableOfContents = a})
                                 (tableOfContents initGlobalState)
                                 $ do
-                                    docPartsHtml <- renderDocParts
+                                    introHtml <- toHtmlM introSSections
+                                    mainHtml <- toHtmlM sectionBody
+                                    outroHtml <- toHtmlM outroSSections
                                     -- \| Render ToC last so local ToC has all Headings set,
                                     --    since the local ToC uses the current State
                                     localTocHtml <- renderLocalToc mTocFormat
-                                    return (localTocHtml, docPartsHtml)
+                                    return (localTocHtml, introHtml, mainHtml, outroHtml)
 
                 -- \| Render DocumentHeading / ToC only if renderFlag was set by parent
                 return $
-                    div_
-                        <$> ( (if renderToC then tocHtml else mempty)
-                                <> (if renderDoc then titleHtml else mempty)
-                                <> documentPartsHtml
+                    div_ <#> Class.Document
+                        <$> ( (if renderDoc then titleHtml else mempty)
+                                <> introHtml
+                                <> (if renderToC then tocHtml else mempty)
+                                <> mainHtml
+                                <> outroHtml
                             )
-          where
-            renderDocParts = do
-                introHtml <- toHtmlM introSSections
-                mainHtml <- toHtmlM sectionBody
-                outroHtml <- toHtmlM outroSSections
 
-                return $ introHtml <> mainHtml <> outroHtml
-
-instance ToHtmlM DocumentHeading where
-    toHtmlM (DocumentHeading headingTextTree) = do
-        titleHtml <- toHtmlM headingTextTree
+-- | Does not only produce the default error box on error,
+--   but also handles ToC entries.
+instance ToHtmlM (Parsed DocumentHeading) where
+    toHtmlM eErrDocumentHeading = do
+        -- \| Title which is used if a parse error occurs
+        fallbackTitle <- asks documentFallbackTitle
+        (resType, titleHtml) <- case eErrDocumentHeading of
+            Left _ -> do
+                setHasErrors
+                failedHeadingTextHtml <- toHtmlM fallbackTitle
+                return (Error, failedHeadingTextHtml)
+            Right (DocumentHeading headingTextTree) -> do
+                headingTextHtml <- toHtmlM headingTextTree
+                -- \| Used for setting HTML title
+                modify (\s -> s {mainDocumentTitle = headingText headingTextTree})
+                return (Success, headingTextHtml)
         -- \| Get HeadingFormat from DocumentContainer or AppendixSection
         headingFormatS <- asks documentHeadingFormat
         -- \| Here we check if we are inside an appendix, since
         --   the appendix heading format has an id and the main documents has not
-        (formattedTitle, htmlId) <- case headingFormatS of
-            Left headFormat -> do
-                -- \| Main Document Heading without Id and mangled anchor link
-                htmlId <- addTocEntry Nothing titleHtml Nothing
-                return (headingFormat headFormat <$> titleHtml, htmlId)
-            Right headFormatId -> do
-                -- \| Heading for Appendix Element (with id and toc key)
-                docId <- asks currentAppendixElementID
-                idFormat <- asks appendixElementIdFormat
-                tocFormat <- asks appendixElementTocKeyFormat
-                let (headingHtml, tocHtml) = appendixFormat idFormat docId tocFormat headFormatId titleHtml
-                -- \| Check if current document has Label and build ToC entry
-                mLabel <- asks appendixElementMLabel
-                htmlId <- addTocEntry (Just tocHtml) titleHtml mLabel
-                return (headingHtml, htmlId)
-        return $ h1_ [cssClass_ Class.DocumentTitle, id_ htmlId] <$> formattedTitle
+        (mIdHtml, formattedTitle, mLabel) <- case headingFormatS of
+            Left headFormat -> buildMainHeading titleHtml headFormat
+            Right headFormatId -> buildAppendixHeading titleHtml headFormatId
+        htmlId <- addTocEntry mIdHtml (resType titleHtml) mLabel Other
+        -- \| In case of a parse error, output and error box
+        return $
+            either
+                (Now . parseErrorHtml (Just htmlId))
+                ( const $
+                    h1_ [cssClass_ Class.DocumentTitle, cssClass_ Class.Anchor, id_ htmlId]
+                        <$> formattedTitle
+                )
+                eErrDocumentHeading
+      where
+        -- \| Main Document Heading without Id and without Label
+        --    This should only be called once
+        buildMainHeading
+            :: Delayed (Html ())
+            -> HeadingFormat False
+            -> ReaderStateMonad (Maybe (Html ()), Delayed (Html ()), Maybe Label)
+        buildMainHeading dTitleHtml headFormat = do
+            let formattedTitle = headingFormat headFormat <$> dTitleHtml
+            -- \| Used for adding title to exported sections
+            modify (\s -> s {mainDocumentTitleHtml = formattedTitle})
+            return (Nothing, formattedTitle, Nothing)
+
+        -- \| Appendix Docuemnt Heading with Id and Label
+        buildAppendixHeading
+            :: Delayed (Html ())
+            -> HeadingFormat True
+            -> ReaderStateMonad (Maybe (Html ()), Delayed (Html ()), Maybe Label)
+        buildAppendixHeading dTitleHtml headFormatId = do
+            -- \| Heading for Appendix Element (with id and toc key)
+            docId <- asks currentAppendixElementID
+            idFormat <- asks appendixElementIdFormat
+            tocFormat <- asks appendixElementTocKeyFormat
+            let (headingHtml, tocHtml) = appendixFormat idFormat docId tocFormat headFormatId dTitleHtml
+            -- \| Check if current document has Label and build ToC entry
+            mLabel <- asks appendixElementMLabel
+            return (Just tocHtml, headingHtml, mLabel)
 
 -------------------------------------------------------------------------------
 
@@ -232,13 +388,12 @@ instance ToHtmlM (Node Section) where
         ( Node
                 mLabel
                 ( Section
-                        sectionFormatS
-                        (Heading headingFormatS title)
+                        parsedHeading
                         sectionBody
                     )
             ) = do
             globalState <- get
-            titleHtml <- toHtmlM title
+            sectionFormatS <- asks localSectionFormat
             let (sectionIDGetter, incrementSectionID, sectionCssClass) =
                     -- \| Check if we are inside a section or a super-section
                     -- TODO: Is (SimpleLeafSectionBody [SimpleBlocks]) counted as super-section? (i think yes)
@@ -246,27 +401,76 @@ instance ToHtmlM (Node Section) where
                         then (currentSuperSectionID, incSuperSectionID, Class.SuperSection)
                         else (currentSectionID, incSectionID, Class.Section)
                 (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (sectionIDGetter globalState)
-                headingHtml =
-                    (h2_ <#> Class.Heading) . headingFormatId headingFormatS sectionIDHtml
-                        <$> titleHtml
              in do
                     addMaybeLabelToState mLabel sectionIDHtml
-                    -- \| Add table of contents entry for section
-                    htmlId <- addTocEntry (Just sectionTocKeyHtml) titleHtml mLabel
-                    -- \| Build heading Html with sectionID
+                    -- \| Render parsed Heading, which also creates ToC Entry
+                    (headingHtml, tocId, rawTitle) <-
+                        buildHeadingHtml sectionIDHtml mLabel sectionTocKeyHtml parsedHeading
+                    headingState <- get
                     childrenHtml <- toHtmlM sectionBody
                     -- \| Also render footnotes in super-sections, since their heading
                     --    could contain footnoteRefs
                     childrensGlobalState <- get
-                    footnotesHtml <- toHtmlM (locallyUsedFootnotes childrensGlobalState)
+                    let footNoteState = addUsedFootnotes childrensGlobalState headingState
+                    footnotesHtml <- toHtmlM (locallyUsedFootnotes footNoteState)
                     -- \| Reset locally used set to inital value
                     modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
                     -- \| increment (super)SectionID for next section
                     incrementSectionID
 
-                    return $
-                        section_ [cssClass_ sectionCssClass, id_ htmlId]
-                            <$> (headingHtml <> childrenHtml <> footnotesHtml)
+                    exportLinkFunc <- asks exportLinkWrapper
+                    let rawdTitleHtml = toHtml . (" " <>) <$> rawTitle
+                        exportLinkHtml =
+                            exportLinkFunc (Label tocId) <$> (pure sectionTocKeyHtml <> rawdTitleHtml)
+
+                        sectionHtml =
+                            section_ [cssClass_ sectionCssClass]
+                                <$> (headingHtml <> childrenHtml <> footnotesHtml <> exportLinkHtml)
+                    -- \| Collects all sections for possible export
+                    collectExportSection tocId rawTitle sectionHtml
+
+                    return sectionHtml
+          where
+            -- \| Also adds table of contents entry for section
+            buildHeadingHtml
+                :: Html ()
+                -> Maybe Label
+                -> Html ()
+                -> Parsed Heading
+                -> ReaderStateMonad
+                    ( Delayed (Html ())
+                    , -- \^ Formatted title
+                      Text
+                    , -- \^ html id
+                      Delayed Text
+                    )
+            -- \^ raw textual title
+
+            buildHeadingHtml sectionIDHtml mLabelH tocKeyHtml eErrHeading =
+                case eErrHeading of
+                    Left parseErr -> do
+                        setHasErrors
+                        htmlId <-
+                            -- In case of a Heading failure
+                            -- we simply display the ID as the title
+                            createTocEntryH Nothing (Error $ Now tocKeyHtml)
+                        return (Now $ parseErrorHtml (Just htmlId) parseErr, htmlId, mempty)
+                    Right (Heading headingFormatS title) -> do
+                        titleHtml <- toHtmlM title
+                        let rawTitleText = headingText title
+                        -- TODO: Maybe: Toc entry for section has no footnotes (headingText skips them),
+                        --       since the could contain @<a>@. When the Toc entry is wrapped in another
+                        --       @<a>@ it creates invalid HTML
+                        htmlId <- createTocEntryH (Just tocKeyHtml) (Success $ toHtml <$> rawTitleText)
+                        return
+                            ( h2_ [cssClass_ Class.Heading, cssClass_ Class.Anchor, id_ htmlId]
+                                . headingFormatId headingFormatS sectionIDHtml
+                                <$> titleHtml
+                            , htmlId
+                            , rawTitleText
+                            )
+              where
+                createTocEntryH mIdHtml rTitle = addTocEntry mIdHtml rTitle mLabelH SomeSection
 
 instance ToHtmlM SectionBody where
     toHtmlM sectionBody = case sectionBody of
@@ -305,7 +509,7 @@ instance ToHtmlM (Node Paragraph) where
                 modify (\s -> s {currentSentenceID = 0})
                 readerState <- ask
                 return $
-                    div_ [cssClass_ Class.Paragraph, mId_ mLabel]
+                    div_ [cssClass_ Class.Paragraph, cssClass_ Class.Anchor, mId_ mLabel]
                         -- \| If this is the only paragraph inside this section we drop the visible paragraphID
                         <$> let idHtml = if isSingleParagraph readerState then mempty else paragraphKeyHtml
                              in return (div_ <#> Class.ParagraphID $ idHtml)
@@ -346,10 +550,8 @@ instance ToHtmlM SimpleParagraph where
 -------------------------------------------------------------------------------
 
 instance ToHtmlM Table where
-    toHtmlM table =
-        returnNow $
-            span_ <#> Class.InlineError $
-                toHtml ("Error: Tables are not supported yet!" :: Text)
+    toHtmlM _ =
+        returnNow $ htmlError "Tables are not implemented yet :("
 
 -------------------------------------------------------------------------------
 
@@ -388,7 +590,7 @@ instance ToHtmlM SentenceStart where
         addMaybeLabelToState mLabel (toHtml $ show (currentSentenceID globalState))
         case mLabel of
             Nothing -> returnNow mempty
-            Just label -> returnNow $ span_ [id_ (unLabel label)] mempty
+            Just label -> returnNow $ span_ [cssClass_ Class.Anchor, id_ (unLabel label)] mempty
 
 instance ToHtmlM Enumeration where
     toHtmlM (Enumeration enumFormatS@(EnumFormat (EnumItemFormat idFormat _)) enumItems) = do
@@ -419,7 +621,8 @@ instance ToHtmlM (Node EnumItem) where
         -- \| Increment enumItemID for next enumItem
         modify (\s -> s {currentEnumItemID = enumItemID + 1})
         return $
-            div_ [cssClass_ Class.TextContainer, mId_ mLabel] <$> enumItemHtml
+            div_ [cssClass_ Class.TextContainer, cssClass_ Class.Anchor, mId_ mLabel]
+                <$> enumItemHtml
 
 instance ToHtmlM FootnoteReference where
     toHtmlM (FootnoteReference label) = do
@@ -500,7 +703,7 @@ instance ToHtmlM FootnoteSet where
                 Just (_, idHtml, delayedTextHtml) ->
                     -- \| <div> <sup>id</sup> <span>text</span> </div>
                     return
-                        ( ( div_ [cssClass_ Class.Footnote, id_ (unLabel label)]
+                        ( ( div_ [cssClass_ Class.Footnote, cssClass_ Class.Anchor, id_ (unLabel label)]
                                 <$> ((sup_ <#> Class.FootnoteID) idHtml <>)
                           )
                             . span_
@@ -518,9 +721,16 @@ instance ToHtmlM AppendixSection where
                     )
                 nodeDocuments
             ) = do
+            -- \| Empty appendices are dropped from HTML structure and ToC
+            let isEmpty = null nodeDocuments
             -- \| Add Entry to ToC but without ID
             htmlId <-
-                addTocEntry Nothing (Now $ toHtml appendixSectionTitle) Nothing
+                if isEmpty
+                    then
+                        -- \| If appendix is dropped htmlId is unused and set to @mempty@
+                        addPhantomTocEntry (Success $ toHtml appendixSectionTitle) >> return mempty
+                    else
+                        addTocEntry Nothing (Success $ Now $ toHtml appendixSectionTitle) Nothing Other
             -- \| Give each Document the corresponding appendix Id
             let zipFunc i nDoc = local (\s -> s {currentAppendixElementID = i}) $ toHtmlM nDoc
             documentHtmls <-
@@ -536,7 +746,11 @@ instance ToHtmlM AppendixSection where
                     $ zipWithM zipFunc [1 ..] nodeDocuments
             -- \| Wrap all appendix documents into one <div>
             return $
-                div_ [cssClass_ Class.AppendixSection, id_ htmlId] <$> mconcat documentHtmls
+                if isEmpty
+                    then mempty
+                    else
+                        div_ [cssClass_ Class.AppendixSection, cssClass_ Class.Anchor, id_ htmlId]
+                            <$> mconcat documentHtmls
 
 -------------------------------------------------------------------------------
 
@@ -559,52 +773,113 @@ instance (ToHtmlM a) => ToHtmlM (Flagged' a) where
 
 -------------------------------------------------------------------------------
 
+-- = The @Parsed a@ instances makes the rendering robust against parse errors
+
+-- | Returns rendered heading text
+instance ToHtmlM (Fallback NavTocHeading) where
+    toHtmlM (Fallback (NavTocHeading title)) = returnNow $ toHtml title
+
+-- | Instance used for 'DocumentIntro', 'DocumentExtro', 'DocumentMainBody' and 'DocumentContainerHeader':
+--   Emits 'PhantomTocEntry' and parse error box
+instance (ToHtmlM a) => ToHtmlM (NavTocHeaded (Parsed a)) where
+    toHtmlM (NavTocHeaded (NavTocHeading title) eErrA) =
+        let titleHtml = toHtml title
+         in case eErrA of
+                Left parseError -> do
+                    setHasErrors
+                    addPhantomTocEntry (Error titleHtml)
+                    returnNow $ parseErrorHtml Nothing parseError
+                Right a -> do
+                    addPhantomTocEntry (Success titleHtml)
+                    toHtmlM a
+
+-- | "Fake" section behaviour in error case
+instance (ToHtmlM a) => ToHtmlM (SectionFormatted (Parsed a)) where
+    toHtmlM (SectionFormatted sectionFormatS eErrA) = case eErrA of
+        Left parseErr -> do
+            setHasErrors
+            -- \| Count error as @Section@, to keep following
+            --    @Section@s correctly numbered
+            sectionID <- gets currentSectionID
+            incSectionID
+            -- \| Since we dont have a title we set the tocID as title
+            let (_, tocKeyHtml) = sectionFormat sectionFormatS sectionID
+            htmlID <- addTocEntry Nothing (Error $ Now tocKeyHtml) Nothing SomeSection
+            returnNow $ parseErrorHtml (Just htmlID) parseErr
+        Right a -> local (\s -> s {localSectionFormat = sectionFormatS}) $ toHtmlM a
+
+-------------------------------------------------------------------------------
+
 -- | Render current ToC from State
 renderLocalToc :: Maybe TocFormat -> HtmlReaderState
 renderLocalToc mTocFormat = do
     globalState <- get
-    tocFunc <- asks tocEntryWrapperFunc
-    return $ renderToc mTocFormat tocFunc globalState
+    entryFunc <- asks tocEntryWrapperFunc
+    buttonFunc <- asks tocButtonWrapperFunc
+    return $ renderToc mTocFormat entryFunc buttonFunc globalState
 
 -- | Returns a Later which takes a GlobalState to render a delayed ToC
 renderDelayedToc :: Maybe TocFormat -> HtmlReaderState
 renderDelayedToc mTocFormat = do
-    tocFunc <- asks tocEntryWrapperFunc
+    entryFunc <- asks tocEntryWrapperFunc
+    buttonFunc <- asks tocButtonWrapperFunc
+
     -- \| Return Later to delay ToC generation to the end;
     --    Join Delayed (Delayed (Html ())) together,
     --    since the ToC itself contains Delayed (Html ()) too
-    return $ join $ Later $ \globalState -> renderToc mTocFormat tocFunc globalState
+    return $ join $ Later $ \globalState -> renderToc mTocFormat entryFunc buttonFunc globalState
 
 -- | Helper function for rendering a ToC from the given  GlobalState
-renderToc :: Maybe TocFormat -> LabelWrapper -> GlobalState -> Delayed (Html ())
-renderToc Nothing _ _ = mempty
-renderToc (Just (TocFormat (TocHeading title))) tocFunc globalState =
-    let tableHead =
-            thead_ $ tr_ (th_ mempty <> th_ (toHtml title))
+renderToc
+    :: Maybe TocFormat
+    -> TocEntryWrapper
+    -- ^ Wrapper for Toc entry text
+    -> TocEntryWrapper
+    -- ^ Wrapper for Toc button
+    -> GlobalState
+    -> Delayed (Html ())
+renderToc Nothing _ _ _ = mempty
+renderToc (Just (TocFormat (TocHeading title))) entryFunc buttonFunc globalState =
+    let colGroup =
+            colgroup_
+                ( col_ <#> Class.MinSizeColumn
+                    <> col_ <#> Class.MaxSizeColumn
+                    <> col_ <#> Class.MinSizeColumn
+                )
+        tableHead =
+            thead_ $ tr_ (th_ [colspan_ "3"] (toHtml title))
                 :: Html ()
 
         -- \| Build List of ToC rows
         tocEntries :: [Delayed (Html ())]
         tocEntries =
-            let tupleList = toList $ tableOfContents globalState
-             in map (buildWrappedRow tocFunc) tupleList
+            -- \| @rights@ filters all phantom entries and unpacks real ones
+            let tupleList = rights $ toList $ tableOfContents globalState
+             in map (buildWrappedRow entryFunc buttonFunc) tupleList
 
         -- \| [Delayed (Html ())] -> Delayed [Html ()] -> Delayed (Html ())
         tableBody = tbody_ . mconcat <$> sequence tocEntries
-     in -- TODO: title from AST
-        table_ <$> (pure tableHead <> tableBody)
+     in (div_ <#> Class.TocContainer) . (table_ <#> Class.TableOfContents)
+            <$> (pure colGroup <> pure tableHead <> tableBody)
   where
     -- \| Build <tr><td>id</td> <td>title</td></tr> and wrap id and title seperatly
     buildWrappedRow
-        :: LabelWrapper
-        -> (Maybe (Html ()), Delayed (Html ()), Text)
+        :: TocEntryWrapper
+        -> TocEntryWrapper
+        -> TocEntry
         -> Delayed (Html ())
-    buildWrappedRow wrapperFunc (mIdHtml, titleHtml, htmlId) =
-        let wrap = wrapperFunc (Label htmlId)
-         in -- TODO: Style ToC
+    buildWrappedRow entryWrapper buttonWrapper (mIdHtml, rTitle, htmlId, category) =
+        let
+            -- \| Draw ToC Error titles as inline errors
+            entryWrap = entryWrapper category (Label htmlId)
+            buttonWrap = buttonWrapper category (Label htmlId)
+            titleHtml = result id (span_ <#> Class.InlineError <$>) rTitle
+            titleCell = td_ . entryWrap <$> titleHtml
+            idCell = td_ <#> Class.Centered $ maybe mempty entryWrap mIdHtml
+            linkButton = td_ <#> Class.Centered $ buttonWrap $ toHtml ("↗" :: Text)
+         in
             -- \| Nothing IdHtmls will be replaced with mempty
-            ((tr_ <$> (td_ (wrap (fromMaybe mempty mIdHtml)) <>)) . td_) . wrap
-                <$> titleHtml
+            tr_ <$> pure idCell <> titleCell <> pure linkButton
 
 -------------------------------------------------------------------------------
 
@@ -614,6 +889,10 @@ instance (ToHtmlM a) => ToHtmlM [a] where
         aHtml <- toHtmlM a
         asHtml <- toHtmlM as
         return (aHtml <> asHtml)
+
+instance (ToHtmlM a) => ToHtmlM (Maybe a) where
+    toHtmlM Nothing = return mempty
+    toHtmlM (Just a) = toHtmlM a
 
 -- | ToHtmlM instance that can never be called, because there are
 --   no values of type Void
@@ -658,3 +937,11 @@ renderGroupedTextTree textF_ enumF_ tts =
 
 htmlError :: Text -> Html ()
 htmlError msg = span_ <#> Class.InlineError $ toHtml ("Error: " <> msg :: Text)
+
+-- | Takes Maybe HtmlId and a parse error and renders a centered parse error box
+parseErrorHtml :: Maybe Text -> ParseErrorBundle Text Void -> Html ()
+parseErrorHtml mHtmlId errBundle = do
+    div_ <#> Class.CenteredBox $
+        div_ [cssClass_ Class.ErrorBox, cssClass_ Class.Anchor, mTextId_ mHtmlId] $ do
+            h1_ <#> Class.DocumentTitle $ "Parsing failed!"
+            pre_ $ code_ <#> Class.LargeFontSize $ toHtml $ errorBundlePretty errBundle
