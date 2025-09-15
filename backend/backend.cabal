@@ -1,0 +1,364 @@
+cabal-version: 1.12
+
+-- This file has been generated from package.yaml by hpack version 0.38.1.
+--
+-- see: https://github.com/sol/hpack
+
+name:           backend
+version:        0.1.0.0
+description:    Please see the README on GitHub at <https://github.com/fachpruefungsordnung/fachpruefungsordnung>
+author:         Author name here
+maintainer:     example@example.com
+copyright:      2025 Author name here
+license:        AGPL-3.0
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+    CHANGELOG.md
+
+library
+  exposed-modules:
+      Control.Applicative.Utils
+      Control.Functor.Utils
+      Control.Monad.CollectionState
+      Control.Monad.ConsumableStack
+      Data.Map.Utils
+      Data.Text.FromWhitespace
+      Data.Typography
+      Database
+      Docs
+      Docs.Comment
+      Docs.Common
+      Docs.Database
+      Docs.Document
+      Docs.DocumentHistory
+      Docs.ExampleDoc
+      Docs.FullDocument
+      Docs.Hash
+      Docs.Hasql.Database
+      Docs.Hasql.Sessions
+      Docs.Hasql.Statements
+      Docs.Hasql.Transactions
+      Docs.Hasql.TreeEdge
+      Docs.LTML
+      Docs.MetaTree
+      Docs.Revision
+      Docs.TextElement
+      Docs.TextRevision
+      Docs.Tree
+      Docs.TreeRevision
+      Docs.UserRef
+      Language.Lsd.AST.Common
+      Language.Lsd.AST.Format
+      Language.Lsd.AST.SimpleRegex
+      Language.Lsd.AST.Type
+      Language.Lsd.AST.Type.AppendixSection
+      Language.Lsd.AST.Type.Document
+      Language.Lsd.AST.Type.DocumentContainer
+      Language.Lsd.AST.Type.Enum
+      Language.Lsd.AST.Type.Footnote
+      Language.Lsd.AST.Type.Paragraph
+      Language.Lsd.AST.Type.Section
+      Language.Lsd.AST.Type.SimpleBlock
+      Language.Lsd.AST.Type.SimpleParagraph
+      Language.Lsd.AST.Type.SimpleSection
+      Language.Lsd.AST.Type.Table
+      Language.Lsd.AST.Type.Text
+      Language.Lsd.Example
+      Language.Lsd.Example.Fpo
+      Language.Lsd.ToMetaMap
+      Language.Ltml.AST.AppendixSection
+      Language.Ltml.AST.Document
+      Language.Ltml.AST.DocumentContainer
+      Language.Ltml.AST.Footnote
+      Language.Ltml.AST.Label
+      Language.Ltml.AST.Node
+      Language.Ltml.AST.Paragraph
+      Language.Ltml.AST.Section
+      Language.Ltml.AST.SimpleBlock
+      Language.Ltml.AST.SimpleParagraph
+      Language.Ltml.AST.SimpleSection
+      Language.Ltml.AST.Table
+      Language.Ltml.AST.Text
+      Language.Ltml.Common
+      Language.Ltml.HTML
+      Language.Ltml.HTML.Common
+      Language.Ltml.HTML.CSS
+      Language.Ltml.HTML.CSS.Classes
+      Language.Ltml.HTML.CSS.Color
+      Language.Ltml.HTML.CSS.CustomClay
+      Language.Ltml.HTML.CSS.Util
+      Language.Ltml.HTML.Export
+      Language.Ltml.HTML.FormatString
+      Language.Ltml.HTML.Pipeline
+      Language.Ltml.HTML.References
+      Language.Ltml.HTML.Test
+      Language.Ltml.HTML.Util
+      Language.Ltml.Parser
+      Language.Ltml.Parser.Common.Combinators
+      Language.Ltml.Parser.Common.Indent
+      Language.Ltml.Parser.Common.Lexeme
+      Language.Ltml.Parser.Document
+      Language.Ltml.Parser.DocumentContainer
+      Language.Ltml.Parser.Footnote
+      Language.Ltml.Parser.Footnote.Combinators
+      Language.Ltml.Parser.Keyword
+      Language.Ltml.Parser.Label
+      Language.Ltml.Parser.MiTree
+      Language.Ltml.Parser.Paragraph
+      Language.Ltml.Parser.Section
+      Language.Ltml.Parser.SimpleBlock
+      Language.Ltml.Parser.SimpleParagraph
+      Language.Ltml.Parser.SimpleSection
+      Language.Ltml.Parser.Table
+      Language.Ltml.Parser.Text
+      Language.Ltml.Pretty
+      Language.Ltml.ToLaTeX.Format
+      Language.Ltml.ToLaTeX.GlobalState
+      Language.Ltml.ToLaTeX.LaTeXType
+      Language.Ltml.ToLaTeX.PDFGenerator
+      Language.Ltml.ToLaTeX.PreLaTeXType
+      Language.Ltml.ToLaTeX.Renderer
+      Language.Ltml.ToLaTeX.Testing
+      Language.Ltml.ToLaTeX.ToLaTeX
+      Language.Ltml.ToLaTeX.ToPreLaTeXM
+      Language.Ltml.Tree
+      Language.Ltml.Tree.Example.Fpo
+      Language.Ltml.Tree.Parser
+      Language.Ltml.Tree.Parser.AppendixSection
+      Language.Ltml.Tree.Parser.Document
+      Language.Ltml.Tree.Parser.DocumentContainer
+      Language.Ltml.Tree.Parser.Section
+      Language.Ltml.Tree.ToLtml
+      Language.Ltml.Tree.ToMeta
+      Lib
+      Logging.Logs
+      Logging.Scope
+      Mail
+      Parse
+      Server
+      Server.Auth
+      Server.Auth.PasswordReset
+      Server.Auth.PasswordResetUtil
+      Server.DTOs.Comments
+      Server.DTOs.CreateComment
+      Server.DTOs.CreateDocument
+      Server.DTOs.CreateReply
+      Server.DTOs.CreateTextElement
+      Server.DTOs.CreateTextRevision
+      Server.DTOs.Documents
+      Server.DTOs.Logs
+      Server.Handlers.AuthHandlers
+      Server.Handlers.DocsHandlers
+      Server.Handlers.GroupHandlers
+      Server.Handlers.PasswordResetHandlers
+      Server.Handlers.RenderHandlers
+      Server.Handlers.RoleHandlers
+      Server.Handlers.UserHandlers
+      Server.HandlerUtil
+      Server.HTTPHeaders
+      UserManagement.DocumentPermission
+      UserManagement.Group
+      UserManagement.Sessions
+      UserManagement.Statements
+      UserManagement.Transactions
+      UserManagement.User
+  other-modules:
+      Paths_backend
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      Cabal
+    , aeson
+    , base >=4.7 && <5
+    , base64-bytestring
+    , bytestring
+    , clay
+    , containers
+    , cryptohash-sha1
+    , directory
+    , dlist
+    , filepath
+    , hasql
+    , hasql-migration
+    , hasql-pool
+    , hasql-th
+    , hasql-transaction
+    , http-api-data
+    , http-media
+    , http-types
+    , insert-ordered-containers
+    , jose
+    , lens
+    , lucid2
+    , megaparsec
+    , mime-mail
+    , mtl
+    , network
+    , openapi3
+    , pandoc-types
+    , parser-combinators
+    , password
+    , pretty-simple
+    , process
+    , profunctors
+    , scientific
+    , servant
+    , servant-auth-server
+    , servant-openapi3
+    , servant-server
+    , smtp-mail
+    , tagged
+    , template-haskell
+    , temporary
+    , text
+    , time
+    , transformers
+    , tuple
+    , uuid
+    , vector
+    , wai
+    , wai-app-static
+    , warp
+    , zip-archive
+    , zlib
+  default-language: Haskell2010
+
+executable backend-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_backend
+  hs-source-dirs:
+      app
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      Cabal
+    , aeson
+    , backend
+    , base >=4.7 && <5
+    , base64-bytestring
+    , bytestring
+    , clay
+    , containers
+    , cryptohash-sha1
+    , directory
+    , dlist
+    , filepath
+    , hasql
+    , hasql-migration
+    , hasql-pool
+    , hasql-th
+    , hasql-transaction
+    , http-api-data
+    , http-media
+    , http-types
+    , insert-ordered-containers
+    , jose
+    , lens
+    , lucid2
+    , megaparsec
+    , mime-mail
+    , mtl
+    , network
+    , openapi3
+    , pandoc-types
+    , parser-combinators
+    , password
+    , pretty-simple
+    , process
+    , profunctors
+    , scientific
+    , servant
+    , servant-auth-server
+    , servant-openapi3
+    , servant-server
+    , smtp-mail
+    , tagged
+    , template-haskell
+    , temporary
+    , text
+    , time
+    , transformers
+    , tuple
+    , uuid
+    , vector
+    , wai
+    , wai-app-static
+    , warp
+    , zip-archive
+    , zlib
+  default-language: Haskell2010
+
+test-suite backend-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      APIQuickCheck
+      Paths_backend
+  hs-source-dirs:
+      test
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      Cabal
+    , QuickCheck
+    , aeson
+    , backend
+    , base >=4.7 && <5
+    , base64-bytestring
+    , bytestring
+    , clay
+    , containers
+    , cryptohash-sha1
+    , directory
+    , dlist
+    , filepath
+    , hasql
+    , hasql-migration
+    , hasql-pool
+    , hasql-th
+    , hasql-transaction
+    , hspec
+    , http-api-data
+    , http-client
+    , http-media
+    , http-types
+    , insert-ordered-containers
+    , jose
+    , lens
+    , lucid2
+    , megaparsec
+    , mime-mail
+    , mtl
+    , network
+    , openapi3
+    , pandoc-types
+    , parser-combinators
+    , password
+    , pretty-simple
+    , process
+    , profunctors
+    , scientific
+    , servant
+    , servant-auth-server
+    , servant-client
+    , servant-openapi3
+    , servant-quickcheck
+    , servant-server
+    , smtp-mail
+    , tagged
+    , template-haskell
+    , temporary
+    , text
+    , time
+    , transformers
+    , tuple
+    , uuid
+    , vector
+    , wai
+    , wai-app-static
+    , warp
+    , zip-archive
+    , zlib
+  default-language: Haskell2010
