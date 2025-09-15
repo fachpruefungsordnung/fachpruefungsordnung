@@ -31,7 +31,7 @@ import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class as EC
-import Effect.Console (log)
+{- import Effect.Console (log) -}
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -741,9 +741,6 @@ editor = connect selectTranslator $ H.mkComponent
     FontSize change -> do
       H.gets _.mEditor >>= traverse_ \ed -> do
         state <- H.get
-        H.liftEffect $ log $ show case state.mContent of
-          Just (Content mC) -> mC.parent
-          _ -> 0
         let newSize = change state.fontSize
         H.modify_ \st -> st { fontSize = newSize }
         -- Set the new font size in the editor
@@ -842,9 +839,6 @@ editor = connect selectTranslator $ H.mkComponent
 
     Upload newEntry newWrapper isAutoSave -> do
       state <- H.get
-      H.liftEffect $ log $ case (state.upToDateVersion) of
-        Nothing -> "empty"
-        Just version -> show version.identifier
       let
         --modify the wrapper if merging to allow saving old versions.
         modifiedWrapper = case isAutoSave of
@@ -864,9 +858,6 @@ editor = connect selectTranslator $ H.mkComponent
         jsonContent = ContentDto.encodeWrapper modifiedWrapper
         newContent = ContentDto.getWrapperContent modifiedWrapper
       -- send the new content as POST to the server
-      H.liftEffect $ log
-        ("wrappedID" <> show (getContentParent (getWrapperContent modifiedWrapper)))
-      H.liftEffect $ log $ show state.isOnMerge
       response <- Request.postJson (ContentDto.extractDraft newContent)
         ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id
             <> "/rev?isAutoSave="
@@ -892,7 +883,7 @@ editor = connect selectTranslator $ H.mkComponent
                 "noConflict" -> pure unit
                 "draftCreated" -> pure unit --raise something to update version
                 "conflict" -> pure unit --should not happen here also raise something just in case
-                _ -> H.liftEffect $ log "case 1"
+                _ -> pure unit
             -- manuell saving and working in latest version
             false, false -> do
               -- H.modify_ _ { mContent = Just updatedContent }
@@ -903,16 +894,14 @@ editor = connect selectTranslator $ H.mkComponent
                   case state.isOnMerge of
                     false -> pure unit
                     true -> H.raise Merged
-                  H.liftEffect $ log "case 2 1"
+                  pure unit
                 "draftCreated" ->
                   do --should not happen here. just copy autosave case in case
                     H.modify_ _ { isOnMerge = true }
-                    H.liftEffect $ log "case 2 2"
                 "conflict" -> do --raise something to update version
                   H.modify_ _ { isOnMerge = true }
-                  H.liftEffect $ log "case 2 3"
                   H.raise RaiseMergeMode
-                _ -> H.liftEffect $ log "case 2"
+                _ -> pure unit
             -- manuell saving, draft mode => publish
             false, true -> do
               case typ of
@@ -922,16 +911,15 @@ editor = connect selectTranslator $ H.mkComponent
                   case state.isOnMerge of
                     false -> pure unit
                     true -> H.raise Merged
-                  H.liftEffect $ log "case 3 1"
+                  pure unit
                 "draftCreated" ->
                   do --should not happen here. just copy autosave case in case
                     H.modify_ _ { isOnMerge = true }
-                    H.liftEffect $ log "case 3 2"
                 "conflict" -> do --raise something to update version
                   H.modify_ _ { isOnMerge = true }
                   H.raise RaiseMergeMode
-                  H.liftEffect $ log "case 3 3"
-                _ -> H.liftEffect $ log "case 3"
+                  pure unit
+                _ -> pure unit
           {-               res <- Request.postJson (ContentDto.extractDraft updatedContent)
             ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id
                 <> "/draft/publish"

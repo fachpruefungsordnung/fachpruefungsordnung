@@ -28,7 +28,7 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
+{- import Effect.Console (log) -}
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -1153,7 +1153,6 @@ splitview = connect selectTranslator $ H.mkComponent
               Nothing -> Nothing
               Just version -> version.versionID
         if state.dirtyVersion && currentVersion /= Nothing then do
-          H.liftEffect $ log (show mVID)
           H.modify_ _ { modalData = Just { elementID: elementID, versionID: mVID } }
         else do
           handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
