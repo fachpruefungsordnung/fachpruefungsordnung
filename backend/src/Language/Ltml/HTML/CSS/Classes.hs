@@ -200,9 +200,10 @@ classStyle FootnoteID =
     toClassSelector FootnoteID ? do
         userSelect none
 classStyle LeftAligned = toClassSelector LeftAligned ? textAlign alignLeft
-classStyle Centered = toClassSelector Centered ? do
-    display block
-    textAlign center
+classStyle Centered =
+    toClassSelector Centered ? do
+        display block
+        textAlign center
 classStyle RightAligned = toClassSelector RightAligned ? textAlign alignLeft
 classStyle SmallFontSize = toClassSelector SmallFontSize ? fontSize (em 0.75)
 classStyle MediumFontSize = toClassSelector MediumFontSize ? fontSize (em 1)

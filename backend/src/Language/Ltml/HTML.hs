@@ -458,7 +458,10 @@ instance ToHtmlM (Node Section) where
                     Right (Heading headingFormatS title) -> do
                         titleHtml <- toHtmlM title
                         let rawTitleText = headingText title
-                        htmlId <- createTocEntryH (Just tocKeyHtml) (Success titleHtml)
+                        -- TODO: Maybe: Toc entry for section has no footnotes (headingText skips them),
+                        --       since the could contain @<a>@. When the Toc entry is wrapped in another
+                        --       @<a>@ it creates invalid HTML
+                        htmlId <- createTocEntryH (Just tocKeyHtml) (Success $ toHtml <$> rawTitleText)
                         return
                             ( h2_ [cssClass_ Class.Heading, cssClass_ Class.Anchor, id_ htmlId]
                                 . headingFormatId headingFormatS sectionIDHtml
