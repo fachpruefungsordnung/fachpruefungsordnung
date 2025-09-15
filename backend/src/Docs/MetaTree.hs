@@ -17,6 +17,7 @@ import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
 import Docs.Tree (NodeHeader)
 import Docs.TreeRevision (TreeRevisionHeader)
+import qualified Language.Ltml.HTML.Common as HTML
 
 data TreeRevisionWithMetaData a
     = TreeRevisionWithMetaData
@@ -65,7 +66,7 @@ instance (ToSchema a) => ToSchema (MetaNode a)
 
 data TocEntry = TocEntry
     { label :: Maybe Text
-    , title :: Maybe Text
+    , title :: HTML.Result (Maybe Text)
     }
     deriving (Generic)
 

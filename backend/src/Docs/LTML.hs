@@ -39,6 +39,7 @@ import qualified Docs.TextRevision as TextRevision
 import Docs.TreeRevision (TreeRevision (TreeRevision))
 import qualified Language.Lsd.AST.Common as LSD
 import qualified Language.Ltml.Common as LTML
+import qualified Language.Ltml.HTML.Common as HTML
 import Language.Ltml.Tree (FlaggedInputTree)
 import qualified Language.Ltml.Tree as LTML
 import qualified Language.Ltml.Tree.ToMeta as LTML
@@ -105,10 +106,10 @@ treeFromFlaggedMetaTree
         _ -> Nothing -- Something went terribly wrong, aber ich hab jetzt auch keine lust auf error handling (`.ok()`). diesen case hätte man einfach durch striktere typen verhindern können.
       where
         toTocEntry tocEntry =
-            let toText bs =
-                    bs >>= either (const Nothing) Just . TE.decodeUtf8' . BL.toStrict
-                label = toText $ tocEntry >>= fst
-                title = toText $ snd <$> tocEntry
+            let toText =
+                    either (const Nothing) Just . TE.decodeUtf8' . BL.toStrict
+                label = fst tocEntry >>= toText
+                title = toText <$> snd tocEntry
              in TocEntry
                     { MetaTree.label = label
                     , MetaTree.title = title
