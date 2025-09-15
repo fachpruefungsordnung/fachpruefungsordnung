@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS docs (
 CREATE TABLE IF NOT EXISTS doc_text_elements (
     id BIGINT PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
     kind TEXT NOT NULL,
+    type TEXT NOT NULL,
     document BIGINT REFERENCES docs (id)
 );
 
@@ -34,7 +35,6 @@ CREATE TABLE IF NOT EXISTS doc_tree_nodes (
 CREATE TABLE IF NOT EXISTS doc_tree_edges (
     parent BYTEA NOT NULL REFERENCES doc_tree_nodes (hash),
     position BIGINT NOT NULL,
-    title TEXT NOT NULL,
     child_node BYTEA REFERENCES doc_tree_nodes (hash),
     child_text_element BIGINT REFERENCES doc_text_elements (id),
     creation_ts TIMESTAMPTZ DEFAULT now(),
