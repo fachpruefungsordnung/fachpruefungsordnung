@@ -2,7 +2,7 @@ module Database (getConnection, getPool, migrate) where
 
 import Data.ByteString.Char8 (pack)
 import Data.Functor
-import qualified Hasql.Connection as Conn
+import qualified Hasql.Connection.Setting as Setting
 import qualified Hasql.Connection.Setting.Connection as Connection
 import Hasql.Migration
 import qualified Hasql.Pool as Pool
@@ -28,7 +28,7 @@ getPool = do
 getConnection :: IO (Either Conn.ConnectionError Conn.Connection)
 getConnection = envSettings >>= Conn.acquire
 
-envSettings :: IO Conn.Setting.Connection
+envSettings :: IO Setting.Connection
 envSettings = do
     host <- getEnv "POSTGRES_HOST" <&> pack
     port <- getEnv "POSTGRES_PORT" <&> read
@@ -36,7 +36,7 @@ envSettings = do
     password <- getEnv "POSTGRES_PASSWORD" <&> pack
     database <- getEnv "POSTGRES_DB" <&> pack
     return $
-        Conn.Setting.connection
+        Setting.connection
             ( Connection.params
                 [ Connection.Param.host host
                 , Connection.Param.port port
