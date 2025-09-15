@@ -116,24 +116,18 @@ instance encodeJsonEdge :: EncodeJson a => EncodeJson (Edge a) where
   encodeJson (Edge child) = encodeJson child
 
 instance encodeJsonTree :: EncodeJson a => EncodeJson (Tree a) where
-  encodeJson (Node { title, children, header }) =
+  encodeJson (Node { children, header }) =
     encodeJson
-      { title
-      , content:
-          { type: "tree"
-          , node:
-              { children: map encodeJson children
-              , header: encodeJson header
-              }
+      { type: "tree"
+      , node:
+          { children: map encodeJson children
+          , header: encodeJson header
           }
       }
-  encodeJson (Leaf { title, node }) =
+  encodeJson (Leaf { node }) =
     encodeJson
-      { title
-      , content:
-          { type: "leaf"
-          , leaf: node
-          }
+      { type: "leaf"
+      , leaf: node
       }
 
 -- Show instances

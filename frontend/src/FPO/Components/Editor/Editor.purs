@@ -91,7 +91,7 @@ import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, enabled, ref, style, title) as HP
 import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
@@ -818,7 +818,7 @@ editor = connect selectTranslator $ H.mkComponent
       -- handle errors in pos and decodeJson
       case response of
         -- if error, try to Save again (Maybe ParentID is lost?)
-        Left _ -> handleAction (Save isAutoSave)
+        Left err -> updateStore $ Store.AddError err
         -- extract and insert new parentID into newContent
         Right updatedContent -> do
           H.raise (SavedSection newEntry)
