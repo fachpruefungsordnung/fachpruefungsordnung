@@ -195,6 +195,7 @@ jobs:
   deploy-staging:
     name: Deploy to Staging Server
     runs-on: self-hosted
+    if: ${{ github.ref == 'refs/heads/main' }}
     needs: [tests-pass]
     timeout-minutes: 60
     env:

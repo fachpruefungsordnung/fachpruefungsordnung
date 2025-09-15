@@ -9,7 +9,6 @@ jobs:
   deploy-prod:
     name: Deploy to Server
     runs-on: self-hosted
-    if: ${{ github.ref == 'refs/heads/main' }}
     timeout-minutes: 60
     env:
       MAIL_HOST: ${{ secrets.MAIL_HOST }}
