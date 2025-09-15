@@ -12,7 +12,7 @@ import Docs (logMessage)
 import qualified Docs
 import Docs.ExampleDoc (exampleTree)
 import Docs.Hasql.Database (run, runTransaction)
-import Logging.Logs (Severity (Info))
+import Logging.Logs (Severity (Error, Info))
 import qualified Logging.Scope as Scope
 import Mail (testMail)
 import Server
@@ -29,7 +29,7 @@ someFunc = do
     let userID = fromMaybe undefined $ fromString "7f59659a-9a46-4ba0-a911-09698107a6ea"
     let groupID = 1
     let title = "Test Document"
-    Right (Right _) <-
+    Right result <-
         flip
             runTransaction
             connection
@@ -38,5 +38,16 @@ someFunc = do
                 groupID
                 title
                 exampleTree
+
+    _ <- case result of
+        Right err ->
+            flip run connection $ logMessage Error Nothing Scope.server err
+        _ ->
+            flip run connection $
+                logMessage
+                    Error
+                    Nothing
+                    Scope.server
+                    ("Document insertion successful" :: String)
     runServer
     return ()
