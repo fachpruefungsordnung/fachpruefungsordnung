@@ -1,3 +1,5 @@
+{-# LANGUAGE ScopedTypeVariables #-}
+
 module Language.Ltml.Tree.Parser.Document
     ( documentTP
     , documentTP'
@@ -45,7 +47,7 @@ import Language.Ltml.AST.Section (SectionBody)
 import Language.Ltml.AST.SimpleSection (SimpleSection)
 import Language.Ltml.Common (Flagged', NavTocHeaded (NavTocHeaded), Parsed)
 import Language.Ltml.Parser.Document (documentHeadingP)
-import Language.Ltml.Parser.Footnote (runFootnoteWriterT)
+import Language.Ltml.Parser.Footnote (FootnoteMap, runFootnoteWriterT)
 import Language.Ltml.Parser.Section (sectionBodyP)
 import Language.Ltml.Parser.SimpleSection (simpleSectionSequenceP)
 import Language.Ltml.Parser.Text (HangingTextP)
@@ -56,7 +58,6 @@ import Language.Ltml.Tree.Parser
     , disjNFlaggedTreePF
     , flaggedTreePF
     , leafFootnoteParser
-    , leafParser
     , nFlaggedTreePF
     )
 import Language.Ltml.Tree.Parser.Section (sectionBodyTP)
@@ -76,7 +77,8 @@ documentTP'
 documentTP' = nFlaggedTreePF documentTXP'
 
 documentTXP'
-    :: (Pure f, HangingTextP f)
+    :: forall f
+     . (Pure f, HangingTextP f)
     => DocumentType
     -> InputTree'
     -> TreeParser (f Document)
@@ -85,18 +87,22 @@ documentTXP' _ (Leaf _) =
 documentTXP'
     (DocumentType kw fmt headingT bodyT (Disjunction fnTs))
     (Tree x children) = do
-        wHheading <- sequenceEither <$> headingTP kw headingT x
-        (body, fnMap) <-
-            runFootnoteWriterT (bodyTP bodyT children) (map unwrapNT fnTs)
-        return $ fmap (\heading -> Document fmt heading body fnMap) wHheading
+        (docF, fnMap) <- runFootnoteWriterT aux (map unwrapNT fnTs)
+        return $ fmap ($ fnMap) docF
+      where
+        aux :: FootnoteTreeParser (f (FootnoteMap -> Document))
+        aux = do
+            wHeading <- sequenceEither <$> headingTP kw headingT x
+            body <- bodyTP bodyT children
+            return $ fmap (\heading -> Document fmt heading body) wHeading
 
 headingTP
     :: (HangingTextP f)
     => Keyword
     -> DocumentHeadingType
     -> Maybe Text
-    -> TreeParser (Parsed (f DocumentHeading))
-headingTP kw t (Just x) = leafParser (documentHeadingP kw t) x
+    -> FootnoteTreeParser (Parsed (f DocumentHeading))
+headingTP kw t (Just x) = leafFootnoteParser (documentHeadingP kw t) x
 headingTP _ _ Nothing = fail "Document lacks heading"
 
 bodyTP

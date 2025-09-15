@@ -1,5 +1,6 @@
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 
@@ -44,14 +45,17 @@ module Language.Ltml.HTML.Common
 
 import Control.Monad.Reader (ReaderT, runReaderT)
 import Control.Monad.State (State, get, modify, runState)
+import Data.Aeson (FromJSON, ToJSON)
 import Data.ByteString.Lazy (ByteString)
 import Data.DList (DList, snoc)
 import qualified Data.DList as DList (empty)
 import Data.Map (Map)
 import qualified Data.Map as Map (empty)
+import Data.OpenApi (ToSchema)
 import Data.Set (Set)
 import qualified Data.Set as Set (empty)
 import Data.Text (Text, cons, pack)
+import GHC.Generics (Generic)
 import Language.Lsd.AST.Common (Fallback, NavTocHeading)
 import Language.Lsd.AST.Format
 import Language.Lsd.AST.Type.Enum (EnumFormat)
@@ -347,7 +351,13 @@ addPhantomTocEntry resHtml =
 type RenderedTocEntry = (Maybe ByteString, Result ByteString)
 
 data Result a = Success a | Error a
-    deriving (Show)
+    deriving (Show, Generic)
+
+instance (ToJSON a) => ToJSON (Result a)
+
+instance (FromJSON a) => FromJSON (Result a)
+
+instance (ToSchema a) => ToSchema (Result a)
 
 -- | Takes a @Result a@, a success function and an error function.
 --   Applies one of the two functions depending on the 'Result' constructor.

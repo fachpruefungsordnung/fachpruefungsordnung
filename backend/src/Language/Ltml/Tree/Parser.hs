@@ -40,7 +40,7 @@ import Language.Ltml.Parser.Footnote
     , eitherMapFootnoteWriterT
     )
 import Language.Ltml.Tree (FlaggedTree, Tree, TypedTree (TypedTree))
-import Text.Megaparsec (runParser)
+import Text.Megaparsec (eof, runParser)
 
 newtype TreeParser a = TreeParser (Either TreeError a)
     deriving (Functor, Applicative, Monad)
@@ -69,7 +69,7 @@ instance (MonadTreeParser m) => MonadTreeParser (FootnoteWriterT m) where
     treeParser = lift . treeParser
 
 parseLeaf :: Parser a -> Text -> Parsed a
-parseLeaf p x = runParser (nSc *> p) "" (x <> "\n")
+parseLeaf p x = runParser (nSc *> p <* eof) "" (x <> "\n")
 
 leafParser :: Parser a -> Text -> TreeParser (Parsed a)
 leafParser p x = return $ parseLeaf p x

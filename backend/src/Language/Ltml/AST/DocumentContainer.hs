@@ -22,8 +22,7 @@ data DocumentContainer
         [Flagged' AppendixSection]
     deriving (Show)
 
-data DocumentContainerHeader
-    = DocumentContainerHeader
+data DocumentContainerHeader = DocumentContainerHeader
     { dchPdfTitle :: Text
     , dchHeaderFooterSuperTitle :: Text
     , dchHeaderFooterTitle :: Text

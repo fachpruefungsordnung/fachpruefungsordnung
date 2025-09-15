@@ -1,0 +1,35 @@
+name: Deploy production
+
+on:
+  push:
+    tags:
+      - "prod"
+
+jobs:
+  deploy-prod:
+    name: Deploy to Server
+    runs-on: self-hosted
+    timeout-minutes: 60
+    env:
+      MAIL_HOST: ${{ secrets.MAIL_HOST }}
+      MAIL_PORT: ${{ secrets.MAIL_PORT }}
+      MAIL_ADDRESS: ${{ secrets.MAIL_ADDRESS }}
+      MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+      MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          password: ${{ secrets.REMOTE_PASSWORD }}
+          port: ${{ secrets.SSH_PORT }}
+          envs: MAIL_HOST,MAIL_PORT,MAIL_ADDRESS,MAIL_USERNAME,MAIL_PASSWORD,SERVER_HOST
+          command_timeout: 200m
+          script: |
+            cd ${{ vars.REPO_PATH }}
+            git pull
+            docker compose -f docker-compose.yaml -f docker-compose.ssl.yaml build
+            docker compose down
+            docker compose -f docker-compose.yaml -f docker-compose.ssl.yaml up -d

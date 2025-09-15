@@ -16,7 +16,6 @@ module Language.Ltml.HTML
     , renderHtmlCssExport
     , renderHtmlCssBS
     , renderTocList
-    , renderTocEntry
     ) where
 
 import Clay (Css)
@@ -198,11 +197,6 @@ renderTocList docContainer =
                 tocList
      in -- \| Render Maybe Html and Result Html to ByteString
         map (bimap (fmap renderBS) (fmap renderBS)) htmlTitleList
-
--- | Renders a single ToC entry from Text and wraps the given Result type;
---   The given Text is wrapped into <span> </span>
-renderTocEntry :: Result () -> Text -> RenderedTocEntry
-renderTocEntry resUnit text = (Nothing, renderBS (span_ $ toHtml text) <$ resUnit)
 
 -------------------------------------------------------------------------------
 
@@ -512,7 +506,9 @@ instance ToHtmlM (Node Paragraph) where
                     div_ [cssClass_ Class.Paragraph, cssClass_ Class.Anchor, mId_ mLabel]
                         -- \| If this is the only paragraph inside this section we drop the visible paragraphID
                         <$> let idHtml = if isSingleParagraph readerState then mempty else paragraphKeyHtml
-                             in return (div_ <#> Class.ParagraphID $ idHtml) <> div_ <#> Class.TextContainer
+                             in return (div_ <#> Class.ParagraphID $ idHtml)
+                                    <> div_
+                                        <#> Class.TextContainer
                                     <$> childText
 
 -------------------------------------------------------------------------------

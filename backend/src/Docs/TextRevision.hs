@@ -11,6 +11,10 @@ module Docs.TextRevision
     , TextRevisionHistory (..)
     , NewTextRevision (..)
     , TextRevisionRef (..)
+    , DraftRevisionID (..)
+    , DraftRevision (..)
+    , DraftRevisionHeader (..)
+    , Rendered (..)
     , contentsNotChanged
     , prettyPrintTextRevisionRef
     , textRevisionRef
@@ -45,6 +49,7 @@ import Data.OpenApi
     , ToParamSchema (..)
     , ToSchema (..)
     , declareSchemaRef
+    , description
     , enum_
     , exclusiveMinimum
     , minimum_
@@ -206,8 +211,7 @@ instance FromJSON TextRevisionHeader
 instance ToSchema TextRevisionHeader
 
 -- | A text revision.
-data TextRevision
-    = TextRevision
+data TextRevision = TextRevision
     { header :: TextRevisionHeader
     , content :: Text
     , commentAnchors :: Vector CommentAnchor
@@ -221,8 +225,7 @@ instance FromJSON TextRevision
 instance ToSchema TextRevision
 
 -- | A text revision with the text element it belongs to.
-data TextElementRevision
-    = TextElementRevision
+data TextElementRevision = TextElementRevision
     { textElement :: TextElement
     , revision :: Maybe TextRevision
     }
@@ -233,6 +236,51 @@ instance ToJSON TextElementRevision
 instance FromJSON TextElementRevision
 
 instance ToSchema TextElementRevision
+
+-- | ID for a draft text revision
+newtype DraftRevisionID = DraftRevisionID
+    { unDraftRevisionID :: Int64
+    }
+    deriving (Eq, Ord, Show)
+
+instance ToJSON DraftRevisionID where
+    toJSON = toJSON . unDraftRevisionID
+
+instance FromJSON DraftRevisionID where
+    parseJSON = fmap DraftRevisionID . parseJSON
+
+instance ToSchema DraftRevisionID where
+    declareNamedSchema _ = declareNamedSchema (Proxy :: Proxy Int64)
+
+-- | Header of a draft text revision.
+data DraftRevisionHeader = DraftRevisionHeader
+    { draftIdentifier :: DraftRevisionID
+    , basedOnRevision :: TextRevisionID
+    , creationTimestamp :: UTCTime
+    , lastUpdatedTimestamp :: UTCTime
+    , draftAuthor :: UserRef
+    }
+    deriving (Show, Generic)
+
+instance ToJSON DraftRevisionHeader
+
+instance FromJSON DraftRevisionHeader
+
+instance ToSchema DraftRevisionHeader
+
+-- | A draft text revision.
+data DraftRevision = DraftRevision
+    { draftHeader :: DraftRevisionHeader
+    , draftContent :: Text
+    , draftCommentAnchors :: Vector CommentAnchor
+    }
+    deriving (Generic)
+
+instance ToJSON DraftRevision
+
+instance FromJSON DraftRevision
+
+instance ToSchema DraftRevision
 
 -- | A sequence of revisions for a text element
 data TextRevisionHistory
@@ -271,6 +319,7 @@ data NewTextRevision = NewTextRevision
     , newTextRevisionParent :: Maybe TextRevisionID
     , newTextRevisionContent :: Text
     , newTextRevisionCommentAnchors :: Vector CommentAnchor
+    , newTextRevisionIsAutoSave :: Bool
     }
 
 -- | Check if a new revisions contents changed from an existing one.
@@ -286,12 +335,20 @@ contentsNotChanged latest newRevision =
 data ConflictStatus
     = Conflict TextRevisionID -- todo: maybe not id but whole TextRevision?
     | NoConflict TextRevision
+    | -- | created draft and conflicting revision ID
+      DraftCreated DraftRevision TextRevisionID
 
 instance ToJSON ConflictStatus where
     toJSON (Conflict conflictWith) =
         Aeson.object ["type" .= ("conflict" :: Text), "with" .= conflictWith]
     toJSON (NoConflict newRevision) =
         Aeson.object ["type" .= ("noConflict" :: Text), "newRevision" .= newRevision]
+    toJSON (DraftCreated draftRevision conflictWith) =
+        Aeson.object
+            [ "type" .= ("draftCreated" :: Text)
+            , "draft" .= draftRevision
+            , "with" .= conflictWith
+            ]
 
 instance FromJSON ConflictStatus where
     parseJSON = Aeson.withObject "ConflictStatus" $ \obj -> do
@@ -299,17 +356,21 @@ instance FromJSON ConflictStatus where
         case ty of
             "conflict" -> Conflict <$> obj .: "with"
             "noConflict" -> NoConflict <$> obj .: "newRevision"
+            "draftCreated" -> DraftCreated <$> obj .: "draft" <*> obj .: "with"
             _ -> fail $ "Unknown ConflictStatus type: " ++ show ty
 
 instance ToSchema ConflictStatus where
     declareNamedSchema _ = do
         textRevIdSchema <- declareSchemaRef (Proxy :: Proxy TextRevisionID)
         textRevSchema <- declareSchemaRef (Proxy :: Proxy TextRevision)
+        draftRevSchema <- declareSchemaRef (Proxy :: Proxy DraftRevision)
 
         return $
             NamedSchema (Just "ConflictStatus") $
                 mempty
                     & type_ ?~ OpenApiObject
+                    & description
+                        ?~ "Status of text revision creation - can be no conflict, conflict with existing revision, or draft created due to AutoSave conflict"
                     & oneOf
                         ?~ [ Inline $
                                 mempty
@@ -329,6 +390,16 @@ instance ToSchema ConflictStatus where
                                             , ("newRevision", textRevSchema)
                                             ]
                                     & required .~ ["type", "newRevision"]
+                           , Inline $
+                                mempty
+                                    & type_ ?~ OpenApiObject
+                                    & properties
+                                        .~ InsOrd.fromList
+                                            [ ("type", Inline $ schemaConstText "draftCreated")
+                                            , ("draft", draftRevSchema)
+                                            , ("with", textRevIdSchema)
+                                            ]
+                                    & required .~ ["type", "draft", "with"]
                            ]
       where
         schemaConstText :: Text -> Schema
@@ -336,3 +407,16 @@ instance ToSchema ConflictStatus where
             mempty
                 & type_ ?~ OpenApiString
                 & enum_ ?~ [toJSON val]
+
+data Rendered a
+    = Rendered
+    { element :: a
+    , html :: Text -- TODO: ByteString might be better suited!
+    }
+    deriving (Generic)
+
+instance (ToJSON a) => ToJSON (Rendered a)
+
+instance (FromJSON a) => FromJSON (Rendered a)
+
+instance (ToSchema a) => ToSchema (Rendered a)

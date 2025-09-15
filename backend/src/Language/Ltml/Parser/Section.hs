@@ -8,7 +8,6 @@ where
 import Control.Applicative ((<|>))
 import Control.Functor.Utils (traverseF)
 import Control.Monad (void)
-import Control.Monad.Trans.Class (lift)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Star (Star))
 import Language.Lsd.AST.Type (unwrapNT)
@@ -28,10 +27,12 @@ import Language.Ltml.AST.Section
     )
 import Language.Ltml.Common (Flagged (Flagged))
 import Language.Ltml.Parser (Parser)
-import Language.Ltml.Parser.Common.Indent (nonIndented)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
 import Language.Ltml.Parser.Footnote (FootnoteParser)
-import Language.Ltml.Parser.Footnote.Combinators (manyWithFootnotesTillSucc)
+import Language.Ltml.Parser.Footnote.Combinators
+    ( manyWithFootnotesTillSucc
+    , withSucceedingFootnotes
+    )
 import Language.Ltml.Parser.Keyword (keywordP)
 import Language.Ltml.Parser.Paragraph (paragraphP)
 import Language.Ltml.Parser.SimpleBlock (simpleBlockP)
@@ -40,8 +41,8 @@ import Text.Megaparsec (many)
 
 sectionP :: SectionType -> Parser () -> FootnoteParser (Node Section)
 sectionP (SectionType kw headingT bodyT) succStartP = do
-    (mLabel, heading) <- lift $ nonIndented $ headingP kw headingT
-    body <- nonIndented $ sectionBodyP bodyT succStartP
+    (mLabel, heading) <- headingP kw headingT
+    body <- sectionBodyP bodyT succStartP
     return $ Node mLabel $ Section (Right heading) body
 
 sectionP'
@@ -74,6 +75,12 @@ sectionBodyP t0 succStartP = bodyP t0
 toStartP :: FormattedSectionType -> Parser ()
 toStartP (SectionFormatted _ (SectionType kw _ _)) = void $ keywordP kw
 
-headingP :: (HangingTextP f) => Keyword -> HeadingType -> Parser (f Heading)
+headingP
+    :: (HangingTextP f)
+    => Keyword
+    -> HeadingType
+    -> FootnoteParser (f Heading)
 headingP kw (HeadingType fmt tt) =
-    nLexeme $ fmap (Heading fmt) <$> hangingTextP' kw tt
+    withSucceedingFootnotes $
+        nLexeme $
+            fmap (Heading fmt) <$> hangingTextP' kw tt

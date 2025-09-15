@@ -24,15 +24,15 @@ import Data.Array
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
 import FPO.Components.Editor as Editor
+import FPO.Components.Editor.Types (ElementData)
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC (Path, SelectedEntity(..))
 import FPO.Components.TOC as TOC
@@ -91,12 +91,11 @@ derive instance eqDragTarget :: Eq DragTarget
 type Output = Unit
 type Input = DocumentID
 
-type ElementData = Editor.ElementData
-
 data Query a = UnitQuery a
 
 data Action
   = Init
+  | Receive (Connected FPOTranslator Input)
   -- Resizing Actions
   -- | SetComparison Int Int
   | StartResize DragTarget MouseEvent
@@ -122,6 +121,7 @@ data Action
   | ModifyVersionMapping Int (Maybe (Maybe Int)) (Maybe (ElementData))
   | UpdateMSelectedTocEntry
   | SetComparison Int (Maybe Int)
+  | UpdateVersionMapping
 
 type State = FPOState
   ( docID :: DocumentID
@@ -145,11 +145,6 @@ type State = FPOState
   , lastExpandedSidebarRatio :: Number
   , lastExpandedPreviewRatio :: Number
 
-  -- There are 2 ways to send content to preview:
-  -- 1. This editorContent is sent through the slot in renderPreview
-  -- 2. Throuth QueryEditor of the Editor, where the editor collects its content and sends it
-  --   to the preview component.
-  -- TODO: Which one to use?
   , renderedHtml :: Maybe (LoadState String)
   , testDownload :: String
 
@@ -201,7 +196,10 @@ splitview = connect selectTranslator $ H.mkComponent
   { initialState
   , render
   , eval: H.mkEval $ H.defaultEval
-      { initialize = Just Init, handleAction = handleAction }
+      { initialize = Just Init
+      , handleAction = handleAction
+      , receive = Just <<< Receive
+      }
   }
   where
   initialState :: Connected FPOTranslator Input -> State
@@ -605,6 +603,9 @@ splitview = connect selectTranslator $ H.mkComponent
       handleAction GET
       handleAction UpdateMSelectedTocEntry
 
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
+
     -- API Actions
 
     POST -> do
@@ -619,26 +620,23 @@ splitview = connect selectTranslator $ H.mkComponent
 
     GET -> do
       s <- H.get
-      -- TODO: Here, we can simply fetch the latest commit (head commit) of the document and
-      --       write the content into the editor. Because requests like these are very common,
-      --       we should think of a way to have a uniform and clean request handling system, especially
-      --       regarding authentification and error handling. Right now, the editor page is simply empty
-      --       if the document retrieval fails in any way.
-      maybeTree <- H.liftAff
-        $ Request.getFromJSONEndpoint DT.decodeDocument
-        $ "/docs/" <> show s.docID <> "/tree/latest"
-      let
-        finalTree = fromMaybe Empty (documentTreeToTOCTree <$> maybeTree)
-        vMapping = map
-          ( \elem ->
-              { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
-          )
-          finalTree
-      H.modify_ _
-        { tocEntries = finalTree
-        , versionMapping = vMapping
-        }
-      H.tell _toc unit (TOC.ReceiveTOCs finalTree)
+      maybeTree <- Request.getJson DT.decodeDocument
+        ("/docs/" <> show s.docID <> "/tree/latest")
+      case maybeTree of
+        Left _ -> pure unit
+        Right tree -> do
+          let
+            finalTree = documentTreeToTOCTree tree
+            vMapping = map
+              ( \elem ->
+                  { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
+              )
+              finalTree
+          H.modify_ _
+            { tocEntries = finalTree
+            , versionMapping = vMapping
+            }
+          H.tell _toc unit (TOC.ReceiveTOCs finalTree)
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -717,11 +715,31 @@ splitview = connect selectTranslator $ H.mkComponent
 
         _ -> pure unit
 
+      when (isJust mt) do
+        H.tell _editor 0 (Editor.EditorResize)
+        H.tell _editor 1 (Editor.EditorResize)
+
     -- Toggle actions
 
     UpdateMSelectedTocEntry -> do
       cToc <- H.request _toc unit TOC.RequestCurrentTocEntry
       H.modify_ _ { mSelectedTocEntry = join cToc }
+
+    UpdateVersionMapping -> do
+      state <- H.get
+      let
+        newVersionMapping =
+          map
+            ( \e ->
+                case
+                  (findRootTree (\v -> v.elementID == e.id) state.versionMapping)
+                  of
+                  Just entry -> entry
+                  Nothing ->
+                    { elementID: e.id, versionID: Nothing, comparisonData: Nothing }
+            )
+            state.tocEntries
+      H.modify_ _ { versionMapping = newVersionMapping }
 
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
@@ -759,6 +777,7 @@ splitview = connect selectTranslator $ H.mkComponent
           { sidebarRatio = st.lastExpandedSidebarRatio
           , sidebarShown = true
           }
+      H.tell _editor 0 (Editor.EditorResize)
 
     -- Toggle the preview area
     TogglePreview -> do
@@ -796,8 +815,6 @@ splitview = connect selectTranslator $ H.mkComponent
                 case versionEntry.comparisonData of
                   Nothing -> mod
                   Just _ -> do
-                    -- Just cData -> do 
-                    -- handleAction (ModifyVersionMapping tocID Nothing cData.revID) 
                     handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
       -- open preview
       else do
@@ -806,6 +823,10 @@ splitview = connect selectTranslator $ H.mkComponent
           { previewRatio = st.lastExpandedPreviewRatio
           , previewShown = true
           }
+        -- only resize second editor, when visible
+        H.tell _editor 1 (Editor.EditorResize)
+      -- always resize main editor for each call
+      H.tell _editor 0 (Editor.EditorResize)
 
     ModifyVersionMapping tocID vID cData -> do
       state <- H.get
@@ -825,7 +846,6 @@ splitview = connect selectTranslator $ H.mkComponent
         newVersionMapping =
           modifyNodeRootTree
             (\v -> v.elementID == tocID)
-            (\string -> string)
             ( \v ->
                 { elementID: v.elementID
                 , versionID: newVersionID v.versionID
@@ -834,7 +854,6 @@ splitview = connect selectTranslator $ H.mkComponent
             )
             state.versionMapping
       H.modify_ _ { versionMapping = newVersionMapping }
-      H.liftEffect $ log "Modified version"
 
     SetComparison elementID vID -> do
       state <- H.get
@@ -849,10 +868,8 @@ splitview = connect selectTranslator $ H.mkComponent
         ( ModifyVersionMapping elementID Nothing
             (Just (Just { tocEntry: tocEntry, revID: vID, title: title }))
         )
-      {-       H.modify_ _
-      { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } } -}
       H.tell _editor 1
-        (Editor.ChangeSection title tocEntry vID)
+        (Editor.ChangeSection tocEntry vID)
 
     -- Query handler
 
@@ -958,13 +975,13 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.RequestComments docID entryID -> do
         H.tell _comment unit (Comment.RequestComments docID entryID)
 
-      Editor.SavedSection toBePosted title tocEntry -> do
+      Editor.SavedSection tocEntry -> do
         state <- H.get
         let
-          newTOCTree = replaceTOCEntry tocEntry.id title tocEntry state.tocEntries
+          newTOCTree = replaceTOCEntry tocEntry.id tocEntry state.tocEntries
         H.modify_ _ { tocEntries = newTOCTree }
         H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
-        when toBePosted (handleAction POST)
+        handleAction POST
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get
@@ -986,17 +1003,39 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.ShowAllCommentsOutput docID tocID -> do
         handleAction $ ToggleCommentOverview true docID tocID
 
+      Editor.RaiseDiscard -> do
+        handleAction UpdateMSelectedTocEntry
+        state <- H.get
+        -- Only the SelLeaf case should ever occur
+        case state.mSelectedTocEntry of
+          Just (SelLeaf id) -> do
+            _ <- Request.deleteIgnore
+              ("/docs/" <> show state.docID <> "/text/" <> show id <> "/draft")
+            handleAction (ModifyVersionMapping id (Just Nothing) Nothing)
+            let
+              -- Nothing case should never occur
+              entry = case (findTOCEntry id state.tocEntries) of
+                Nothing -> emptyTOCEntry
+                Just e -> e
+            H.tell _editor 0 (Editor.ChangeSection entry Nothing)
+          _ -> do
+            pure unit
+
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
 
       TOC.ModifyVersion elementID mVID -> do
+        state <- H.get
         handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
+        case (findTOCEntry elementID state.tocEntries) of
+          Nothing -> pure unit
+          Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
 
       TOC.CompareTo elementID vID -> do
         handleAction (SetComparison elementID vID)
 
-      TOC.ChangeToLeaf title selectedId -> do
+      TOC.ChangeToLeaf selectedId -> do
         H.tell _editor 0 Editor.SaveSection
         handleAction UpdateMSelectedTocEntry
         state <- H.get
@@ -1011,17 +1050,13 @@ splitview = connect selectTranslator $ H.mkComponent
               Nothing ->
                 { elementID: -1, versionID: Nothing, comparisonData: Nothing }
               Just elem -> elem
-        -- handleAction (ModifyVersionMapping selectedID rev)
-        H.tell _editor 0 (Editor.ChangeSection title entry ev.versionID)
+        H.tell _editor 0 (Editor.ChangeSection entry ev.versionID)
         case ev.comparisonData of
           Nothing -> do
             -- this case should be covered by mSelectedTocEntry being set to Nothing
             pure unit
           Just d ->
-            H.tell _editor 1 (Editor.ChangeSection d.title d.tocEntry d.revID)
-
-      TOC.ChangeToNode path title -> do
-        H.tell _editor 0 (Editor.ChangeToNode title path)
+            H.tell _editor 1 (Editor.ChangeSection d.tocEntry d.revID)
 
       TOC.UpdateNodePosition path -> do
         H.tell _editor 0 (Editor.UpdateNodePosition path)
@@ -1053,6 +1088,7 @@ splitview = connect selectTranslator $ H.mkComponent
         encodedTree
       -- TODO auch hier mit potentiellen Fehlern umgehen
       H.modify_ \st -> st { tocEntries = newTree }
+      handleAction UpdateVersionMapping
       H.tell _toc unit (TOC.ReceiveTOCs newTree)
 
 -- findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection

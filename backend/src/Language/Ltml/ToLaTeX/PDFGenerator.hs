@@ -13,8 +13,7 @@ import Control.Monad.State (runState)
 import qualified Data.ByteString.Char8 as BS
 import qualified Data.ByteString.Lazy as BSL
 import Data.Text (Text)
-import qualified Data.Text.Lazy as LT
-import qualified Data.Text.Lazy.Encoding as TLE
+import qualified Data.Text.Encoding as TE
 import Language.Ltml.ToLaTeX.GlobalState
     ( initialGlobalState
     , labelToRef
@@ -59,7 +58,7 @@ compilePDF input =
         let latexSource = generateLaTeX input
 
         -- Write LaTeX source
-        BSL.writeFile texFile (TLE.encodeUtf8 latexSource)
+        BS.writeFile texFile (TE.encodeUtf8 latexSource)
 
         -- Compile with pdflatex
         (exitCode, stdout, _) <- runLatex texFile tmpDir
@@ -70,7 +69,7 @@ compilePDF input =
 
 -------------------------------- Helpers -----------------------------------
 
-generateLaTeX :: (ToPreLaTeXM a) => a -> LT.Text
+generateLaTeX :: (ToPreLaTeXM a) => a -> Text
 generateLaTeX input =
     let (res, gs) = runState (toPreLaTeXM input) initialGlobalState
      in renderLaTeX $

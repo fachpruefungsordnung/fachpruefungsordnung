@@ -18,7 +18,7 @@ References are always permitted.
 
 ## Line breaks & Whitespace
 
-Text may be spread over several lines---maintaining indentation if any.
+Text may be spread over several lines---all with the same minimum indentation.
 Such input lines form a single logical line, joined by whitespace.
 Text is terminated by a final newline character.
 
@@ -26,12 +26,24 @@ Any internal whitespace---either from a single linebreak as described above,
 or a non-empty sequence of ASCII spaces, but neither initial nor final---is
 treated the same: as a word separator, which is generally rendered as a single
 space character.
-In particular, it is impossible to encode a line break; lines are
-automatically broken in the output whenever an output line is full.
+Normally, lines in the output are automatically broken when full.
+
+A hard line break can be encoded as `{nl}`, and a non-breaking space as `~`.
 
 Empty lines are disallowed within text.
 Note, however, that empty lines may be used to split up
 [paragraphs](./paragraph.md), which are otherwise basically just text.
+
+
+## Escaping
+
+Any non-whitespace character that is generally valid may be escaped by
+prepending a backslash (`\`), yielding the respective literal character.
+This is useful for characters with special meaning.
+In particular, a literal backslash can be encoded as `\\`.
+
+All Unicode characters except Unicode control characters
+(`Cc`; e.g., `U+007F` - `DEL`) are generally valid.
 
 
 ## Keyword-headed text
@@ -39,8 +51,9 @@ Note, however, that empty lines may be used to split up
 In some contexts (e.g., [enumerations](./enumeration.md)), text is headed by a
 [keyword](general/identifier.md#input-identifiers).
 
-In this case, one level of [indentation](general/indentation.md) is implicitly
-added.
+In this case, in order to belong to the headed text, any input line following
+the first must be indented more than that first line, but not necessarily by
+the same amount.
 
 The first line may generally be written right after the keyword (in the same
 line, separated by at least one ASCII space); otherwise, it starts on the
@@ -53,11 +66,10 @@ See [enumerations](./enumeration.md) for example input.
 
 * Some (but not all) node kinds permit styled text.
 * Specifically, text may be `<*bold>`, `</in italics>`, or `<_underlined>`.
-* Different style tags may be nested (e.g., `<*bold </and italics/>*>`).
-    * However, a style tag may not be (transitively) nested within itself
-      (e.g., `<*bold <*again*>*>` is illegal).
-        * Note: This restriction is not yet implemented and might be removed
-          later.
+* Different style tags may be nested (e.g., `<*bold </and italics>>`).
+    * Nesting the same style tag within itself is possible but of little use.
+        * E.g., `<*bold <*again>>` is visually equivalent to `<*bold again>`
+          in the output.
 * ```
   <*Styled text can
   span multiple lines,
@@ -117,9 +129,10 @@ Text nodes (e.g., headings, sentences) generally permit in-line children.
 That is, at any point in such a text node, certain child nodes may be inserted.
 This requires breaking the line where the children are to be inserted.
 
-Text children must be [indented](general/indentation.md) one level from the
-current context (text); that is, two levels from the textual node's keyword,
-if any.
+Child nodes need not be indented further than the context, but this is deemed
+good practice.
+Similarly, they should not appear before any regular text, but this is not
+prohibited.
 
 There is currently one kind of text children, [enumeration](./enumeration.md)
 items.

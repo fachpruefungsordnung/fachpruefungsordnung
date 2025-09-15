@@ -27,8 +27,7 @@ import qualified Docs.Hasql.Transactions as Transactions
 import Logging.Logs (Severity (..))
 import qualified Logging.Scope as Scope
 
-newtype HasqlSession a
-    = HasqlSession
+newtype HasqlSession a = HasqlSession
     { unHasqlSession :: Session a
     }
     deriving (Functor, Applicative, Monad)
@@ -89,7 +88,7 @@ instance HasGetTextElementRevision HasqlSession where
     getTextElementRevision = HasqlSession . Sessions.getTextElementRevision
 
 instance HasGetTextHistory HasqlSession where
-    getTextHistory = ((HasqlSession .) .) . Sessions.getTextRevisionHistory
+    getTextHistory = (((HasqlSession .) .) .) . Sessions.getTextRevisionHistory
 
 instance HasGetTreeHistory HasqlSession where
     getTreeHistory = ((HasqlSession .) .) . Sessions.getTreeRevisionHistory
@@ -112,13 +111,12 @@ instance HasCreateDocument HasqlSession where
     createDocument = ((HasqlSession .) .) . Sessions.createDocument
 
 instance HasCreateTextElement HasqlSession where
-    createTextElement = (HasqlSession .) . Sessions.createTextElement
+    createTextElement = ((HasqlSession .) .) . Sessions.createTextElement
 
 instance HasLogMessage HasqlSession where
     logMessage = (((HasqlSession .) .) .) . Sessions.logMessage
 
-newtype HasqlTransaction a
-    = HasqlTransaction
+newtype HasqlTransaction a = HasqlTransaction
     { unHasqlTransaction :: Transaction a
     }
     deriving (Functor, Applicative, Monad)
@@ -178,6 +176,12 @@ instance HasGetTextElementRevision HasqlTransaction where
 instance HasGetTextElement HasqlTransaction where
     getTextElement = HasqlTransaction . Transactions.getTextElement
 
+instance HasGetTreeRevision HasqlTransaction where
+    getTreeRevision = HasqlTransaction . Transactions.getTreeRevision
+
+instance HasExistsTreeRevision HasqlTransaction where
+    existsTreeRevision = HasqlTransaction . Transactions.existsTreeRevision
+
 -- create
 
 instance HasCreateTextRevision HasqlTransaction where
@@ -196,6 +200,11 @@ instance HasCreateComment HasqlTransaction where
     resolveComment = HasqlTransaction . Transactions.resolveComment
     createReply = ((HasqlTransaction .) .) . Transactions.createReply
 
+instance HasDraftTextRevision HasqlTransaction where
+    createDraftTextRevision = ((((HasqlTransaction .) .) .) .) . Transactions.createDraftTextRevision
+    getDraftTextRevision = (HasqlTransaction .) . Transactions.getDraftTextRevision
+    deleteDraftTextRevision = (HasqlTransaction .) . Transactions.deleteDraftTextRevision
+
 instance HasLogMessage HasqlTransaction where
     logMessage = (((HasqlTransaction .) .) .) . Transactions.logMessage
 
@@ -203,4 +212,4 @@ instance HasCreateDocument HasqlTransaction where
     createDocument = ((HasqlTransaction .) .) . Transactions.createDocument
 
 instance HasCreateTextElement HasqlTransaction where
-    createTextElement = (HasqlTransaction .) . Transactions.createTextElement
+    createTextElement = ((HasqlTransaction .) .) . Transactions.createTextElement

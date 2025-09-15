@@ -3,9 +3,13 @@
 
 -- | Parsing Mixed Indentation Trees---trees that may both be represented by
 --   indentation, or by bracketing tokens, where the latter nodes may span
---   multiple lines of matching indentation.
+--   multiple lines, while empty lines are disallowed.
 module Language.Ltml.Parser.MiTree
     ( MiElementConfig (..)
+    , InlineParser (..)
+    , Restricted
+    , unrestricted
+    , unbracketed
     , miForest
     , hangingBlock
     , hangingBlock'
@@ -13,30 +17,23 @@ module Language.Ltml.Parser.MiTree
     )
 where
 
-import Control.Alternative.Utils (whenAlt)
 import Control.Applicative (optional, (<|>))
-import Control.Applicative.Utils ((<:>))
-import Control.Monad (void, when)
+import Control.Applicative.Combinators (choice)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import Data.Text.FromWhitespace (FromWhitespace, fromWhitespace)
 import Language.Ltml.Parser (MonadParser)
 import Language.Ltml.Parser.Common.Indent
-    ( checkIndent
-    , nextIndentLevel
+    ( checkIndentGT
     , nli
     )
-import Language.Ltml.Parser.Common.Lexeme (sp, sp1)
-import Text.Megaparsec (Pos)
+import Language.Ltml.Parser.Common.Lexeme (sp)
+import Text.Megaparsec (Pos, empty, (<?>))
 import qualified Text.Megaparsec.Char.Lexer as L (indentLevel)
 
 -- | Configuration on how to handle an element (node in a mi-tree).
 data MiElementConfig = MiElementConfig
-    { miecPermitEnd :: Bool
-    -- ^ Whether to permit the parent element to end with this element
-    --   (or else require a succeeding element).
-    , miecPermitChild :: Bool
-    -- ^ Whether to permit a child to succeed this element.
-    , miecRetainPrecedingWhitespace :: Bool
+    { miecRetainPrecedingWhitespace :: Bool
     -- ^ whether to retain (or else drop) whitespace between the preceding and
     --   this element (if any).
     , miecRetainTrailingWhitespace :: Bool
@@ -46,68 +43,136 @@ data MiElementConfig = MiElementConfig
     --   case whitespace is always dropped).
     }
 
+-- | An in-line element parser (constructor).
+--   Involved parsers must not consume whitespace (ASCII spaces, newlines)
+--   and must not accept the empty input.
+data InlineParser m a
+    = LeafParser (m (MiElementConfig, [a]))
+    | -- | Bracketing parser, composed of two parsers, one for the opening
+      --   bracket, one for the closing bracket.
+      --   The closing bracket parser is only used if possible
+      --   (via 'Control.Applicative.optional').
+      --   The body parser is determined by context.
+      --   Any whitespace both within and adjacent to the brackets is dropped.
+      BracketingParser (m ([a] -> (MiElementConfig, [a]))) (m ())
+
+data Restricted a = Restricted Restriction a
+
+data Restriction
+    = Unrestricted
+    | Unbracketed
+    deriving (Eq)
+
+unrestricted :: a -> Restricted a
+unrestricted = Restricted Unrestricted
+
+unbracketed :: a -> Restricted a
+unbracketed = Restricted Unbracketed
+
+filterRestricted :: (Restriction -> Bool) -> [Restricted a] -> [a]
+filterRestricted p = mapMaybe aux
+  where
+    aux (Restricted r x) = if p r then Just x else Nothing
+
 -- | Parse a list of mixed indentation trees (a forest), terminated by a
 --   newline (plus indentation).
 --
---   In-line nodes are parsed by @'elementPF' p@, where @p@ is supplied as the
---   parser for the children nodes.
+--   At least one element is parsed.
 --
---   Indented nodes are parsed by 'childP'.
+--   This is expected to be run at the start of a non-empty line, after any
+--   indentation.
 --
---   This expects that the next character is not an (ASCII) space.
---
---   'elementPF' is expected to be a simple bracketing wrapper around its
---   argument @p@, and not to consume (ASCII) spaces or newlines, unlike @p@.
---   For leaf nodes, 'elementPF' may simply ignore @p@.
---   @'elementPF' p@ is further generally expected to not accept the empty
---   input.  Exceptions are permitted when
---   (a) sufficiently repeated application eventually halts
---       (i.e. @'Text.Megaparsec.many' ('elementPF' p)@ halts), and
---   (b) @'elementPF' p@ does not succeed on an empty input line (possibly
---       with indentation / (ASCII) spaces).
---
---   Unlike 'elementPF', 'childP' is expected to take care of indentation
---   itself--except at the very beginning, where it may expect that any
---   indentation has been parsed and the indentation is correct.
---   Further, 'childP' must only succeed after a final newline (plus
---   indentation).
---   Typically, 'childP' uses 'hangingBlock', which satisfies these
---   requirements.
+--   The initial (minimum) indentation is set to none.
 miForest
     :: forall m a
      . (MonadParser m, FromWhitespace [a])
-    => (m [a] -> m (MiElementConfig, [a]))
-    -> m a
+    => [Restricted (InlineParser m a)]
+    -- ^ In-line element parsers.
+    --   They are tried in the given order.
+    -> (Maybe Pos -> m a)
+    -- ^ Block element parser.
+    --
+    --   The block parser is only attempted at the start of a line, and takes
+    --   precedence over in-line parsers there.
+    --
+    --   Unlike the in-line parsers, the block parser must take care of
+    --   indentation itself--except at the very beginning, where it may
+    --   expect that any indentation has been consumed and the indentation is
+    --   correct.
+    --   The supplied indentation is the parent's, and indentation is
+    --   acceptable iff strictly larger than that.
+    --
+    --   Further, the block parser must only succeed after a final newline
+    --   (plus indentation).
+    --
+    --   Typically, a block parser is constructed via 'hangingBlock'
+    --   (optionally combined with
+    --   'Language.Ltml.Parser.Common.Indent.someIndented' and/or
+    --   'Control.Applicative.<|>'), which satisfies these requirements.
     -> m [a]
-miForest elementPF childP = L.indentLevel >>= miForestFrom elementPF childP
+miForest inlinePs blockP = miForestFrom False inlinePs blockP Nothing
 
+-- | Information on whitespace separating two elements.
+data Sep
+    = Sep
+        Bool
+        -- ^ whether including linebreak
+        Text
+
+-- | Generalization of 'miForest'.
 miForestFrom
     :: forall m a
      . (MonadParser m, FromWhitespace [a])
-    => (m [a] -> m (MiElementConfig, [a]))
-    -> m a
-    -> Pos
+    => Bool
+    -- ^ Whether there has already been parsed a "head" in the current line.
+    --   A head is any non-empty token (whitespace counting as empty).
+    --   If @True@, the parser behaves as if an initial in-line element was
+    --   already parsed.  In particular, returning successfully without
+    --   parsing any element is possible.
+    --   If @False@, the parser is expected to be run at the start of an
+    --   (indented) non-empty line.
+    -> [Restricted (InlineParser m a)]
+    -> (Maybe Pos -> m a)
+    -> Maybe Pos
+    -- ^ Parent indentation level.  Only input indented strictly further is
+    --   accepted.
     -> m [a]
-miForestFrom elementPF childP lvl = go False mempty
+miForestFrom rootIsHeaded rInlinePs blockP lvl = do
+    (x, sep) <- go rootIsHeaded (filterRestricted (const True) rInlinePs)
+    case sep of
+        Sep True _ -> return x
+        Sep False _ -> empty <?> "newline"
   where
-    go :: Bool -> Text -> m [a]
-    go isBracketed initialPrecWS = do
-        -- Permit and drop initial whitespace within brackets.
-        if isBracketed
-            then sp >> optional (nli >> checkIndent lvl) >> goE mempty
-            else goE initialPrecWS
-      where
-        -- `goX` vs. `goX'`:
-        --  - The `goX` parsers must generally be used in-line; that is, not
-        --    at the start of a line.
-        --    - Exception: `goE`, initially.
-        --  - The `goX'` parsers must only be used at the start of a line
-        --    (after indentation; i.e., after `nli`).
+    mkP :: InlineParser m a -> m ((MiElementConfig, [a]), Sep)
+    mkP (LeafParser p) = (,) <$> p <*> sepP
+    mkP (BracketingParser openP closeP) = do
+        f <- openP
+        (body, s) <- go True $ filterRestricted (/= Unbracketed) rInlinePs
+        ms' <- optional (closeP *> sepP)
+        return (f body, fromMaybe s ms')
 
-        -- Parse forest, headed by element.
-        goE :: Text -> m [a]
-        goE precWS = do
-            (cfg, e) <- elementPF (go True mempty)
+    -- CONSIDER: Permit EOF.
+    sepP :: m Sep
+    sepP = do
+        s <- sp
+        ms' <- optional nli
+        case ms' of
+            Just s' -> return $ Sep True (s <> s')
+            Nothing -> return $ Sep False s
+
+    -- To be called at the start of an (indented) line iff not isHeaded.
+    -- Iff `isHeaded`, treated as if a first in-line element was already
+    -- parsed.
+    --  - In particular, permits empty element list.
+    go :: Bool -> [InlineParser m a] -> m ([a], Sep)
+    go isHeaded inlinePs =
+        if isHeaded
+            then sepP >>= goTail False
+            else goBlock <|> goInline mempty
+      where
+        goInline :: Text -> m ([a], Sep)
+        goInline precWS = do
+            ((cfg, e), s) <- choice $ map mkP inlinePs
 
             let precWS' :: [a]
                 precWS' =
@@ -115,83 +180,54 @@ miForestFrom elementPF childP lvl = go False mempty
                         then fromWhitespace precWS
                         else []
 
-            s0 <- sp
+            (es, s') <- goTail (miecRetainTrailingWhitespace cfg) s
 
-            let f :: Text -> Text
-                f =
-                    if miecRetainTrailingWhitespace cfg
-                        then (s0 <>)
-                        else id
+            return (precWS' ++ e ++ es, s')
 
-                wC :: m [a] -> m [a]
-                wC = whenAlt $ miecPermitChild cfg
-
-                wEnd :: m [a] -> m [a]
-                wEnd = whenAlt $ miecPermitEnd cfg
-
-                goAny :: m [a]
-                goAny =
-                    goE (f mempty)
-                        <|> whenAlt isBracketed (wEnd goEnd)
-
-                goAny' :: Text -> m [a]
-                goAny' s =
-                    goE' (f s)
-                        <|> wC goC'
-                        <|> wEnd goEnd'
-
-            es <- (nli >>= goAny') <|> goAny
-
-            return $ precWS' ++ e ++ es
-
-        goE' :: Text -> m [a]
-        goE' s = checkIndent lvl *> goE s
-
-        -- Parse forest, headed by child; at start of an input line.
-        goC' :: m [a]
-        goC' = checkIndent lvl' *> childP <:> (goE' mempty <|> goC' <|> goEnd')
+        goTail :: Bool -> Sep -> m ([a], Sep)
+        goTail retainWS (Sep lineEnded precWS) =
+            if lineEnded
+                then checkIndentGT lvl *> (goBlock <|> goInline') <|> goEnd'
+                else goInline' <|> goEnd'
           where
-            lvl' = nextIndentLevel lvl
+            goInline' = goInline precWS'
+            goEnd' = goEnd (Sep lineEnded precWS')
+            precWS' = if retainWS then precWS else mempty
 
-        goEnd :: m [a]
-        goEnd = pure []
+        goBlock :: m ([a], Sep)
+        goBlock = do
+            x <- blockP lvl
+            (xs, s) <- goTail False (Sep True mempty)
+            return (x : xs, s)
 
-        goEnd' :: m [a]
-        goEnd' = do
-            -- Check indentation of closing bracket.
-            when isBracketed (checkIndent lvl)
-            goEnd
+        goEnd :: Sep -> m ([a], Sep)
+        goEnd s = pure ([], s)
 
 -- | Parse a mi-forest headed by a keyword, with all lines but the first
---   indented one additional level.
+--   indented further than the first.
 --
---   Text may begin on the line of the keyword, with at least one separating
---   (ASCII) space, or on the next (indented) line.
+--   Text may begin on the line of the keyword or on the next (indented) line.
 --
---   The result of 'keywordP' is a function that is applied to the parsed
---   mi-forest.
---   'keywordP' is expected not to consume any whitespace.
---
---   For the other arguments, see 'miForest'.
+--   The documentation on 'miForest' generally applies.
 hangingBlock
     :: (MonadParser m, FromWhitespace [a])
     => m ([a] -> b)
-    -> (m [a] -> m (MiElementConfig, [a]))
-    -> m a
+    -- ^ Keyword parser.  Result is applied to the parsed mi-forest.
+    --   This is expected not to consume any whitespace.
+    -> [Restricted (InlineParser m a)]
+    -> (Maybe Pos -> m a)
     -> m b
-hangingBlock keywordP elementPF childP = do
-    lvl' <- nextIndentLevel <$> L.indentLevel
-    f <- keywordP
-    void sp1 <|> void nli <* checkIndent lvl'
-    f <$> miForestFrom elementPF childP lvl'
+hangingBlock keywordP inlinePs blockP = do
+    lvl' <- L.indentLevel
+    keywordP <*> miForestFrom True inlinePs blockP (Just lvl')
 
 -- | Version of 'hangingBlock' where the keyword parser may yield any value,
 --   which is paired with the parsed mi-forest.
 hangingBlock'
     :: (MonadParser m, FromWhitespace [a])
     => m b
-    -> (m [a] -> m (MiElementConfig, [a]))
-    -> m a
+    -> [Restricted (InlineParser m a)]
+    -> (Maybe Pos -> m a)
     -> m (b, [a])
 hangingBlock' = hangingBlock . fmap (,)
 
@@ -200,7 +236,7 @@ hangingBlock' = hangingBlock . fmap (,)
 hangingBlock_
     :: (MonadParser m, FromWhitespace [a])
     => m ()
-    -> (m [a] -> m (MiElementConfig, [a]))
-    -> m a
+    -> [Restricted (InlineParser m a)]
+    -> (Maybe Pos -> m a)
     -> m [a]
 hangingBlock_ = hangingBlock . fmap (const id)

@@ -10,6 +10,7 @@ import DOM.HTML.Indexed.InputType (InputType)
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.String (null)
+import FPO.Util (handleKeyDownEscape)
 import Halogen.HTML as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -49,6 +50,26 @@ addColumn val str placeholder bi for act =
 
             ]
         ]
+
+-- Similar to AddColumn but creates textfields tailored towards the Version history dropdown.
+addField
+  :: forall w a
+   . String -- ^ value
+  -> String -- ^ placeholder
+  -> InputType -- ^ input type
+  -> (String -> a) -- ^ action (parametrized with the value)
+  -> HH.HTML w a
+addField val placeholder for act =
+  HH.div [ HP.classes [ HB.inputGroup, HB.inputGroupSm ] ]
+    [ HH.input
+        [ HP.type_ for
+        , HP.classes [ HB.formControl, HB.formControlSm ]
+        , HP.placeholder placeholder
+        , HP.value val
+        , HE.onValueInput act
+        ]
+
+    ]
 
 -- | Creates a button with an icon.
 addButton
@@ -125,13 +146,17 @@ addCard title e content =
       , content `addClass` HB.cardBody
       ]
 
+-- | Creates a modal with the given title, cancel action and content.
+-- | The modal can always be closed by clicking the close icon or by
+-- | hitting the escape key.
 addModal
   :: forall w i
    . String -- ^ title of the modal
-  -> (MouseEvent -> i) -- ^ action for the cancel button
+  -> i -- ^ action for the cancel button
+  -> i -- ^ action for doing nothing
   -> Array (HH.HTML w i) -- ^ content of the modal
   -> HH.HTML w i
-addModal title cancelAction content =
+addModal title cancelAction doNothingAction content =
   HH.div_
     [ HH.div
         [ HP.classes
@@ -142,6 +167,8 @@ addModal title cancelAction content =
         , HP.attr (HH.AttrName "tabindex") "-1"
         , HP.attr (HH.AttrName "aria-hidden") "false"
         , HP.style "display: block;"
+        , HP.tabIndex 0
+        , HE.onKeyDown $ handleKeyDownEscape cancelAction doNothingAction
         ]
         [ HH.div
             [ HP.classes [ HH.ClassName "modal-dialog" ] ]
@@ -159,7 +186,7 @@ addModal title cancelAction content =
                           , HP.classes [ HB.btnClose ]
                           , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
                           , HP.attr (HH.AttrName "aria-label") "Close"
-                          , HE.onClick cancelAction
+                          , HE.onClick $ const cancelAction
                           ]
                           []
                       ]
@@ -202,19 +229,22 @@ emptyEntryGen content =
         content
     ]
 
--- | Adds an error message to the page.
-addError
-  :: forall w i
-   . Maybe String -- ^ error message
-  -> HH.HTML w i
-addError msg =
-  HH.div [ HP.classes [ HB.textCenter ] ]
-    [ case msg of
-        Just err -> HH.div
-          [ HP.classes [ HB.alert, HB.alertDanger, HB.mt5 ] ]
-          [ HH.text err ]
-        Nothing -> HH.text ""
+-- | Creates an empty table entry for padding (`tr`).
+emptyTableRow :: forall w a. Int -> Int -> HH.HTML w a
+emptyTableRow height cols =
+  HH.tr [ HP.classes [ H.ClassName "no-hover" ] ]
+    [ HH.td
+        [ HP.colSpan cols
+        , HP.style $ "height: " <> show height <> "px;"
+        ]
+        []
     ]
+
+-- | Creates an empty list entry for padding (`li`).
+emptyListEntry :: forall w a. Int -> HH.HTML w a
+emptyListEntry height =
+  HH.li [ HP.style $ "height: " <> show height <> "px;" ]
+    []
 
 loadingSpinner :: forall w i. HH.HTML w i
 loadingSpinner =

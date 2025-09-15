@@ -5,8 +5,11 @@ module FPO.Components.Modals.DeleteModal
 import Prelude
 
 import Data.Array (singleton)
+import Data.Maybe (Maybe(..))
 import FPO.Translations.Labels (Labels)
 import FPO.UI.HTML (addModal)
+import FPO.Util as Util
+import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
@@ -28,7 +31,23 @@ import Simple.I18n.Translator (Translator, label, translate)
 -- |  3. something to derive a label for the object to delete
 -- |  4. an action to cancel the deletion
 -- |  5. an action to proceed the deletion
--- |  6. a name for the type of the given object
+-- |  6. a no-op action as a default do-nothing action
+-- |  7. an optional reference label for the delete button
+--       (e.g., for automatic focus).
+-- |  8. a name for the type of the given object
+-- |
+-- | TODO: As of now, this modal exposes a reference label interface for the
+-- |       delete button. This allows for two things:
+-- |        1. Focusing the delete button when the modal opens, for fast keyboard
+-- |           interaction (main use case).
+-- |        2. Just focusing the modal in general, allowing for closing it with
+-- |           "Escape" (secondary use case).
+-- |       We might not want to have the delete button focused by default,
+-- |       but rather just the modal itself. This would allow for closing the
+-- |       modal with "Escape", but would require the user to tab to the delete
+-- |       button before being able to confirm the deletion with "Enter". For this,
+-- |       we can easily just associate the reference label with some other element,
+-- |       like the modal body or footer.
 deleteConfirmationModal
   :: forall w a action
    . Translator Labels
@@ -36,6 +55,8 @@ deleteConfirmationModal
   -> (a -> String)
   -> action
   -> (a -> action)
+  -> action
+  -> Maybe H.RefLabel
   -> String
   -> HH.HTML w action
 deleteConfirmationModal
@@ -44,11 +65,19 @@ deleteConfirmationModal
   toObjectName
   cancelAction
   confirmAction
+  doNothingAction
+  mRefLabel
   objectTypeName =
   addModal (translate (label :: _ "common_confirmDelete") translator)
-    (const cancelAction) $
+    cancelAction
+    doNothingAction $
     [ HH.div
-        [ HP.classes [ HB.modalBody ] ]
+        [ HP.classes [ HB.modalBody ]
+        , HE.onKeyDown $ Util.handleKeyDown
+            cancelAction
+            (confirmAction objectIdentifier)
+            doNothingAction
+        ]
         [ HH.text $
             translate (label :: _ "common_deletePhraseA") translator
               <> objectTypeName
@@ -69,10 +98,15 @@ deleteConfirmationModal
             ]
             [ HH.text $ translate (label :: _ "common_cancel") translator ]
         , HH.button
-            [ HP.type_ HP.ButtonButton
-            , HP.classes [ HB.btn, HB.btnDanger ]
-            , HE.onClick (const $ confirmAction objectIdentifier)
-            ]
+            ( [ HP.type_ HP.ButtonButton
+              , HP.classes [ HB.btn, HB.btnDanger ]
+              , HE.onClick (const $ confirmAction objectIdentifier)
+              ]
+                <>
+                  case mRefLabel of
+                    Just refLabel -> [ HP.ref refLabel ]
+                    Nothing -> []
+            )
             [ HH.text $ translate (label :: _ "common_delete") translator ]
         ]
     ]
