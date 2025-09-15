@@ -76,6 +76,9 @@ jobs:
           cache-prefix: v2/
           test: false
 
+      - name: Clear cache
+        run: stack clean --full
+
   check-frontend:
     name: Check Frontend
     runs-on: self-hosted
