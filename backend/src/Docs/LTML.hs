@@ -39,7 +39,6 @@ import qualified Docs.TextRevision as TextRevision
 import Docs.TreeRevision (TreeRevision (TreeRevision))
 import qualified Language.Lsd.AST.Common as LSD
 import qualified Language.Ltml.Common as LTML
-import qualified Language.Ltml.HTML.Common as HTML
 import Language.Ltml.Tree (FlaggedInputTree)
 import qualified Language.Ltml.Tree as LTML
 import qualified Language.Ltml.Tree.ToMeta as LTML
