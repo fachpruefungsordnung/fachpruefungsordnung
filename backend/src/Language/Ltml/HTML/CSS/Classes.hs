@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
 -- Turn incomplete pattern matches into error, so that every defined Class has to have a style
 -- This ensures that every class used in Lucid also has an entry in the css stylesheet
@@ -19,6 +20,7 @@ import Data.String (fromString)
 import Data.Text (Text, pack, unpack)
 import qualified Data.Typography as Ltml
 import Data.Void (Void, absurd)
+import qualified Language.Ltml.HTML.CSS.Color as Color
 import Language.Ltml.HTML.CSS.CustomClay
 
 data Class
@@ -26,6 +28,8 @@ data Class
       Body
     | -- | Class for spacing and alignment of and inside of an appendix section
       AppendixSection
+    | -- | Class for alignment inside of a document
+      Document
     | -- | Class for styling and aligning document title <h1>
       DocumentTitle
     | -- | Class for spacing and alignment of and inside of a super-section
@@ -72,6 +76,20 @@ data Class
       CenteredBox
     | -- | Class for a centered, boxed for parsing errors
       ErrorBox
+    | -- | Styling of anchor links @<a>@
+      AnchorLink
+    | -- | Link @<a>@ that looks not like a link but more like a button
+      ButtonLink
+    | -- | Class for elements that have HTML anchors (adds scroll-margin)
+      Anchor
+    | -- | Wrapper around ToC, which places the Table on the page
+      TocContainer
+    | -- | Class for <table> element of ToC
+      TableOfContents
+    | -- | Table column thats only as wide as needed
+      MinSizeColumn
+    | -- | Table column that consumes maximum space possible
+      MaxSizeColumn
     deriving (Show, Eq, Enum, Bounded)
 
 -- | maps Class to its css style definition
@@ -92,6 +110,12 @@ classStyle AppendixSection =
         flexDirection column
         -- \| gap between documents inside an appendix section
         gap (em 10)
+classStyle Document =
+    toClassSelector Document ? do
+        display flex
+        flexDirection column
+        -- \| gap between document childs
+        gap (em 3)
 classStyle DocumentTitle =
     toClassSelector DocumentTitle ? do
         marginTop (em 0)
@@ -102,7 +126,7 @@ classStyle SuperSection =
         display flex
         flexDirection column
         -- \| gap between sections
-        gap (em 3)
+        gap (em 2)
 classStyle Section =
     toClassSelector Section ? do
         display flex
@@ -176,7 +200,10 @@ classStyle FootnoteID =
     toClassSelector FootnoteID ? do
         userSelect none
 classStyle LeftAligned = toClassSelector LeftAligned ? textAlign alignLeft
-classStyle Centered = toClassSelector Centered ? textAlign center
+classStyle Centered =
+    toClassSelector Centered ? do
+        display block
+        textAlign center
 classStyle RightAligned = toClassSelector RightAligned ? textAlign alignLeft
 classStyle SmallFontSize = toClassSelector SmallFontSize ? fontSize (em 0.75)
 classStyle MediumFontSize = toClassSelector MediumFontSize ? fontSize (em 1)
@@ -192,7 +219,7 @@ classStyle Underlined = do
         textDecoration underline
 classStyle InlineError =
     toClassSelector InlineError ? do
-        fontColor red
+        fontColor Color.errorText
         fontWeight bold
 classStyle CenteredBox =
     toClassSelector CenteredBox ? do
@@ -205,7 +232,65 @@ classStyle CenteredBox =
 classStyle ErrorBox =
     toClassSelector ErrorBox ? do
         padding (em 1) (em 1) (em 1) (em 1)
-        border (px 2) dashed red
+        border (px 2) dashed Color.errorBoxBorder
+classStyle AnchorLink = do
+    toClassSelector AnchorLink ? do
+        color Color.linkText
+        textDecoration underline
+        textDecorationColor Color.linkUnderline
+
+    toClassSelector AnchorLink # hover ? do
+        textDecoration none
+        color Color.linkTextHover
+classStyle ButtonLink = do
+    toClassSelector ButtonLink ? do
+        padding (px 0) (px 6) (px 3) (px 6)
+        borderRadius (px 10) (px 10) (px 10) (px 10)
+        textDecoration none
+        fontSize (em 1.5)
+        color Color.linkText
+
+    toClassSelector ButtonLink # hover ? do
+        color Color.linkTextHover
+        backgroundColor Color.tableDarkCell
+classStyle Anchor =
+    toClassSelector Anchor ? do
+        scrollMarginTop (em 2)
+classStyle TocContainer = do
+    toClassSelector TocContainer ? do
+        display flex
+        justifyContent center
+classStyle TableOfContents = do
+    toClassSelector TableOfContents ? do
+        width (pct 100)
+        tableLayout autoLayout
+    -- borderCollapse collapse
+    -- boxShadow [ rgba 0 0 0 0.15 `bsColor` shadowWithBlur (px 0) (px 0) (px 20) ]
+
+    toClassSelector TableOfContents |> thead |> tr |> th ? do
+        textAlign alignLeft
+
+    toClassSelector TableOfContents |> tbody |> tr ? do
+        borderBottom (px 1) solid Color.tableCellBorder
+
+    toClassSelector TableOfContents |> tbody |> tr # lastOfType ? do
+        borderBottom (px 2) solid Color.tableCellBorder
+
+    toClassSelector TableOfContents |> tbody |> tr |> td ? do
+        whiteSpace nowrap
+        padding (px 10) (px 10) (px 10) (px 10)
+
+    toClassSelector TableOfContents |> tbody |> tr # nthOfType "odd" ? do
+        backgroundColor Color.tableDarkCell
+
+    toClassSelector TableOfContents |> tbody |> tr # hover ? do
+        backgroundColor Color.tableActiveRow
+classStyle MinSizeColumn = do
+    toClassSelector MinSizeColumn ? do
+        width (pct 1)
+classStyle MaxSizeColumn = do
+    toClassSelector MaxSizeColumn ? do
+        width auto
 
 -- | Returns the html class name of given Class
 className :: Class -> Text
