@@ -67,6 +67,9 @@ jobs:
           path: backend/
           fail-on: suggestion
 
+      - name: Clear cache
+        run: stack clean --full
+
       - name: Build Stack Project
         uses: freckle/stack-action@v5
         with:
@@ -75,10 +78,6 @@ jobs:
           stack-build-arguments: --no-test --fast --allow-newer
           cache-prefix: v2/
           test: false
-          pedantic: false
-
-      - name: Clear cache
-        run: stack clean --full
 
   check-frontend:
     name: Check Frontend
