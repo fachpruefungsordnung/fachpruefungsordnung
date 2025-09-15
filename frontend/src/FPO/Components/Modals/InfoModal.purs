@@ -38,7 +38,7 @@ infoModal
 >>>>>>> main -}
   cancelAction
   doNothingAction =
-  addModal (translate (label :: _ "common_mergingInfo") translator)
+  addModal (translate (label :: _ "editor_mergingInfo") translator)
     cancelAction
     doNothingAction $
     [ HH.div
