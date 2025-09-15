@@ -44,7 +44,8 @@ enEditor = fromRecord
   , editor_comment: "Comment"
   , editor_compareVersion: "Compare Version"
   , editor_deleteComment: "Delete comment"
-  , editor_dirtySwitch: "You currently have unsaved changes made to the current version. Switching between versions now will discard these changes."
+  , editor_dirtySwitch:
+      "You currently have unsaved changes made to the current version. Switching between versions now will discard these changes."
   , editor_discard: "discard"
   , editor_fontSizeDown: "Font size down"
   , editor_fontSizeUp: "Font size up"
@@ -70,7 +71,8 @@ enEditor = fromRecord
         "and copy over any changes you want to keep. Once you are done, you can save again, at which point you will be up to date again.\n\n"
       <>
         "If you do not wish to save your currently opened version, you can click on \"Discard\" to discard them and open the current version."
-  , editor_mergingNow: "Copy over desired changes from the right and finish by clicking on \"Merge\""
+  , editor_mergingNow:
+      "Copy over desired changes from the right and finish by clicking on \"Merge\""
   , editor_oldVersion: "You are editing an old version"
   , editor_pdf: "Export PDF"
   , editor_preview: "Preview"
@@ -93,7 +95,8 @@ deEditor = fromRecord
   , editor_comment: "Kommentar"
   , editor_compareVersion: "Version vergleichen"
   , editor_deleteComment: "Kommentar löschen"
-  , editor_dirtySwitch: "Der aktuelle Abschnitt beinhält ungespeicherte Änderungen. Diese werden beim Wechseln der Version verworfen."
+  , editor_dirtySwitch:
+      "Der aktuelle Abschnitt beinhält ungespeicherte Änderungen. Diese werden beim Wechseln der Version verworfen."
   , editor_discard: "verwerfen"
   , editor_fontSizeDown: "Schrift verkleinern"
   , editor_fontSizeUp: "Schrift vergrößern"
@@ -123,7 +126,8 @@ deEditor = fromRecord
         "klicken auf \"speichern\" ihre Änderungen speichern\n\n"
       <>
         "Falls sie wünschen, ihre aktuellen änderungen zu verwerfen, so könne sie auf \"Verwerfen\" klicken um sie zu verwerfen und zur aktuellen Version zurückzukehren."
-  , editor_mergingNow: "Bitte übernehmen sie gewünschten Änderungen der rechten Seite und klicken sie danach auf \"Vereinen\""
+  , editor_mergingNow:
+      "Bitte übernehmen sie gewünschten Änderungen der rechten Seite und klicken sie danach auf \"Vereinen\""
   , editor_oldVersion: "Sie bearbeiten eine alte Version"
   , editor_pdf: "PDF exportieren"
   , editor_preview: "Vorschau"

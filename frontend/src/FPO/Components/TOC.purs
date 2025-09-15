@@ -40,7 +40,10 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postJson)
 import FPO.Data.Store as Store
-import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed{-, formatRelativeTime -})
+import FPO.Data.Time
+  ( dateToDatetime
+  , formatAbsoluteTimeDetailed {-, formatRelativeTime -}
+  )
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
@@ -291,12 +294,12 @@ tocview = connect (selectEq identity) $ H.mkComponent
       handleAction act1
       handleAction act2
 
-    UpdateUpToDateVersion -> do 
+    UpdateUpToDateVersion -> do
       s <- H.get
       case s.mSelectedTocEntry of
         Just (SelLeaf elementID) -> do
           temp <- getTextElemHistory s.docID elementID Nothing Nothing (Just 1)
-          let 
+          let
             upToDate =
               case temp of
                 Left _ ->
@@ -316,9 +319,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
                       , timestamp: TE.getHistoryElementTimestamp val
                       , author: TE.getHistoryElementAuthor val
                       }
-          H.modify_ _ {upToDateVersion = Just upToDate}
+          H.modify_ _ { upToDateVersion = Just upToDate }
         _ -> pure unit
-
 
     -- the newest version requested in this action is assumed to be the newest version in general
     UpdateVersions mAfter mBefore elementID -> do
@@ -411,7 +413,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
             { versions = newVersions
             , upToDateVersion = Just upToDate
             }
-
 
     SearchVersions elementID -> do
       state <- H.get
@@ -728,7 +729,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       pure (Just (reply state.mSelectedTocEntry))
 
     RequestUpToDateVersion reply -> do
-      handleAction UpdateUpToDateVersion 
+      handleAction UpdateUpToDateVersion
       state <- H.get
       pure (Just (reply state.upToDateVersion))
 
@@ -1139,14 +1140,15 @@ tocview = connect (selectEq identity) $ H.mkComponent
       in
         [ HH.div
             [ HP.classes [ HB.dFlex, HB.flexColumn ]
-{-             , HP.style
-                "border-bottom-style: solid; border-color: grey; border-width: 1px;" -}
+            {-             , HP.style
+            "border-bottom-style: solid; border-color: grey; border-width: 1px;" -}
             ]
             [ HH.div
                 [ HP.classes
                     [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
                 ]
-                [ punctuation $ (translate (label :: _ "common_from") state.translator) <> ": "
+                [ punctuation $
+                    (translate (label :: _ "common_from") state.translator) <> ": "
                 , HH.input
                     [ HP.type_ HP.InputDate
                     , HP.value fromDate
@@ -1157,7 +1159,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 [ HP.classes
                     [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
                 ]
-                [ punctuation $ (translate (label :: _ "common_to") state.translator) <> ": "
+                [ punctuation $ (translate (label :: _ "common_to") state.translator)
+                    <> ": "
                 , HH.input
                     [ HP.type_ HP.InputDate
                     , HP.value toDate
@@ -1217,7 +1220,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 <>
                   buttonStyle
           , HP.style
-            "border: none; border-top-style: solid; border-color: grey; border-width: 1px; border-radius: 0;"
+              "border: none; border-top-style: solid; border-color: grey; border-width: 1px; border-radius: 0;"
 
           , HE.onClick \_ -> ToggleHistorySubmenu version.identifier
           ] $
@@ -1226,8 +1229,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
               []
           , HH.div [ HP.classes [ HB.fs6 ] ]
               [ HH.text
-                  (   formatAbsoluteTimeDetailed state.timezoneOffset
-                        (DD.docDateToDateTime version.timestamp)
+                  ( formatAbsoluteTimeDetailed state.timezoneOffset
+                      (DD.docDateToDateTime version.timestamp)
                       <> " "
                       <> (translate (label :: _ "common_by") state.translator)
                       <> " "
@@ -1249,8 +1252,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
                         ]
                     , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
                     ]
-                    [ versionHistorySubmenuButton (translate (label :: _ "editor_viewVersion") state.translator) OpenVersion version
-                    , versionHistorySubmenuButton (translate (label :: _ "editor_compareVersion") state.translator)
+                    [ versionHistorySubmenuButton
+                        (translate (label :: _ "editor_viewVersion") state.translator)
+                        OpenVersion
+                        version
+                    , versionHistorySubmenuButton
+                        ( translate (label :: _ "editor_compareVersion")
+                            state.translator
+                        )
                         CompareVersion
                         version
                     ]

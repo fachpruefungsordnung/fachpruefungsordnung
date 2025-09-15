@@ -74,14 +74,15 @@ import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
-import FPO.Dto.ContentDto 
-  (Content(..)
+import FPO.Dto.ContentDto
+  ( Content(..)
   , ContentWrapper
   , convertDCWToCW
   , getContentParent
   , getWrapperContent
   , setContentParent
-  , setWrapperContent)
+  , setWrapperContent
+  )
 import FPO.Dto.ContentDto as ContentDto
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.UserDto (getUserName)
@@ -426,7 +427,7 @@ editor = connect selectTranslator $ H.mkComponent
                         state.showButtonText
                         (Save false)
                         "bi-floppy"
-                        case state.isOnMerge of 
+                        case state.isOnMerge of
                           false ->
                             (translate (label :: _ "editor_save") state.translator)
                           true ->
@@ -740,9 +741,9 @@ editor = connect selectTranslator $ H.mkComponent
     FontSize change -> do
       H.gets _.mEditor >>= traverse_ \ed -> do
         state <- H.get
-        H.liftEffect $ log $ show case state.mContent of 
-                              Just (Content mC) -> mC.parent
-                              _ -> 0
+        H.liftEffect $ log $ show case state.mContent of
+          Just (Content mC) -> mC.parent
+          _ -> 0
         let newSize = change state.fontSize
         H.modify_ \st -> st { fontSize = newSize }
         -- Set the new font size in the editor
@@ -841,25 +842,30 @@ editor = connect selectTranslator $ H.mkComponent
 
     Upload newEntry newWrapper isAutoSave -> do
       state <- H.get
-      H.liftEffect $ log $ case (state.upToDateVersion) of 
-                            Nothing -> "empty"
-                            Just version -> show version.identifier
+      H.liftEffect $ log $ case (state.upToDateVersion) of
+        Nothing -> "empty"
+        Just version -> show version.identifier
       let
         --modify the wrapper if merging to allow saving old versions.
-        modifiedWrapper = case isAutoSave of 
-          true -> newWrapper 
+        modifiedWrapper = case isAutoSave of
+          true -> newWrapper
           false -> case state.isOnMerge of
             true -> case state.upToDateVersion of
               Nothing -> newWrapper
               Just { author: _, identifier: id, timestamp: _ } ->
-                case id of 
+                case id of
                   Nothing -> newWrapper
-                  Just i -> (setWrapperContent (setContentParent i (getWrapperContent newWrapper)) newWrapper)
+                  Just i ->
+                    ( setWrapperContent
+                        (setContentParent i (getWrapperContent newWrapper))
+                        newWrapper
+                    )
             false -> newWrapper
         jsonContent = ContentDto.encodeWrapper modifiedWrapper
         newContent = ContentDto.getWrapperContent modifiedWrapper
       -- send the new content as POST to the server
-      H.liftEffect $ log ("wrappedID" <> show (getContentParent (getWrapperContent modifiedWrapper)))
+      H.liftEffect $ log
+        ("wrappedID" <> show (getContentParent (getWrapperContent modifiedWrapper)))
       H.liftEffect $ log $ show state.isOnMerge
       response <- Request.postJson (ContentDto.extractDraft newContent)
         ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id
@@ -893,16 +899,17 @@ editor = connect selectTranslator $ H.mkComponent
               updateStore $ Store.AddSuccess "Saved successfully"
               case typ of
                 "noConflict" -> do
-                  H.modify_ _ {isOnMerge = false}
+                  H.modify_ _ { isOnMerge = false }
                   case state.isOnMerge of
                     false -> pure unit
                     true -> H.raise Merged
                   H.liftEffect $ log "case 2 1"
-                "draftCreated" -> do --should not happen here. just copy autosave case in case
-                  H.modify_ _ {isOnMerge = true}
-                  H.liftEffect $ log "case 2 2"
+                "draftCreated" ->
+                  do --should not happen here. just copy autosave case in case
+                    H.modify_ _ { isOnMerge = true }
+                    H.liftEffect $ log "case 2 2"
                 "conflict" -> do --raise something to update version
-                  H.modify_ _ {isOnMerge = true}
+                  H.modify_ _ { isOnMerge = true }
                   H.liftEffect $ log "case 2 3"
                   H.raise RaiseMergeMode
                 _ -> H.liftEffect $ log "case 2"
@@ -911,40 +918,41 @@ editor = connect selectTranslator $ H.mkComponent
               case typ of
                 --happends if parent was updated due to merge view being present.
                 "noConflict" -> do
-                  H.modify_ _ {isOnMerge = false}
+                  H.modify_ _ { isOnMerge = false }
                   case state.isOnMerge of
                     false -> pure unit
                     true -> H.raise Merged
                   H.liftEffect $ log "case 3 1"
-                "draftCreated" -> do --should not happen here. just copy autosave case in case
-                  H.modify_ _ {isOnMerge = true}
-                  H.liftEffect $ log "case 3 2"
+                "draftCreated" ->
+                  do --should not happen here. just copy autosave case in case
+                    H.modify_ _ { isOnMerge = true }
+                    H.liftEffect $ log "case 3 2"
                 "conflict" -> do --raise something to update version
-                  H.modify_ _ {isOnMerge = true}
+                  H.modify_ _ { isOnMerge = true }
                   H.raise RaiseMergeMode
                   H.liftEffect $ log "case 3 3"
                 _ -> H.liftEffect $ log "case 3"
-{-               res <- Request.postJson (ContentDto.extractDraft updatedContent)
-                ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id
-                    <> "/draft/publish"
-                )
-                jsonEmptyObject
-              
-              case res of
-                Left err' -> updateStore $ Store.AddError $ err'
-                Right upCon -> do
-                  H.modify_ _ { mContent = Just upCon }
-                  -- Put merged content into editor
-                  H.gets _.mEditor >>= traverse_ \ed -> do
-                    H.liftEffect do
-                      session <- Editor.getSession ed
-                      document <- Session.getDocument session
-                      Document.setValue (ContentDto.getContentText upCon) document
-                      -- reset Ref, because loading new content is considered 
-                      -- changing the existing content, which would set the flag
-                      for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
-                  updateStore $ Store.AddSuccess "Saved and Merged successfully."
-                  pure unit -}
+          {-               res <- Request.postJson (ContentDto.extractDraft updatedContent)
+            ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id
+                <> "/draft/publish"
+            )
+            jsonEmptyObject
+
+          case res of
+            Left err' -> updateStore $ Store.AddError $ err'
+            Right upCon -> do
+              H.modify_ _ { mContent = Just upCon }
+              -- Put merged content into editor
+              H.gets _.mEditor >>= traverse_ \ed -> do
+                H.liftEffect do
+                  session <- Editor.getSession ed
+                  document <- Session.getDocument session
+                  Document.setValue (ContentDto.getContentText upCon) document
+                  -- reset Ref, because loading new content is considered 
+                  -- changing the existing content, which would set the flag
+                  for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+              updateStore $ Store.AddSuccess "Saved and Merged successfully."
+              pure unit -}
 
           -- mDirtyRef := false
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
@@ -1442,20 +1450,20 @@ editor = connect selectTranslator $ H.mkComponent
 
         -- when a draft was found, set the dirtyVersion ref to true so user doesn't swap without discarding.
         -- otherwise, switching the section/version means that it can be set to false
-{-         case loadedDraftContent of 
-          Right _ -> do 
-            for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write true r
-            isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
-              _.mDirtyVersion
-            H.liftEffect $ log ("ended up in right segment" <> (show isDirty))
-          Left _ -> do 
-            pure unit
-            for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
-            H.liftEffect $ log "ended up in left segment" -}
+        {-         case loadedDraftContent of 
+        Right _ -> do 
+          for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write true r
+          isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+            _.mDirtyVersion
+          H.liftEffect $ log ("ended up in right segment" <> (show isDirty))
+        Left _ -> do 
+          pure unit
+          for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+          H.liftEffect $ log "ended up in left segment" -}
 
         loadedContent <- case loadedDraftContent of
-          Right res -> pure (Right $ convertDCWToCW res) 
-          Left _ -> do 
+          Right res -> pure (Right $ convertDCWToCW res)
+          Left _ -> do
             Request.getJson
               ContentDto.decodeContentWrapper
               ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
@@ -1463,12 +1471,12 @@ editor = connect selectTranslator $ H.mkComponent
                   <> version
               )
 
-{-         loadedContent <- Request.getJson
-          ContentDto.decodeContentWrapper
-          ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-              <> "/rev/"
-              <> version
-          ) -}
+        {-         loadedContent <- Request.getJson
+        ContentDto.decodeContentWrapper
+        ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+            <> "/rev/"
+            <> version
+        ) -}
         let
           wrapper = case loadedContent of
             Left _ -> ContentDto.failureContentWrapper
@@ -1505,10 +1513,10 @@ editor = connect selectTranslator $ H.mkComponent
           -- Get comments information from Comment Child
           H.raise (RequestComments state.docID entry.id)
         --will be set to true right now, but should be set to false if didn't change to draft
-        case loadedDraftContent of 
-          Right _ -> do 
+        case loadedDraftContent of
+          Right _ -> do
             pure unit
-          Left _ -> do 
+          Left _ -> do
             for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure unit
 

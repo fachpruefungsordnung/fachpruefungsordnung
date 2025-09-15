@@ -173,7 +173,7 @@ type State = FPOState
   -- this value is updated from the same value in TOC
   , mSelectedTocEntry :: Maybe SelectedEntity
   , dirtyVersion :: Boolean
-  , modalData :: Maybe { elementID :: Int, versionID :: Maybe Int}
+  , modalData :: Maybe { elementID :: Int, versionID :: Maybe Int }
   -- obtained from TOC
   , upToDateVersion :: Maybe Version
   )
@@ -245,16 +245,16 @@ splitview = connect selectTranslator $ H.mkComponent
       [ renderSplit state ]
         <> renderDirtyVersionModal
     where
-      renderDirtyVersionModal = case state.modalData of
-        Nothing -> []
-        Just { elementID: eID, versionID: mVID } ->
-          [ dirtyVersionModal
-              state.translator
-              HideDirtyVersionModal
-              ModifyVersionFromModal
-              eID
-              mVID
-          ]
+    renderDirtyVersionModal = case state.modalData of
+      Nothing -> []
+      Just { elementID: eID, versionID: mVID } ->
+        [ dirtyVersionModal
+            state.translator
+            HideDirtyVersionModal
+            ModifyVersionFromModal
+            eID
+            mVID
+        ]
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
   renderSplit state =
@@ -634,14 +634,14 @@ splitview = connect selectTranslator $ H.mkComponent
       isDirty <- H.request _editor 0 Editor.RequestDirtyVersion
       case isDirty of
         Just dirty -> do
-          H.modify_ _ {dirtyVersion = dirty}
+          H.modify_ _ { dirtyVersion = dirty }
         Nothing -> pure unit
 
     HideDirtyVersionModal -> do
-      H.modify_ _{ modalData = Nothing }
+      H.modify_ _ { modalData = Nothing }
 
     ModifyVersionFromModal elementID mVID -> do
-      H.modify_ _{ modalData = Nothing }
+      H.modify_ _ { modalData = Nothing }
       H.tell _editor 0 Editor.ResetDirtyVersion
       state <- H.get
       handleAction DeleteDraft
@@ -1058,16 +1058,16 @@ splitview = connect selectTranslator $ H.mkComponent
           _ -> do
             pure unit
 
-      Editor.RaiseMergeMode -> do 
+      Editor.RaiseMergeMode -> do
         handleAction UpdateMSelectedTocEntry
         state <- H.get
         upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
         case upToDateVersion of
-          Just (Just version) -> do 
+          Just (Just version) -> do
             H.modify_ _ { upToDateVersion = Just version }
             H.tell _editor 0 (Editor.ReceiveUpToDateUpdate (Just version))
-            case state.mSelectedTocEntry of 
-              Just (SelLeaf id) -> do 
+            case state.mSelectedTocEntry of
+              Just (SelLeaf id) -> do
                 let
                   tocEntry = fromMaybe
                     emptyTOCEntry
@@ -1075,8 +1075,18 @@ splitview = connect selectTranslator $ H.mkComponent
                   title = fromMaybe
                     ""
                     (findTitleTOCEntry id state.tocEntries)
-                handleAction (ModifyVersionMapping id Nothing (Just (Just { tocEntry: tocEntry, revID: version.identifier, title: title })))
-{-                 let
+                handleAction
+                  ( ModifyVersionMapping id Nothing
+                      ( Just
+                          ( Just
+                              { tocEntry: tocEntry
+                              , revID: version.identifier
+                              , title: title
+                              }
+                          )
+                      )
+                  )
+                {-                 let
                   tocEntry = fromMaybe
                     emptyTOCEntry
                     (findTOCEntry elementID state.tocEntries)
@@ -1093,26 +1103,27 @@ splitview = connect selectTranslator $ H.mkComponent
                     Nothing -> emptyTOCEntry
                     Just e -> e
                 H.tell _editor 1 (Editor.ChangeSection entry version.identifier)
-              _ -> pure unit 
+              _ -> pure unit
           _ -> do
             pure unit
-      
+
       Editor.Merged -> do
         handleAction UpdateMSelectedTocEntry
-        state <- H.get 
-        case state.mSelectedTocEntry of 
+        state <- H.get
+        case state.mSelectedTocEntry of
           Just (SelLeaf elementID) -> do
-            handleAction (ModifyVersionMapping elementID (Just Nothing) (Just Nothing))
+            handleAction
+              (ModifyVersionMapping elementID (Just Nothing) (Just Nothing))
             case (findTOCEntry elementID state.tocEntries) of
               Nothing -> pure unit
               Just entry -> H.tell _editor 0 (Editor.ChangeSection entry Nothing)
-  {-           case (findRootTree (\e -> e.elementID == tocID) state.versionMapping) of 
-              Nothing -> pure unit 
-              Just {elementID: _, versionID: _, comparisonData: cD} -> do
-                H.tell _editor 1 (Editor.ChangeSection cD Nothing) -}
+          {-           case (findRootTree (\e -> e.elementID == tocID) state.versionMapping) of 
+          Nothing -> pure unit 
+          Just {elementID: _, versionID: _, comparisonData: cD} -> do
+            H.tell _editor 1 (Editor.ChangeSection cD Nothing) -}
           _ -> pure unit
 
-    DeleteDraft -> do 
+    DeleteDraft -> do
       handleAction UpdateMSelectedTocEntry
       state <- H.get
       -- Only the SelLeaf case should ever occur
@@ -1124,7 +1135,6 @@ splitview = connect selectTranslator $ H.mkComponent
         _ -> do
           pure unit
 
-
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
@@ -1132,20 +1142,19 @@ splitview = connect selectTranslator $ H.mkComponent
       TOC.ModifyVersion elementID mVID -> do
         handleAction UpdateDirtyVersion
         state <- H.get
-        let 
-          currentVersion = 
-            case findRootTree (\e -> e.elementID == elementID) state.versionMapping of 
-              Nothing -> Nothing 
+        let
+          currentVersion =
+            case findRootTree (\e -> e.elementID == elementID) state.versionMapping of
+              Nothing -> Nothing
               Just version -> version.versionID
         if state.dirtyVersion && currentVersion /= Nothing then do
-          H.liftEffect $ log (show mVID) 
-          H.modify_ _ { modalData = Just {elementID: elementID, versionID: mVID}}
+          H.liftEffect $ log (show mVID)
+          H.modify_ _ { modalData = Just { elementID: elementID, versionID: mVID } }
         else do
           handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
           case (findTOCEntry elementID state.tocEntries) of
             Nothing -> pure unit
             Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
-
 
       TOC.CompareTo elementID vID -> do
         handleAction (SetComparison elementID vID)

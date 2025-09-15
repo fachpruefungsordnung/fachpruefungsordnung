@@ -148,8 +148,8 @@ instance showContentWrapper :: Show ContentWrapper where
 
 --convertDraftContentWrapperToContentWrapper
 convertDCWToCW :: DraftContentWrapper -> ContentWrapper
-convertDCWToCW (DraftWrapper { content: DraftContent dc, comments: com}) =
-  Wrapper { content: Content dc, comments: com} 
+convertDCWToCW (DraftWrapper { content: DraftContent dc, comments: com }) =
+  Wrapper { content: Content dc, comments: com }
 
 decodeContent :: Json -> Either JsonDecodeError Content
 decodeContent json = decodeJson json
@@ -212,7 +212,8 @@ extractNewParent (Content cont) json = do
     _ ->
       pure (Content cont)
 
-extractDraft :: Content -> Json -> Either JsonDecodeError {content :: Content, typ :: String}
+extractDraft
+  :: Content -> Json -> Either JsonDecodeError { content :: Content, typ :: String }
 extractDraft (Content cont) json = do
   obj <- decodeJson json
   typ <- obj .: "type" :: Either JsonDecodeError String
@@ -221,14 +222,14 @@ extractDraft (Content cont) json = do
       newRev <- obj .: "newRevision"
       hdr <- newRev .: "header"
       pid <- hdr .: "identifier"
-      pure $ {content: Content $ cont { parent = pid }, typ: "noConflict"}
+      pure $ { content: Content $ cont { parent = pid }, typ: "noConflict" }
     "draftCreated" -> do
       -- TODO update Commentmarkers
       draft <- obj .: "draft"
       newCon <- draft .: "draftContent"
-      pure $ {content: Content $ cont { content = newCon }, typ: "draftCreated"}
+      pure $ { content: Content $ cont { content = newCon }, typ: "draftCreated" }
     _ ->
-      pure {content: Content cont, typ: "conflict"}
+      pure { content: Content cont, typ: "conflict" }
 
 convertToAnnotetedMarker
   :: CommentAnchor

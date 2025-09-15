@@ -25,7 +25,7 @@ infoModal
   -> HH.HTML w action
 infoModal
   translator
-{- <<<<<<< HEAD
+  {- <<<<<<< HEAD
   cancelAction =
   addModal (translate (label :: _ "editor_mergingInfo") translator)
     (const cancelAction) $
