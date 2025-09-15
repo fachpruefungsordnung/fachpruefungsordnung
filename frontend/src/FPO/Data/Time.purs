@@ -1,15 +1,23 @@
 module FPO.Data.Time
   ( adjustDateTime
   {-   , getEditTimestamp -}
+  , dateToDatetime
   , formatAbsoluteTimeDetailed
   , formatRelativeTime
   , defaultFormatter
   , timeStampsVersions
+  , genericDatetime
   ) where
 
 import Prelude
 
-import Data.DateTime (DateTime, adjust, diff)
+import Data.DateTime
+  ( Date
+  , DateTime(..)
+  , Time(..)
+  , adjust
+  , canonicalDate
+  , diff)
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter, format, formatDateTime)
 import Data.Formatter.DateTime as FDT
