@@ -75,10 +75,10 @@ import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.ContentDto
-  ( Content(..)
+  ( Content
   , ContentWrapper
   , convertDCWToCW
-  , getContentParent
+  {- , getContentParent -}
   , getWrapperContent
   , setContentParent
   , setWrapperContent
