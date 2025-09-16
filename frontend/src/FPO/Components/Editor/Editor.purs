@@ -11,6 +11,7 @@ module FPO.Components.Editor
 
 import Prelude
 
+{- import Data.Argonaut.Core (jsonEmptyObject) -}
 import Ace (ace, editNode) as Ace
 import Ace.Anchor as Anchor
 import Ace.Document as Document
@@ -30,6 +31,7 @@ import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class as EC
+{- import Effect.Console (log) -}
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -67,11 +69,20 @@ import FPO.Components.Editor.Types
   )
 import FPO.Components.Modals.DiscardModal (discardModal)
 import FPO.Components.Modals.InfoModal (infoModal)
+import FPO.Components.TOC (Version)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
-import FPO.Dto.ContentDto (Content, ContentWrapper)
+import FPO.Dto.ContentDto
+  ( Content
+  , ContentWrapper
+  , convertDCWToCW
+  {- , getContentParent -}
+  , getWrapperContent
+  , setContentParent
+  , setWrapperContent
+  )
 import FPO.Dto.ContentDto as ContentDto
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.UserDto (getUserName)
@@ -178,6 +189,12 @@ type State = FPOState
   , isEditorOutdated :: Boolean
   , outdatedInfoPopup :: Boolean
   , discardPopup :: Boolean
+  -- similar to mDirtyRef, but for Drafts. causes popup is user tries changing version with open draft, as that would discard the draft.
+  , mDirtyVersion :: Maybe (Ref Boolean)
+  -- Determines whether the user is on the merge view
+  , isOnMerge :: Boolean
+  -- obtained from TOC. Used when merging. Set to the version details of the Version loaded into the right editor.
+  , upToDateVersion :: Maybe Version
   )
 
 type Input = { docID :: DocumentID, elementData :: ElementData }
@@ -187,12 +204,13 @@ data Output
   | ClickedQuery (Array String)
   | DeletedComment TOCEntry (Array Int)
   | PostPDF String
-  | SavedSection TOCEntry
   | RenamedNode String Path
   | RequestComments Int Int
   | SelectedCommentSection Int Int
   | ShowAllCommentsOutput Int Int
   | RaiseDiscard
+  | RaiseMergeMode
+  | Merged
 
 data Action
   = Init
@@ -245,6 +263,9 @@ data Query a
   | UpdateComment CommentSection a
   | SelectCommentSection Int a
   | ToDeleteComment a
+  | RequestDirtyVersion (Boolean -> a)
+  | ResetDirtyVersion a
+  | ReceiveUpToDateUpdate (Maybe Version) a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -274,8 +295,7 @@ editor = connect selectTranslator $ H.mkComponent
       ] $
       [ renderAll state ]
         <> renderInfoModal
-        <>
-          renderDiscardModal
+        <> renderDiscardModal
     where
     renderInfoModal = case state.outdatedInfoPopup of
       false -> []
@@ -407,7 +427,11 @@ editor = connect selectTranslator $ H.mkComponent
                         state.showButtonText
                         (Save false)
                         "bi-floppy"
-                        (translate (label :: _ "editor_save") state.translator)
+                        case state.isOnMerge of
+                          false ->
+                            (translate (label :: _ "editor_save") state.translator)
+                          true ->
+                            (translate (label :: _ "editor_merge") state.translator)
                     , makeEditorToolbarButtonWithText
                         true
                         state.showButtonText
@@ -452,9 +476,15 @@ editor = connect selectTranslator $ H.mkComponent
                   [ HH.div
                       [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
                       [ HH.text
-                          ( translate (label :: _ "editor_oldVersion")
-                              state.translator
-                          )
+                          case state.isOnMerge of
+                            false ->
+                              ( translate (label :: _ "editor_oldVersion")
+                                  state.translator
+                              )
+                            true ->
+                              ( translate (label :: _ "editor_mergingNow")
+                                  state.translator
+                              )
                       , makeEditorToolbarButton
                           true
                           ""
@@ -584,8 +614,10 @@ editor = connect selectTranslator $ H.mkComponent
               Editor.setReadOnly false editor_
 
       -- New Ref for keeping track, if the content in editor has changed
-      -- since last save
+      -- 1. since last save
+      -- 2. since opening version
       dref <- H.liftEffect $ Ref.new false
+      vref <- H.liftEffect $ Ref.new false
 
       win <- H.liftEffect window
       let
@@ -608,6 +640,7 @@ editor = connect selectTranslator $ H.mkComponent
             { mDirtyRef = Just dref
             , mBeforeUnloadL = Just buL
             }
+        , mDirtyVersion = Just vref
         }
       H.liftEffect $ addEventListener beforeunload buL false winTarget
 
@@ -634,7 +667,7 @@ editor = connect selectTranslator $ H.mkComponent
       H.gets _.mEditor >>= traverse_ \ed -> do
 
         -- change Editor content listener
-        H.liftEffect $ addChangeListenerWithRef ed dref listener
+        H.liftEffect $ addChangeListenerWithRef ed dref vref listener
         container <- H.liftEffect $ Editor.getContainer ed
 
         -- Mouse events
@@ -751,11 +784,13 @@ editor = connect selectTranslator $ H.mkComponent
 
     Save isAutoSave -> do
       state <- H.get
-      when (not state.isEditorOutdated && state.compareToElement == Nothing) $ do
+      when (state.compareToElement == Nothing) $ do
         isDirty <- EC.liftEffect $ Ref.read =<< case state.saveState.mDirtyRef of
           Just r -> pure r
           Nothing -> EC.liftEffect $ Ref.new false
-        when isDirty $ do
+        -- Only save, when dirty flag is true or we are in older version
+        -- TODO: Add another flag instead of using isEditorOutdated
+        when (isDirty || state.isEditorOutdated) $ do
           allLines <- H.gets _.mEditor >>= traverse \ed -> do
             H.liftEffect $ Editor.getSession ed
               >>= Session.getDocument
@@ -805,31 +840,114 @@ editor = connect selectTranslator $ H.mkComponent
     Upload newEntry newWrapper isAutoSave -> do
       state <- H.get
       let
-        jsonContent = ContentDto.encodeWrapper newWrapper
-        newContent = ContentDto.getWrapperContent newWrapper
+        --modify the wrapper if merging to allow saving old versions.
+        modifiedWrapper = case isAutoSave of
+          true -> newWrapper
+          false -> case state.isOnMerge of
+            true -> case state.upToDateVersion of
+              Nothing -> newWrapper
+              Just { author: _, identifier: id, timestamp: _ } ->
+                case id of
+                  Nothing -> newWrapper
+                  Just i ->
+                    ( setWrapperContent
+                        (setContentParent i (getWrapperContent newWrapper))
+                        newWrapper
+                    )
+            false -> newWrapper
+        jsonContent = ContentDto.encodeWrapper modifiedWrapper
+        newContent = ContentDto.getWrapperContent modifiedWrapper
       -- send the new content as POST to the server
-      response <- Request.postJson (ContentDto.extractNewParent newContent)
+      response <- Request.postJson (ContentDto.extractDraft newContent)
         ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id
             <> "/rev?isAutoSave="
             <> show isAutoSave
         )
         jsonContent
-
       -- handle errors in pos and decodeJson
       case response of
         -- if error, try to Save again (Maybe ParentID is lost?)
+
         Left err -> updateStore $ Store.AddError err
+
+        {- <<<<<<< HEAD
+        Left err -> updateStore $ Store.AddError $ err
+=======
+        Left err -> updateStore $ Store.AddError err
+>>>>>>> main -}
         -- extract and insert new parentID into newContent
-        Right updatedContent -> do
-          H.raise (SavedSection newEntry)
+        Right { content: updatedContent, typ: typ } -> do
 
-          H.modify_ _
-            { mTocEntry = Just newEntry
-            , mContent = Just updatedContent
-            }
+          H.modify_ _ { mContent = Just updatedContent }
 
-          -- Show saved icon
-          handleAction SavedIcon
+          -- Show saved icon or toast
+          case isAutoSave, state.isEditorOutdated of
+            -- auto save interaction
+            true, _ -> do
+              -- H.modify_ _ { mContent = Just updatedContent }
+              handleAction SavedIcon
+              case typ of
+                "noConflict" -> pure unit
+                "draftCreated" -> pure unit --raise something to update version
+                "conflict" -> pure unit --should not happen here also raise something just in case
+                _ -> pure unit
+            -- manuell saving and working in latest version
+            false, false -> do
+              -- H.modify_ _ { mContent = Just updatedContent }
+              updateStore $ Store.AddSuccess "Saved successfully"
+              case typ of
+                "noConflict" -> do
+                  H.modify_ _ { isOnMerge = false }
+                  case state.isOnMerge of
+                    false -> pure unit
+                    true -> H.raise Merged
+                  pure unit
+                "draftCreated" ->
+                  do --should not happen here. just copy autosave case in case
+                    H.modify_ _ { isOnMerge = true }
+                "conflict" -> do --raise something to update version
+                  H.modify_ _ { isOnMerge = true }
+                  H.raise RaiseMergeMode
+                _ -> pure unit
+            -- manuell saving, draft mode => publish
+            false, true -> do
+              case typ of
+                --happends if parent was updated due to merge view being present.
+                "noConflict" -> do
+                  H.modify_ _ { isOnMerge = false }
+                  case state.isOnMerge of
+                    false -> pure unit
+                    true -> H.raise Merged
+                  pure unit
+                "draftCreated" ->
+                  do --should not happen here. just copy autosave case in case
+                    H.modify_ _ { isOnMerge = true }
+                "conflict" -> do --raise something to update version
+                  H.modify_ _ { isOnMerge = true }
+                  H.raise RaiseMergeMode
+                  pure unit
+                _ -> pure unit
+          {-               res <- Request.postJson (ContentDto.extractDraft updatedContent)
+            ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id
+                <> "/draft/publish"
+            )
+            jsonEmptyObject
+
+          case res of
+            Left err' -> updateStore $ Store.AddError $ err'
+            Right upCon -> do
+              H.modify_ _ { mContent = Just upCon }
+              -- Put merged content into editor
+              H.gets _.mEditor >>= traverse_ \ed -> do
+                H.liftEffect do
+                  session <- Editor.getSession ed
+                  document <- Session.getDocument session
+                  Document.setValue (ContentDto.getContentText upCon) document
+                  -- reset Ref, because loading new content is considered 
+                  -- changing the existing content, which would set the flag
+                  for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+              updateStore $ Store.AddSuccess "Saved and Merged successfully."
+              pure unit -}
 
           -- mDirtyRef := false
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
@@ -1317,12 +1435,43 @@ editor = connect selectTranslator $ H.mkComponent
         -- We need Aff for that and thus cannot go inside Eff
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
         -- See, why and fix it
-        loadedContent <- Request.getJson
-          ContentDto.decodeContentWrapper
+
+        --first we look whether a draft to load is present
+        loadedDraftContent <- Request.getJson
+          ContentDto.decodeDraftContentWrapper
           ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-              <> "/rev/"
-              <> version
+              <> "/draft"
           )
+
+        -- when a draft was found, set the dirtyVersion ref to true so user doesn't swap without discarding.
+        -- otherwise, switching the section/version means that it can be set to false
+        {-         case loadedDraftContent of 
+        Right _ -> do 
+          for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write true r
+          isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+            _.mDirtyVersion
+          H.liftEffect $ log ("ended up in right segment" <> (show isDirty))
+        Left _ -> do 
+          pure unit
+          for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+          H.liftEffect $ log "ended up in left segment" -}
+
+        loadedContent <- case loadedDraftContent of
+          Right res -> pure (Right $ convertDCWToCW res)
+          Left _ -> do
+            Request.getJson
+              ContentDto.decodeContentWrapper
+              ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+                  <> "/rev/"
+                  <> version
+              )
+
+        {-         loadedContent <- Request.getJson
+        ContentDto.decodeContentWrapper
+        ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+            <> "/rev/"
+            <> version
+        ) -}
         let
           wrapper = case loadedContent of
             Left _ -> ContentDto.failureContentWrapper
@@ -1333,6 +1482,7 @@ editor = connect selectTranslator $ H.mkComponent
           { mTocEntry = Just entry
           , mContent = Just content
           , isEditorOutdated = version /= "latest"
+          , isOnMerge = false
           }
 
         -- Only secondary Editor has ElementData
@@ -1357,6 +1507,12 @@ editor = connect selectTranslator $ H.mkComponent
             }
           -- Get comments information from Comment Child
           H.raise (RequestComments state.docID entry.id)
+        --will be set to true right now, but should be set to false if didn't change to draft
+        case loadedDraftContent of
+          Right _ -> do
+            pure unit
+          Left _ -> do
+            for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure unit
 
     -- After getting information from from Comment
@@ -1416,6 +1572,10 @@ editor = connect selectTranslator $ H.mkComponent
      . Query a
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
+
+    ReceiveUpToDateUpdate mVersion a -> do
+      H.modify_ _ { upToDateVersion = mVersion }
+      pure (Just a)
 
     EditorResize a -> do
       editor_ <- H.gets _.mEditor
@@ -1555,6 +1715,16 @@ editor = connect selectTranslator $ H.mkComponent
         _, _ -> pure unit
       pure (Just a)
 
+    RequestDirtyVersion reply -> do
+      isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+        _.mDirtyVersion
+      pure (Just (reply isDirty))
+
+    ResetDirtyVersion a -> do
+      state <- H.get
+      for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+      pure (Just a)
+
 -- | Change listener for the editor.
 --
 --   This function should implement stuff like parsing and syntax analysis,
@@ -1565,9 +1735,10 @@ editor = connect selectTranslator $ H.mkComponent
 addChangeListenerWithRef
   :: Types.Editor
   -> Ref Boolean
+  -> Ref Boolean
   -> HS.Listener Action
   -> Effect Unit
-addChangeListenerWithRef editor_ dref listener = do
+addChangeListenerWithRef editor_ dref vref listener = do
   session <- Editor.getSession editor_
   -- in order to prevent an ifinite loop with this listener
   guardRef <- Ref.new false
@@ -1575,6 +1746,7 @@ addChangeListenerWithRef editor_ dref listener = do
     do
       -- set dirty flag
       Ref.write true dref
+      Ref.write true vref
       HS.notify listener AutoSaveTimer
 
       -- '#' → '  #' at beginning of a line with Reentrancy-Guard
@@ -1702,6 +1874,9 @@ initialState { context, input } =
   , isEditorOutdated: false
   , outdatedInfoPopup: false
   , discardPopup: false
+  , mDirtyVersion: Nothing
+  , isOnMerge: false
+  , upToDateVersion: Nothing
   }
 
 makeEditorToolbarButton

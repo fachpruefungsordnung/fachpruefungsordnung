@@ -25,14 +25,25 @@ infoModal
   -> HH.HTML w action
 infoModal
   translator
+  {- <<<<<<< HEAD
+  cancelAction =
+  addModal (translate (label :: _ "editor_mergingInfo") translator)
+    (const cancelAction) $
+=======
   cancelAction
   doNothingAction =
   addModal (translate (label :: _ "common_mergingInfo") translator)
     cancelAction
     doNothingAction $
+>>>>>>> main -}
+  cancelAction
+  doNothingAction =
+  addModal (translate (label :: _ "editor_mergingInfo") translator)
+    cancelAction
+    doNothingAction $
     [ HH.div
         [ HP.classes [ HB.modalBody ], HP.style "white-space: pre-line;" ]
         [ HH.text $
-            translate (label :: _ "common_mergingInfoText") translator
+            translate (label :: _ "editor_mergingInfoText") translator
         ]
     ]
