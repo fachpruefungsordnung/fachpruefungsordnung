@@ -40,9 +40,11 @@ someFunc = do
                 exampleTree
 
     _ <- case result of
-        Right (Right err) ->
-            flip run connection $ logMessage Error Nothing Scope.server err
-        Right err ->
+        Left err ->
+            flip run connection $
+                logMessage Error Nothing Scope.server $
+                    show err
+        Right (Left err) ->
             flip run connection $ logMessage Error Nothing Scope.server err
         _ ->
             flip run connection $
