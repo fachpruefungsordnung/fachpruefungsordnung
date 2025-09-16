@@ -71,13 +71,16 @@ jobs:
           fail-on: suggestion
 
       - name: Build Stack Project
-        uses: freckle/stack-action@v5
-        with:
-          working-directory: backend
-          stack-build-arguments: --no-test --fast --allow-newer
-          cache-prefix: v1/
-          test: false
-          upgrade-stack: false
+        run: cd backend && stack build
+
+      # - name: Build Stack Project
+      #   uses: freckle/stack-action@v5
+      #   with:
+      #     working-directory: backend
+      #     stack-build-arguments: --no-test --fast --allow-newer
+      #     cache-prefix: v1/
+      #     test: false
+      #     upgrade-stack: false
 
   check-frontend:
     name: Check Frontend
