@@ -63,16 +63,12 @@ instance decodeJsonContent :: DecodeJson Content where
   decodeJson json = do
     obj <- decodeJson json
     mCon <- obj .:? "content"
-    case mCon of
-      Just con -> do
-        header <- obj .: "header"
-        id <- header .: "identifier"
-        pure $ Content { content: con, parent: id }
-      Nothing -> do
-        con <- obj .: "draftContent"
-        header <- obj .: "draftHeader"
-        id <- header .: "draftIdentifier"
-        pure $ Content { content: con, parent: id }
+    con <- case mCon of
+      Just c -> pure c
+      Nothing -> obj .: "draftContent"
+    header <- obj .: "draftHeader"
+    id <- header .: "draftIdentifier"
+    pure $ Content { content: con, parent: id }
 
 instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
   decodeJson json = do
