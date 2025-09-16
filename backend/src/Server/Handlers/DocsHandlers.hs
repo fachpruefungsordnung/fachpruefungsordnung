@@ -131,6 +131,7 @@ type DocsAPI =
                 :<|> PostTextElement
                 :<|> PostTextRevision
                 :<|> GetTextElementRevision
+                :<|> GetTextElementRevisionPDF
                 :<|> PostTreeRevision
                 :<|> GetTreeRevision
                 :<|> GetTreeRevisionFull
@@ -202,6 +203,16 @@ type GetTextElementRevision =
         :> "rev"
         :> Capture "textRevision" TextRevisionSelector
         :> Get '[JSON] (Maybe (Rendered TextElementRevision))
+
+type GetTextElementRevisionPDF =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "rev"
+        :> Capture "textRevision" TextRevisionSelector
+        :> "pdf"
+        :> Get '[PDF] PDFByteString
 
 type PostTreeRevision =
     Auth AuthMethod Auth.Token
@@ -391,6 +402,7 @@ docsServer =
         :<|> postTextElementHandler
         :<|> postTextRevisionHandler
         :<|> getTextElementRevisionHandler
+        :<|> getTextRevisionPDFHandler
         :<|> postTreeRevisionHandler
         :<|> getTreeRevisionHandler
         :<|> getTreeRevisionFullHandler
@@ -500,6 +512,21 @@ getTextElementRevisionHandler auth docID textID revision = do
         run $
             Docs.getTextElementRevision userID $
                 TextRevisionRef (TextElementRef docID textID) revision
+
+getTextRevisionPDFHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> TextRevisionSelector
+    -> Handler PDFByteString
+getTextRevisionPDFHandler auth docID textID revision = do
+    userID <- getUser auth
+    pdf <-
+        withDB $
+            run $
+                Docs.getTextRevisionPDF userID $
+                    TextRevisionRef (TextElementRef docID textID) revision
+    return $ PDFByteString pdf
 
 postTreeRevisionHandler
     :: AuthResult Auth.Token

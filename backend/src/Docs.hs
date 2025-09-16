@@ -13,6 +13,7 @@ module Docs
     , createTextElement
     , createTextRevision
     , getTextElementRevision
+    , getTextRevisionPDF
     , getDocumentRevisionText
     , getTreeRevision
     , getDocumentRevisionTree
@@ -105,6 +106,7 @@ import Docs.Revision
     , textRevisionRefFor
     , treeRevisionRefFor
     )
+import qualified Docs.Revision as Revision
 import Docs.TextElement
     ( TextElement
     , TextElementID
@@ -460,6 +462,28 @@ getFullTreeRevision' userID ref = do
         Just tree -> bimap (Custom . Text.pack . show) Just (treeRevisionToMeta tree)
         Nothing -> Right Nothing
 
+getTextRevisionPDF
+    :: ( HasGetTreeRevision m
+       , HasLogMessage m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , MonadIO m
+       )
+    => UserID
+    -> TextRevisionRef
+    -> m (Result BL.ByteString)
+getTextRevisionPDF userID ref@(TextRevisionRef (TextElementRef _ textID) _) =
+    logged userID Scope.docsTreeRevision $ runExceptT $ do
+        guardExistsTextRevision False ref
+        let ref' = Revision.refFromTextRevision ref
+        maybeDocumentContainer <-
+            getDocumentRevisionDocumentContainerForTextElement userID ref' textID
+        documentContainer <-
+            ExceptT . pure $
+                maybe (Left $ RevisionNotFound ref') Right maybeDocumentContainer
+        toPDF documentContainer
+
 getTreeRevisionPDF
     :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m, MonadIO m)
     => UserID
@@ -523,6 +547,40 @@ toDocumentContainer fullRevision =
   where
     toInputTree (TreeRevision _ node) =
         nodeToLtmlInputTreePred (const True) (const True) node
+
+toDocumentContainerForTextElement
+    :: TextElementID
+    -> TreeRevision TextElementRevision
+    -> Result (LTML.Flagged' LTML.DocumentContainer)
+toDocumentContainerForTextElement teID fullRevision =
+    first (Custom . Text.pack . show) $
+        LTML.treeToLtml $
+            toInputTree fullRevision
+  where
+    toInputTree (TreeRevision _ node) =
+        nodeToLtmlInputTreePred
+            (const True)
+            ((teID ==) . TextElement.identifier . TextRevision.textElement)
+            node
+
+getDocumentRevisionDocumentContainerForTextElement
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       )
+    => UserID
+    -> RevisionRef
+    -> TextElementID
+    -> ExceptT Error m (Maybe (LTML.Flagged' LTML.DocumentContainer))
+getDocumentRevisionDocumentContainerForTextElement userID ref textID = do
+    fullRevision <- getDocumentRevision' userID ref <&> FullDocument.body
+    ExceptT . pure $
+        maybe
+            (Right Nothing)
+            (second Just . toDocumentContainerForTextElement textID)
+            fullRevision
 
 getTreeRevision
     :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
