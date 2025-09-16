@@ -71,6 +71,7 @@ import FPO.Components.TOC (Version)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
+import FPO.Data.Store (preventErrorHandlingLocally)
 import FPO.Data.Store as Store
 import FPO.Dto.ContentDto
   ( Content
@@ -939,7 +940,7 @@ editor = connect selectTranslator $ H.mkComponent
                   session <- Editor.getSession ed
                   document <- Session.getDocument session
                   Document.setValue (ContentDto.getContentText upCon) document
-                  -- reset Ref, because loading new content is considered 
+                  -- reset Ref, because loading new content is considered
                   -- changing the existing content, which would set the flag
                   for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
               updateStore $ Store.AddSuccess "Saved and Merged successfully."
@@ -1077,7 +1078,7 @@ editor = connect selectTranslator $ H.mkComponent
             -- remove the selection
             H.liftEffect $ clearSelection ed
 
-        _, _ -> pure unit -- TODO error handling 
+        _, _ -> pure unit -- TODO error handling
 
     SelectComment -> do
       state <- H.get
@@ -1433,7 +1434,7 @@ editor = connect selectTranslator $ H.mkComponent
         -- See, why and fix it
 
         --first we look whether a draft to load is present
-        loadedDraftContent <- Request.getJson
+        loadedDraftContent <- preventErrorHandlingLocally $ Request.getJson
           ContentDto.decodeContentWrapper
           ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
               <> "/draft"
@@ -1452,13 +1453,13 @@ editor = connect selectTranslator $ H.mkComponent
 
         -- when a draft was found, set the dirtyVersion ref to true so user doesn't swap without discarding.
         -- otherwise, switching the section/version means that it can be set to false
-        {-         case loadedDraftContent of 
-        Right _ -> do 
+        {-         case loadedDraftContent of
+        Right _ -> do
           for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write true r
           isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
             _.mDirtyVersion
           H.liftEffect $ log ("ended up in right segment" <> (show isDirty))
-        Left _ -> do 
+        Left _ -> do
           pure unit
           for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
           H.liftEffect $ log "ended up in left segment" -}
@@ -1537,7 +1538,7 @@ editor = connect selectTranslator $ H.mkComponent
                 document
               Editor.setReadOnly (state.compareToElement /= Nothing) ed
 
-              -- reset Ref, because loading new content is considered 
+              -- reset Ref, because loading new content is considered
               -- changing the existing content, which would set the flag
               for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
 

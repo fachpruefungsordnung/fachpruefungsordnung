@@ -505,7 +505,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
             else [ -1 ]
         }
 
-    -- does not toggle off if clicked on same toc element 
+    -- does not toggle off if clicked on same toc element
     ToggleHistoryMenuOff path -> do
       H.modify_ \state ->
         state
@@ -528,7 +528,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       gotRes <- postJson PostTextDto.decodePostTextDto
         ("/docs/" <> show s.docID <> "/text")
         ( PostTextDto.encodePostTextDto
-            (PostTextDto { identifier: 0, kind: "new Text" })
+            (PostTextDto { identifier: 0, kind: "new Text", type_: "text" }) -- TODO: choose type_ according to (still missing) meta map!
         )
       case gotRes of
         Left _ -> pure unit -- TODO error handling

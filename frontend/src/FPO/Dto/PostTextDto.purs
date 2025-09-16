@@ -11,6 +11,7 @@ import Data.Newtype (class Newtype)
 newtype PostTextDto = PostTextDto
   { identifier :: Int
   , kind :: String
+  , type_ :: String
   }
 
 derive instance newtypePostTextDto :: Newtype PostTextDto _
@@ -20,11 +21,12 @@ instance decodeJsonPostTextDto :: DecodeJson PostTextDto where
     obj <- decodeJson json
     id <- obj .: "identifier"
     kind <- obj .: "textElementKind"
-    pure $ PostTextDto { identifier: id, kind }
+    type_ <- obj .: "textElementType"
+    pure $ PostTextDto { identifier: id, kind, type_ }
 
 instance encodeJsonPostTextDto :: EncodeJson PostTextDto where
-  encodeJson (PostTextDto { kind }) =
-    encodeJson { textElementKind: kind }
+  encodeJson (PostTextDto { kind, type_ }) =
+    encodeJson { kind: kind, type_: type_ }
 
 instance showPostTextDto :: Show PostTextDto where
   show (PostTextDto { identifier, kind }) =
