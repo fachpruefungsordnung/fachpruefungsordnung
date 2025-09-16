@@ -51,6 +51,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Install Bullshit
+        run: apt-get install -y --no-install-recommends build-essential pkg-config
+
       - name: Check Formatting
         uses: haskell-actions/run-fourmolu@v9
         with:
