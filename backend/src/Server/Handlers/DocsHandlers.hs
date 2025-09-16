@@ -141,6 +141,7 @@ type DocsAPI =
                 :<|> ResolveComment
                 :<|> PostReply
                 :<|> GetDocumentRevision
+                :<|> GetDocumentRevisionPDF
                 :<|> GetDocumentRevisionTree
                 :<|> GetDocumentRevisionText
                 :<|> GetDraftTextRevision
@@ -303,6 +304,14 @@ type GetDocumentRevision =
         :> Capture "revision" RevisionSelector
         :> Get '[JSON] (FullDocument TextElementRevision)
 
+type GetDocumentRevisionPDF =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "rev"
+        :> Capture "revision" RevisionSelector
+        :> "pdf"
+        :> Get '[PDF] PDFByteString
+
 type GetDocumentRevisionTree =
     Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
@@ -374,6 +383,7 @@ docsServer =
         :<|> resolveCommentHandler
         :<|> createReplyHandler
         :<|> getDocumentRevisionHandler
+        :<|> getDocumentRevisionPDFHandler
         :<|> getDocumentRevisionTreeHandler
         :<|> getDocumentRevisionTextHandler
         :<|> getDraftTextRevisionHandler
@@ -506,7 +516,8 @@ getTreeRevisionPDFHandler
     -> Handler PDFByteString
 getTreeRevisionPDFHandler auth docID revision = do
     userID <- getUser auth
-    pdf <- withDB $ run $ Docs.getPDF userID $ TreeRevisionRef docID revision
+    pdf <-
+        withDB $ run $ Docs.getTreeRevisionPDF userID $ TreeRevisionRef docID revision
     return $ PDFByteString pdf
 
 getTextHistoryHandler
@@ -615,6 +626,20 @@ getDocumentRevisionHandler
 getDocumentRevisionHandler auth docID rev = do
     userID <- getUser auth
     withDB $ run $ Docs.getDocumentRevision userID (RevisionRef docID rev)
+
+getDocumentRevisionPDFHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> RevisionSelector
+    -> Handler PDFByteString
+getDocumentRevisionPDFHandler auth docID revision = do
+    userID <- getUser auth
+    pdf <-
+        withDB $
+            run $
+                Docs.getDocumentRevisionPDF userID $
+                    RevisionRef docID revision
+    return $ PDFByteString pdf
 
 getDocumentRevisionTreeHandler
     :: AuthResult Auth.Token
