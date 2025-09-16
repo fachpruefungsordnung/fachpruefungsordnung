@@ -119,8 +119,6 @@ import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
 
-import Effect.Console (log)
-
 foreign import _resize :: Types.Editor -> Effect Unit
 
 type CommentState =
@@ -1444,17 +1442,13 @@ editor = connect selectTranslator $ H.mkComponent
 
         -- check, if draft is present. Otherwise get from version
         loadedContent <- case loadedDraftContent of
-          Right res -> do
-            H.liftEffect $ log "loadedDraftContent"
-            pure (Right res)
-          Left _ -> do
-            H.liftEffect $ log "Left new load"
-            Request.getJson
-              ContentDto.decodeContentWrapper
-              ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-                  <> "/rev/"
-                  <> version
-              )
+          Right res -> pure (Right res)
+          Left _ -> Request.getJson
+            ContentDto.decodeContentWrapper
+            ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+                <> "/rev/"
+                <> version
+            )
 
         -- when a draft was found, set the dirtyVersion ref to true so user doesn't swap without discarding.
         -- otherwise, switching the section/version means that it can be set to false
