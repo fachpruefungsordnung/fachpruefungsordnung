@@ -23,7 +23,9 @@ module Docs
     , getDocumentHistory
     , getDocumentRevision
     , getTreeRevisionPDF
+    , getTreeRevisionHTML
     , getDocumentRevisionPDF
+    , getDocumentRevisionHTML
     , createComment
     , getComments
     , resolveComment
@@ -133,6 +135,7 @@ import qualified Docs.UserRef as UserRef
 import GHC.Generics (Generic)
 import GHC.Int (Int64)
 import qualified Language.Ltml.AST.DocumentContainer as LTML
+import qualified Language.Ltml.HTML.Export as HTML
 import Language.Ltml.HTML.Pipeline (htmlPipeline)
 import qualified Language.Ltml.ToLaTeX.PDFGenerator as PDF
 import qualified Language.Ltml.Tree.ToLtml as LTML
@@ -151,6 +154,8 @@ data Error
     | TextRevisionNotFound TextRevisionRef
     | TreeRevisionNotFound TreeRevisionRef
     | CommentNotFound CommentRef
+    | PDFError Text
+    | ZipHTMLError
     | Custom Text
     deriving (Generic)
 
@@ -467,13 +472,33 @@ getTreeRevisionPDF userID ref = logged userID Scope.docsTreeRevision $ runExcept
             maybe (Left $ TreeRevisionNotFound ref) Right maybeDocumentContainer
     toPDF documentContainer
 
+getTreeRevisionHTML
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m, MonadIO m)
+    => UserID
+    -> TreeRevisionRef
+    -> m (Result BL.ByteString)
+getTreeRevisionHTML userID ref = logged userID Scope.docsTreeRevision $ runExceptT $ do
+    maybeDocumentContainer <- getTreeRevisionDocumentContainer userID ref
+    documentContainer <-
+        ExceptT . pure $
+            maybe (Left $ TreeRevisionNotFound ref) Right maybeDocumentContainer
+    toHTML documentContainer
+
 toPDF
     :: (MonadIO m)
     => LTML.Flagged' LTML.DocumentContainer
     -> ExceptT Error m BL.ByteString
 toPDF documentContainer = do
     pdf <- liftIO $ PDF.generatePDF documentContainer
-    ExceptT . pure $ first (Custom . Text.pack) pdf
+    ExceptT . pure $ first (PDFError . Text.pack) pdf
+
+toHTML
+    :: (MonadIO m)
+    => LTML.Flagged' LTML.DocumentContainer
+    -> ExceptT Error m BL.ByteString
+toHTML documentContainer = do
+    zipBytes <- liftIO $ HTML.renderZip documentContainer
+    ExceptT . pure $ maybe (Left ZipHTMLError) Right zipBytes
 
 getTreeRevisionDocumentContainer
     :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
@@ -615,6 +640,28 @@ getDocumentRevisionPDF userID ref =
                     Right
                     maybeDocumentContainer
         toPDF documentContainer
+
+getDocumentRevisionHTML
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       , MonadIO m
+       )
+    => UserID
+    -> RevisionRef
+    -> m (Result BL.ByteString)
+getDocumentRevisionHTML userID ref =
+    logged userID Scope.docsTreeRevision $ runExceptT $ do
+        maybeDocumentContainer <- getDocumentRevisionDocumentContainer userID ref
+        documentContainer <-
+            ExceptT . pure $
+                maybe
+                    (Left $ RevisionNotFound ref)
+                    Right
+                    maybeDocumentContainer
+        toHTML documentContainer
 
 getDocumentRevisionDocumentContainer
     :: ( HasGetTreeRevision m
