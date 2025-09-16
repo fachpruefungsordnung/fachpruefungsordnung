@@ -522,7 +522,7 @@ toDocumentContainer fullRevision =
             toInputTree fullRevision
   where
     toInputTree (TreeRevision _ node) =
-        nodeToLtmlInputTreePred (const False) (const False) node
+        nodeToLtmlInputTreePred (const True) (const True) node
 
 getTreeRevision
     :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
