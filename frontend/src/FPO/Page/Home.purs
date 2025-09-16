@@ -251,43 +251,42 @@ component =
               pure unit
 
     -- H.liftEffect $ downloadPdf projectId
-    DownloadZip _ _ event -> do
+    DownloadZip projectId projectName event -> do
       H.liftEffect $ do
         preventDefault (MouseEvent.toEvent event)
         stopPropagation (MouseEvent.toEvent event)
-      updateStore $ Store.AddWarning "Not yet implemented!"
 
-  -- renderedZip' <- Request.postBlobOrError ("/render/zip/" <> projectId)
-  -- let filename = projectName <> ".zip"
-  -- case renderedZip' of
-  --   Left _ -> pure unit
-  --   Right blobOrError ->
-  --     case blobOrError of
-  --       Left errMsg -> do
-  --         updateStore $ Store.AddError $ "Failed to generate ZIP: " <> errMsg
-  --       Right body -> do
-  --         -- create blob link
-  --         url <- H.liftEffect $ createObjectURL body
-  --         -- Create an invisible link and click it to download ZIP
-  --         H.liftEffect $ do
-  --           -- get window stuff
-  --           win <- window
-  --           hdoc <- document win
-  --           let doc = HTMLDocument.toDocument hdoc
+      renderedZip' <- getBlobOrError
+        ("/docs/" <> show projectId <> "/rev/latest/html")
+      let filename = projectName <> ".zip"
+      case renderedZip' of
+        Left _ -> pure unit
+        Right blobOrError ->
+          case blobOrError of
+            Left _ -> pure unit
+            Right body -> do
+              -- create blob link
+              url <- H.liftEffect $ createObjectURL body
+              -- Create an invisible link and click it to download ZIP
+              H.liftEffect $ do
+                -- get window stuff
+                win <- window
+                hdoc <- document win
+                let doc = HTMLDocument.toDocument hdoc
 
-  --           -- create link
-  --           aEl <- Document.createElement "a" doc
-  --           case HTMLElement.fromElement aEl of
-  --             Nothing -> pure unit
-  --             Just aHtml -> do
-  --               Element.setAttribute "href" url aEl
-  --               Element.setAttribute "download" filename aEl
-  --               HTMLElement.click aHtml
-  --         -- deactivate the blob link after 1 sec
-  --         _ <- H.fork do
-  --           H.liftAff $ delay (Milliseconds 1000.0)
-  --           H.liftEffect $ revokeObjectURL url
-  --         pure unit
+                -- create link
+                aEl <- Document.createElement "a" doc
+                case HTMLElement.fromElement aEl of
+                  Nothing -> pure unit
+                  Just aHtml -> do
+                    Element.setAttribute "href" url aEl
+                    Element.setAttribute "download" filename aEl
+                    HTMLElement.click aHtml
+              -- deactivate the blob link after 1 sec
+              _ <- H.fork do
+                H.liftAff $ delay (Milliseconds 1000.0)
+                H.liftEffect $ revokeObjectURL url
+              pure unit
 
   -- H.liftEffect $ downloadPdf projectId
 
