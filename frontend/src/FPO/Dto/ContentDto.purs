@@ -63,22 +63,36 @@ instance decodeJsonContent :: DecodeJson Content where
   decodeJson json = do
     obj <- decodeJson json
     mCon <- obj .:? "content"
-    con <- case mCon of
-      Just c -> pure c
-      Nothing -> obj .: "draftContent"
-    header <- obj .: "draftHeader"
-    id <- header .: "draftIdentifier"
-    pure $ Content { content: con, parent: id }
+    case mCon of
+      -- Normal content
+      Just con -> do
+        header <- obj .: "header"
+        id <- header .: "identifier"
+        pure $ Content { content: con, parent: id }
+      -- Draft
+      Nothing -> do
+        con <- obj .: "draftContent"
+        header <- obj .: "draftHeader"
+        id <- header .: "draftIdentifier"
+        pure $ Content { content: con, parent: id }
 
 instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
   decodeJson json = do
     obj <- decodeJson json
-    ele <- obj .: "element"
-    rev <- ele .: "revision"
-    con <- decodeJson (fromObject rev)
-    coms <- rev .: "commentAnchors"
-    html <- obj .: "html"
-    pure $ Wrapper { content: con, comments: coms, html }
+    mEle <- obj .:? "element"
+    case mEle of
+      -- Normal Content
+      Just ele -> do
+        rev <- ele .: "revision"
+        con <- decodeJson (fromObject rev)
+        coms <- rev .: "commentAnchors"
+        html <- obj .: "html"
+        pure $ Wrapper { content: con, comments: coms, html }
+      -- Draft
+      Nothing -> do
+        con <- decodeJson (fromObject obj)
+        coms <- obj .: "draftCommentAnchors"
+        pure $ Wrapper { content: con, comments: coms, html: "" }
 
 instance encodeJsonCommentAnchor :: EncodeJson CommentAnchor where
   encodeJson (CommentAnchor { id, startCol, startRow, endCol, endRow }) =

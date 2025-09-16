@@ -1443,13 +1443,12 @@ editor = connect selectTranslator $ H.mkComponent
         -- check, if draft is present. Otherwise get from version
         loadedContent <- case loadedDraftContent of
           Right res -> pure (Right res)
-          Left _ -> do
-            Request.getJson
-              ContentDto.decodeContentWrapper
-              ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-                  <> "/rev/"
-                  <> version
-              )
+          Left _ -> Request.getJson
+            ContentDto.decodeContentWrapper
+            ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+                <> "/rev/"
+                <> version
+            )
 
         -- when a draft was found, set the dirtyVersion ref to true so user doesn't swap without discarding.
         -- otherwise, switching the section/version means that it can be set to false
