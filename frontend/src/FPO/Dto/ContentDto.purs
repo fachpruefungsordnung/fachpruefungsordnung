@@ -200,15 +200,6 @@ failureContent = Content { content: "Error decoding content", parent: -1 }
 failureContentWrapper :: ContentWrapper
 failureContentWrapper = Wrapper { content: failureContent, comments: [] }
 
-extractNewParent :: Content -> Json -> Either JsonDecodeError Content
-extractNewParent (Content cont) json = do
-  obj <- decodeJson json
-  ele <- obj .: "element"
-  newRev <- ele .: "newRevision"
-  header <- newRev .: "header"
-  newPar <- header .: "identifier"
-  pure $ Content $ cont { parent = newPar }
-
 extractDraft
   :: Content -> Json -> Either JsonDecodeError { content :: Content, typ :: String }
 extractDraft (Content cont) json = do
