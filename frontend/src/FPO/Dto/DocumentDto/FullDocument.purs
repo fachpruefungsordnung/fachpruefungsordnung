@@ -1,13 +1,17 @@
-module FPO.Dto.DocumentDto.FullDocument where
+module FPO.Dto.DocumentDto.FullDocument
+  ( FullDocument(..)
+  , decodeFullDocument
+  , getBody
+  , getHeader
+  ) where
 
 import Prelude
 
 import Data.Argonaut (Json, JsonDecodeError, decodeJson, (.:))
 import Data.Either (Either)
-import Data.Maybe (Maybe)
-import Data.Traversable (traverse)
+import Data.Maybe (Maybe(..))
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader)
-import FPO.Dto.DocumentDto.DocumentTree (DocumentTreeTER, decodeDocument)
+import FPO.Dto.DocumentDto.DocumentTree (DocumentTreeTER)
 
 newtype FullDocument = FullDocument
   { header :: DocumentHeader
@@ -24,5 +28,6 @@ decodeFullDocument :: Json -> Either JsonDecodeError FullDocument
 decodeFullDocument json = do
   obj <- decodeJson json
   header <- obj .: "header" >>= decodeJson
-  body <- obj .: "body" >>= traverse decodeDocument
-  pure $ FullDocument { header, body }
+  -- body <- obj .: "body" >>= traverse decodeDocument 
+  -- Body is not really relevant for decoding if creating a new document, so we ignore it for now
+  pure $ FullDocument { header, body: Nothing }
