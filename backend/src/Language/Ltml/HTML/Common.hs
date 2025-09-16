@@ -7,7 +7,6 @@
 module Language.Ltml.HTML.Common
     ( HtmlReaderState
     , ReaderStateMonad
-    , runReaderState
     , GlobalState (..)
     , ReaderState (..)
     , initGlobalState
@@ -17,12 +16,9 @@ module Language.Ltml.HTML.Common
     , FootnoteMap
     , convertLabelMap
     , addUsedFootnoteLabels
-    , addUsedFootnotes
     , FootnoteSet
     , NumLabel (..)
     , ToC
-    , TocEntry
-    , TocCategory (..)
     , addTocEntry
     , addPhantomTocEntry
     , PhantomTocEntry
@@ -31,20 +27,14 @@ module Language.Ltml.HTML.Common
     , result
     , EnumStyleMap
     , LabelWrapper
-    , TocEntryWrapper
     , anchorLink
-    , pageLink
-    , mainPageAnchorLink
-    , collectExportSection
-    , exportLink
-    , setHasErrors
     , Delayed (..)
     , evalDelayed
     , returnNow
     ) where
 
-import Control.Monad.Reader (ReaderT, runReaderT)
-import Control.Monad.State (State, get, modify, runState)
+import Control.Monad.Reader (ReaderT)
+import Control.Monad.State (State, get, modify)
 import Data.Aeson (FromJSON, ToJSON)
 import Data.ByteString.Lazy (ByteString)
 import Data.DList (DList, snoc)
@@ -62,9 +52,7 @@ import Language.Lsd.AST.Type.Enum (EnumFormat)
 import Language.Lsd.AST.Type.Section (SectionFormat)
 import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label (unLabel))
-import qualified Language.Ltml.HTML.CSS.Classes as Class
-import Language.Ltml.HTML.CSS.Util (cssClass_, (<#>))
-import Lucid (Html, a_, div_, href_, span_, toHtml)
+import Lucid (Html, a_, href_)
 
 -- TODO: Third ConfigState? With custom Reader Monad that is read only
 
@@ -76,12 +64,6 @@ import Lucid (Html, a_, div_, href_, span_, toHtml)
 type HtmlReaderState = ReaderStateMonad (Delayed (Html ()))
 
 type ReaderStateMonad a = ReaderT ReaderState (State GlobalState) a
-
-runReaderState
-    :: ReaderStateMonad a -> ReaderState -> GlobalState -> (a, GlobalState)
-runReaderState ma readerState = runState (runReaderT ma readerState)
-
--------------------------------------------------------------------------------
 
 data GlobalState = GlobalState
     { hasFlagged :: Bool
@@ -115,10 +97,8 @@ data GlobalState = GlobalState
     -- ^ Holds all labels and the Html element that should be displayed when this label is referenced
     , tableOfContents :: ToC
     -- ^ Holds all entries for the table of contents as (Maybe key (e.g. § 1),
-    --   title, HTML id as anchor link, category). The title is wrapped into 'Result'.
+    --   title, HTML id as anchor link). The title is wrapped into 'Result'.
     --   In case of an parse error this title will be set to an Error title.
-    --   The 'Left' constructor holds metadata for the Frontend,
-    --   which is ignored when rendering the 'ToC'.
     , mangledLabelName :: Text
     -- ^ Mangled prefix name for generating new label names that do not exist in source language
     , mangledLabelID :: Int
@@ -129,15 +109,6 @@ data GlobalState = GlobalState
     -- ^ Holds prefix for generating new css class names for enum counter styles
     , mangledEnumCounterID :: Int
     -- ^ Holds postfix id which makes enum counter class name unique
-    , exportSections :: [(Text, Delayed Text, Delayed (Html ()))]
-    -- ^ Collects all (non-super) sections as their their @htmlID@, their 'Html' and their title
-    , mainDocumentTitleHtml :: Delayed (Html ())
-    -- ^ Styled title of the main Document for building exported sections
-    , mainDocumentTitle :: Delayed Text
-    -- ^ Raw title of the main Document for building HTML headers
-    , hasErrors :: Bool
-    -- ^ True if any error occured while parsing;
-    --   Note: "soft" errors like undefined labels are not catched
     }
 
 data ReaderState = ReaderState
@@ -181,12 +152,8 @@ data ReaderState = ReaderState
     -- ^ Wrapper around the Reference Html inside the TextTree (e.g. for adding anchor links)
     , footnoteWrapperFunc :: LabelWrapper
     -- ^ Wrapper around Footnote reference Html inside the TextTree (e.g. for adding anchor links)
-    , tocEntryWrapperFunc :: TocEntryWrapper
+    , tocEntryWrapperFunc :: LabelWrapper
     -- ^ Wrapper around an ToC entry (e.g. for adding anchor links)
-    , tocButtonWrapperFunc :: TocEntryWrapper
-    -- ^ Wrapper around the button in the right column of the ToC (e.g. for adding page links)
-    , exportLinkWrapper :: LabelWrapper
-    -- ^ Wrapper around the ID of a section at the end of it (e.g. for adding export links)
     }
 
 initGlobalState :: GlobalState
@@ -208,16 +175,12 @@ initGlobalState =
         , enumStyles = []
         , mangledEnumCounterName = "_ENUM_STYLE_"
         , mangledEnumCounterID = 0
-        , exportSections = []
-        , mainDocumentTitleHtml = mempty
-        , mainDocumentTitle = mempty
-        , hasErrors = False
         }
 
 initReaderState :: ReaderState
 initReaderState =
     ReaderState
-        { shouldRender = True
+        { shouldRender = False
         , hasGlobalToC = False
         , appendixHasGlobalToC = False
         , currentAppendixElementID = 1
@@ -231,12 +194,9 @@ initReaderState =
         , currentEnumIDFormatString = error "Undefined enum id format!"
         , footnoteMap = Map.empty
         , -- \| Default rendering method is "preview", so no anchor links
-          --    and no export links at all
           labelWrapperFunc = const id -- anchorLink
         , footnoteWrapperFunc = const id
-        , tocEntryWrapperFunc = const $ const id
-        , tocButtonWrapperFunc = const anchorLink
-        , exportLinkWrapper = const mempty
+        , tocEntryWrapperFunc = const id
         }
 
 -------------------------------------------------------------------------------
@@ -265,18 +225,6 @@ addUsedFootnoteLabels globalState =
     let usedFootnotes = convertLabelMap $ usedFootnoteMap globalState
      in globalState {labels = usedFootnotes ++ labels globalState}
 
--- | Adds used footnotes of base state to add state (appends at the front)
-addUsedFootnotes
-    :: GlobalState
-    -- ^ Base State
-    -> GlobalState
-    -- ^ Add State
-    -> GlobalState
-addUsedFootnotes base add =
-    base
-        { locallyUsedFootnotes = locallyUsedFootnotes add <> locallyUsedFootnotes base
-        }
-
 -------------------------------------------------------------------------------
 
 -- | Set of footnote labels with their respective footnote id
@@ -298,9 +246,7 @@ instance Ord NumLabel where
 --   since the list is evaluated only ones when building the ToC Html at the end of rendering.
 type ToC = DList (Either PhantomTocEntry TocEntry)
 
-type TocEntry = (Maybe (Html ()), Result (Delayed (Html ())), Text, TocCategory)
-
-data TocCategory = SomeSection | Other
+type TocEntry = (Maybe (Html ()), Result (Delayed (Html ())), Text)
 
 -- | Toc Entry that only exists to send info to the Frontend;
 --   It is ignored when rendering a ToC
@@ -313,9 +259,8 @@ addTocEntry
     :: Maybe (Html ())
     -> Result (Delayed (Html ()))
     -> Maybe Label
-    -> TocCategory
     -> ReaderStateMonad Text
-addTocEntry mKey title mLabel cat = do
+addTocEntry mKey title mLabel = do
     globalState <- get
     htmlId <- case mLabel of
         -- \| Create new mangled name for non existing label
@@ -328,10 +273,7 @@ addTocEntry mKey title mLabel cat = do
                     return mangledLabel
         Just label -> return $ unLabel label
     modify
-        ( \s ->
-            s
-                { tableOfContents = snoc (tableOfContents s) (Right (mKey, title, htmlId, cat))
-                }
+        ( \s -> s {tableOfContents = snoc (tableOfContents s) (Right (mKey, title, htmlId))}
         )
     return htmlId
 
@@ -382,59 +324,17 @@ type EnumStyleMap = [(EnumFormat, Text)]
 --   e.g. for adding anchor links
 type LabelWrapper = Label -> Html () -> Html ()
 
-type TocEntryWrapper = TocCategory -> LabelWrapper
-
--- | Converts 'Label' into @<a href = "#<label>">@ for jumping to a HTML id
+-- | Converts Label into <a href = "#<label>"> for jumping to a HTML id
 anchorLink :: LabelWrapper
-anchorLink label = a_ [cssClass_ Class.AnchorLink, href_ (cons '#' $ unLabel label)]
-
--- | Converts 'Label' into @<a href = "<path>/<label>.html">@ for jumping
---   to another page
-pageLink
-    :: FilePath
-    -- ^ Path prefix
-    -> TocEntryWrapper
-pageLink _ Other _ = const mempty
-pageLink path _ label =
-    a_ [cssClass_ Class.ButtonLink, href_ (labelPath path label)]
-
--- | Converts 'Label' into @<a href = "<path>#<label>">@ for jumping
---   to another pages anchor
-mainPageAnchorLink :: FilePath -> LabelWrapper
-mainPageAnchorLink path label = a_ [cssClass_ Class.AnchorLink, href_ (pack path <> "#" <> unLabel label)]
-
--- | Builds a link with 'labelPath', prefix "Zur Einzelansicht"
---   and adds some vertical spacing
-exportLink :: FilePath -> LabelWrapper
-exportLink path label =
-    div_
-        . a_ [cssClass_ Class.AnchorLink, href_ (labelPath path label)]
-        . ((span_ <#> Class.LargeFontSize $ toHtml ("↗ " :: Text)) <>)
-
--- | Builds "<path>/<label>.html"
-labelPath :: FilePath -> Label -> Text
-labelPath path label = pack path <> "/" <> unLabel label <> ".html"
-
--------------------------------------------------------------------------------
-
--- | Adds a 'Section' with @htmlId@ and HTML @title@ to 'GlobalState'
-collectExportSection
-    :: Text -> Delayed Text -> Delayed (Html ()) -> ReaderStateMonad ()
-collectExportSection htmlId title sectionHtml =
-    modify
-        (\s -> s {exportSections = (htmlId, title, sectionHtml) : exportSections s})
-
--- | Sets the 'hasErrors' flag to @True@
-setHasErrors :: ReaderStateMonad ()
-setHasErrors = modify (\s -> s {hasErrors = True})
+anchorLink label = a_ [href_ (cons '#' $ unLabel label)]
 
 -------------------------------------------------------------------------------
 
 data Delayed a = Now a | Later (GlobalState -> a)
 
-evalDelayed :: GlobalState -> Delayed a -> a
-evalDelayed _ (Now a) = a
-evalDelayed s (Later fa) = fa s
+evalDelayed :: Delayed a -> GlobalState -> a
+evalDelayed (Now a) _ = a
+evalDelayed (Later fa) s = fa s
 
 returnNow :: Html () -> HtmlReaderState
 returnNow = return . Now
