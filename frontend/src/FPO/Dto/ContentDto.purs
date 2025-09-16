@@ -3,7 +3,13 @@ module FPO.Dto.ContentDto where
 import Prelude
 
 import Data.Argonaut (Json, fromObject)
-import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError, decodeJson, (.:))
+import Data.Argonaut.Decode
+  ( class DecodeJson
+  , JsonDecodeError
+  , decodeJson
+  , (.:)
+  , (.:?)
+  )
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Either (Either)
 import Data.Maybe (Maybe(..))
@@ -21,21 +27,11 @@ newtype CommentAnchor = CommentAnchor
 newtype Content = Content
   { content :: String
   , parent :: Int
-  }
-
---looks like Content but decodeJson behaves differently
-newtype DraftContent = DraftContent
-  { content :: String
-  , parent :: Int
+  , draft :: Boolean
   }
 
 newtype ContentWrapper = Wrapper
   { content :: Content
-  , comments :: Array CommentAnchor
-  }
-
-newtype DraftContentWrapper = DraftWrapper
-  { content :: DraftContent
   , comments :: Array CommentAnchor
   }
 
@@ -66,18 +62,17 @@ instance decodeJsonCommentAnchor :: DecodeJson CommentAnchor where
 instance decodeJsonContent :: DecodeJson Content where
   decodeJson json = do
     obj <- decodeJson json
-    con <- obj .: "content"
-    header <- obj .: "header"
-    id <- header .: "identifier"
-    pure $ Content { content: con, parent: id }
-
-instance decodeJsonDraftContent :: DecodeJson DraftContent where
-  decodeJson json = do
-    obj <- decodeJson json
-    con <- obj .: "draftContent"
-    header <- obj .: "draftHeader"
-    id <- header .: "draftIdentifier"
-    pure $ DraftContent { content: con, parent: id }
+    mCon <- obj .:? "content"
+    case mCon of
+      Just con -> do
+        header <- obj .: "header"
+        id <- header .: "identifier"
+        pure $ Content { content: con, parent: id, draft: false }
+      Nothing -> do
+        con <- obj .: "draftContent"
+        header <- obj .: "draftHeader"
+        id <- header .: "draftIdentifier"
+        pure $ Content { content: con, parent: id, draft: true }
 
 instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
   decodeJson json = do
@@ -87,13 +82,6 @@ instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
     con <- decodeJson (fromObject rev)
     coms <- rev .: "commentAnchors"
     pure $ Wrapper { content: con, comments: coms }
-
-instance decodeJsonDraftContentWrapper :: DecodeJson DraftContentWrapper where
-  decodeJson json = do
-    obj <- decodeJson json
-    con <- decodeJson json
-    coms <- obj .: "draftCommentAnchors"
-    pure $ DraftWrapper { content: con, comments: coms }
 
 instance encodeJsonCommentAnchor :: EncodeJson CommentAnchor where
   encodeJson (CommentAnchor { id, startCol, startRow, endCol, endRow }) =
@@ -137,9 +125,11 @@ instance showCommentAnchor :: Show CommentAnchor where
       <> " }"
 
 instance showContent :: Show Content where
-  show (Content { content, parent }) = "Content { content: " <> content
+  show (Content { content, parent, draft }) = "Content { content: " <> content
     <> ", parent: "
     <> show parent
+    <> ", "
+    <> show draft
     <> " }"
 
 instance showContentWrapper :: Show ContentWrapper where
@@ -147,16 +137,8 @@ instance showContentWrapper :: Show ContentWrapper where
     <> show comments
     <> " }"
 
---convertDraftContentWrapperToContentWrapper
-convertDCWToCW :: DraftContentWrapper -> ContentWrapper
-convertDCWToCW (DraftWrapper { content: DraftContent dc, comments: com }) =
-  Wrapper { content: Content dc, comments: com }
-
 decodeContent :: Json -> Either JsonDecodeError Content
 decodeContent json = decodeJson json
-
-decodeDraftContentWrapper :: Json -> Either JsonDecodeError DraftContentWrapper
-decodeDraftContentWrapper json = decodeJson json
 
 decodeContentWrapper :: Json -> Either JsonDecodeError ContentWrapper
 decodeContentWrapper json = decodeJson json
@@ -173,6 +155,9 @@ getContentText (Content { content }) = content
 getContentParent :: Content -> Int
 getContentParent (Content { parent }) = parent
 
+getContentDraft :: Content -> Boolean
+getContentDraft (Content { draft }) = draft
+
 -- Wrapper getter and setter
 
 getWrapperContent :: ContentWrapper -> Content
@@ -188,14 +173,14 @@ setWrapperContent :: Content -> ContentWrapper -> ContentWrapper
 setWrapperContent content (Wrapper { comments }) = Wrapper { content, comments }
 
 setContentText :: String -> Content -> Content
-setContentText newText (Content { parent }) = Content { content: newText, parent }
+setContentText newText (Content con) = Content (con { content = newText })
 
 setContentParent :: Int -> Content -> Content
-setContentParent newParent (Content { content }) = Content
-  { content, parent: newParent }
+setContentParent newParent (Content con) = Content (con { parent = newParent })
 
 failureContent :: Content
-failureContent = Content { content: "Error decoding content", parent: -1 }
+failureContent = Content
+  { content: "Error decoding content", parent: -1, draft: true }
 
 failureContentWrapper :: ContentWrapper
 failureContentWrapper = Wrapper { content: failureContent, comments: [] }
@@ -218,6 +203,7 @@ extractDraft (Content cont) json = do
       newCon <- draft .: "draftContent"
       pure $ { content: Content $ cont { content = newCon }, typ: "draftCreated" }
     _ -> -- "conflict"
+
       pure { content: Content cont, typ: "conflict" }
 
 convertToAnnotetedMarker

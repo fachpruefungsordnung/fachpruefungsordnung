@@ -75,7 +75,6 @@ import FPO.Data.Store as Store
 import FPO.Dto.ContentDto
   ( Content
   , ContentWrapper
-  , convertDCWToCW
   , getWrapperContent
   , setContentParent
   , setWrapperContent
@@ -1428,8 +1427,8 @@ editor = connect selectTranslator $ H.mkComponent
         -- See, why and fix it
 
         --first we look whether a draft to load is present
-        loadedDraftContent <- Request.getJson
-          ContentDto.decodeDraftContentWrapper
+        loadedContent <- Request.getJson
+          ContentDto.decodeContentWrapper
           ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
               <> "/draft"
           )
@@ -1446,16 +1445,6 @@ editor = connect selectTranslator $ H.mkComponent
           pure unit
           for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
           H.liftEffect $ log "ended up in left segment" -}
-
-        loadedContent <- case loadedDraftContent of
-          Right res -> pure (Right $ convertDCWToCW res)
-          Left _ -> do
-            Request.getJson
-              ContentDto.decodeContentWrapper
-              ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-                  <> "/rev/"
-                  <> version
-              )
 
         {-         loadedContent <- Request.getJson
         ContentDto.decodeContentWrapper
@@ -1499,11 +1488,16 @@ editor = connect selectTranslator $ H.mkComponent
           -- Get comments information from Comment Child
           H.raise (RequestComments state.docID entry.id)
         --will be set to true right now, but should be set to false if didn't change to draft
-        case loadedDraftContent of
-          Right _ -> do
-            pure unit
-          Left _ -> do
-            for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+        if (ContentDto.getContentDraft content) then
+          pure unit
+        else
+          for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+
+      -- case loadedDraftContent of
+      --   Right _ -> do
+      --     pure unit
+      --   Left _ -> do
+      --     for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure unit
 
     -- After getting information from from Comment
