@@ -228,43 +228,6 @@ extractDraft (Content cont) json = do
     _ ->
       pure { content: Content cont, typ: "conflict" }
 
-{- <<<<<<< HEAD
-  typ <- obj .: "type" :: Either JsonDecodeError String
-  case typ of
-    "noConflict" -> do
-      newRev <- obj .: "newRevision"
-      hdr <- newRev .: "header"
-      pid <- hdr .: "identifier"
-      pure $ Content $ cont { parent = pid }
-    _ ->
-      pure (Content cont)
-
-extractDraft
-  :: Content -> Json -> Either JsonDecodeError { content :: Content, typ :: String }
-extractDraft (Content cont) json = do
-  obj <- decodeJson json
-  typ <- obj .: "type" :: Either JsonDecodeError String
-  case typ of
-    "noConflict" -> do
-      newRev <- obj .: "newRevision"
-      hdr <- newRev .: "header"
-      pid <- hdr .: "identifier"
-      pure $ { content: Content $ cont { parent = pid }, typ: "noConflict" }
-    "draftCreated" -> do
-      -- TODO update Commentmarkers
-      draft <- obj .: "draft"
-      newCon <- draft .: "draftContent"
-      pure $ { content: Content $ cont { content = newCon }, typ: "draftCreated" }
-    _ ->
-      pure { content: Content cont, typ: "conflict" }
-=======
-  ele <- obj .: "element"
-  newRev <- ele .: "newRevision"
-  header <- newRev .: "header"
-  newPar <- header .: "identifier"
-  pure $ Content $ cont { parent = newPar }
->>>>>>> main -}
-
 convertToAnnotetedMarker
   :: CommentAnchor
   -> AnnotatedMarker

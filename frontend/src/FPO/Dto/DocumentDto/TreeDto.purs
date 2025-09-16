@@ -1,11 +1,15 @@
 module FPO.Dto.DocumentDto.TreeDto
   ( Edge(..)
   , Meta(..)
+  , Result(..)
   , RootTree(..)
   , Tree(..)
   , TreeHeader(..)
+  , errorMeta
   , findRootTree
   , findTitleRootTree
+  , getContent
+  , getContentOr
   , getEdgeTree
   , getFullTitle
   , getShortTitle
@@ -24,6 +28,7 @@ import Data.Foldable (foldr)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (length, splitAt)
 import Data.Traversable (traverse)
+import Data.Tuple (Tuple(..), fst, snd)
 
 newtype TreeHeader = TreeHeader
   { headerKind :: String
@@ -44,21 +49,35 @@ newtype TreeHeader = TreeHeader
 -- |       this would not work for tooltips...
 newtype Meta = Meta
   { label :: Maybe String
-  , title :: String
+  , title :: Result (Maybe String)
   }
+
+-- | Signals if a generated TOC title was parsed successfully or not.
+data Result a = Success a | Error a
+
+getContent :: ∀ a. Result a -> a
+getContent (Success x) = x
+getContent (Error x) = x
+
+getContentOr :: ∀ a. a -> Result (Maybe a) -> a
+getContentOr b = fromMaybe b <<< getContent
+
+errorMeta :: Meta
+errorMeta = Meta { label: Nothing, title: Error $ Just "(error)" }
 
 -- | Returns the full title of the node, including the label if it exists.
 -- | Removes HTML tags.
 getFullTitle :: Meta -> String
 getFullTitle (Meta { label, title }) =
   case label of
-    Just l -> removeHTMLTags l <> " " <> removeHTMLTags title
-    Nothing -> removeHTMLTags title
+    Just l -> removeHTMLTags l <> " " <> removeHTMLTags
+      (getContentOr "(missing)" title)
+    Nothing -> removeHTMLTags $ getContentOr "(missing)" title
 
 -- | Returns the short title of the node, i.e. the title without the label.
 -- | Removes HTML tags.
 getShortTitle :: Meta -> String
-getShortTitle (Meta { title }) = removeHTMLTags title
+getShortTitle (Meta { title }) = removeHTMLTags $ getContentOr "(missing)" title
 
 -- | Drops the <span> and </span> tags from a string, if they exist.
 -- | Otherwise, the string is returned unchanged.
@@ -137,8 +156,18 @@ instance decodeJsonMeta :: DecodeJson Meta where
   decodeJson json = do
     obj <- decodeJson json
     label <- obj .:? "label"
-    title <- obj .:? "title"
-    pure $ Meta { label, title: fromMaybe "" title }
+    title <- obj .: "title"
+    pure $ Meta { label, title: title }
+
+instance decodeJsonResult :: DecodeJson a => DecodeJson (Result a) where
+  decodeJson json = do
+    obj <- decodeJson json
+    tag <- obj .: "tag"
+    contents <- obj .: "contents"
+    case tag of
+      "Success" -> pure $ Success contents
+      "Error" -> pure $ Error contents
+      _ -> throwError $ TypeMismatch $ "Unknown result type: " <> tag
 
 -- EncodeJson instances
 
@@ -198,7 +227,17 @@ instance showTree :: Show a => Show (Tree a) where
 
 instance showMeta :: Show Meta where
   show (Meta { label, title }) =
-    "Meta { label: " <> show label <> ", title: " <> title <> " }"
+    "Meta { label: " <> show label <> ", title: " <> show title <> " }"
+
+instance showResult :: Show a => Show (Result a) where
+  show r = "Result { contents: " <> fst contentsAndTag <> ", tag: "
+    <> snd contentsAndTag
+    <> " }"
+    where
+    contentsAndTag =
+      case r of
+        Success a -> Tuple (show a) "Success"
+        Error a -> Tuple (show a) "Error"
 
 -- TODO: DFS. Maybe use a different search method? But maybe not necessary,
 -- because the document tree may never be that large to notice.
@@ -228,6 +267,7 @@ findTitleRootTree predicate (RootTree { children }) =
     Nothing
     children
 
+-- | Returns `Nothing` if no matching node is found or if the found node has no title(!).
 findTitleTree :: forall a. (a -> Boolean) -> Tree a -> Maybe String
 findTitleTree predicate (Node { children }) =
   foldr
@@ -235,7 +275,7 @@ findTitleTree predicate (Node { children }) =
     Nothing
     children
 findTitleTree predicate (Leaf { meta: Meta meta, node }) =
-  if predicate node then Just meta.title else Nothing
+  if predicate node then getContent meta.title else Nothing
 
 modifyNodeRootTree
   :: forall a

@@ -38,20 +38,19 @@ import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postJson)
 import FPO.Data.Store as Store
-import FPO.Data.Time
-  ( dateToDatetime
-  , formatAbsoluteTimeDetailed {-, formatRelativeTime -}
-  )
+import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
 import FPO.Dto.DocumentDto.TreeDto
   ( Edge(..)
   , Meta(..)
+  , Result(..)
   , RootTree(..)
   , Tree(..)
   , TreeHeader(..)
   , findRootTree
+  , getContent
   , getFullTitle
   , getShortTitle
   , modifyNodeRootTree
@@ -539,7 +538,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
               Leaf
                 { meta: Meta
                     { label: Nothing
-                    , title: "New Subsection"
+                    , title: Success $ Just "New Subsection"
                     }
                 , node:
                     { id: PostTextDto.getID dto
@@ -556,7 +555,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
         newEntry = Node
           { meta: Meta
               { label: Nothing
-              , title: "New Section"
+              , title: Success $ Just "New Section"
               }
           , children: []
           , header: TreeHeader
@@ -910,12 +909,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     state.versions
                     state.showHistorySubmenu
                     (getFullTitle meta)
-                    {- <<<<<<< HEAD
-                    title
-=======
-                    now
-                    (getFullTitle meta)
->>>>>>> main -}
                     id
                     searchData
                     state
@@ -1385,6 +1378,6 @@ findLeafTitleInChildren targetId children =
 findLeafTitleInTree :: Int -> Tree TOCEntry -> Maybe String
 findLeafTitleInTree targetId = case _ of
   Leaf { meta: Meta meta, node: { id } } ->
-    if id == targetId then Just meta.title else Nothing
+    if id == targetId then getContent meta.title else Nothing
   Node { children } ->
     findLeafTitleInChildren targetId children

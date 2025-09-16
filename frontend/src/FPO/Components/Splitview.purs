@@ -17,7 +17,6 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-{- import Effect.Console (log) -}
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -39,6 +38,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , RootTree(..)
   , Tree(..)
   , TreeHeader(..)
+  , errorMeta
   , findRootTree
   , modifyNodeRootTree
   )
@@ -1219,6 +1219,7 @@ splitview = connect selectTranslator $ H.mkComponent
 
 {- ------------------ Tree traversal and mutation function ------------------ -}
 {- --------------------- TODO: Move to seperate module  --------------------- -}
+-- TODO(lasse): Clean up redundant cases. Update `changeNodeName` regarding headings.
 
 -- Add a node in TOC tree
 addRootNode
@@ -1243,7 +1244,7 @@ addRootNode path entry (RootTree { children, header }) =
           fromMaybe
             ( Edge
                 ( Leaf
-                    { meta: Meta { label: Nothing, title: "Error" }
+                    { meta: errorMeta
                     , node: emptyTOCEntry
                     }
                 )
@@ -1275,7 +1276,7 @@ addNode path entry (Edge (Node { meta, children, header })) =
           fromMaybe
             ( Edge
                 ( Leaf
-                    { meta: Meta { label: Nothing, title: "Error" }
+                    { meta: errorMeta
                     , node: emptyTOCEntry
                     }
                 )
@@ -1310,7 +1311,7 @@ deleteRootNode path (RootTree { children, header }) =
             fromMaybe
               ( Edge
                   ( Leaf
-                      { meta: Meta { label: Nothing, title: "Error" }
+                      { meta: errorMeta
                       , node: emptyTOCEntry
                       }
                   )
@@ -1348,7 +1349,7 @@ deleteNode path (Edge (Node { meta, children, header })) =
             fromMaybe
               ( Edge
                   ( Leaf
-                      { meta: Meta { label: Nothing, title: "Error" }
+                      { meta: errorMeta
                       , node: emptyTOCEntry
                       }
                   )
