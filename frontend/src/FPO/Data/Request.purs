@@ -653,16 +653,18 @@ getBlobOrError
   => String
   -> H.HalogenM st act slots msg m (Either AppError (Either String Blob))
 getBlobOrError url = do
-  result <- handleRequest' url (getBlob' url)
-  case result of
+  -- First try as blob
+  blobResult <- handleRequest' url (getBlob' url)
+  case blobResult of
     Right blob -> pure $ Right $ Right blob
     Left _ -> do
+      -- If blob failed, try as string (likely an error message)
       stringResult <- H.liftAff $ getString' url
       case stringResult of
         Right { body: errMsg, status } -> case status of
-          StatusCode 404 -> pure $ Right $ Left errMsg
+          StatusCode 400 -> pure $ Right $ Left errMsg
           _ -> pure $ Right $ Left "Unknown error occurred"
-        Left _ -> pure $ Left (ServerError "Error fetching Blob.")
+        Left _ -> pure $ Left (ServerError "Error creating Blob.")
 
 postIgnoreOrError
   :: forall st act slots msg m
