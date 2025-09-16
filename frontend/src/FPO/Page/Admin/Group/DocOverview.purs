@@ -18,6 +18,7 @@ import Effect.Now (nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
+import FPO.Data.AppError (AppError(..))
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request
   ( createNewDocument
@@ -483,7 +484,8 @@ component =
 
         createResponse <- createNewDocument dto
         case createResponse of
-          Left _ -> pure unit
+          Left err -> updateStore $ Store.AddError $ DataError $
+            "Failed to create document: " <> show err
           Right h -> do
             H.modify_ _ { modalState = NoModal, newDocumentName = "" }
             now <- H.liftEffect nowDateTime

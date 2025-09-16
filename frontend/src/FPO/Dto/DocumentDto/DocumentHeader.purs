@@ -30,6 +30,8 @@ derive newtype instance eqUser :: Eq User
 
 newtype DocumentHeader = DH
   { group :: Int
+  , created :: DocDate
+  , createdBy :: User
   , identifier :: DocumentID
   , lastEdited :: DocDate
   , lastEditedBy :: User
