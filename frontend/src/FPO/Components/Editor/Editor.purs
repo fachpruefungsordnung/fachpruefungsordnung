@@ -118,8 +118,6 @@ import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
 
-import Effect.Console (log)
-
 foreign import _resize :: Types.Editor -> Effect Unit
 
 type CommentState =
@@ -168,6 +166,7 @@ type State = FPOState
   , currentVersion :: String
   , mNodePath :: Maybe Path
   , mContent :: Maybe Content
+  , html :: String
   -- comments
   , commentState :: CommentState
   , fontSize :: Int
@@ -199,7 +198,7 @@ type Input = { docID :: DocumentID, elementData :: ElementData }
 
 data Output
   = AddComment Int Int
-  | ClickedQuery (Array String)
+  | ClickedQuery String
   | DeletedComment TOCEntry (Array Int)
   | PostPDF String
   | RenamedNode String Path
@@ -571,6 +570,8 @@ editor = connect selectTranslator $ H.mkComponent
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
     Init -> do
+      -- Do not load content, since no TOC has been selected yet
+
       -- create subscription for later use
       state <- H.get
       { emitter, listener } <- H.liftEffect HS.create
@@ -765,7 +766,10 @@ editor = connect selectTranslator $ H.mkComponent
           >>= Session.getDocument
           >>= Document.getAllLines
       case renderType of
-        RenderHTML -> H.raise (ClickedQuery $ fromMaybe [] allLines)
+        RenderHTML -> do
+          html <- H.gets _.html
+          H.raise (ClickedQuery html)
+        -- TODO change this later when backend is ready
         RenderPDF -> do
           let
             content = case allLines of
@@ -1434,7 +1438,7 @@ editor = connect selectTranslator $ H.mkComponent
           ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
               <> "/draft"
           )
-        
+
         -- check, if draft is present. Otherwise get from version
         loadedContent <- case loadedDraftContent of
           Right res -> pure (Right res)
@@ -1445,8 +1449,6 @@ editor = connect selectTranslator $ H.mkComponent
                   <> "/rev/"
                   <> version
               )
-
-
 
         -- when a draft was found, set the dirtyVersion ref to true so user doesn't swap without discarding.
         -- otherwise, switching the section/version means that it can be set to false
@@ -1467,20 +1469,20 @@ editor = connect selectTranslator $ H.mkComponent
             <> "/rev/"
             <> version
         ) -}
-        case loadedContent of 
+        case loadedContent of
           Left err -> updateStore $ Store.AddError err
           Right wrapper -> do
             let
               content = ContentDto.getWrapperContent wrapper
+              html = ContentDto.getWrapperHtml wrapper
 
             H.modify_ _
               { mTocEntry = Just entry
               , mContent = Just content
+              , html = html
               , isEditorOutdated = version /= "latest"
               , isOnMerge = false
               }
-            
-            H.liftEffect $ log (ContentDto.getWrapperHtml wrapper)
 
             -- Only secondary Editor has ElementData
             -- Only first Editor gets to load the comments
@@ -1504,17 +1506,11 @@ editor = connect selectTranslator $ H.mkComponent
                 }
               -- Get comments information from Comment Child
               H.raise (RequestComments state.docID entry.id)
-            --will be set to true right now, but should be set to false if didn't change to draft
-            if (ContentDto.getContentDraft content) then
-              pure unit
-            else
-              for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
 
-          -- case loadedDraftContent of
-          --   Right _ -> do
-          --     pure unit
-          --   Left _ -> do
-          --     for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+        --will be set to true right now, but should be set to false if didn't change to draft
+        case loadedDraftContent of
+          Right _ -> pure unit
+          Left _ -> for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure unit
 
     -- After getting information from from Comment
@@ -1864,6 +1860,7 @@ initialState { context, input } =
   , currentVersion: ""
   , mNodePath: Nothing
   , mContent: Nothing
+  , html: ""
   , commentState: initialCommentState
   , fontSize: 12
   , mListener: Nothing

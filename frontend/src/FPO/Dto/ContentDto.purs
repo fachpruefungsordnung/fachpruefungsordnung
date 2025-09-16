@@ -27,7 +27,6 @@ newtype CommentAnchor = CommentAnchor
 newtype Content = Content
   { content :: String
   , parent :: Int
-  , draft :: Boolean
   }
 
 newtype ContentWrapper = Wrapper
@@ -68,12 +67,12 @@ instance decodeJsonContent :: DecodeJson Content where
       Just con -> do
         header <- obj .: "header"
         id <- header .: "identifier"
-        pure $ Content { content: con, parent: id, draft: false }
+        pure $ Content { content: con, parent: id }
       Nothing -> do
         con <- obj .: "draftContent"
         header <- obj .: "draftHeader"
         id <- header .: "draftIdentifier"
-        pure $ Content { content: con, parent: id, draft: true }
+        pure $ Content { content: con, parent: id }
 
 instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
   decodeJson json = do
@@ -127,16 +126,15 @@ instance showCommentAnchor :: Show CommentAnchor where
       <> " }"
 
 instance showContent :: Show Content where
-  show (Content { content, parent, draft }) = "Content { content: " <> content
+  show (Content { content, parent }) = "Content { content: " <> content
     <> ", parent: "
     <> show parent
-    <> ", "
-    <> show draft
     <> " }"
 
 instance showContentWrapper :: Show ContentWrapper where
   show (Wrapper { content, comments, html }) = "Content : { " <> show content <> ", "
-    <> show comments <> ", HMTL: "
+    <> show comments
+    <> ", HMTL: "
     <> html
     <> " }"
 
@@ -158,9 +156,6 @@ getContentText (Content { content }) = content
 getContentParent :: Content -> Int
 getContentParent (Content { parent }) = parent
 
-getContentDraft :: Content -> Boolean
-getContentDraft (Content { draft }) = draft
-
 -- Wrapper getter and setter
 
 getWrapperContent :: ContentWrapper -> Content
@@ -176,7 +171,8 @@ setWrapper :: Content -> Array CommentAnchor -> ContentWrapper
 setWrapper content comments = Wrapper { content, comments, html: "" }
 
 setWrapperContent :: Content -> ContentWrapper -> ContentWrapper
-setWrapperContent newContent ( Wrapper wrapper ) = Wrapper (wrapper { content = newContent })
+setWrapperContent newContent (Wrapper wrapper) = Wrapper
+  (wrapper { content = newContent })
 
 setContentText :: String -> Content -> Content
 setContentText newText (Content con) = Content (con { content = newText })
@@ -186,7 +182,7 @@ setContentParent newParent (Content con) = Content (con { parent = newParent })
 
 failureContent :: Content
 failureContent = Content
-  { content: "Error decoding content", parent: -1, draft: true }
+  { content: "Error decoding content", parent: -1 }
 
 failureContentWrapper :: ContentWrapper
 failureContentWrapper = Wrapper { content: failureContent, comments: [], html: "" }

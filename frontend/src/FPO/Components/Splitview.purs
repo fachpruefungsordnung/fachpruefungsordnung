@@ -14,7 +14,6 @@ import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
-import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Unsafe (unsafePerformEffect)
@@ -953,17 +952,14 @@ splitview = connect selectTranslator $ H.mkComponent
             }
         H.tell _comment unit (Comment.AddComment docID tocID)
 
-      Editor.ClickedQuery response -> do
+      Editor.ClickedQuery html -> do
         mSelectedTocEntry <- H.gets _.mSelectedTocEntry
         case mSelectedTocEntry of
           Just (SelLeaf tocID) ->
             handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
           _ -> pure unit
         H.modify_ _ { renderedHtml = Just Loading }
-        renderedHtml' <- Request.postRenderHtml (joinWith "\n" response)
-        case renderedHtml' of
-          Left _ -> pure unit -- Handle error
-          Right body -> H.modify_ _ { renderedHtml = Just (Loaded body) }
+        H.modify_ _ { renderedHtml = Just (Loaded html) }
 
       Editor.DeletedComment tocEntry deletedIDs -> do
         H.modify_ \st ->
