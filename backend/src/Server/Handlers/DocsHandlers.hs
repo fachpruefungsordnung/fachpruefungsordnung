@@ -113,7 +113,12 @@ import Server.DTOs.Documents
     , DocumentsQuery (DocumentsQuery)
     )
 import qualified Server.DTOs.Documents as Documents
-import Server.Handlers.RenderHandlers (RenderAPI, renderServer)
+import Server.Handlers.RenderHandlers
+    ( PDF
+    , PDFByteString (PDFByteString)
+    , RenderAPI
+    , renderServer
+    )
 import UserManagement.Group (GroupID)
 
 type DocsAPI =
@@ -127,6 +132,7 @@ type DocsAPI =
                 :<|> PostTreeRevision
                 :<|> GetTreeRevision
                 :<|> GetTreeRevisionFull
+                :<|> GetTreeRevisionPDF
                 :<|> GetTextHistory
                 :<|> GetTreeHistory
                 :<|> GetDocumentHistory
@@ -213,6 +219,14 @@ type GetTreeRevisionFull =
         :> Capture "treeRevision" TreeRevisionSelector
         :> "full"
         :> Get '[JSON] (Maybe (TreeRevisionWithMetaData TextElementRevision))
+
+type GetTreeRevisionPDF =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "tree"
+        :> Capture "treeRevision" TreeRevisionSelector
+        :> "pdf"
+        :> Get '[PDF] PDFByteString
 
 type GetTextHistory =
     Auth AuthMethod Auth.Token
@@ -351,6 +365,7 @@ docsServer =
         :<|> postTreeRevisionHandler
         :<|> getTreeRevisionHandler
         :<|> getTreeRevisionFullHandler
+        :<|> getTreeRevisionPDFHandler
         :<|> getTextHistoryHandler
         :<|> getTreeHistoryHandler
         :<|> getDocumentHistoryHandler
@@ -483,6 +498,16 @@ getTreeRevisionHandler
 getTreeRevisionHandler auth docID revision = do
     userID <- getUser auth
     withDB $ run $ Docs.getTreeRevision userID $ TreeRevisionRef docID revision
+
+getTreeRevisionPDFHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TreeRevisionSelector
+    -> Handler PDFByteString
+getTreeRevisionPDFHandler auth docID revision = do
+    userID <- getUser auth
+    pdf <- withDB $ run $ Docs.getPDF userID $ TreeRevisionRef docID revision
+    return $ PDFByteString pdf
 
 getTextHistoryHandler
     :: AuthResult Auth.Token

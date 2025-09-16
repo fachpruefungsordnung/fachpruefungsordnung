@@ -4,7 +4,12 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Server.Handlers.RenderHandlers (RenderAPI, renderServer, PDF, PDFByteString (..)) where
+module Server.Handlers.RenderHandlers
+    ( RenderAPI
+    , renderServer
+    , PDF
+    , PDFByteString (..)
+    ) where
 
 import Control.Exception (Exception (displayException), SomeException, try)
 import Control.Monad.IO.Class (MonadIO (liftIO))

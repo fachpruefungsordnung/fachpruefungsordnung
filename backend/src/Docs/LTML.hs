@@ -6,6 +6,7 @@ module Docs.LTML
     , treeToMeta'
     , treeRevisionToLtmlInputTree
     , nodeToLtmlInputTree
+    , nodeToLtmlInputTreePred
     , nodeToLtmlInputTree'
     , treeToLtmlInputTree
     , treeRevisionToMeta
@@ -128,6 +129,21 @@ nodeToLtmlInputTree' =
         id
         id
         . nodeToLtmlInputTree
+
+nodeToLtmlInputTreePred
+    :: (NodeHeader -> Bool)
+    -> (TextElementRevision -> Bool)
+    -> Node TextElementRevision
+    -> FlaggedInputTree Bool
+nodeToLtmlInputTreePred treePred leafPred =
+    LTML.flaggedTreeMap
+        pred'
+        id
+        id
+        . nodeToLtmlInputTree
+  where
+    pred' (TreeFlag t) = treePred t
+    pred' (LeafFlag l) = leafPred l
 
 nodeToLtmlInputTree
     :: Node TextElementRevision
