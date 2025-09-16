@@ -1,43 +1,20 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Ltml.HTML.Export (exportDocument, renderZip) where
+module Language.Ltml.HTML.Export () where
 
-import Clay (render)
-import Codec.Archive.Zip
-import Data.ByteString.Lazy (ByteString)
-import Data.Text (unpack)
-import Data.Text.IO (writeFile)
-import Data.Text.Lazy (toStrict)
-import Data.Text.Lazy.Encoding (encodeUtf8)
-import Data.Time.Clock.POSIX (getPOSIXTime)
-import Language.Ltml.AST.DocumentContainer (DocumentContainer)
-import Language.Ltml.Common (Flagged')
+import Control.Monad.Reader (ReaderT (runReaderT))
+import Control.Monad.State (runState)
+import Language.Ltml.AST.Document
 import Language.Ltml.HTML
 import Language.Ltml.HTML.CSS.Util
 import Language.Ltml.HTML.Common
 import Language.Ltml.HTML.Util
 import Lucid
 import System.Directory
-import System.FilePath.Posix
-import Prelude hiding (writeFile)
+import System.FilePath
 
 -- ReaderState felder mit wrapperFunktionen für:
 --  - <a> für Section Headings (Sprung zur Einzelansicht)
-
--- @
--- <path>/
---     <mainDirectoryName>/
---         <realtiveCssFilePath>/
---             style.css
---         index.html
---         <relativeSectionDir>/
---             section1.html
---             section2.html
---             ...
--- @
-
-mainDirectoryName :: FilePath
-mainDirectoryName = "doc"
 
 -- | Path to main CSS file relative to the index.html
 relativeCssFilePath :: FilePath
@@ -47,83 +24,38 @@ relativeCssFilePath = "css" </> "style.css"
 relativeSectionsDir :: FilePath
 relativeSectionsDir = "sections"
 
-exportReaderState :: ReaderState
-exportReaderState =
-    initReaderState
-        { shouldRender = True
-        , labelWrapperFunc = anchorLink
-        , footnoteWrapperFunc = anchorLink
-        , tocEntryWrapperFunc = const anchorLink -- ignore category
-        , tocButtonWrapperFunc = pageLink relativeSectionsDir
-        , exportLinkWrapper = exportLink relativeSectionsDir
-        }
-
-exportSectionReaderState :: ReaderState
-exportSectionReaderState =
-    exportReaderState
-        { labelWrapperFunc =
-            mainPageAnchorLink (disjointRelative relativeSectionsDir "index.html")
-        , exportLinkWrapper = const mempty -- no export links in exported view
-        }
-
 -------------------------------------------------------------------------------
 
--- TODO: Maybe for instantly self hosting
+-- | Exports document structure as HTML pages to given directory path
+-- TODO: Fit export to new Document Structur (or abstract to DocumentContainer)
+-- exportDocument :: Document -> FilePath -> IO ()
+-- exportDocument doc@(Document format header (DocumentBody nodeSections)) path =
+--     let absCssFilePath = path </> relativeCssFilePath
+--         absSectionsDir = path </> relativeSectionsDir
+--      in do
+--             createDirectoryIfMissing True path
+--             createDirectoryIfMissing True (takeDirectory absCssFilePath)
+--             createDirectoryIfMissing True absSectionsDir
+--             -- TODO: this has to build the final css based on the rendering
+--             -- writeCss absCssFilePath
+--             -- \| TODO: Add actual Document title
+--             renderToFile
+--                 (path </> "index.html")
+--                 (addHtmlHeader "Tolles Dokument" relativeCssFilePath $ aToHtml doc)
+--             mapState (exportSingleSection absSectionsDir) initGlobalState nodeSections
 
--- | Exports WHOLE document structure as HTML pages to given directory path
-exportDocument :: Flagged' DocumentContainer -> FilePath -> IO ()
-exportDocument docCon path =
-    let mainDir = path </> mainDirectoryName
-        absCssFilePath = mainDir </> relativeCssFilePath
-        absSectionsDir = mainDir </> relativeSectionsDir
-        (body, css) = renderHtmlCssWith exportReaderState initGlobalState docCon
-        -- TODO: Get real Doc Title
-        mainHtml = addHtmlHeader ("Temp Title" :: String) relativeCssFilePath body
+-- | Render section with given initial state and creates .html file
+-- in given directory; returns the final state
+exportSingleSection
+    :: (ToHtmlM a) => FilePath -> GlobalState -> a -> IO GlobalState
+exportSingleSection path globalState a =
+    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM a) initReaderState) globalState
+        body = evalDelayed delayedHtml finalState
+        sectionID = show (currentSectionID globalState)
      in do
-            createDirectoryIfMissing True path
-            createDirectoryIfMissing True (takeDirectory absCssFilePath)
-            createDirectoryIfMissing True absSectionsDir
-
-            writeFile absCssFilePath (toStrict $ render css)
-            renderToFile (mainDir </> "index.html") mainHtml
-
--- | Renders WHOLE document structure as HTML pages to zip archive (as 'ByteString');
---   Returns @Nothing@, if AST contains any parse errors.
-renderZip :: Flagged' DocumentContainer -> IO (Maybe ByteString)
-renderZip docCon =
-    -- TODO: check if Label "errors" occured not only parse erros
-    let relativeHomePath = disjointRelative relativeSectionsDir "index.html"
-        mHtmlCssParts =
-            renderHtmlCssExport
-                relativeHomePath
-                exportReaderState
-                initGlobalState
-                exportSectionReaderState
-                docCon
-     in maybe (return Nothing) (fmap Just . buildZip) mHtmlCssParts
-  where
-    buildZip (mainBody, css, sectionBodies, rawTitle) =
-        let
-            mainHtml = addHtmlHeader rawTitle relativeCssFilePath mainBody
-            mainBS = renderBS mainHtml
-            stylesheetBS = encodeUtf8 $ render css
-            sectionRelativeCssPath = disjointRelative relativeSectionsDir relativeCssFilePath
-            sectionPathBS =
-                map
-                    ( \(tocId, title, html) ->
-                        ( relativeSectionsDir </> unpack tocId <> ".html"
-                        , renderBS $ addHtmlHeader title sectionRelativeCssPath html
-                        )
-                    )
-                    sectionBodies
-            files =
-                [ ("index.html", mainBS)
-                , (relativeCssFilePath, stylesheetBS)
-                ]
-                    ++ sectionPathBS
-         in
-            do
-                currentTime <- round <$> getPOSIXTime
-                let entries = map (\(path, bs) -> toEntry path currentTime bs) files
-                    archive = foldr addEntryToArchive emptyArchive entries
-                return $ fromArchive archive
+            renderToFile (path </> ("section_" ++ sectionID ++ ".html")) $
+                addHtmlHeader
+                    ("Einzelansicht § " ++ sectionID)
+                    (".." </> relativeCssFilePath)
+                    body
+            return finalState

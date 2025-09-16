@@ -11,27 +11,21 @@ module Language.Ltml.HTML.Util
     , whenJust
     , mapState
     , withModified
-    , nothingA2
     , convertNewLine
     , mId_
     , mTextId_
     , getNextRawTextTree
     , isSuper
-    , disjointRelative
-    , headingText
     ) where
 
 import Control.Monad.State (MonadState, gets, modify)
 import Data.Char (chr)
 import Data.Text (Text)
-import Data.Text.Lazy (toStrict)
-import Data.Void (absurd)
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Section (SectionBody (InnerSectionBody))
-import Language.Ltml.AST.Text (HeadingTextTree, TextTree (..))
-import Language.Ltml.HTML.Common (Delayed (..), GlobalState (..))
+import Language.Ltml.AST.Text (TextTree (..))
+import Language.Ltml.HTML.Common (GlobalState)
 import Lucid
-import System.FilePath.Posix (splitDirectories, (</>))
 
 -- | Converts Int to corresponding lowercase letter in the alphabet.
 --   If Int is (<= 0) or (>= 27), it returns "?"
@@ -82,11 +76,6 @@ withModified getter setter newValue action = do
     modify (\s -> setter s saved)
     return res
 
--- | Ignores both arguments and does nothing;
---   except returning '()'
-nothingA2 :: (Monad m) => a -> b -> m ()
-nothingA2 = const $ const $ pure ()
-
 -------------------------------------------------------------------------------
 
 -- | Replaces every '\n' with HTML <br> while maintaining toHtml input sanitization
@@ -129,41 +118,3 @@ getNextRawTextTree =
 isSuper :: SectionBody -> Bool
 isSuper (InnerSectionBody _) = True
 isSuper _ = False
-
--------------------------------------------------------------------------------
-
--- | Creates relative path from base to target; Will introduce @".."@ and
---   should only be used for disjoint base and target paths;
---   otherwise use 'makeRelative'
-disjointRelative :: FilePath -> FilePath -> FilePath
-disjointRelative base target =
-    let dirs = length $ splitDirectories base
-        prefix = foldr (</>) "" $ replicate dirs ".."
-     in prefix </> target
-
--------------------------------------------------------------------------------
-
--- | Generate raw textual title from 'HeadingTextTree';
---   Note: Footnotes are skipped and check for undefined Labels
---         before using this function.
-headingText :: [HeadingTextTree] -> Delayed Text
-headingText = foldr ((<>) . translate) (Now "")
-  where
-    translate :: HeadingTextTree -> Delayed Text
-    translate htt = case htt of
-        Word text -> Now text
-        Space -> Now " "
-        NonBreakingSpace -> Now " "
-        LineBreak void -> absurd void
-        Special void -> absurd void
-        Reference label -> Later $ \globalState ->
-            case lookup label $ labels globalState of
-                -- \| Label was not found in GlobalState;
-                --    Since this function is only used for export,
-                --    no errors will occur
-                Nothing -> ""
-                Just labelHtml -> toStrict $ renderText labelHtml
-        Styled void _ -> absurd void
-        Enum void -> absurd void
-        -- \| Note this: Footnotes are skipped
-        FootnoteRef _ -> Now ""
