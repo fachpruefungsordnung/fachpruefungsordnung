@@ -49,7 +49,7 @@ someFunc = do
         _ ->
             flip run connection $
                 logMessage
-                    Error
+                    Info
                     Nothing
                     Scope.server
                     ("Document insertion successful" :: String)
