@@ -220,7 +220,7 @@ component =
         stopPropagation (MouseEvent.toEvent event)
 
       renderedPdf' <- getBlobOrError ("/docs/" <> show projectId <> "/rev/latest/pdf")
-      let filename = projectName <> ".zip"
+      let filename = projectName <> ".pdf"
       case renderedPdf' of
         Left _ -> pure unit
         Right blobOrError ->
@@ -229,7 +229,7 @@ component =
             Right body -> do
               -- create blobl link
               url <- H.liftEffect $ createObjectURL body
-              -- Create an invisible link and click it to download Zip
+              -- Create an invisible link and click it to download Pdf
               H.liftEffect $ do
                 -- get window stuff
                 win <- window
