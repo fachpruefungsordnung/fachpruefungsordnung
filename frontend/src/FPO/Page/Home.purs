@@ -23,7 +23,6 @@ import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
-import FPO.Data.AppError (AppError(..))
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request
   ( LoadState(..)
@@ -226,7 +225,7 @@ component =
         Left _ -> pure unit
         Right blobOrError ->
           case blobOrError of
-            Left errMsg -> pure unit
+            Left _ -> pure unit
             Right body -> do
               -- create blobl link
               url <- H.liftEffect $ createObjectURL body
