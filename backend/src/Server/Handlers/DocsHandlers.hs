@@ -310,7 +310,7 @@ type GetDocumentRevisionPDF =
         :> "rev"
         :> Capture "revision" RevisionSelector
         :> "pdf"
-        :> Get '[PDF] (PDFByteString)
+        :> Get '[PDF] PDFByteString
 
 type GetDocumentRevisionTree =
     Auth AuthMethod Auth.Token
