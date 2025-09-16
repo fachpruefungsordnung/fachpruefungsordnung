@@ -118,6 +118,8 @@ import Web.ResizeObserver as RO
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
 
+import Effect.Console (log)
+
 foreign import _resize :: Types.Editor -> Effect Unit
 
 type CommentState =
@@ -1427,11 +1429,24 @@ editor = connect selectTranslator $ H.mkComponent
         -- See, why and fix it
 
         --first we look whether a draft to load is present
-        loadedContent <- Request.getJson
+        loadedDraftContent <- Request.getJson
           ContentDto.decodeContentWrapper
           ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
               <> "/draft"
           )
+        
+        -- check, if draft is present. Otherwise get from version
+        loadedContent <- case loadedDraftContent of
+          Right res -> pure (Right res)
+          Left _ -> do
+            Request.getJson
+              ContentDto.decodeContentWrapper
+              ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+                  <> "/rev/"
+                  <> version
+              )
+
+
 
         -- when a draft was found, set the dirtyVersion ref to true so user doesn't swap without discarding.
         -- otherwise, switching the section/version means that it can be set to false
@@ -1452,52 +1467,54 @@ editor = connect selectTranslator $ H.mkComponent
             <> "/rev/"
             <> version
         ) -}
-        let
-          wrapper = case loadedContent of
-            Left _ -> ContentDto.failureContentWrapper
-            Right res -> res
-          content = ContentDto.getWrapperContent wrapper
+        case loadedContent of 
+          Left err -> updateStore $ Store.AddError err
+          Right wrapper -> do
+            let
+              content = ContentDto.getWrapperContent wrapper
 
-        H.modify_ _
-          { mTocEntry = Just entry
-          , mContent = Just content
-          , isEditorOutdated = version /= "latest"
-          , isOnMerge = false
-          }
+            H.modify_ _
+              { mTocEntry = Just entry
+              , mContent = Just content
+              , isEditorOutdated = version /= "latest"
+              , isOnMerge = false
+              }
+            
+            H.liftEffect $ log (ContentDto.getWrapperHtml wrapper)
 
-        -- Only secondary Editor has ElementData
-        -- Only first Editor gets to load the comments
-        if isJust state.compareToElement then do
-          handleAction $ ContinueChangeToSection []
-        else do
-          -- Get comments
-          let
-            comments = ContentDto.getWrapperComments wrapper
-            -- convert markers
-            markers = map ContentDto.convertToAnnotetedMarker comments
-          -- update the markers into state
-          H.modify_ \st -> st
-            { commentState = st.commentState
-                { selectedLiveMarker = Nothing
-                , markerAnnoHS = empty
-                , oldMarkerAnnoPos = empty
-                , markers = markers
+            -- Only secondary Editor has ElementData
+            -- Only first Editor gets to load the comments
+            if isJust state.compareToElement then do
+              handleAction $ ContinueChangeToSection []
+            else do
+              -- Get comments
+              let
+                comments = ContentDto.getWrapperComments wrapper
+                -- convert markers
+                markers = map ContentDto.convertToAnnotetedMarker comments
+              -- update the markers into state
+              H.modify_ \st -> st
+                { commentState = st.commentState
+                    { selectedLiveMarker = Nothing
+                    , markerAnnoHS = empty
+                    , oldMarkerAnnoPos = empty
+                    , markers = markers
+                    }
+                , isEditorOutdated = version /= "latest"
                 }
-            , isEditorOutdated = version /= "latest"
-            }
-          -- Get comments information from Comment Child
-          H.raise (RequestComments state.docID entry.id)
-        --will be set to true right now, but should be set to false if didn't change to draft
-        if (ContentDto.getContentDraft content) then
-          pure unit
-        else
-          for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+              -- Get comments information from Comment Child
+              H.raise (RequestComments state.docID entry.id)
+            --will be set to true right now, but should be set to false if didn't change to draft
+            if (ContentDto.getContentDraft content) then
+              pure unit
+            else
+              for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
 
-      -- case loadedDraftContent of
-      --   Right _ -> do
-      --     pure unit
-      --   Left _ -> do
-      --     for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+          -- case loadedDraftContent of
+          --   Right _ -> do
+          --     pure unit
+          --   Left _ -> do
+          --     for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure unit
 
     -- After getting information from from Comment

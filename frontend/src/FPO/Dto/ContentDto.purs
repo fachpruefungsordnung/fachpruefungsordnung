@@ -33,6 +33,7 @@ newtype Content = Content
 newtype ContentWrapper = Wrapper
   { content :: Content
   , comments :: Array CommentAnchor
+  , html :: String
   }
 
 derive instance newtypeCommentAnchor :: Newtype CommentAnchor _
@@ -81,7 +82,8 @@ instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
     rev <- ele .: "revision"
     con <- decodeJson (fromObject rev)
     coms <- rev .: "commentAnchors"
-    pure $ Wrapper { content: con, comments: coms }
+    html <- obj .: "html"
+    pure $ Wrapper { content: con, comments: coms, html }
 
 instance encodeJsonCommentAnchor :: EncodeJson CommentAnchor where
   encodeJson (CommentAnchor { id, startCol, startRow, endCol, endRow }) =
@@ -133,8 +135,9 @@ instance showContent :: Show Content where
     <> " }"
 
 instance showContentWrapper :: Show ContentWrapper where
-  show (Wrapper { content, comments }) = "Content : { " <> show content <> ", "
-    <> show comments
+  show (Wrapper { content, comments, html }) = "Content : { " <> show content <> ", "
+    <> show comments <> ", HMTL: "
+    <> html
     <> " }"
 
 decodeContent :: Json -> Either JsonDecodeError Content
@@ -166,11 +169,14 @@ getWrapperContent (Wrapper { content }) = content
 getWrapperComments :: ContentWrapper -> Array CommentAnchor
 getWrapperComments (Wrapper { comments }) = comments
 
+getWrapperHtml :: ContentWrapper -> String
+getWrapperHtml (Wrapper { html }) = html
+
 setWrapper :: Content -> Array CommentAnchor -> ContentWrapper
-setWrapper content comments = Wrapper { content, comments }
+setWrapper content comments = Wrapper { content, comments, html: "" }
 
 setWrapperContent :: Content -> ContentWrapper -> ContentWrapper
-setWrapperContent content (Wrapper { comments }) = Wrapper { content, comments }
+setWrapperContent newContent ( Wrapper wrapper ) = Wrapper (wrapper { content = newContent })
 
 setContentText :: String -> Content -> Content
 setContentText newText (Content con) = Content (con { content = newText })
@@ -183,7 +189,7 @@ failureContent = Content
   { content: "Error decoding content", parent: -1, draft: true }
 
 failureContentWrapper :: ContentWrapper
-failureContentWrapper = Wrapper { content: failureContent, comments: [] }
+failureContentWrapper = Wrapper { content: failureContent, comments: [], html: "" }
 
 extractDraft
   :: Content -> Json -> Either JsonDecodeError { content :: Content, typ :: String }
