@@ -22,6 +22,7 @@ import Docs.Database
 import qualified UserManagement.Sessions as UserSessions
 import qualified UserManagement.Transactions as UserTransactions
 
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Docs.Hasql.Sessions as Sessions
 import qualified Docs.Hasql.Transactions as Transactions
 import Logging.Logs (Severity (..))
@@ -31,6 +32,9 @@ newtype HasqlSession a = HasqlSession
     { unHasqlSession :: Session a
     }
     deriving (Functor, Applicative, Monad)
+
+instance MonadIO HasqlSession where
+    liftIO = HasqlSession . liftIO
 
 run :: HasqlSession a -> Connection -> IO (Either SessionError a)
 run session conn = do

@@ -22,6 +22,7 @@ module Docs
     , getTreeHistory
     , getDocumentHistory
     , getDocumentRevision
+    , getPDF
     , createComment
     , getComments
     , resolveComment
@@ -49,8 +50,9 @@ import qualified Language.Lsd.AST.Common as LSD
 import qualified Language.Ltml.Common as LTML
 import qualified Language.Ltml.Tree as LTML
 
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Aeson (FromJSON, ToJSON)
-import Data.Bifunctor (Bifunctor (bimap))
+import Data.Bifunctor (Bifunctor (bimap, first))
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (fromMaybe)
 import Data.OpenApi (ToSchema)
@@ -90,7 +92,10 @@ import qualified Docs.Document as Document
 import Docs.DocumentHistory (DocumentHistory)
 import Docs.FullDocument (FullDocument (FullDocument))
 import qualified Docs.FullDocument as FullDocument
-import Docs.LTML (treeRevisionToMeta)
+import Docs.LTML
+    ( nodeToLtmlInputTreePred
+    , treeRevisionToMeta
+    )
 import Docs.MetaTree (TreeRevisionWithMetaData (TreeRevisionWithMetaData))
 import Docs.Revision
     ( RevisionRef (RevisionRef)
@@ -126,7 +131,10 @@ import qualified Docs.TreeRevision as TreeRevision
 import qualified Docs.UserRef as UserRef
 import GHC.Generics (Generic)
 import GHC.Int (Int64)
+import qualified Language.Ltml.AST.DocumentContainer as LTML
 import Language.Ltml.HTML.Pipeline (htmlPipeline)
+import qualified Language.Ltml.ToLaTeX.PDFGenerator as PDF
+import qualified Language.Ltml.Tree.ToLtml as LTML
 import Logging.Logs (LogMessage, Severity (Warning))
 import Logging.Scope (Scope)
 import qualified Logging.Scope as Scope
@@ -445,6 +453,37 @@ getFullTreeRevision' userID ref = do
     ExceptT . pure $ case fullTree of
         Just tree -> bimap (Custom . Text.pack . show) Just (treeRevisionToMeta tree)
         Nothing -> Right Nothing
+
+getPDF
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m, MonadIO m)
+    => UserID
+    -> TreeRevisionRef
+    -> m (Result BL.ByteString)
+getPDF userID ref = logged userID Scope.docsTreeRevision $ runExceptT $ do
+    maybeDocumentContainer <- getDocumentContainer userID ref
+    documentContainer <-
+        ExceptT . pure $
+            maybe (Left $ TreeRevisionNotFound ref) Right maybeDocumentContainer
+    pdf <- liftIO $ PDF.generatePDF documentContainer
+    ExceptT . pure $ first (Custom . Text.pack) pdf
+
+getDocumentContainer
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
+    => UserID
+    -> TreeRevisionRef
+    -> ExceptT Error m (Maybe (LTML.Flagged' LTML.DocumentContainer))
+getDocumentContainer userID ref = do
+    fullRevision <- getTreeWithLatestTexts userID ref
+    let inputTree = toInputTree <$> fullRevision
+    let ltmlTree = LTML.treeToLtml <$> inputTree
+    ExceptT . pure $
+        maybe
+            (Right Nothing)
+            (bimap (Custom . Text.pack . show) Just)
+            ltmlTree
+  where
+    toInputTree (TreeRevision _ node) =
+        nodeToLtmlInputTreePred (const False) (const False) node
 
 getTreeRevision
     :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
