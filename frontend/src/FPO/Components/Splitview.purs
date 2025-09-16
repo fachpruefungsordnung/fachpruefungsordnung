@@ -34,7 +34,6 @@ import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
 import FPO.Dto.DocumentDto.TreeDto
   ( Edge(..)
-  , Meta(..)
   , RootTree(..)
   , Tree(..)
   , TreeHeader(..)
