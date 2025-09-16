@@ -11,6 +11,7 @@ module FPO.Data.Request
   , fromLoading
   , getAuthorizedUser
   , getBlob
+  , getBlobOrError
   , getCommentSections
   , getDocument
   , getDocumentHeader
@@ -638,6 +639,27 @@ postBlobOrError url body = do
     Left _ -> do
       -- If blob failed, try as string (likely an error message)
       stringResult <- H.liftAff $ postString' url body
+      case stringResult of
+        Right { body: errMsg, status } -> case status of
+          StatusCode 400 -> pure $ Right $ Left errMsg
+          _ -> pure $ Right $ Left "Unknown error occurred"
+        Left _ -> pure $ Left (ServerError "Error creating Blob.")
+
+getBlobOrError
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => String
+  -> H.HalogenM st act slots msg m (Either AppError (Either String Blob))
+getBlobOrError url = do
+  -- First try as blob
+  blobResult <- handleRequest' url (getBlob' url)
+  case blobResult of
+    Right blob -> pure $ Right $ Right blob
+    Left _ -> do
+      -- If blob failed, try as string (likely an error message)
+      stringResult <- H.liftAff $ getString' url
       case stringResult of
         Right { body: errMsg, status } -> case status of
           StatusCode 400 -> pure $ Right $ Left errMsg
