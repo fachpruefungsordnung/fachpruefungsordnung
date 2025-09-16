@@ -119,7 +119,6 @@ data CounterState = CounterState
     , _footnoteCTR :: Int
     , _appendixCTR :: Int
     , _tocLabelCTR :: Int
-    , _documentCTR :: Int
     }
     deriving (Show)
 

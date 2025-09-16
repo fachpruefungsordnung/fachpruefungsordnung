@@ -12,44 +12,44 @@ import qualified Data.Text.Lazy.Builder as B
 import Language.Ltml.ToLaTeX.LaTeXType (LaTeX (..))
 
 renderLaTeX :: LaTeX -> T.Text
-renderLaTeX = LT.toStrict . B.toLazyText . go
+renderLaTeX = LT.toStrict . B.toLazyText . build
   where
-    go :: LaTeX -> B.Builder
-    go (Text t) = escape t
-    go (Raw t) = B.fromText t
-    go (CommandS name) =
+    build :: LaTeX -> B.Builder
+    build (Text t) = escape t
+    build (Raw t) = B.fromText t
+    build (CommandS name) =
         "\\" <> B.fromText name
-    go (Command name opts args) =
+    build (Command name opts args) =
         "\\"
             <> B.fromText name
             <> renderOpts opts
-            <> mconcat (map (wrapInBraces . go) args)
-    go (Environment name opts body) =
+            <> mconcat (map (wrapInBraces . build) args)
+    build (Environment name opts body) =
         "\\begin{"
             <> B.fromText name
             <> "}"
             <> renderOpts opts
-            <> mconcat (map go body)
+            <> mconcat (map build body)
             <> "\\end{"
             <> B.fromText name
             <> "}"
-    go (Braced latex) = wrapInBraces (go latex)
-    go (Sequence xs) = mconcat (map go xs)
+    build (Braced latex) = wrapInBraces (build latex)
+    build (Sequence xs) = mconcat (map build xs)
 
 renderLaTeXPretty :: LaTeX -> T.Text
-renderLaTeXPretty = LT.toStrict . B.toLazyText . go 0
+renderLaTeXPretty = LT.toStrict . B.toLazyText . build 0
   where
-    go :: Int64 -> LaTeX -> B.Builder
-    go _ (Text t) = escape t
-    go _ (Raw t) = B.fromText t
-    go _ (CommandS name) =
+    build :: Int64 -> LaTeX -> B.Builder
+    build _ (Text t) = escape t
+    build _ (Raw t) = B.fromText t
+    build _ (CommandS name) =
         "\\" <> B.fromText name
-    go n (Command name opts args) =
+    build n (Command name opts args) =
         "\\"
             <> B.fromText name
             <> renderOpts opts
-            <> mconcat (map (wrapInBraces . go n) args)
-    go n (Environment name opts body) =
+            <> mconcat (map (wrapInBraces . build n) args)
+    build n (Environment name opts body) =
         "\n"
             <> B.fromText (T.replicate (fromIntegral n) "\t")
             <> "\\begin{"
@@ -61,7 +61,7 @@ renderLaTeXPretty = LT.toStrict . B.toLazyText . go 0
                 ( map
                     ( (B.fromText (T.replicate (fromIntegral (n + 1)) "\t") <>)
                         . (<> "\n")
-                        . go (n + 1)
+                        . build (n + 1)
                     )
                     body
                 )
@@ -69,8 +69,8 @@ renderLaTeXPretty = LT.toStrict . B.toLazyText . go 0
             <> "\\end{"
             <> B.fromText name
             <> "}\n"
-    go n (Braced latex) = wrapInBraces (go n latex)
-    go n (Sequence xs) = mconcat (map (go n) xs)
+    build n (Braced latex) = wrapInBraces (build n latex)
+    build n (Sequence xs) = mconcat (map (build n) xs)
 
 renderOpts :: [T.Text] -> B.Builder
 renderOpts [] = mempty
