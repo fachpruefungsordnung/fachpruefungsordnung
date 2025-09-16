@@ -213,19 +213,20 @@ extractDraft
   :: Content -> Json -> Either JsonDecodeError { content :: Content, typ :: String }
 extractDraft (Content cont) json = do
   obj <- decodeJson json
-  typ <- obj .: "type" :: Either JsonDecodeError String
+  ele <- obj .: "element"
+  typ <- ele .: "type" :: Either JsonDecodeError String
   case typ of
     "noConflict" -> do
-      newRev <- obj .: "newRevision"
+      newRev <- ele .: "newRevision"
       hdr <- newRev .: "header"
       pid <- hdr .: "identifier"
       pure $ { content: Content $ cont { parent = pid }, typ: "noConflict" }
     "draftCreated" -> do
       -- TODO update Commentmarkers
-      draft <- obj .: "draft"
+      draft <- ele .: "draft"
       newCon <- draft .: "draftContent"
       pure $ { content: Content $ cont { content = newCon }, typ: "draftCreated" }
-    _ ->
+    _ -> -- "conflict"
       pure { content: Content cont, typ: "conflict" }
 
 convertToAnnotetedMarker
