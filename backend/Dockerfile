@@ -64,7 +64,7 @@ FROM base AS final
 WORKDIR /home
 
 RUN apt-get update
-RUN apt-get install -y --no-install-recommends texlive texlive-latex-extra
+RUN apt-get install -y --no-install-recommends texlive texlive-latex-extra latexmk
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ENV LANG=de_DE.UTF-8
