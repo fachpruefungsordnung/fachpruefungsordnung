@@ -14,21 +14,24 @@ module FPO.Page.Home (component) where
 import Prelude
 
 import Data.Array (filter, length, null, replicate, slice)
--- import Data.DateTime (DateTime, adjust, date, day, diff, month, year)
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
--- import Data.Enum (fromEnum)
--- import Data.Int (floor)
--- import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), contains, toLower)
--- import Data.Time.Duration (class Duration, Seconds(..), negateDuration, toDuration)
+import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
+import FPO.Data.AppError (AppError(..))
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (LoadState(..), fromLoading, getUser, getUserDocuments)
+import FPO.Data.Request
+  ( LoadState(..)
+  , fromLoading
+  , getBlobOrError
+  , getUser
+  , getUserDocuments
+  )
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Data.Time (formatRelativeTime)
@@ -54,7 +57,14 @@ import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
+import Web.DOM.Document as Document
+import Web.DOM.Element as Element
 import Web.Event.Event (preventDefault, stopPropagation)
+import Web.File.Url (createObjectURL, revokeObjectURL)
+import Web.HTML (window)
+import Web.HTML.HTMLDocument as HTMLDocument
+import Web.HTML.HTMLElement as HTMLElement
+import Web.HTML.Window (document)
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
 
@@ -205,43 +215,41 @@ component =
       H.modify_ _ { searchQuery = query }
     SetPage (P.Clicked page) -> do
       H.modify_ _ { page = page }
-    DownloadPdf _ _ event -> do
+    DownloadPdf projectId projectName event -> do
       H.liftEffect $ do
         preventDefault (MouseEvent.toEvent event)
         stopPropagation (MouseEvent.toEvent event)
-      updateStore $ Store.AddWarning "Not yet implemented!"
 
-    -- renderedZip' <- Request.postBlobOrError ("/render/pdf/" <> projectId)
-    -- let filename = projectName <> ".zip"
-    -- case renderedZip' of
-    --   Left _ -> pure unit
-    --   Right blobOrError ->
-    --     case blobOrError of
-    --       Left errMsg -> do
-    --         updateStore $ Store.AddError $ "Failed to generate ZIP: " <> errMsg
-    --       Right body -> do
-    --         -- create blobl link
-    --         url <- H.liftEffect $ createObjectURL body
-    --         -- Create an invisible link and click it to download Zip
-    --         H.liftEffect $ do
-    --           -- get window stuff
-    --           win <- window
-    --           hdoc <- document win
-    --           let doc = HTMLDocument.toDocument hdoc
+      renderedPdf' <- getBlobOrError ("/docs/" <> show projectId <> "/rev/latest/pdf")
+      let filename = projectName <> ".zip"
+      case renderedPdf' of
+        Left _ -> pure unit
+        Right blobOrError ->
+          case blobOrError of
+            Left errMsg -> pure unit
+            Right body -> do
+              -- create blobl link
+              url <- H.liftEffect $ createObjectURL body
+              -- Create an invisible link and click it to download Zip
+              H.liftEffect $ do
+                -- get window stuff
+                win <- window
+                hdoc <- document win
+                let doc = HTMLDocument.toDocument hdoc
 
-    --           -- create link
-    --           aEl <- Document.createElement "a" doc
-    --           case HTMLElement.fromElement aEl of
-    --             Nothing -> pure unit
-    --             Just aHtml -> do
-    --               Element.setAttribute "href" url aEl
-    --               Element.setAttribute "download" filename aEl
-    --               HTMLElement.click aHtml
-    --         -- deactivate the blob link after 1 sec
-    --         _ <- H.fork do
-    --           H.liftAff $ delay (Milliseconds 1000.0)
-    --           H.liftEffect $ revokeObjectURL url
-    --         pure unit
+                -- create link
+                aEl <- Document.createElement "a" doc
+                case HTMLElement.fromElement aEl of
+                  Nothing -> pure unit
+                  Just aHtml -> do
+                    Element.setAttribute "href" url aEl
+                    Element.setAttribute "download" filename aEl
+                    HTMLElement.click aHtml
+              -- deactivate the blob link after 1 sec
+              _ <- H.fork do
+                H.liftAff $ delay (Milliseconds 1000.0)
+                H.liftEffect $ revokeObjectURL url
+              pure unit
 
     -- H.liftEffect $ downloadPdf projectId
     DownloadZip _ _ event -> do
