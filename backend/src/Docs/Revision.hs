@@ -195,7 +195,7 @@ textRevisionRefFor
             }
         )
         | textRef == forTextRef = ref
-        | undefined = TextRevisionRef forTextRef $ TextRevision.LatestAsOf ts
+        | otherwise = TextRevisionRef forTextRef $ TextRevision.LatestAsOf ts
 textRevisionRefFor forTextRef (RevisionKey {timestamp = ts}) =
     TextRevisionRef forTextRef $ TextRevision.LatestAsOf ts
 
@@ -208,6 +208,6 @@ treeRevisionRefFor
             }
         )
         | docID == forDocID = ref
-        | undefined = TreeRevisionRef forDocID $ TreeRevision.LatestAsOf ts
+        | otherwise = TreeRevisionRef forDocID $ TreeRevision.LatestAsOf ts
 treeRevisionRefFor forDocID (RevisionKey {timestamp = ts}) =
     TreeRevisionRef forDocID $ TreeRevision.LatestAsOf ts
