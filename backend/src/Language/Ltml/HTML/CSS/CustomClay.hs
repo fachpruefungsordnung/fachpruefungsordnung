@@ -13,7 +13,10 @@ module Language.Ltml.HTML.CSS.CustomClay
     , alignLeft
     , alignRight
     , displayContents
+    , autoLayout
     , gap
+    , scrollMarginTop
+    , tableLayout
     ) where
 
 import Clay hiding (a, b, s)
@@ -68,7 +71,16 @@ alignRight = other "right"
 displayContents :: Display
 displayContents = other "contents"
 
+autoLayout :: Position
+autoLayout = other "auto"
+
 -------------------------------------------------------------------------------
 
 gap :: Size LengthUnit -> Css
 gap s = "gap" -: unPlain (unValue $ value s)
+
+scrollMarginTop :: Size LengthUnit -> Css
+scrollMarginTop s = "scroll-margin-top" -: unPlain (unValue $ value s)
+
+tableLayout :: Position -> Css
+tableLayout arg = "table-layout" -: unPlain (unValue $ value arg)
