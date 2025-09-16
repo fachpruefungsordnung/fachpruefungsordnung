@@ -22,7 +22,8 @@ module Docs
     , getTreeHistory
     , getDocumentHistory
     , getDocumentRevision
-    , getPDF
+    , getTreeRevisionPDF
+    , getDocumentRevisionPDF
     , createComment
     , getComments
     , resolveComment
@@ -52,7 +53,7 @@ import qualified Language.Ltml.Tree as LTML
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Aeson (FromJSON, ToJSON)
-import Data.Bifunctor (Bifunctor (bimap, first))
+import Data.Bifunctor (Bifunctor (bimap, first, second))
 import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (fromMaybe)
 import Data.OpenApi (ToSchema)
@@ -454,33 +455,46 @@ getFullTreeRevision' userID ref = do
         Just tree -> bimap (Custom . Text.pack . show) Just (treeRevisionToMeta tree)
         Nothing -> Right Nothing
 
-getPDF
+getTreeRevisionPDF
     :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m, MonadIO m)
     => UserID
     -> TreeRevisionRef
     -> m (Result BL.ByteString)
-getPDF userID ref = logged userID Scope.docsTreeRevision $ runExceptT $ do
-    maybeDocumentContainer <- getDocumentContainer userID ref
+getTreeRevisionPDF userID ref = logged userID Scope.docsTreeRevision $ runExceptT $ do
+    maybeDocumentContainer <- getTreeRevisionDocumentContainer userID ref
     documentContainer <-
         ExceptT . pure $
             maybe (Left $ TreeRevisionNotFound ref) Right maybeDocumentContainer
+    toPDF documentContainer
+
+toPDF
+    :: (MonadIO m)
+    => LTML.Flagged' LTML.DocumentContainer
+    -> ExceptT Error m BL.ByteString
+toPDF documentContainer = do
     pdf <- liftIO $ PDF.generatePDF documentContainer
     ExceptT . pure $ first (Custom . Text.pack) pdf
 
-getDocumentContainer
+getTreeRevisionDocumentContainer
     :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
     => UserID
     -> TreeRevisionRef
     -> ExceptT Error m (Maybe (LTML.Flagged' LTML.DocumentContainer))
-getDocumentContainer userID ref = do
+getTreeRevisionDocumentContainer userID ref = do
     fullRevision <- getTreeWithLatestTexts userID ref
-    let inputTree = toInputTree <$> fullRevision
-    let ltmlTree = LTML.treeToLtml <$> inputTree
     ExceptT . pure $
         maybe
             (Right Nothing)
-            (bimap (Custom . Text.pack . show) Just)
-            ltmlTree
+            (second Just . toDocumentContainer)
+            fullRevision
+
+toDocumentContainer
+    :: TreeRevision TextElementRevision
+    -> Result (LTML.Flagged' LTML.DocumentContainer)
+toDocumentContainer fullRevision =
+    first (Custom . Text.pack . show) $
+        LTML.treeToLtml $
+            toInputTree fullRevision
   where
     toInputTree (TreeRevision _ node) =
         nodeToLtmlInputTreePred (const False) (const False) node
@@ -580,6 +594,46 @@ getTreeWithLatestTexts userID revision = do
     getter' = (<&> (>>= elementRevisionToRevision)) . getter
     elementRevisionToRevision (TextElementRevision _ rev) = rev
 
+getDocumentRevisionPDF
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       , MonadIO m
+       )
+    => UserID
+    -> RevisionRef
+    -> m (Result BL.ByteString)
+getDocumentRevisionPDF userID ref =
+    logged userID Scope.docsTreeRevision $ runExceptT $ do
+        maybeDocumentContainer <- getDocumentRevisionDocumentContainer userID ref
+        documentContainer <-
+            ExceptT . pure $
+                maybe
+                    (Left $ RevisionNotFound ref)
+                    Right
+                    maybeDocumentContainer
+        toPDF documentContainer
+
+getDocumentRevisionDocumentContainer
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       )
+    => UserID
+    -> RevisionRef
+    -> ExceptT Error m (Maybe (LTML.Flagged' LTML.DocumentContainer))
+getDocumentRevisionDocumentContainer userID ref = do
+    fullRevision <- getDocumentRevision' userID ref <&> FullDocument.body
+    ExceptT . pure $
+        maybe
+            (Right Nothing)
+            (second Just . toDocumentContainer)
+            fullRevision
+
 getDocumentRevision
     :: ( HasGetTreeRevision m
        , HasGetTextElementRevision m
@@ -590,22 +644,34 @@ getDocumentRevision
     => UserID
     -> RevisionRef
     -> m (Result (FullDocument TextElementRevision))
-getDocumentRevision userID ref@(RevisionRef docID _) =
-    logged userID Scope.docs $ runExceptT $ do
-        guardPermission Read docID userID
-        guardExistsDocument docID
-        maybeDocument <- lift $ DB.getDocument docID
-        document <- maybe (throwError $ DocumentNotFound docID) pure maybeDocument
-        lift $ do
-            key <- DB.getRevisionKey ref
-            result <- mapM (DB.getTreeRevision . treeRevisionRefFor docID) key
-            let tree = join result
-            body <- mapM (TreeRevision.withTextRevisions getter') tree
-            return
-                FullDocument
-                    { FullDocument.header = document
-                    , FullDocument.body = body
-                    }
+getDocumentRevision userID =
+    logged userID Scope.docs . runExceptT . getDocumentRevision' userID
+
+getDocumentRevision'
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       )
+    => UserID
+    -> RevisionRef
+    -> ExceptT Error m (FullDocument TextElementRevision)
+getDocumentRevision' userID ref@(RevisionRef docID _) = do
+    guardPermission Read docID userID
+    guardExistsDocument docID
+    maybeDocument <- lift $ DB.getDocument docID
+    document <- maybe (throwError $ DocumentNotFound docID) pure maybeDocument
+    lift $ do
+        key <- DB.getRevisionKey ref
+        result <- mapM (DB.getTreeRevision . treeRevisionRefFor docID) key
+        let tree = join result
+        body <- mapM (TreeRevision.withTextRevisions getter') tree
+        return
+            FullDocument
+                { FullDocument.header = document
+                , FullDocument.body = body
+                }
   where
     getter textID = do
         key <- DB.getRevisionKey ref
