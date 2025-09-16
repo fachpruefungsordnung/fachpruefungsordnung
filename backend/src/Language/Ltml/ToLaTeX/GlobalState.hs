@@ -180,6 +180,7 @@ resetCountersHard :: State GlobalState ()
 resetCountersHard = do
     counterState . supersectionCTR .= 0
     counterState . sectionCTR .= 0
+    counterState . paragraphCTR .= 0
     counterState . footnoteCTR .= 0
     counterState . appendixCTR .= 0
 
@@ -187,6 +188,7 @@ resetCountersSoft :: State GlobalState ()
 resetCountersSoft = do
     counterState . supersectionCTR .= 0
     counterState . sectionCTR .= 0
+    counterState . paragraphCTR .= 0
     counterState . footnoteCTR .= 0
 
 -- Get the next label at the current depth

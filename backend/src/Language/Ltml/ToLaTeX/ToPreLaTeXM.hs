@@ -94,6 +94,7 @@ import Language.Ltml.ToLaTeX.Format
 import qualified Language.Ltml.ToLaTeX.GlobalState as GS
 import Language.Ltml.ToLaTeX.PreLaTeXType
     ( PreLaTeX (ISequence, IText, MissingRef)
+    , bold
     , enumerate
     , footnote
     , footref
@@ -423,7 +424,7 @@ instance Labelable Document where
                 toc' <- use GS.toc
                 appendixHeaders' <- use GS.appendixHeaders
                 pure $
-                    IText tocHeading <> linebreak <> case t of
+                    bold (IText tocHeading) <> linebreak <> case t of
                         GS.Appendix ->
                             ISequence $ DList.toList toc'
                         GS.Main ->
