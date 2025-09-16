@@ -11,7 +11,6 @@ module FPO.Components.Editor
 
 import Prelude
 
-{- import Data.Argonaut.Core (jsonEmptyObject) -}
 import Ace (ace, editNode) as Ace
 import Ace.Anchor as Anchor
 import Ace.Document as Document
@@ -31,7 +30,6 @@ import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class as EC
-{- import Effect.Console (log) -}
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -78,7 +76,6 @@ import FPO.Dto.ContentDto
   ( Content
   , ContentWrapper
   , convertDCWToCW
-  {- , getContentParent -}
   , getWrapperContent
   , setContentParent
   , setWrapperContent
@@ -867,14 +864,8 @@ editor = connect selectTranslator $ H.mkComponent
       -- handle errors in pos and decodeJson
       case response of
         -- if error, try to Save again (Maybe ParentID is lost?)
-
         Left err -> updateStore $ Store.AddError err
 
-        {- <<<<<<< HEAD
-        Left err -> updateStore $ Store.AddError $ err
-=======
-        Left err -> updateStore $ Store.AddError err
->>>>>>> main -}
         -- extract and insert new parentID into newContent
         Right { content: updatedContent, typ: typ } -> do
 

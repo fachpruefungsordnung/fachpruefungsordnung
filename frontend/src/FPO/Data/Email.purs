@@ -4,7 +4,7 @@ import Data.Either (Either(..))
 import Data.String.Regex (regex, test)
 import Data.String.Regex.Flags (noFlags)
 
--- | Stricter email validation that requires a proper domain with TLD
+-- | Stricter email validation that requires a proper domain with TLD.
 -- | This validates that the email has:
 -- | - A local part (before @)
 -- | - A domain name (after @)
