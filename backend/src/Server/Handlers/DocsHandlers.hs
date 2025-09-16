@@ -117,6 +117,8 @@ import Server.Handlers.RenderHandlers
     ( PDF
     , PDFByteString (PDFByteString)
     , RenderAPI
+    , Zip
+    , ZipByteString (ZipByteString)
     , renderServer
     )
 import UserManagement.Group (GroupID)
@@ -133,6 +135,7 @@ type DocsAPI =
                 :<|> GetTreeRevision
                 :<|> GetTreeRevisionFull
                 :<|> GetTreeRevisionPDF
+                :<|> GetTreeRevisionHTML
                 :<|> GetTextHistory
                 :<|> GetTreeHistory
                 :<|> GetDocumentHistory
@@ -142,6 +145,7 @@ type DocsAPI =
                 :<|> PostReply
                 :<|> GetDocumentRevision
                 :<|> GetDocumentRevisionPDF
+                :<|> GetDocumentRevisionHTML
                 :<|> GetDocumentRevisionTree
                 :<|> GetDocumentRevisionText
                 :<|> GetDraftTextRevision
@@ -229,6 +233,14 @@ type GetTreeRevisionPDF =
         :> "pdf"
         :> Get '[PDF] PDFByteString
 
+type GetTreeRevisionHTML =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "tree"
+        :> Capture "treeRevision" TreeRevisionSelector
+        :> "html"
+        :> Get '[Zip] ZipByteString
+
 type GetTextHistory =
     Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
@@ -312,6 +324,14 @@ type GetDocumentRevisionPDF =
         :> "pdf"
         :> Get '[PDF] PDFByteString
 
+type GetDocumentRevisionHTML =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "rev"
+        :> Capture "revision" RevisionSelector
+        :> "html"
+        :> Get '[Zip] ZipByteString
+
 type GetDocumentRevisionTree =
     Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
@@ -375,6 +395,7 @@ docsServer =
         :<|> getTreeRevisionHandler
         :<|> getTreeRevisionFullHandler
         :<|> getTreeRevisionPDFHandler
+        :<|> getTreeRevisionHTMLHandler
         :<|> getTextHistoryHandler
         :<|> getTreeHistoryHandler
         :<|> getDocumentHistoryHandler
@@ -384,6 +405,7 @@ docsServer =
         :<|> createReplyHandler
         :<|> getDocumentRevisionHandler
         :<|> getDocumentRevisionPDFHandler
+        :<|> getDocumentRevisionHTMLHandler
         :<|> getDocumentRevisionTreeHandler
         :<|> getDocumentRevisionTextHandler
         :<|> getDraftTextRevisionHandler
@@ -520,6 +542,17 @@ getTreeRevisionPDFHandler auth docID revision = do
         withDB $ run $ Docs.getTreeRevisionPDF userID $ TreeRevisionRef docID revision
     return $ PDFByteString pdf
 
+getTreeRevisionHTMLHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TreeRevisionSelector
+    -> Handler ZipByteString
+getTreeRevisionHTMLHandler auth docID revision = do
+    userID <- getUser auth
+    zipBytes <-
+        withDB $ run $ Docs.getTreeRevisionHTML userID $ TreeRevisionRef docID revision
+    return $ ZipByteString zipBytes
+
 getTextHistoryHandler
     :: AuthResult Auth.Token
     -> DocumentID
@@ -640,6 +673,20 @@ getDocumentRevisionPDFHandler auth docID revision = do
                 Docs.getDocumentRevisionPDF userID $
                     RevisionRef docID revision
     return $ PDFByteString pdf
+
+getDocumentRevisionHTMLHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> RevisionSelector
+    -> Handler ZipByteString
+getDocumentRevisionHTMLHandler auth docID revision = do
+    userID <- getUser auth
+    zipBytes <-
+        withDB $
+            run $
+                Docs.getDocumentRevisionHTML userID $
+                    RevisionRef docID revision
+    return $ ZipByteString zipBytes
 
 getDocumentRevisionTreeHandler
     :: AuthResult Auth.Token
@@ -781,6 +828,16 @@ guardDocsResult (Left err) = throwError $ mapErr err
             { errBody =
                 LBS.pack $
                     T.unpack msg ++ "\n"
+            }
+    mapErr (Docs.PDFError msg) =
+        err400
+            { errBody =
+                LBS.pack $
+                    T.unpack msg ++ "\n"
+            }
+    mapErr Docs.ZipHTMLError =
+        err400
+            { errBody = "Error creating html zip file.\n"
             }
 
 -- | Get draft text revision for current user
