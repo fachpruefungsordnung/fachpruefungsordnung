@@ -19,7 +19,7 @@ import Data.OpenApi
     )
 import Data.Text (Text)
 import Language.Ltml.HTML.Pipeline (htmlPipeline)
-import Language.Ltml.ToLaTeX (generatePDFFromSection)
+import Language.Ltml.ToLaTeX.PDFGenerator (generatePDFFromSection)
 import Network.HTTP.Media.MediaType ((//))
 import Servant
 import Servant.Auth.Server

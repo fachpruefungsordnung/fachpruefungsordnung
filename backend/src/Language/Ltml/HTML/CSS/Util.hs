@@ -31,9 +31,9 @@ cssClasses_ = map (class_ . className)
 
 -------------------------------------------------------------------------------
 
--- | Adds html, head and body tags onto given html and
+-- | Adds html, @<head>@ and @<body>@ tags onto given html and
 --   sets title and css path
-addHtmlHeader :: String -> FilePath -> Html () -> Html ()
+addHtmlHeader :: (ToHtml title) => title -> FilePath -> Html () -> Html ()
 addHtmlHeader title cssPath html = doctypehtml_ $ do
     head_ $ do
         title_ (toHtml title)

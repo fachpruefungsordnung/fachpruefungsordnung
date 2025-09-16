@@ -49,13 +49,13 @@ import Docs.DocumentHistory (DocumentHistory (..))
 import Docs.Hash (Hash)
 import qualified Docs.Hasql.Statements as Statements
 import qualified Docs.Hasql.Transactions as Transactions
-import Docs.Hasql.TreeEdge (TreeEdgeChild (..))
 import Docs.Revision (RevisionKey, RevisionRef (RevisionRef))
 import Docs.TextElement
     ( TextElement
     , TextElementID
     , TextElementKind
     , TextElementRef (TextElementRef)
+    , TextElementType
     )
 import Docs.TextRevision
     ( TextElementRevision
@@ -63,8 +63,7 @@ import Docs.TextRevision
     , TextRevisionHistory (TextRevisionHistory)
     , TextRevisionRef
     )
-import Docs.Tree (Edge (Edge), Node (Node), NodeHeader)
-import qualified Docs.Tree as Tree
+import Docs.Tree (Node)
 import Docs.TreeRevision
     ( TreeRevision
     , TreeRevisionHistory (TreeRevisionHistory)
@@ -98,8 +97,12 @@ getDocuments = (`statement` Statements.getDocuments)
 getDocumentsBy :: Maybe UserID -> Maybe GroupID -> Session (Vector Document)
 getDocumentsBy = curry (`statement` Statements.getDocumentsBy)
 
-createTextElement :: DocumentID -> TextElementKind -> Session TextElement
-createTextElement = curry (`statement` Statements.createTextElement)
+createTextElement
+    :: DocumentID
+    -> TextElementKind
+    -> TextElementType
+    -> Session TextElement
+createTextElement docID kind type_ = statement (docID, kind, type_) Statements.createTextElement
 
 createTextRevision
     :: UserID
@@ -131,36 +134,27 @@ createTreeRevision authorID docID rootNode =
 getTreeRevision
     :: TreeRevisionRef
     -> Session (Maybe (TreeRevision TextElement))
-getTreeRevision ref = do
-    revision <- getRevision
-    case revision of
-        Just (rootHash, treeRevision) -> do
-            root <- getTree rootHash
-            return $ Just $ treeRevision root
-        Nothing -> return Nothing
-  where
-    getRevision = statement ref Statements.getTreeRevision
+getTreeRevision =
+    transaction
+        Serializable
+        Write
+        . Transactions.getTreeRevision
 
 getTree :: Hash -> Session (Node TextElement)
-getTree rootHash = do
-    rootHeader <- statement rootHash Statements.getTreeNode
-    fromHeader rootHash rootHeader
-  where
-    fromHeader :: Hash -> NodeHeader -> Session (Node TextElement)
-    fromHeader hash header = do
-        children <- statement hash Statements.getTreeEdgesByParent
-        edges <- mapM edgeSelector children
-        return $ Node header $ Vector.toList edges
-    edgeSelector :: (Text, TreeEdgeChild) -> Session (Edge TextElement)
-    edgeSelector (title, edge) =
-        Edge title <$> case edge of
-            (TreeEdgeToTextElement textElement) -> return $ Tree.Leaf textElement
-            (TreeEdgeToNode hash header) -> fromHeader hash header <&> Tree.Tree
+getTree =
+    transaction
+        Serializable
+        Write
+        . Transactions.getTree
 
 getTextRevisionHistory
-    :: TextElementRef -> Maybe UTCTime -> Int64 -> Session TextRevisionHistory
-getTextRevisionHistory ref before limit =
-    statement (ref, before, limit) Statements.getTextRevisionHistory
+    :: TextElementRef
+    -> Maybe UTCTime
+    -> Maybe UTCTime
+    -> Int64
+    -> Session TextRevisionHistory
+getTextRevisionHistory ref after before limit =
+    statement (ref, after, before, limit) Statements.getTextRevisionHistory
         <&> TextRevisionHistory ref . Vector.toList
 
 getTreeRevisionHistory

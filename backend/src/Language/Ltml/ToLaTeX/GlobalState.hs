@@ -33,10 +33,12 @@ module Language.Ltml.ToLaTeX.GlobalState
     , sentenceCTR
     , footnoteCTR
     , appendixCTR
+    , tocLabelCTR
     , enumPosition
     , enumIdentifierFormat
     , appendixFormat
     , docHeadingFormat
+    , sectionFormat
     , onlyOneParagraph
     , isSupersection
     , flaggedParent
@@ -65,12 +67,14 @@ import Language.Lsd.AST.Type.AppendixSection (AppendixElementFormat)
 import Language.Lsd.AST.Type.DocumentContainer
     ( HeaderFooterFormat (HeaderFooterFormat)
     )
+import Language.Lsd.AST.Type.Section (SectionFormat)
 import Language.Ltml.AST.Footnote (Footnote)
-import Language.Ltml.AST.Label (Label)
+import Language.Ltml.AST.Label (Label (Label))
 import Language.Ltml.ToLaTeX.Format
     ( emptyAppendixFormat
     , emptyHeadingFormat
     , emptyIdentifierFormat
+    , emptySectionFormat
     , formatHeaderFooterItem
     , formatKey
     , getIdentifier
@@ -80,6 +84,8 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     ( PreLaTeX (ISequence, IText)
     , fancyfoot
     , fancyhead
+    , hyperlink
+    , hypertarget
     , linebreak
     )
 
@@ -112,6 +118,7 @@ data CounterState = CounterState
     , _sentenceCTR :: Int
     , _footnoteCTR :: Int
     , _appendixCTR :: Int
+    , _tocLabelCTR :: Int
     , _documentCTR :: Int
     }
     deriving (Show)
@@ -132,6 +139,7 @@ data FormatState = FormatState
     { _docHeadingFormat :: MainHeadingFormat
     , _appendixFormat :: AppendixElementFormat
     , _enumIdentifierFormat :: IdentifierFormat
+    , _sectionFormat :: SectionFormat
     }
     deriving (Show)
 
@@ -164,6 +172,10 @@ nextFootnote = do
 nextAppendix :: State GlobalState Int
 nextAppendix = do
     counterState . appendixCTR <+= 1
+
+nextTOCLabel :: State GlobalState Int
+nextTOCLabel = do
+    counterState . tocLabelCTR <+= 1
 
 resetCountersHard :: State GlobalState ()
 resetCountersHard = do
@@ -203,17 +215,25 @@ insertRefLabel mLabel ident =
     forM_ mLabel $ \l -> labelToRef %= insert l ident
 
 addTOCEntry
-    :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState ()
-addTOCEntry n keyident ident headingText =
+    :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState PreLaTeX
+addTOCEntry n keyident ident headingText = do
+    m <- nextTOCLabel
+    let tocLabel = Label $ T.pack $ "/" ++ show m ++ "/"
     toc
         %= ( <>
                 DList.fromList
-                    [ formatKey keyident (IText $ getIdentifier ident n)
-                    , IText " "
-                    , headingText
+                    [ hyperlink
+                        tocLabel
+                        ( ISequence
+                            [ formatKey keyident (IText $ getIdentifier ident n)
+                            , IText " "
+                            , headingText
+                            ]
+                        )
                     , linebreak
                     ]
            )
+    return $ hypertarget tocLabel mempty
 
 addAppendixHeaderEntry
     :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState ()
@@ -295,3 +315,4 @@ initialFormatState =
         emptyHeadingFormat
         emptyAppendixFormat
         emptyIdentifierFormat
+        emptySectionFormat

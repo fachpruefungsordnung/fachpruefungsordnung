@@ -99,8 +99,7 @@ instance ToSchema DocumentHistoryItem where
                 & type_ ?~ OpenApiString
                 & enum_ ?~ [toJSON val]
 
-data DocumentHistory
-    = DocumentHistory
+data DocumentHistory = DocumentHistory
     { document :: DocumentID
     , history :: [DocumentHistoryItem]
     }

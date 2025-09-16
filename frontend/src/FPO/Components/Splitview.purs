@@ -9,18 +9,7 @@ module FPO.Component.Splitview where
 import Prelude
 
 import Data.Argonaut (fromString)
-import Data.Array
-  ( cons
-  , deleteAt
-  , head
-  , insertAt
-  , mapWithIndex
-  , null
-  , snoc
-  , uncons
-  , updateAt
-  , (!!)
-  )
+import Data.Array (cons, deleteAt, head, insertAt, null, snoc, uncons, updateAt, (!!))
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
@@ -28,13 +17,14 @@ import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String (joinWith)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
 import FPO.Components.Editor as Editor
+import FPO.Components.Editor.Types (ElementData)
+import FPO.Components.Modals.DirtyVersionModal (dirtyVersionModal)
 import FPO.Components.Preview as Preview
-import FPO.Components.TOC (Path, SelectedEntity(..))
+import FPO.Components.TOC (Path, SelectedEntity(..), Version)
 import FPO.Components.TOC as TOC
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (LoadState(..))
@@ -47,6 +37,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , RootTree(..)
   , Tree(..)
   , TreeHeader(..)
+  , errorMeta
   , findRootTree
   , modifyNodeRootTree
   )
@@ -59,7 +50,6 @@ import FPO.Types
   , emptyTOCEntry
   , findTOCEntry
   , findTitleTOCEntry
-  , replaceTOCEntry
   , timeStampsVersions
   , tocTreeToDocumentTree
   )
@@ -68,7 +58,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore)
+import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
@@ -91,15 +81,12 @@ derive instance eqDragTarget :: Eq DragTarget
 type Output = Unit
 type Input = DocumentID
 
-type ElementData = Editor.ElementData
-
 data Query a = UnitQuery a
 
 data Action
   = Init
   | Receive (Connected FPOTranslator Input)
   -- Resizing Actions
-  -- | SetComparison Int Int
   | StartResize DragTarget MouseEvent
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
@@ -123,6 +110,13 @@ data Action
   | ModifyVersionMapping Int (Maybe (Maybe Int)) (Maybe (ElementData))
   | UpdateMSelectedTocEntry
   | SetComparison Int (Maybe Int)
+  | UpdateVersionMapping
+  | UpdateDirtyVersion
+  | HideDirtyVersionModal
+  -- continues ModifyVersion when approved through the modal
+  | ModifyVersionFromModal Int (Maybe Int)
+  | DeleteDraft
+  | DoNothing
 
 type State = FPOState
   ( docID :: DocumentID
@@ -146,11 +140,6 @@ type State = FPOState
   , lastExpandedSidebarRatio :: Number
   , lastExpandedPreviewRatio :: Number
 
-  -- There are 2 ways to send content to preview:
-  -- 1. This editorContent is sent through the slot in renderPreview
-  -- 2. Throuth QueryEditor of the Editor, where the editor collects its content and sends it
-  --   to the preview component.
-  -- TODO: Which one to use?
   , renderedHtml :: Maybe (LoadState String)
   , testDownload :: String
 
@@ -173,6 +162,10 @@ type State = FPOState
   -- , compareToElement :: ElementData
   -- this value is updated from the same value in TOC
   , mSelectedTocEntry :: Maybe SelectedEntity
+  , dirtyVersion :: Boolean
+  , modalData :: Maybe { elementID :: Int, versionID :: Maybe Int }
+  -- obtained from TOC
+  , upToDateVersion :: Maybe Version
   )
 
 type ElemVersion =
@@ -231,12 +224,28 @@ splitview = connect selectTranslator $ H.mkComponent
     , commentShown: false
     , previewShown: true
     , mSelectedTocEntry: Nothing
+    , dirtyVersion: false
+    , modalData: Nothing
+    , upToDateVersion: Nothing
     }
 
   render :: State -> H.ComponentHTML Action Slots m
   render state =
-    HH.div_
+    HH.div_ $
       [ renderSplit state ]
+        <> renderDirtyVersionModal
+    where
+    renderDirtyVersionModal = case state.modalData of
+      Nothing -> []
+      Just { elementID: eID, versionID: mVID } ->
+        [ dirtyVersionModal
+            state.translator
+            HideDirtyVersionModal
+            ModifyVersionFromModal
+            eID
+            mVID
+            DoNothing
+        ]
 
   renderSplit :: State -> H.ComponentHTML Action Slots m
   renderSplit state =
@@ -612,6 +621,26 @@ splitview = connect selectTranslator $ H.mkComponent
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
 
+    UpdateDirtyVersion -> do
+      isDirty <- H.request _editor 0 Editor.RequestDirtyVersion
+      case isDirty of
+        Just dirty -> do
+          H.modify_ _ { dirtyVersion = dirty }
+        Nothing -> pure unit
+
+    HideDirtyVersionModal -> do
+      H.modify_ _ { modalData = Nothing }
+
+    ModifyVersionFromModal elementID mVID -> do
+      H.modify_ _ { modalData = Nothing }
+      H.tell _editor 0 Editor.ResetDirtyVersion
+      state <- H.get
+      handleAction DeleteDraft
+      handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
+      case (findTOCEntry elementID state.tocEntries) of
+        Nothing -> pure unit
+        Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
+
     -- API Actions
 
     POST -> do
@@ -626,26 +655,23 @@ splitview = connect selectTranslator $ H.mkComponent
 
     GET -> do
       s <- H.get
-      -- TODO: Here, we can simply fetch the latest commit (head commit) of the document and
-      --       write the content into the editor. Because requests like these are very common,
-      --       we should think of a way to have a uniform and clean request handling system, especially
-      --       regarding authentification and error handling. Right now, the editor page is simply empty
-      --       if the document retrieval fails in any way.
-      maybeTree <- H.liftAff
-        $ Request.getFromJSONEndpoint DT.decodeDocument
-        $ "/docs/" <> show s.docID <> "/tree/latest"
-      let
-        finalTree = fromMaybe Empty (documentTreeToTOCTree <$> maybeTree)
-        vMapping = map
-          ( \elem ->
-              { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
-          )
-          finalTree
-      H.modify_ _
-        { tocEntries = finalTree
-        , versionMapping = vMapping
-        }
-      H.tell _toc unit (TOC.ReceiveTOCs finalTree)
+      maybeTree <- Request.getJson DT.decodeDocument
+        ("/docs/" <> show s.docID <> "/tree/latest")
+      case maybeTree of
+        Left err -> updateStore $ Store.AddError err
+        Right tree -> do
+          let
+            finalTree = documentTreeToTOCTree tree
+            vMapping = map
+              ( \elem ->
+                  { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
+              )
+              finalTree
+          H.modify_ _
+            { tocEntries = finalTree
+            , versionMapping = vMapping
+            }
+          H.tell _toc unit (TOC.ReceiveTOCs finalTree)
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -724,13 +750,32 @@ splitview = connect selectTranslator $ H.mkComponent
 
         _ -> pure unit
 
-      when (isJust mt) (H.tell _editor 0 (Editor.EditorResize))
+      when (isJust mt) do
+        H.tell _editor 0 (Editor.EditorResize)
+        H.tell _editor 1 (Editor.EditorResize)
 
     -- Toggle actions
 
     UpdateMSelectedTocEntry -> do
       cToc <- H.request _toc unit TOC.RequestCurrentTocEntry
       H.modify_ _ { mSelectedTocEntry = join cToc }
+
+    -- for when the tree updates.
+    UpdateVersionMapping -> do
+      state <- H.get
+      let
+        newVersionMapping =
+          map
+            ( \e ->
+                case
+                  (findRootTree (\v -> v.elementID == e.id) state.versionMapping)
+                  of
+                  Just entry -> entry
+                  Nothing ->
+                    { elementID: e.id, versionID: Nothing, comparisonData: Nothing }
+            )
+            state.tocEntries
+      H.modify_ _ { versionMapping = newVersionMapping }
 
     ToggleComment -> H.modify_ \st -> st { commentShown = false }
 
@@ -768,6 +813,10 @@ splitview = connect selectTranslator $ H.mkComponent
           { sidebarRatio = st.lastExpandedSidebarRatio
           , sidebarShown = true
           }
+      H.tell _editor 0 (Editor.EditorResize)
+
+    DoNothing -> do
+      pure unit
 
     -- Toggle the preview area
     TogglePreview -> do
@@ -805,8 +854,6 @@ splitview = connect selectTranslator $ H.mkComponent
                 case versionEntry.comparisonData of
                   Nothing -> mod
                   Just _ -> do
-                    -- Just cData -> do 
-                    -- handleAction (ModifyVersionMapping tocID Nothing cData.revID) 
                     handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
       -- open preview
       else do
@@ -815,6 +862,10 @@ splitview = connect selectTranslator $ H.mkComponent
           { previewRatio = st.lastExpandedPreviewRatio
           , previewShown = true
           }
+        -- only resize second editor, when visible
+        H.tell _editor 1 (Editor.EditorResize)
+      -- always resize main editor for each call
+      H.tell _editor 0 (Editor.EditorResize)
 
     ModifyVersionMapping tocID vID cData -> do
       state <- H.get
@@ -842,9 +893,8 @@ splitview = connect selectTranslator $ H.mkComponent
             )
             state.versionMapping
       H.modify_ _ { versionMapping = newVersionMapping }
-      H.liftEffect $ log "Modified version"
 
-    SetComparison elementID vID -> do
+    SetComparison elementID mVID -> do
       state <- H.get
       let
         tocEntry = fromMaybe
@@ -855,12 +905,10 @@ splitview = connect selectTranslator $ H.mkComponent
           (findTitleTOCEntry elementID state.tocEntries)
       handleAction
         ( ModifyVersionMapping elementID Nothing
-            (Just (Just { tocEntry: tocEntry, revID: vID, title: title }))
+            (Just (Just { tocEntry: tocEntry, revID: mVID, title: title }))
         )
-      {-       H.modify_ _
-      { compareToElement = Just { tocEntry: tocEntry, revID: vID, title: title } } -}
       H.tell _editor 1
-        (Editor.ChangeSection tocEntry vID)
+        (Editor.ChangeSection tocEntry mVID)
 
     -- Query handler
 
@@ -966,14 +1014,6 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.RequestComments docID entryID -> do
         H.tell _comment unit (Comment.RequestComments docID entryID)
 
-      Editor.SavedSection tocEntry -> do
-        state <- H.get
-        let
-          newTOCTree = replaceTOCEntry tocEntry.id tocEntry state.tocEntries
-        H.modify_ _ { tocEntries = newTOCTree }
-        H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
-        handleAction POST
-
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get
         if state.sidebarShown then
@@ -987,19 +1027,128 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _comment unit
           (Comment.SelectedCommentSection state.docID tocID markerID)
 
-      Editor.RenamedNode newName path -> do
-        s <- H.get
-        updateTree $ changeNodeName path newName s.tocEntries
+      Editor.RenamedNode _ _ -> do
+        -- s <- H.get
+        -- updateTree $ changeNodeName path newName s.tocEntries
+        pure unit
 
       Editor.ShowAllCommentsOutput docID tocID -> do
         handleAction $ ToggleCommentOverview true docID tocID
+
+      Editor.RaiseDiscard -> do
+        handleAction UpdateMSelectedTocEntry
+        state <- H.get
+        -- Only the SelLeaf case should ever occur
+        case state.mSelectedTocEntry of
+          Just (SelLeaf id) -> do
+            _ <- Request.deleteIgnore
+              ("/docs/" <> show state.docID <> "/text/" <> show id <> "/draft")
+            handleAction (ModifyVersionMapping id (Just Nothing) Nothing)
+            let
+              -- Nothing case should never occur
+              entry = case (findTOCEntry id state.tocEntries) of
+                Nothing -> emptyTOCEntry
+                Just e -> e
+            H.tell _editor 0 (Editor.ChangeSection entry Nothing)
+          _ -> do
+            pure unit
+
+      Editor.RaiseMergeMode -> do
+        handleAction UpdateMSelectedTocEntry
+        state <- H.get
+        upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
+        case upToDateVersion of
+          Just (Just version) -> do
+            H.modify_ _ { upToDateVersion = Just version }
+            H.tell _editor 0 (Editor.ReceiveUpToDateUpdate (Just version))
+            case state.mSelectedTocEntry of
+              Just (SelLeaf id) -> do
+                let
+                  tocEntry = fromMaybe
+                    emptyTOCEntry
+                    (findTOCEntry id state.tocEntries)
+                  title = fromMaybe
+                    ""
+                    (findTitleTOCEntry id state.tocEntries)
+                handleAction
+                  ( ModifyVersionMapping id Nothing
+                      ( Just
+                          ( Just
+                              { tocEntry: tocEntry
+                              , revID: version.identifier
+                              , title: title
+                              }
+                          )
+                      )
+                  )
+                {-                 let
+                  tocEntry = fromMaybe
+                    emptyTOCEntry
+                    (findTOCEntry elementID state.tocEntries)
+                  title = fromMaybe
+                    ""
+                    (findTitleTOCEntry elementID state.tocEntries)
+                handleAction
+                  ( ModifyVersionMapping elementID Nothing
+                      (Just (Just { tocEntry: tocEntry, revID: vID, title: title }))
+                  ) -}
+                let
+                  -- Nothing case should never occur
+                  entry = case (findTOCEntry id state.tocEntries) of
+                    Nothing -> emptyTOCEntry
+                    Just e -> e
+                H.tell _editor 1 (Editor.ChangeSection entry version.identifier)
+              _ -> pure unit
+          _ -> do
+            pure unit
+
+      Editor.Merged -> do
+        handleAction UpdateMSelectedTocEntry
+        state <- H.get
+        case state.mSelectedTocEntry of
+          Just (SelLeaf elementID) -> do
+            handleAction
+              (ModifyVersionMapping elementID (Just Nothing) (Just Nothing))
+            case (findTOCEntry elementID state.tocEntries) of
+              Nothing -> pure unit
+              Just entry -> H.tell _editor 0 (Editor.ChangeSection entry Nothing)
+          {-           case (findRootTree (\e -> e.elementID == tocID) state.versionMapping) of 
+          Nothing -> pure unit 
+          Just {elementID: _, versionID: _, comparisonData: cD} -> do
+            H.tell _editor 1 (Editor.ChangeSection cD Nothing) -}
+          _ -> pure unit
+
+    DeleteDraft -> do
+      handleAction UpdateMSelectedTocEntry
+      state <- H.get
+      -- Only the SelLeaf case should ever occur
+      case state.mSelectedTocEntry of
+        Just (SelLeaf id) -> do
+          _ <- Request.deleteIgnore
+            ("/docs/" <> show state.docID <> "/text/" <> show id <> "/draft")
+          pure unit
+        _ -> do
+          pure unit
 
     HandlePreview _ -> pure unit
 
     HandleTOC output -> case output of
 
       TOC.ModifyVersion elementID mVID -> do
-        handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
+        handleAction UpdateDirtyVersion
+        state <- H.get
+        let
+          currentVersion =
+            case findRootTree (\e -> e.elementID == elementID) state.versionMapping of
+              Nothing -> Nothing
+              Just version -> version.versionID
+        if state.dirtyVersion && currentVersion /= Nothing then do
+          H.modify_ _ { modalData = Just { elementID: elementID, versionID: mVID } }
+        else do
+          handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
+          case (findTOCEntry elementID state.tocEntries) of
+            Nothing -> pure unit
+            Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
 
       TOC.CompareTo elementID vID -> do
         handleAction (SetComparison elementID vID)
@@ -1019,7 +1168,6 @@ splitview = connect selectTranslator $ H.mkComponent
               Nothing ->
                 { elementID: -1, versionID: Nothing, comparisonData: Nothing }
               Just elem -> elem
-        -- handleAction (ModifyVersionMapping selectedID rev)
         H.tell _editor 0 (Editor.ChangeSection entry ev.versionID)
         case ev.comparisonData of
           Nothing -> do
@@ -1043,9 +1191,10 @@ splitview = connect selectTranslator $ H.mkComponent
         s <- H.get
         updateTree $ reorderTocEntries from to s.tocEntries
 
-      TOC.RenameNode { path, newName } -> do
-        s <- H.get
-        updateTree $ changeNodeName path newName s.tocEntries
+      TOC.RenameNode _ -> do
+        -- s <- H.get
+        -- updateTree $ changeNodeName path newName s.tocEntries
+        pure unit
 
     where
     -- Communicates tree changes to the server and TOC component.
@@ -1058,6 +1207,7 @@ splitview = connect selectTranslator $ H.mkComponent
         encodedTree
       -- TODO auch hier mit potentiellen Fehlern umgehen
       H.modify_ \st -> st { tocEntries = newTree }
+      handleAction UpdateVersionMapping
       H.tell _toc unit (TOC.ReceiveTOCs newTree)
 
 -- findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
@@ -1068,6 +1218,7 @@ splitview = connect selectTranslator $ H.mkComponent
 
 {- ------------------ Tree traversal and mutation function ------------------ -}
 {- --------------------- TODO: Move to seperate module  --------------------- -}
+-- TODO(lasse): Clean up redundant cases. Update `changeNodeName` regarding headings.
 
 -- Add a node in TOC tree
 addRootNode
@@ -1090,7 +1241,13 @@ addRootNode path entry (RootTree { children, header }) =
       let
         child =
           fromMaybe
-            (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+            ( Edge
+                ( Leaf
+                    { meta: errorMeta
+                    , node: emptyTOCEntry
+                    }
+                )
+            )
             (children !! head)
         newChildren =
           case updateAt head (addNode tail entry child) children of
@@ -1104,26 +1261,32 @@ addNode
   -> Tree TOCEntry
   -> Edge TOCEntry
   -> Edge TOCEntry
-addNode _ _ (Edge (Leaf { title, node })) =
-  Edge (Leaf { title, node }) -- Cannot add to a leaf
-addNode [] entry (Edge (Node { title, children, header })) =
-  Edge (Node { title, children: snoc children (Edge entry), header })
-addNode path entry (Edge (Node { title, children, header })) =
+addNode _ _ (Edge (Leaf { meta, node })) =
+  Edge (Leaf { meta, node }) -- Cannot add to a leaf
+addNode [] entry (Edge (Node { meta, children, header })) =
+  Edge (Node { meta, children: snoc children (Edge entry), header })
+addNode path entry (Edge (Node { meta, children, header })) =
   case uncons path of
     Nothing ->
-      Edge (Node { title, children: snoc children (Edge entry), header })
+      Edge (Node { meta, children: snoc children (Edge entry), header })
     Just { head, tail } ->
       let
         child =
           fromMaybe
-            (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+            ( Edge
+                ( Leaf
+                    { meta: errorMeta
+                    , node: emptyTOCEntry
+                    }
+                )
+            )
             (children !! head)
         newChildren' =
           case updateAt head (addNode tail entry child) children of
             Nothing -> children
             Just res -> res
       in
-        Edge (Node { title, children: newChildren', header })
+        Edge (Node { meta, children: newChildren', header })
 
 deleteRootNode
   :: Array Int
@@ -1145,7 +1308,13 @@ deleteRootNode path (RootTree { children, header }) =
         let
           child =
             fromMaybe
-              (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+              ( Edge
+                  ( Leaf
+                      { meta: errorMeta
+                      , node: emptyTOCEntry
+                      }
+                  )
+              )
               (children !! head)
           newChildren =
             case updateAt head (deleteNode tail child) children of
@@ -1164,27 +1333,33 @@ deleteNode [] e =
   -- If path is empty, delete this node entirely is handled by parent
   -- so this case should not normally be reached.
   e
-deleteNode path (Edge (Node { title, children, header })) =
+deleteNode path (Edge (Node { meta, children, header })) =
   case uncons path of
     Nothing ->
-      Edge (Node { title, children, header })
+      Edge (Node { meta, children, header })
     Just { head, tail } ->
       if null tail then
         case deleteAt head children of
-          Nothing -> Edge (Node { title, children, header })
-          Just newChildren -> Edge (Node { title, children: newChildren, header })
+          Nothing -> Edge (Node { meta, children, header })
+          Just newChildren -> Edge (Node { meta, children: newChildren, header })
       else
         let
           child =
             fromMaybe
-              (Edge (Leaf { title: "Error", node: emptyTOCEntry }))
+              ( Edge
+                  ( Leaf
+                      { meta: errorMeta
+                      , node: emptyTOCEntry
+                      }
+                  )
+              )
               (children !! head)
           newChildren' =
             case updateAt head (deleteNode tail child) children of
               Nothing -> children
               Just res -> res
         in
-          Edge (Node { title, children: newChildren', header })
+          Edge (Node { meta, children: newChildren', header })
 
 -- Reorder TOC entries by moving a node from `sourcePath` to `targetPath`.
 -- The node at sourcePath takes the place of the node at targetPath,
@@ -1313,25 +1488,25 @@ insertNodeAtPosition path node (RootTree { children, header }) =
 insertNodeIntoEdgeAtPosition
   :: Path -> Tree TOCEntry -> Edge TOCEntry -> Edge TOCEntry
 insertNodeIntoEdgeAtPosition _ _ edge@(Edge (Leaf _)) = edge -- Cannot insert into leaf
-insertNodeIntoEdgeAtPosition [] node (Edge (Node { title, children, header })) =
+insertNodeIntoEdgeAtPosition [] node (Edge (Node { meta, children, header })) =
   -- Insert at end of children
-  Edge (Node { title, children: snoc children (Edge node), header })
-insertNodeIntoEdgeAtPosition path node (Edge (Node { title, children, header })) =
+  Edge (Node { meta, children: snoc children (Edge node), header })
+insertNodeIntoEdgeAtPosition path node (Edge (Node { meta, children, header })) =
   case uncons path of
-    Nothing -> Edge (Node { title, children: snoc children (Edge node), header })
+    Nothing -> Edge (Node { meta, children: snoc children (Edge node), header })
     Just { head, tail } ->
       if null tail then
         -- Insert exactly at position `head`, pushing existing elements down
         case insertAt head (Edge node) children of
           Nothing ->
             -- If insertion fails (index out of bounds), append to end
-            Edge (Node { title, children: snoc children (Edge node), header })
+            Edge (Node { meta, children: snoc children (Edge node), header })
           Just result ->
-            Edge (Node { title, children: result, header })
+            Edge (Node { meta, children: result, header })
       else
         -- Navigate deeper
         case children !! head of
-          Nothing -> Edge (Node { title, children, header })
+          Nothing -> Edge (Node { meta, children, header })
           Just childEdge ->
             let
               newChild = insertNodeIntoEdgeAtPosition tail node childEdge
@@ -1339,43 +1514,45 @@ insertNodeIntoEdgeAtPosition path node (Edge (Node { title, children, header }))
                 Nothing -> children
                 Just res -> res
             in
-              Edge (Node { title, children: newChildren, header })
+              Edge (Node { meta, children: newChildren, header })
 
 -- Changes the name of a node in the TOC root tree.
-changeNodeName
-  :: Path -> String -> TOCTree -> TOCTree
-changeNodeName _ _ Empty = Empty
-changeNodeName path newName (RootTree { children, header }) =
-  let
-    newChildren = mapWithIndex
-      ( \ix (Edge child) ->
-          case uncons path of
-            Just { head, tail } | ix == head ->
-              Edge $ changeNodeName' tail newName child
-            _ -> Edge child
-      )
-      children
-  in
-    RootTree { children: newChildren, header }
+-- TODO: Do we need this? This should be done in the text element associated
+--       with the node..
+-- changeNodeName
+--   :: Path -> String -> TOCTree -> TOCTree
+-- changeNodeName _ _ Empty = Empty
+-- changeNodeName path newName (RootTree { children, header }) =
+--   let
+--     newChildren = mapWithIndex
+--       ( \ix (Edge child) ->
+--           case uncons path of
+--             Just { head, tail } | ix == head ->
+--               Edge $ changeNodeName' tail newName child
+--             _ -> Edge child
+--       )
+--       children
+--   in
+--     RootTree { children: newChildren, header }
 
--- Changes the name of a node in the TOC tree.
-changeNodeName' :: Path -> String -> Tree TOCEntry -> Tree TOCEntry
-changeNodeName' path newName tree = case path of
-  [] -> case tree of
-    Node record -> Node record { title = newName }
-    leaf -> leaf
-  _ -> case tree of
-    Node { title, children, header } ->
-      case uncons path of
-        Just { head: index, tail } ->
-          let
-            newChildren = mapWithIndex
-              ( \ix (Edge child) ->
-                  if ix == index then Edge $ changeNodeName' tail newName child
-                  else Edge child
-              )
-              children
-          in
-            Node { title, children: newChildren, header }
-        Nothing -> Node { title, children, header }
-    leaf -> leaf
+-- -- Changes the name of a node in the TOC tree.
+-- changeNodeName' :: Path -> String -> Tree TOCEntry -> Tree TOCEntry
+-- changeNodeName' path newName tree = case path of
+--   [] -> case tree of
+--     Node record -> Node record { title = newName }
+--     leaf -> leaf
+--   _ -> case tree of
+--     Node { title, children, header } ->
+--       case uncons path of
+--         Just { head: index, tail } ->
+--           let
+--             newChildren = mapWithIndex
+--               ( \ix (Edge child) ->
+--                   if ix == index then Edge $ changeNodeName' tail newName child
+--                   else Edge child
+--               )
+--               children
+--           in
+--             Node { title, children: newChildren, header }
+--         Nothing -> Node { title, children, header }
+--     leaf -> leaf

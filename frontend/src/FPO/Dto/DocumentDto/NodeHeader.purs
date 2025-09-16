@@ -9,14 +9,14 @@ import Data.Argonaut (class DecodeJson, class EncodeJson)
 -- This seems to be `TextElement` in the backend?
 newtype NodeHeader = NodeHeader
   { identifier :: Int
-  , kind :: String
+  , textElementKind :: String
   }
 
 getId :: NodeHeader -> Int
 getId (NodeHeader nh) = nh.identifier
 
 getKind :: NodeHeader -> String
-getKind (NodeHeader nh) = nh.kind
+getKind (NodeHeader nh) = nh.textElementKind
 
 derive newtype instance decodeJsonNodeHeader :: DecodeJson NodeHeader
 derive newtype instance encodeJsonNodeHeader :: EncodeJson NodeHeader

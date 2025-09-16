@@ -20,7 +20,8 @@ FROM base AS build
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends \
     g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git \
-    gnupg curl libexpat-dev libpq-dev ca-certificates
+    gnupg curl libexpat-dev libpq-dev ca-certificates \
+    build-essential pkg-config
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # install stack

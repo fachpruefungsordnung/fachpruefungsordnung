@@ -8,20 +8,22 @@
 -- This must be changed. For now, the toProject function translates as needed and makes up
 -- missing data
 
-module FPO.Page.Home (component, adjustDateTime, formatRelativeTime) where
+-- module FPO.Page.Home (component, adjustDateTime, formatRelativeTime) where
+module FPO.Page.Home (component) where
 
 import Prelude
 
 import Data.Array (filter, length, null, replicate, slice)
-import Data.DateTime (DateTime, adjust, date, day, diff, month, year)
+-- import Data.DateTime (DateTime, adjust, date, day, diff, month, year)
+import Data.DateTime (DateTime)
 import Data.Either (Either(..))
-import Data.Enum (fromEnum)
-import Data.Int (floor)
-import Data.Maybe (Maybe(..), fromMaybe)
+-- import Data.Enum (fromEnum)
+-- import Data.Int (floor)
+-- import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), contains, toLower)
-import Data.Time.Duration (class Duration, Seconds(..), negateDuration, toDuration)
+-- import Data.Time.Duration (class Duration, Seconds(..), negateDuration, toDuration)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class.Console (log)
 import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
 import FPO.Components.Table.Head as TH
@@ -29,8 +31,13 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (LoadState(..), fromLoading, getUser, getUserDocuments)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
+import FPO.Data.Time (formatRelativeTime)
 import FPO.Dto.DocumentDto.DocDate as DocDate
-import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader, DocumentID)
+import FPO.Dto.DocumentDto.DocumentHeader
+  ( DocumentHeader
+  , DocumentID
+  , getEditTimestamp
+  )
 import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
@@ -68,7 +75,8 @@ data Action
   | ChangeSorting TH.Output
   | HandleSearchInput String
   | SetPage P.Output
-  | DownloadPdf DocumentID String MouseEvent
+  | DownloadPdf DocumentID String MouseEvent -- Id, Project Name, Event (used for prevent default)
+  | DownloadZip DocumentID String MouseEvent -- Id, Project Name, Event (used for prevent default)
 
 type State = FPOState
   ( user :: LoadState (Maybe FullUserDto)
@@ -156,7 +164,6 @@ component =
                 }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
-      log $ "Routing to editor for project " <> (DocumentHeader.getName project)
       navigate (Editor { docID: DocumentHeader.getID project })
     NavLogin -> do
       updateStore $ Store.SetLoginRedirect (Just Home)
@@ -204,18 +211,57 @@ component =
         stopPropagation (MouseEvent.toEvent event)
       updateStore $ Store.AddWarning "Not yet implemented!"
 
-  -- renderedPDF' <- Request.postBlobOrError ("/render/pdf" <> projectId)
-  -- let filename = projectName <> ".pdf"
-  -- case renderedPDF' of
+    -- renderedZip' <- Request.postBlobOrError ("/render/pdf/" <> projectId)
+    -- let filename = projectName <> ".zip"
+    -- case renderedZip' of
+    --   Left _ -> pure unit
+    --   Right blobOrError ->
+    --     case blobOrError of
+    --       Left errMsg -> do
+    --         updateStore $ Store.AddError $ "Failed to generate ZIP: " <> errMsg
+    --       Right body -> do
+    --         -- create blobl link
+    --         url <- H.liftEffect $ createObjectURL body
+    --         -- Create an invisible link and click it to download Zip
+    --         H.liftEffect $ do
+    --           -- get window stuff
+    --           win <- window
+    --           hdoc <- document win
+    --           let doc = HTMLDocument.toDocument hdoc
+
+    --           -- create link
+    --           aEl <- Document.createElement "a" doc
+    --           case HTMLElement.fromElement aEl of
+    --             Nothing -> pure unit
+    --             Just aHtml -> do
+    --               Element.setAttribute "href" url aEl
+    --               Element.setAttribute "download" filename aEl
+    --               HTMLElement.click aHtml
+    --         -- deactivate the blob link after 1 sec
+    --         _ <- H.fork do
+    --           H.liftAff $ delay (Milliseconds 1000.0)
+    --           H.liftEffect $ revokeObjectURL url
+    --         pure unit
+
+    -- H.liftEffect $ downloadPdf projectId
+    DownloadZip _ _ event -> do
+      H.liftEffect $ do
+        preventDefault (MouseEvent.toEvent event)
+        stopPropagation (MouseEvent.toEvent event)
+      updateStore $ Store.AddWarning "Not yet implemented!"
+
+  -- renderedZip' <- Request.postBlobOrError ("/render/zip/" <> projectId)
+  -- let filename = projectName <> ".zip"
+  -- case renderedZip' of
   --   Left _ -> pure unit
   --   Right blobOrError ->
   --     case blobOrError of
   --       Left errMsg -> do
-  --         updateStore $ Store.AddError $ "Failed to generate PDF: " <> errMsg
+  --         updateStore $ Store.AddError $ "Failed to generate ZIP: " <> errMsg
   --       Right body -> do
-  --         -- create blobl link
+  --         -- create blob link
   --         url <- H.liftEffect $ createObjectURL body
-  --         -- Create an invisible link and click it to download PDF
+  --         -- Create an invisible link and click it to download ZIP
   --         H.liftEffect $ do
   --           -- get window stuff
   --           win <- window
@@ -534,9 +580,10 @@ component =
     HH.table
       [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
       [ HH.colgroup_
-          [ HH.col [ HP.style "width: 60%;" ] -- 'Title' column
-          , HH.col [ HP.style "width: 30%;" ] -- 'Last Updated' column
-          , HH.col [ HP.style "width: 10%;" ] -- 'PDF' column
+          [ HH.col [ HP.style "width: 57%;" ] -- 'Title' column
+          , HH.col [ HP.style "width: 27%;" ] -- 'Last Updated' column
+          , HH.col [ HP.style "width: 8%;" ] -- 'PDF' column
+          , HH.col [ HP.style "width: 8%;" ] -- 'ZIP' column
           ]
       , HH.slot _tablehead unit TH.component
           { columns: tableCols state.translator
@@ -547,7 +594,7 @@ component =
           if null ps then
             [ HH.tr []
                 [ HH.td
-                    [ HP.colSpan 3
+                    [ HP.colSpan 4
                     , HP.classes [ HB.textCenter ]
                     ]
                     [ HH.i_
@@ -559,7 +606,7 @@ component =
             ]
           else
             ( map (renderProjectRow state) ps
-                <> replicate (5 - length ps) (emptyTableRow 48 3)
+                <> replicate (5 - length ps) (emptyTableRow 48 4)
             ) -- Fill up to 5 rows
       ]
     where
@@ -571,6 +618,9 @@ component =
         , style: Just TH.Numeric
         }
       , { title: "PDF"
+        , style: Nothing
+        }
+      , { title: "ZIP"
         , style: Nothing
         }
       ]
@@ -606,6 +656,23 @@ component =
                   []
               ]
           ]
+      , HH.td
+          [ HP.classes [ HB.textCenter, HB.alignMiddle ] ]
+          [ HH.button
+              [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+              , HE.onClick $ \e -> DownloadZip (DocumentHeader.getIdentifier project)
+                  (DocumentHeader.getName project)
+                  e
+              ]
+              [ HH.i
+                  [ HP.classes
+                      [ HH.ClassName "bi-file-zip"
+                      , HB.bi
+                      ]
+                  ]
+                  []
+              ]
+          ]
       ]
 
   filterProjects :: String -> Array DocumentHeader -> Array DocumentHeader
@@ -613,49 +680,3 @@ component =
     filter
       (\p -> contains (Pattern $ toLower query) (toLower $ DocumentHeader.getName p))
       projects
-
--- | Helper function to adjust a DateTime by a duration (subtract from current time)
-adjustDateTime :: forall d. Duration d => d -> DateTime -> DateTime
-adjustDateTime duration dt =
-  fromMaybe dt $ adjust (negateDuration duration) dt
-
-getEditTimestamp ∷ DocumentHeader → DateTime
-getEditTimestamp = DocDate.docDateToDateTime <<< DocumentHeader.getLastEdited
-
--- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
-formatRelativeTime :: Maybe DateTime -> DateTime -> String
-formatRelativeTime Nothing _ = "Unknown"
-formatRelativeTime (Just current) updated =
-  let
-    timeDiff =
-      if current > updated then diff current updated else diff updated current
-
-    (Seconds seconds) = toDuration timeDiff :: Seconds
-    totalMinutes = floor (seconds / 60.0)
-    totalHours = floor (seconds / 3600.0)
-    totalDays = floor (seconds / 86400.0)
-  in
-    if totalDays > 7 then
-      formatAbsoluteDate updated
-    else if totalDays >= 1 then
-      show totalDays <> if totalDays == 1 then " day ago" else " days ago"
-    else if totalHours >= 1 then
-      show totalHours <> if totalHours == 1 then " hour ago" else " hours ago"
-    else if totalMinutes >= 1 then
-      show totalMinutes <>
-        if totalMinutes == 1 then " minute ago" else " minutes ago"
-    else
-      "Just now"
-  where
-  -- Format DateTime as absolute date (YYYY-MM-DD)
-  formatAbsoluteDate :: DateTime -> String
-  formatAbsoluteDate dt =
-    let
-      d' = date dt
-      y = show $ fromEnum $ year d'
-      m = padZero $ fromEnum $ month d'
-      d = padZero $ fromEnum $ day d'
-    in
-      d <> "." <> m <> "." <> y
-    where
-    padZero n = if n < 10 then "0" <> show n else show n

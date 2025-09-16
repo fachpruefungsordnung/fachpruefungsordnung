@@ -115,10 +115,6 @@ component =
     HandlePress title -> do
       state <- H.get
 
-      -- TODO: Rewrite this. We need to not only update some element of an array,
-      --       but also return the updated element. The current implementation
-      --       isn't really idiomatic and is a bit of a hack.
-
       toggleResult <- pure $ do
         -- Find the index of the column with the given title.
         mcol <- findIndex

@@ -1,7 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module Language.Ltml.Parser.Footnote.Combinators
-    ( manyWithFootnotesTillSucc
+    ( withSucceedingFootnotes
+    , manyWithFootnotesTillSucc
     )
 where
 
@@ -12,6 +13,16 @@ import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Combinators (manyTillSucc)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
 import Language.Ltml.Parser.Footnote (FootnoteParser, footnoteP)
+import Text.Megaparsec (many)
+
+-- | Parse with any succeeding footnotes, consuming any empty lines between
+--   footnotes and finally.
+--
+--   The supplied argument parser must not succeed in-line, and must consume
+--   any final whitespace.  I.e., it may only succeed after a newline plus any
+--   subsequent whitespace.
+withSucceedingFootnotes :: Parser a -> FootnoteParser a
+withSucceedingFootnotes p = lift p <* many (nLexeme footnoteP)
 
 -- | Like 'manyTillSucc', but parse any interleaved footnotes, and consume
 --   any number of empty lines between nodes (including footnotes) and
