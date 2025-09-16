@@ -11,6 +11,7 @@ module FPO.Data.Request
   , fromLoading
   , getAuthorizedUser
   , getBlob
+  , getBlobOrError
   , getCommentSections
   , getDocument
   , getDocumentHeader
@@ -643,6 +644,25 @@ postBlobOrError url body = do
           StatusCode 400 -> pure $ Right $ Left errMsg
           _ -> pure $ Right $ Left "Unknown error occurred"
         Left _ -> pure $ Left (ServerError "Error creating Blob.")
+
+getBlobOrError
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => String
+  -> H.HalogenM st act slots msg m (Either AppError (Either String Blob))
+getBlobOrError url = do
+  result <- handleRequest' url (getBlob' url)
+  case result of
+    Right blob -> pure $ Right $ Right blob
+    Left _ -> do
+      stringResult <- H.liftAff $ getString' url
+      case stringResult of
+        Right { body: errMsg, status } -> case status of
+          StatusCode 404 -> pure $ Right $ Left errMsg
+          _ -> pure $ Right $ Left "Unknown error occurred"
+        Left _ -> pure $ Left (ServerError "Error fetching Blob.")
 
 postIgnoreOrError
   :: forall st act slots msg m
