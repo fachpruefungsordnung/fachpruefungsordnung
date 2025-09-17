@@ -1090,6 +1090,7 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.Merged -> do
         handleAction UpdateMSelectedTocEntry
         state <- H.get
+        handleAction DeleteDraft
         case state.mSelectedTocEntry of
           Just (SelLeaf elementID) -> do
             handleAction

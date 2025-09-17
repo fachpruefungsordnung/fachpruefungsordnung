@@ -68,6 +68,7 @@ import FPO.Components.Editor.Types
 import FPO.Components.Modals.DiscardModal (discardModal)
 import FPO.Components.Modals.InfoModal (infoModal)
 import FPO.Components.TOC (Version)
+import FPO.Data.AppError (AppError(..))
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
@@ -1412,12 +1413,15 @@ editor = connect selectTranslator $ H.mkComponent
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
         -- See, why and fix it
 
-        --first we look whether a draft to load is present
-        loadedDraftContent <- preventErrorHandlingLocally $ Request.getJson
-          ContentDto.decodeContentWrapper
-          ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-              <> "/draft"
-          )
+        --first we look whether a draft to load is present. The right editor does not load drafts
+        loadedDraftContent <- case state.compareToElement of 
+          Nothing ->
+            preventErrorHandlingLocally $ Request.getJson
+              ContentDto.decodeContentWrapper
+              ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+                  <> "/draft"
+              )
+          Just _ -> pure $ Left $ NotFoundError "No Draft Found" 
 
         -- check, if draft is present. Otherwise get from version
         loadedContent <- case loadedDraftContent of
