@@ -186,6 +186,14 @@ instance HasGetTreeRevision HasqlTransaction where
 instance HasExistsTreeRevision HasqlTransaction where
     existsTreeRevision = HasqlTransaction . Transactions.existsTreeRevision
 
+instance HasGetRevisionKey HasqlTransaction where
+    getRevisionKey = HasqlTransaction . Transactions.getRevisionKey
+
+instance HasGetDocument HasqlTransaction where
+    getDocument = HasqlTransaction . Transactions.getDocument
+    getDocuments = HasqlTransaction . Transactions.getDocuments
+    getDocumentsBy = (HasqlTransaction .) . Transactions.getDocumentsBy
+
 -- create
 
 instance HasCreateTextRevision HasqlTransaction where

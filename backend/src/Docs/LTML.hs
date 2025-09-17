@@ -20,7 +20,7 @@ import qualified Data.Text.Encoding as TE
 
 import Docs.TextElement (TextElement)
 import Docs.TextRevision
-    ( TextElementRevision (TextElementRevision, revision, textElement)
+    ( TextElementRevision (TextElementRevision)
     )
 import Docs.Tree (Node (Node), NodeHeader, Tree (Leaf, Tree))
 
@@ -35,7 +35,7 @@ import Docs.MetaTree
     , TreeWithMetaData (TreeWithMetaData)
     )
 import qualified Docs.MetaTree as MetaTree
-import qualified Docs.TextElement as TextElement
+import Docs.Renderable (Renderable (contentOf, kindOf, typeOf))
 import qualified Docs.TextRevision as TextRevision
 import Docs.TreeRevision (TreeRevision (TreeRevision))
 import qualified Language.Lsd.AST.Common as LSD
@@ -45,8 +45,9 @@ import qualified Language.Ltml.Tree as LTML
 import qualified Language.Ltml.Tree.ToMeta as LTML
 
 treeRevisionToMeta
-    :: TreeRevision TextElementRevision
-    -> Either LTML.MetaError (TreeRevisionWithMetaData TextElementRevision)
+    :: (Renderable r)
+    => TreeRevision r
+    -> Either LTML.MetaError (TreeRevisionWithMetaData r)
 treeRevisionToMeta (TreeRevision header root) =
     TreeRevisionWithMetaData header <$> treeToMeta root
 
@@ -56,8 +57,9 @@ treeToMeta'
 treeToMeta' input = (TextRevision.textElement <$>) <$> treeToMeta input
 
 treeToMeta
-    :: Node TextElementRevision
-    -> Either LTML.MetaError (TreeWithMetaData TextElementRevision)
+    :: (Renderable r)
+    => Node r
+    -> Either LTML.MetaError (TreeWithMetaData r)
 treeToMeta input =
     let ltmlMeta =
             first treeFromFlaggedMetaTree
@@ -116,8 +118,9 @@ treeFromFlaggedMetaTree
                     }
 
 treeRevisionToLtmlInputTree
-    :: TreeRevision TextElementRevision
-    -> FlaggedInputTree (MetaFlag TextElementRevision)
+    :: (Renderable r)
+    => TreeRevision r
+    -> FlaggedInputTree (MetaFlag r)
 treeRevisionToLtmlInputTree (TreeRevision _ node) = nodeToLtmlInputTree node
 
 nodeToLtmlInputTree'
@@ -131,9 +134,10 @@ nodeToLtmlInputTree' =
         . nodeToLtmlInputTree
 
 nodeToLtmlInputTreePred
-    :: (NodeHeader -> Bool)
-    -> (TextElementRevision -> Bool)
-    -> Node TextElementRevision
+    :: (Renderable r)
+    => (NodeHeader -> Bool)
+    -> (r -> Bool)
+    -> Node r
     -> FlaggedInputTree Bool
 nodeToLtmlInputTreePred treePred leafPred =
     LTML.flaggedTreeMap
@@ -146,8 +150,9 @@ nodeToLtmlInputTreePred treePred leafPred =
     pred' (LeafFlag l) = leafPred l
 
 nodeToLtmlInputTree
-    :: Node TextElementRevision
-    -> FlaggedInputTree (MetaFlag TextElementRevision)
+    :: (Renderable r)
+    => Node r
+    -> FlaggedInputTree (MetaFlag r)
 nodeToLtmlInputTree (Node {Tree.header, Tree.children}) =
     let kind = LSD.KindName $ Text.unpack $ Tree.headerKind header
         type_ = LSD.TypeName $ Text.unpack $ Tree.headerType header
@@ -159,13 +164,12 @@ nodeToLtmlInputTree (Node {Tree.header, Tree.children}) =
             $ treeToLtmlInputTree <$> children
 
 treeToLtmlInputTree
-    :: Tree TextElementRevision
-    -> FlaggedInputTree (MetaFlag TextElementRevision)
+    :: (Renderable r)
+    => Tree r
+    -> FlaggedInputTree (MetaFlag r)
 treeToLtmlInputTree (Tree node) = nodeToLtmlInputTree node
-treeToLtmlInputTree (Leaf textElementRevision@TextElementRevision {textElement, revision}) =
-    let kind = LSD.KindName $ Text.unpack $ TextElement.textElementKind textElement
-        type_ = LSD.TypeName $ Text.unpack $ TextElement.textElementType textElement
-        content = maybe "" TextRevision.content revision -- TODO: no revison -> empty text?
-     in LTML.Flagged (LeafFlag textElementRevision) $
-            LTML.TypedTree kind type_ $
-                LTML.Leaf content
+treeToLtmlInputTree (Leaf element) =
+    LTML.Flagged (LeafFlag element) $
+        LTML.TypedTree (kindOf element) (typeOf element) $
+            LTML.Leaf $
+                contentOf element
