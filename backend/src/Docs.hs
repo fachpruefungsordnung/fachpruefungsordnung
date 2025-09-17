@@ -518,7 +518,7 @@ getTextRevisionPDF
     -> m (Result PDFBytes)
 getTextRevisionPDF userID ref@(TextRevisionRef (TextElementRef _ textID) _) =
     logged userID Scope.docsTreeRevision $ runExceptT $ do
-        guardExistsTextRevision False ref
+        guardExistsTextRevision True ref
         let ref' = Revision.refFromTextRevision ref
         maybeDocumentContainer <-
             getDocumentRevisionDocumentContainerForTextElement userID ref' textID
