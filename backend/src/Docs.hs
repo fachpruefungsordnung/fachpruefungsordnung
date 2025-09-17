@@ -146,7 +146,6 @@ import GHC.Int (Int64)
 import qualified Language.Ltml.AST.DocumentContainer as LTML
 import qualified Language.Ltml.HTML as HTML
 import qualified Language.Ltml.HTML.Export as HTML
-import Language.Ltml.HTML.Pipeline (htmlPipeline)
 import qualified Language.Ltml.ToLaTeX.PDFGenerator as PDF
 import qualified Language.Ltml.Tree.ToLtml as LTML
 import Logging.Logs (LogMessage, Severity (Warning))
@@ -379,7 +378,12 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                 $ timestamp latestRevision
 
 getTextElementRevision
-    :: (HasGetTextElementRevision m, HasLogMessage m)
+    :: ( HasGetTextElementRevision m
+       , HasGetTreeRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       )
     => UserID
     -> TextRevisionRef
     -> m (Result (Maybe (Rendered TextElementRevision)))
@@ -389,26 +393,22 @@ getTextElementRevision userID ref = logged userID Scope.docsTextRevision $
         guardPermission Read docID userID
         guardExistsTextRevision True ref
         revision <- lift $ DB.getTextElementRevision ref
-        return $ renderTextElementRevision <$> revision
+        mapM (renderTextElementRevision userID ref) revision
 
 renderTextElementRevision
-    :: TextElementRevision
-    -> Rendered TextElementRevision
-renderTextElementRevision rev = rendered content rev
+    :: ( HasGetTreeRevision m
+       , HasLogMessage m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       )
+    => UserID
+    -> TextRevisionRef
+    -> TextElementRevision
+    -> ExceptT Error m (Rendered TextElementRevision)
+renderTextElementRevision userID ref rev = rendered' userID ref content rev
   where
-    content = TextRevision.content <$> TextRevision.revision rev
-
-rendered :: Maybe Text -> a -> Rendered a
-rendered content element =
-    Rendered
-        { TextRevision.element = element
-        , TextRevision.html = fromMaybe "" html
-        }
-  where
-    -- TODO: use correct HTML pipeline.
-    html =
-        content
-            >>= (either (const Nothing) Just . TE.decodeUtf8' . BL.toStrict) . htmlPipeline
+    content = maybe "" TextRevision.content $ TextRevision.revision rev
 
 rendered'
     :: ( HasGetTreeRevision m
