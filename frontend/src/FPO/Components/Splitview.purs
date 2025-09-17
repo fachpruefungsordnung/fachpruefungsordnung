@@ -13,6 +13,8 @@ import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.String.Regex as Regex
+import Data.String.Regex.Flags as RegexFlags
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Unsafe (unsafePerformEffect)
@@ -995,10 +997,12 @@ splitview = connect selectTranslator $ H.mkComponent
                 <> (if revisionId == -1 then "latest" else show revisionId)
                 <> "/pdf"
             )
-          tocTitleMaybe <- H.request _toc unit TOC.RequestCurrentTocEntryTitle
+          tocTitleMaybeMaybe <- H.request _toc unit TOC.RequestCurrentTocEntryTitle
           let
-            tocTitle = join tocTitleMaybe -- This flattens Maybe (Maybe String) to Maybe String
-            filename = (fromMaybe "document" tocTitle) <> ".pdf"
+            tocTitleMaybe = join tocTitleMaybeMaybe -- This flattens Maybe (Maybe String) to Maybe String
+            tocTitleUgly = fromMaybe "document" tocTitleMaybe
+            cleanTocTitle = stripHtmlTags tocTitleUgly
+            filename = cleanTocTitle <> ".pdf"
           case renderedPDF' of
             Left _ -> pure unit
             Right blobOrError ->
@@ -1520,6 +1524,12 @@ insertNodeIntoEdgeAtPosition path node (Edge (Node { meta, children, header })) 
                 Just res -> res
             in
               Edge (Node { meta, children: newChildren, header })
+
+stripHtmlTags :: String -> String
+stripHtmlTags input =
+  case Regex.regex "<[^>]*>" (RegexFlags.global <> RegexFlags.ignoreCase) of
+    Left _ -> input -- If regex compilation fails, return original string
+    Right htmlRegex -> Regex.replace htmlRegex "" input
 
 -- Changes the name of a node in the TOC root tree.
 -- TODO: Do we need this? This should be done in the text element associated
