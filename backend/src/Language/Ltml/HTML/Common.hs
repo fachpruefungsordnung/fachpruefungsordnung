@@ -16,7 +16,6 @@ module Language.Ltml.HTML.Common
     , incSuperSectionID
     , FootnoteMap
     , convertLabelMap
-    , addUsedFootnoteLabels
     , addUsedFootnotes
     , FootnoteSet
     , NumLabel (..)
@@ -257,13 +256,6 @@ type FootnoteMap = [(Label, (Int, Html (), Delayed (Html ())))]
 -- | Converts FootnoteMap to Label Map used for "normal" references
 convertLabelMap :: FootnoteMap -> [(Label, Html ())]
 convertLabelMap = map (\(label, (_, idHtml, _)) -> (label, idHtml))
-
--- | Adds used Footnotes as "normal" references to GlobalState
---   Note: Footnote Labels will shadow normal Labels with the same name!
-addUsedFootnoteLabels :: GlobalState -> GlobalState
-addUsedFootnoteLabels globalState =
-    let usedFootnotes = convertLabelMap $ usedFootnoteMap globalState
-     in globalState {labels = usedFootnotes ++ labels globalState}
 
 -- | Adds used footnotes of base state to add state (appends at the front)
 addUsedFootnotes

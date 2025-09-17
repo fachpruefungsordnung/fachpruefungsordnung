@@ -88,9 +88,7 @@ renderSectionHtmlCss section fnMap =
     -- \| Render with given footnote context
     let readerState = initReaderState {footnoteMap = fnMap}
         (delayedHtml, finalState) = runState (runReaderT (toHtmlM section) readerState) initGlobalState
-        -- \| Add footnote labes for "normal" (non-footnote) references
-        finalState' = addUsedFootnoteLabels finalState
-     in (evalDelayed finalState' delayedHtml, mainStylesheet (enumStyles finalState))
+     in (evalDelayed finalState delayedHtml, mainStylesheet (enumStyles finalState))
 
 -- | Render a @Flagged' DocumentContainer@ to HTML and CSS
 renderHtmlCss :: Flagged' DocumentContainer -> (Html (), Css)
@@ -103,9 +101,7 @@ renderHtmlCssWith
 renderHtmlCssWith readerState globalState docContainer =
     -- \| Render with given footnote context
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) readerState) globalState
-        -- \| Add footnote labes for "normal" (non-footnote) references
-        finalState' = addUsedFootnoteLabels finalState
-     in (evalDelayed finalState' delayedHtml, mainStylesheet (enumStyles finalState))
+     in (evalDelayed finalState delayedHtml, mainStylesheet (enumStyles finalState))
 
 -- | Render a @Flagged' DocumentContainer@ with given states to main HTML, main CSS,
 --   and list of exported sections. Fails, if any parse errors occur.
@@ -132,15 +128,13 @@ renderHtmlCssExport backPath readerState globalState exportReaderState docCon =
     -- \| Render with given footnote context
     let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docCon) readerState) globalState
         -- \| Add footnote labes for "normal" (non-footnote) references
-        finalState' = addUsedFootnoteLabels finalState
-        mainHtml = evalDelayed finalState' delayedHtml
-        css = mainStylesheet (enumStyles finalState')
-        mainDocTitleHtml = mainDocumentTitleHtml finalState'
-        rawMainDocTitle = evalDelayed finalState' $ mainDocumentTitle finalState'
+        mainHtml = evalDelayed finalState delayedHtml
+        css = mainStylesheet (enumStyles finalState)
+        mainDocTitleHtml = mainDocumentTitleHtml finalState
+        rawMainDocTitle = evalDelayed finalState $ mainDocumentTitle finalState
         -- \| Second render for exported sections
         -- TODO: get rid of second render run (its only because of the different labelWrapperFuncs)
         (_, finalExportState) = runReaderState (toHtmlM docCon) exportReaderState globalState
-        finalExportState' = addUsedFootnoteLabels finalExportState
         backButton =
             div_ $
                 a_ [cssClass_ Class.ButtonLink, href_ $ pack backPath] (toHtml ("←" :: Text))
@@ -148,16 +142,16 @@ renderHtmlCssExport backPath readerState globalState exportReaderState docCon =
             map
                 ( \(htmlId, dTitle, dHtml) ->
                     ( htmlId
-                    , evalDelayed finalExportState' dTitle
-                    , evalDelayed finalExportState'
+                    , evalDelayed finalExportState dTitle
+                    , evalDelayed finalExportState
                         . ( fmap (pure backButton <> div_ <#> Class.Document)
                                 . (mainDocTitleHtml <>)
                           )
                         $ dHtml
                     )
                 )
-                (exportSections finalExportState')
-     in if hasErrors finalState'
+                (exportSections finalExportState)
+     in if hasErrors finalState
             then Nothing
             else Just (mainHtml, css, sections, rawMainDocTitle)
 
@@ -185,16 +179,14 @@ renderTocList docContainer =
                     (initReaderState {appendixHasGlobalToC = True})
                 )
                 initGlobalState
-        -- \| Add footnote labes for "normal" (non-footnote) references
-        finalState' = addUsedFootnoteLabels finalState
-        tocList = toList $ tableOfContents finalState'
+        tocList = toList $ tableOfContents finalState
         -- \| Produce (Just <span>id</span>, Success <span>title</span>);
         --    This creates one homogeneous list without Either
         htmlTitleList =
             map
                 ( either
                     (bimap ((<$>) span_) ((<$>) span_))
-                    ( \(mId, rDt, _, _) -> (span_ <$> mId, span_ . evalDelayed finalState' <$> rDt)
+                    ( \(mId, rDt, _, _) -> (span_ <$> mId, span_ . evalDelayed finalState <$> rDt)
                     )
                 )
                 tocList
@@ -443,8 +435,8 @@ instance ToHtmlM (Node Section) where
                       Text
                     , -- \^ html id
                       Delayed Text
+                      -- \^ raw textual title
                     )
-            -- \^ raw textual title
 
             buildHeadingHtml sectionIDHtml mLabelH tocKeyHtml eErrHeading =
                 case eErrHeading of
@@ -642,6 +634,8 @@ instance ToHtmlM FootnoteReference where
                         footnoteID <- gets currentFootnoteID
                         let footnoteIdHtml = toHtml $ show footnoteID
                         footnoteTextHtml <- toHtmlM footnote
+                        -- \| Add Label for normal references to this footnote
+                        addMaybeLabelToState (Just label) footnoteIdHtml
                         -- \| Add new used footnote with id and rendered (delayed) text
                         modify
                             ( \s ->
