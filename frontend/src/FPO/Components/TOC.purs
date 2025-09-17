@@ -95,6 +95,7 @@ import Prelude
   , (<>)
   , (==)
   , (>)
+  , (>=)
   , (||)
   )
 import Simple.I18n.Translator (label, translate)
@@ -1116,15 +1117,41 @@ tocview = connect (selectEq identity) $ H.mkComponent
           ]
     where
     -- this is a placeholder that only allows to look at the 5 last versions
+
+    vHM =
+      ( map
+          (\v -> addVersionButton v)
+          versions
+      )
+
     versionHistoryMenu =
       searchBarSegment
         <>
           [ HH.div
-              [ HP.style "overflow: auto; max-height: 19.3rem;" ]
-              ( map
-                  (\v -> addVersionButton v)
-                  versions
-              )
+              [ HP.style "overflow: auto; max-height: 19.3rem;" ] $
+              vHM
+                <>
+                  if length vHM >= 200 then
+                    [ HH.div
+                        [ HP.classes $
+                            [ HB.btn
+                            , HB.btnInfo
+                            , HB.textStart
+                            , HB.textDecorationNone
+                            , HB.w100
+                            , HB.textBody
+                            , HB.dFlex
+                            , HB.alignItemsCenter
+                            , HH.ClassName "toc-item"
+                            ]
+                        , HP.style
+                            "border: none; border-top-style: solid; border-color: grey; border-width: 1px; border-radius: 0;"
+                        ] $
+                        [ HH.text (translate (label :: _ "toc_full") state.translator)
+                        ]
+                    ]
+                  else
+                    []
           ]
 
     searchBarSegment =
@@ -1140,8 +1167,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
       in
         [ HH.div
             [ HP.classes [ HB.dFlex, HB.flexColumn ]
-            {-             , HP.style
-            "border-bottom-style: solid; border-color: grey; border-width: 1px;" -}
             ]
             [ HH.div
                 [ HP.classes

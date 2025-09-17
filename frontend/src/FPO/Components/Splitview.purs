@@ -1077,17 +1077,6 @@ splitview = connect selectTranslator $ H.mkComponent
                           )
                       )
                   )
-                {-                 let
-                  tocEntry = fromMaybe
-                    emptyTOCEntry
-                    (findTOCEntry elementID state.tocEntries)
-                  title = fromMaybe
-                    ""
-                    (findTitleTOCEntry elementID state.tocEntries)
-                handleAction
-                  ( ModifyVersionMapping elementID Nothing
-                      (Just (Just { tocEntry: tocEntry, revID: vID, title: title }))
-                  ) -}
                 let
                   -- Nothing case should never occur
                   entry = case (findTOCEntry id state.tocEntries) of
@@ -1108,10 +1097,6 @@ splitview = connect selectTranslator $ H.mkComponent
             case (findTOCEntry elementID state.tocEntries) of
               Nothing -> pure unit
               Just entry -> H.tell _editor 0 (Editor.ChangeSection entry Nothing)
-          {-           case (findRootTree (\e -> e.elementID == tocID) state.versionMapping) of 
-          Nothing -> pure unit 
-          Just {elementID: _, versionID: _, comparisonData: cD} -> do
-            H.tell _editor 1 (Editor.ChangeSection cD Nothing) -}
           _ -> pure unit
 
     DeleteDraft -> do

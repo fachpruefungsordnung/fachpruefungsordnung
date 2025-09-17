@@ -924,27 +924,6 @@ editor = connect selectTranslator $ H.mkComponent
                   H.raise RaiseMergeMode
                   pure unit
                 _ -> pure unit
-          {-               res <- Request.postJson (ContentDto.extractDraft updatedContent)
-            ( "/docs/" <> show state.docID <> "/text/" <> show newEntry.id
-                <> "/draft/publish"
-            )
-            jsonEmptyObject
-
-          case res of
-            Left err' -> updateStore $ Store.AddError $ err'
-            Right upCon -> do
-              H.modify_ _ { mContent = Just upCon }
-              -- Put merged content into editor
-              H.gets _.mEditor >>= traverse_ \ed -> do
-                H.liftEffect do
-                  session <- Editor.getSession ed
-                  document <- Session.getDocument session
-                  Document.setValue (ContentDto.getContentText upCon) document
-                  -- reset Ref, because loading new content is considered
-                  -- changing the existing content, which would set the flag
-                  for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
-              updateStore $ Store.AddSuccess "Saved and Merged successfully."
-              pure unit -}
 
           -- mDirtyRef := false
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
@@ -1450,25 +1429,6 @@ editor = connect selectTranslator $ H.mkComponent
                 <> version
             )
 
-        -- when a draft was found, set the dirtyVersion ref to true so user doesn't swap without discarding.
-        -- otherwise, switching the section/version means that it can be set to false
-        {-         case loadedDraftContent of
-        Right _ -> do
-          for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write true r
-          isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
-            _.mDirtyVersion
-          H.liftEffect $ log ("ended up in right segment" <> (show isDirty))
-        Left _ -> do
-          pure unit
-          for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
-          H.liftEffect $ log "ended up in left segment" -}
-
-        {-         loadedContent <- Request.getJson
-        ContentDto.decodeContentWrapper
-        ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-            <> "/rev/"
-            <> version
-        ) -}
         case loadedContent of
           Left err -> updateStore $ Store.AddError err
           Right wrapper -> do

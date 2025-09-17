@@ -295,6 +295,7 @@ type Labels =
 
       -- | Table of Contents (TOC)
       ::: "toc_end_dropzone"
+      ::: "toc_full"
       ::: "toc_paragraph"
       ::: "toc_section"
 
