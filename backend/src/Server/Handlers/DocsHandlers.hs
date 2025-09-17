@@ -366,7 +366,7 @@ type GetDraftTextRevision =
         :> "text"
         :> Capture "textElementID" TextElementID
         :> "draft"
-        :> Get '[JSON] (Maybe DraftRevision)
+        :> Get '[JSON] (Maybe (Rendered DraftRevision))
 
 type PublishDraftTextRevision =
     Summary "Publish draft text revision"
@@ -861,7 +861,7 @@ getDraftTextRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TextElementID
-    -> Handler (Maybe DraftRevision)
+    -> Handler (Maybe (Rendered DraftRevision))
 getDraftTextRevisionHandler auth docID textID = do
     userID <- getUser auth
     withDB $
