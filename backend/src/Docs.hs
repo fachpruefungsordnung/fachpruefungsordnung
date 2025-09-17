@@ -625,7 +625,7 @@ toDocumentContainerForCustomText textID text fullRevision =
   where
     toInputTree (TreeRevision _ node) =
         nodeToLtmlInputTreePred
-            (const True)
+            (const False)
             ((textID ==) . Renderable.identifier)
             node
     override rev@(TextElementRevision textElement _) =
@@ -648,7 +648,7 @@ toDocumentContainerForTextElement teID fullRevision =
   where
     toInputTree (TreeRevision _ node) =
         nodeToLtmlInputTreePred
-            (const True)
+            (const False)
             ((teID ==) . TextElement.identifier . TextRevision.textElement)
             node
 
