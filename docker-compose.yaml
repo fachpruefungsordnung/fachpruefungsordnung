@@ -50,8 +50,8 @@ services:
       interval: 5s
     networks:
       - backend
-    # volumes:
-    #   - database:/var/lib/postgresql/data
+    volumes:
+      - database:/var/lib/postgresql/data
 
   pgweb:
     container_name: fpo-pgweb

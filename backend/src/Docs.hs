@@ -1139,6 +1139,11 @@ getDraftTextRevision
     -> TextElementRef
     -> m (Result (Maybe (Rendered DraftRevision)))
 getDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Scope.docsTextRevision $ runExceptT $ do
+    -- let render =
+    --         rendered'
+    --             userID
+    --             (TextRevisionRef ref TextRevision.Latest)
+    --             (newTextRevisionContent revision)
     guardPermission Read docID userID
     guardExistsTextElement ref
     revision <- lift $ DB.getDraftTextRevision userID ref
