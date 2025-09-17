@@ -34,22 +34,24 @@ instance Renderable TextElementRevision where
     contentOf =
         maybe "" TextRevision.content . TextRevision.revision
 
-data DirectRenderable
+data DirectRenderable id
     = DirectRenderable
     { kind :: LSD.KindName
     , type_ :: LSD.TypeName
     , content :: Text
+    , identifier :: id
     }
 
-directRenderable :: (Renderable r) => r -> DirectRenderable
-directRenderable element =
+directRenderable :: (Renderable r) => r -> id -> DirectRenderable id
+directRenderable element id_ =
     DirectRenderable
         { kind = kindOf element
         , type_ = typeOf element
         , content = contentOf element
+        , identifier = id_
         }
 
-instance Renderable DirectRenderable where
+instance Renderable (DirectRenderable id) where
     kindOf = kind
     typeOf = type_
     contentOf = content

@@ -29,6 +29,10 @@ module Docs.Hasql.Transactions
     , createDraftTextRevision
     , getDraftTextRevision
     , deleteDraftTextRevision
+    , getRevisionKey
+    , getDocument
+    , getDocuments
+    , getDocumentsBy
     ) where
 
 import qualified Crypto.Hash.SHA1 as SHA1
@@ -61,6 +65,7 @@ import Docs.Hasql.TreeEdge
     , TreeEdgeChildRef (..)
     )
 import qualified Docs.Hasql.TreeEdge as TreeEdge
+import Docs.Revision (RevisionKey, RevisionRef (RevisionRef))
 import Docs.TextElement
     ( TextElement
     , TextElementID
@@ -299,3 +304,16 @@ getTree rootHash = do
 
 existsTreeRevision :: TreeRevisionRef -> Transaction Bool
 existsTreeRevision = flip statement Statements.existsTreeRevision
+
+getRevisionKey :: RevisionRef -> Transaction (Maybe RevisionKey)
+getRevisionKey (RevisionRef docID revID) =
+    statement (docID, revID) Statements.getRevisionKey
+
+getDocument :: DocumentID -> Transaction (Maybe Document)
+getDocument = (`statement` Statements.getDocument)
+
+getDocuments :: UserID -> Transaction (Vector Document)
+getDocuments = (`statement` Statements.getDocuments)
+
+getDocumentsBy :: Maybe UserID -> Maybe GroupID -> Transaction (Vector Document)
+getDocumentsBy = curry (`statement` Statements.getDocumentsBy)
