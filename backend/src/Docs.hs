@@ -1128,14 +1128,34 @@ guardExistsComment ref@(CommentRef textRef _) = do
 -- Returns Nothing if no draft exists for this user/element combination.
 -- Drafts are user-specific and element-specific (one draft per user per text element).
 getDraftTextRevision
-    :: (DB.HasDraftTextRevision m, HasLogMessage m)
+    :: ( DB.HasDraftTextRevision m
+       , HasLogMessage m
+       , HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       )
     => UserID
     -> TextElementRef
-    -> m (Result (Maybe DraftRevision))
+    -> m (Result (Maybe (Rendered DraftRevision)))
 getDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Scope.docsTextRevision $ runExceptT $ do
+    -- let render =
+    --         rendered'
+    --             userID
+    --             (TextRevisionRef ref TextRevision.Latest)
+    --             (newTextRevisionContent revision)
     guardPermission Read docID userID
     guardExistsTextElement ref
-    lift $ DB.getDraftTextRevision userID ref
+    revision <- lift $ DB.getDraftTextRevision userID ref
+    mapM
+        ( \rev ->
+            rendered'
+                userID
+                (TextRevisionRef ref TextRevision.Latest)
+                (TextRevision.draftContent rev)
+                rev
+        )
+        revision
 
 -- | Publish a draft text revision to the main revision tree.
 -- This attempts to create a regular text revision from the draft content.
