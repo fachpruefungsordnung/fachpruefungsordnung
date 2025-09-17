@@ -378,15 +378,15 @@ type TocEntryWrapper = TocCategory -> LabelWrapper
 
 -- | Converts 'Label' into @<a href = "#<label>">@ for jumping to a HTML id
 anchorLink :: LabelWrapper
-anchorLink label = 
+anchorLink label =
     a_
         [ cssClass_ Class.AnchorLink
         , href_ (cons '#' $ unLabel label)
         , onclick_ scrollScript
         ]
   where
-    scrollScript = 
-        "event.preventDefault(); document.getElementById('" 
+    scrollScript =
+        "event.preventDefault(); document.getElementById('"
             <> unLabel label
             <> "').scrollIntoView({behavior: 'smooth'});"
 
