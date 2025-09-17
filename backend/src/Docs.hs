@@ -540,7 +540,7 @@ getTextRevisionHTMLForCustomText
     -> m (Result HTMLBytes)
 getTextRevisionHTMLForCustomText userID ref@(TextRevisionRef (TextElementRef _ textID) _) text =
     logged userID Scope.docsTreeRevision $ runExceptT $ do
-        guardExistsTextRevision False ref
+        guardExistsTextRevision True ref
         let ref' = Revision.refFromTextRevision ref
         maybeDocumentContainer <-
             getDocumentRevisionDocumentContainerForCustomText userID ref' textID text
