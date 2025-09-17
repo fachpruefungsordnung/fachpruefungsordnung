@@ -544,10 +544,9 @@ getTextRevisionHTMLForCustomText userID ref@(TextRevisionRef (TextElementRef _ t
         let ref' = Revision.refFromTextRevision ref
         maybeDocumentContainer <-
             getDocumentRevisionDocumentContainerForCustomText userID ref' textID text
-        documentContainer <-
-            ExceptT . pure $
-                maybe (Left $ RevisionNotFound ref') Right maybeDocumentContainer
-        return $ HTMLBytes $ HTML.renderHtmlCssBS documentContainer
+        return $
+            HTMLBytes $
+                maybe "" HTML.renderHtmlCssBS maybeDocumentContainer
 
 getTreeRevisionPDF
     :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m, MonadIO m)
