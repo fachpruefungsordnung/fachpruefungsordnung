@@ -91,6 +91,7 @@ import Docs.Comment
     )
 import Docs.FullDocument (FullDocument)
 import Docs.MetaTree (TreeRevisionWithMetaData)
+import Docs.Rendered (PDF, PDFBytes, Zip, ZipBytes)
 import Docs.Revision
     ( RevisionRef (RevisionRef)
     , RevisionSelector
@@ -114,11 +115,7 @@ import Server.DTOs.Documents
     )
 import qualified Server.DTOs.Documents as Documents
 import Server.Handlers.RenderHandlers
-    ( PDF
-    , PDFByteString (PDFByteString)
-    , RenderAPI
-    , Zip
-    , ZipByteString (ZipByteString)
+    ( RenderAPI
     , renderServer
     )
 import UserManagement.Group (GroupID)
@@ -212,7 +209,7 @@ type GetTextElementRevisionPDF =
         :> "rev"
         :> Capture "textRevision" TextRevisionSelector
         :> "pdf"
-        :> Get '[PDF] PDFByteString
+        :> Get '[PDF] PDFBytes
 
 type PostTreeRevision =
     Auth AuthMethod Auth.Token
@@ -242,7 +239,7 @@ type GetTreeRevisionPDF =
         :> "tree"
         :> Capture "treeRevision" TreeRevisionSelector
         :> "pdf"
-        :> Get '[PDF] PDFByteString
+        :> Get '[PDF] PDFBytes
 
 type GetTreeRevisionHTML =
     Auth AuthMethod Auth.Token
@@ -250,7 +247,7 @@ type GetTreeRevisionHTML =
         :> "tree"
         :> Capture "treeRevision" TreeRevisionSelector
         :> "html"
-        :> Get '[Zip] ZipByteString
+        :> Get '[Zip] ZipBytes
 
 type GetTextHistory =
     Auth AuthMethod Auth.Token
@@ -333,7 +330,7 @@ type GetDocumentRevisionPDF =
         :> "rev"
         :> Capture "revision" RevisionSelector
         :> "pdf"
-        :> Get '[PDF] PDFByteString
+        :> Get '[PDF] PDFBytes
 
 type GetDocumentRevisionHTML =
     Auth AuthMethod Auth.Token
@@ -341,7 +338,7 @@ type GetDocumentRevisionHTML =
         :> "rev"
         :> Capture "revision" RevisionSelector
         :> "html"
-        :> Get '[Zip] ZipByteString
+        :> Get '[Zip] ZipBytes
 
 type GetDocumentRevisionTree =
     Auth AuthMethod Auth.Token
@@ -518,15 +515,15 @@ getTextRevisionPDFHandler
     -> DocumentID
     -> TextElementID
     -> TextRevisionSelector
-    -> Handler PDFByteString
+    -> Handler PDFBytes
 getTextRevisionPDFHandler auth docID textID revision = do
     userID <- getUser auth
-    pdf <-
-        withDB $
-            run $
-                Docs.getTextRevisionPDF userID $
-                    TextRevisionRef (TextElementRef docID textID) revision
-    return $ PDFByteString pdf
+    withDB $
+        run $
+            Docs.getTextRevisionPDF userID $
+                TextRevisionRef
+                    (TextElementRef docID textID)
+                    revision
 
 postTreeRevisionHandler
     :: AuthResult Auth.Token
@@ -562,23 +559,19 @@ getTreeRevisionPDFHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TreeRevisionSelector
-    -> Handler PDFByteString
+    -> Handler PDFBytes
 getTreeRevisionPDFHandler auth docID revision = do
     userID <- getUser auth
-    pdf <-
-        withDB $ run $ Docs.getTreeRevisionPDF userID $ TreeRevisionRef docID revision
-    return $ PDFByteString pdf
+    withDB $ run $ Docs.getTreeRevisionPDF userID $ TreeRevisionRef docID revision
 
 getTreeRevisionHTMLHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TreeRevisionSelector
-    -> Handler ZipByteString
+    -> Handler ZipBytes
 getTreeRevisionHTMLHandler auth docID revision = do
     userID <- getUser auth
-    zipBytes <-
-        withDB $ run $ Docs.getTreeRevisionHTML userID $ TreeRevisionRef docID revision
-    return $ ZipByteString zipBytes
+    withDB $ run $ Docs.getTreeRevisionHTML userID $ TreeRevisionRef docID revision
 
 getTextHistoryHandler
     :: AuthResult Auth.Token
@@ -691,29 +684,25 @@ getDocumentRevisionPDFHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> RevisionSelector
-    -> Handler PDFByteString
+    -> Handler PDFBytes
 getDocumentRevisionPDFHandler auth docID revision = do
     userID <- getUser auth
-    pdf <-
-        withDB $
-            run $
-                Docs.getDocumentRevisionPDF userID $
-                    RevisionRef docID revision
-    return $ PDFByteString pdf
+    withDB $
+        run $
+            Docs.getDocumentRevisionPDF userID $
+                RevisionRef docID revision
 
 getDocumentRevisionHTMLHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> RevisionSelector
-    -> Handler ZipByteString
+    -> Handler ZipBytes
 getDocumentRevisionHTMLHandler auth docID revision = do
     userID <- getUser auth
-    zipBytes <-
-        withDB $
-            run $
-                Docs.getDocumentRevisionHTML userID $
-                    RevisionRef docID revision
-    return $ ZipByteString zipBytes
+    withDB $
+        run $
+            Docs.getDocumentRevisionHTML userID $
+                RevisionRef docID revision
 
 getDocumentRevisionTreeHandler
     :: AuthResult Auth.Token
