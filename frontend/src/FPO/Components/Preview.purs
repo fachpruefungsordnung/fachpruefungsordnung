@@ -46,8 +46,7 @@ preview = H.mkComponent
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.iframe
-      [ (HP.attr (AttrName "sandbox") "")
-      , HP.srcDoc $ case state.renderedHtml of
+      [ HP.srcDoc $ case state.renderedHtml of
           Nothing -> "No content rendered yet."
           Just (Loaded html) -> html
           Just Loading -> "Loading..."

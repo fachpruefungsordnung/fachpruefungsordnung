@@ -63,7 +63,7 @@ import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label (unLabel))
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util (cssClass_, (<#>))
-import Lucid (Html, a_, div_, href_, span_, toHtml)
+import Lucid (Html, a_, div_, href_, onclick_, span_, toHtml)
 
 -- TODO: Third ConfigState? With custom Reader Monad that is read only
 
@@ -378,7 +378,17 @@ type TocEntryWrapper = TocCategory -> LabelWrapper
 
 -- | Converts 'Label' into @<a href = "#<label>">@ for jumping to a HTML id
 anchorLink :: LabelWrapper
-anchorLink label = a_ [cssClass_ Class.AnchorLink, href_ (cons '#' $ unLabel label)]
+anchorLink label =
+    a_
+        [ cssClass_ Class.AnchorLink
+        , href_ (cons '#' $ unLabel label)
+        , onclick_ scrollScript
+        ]
+  where
+    scrollScript =
+        "event.preventDefault(); document.getElementById('"
+            <> unLabel label
+            <> "').scrollIntoView({behavior: 'smooth'});"
 
 -- | Converts 'Label' into @<a href = "<path>/<label>.html">@ for jumping
 --   to another page
