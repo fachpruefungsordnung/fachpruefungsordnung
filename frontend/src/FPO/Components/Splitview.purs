@@ -8,12 +8,13 @@ module FPO.Component.Splitview where
 
 import Prelude
 
-import Data.Argonaut (fromString)
 import Data.Array (cons, deleteAt, head, insertAt, null, snoc, uncons, updateAt, (!!))
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.String.Regex as Regex
+import Data.String.Regex.Flags as RegexFlags
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Unsafe (unsafePerformEffect)
@@ -969,43 +970,70 @@ splitview = connect selectTranslator $ H.mkComponent
             }
         H.tell _comment unit (Comment.DeletedComment deletedIDs)
 
-      Editor.PostPDF content -> do
-        renderedPDF' <- Request.postBlobOrError "/render/pdf" (fromString content)
-        tocTitleMaybe <- H.request _toc unit TOC.RequestCurrentTocEntryTitle
+      Editor.PostPDF _ -> do
+        state <- H.get
+        upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
         let
-          tocTitle = join tocTitleMaybe -- This flattens Maybe (Maybe String) to Maybe String
-          filename = (fromMaybe "document" tocTitle) <> ".pdf"
-        case renderedPDF' of
-          Left _ -> pure unit
-          Right blobOrError ->
-            case blobOrError of
-              Left errMsg -> H.modify_ _
-                { renderedHtml = Just
-                    (Loaded ("<pre><code>" <> errMsg <> "</code></pre>"))
-                }
-              Right body -> do
-                -- create blobl link
-                url <- H.liftEffect $ createObjectURL body
-                -- Create an invisible link and click it to download PDF
-                H.liftEffect $ do
-                  -- get window stuff
-                  win <- window
-                  hdoc <- document win
-                  let doc = HTMLDocument.toDocument hdoc
+          textElementId :: Int
+          textElementId = case state.mSelectedTocEntry of
+            Just (SelLeaf id) -> id
+            _ -> -1
 
-                  -- create link
-                  aEl <- Document.createElement "a" doc
-                  case HTMLElement.fromElement aEl of
-                    Nothing -> pure unit
-                    Just aHtml -> do
-                      Element.setAttribute "href" url aEl
-                      Element.setAttribute "download" filename aEl
-                      HTMLElement.click aHtml
-                -- deactivate the blob link after 1 sec
-                _ <- H.fork do
-                  H.liftAff $ delay (Milliseconds 1000.0)
-                  H.liftEffect $ revokeObjectURL url
-                pure unit
+          revisionId :: Int
+          revisionId =
+            case
+              findRootTree (\e -> e.elementID == textElementId) state.versionMapping
+              of
+              Just revision -> fromMaybe (-1) revision.versionID
+              Nothing -> case upToDateVersion of
+                Just (Just version) -> fromMaybe (-1) version.identifier
+                _ -> -1
+        if textElementId == -1 then do
+          updateStore $ Store.AddWarning "No section selected for PDF export"
+        else do
+          renderedPDF' <- Request.getBlobOrError
+            ( "/docs/" <> show state.docID <> "/text/" <> show textElementId
+                <> "/rev/"
+                <> (if revisionId == -1 then "latest" else show revisionId)
+                <> "/pdf"
+            )
+          tocTitleMaybeMaybe <- H.request _toc unit TOC.RequestCurrentTocEntryTitle
+          let
+            tocTitleMaybe = join tocTitleMaybeMaybe -- This flattens Maybe (Maybe String) to Maybe String
+            tocTitleUgly = fromMaybe "document" tocTitleMaybe
+            cleanTocTitle = stripHtmlTags tocTitleUgly
+            filename = cleanTocTitle <> ".pdf"
+          case renderedPDF' of
+            Left _ -> pure unit
+            Right blobOrError ->
+              case blobOrError of
+                Left errMsg -> H.modify_ _
+                  { renderedHtml = Just
+                      (Loaded ("<pre><code>" <> errMsg <> "</code></pre>"))
+                  }
+                Right body -> do
+                  -- create blobl link
+                  url <- H.liftEffect $ createObjectURL body
+                  -- Create an invisible link and click it to download PDF
+                  H.liftEffect $ do
+                    -- get window stuff
+                    win <- window
+                    hdoc <- document win
+                    let doc = HTMLDocument.toDocument hdoc
+
+                    -- create link
+                    aEl <- Document.createElement "a" doc
+                    case HTMLElement.fromElement aEl of
+                      Nothing -> pure unit
+                      Just aHtml -> do
+                        Element.setAttribute "href" url aEl
+                        Element.setAttribute "download" filename aEl
+                        HTMLElement.click aHtml
+                  -- deactivate the blob link after 1 sec
+                  _ <- H.fork do
+                    H.liftAff $ delay (Milliseconds 1000.0)
+                    H.liftEffect $ revokeObjectURL url
+                  pure unit
 
       Editor.RequestComments docID entryID -> do
         H.tell _comment unit (Comment.RequestComments docID entryID)
@@ -1497,6 +1525,12 @@ insertNodeIntoEdgeAtPosition path node (Edge (Node { meta, children, header })) 
                 Just res -> res
             in
               Edge (Node { meta, children: newChildren, header })
+
+stripHtmlTags :: String -> String
+stripHtmlTags input =
+  case Regex.regex "<[^>]*>" (RegexFlags.global <> RegexFlags.ignoreCase) of
+    Left _ -> input -- If regex compilation fails, return original string
+    Right htmlRegex -> Regex.replace htmlRegex "" input
 
 -- Changes the name of a node in the TOC root tree.
 -- TODO: Do we need this? This should be done in the text element associated

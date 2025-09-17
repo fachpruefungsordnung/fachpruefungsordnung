@@ -763,21 +763,14 @@ editor = connect selectTranslator $ H.mkComponent
       H.modify_ _ { discardPopup = true }
 
     Render renderType -> do
-      allLines <- H.gets _.mEditor >>= traverse \ed -> do
-        H.liftEffect $ Editor.getSession ed
-          >>= Session.getDocument
-          >>= Document.getAllLines
       case renderType of
         RenderHTML -> do
           html <- H.gets _.html
           H.raise (ClickedQuery html)
         -- TODO change this later when backend is ready
         RenderPDF -> do
-          let
-            content = case allLines of
-              Nothing -> ""
-              Just ls -> intercalate "\n" ls
-          H.raise (PostPDF content)
+          state <- H.get
+          H.raise (PostPDF state.currentVersion)
 
     ShowAllComments -> do
       state <- H.get
