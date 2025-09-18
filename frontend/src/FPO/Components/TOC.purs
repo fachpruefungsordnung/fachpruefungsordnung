@@ -55,7 +55,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , getShortTitle
   , modifyNodeRootTree
   )
-import FPO.Dto.PostTextDto (PostTextDto(..), createPostTextDto)
+import FPO.Dto.PostTextDto (PostTextDto, createPostTextDto)
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)

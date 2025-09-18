@@ -1215,12 +1215,38 @@ splitview = connect selectTranslator $ H.mkComponent
       let
         doctTree = tocTreeToDocumentTree newTree
         encodedTree = DT.encodeDocumentTree doctTree
+
+      -- TODO: This transaction actually returns an almost good-enough tree,
+      --       but unfortunately the leaves have as content just the id,
+      --       not the full TOCEntry. So we do not use the returned tree ...
       _ <- Request.postJson Right ("/docs/" <> show state.docID <> "/tree")
         encodedTree
-      -- TODO auch hier mit potentiellen Fehlern umgehen
-      H.modify_ \st -> st { tocEntries = newTree }
+
+      -- TODO: ... but instead fetch the latest tree again. A bit inefficient,
+      --       but good enough for now. We should probably change the server
+      --       endpoint to return the full tree with TOCEntries, given that this
+      --       wouldn't cause trouble elsewhere.
+      maybeTree <- Request.getJson MM.decodeDocumentWithMetaMap
+        ("/docs/" <> show state.docID <> "/tree/latest")
+
+      -- TODO: After changing the TOC (e.g., adding a node in the TOC),
+      --       we receive a new tree from the server. This code was just
+      --       yoinked from above, and we should implement just one function
+      --       or action to handle receiving a new tree and meta map from
+      --       the server.
+      case maybeTree of
+        Left err -> updateStore $ Store.AddError err
+        Right (MM.DocumentTreeWithMetaMap { tree {-, metaMap -} }) -> do
+          let
+            finalTree = documentTreeToTOCTree tree
+          H.modify_ _
+            { tocEntries = finalTree
+            }
+          H.tell _toc unit (TOC.ReceiveTOCs finalTree)
+
+      newTOCTree <- _.tocEntries <$> H.get
       handleAction UpdateVersionMapping
-      H.tell _toc unit (TOC.ReceiveTOCs newTree)
+      H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
 
 -- findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
 -- findCommentSection tocEntries tocID markerID = do
