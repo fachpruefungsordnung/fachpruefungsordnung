@@ -88,7 +88,8 @@ instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
         case mRev of
           Nothing -> do
             -- TODO: How to handle this case?
-            pure $ Wrapper { content: Content { content: "", parent: -1}, comments: [], html }
+            pure $ Wrapper
+              { content: Content { content: "", parent: -1 }, comments: [], html }
           Just rev -> do
             con <- decodeJson (fromObject rev)
             coms <- rev .: "commentAnchors"
