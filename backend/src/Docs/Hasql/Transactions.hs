@@ -180,9 +180,9 @@ putTree (Node metaData children) = do
             Hash $
                 SHA1.finalize $
                     foldr
-                        (flip updateHash)
+                        (\(child, idx) -> (`updateHash` idx) . flip updateHash child)
                         (updateHash SHA1.init metaData)
-                        childRefs
+                        (zip childRefs [0 :: Int ..])
     statement (ownHash, metaData) Statements.putTreeNode
     let toEdge ref idx =
             TreeEdge
