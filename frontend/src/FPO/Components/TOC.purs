@@ -12,7 +12,20 @@ module FPO.Components.TOC
   , tocview
   ) where
 
-import Data.Array (concat, cons, drop, head, last, length, mapWithIndex, snoc, tail, take, uncons, unsnoc)
+import Data.Array
+  ( concat
+  , cons
+  , drop
+  , head
+  , last
+  , length
+  , mapWithIndex
+  , snoc
+  , tail
+  , take
+  , uncons
+  , unsnoc
+  )
 import Data.Date (Date)
 import Data.DateTime (DateTime, adjust)
 import Data.Either (Either(..))
@@ -29,7 +42,19 @@ import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
-import FPO.Dto.DocumentDto.TreeDto (Edge(..), Meta(..), Result(..), RootTree(..), Tree(..), TreeHeader(..), findRootTree, getContent, getFullTitle, getShortTitle, modifyNodeRootTree)
+import FPO.Dto.DocumentDto.TreeDto
+  ( Edge(..)
+  , Meta(..)
+  , Result(..)
+  , RootTree(..)
+  , Tree(..)
+  , TreeHeader(..)
+  , findRootTree
+  , getContent
+  , getFullTitle
+  , getShortTitle
+  , modifyNodeRootTree
+  )
 import FPO.Dto.PostTextDto (PostTextDto(..), createPostTextDto)
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
@@ -46,7 +71,33 @@ import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
 import Parsing (runParserT)
-import Prelude (class Eq, Unit, bind, const, discard, identity, map, negate, not, pure, show, unit, when, ($), (&&), (+), (-), (/=), (<), (<<<), (<>), (==), (>), (>=), (||))
+import Prelude
+  ( class Eq
+  , Unit
+  , bind
+  , const
+  , discard
+  , identity
+  , map
+  , negate
+  , not
+  , pure
+  , show
+  , unit
+  , when
+  , ($)
+  , (&&)
+  , (+)
+  , (-)
+  , (/=)
+  , (<)
+  , (<<<)
+  , (<>)
+  , (==)
+  , (>)
+  , (>=)
+  , (||)
+  )
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
 import Web.HTML.Event.DragEvent (DragEvent, toEvent)
@@ -509,7 +560,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
               }
           , children: []
           , header: TreeHeader
-              { headerKind: "section", headerType: "supersection", heading: "New Section" }
+              { headerKind: "section"
+              , headerType: "supersection"
+              , heading: "New Section"
+              }
           }
       H.raise (AddNode path newEntry)
 
