@@ -83,11 +83,16 @@ instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
     case mEle of
       -- Normal Content
       Just ele -> do
-        rev <- ele .: "revision"
-        con <- decodeJson (fromObject rev)
-        coms <- rev .: "commentAnchors"
+        mRev <- ele .:? "revision"
         html <- obj .: "html"
-        pure $ Wrapper { content: con, comments: coms, html }
+        case mRev of
+          Nothing -> do
+            -- TODO: How to handle this case?
+            pure $ Wrapper { content: Content { content: "", parent: -1}, comments: [], html }
+          Just rev -> do
+            con <- decodeJson (fromObject rev)
+            coms <- rev .: "commentAnchors"
+            pure $ Wrapper { content: con, comments: coms, html }
       -- Draft
       Nothing -> do
         con <- decodeJson (fromObject obj)
