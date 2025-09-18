@@ -17,6 +17,7 @@ import Data.String.Regex as Regex
 import Data.String.Regex.Flags as RegexFlags
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -32,27 +33,11 @@ import FPO.Data.Request as Request
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
-import FPO.Dto.DocumentDto.TreeDto
-  ( Edge(..)
-  , RootTree(..)
-  , Tree(..)
-  , TreeHeader(..)
-  , errorMeta
-  , findRootTree
-  , modifyNodeRootTree
-  )
+import FPO.Dto.DocumentDto.MetaTree as MM
+import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..), TreeHeader(..), errorMeta, findRootTree, modifyNodeRootTree)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.Types
-  ( TOCEntry
-  , TOCTree
-  , documentTreeToTOCTree
-  , emptyTOCEntry
-  , findTOCEntry
-  , findTitleTOCEntry
-  , timeStampsVersions
-  , tocTreeToDocumentTree
-  )
+import FPO.Types (TOCEntry, TOCTree, documentTreeToTOCTree, emptyTOCEntry, findTOCEntry, findTitleTOCEntry, timeStampsVersions, tocTreeToDocumentTree)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -106,7 +91,7 @@ data Action
   -- left part is elementID, center is for left editor, right is for comparison editor
   -- outer maybe determines whether to change this part of the versionMapping,
   -- inner maybe for how. Nothing for left Version means newest version, nothing
-  -- for right version means no comparison 
+  -- for right version means no comparison
   | ModifyVersionMapping Int (Maybe (Maybe Int)) (Maybe (ElementData))
   | UpdateMSelectedTocEntry
   | SetComparison Int (Maybe Int)
@@ -655,11 +640,11 @@ splitview = connect selectTranslator $ H.mkComponent
 
     GET -> do
       s <- H.get
-      maybeTree <- Request.getJson DT.decodeDocument
+      maybeTree <- Request.getJson MM.decodeDocumentWithMetaMap
         ("/docs/" <> show s.docID <> "/tree/latest")
       case maybeTree of
         Left err -> updateStore $ Store.AddError err
-        Right tree -> do
+        Right (MM.DocumentTreeWithMetaMap { tree, metaMap }) -> do
           let
             finalTree = documentTreeToTOCTree tree
             vMapping = map
@@ -667,6 +652,7 @@ splitview = connect selectTranslator $ H.mkComponent
                   { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
               )
               finalTree
+          H.liftEffect $ log (MM.prettyPrintMetaMap metaMap)
           H.modify_ _
             { tocEntries = finalTree
             , versionMapping = vMapping

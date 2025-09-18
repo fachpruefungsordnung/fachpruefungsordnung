@@ -1,3 +1,5 @@
+-- | This module defines the document tree structure with meta information.
+-- | The meta map is not part of this (one layer above).
 module FPO.Dto.DocumentDto.TreeDto
   ( Edge(..)
   , Meta(..)
@@ -44,7 +46,7 @@ newtype TreeHeader = TreeHeader
 -- | Note: Altough the label and title are html-escaped strings, they should not
 -- |       contain any html tags except for <span> and </span>. Because there is no convenient
 -- |       way to insert raw html into Halogen rendering, we can drop these tags before
--- |       rendering (using, e.g., `getFullTitle`). This isn't a perfect solution, 
+-- |       rendering (using, e.g., `getFullTitle`). This isn't a perfect solution,
 -- |       but easier than other approaches. We could use `FPO.UI.HTML.rawHtml`, but
 -- |       this would not work for tooltips...
 newtype Meta = Meta
