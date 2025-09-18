@@ -26,6 +26,7 @@ import Docs.Tree (Node (Node), NodeHeader, Tree (Leaf, Tree))
 
 import qualified Docs.Tree as Tree
 
+import Control.Monad (mfilter)
 import Docs.MetaTree
     ( Meta (Meta)
     , MetaNode (MetaNode)
@@ -156,7 +157,7 @@ nodeToLtmlInputTree
 nodeToLtmlInputTree (Node {Tree.header, Tree.children}) =
     let kind = LSD.KindName $ Text.unpack $ Tree.headerKind header
         type_ = LSD.TypeName $ Text.unpack $ Tree.headerType header
-        heading = Tree.heading header
+        heading = mfilter (/= "") $ Tree.heading header
      in LTML.Flagged
             (TreeFlag header)
             $ LTML.TypedTree kind type_
