@@ -529,7 +529,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       gotRes <- postJson PostTextDto.decodePostTextDto
         ("/docs/" <> show s.docID <> "/text")
         ( PostTextDto.encodePostTextDto
-            (PostTextDto { identifier: 0, kind: "section", type_: "text" }) -- TODO: choose type_ according to (still missing) meta map!
+            (PostTextDto { identifier: 0, kind: "section", type_: "section" }) -- TODO: choose type_ according to (still missing) meta map!
         )
       case gotRes of
         Left _ -> pure unit -- TODO error handling
