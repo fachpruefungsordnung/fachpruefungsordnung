@@ -32,6 +32,14 @@ instance showPostTextDto :: Show PostTextDto where
   show (PostTextDto { identifier, kind }) =
     "PostTextDto { identifier: " <> show identifier <> ", kind: " <> kind <> " }"
 
+-- | Create a new PostTextDto where the identifier is not relevant.
+-- | TODO: It would be smart to differentiate between a `PostTextDto` (without id)
+-- |       and a `GetTextDto` (with id), but for simplicity we just use this one type.
+-- |       The POST requests do not care about the identifier field.
+createPostTextDto :: { kind :: String, type_ :: String } -> PostTextDto
+createPostTextDto { kind, type_ } =
+  PostTextDto { identifier: 0, kind, type_ }
+
 decodePostTextDto :: Json -> Either JsonDecodeError PostTextDto
 decodePostTextDto json = decodeJson json
 

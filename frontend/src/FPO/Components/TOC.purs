@@ -55,7 +55,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , getShortTitle
   , modifyNodeRootTree
   )
-import FPO.Dto.PostTextDto (PostTextDto(..))
+import FPO.Dto.PostTextDto (createPostTextDto)
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
@@ -528,8 +528,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
       s <- H.get
       gotRes <- postJson PostTextDto.decodePostTextDto
         ("/docs/" <> show s.docID <> "/text")
-        ( PostTextDto.encodePostTextDto
-            (PostTextDto { identifier: 0, kind: "section", type_: "section" }) -- TODO: choose type_ according to (still missing) meta map!
+        ( PostTextDto.encodePostTextDto -- TODO: choose type_ according to (still missing) meta map!
+            (createPostTextDto { kind: "section", type_: "section" })
         )
       case gotRes of
         Left _ -> pure unit -- TODO error handling
@@ -539,7 +539,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
               Leaf
                 { meta: Meta
                     { label: Nothing
-                    , title: Success $ Just "New Subsection"
+                    , title: Success $ Just "New Subsection (Meta)"
                     }
                 , node:
                     { id: PostTextDto.getID dto
@@ -556,11 +556,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
         newEntry = Node
           { meta: Meta
               { label: Nothing
-              , title: Success $ Just "New Section"
+              , title: Success $ Just "New Section (Meta)"
               }
           , children: []
           , header: TreeHeader
-              { headerKind: "section", headerType: "section", heading: "" }
+              { headerKind: "section"
+              , headerType: "supersection"
+              , heading: "New Section"
+              }
           }
       H.raise (AddNode path newEntry)
 
