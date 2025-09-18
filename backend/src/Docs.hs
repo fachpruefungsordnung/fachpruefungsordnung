@@ -89,6 +89,7 @@ import Docs.Database
     , HasIsGroupAdmin
     , HasIsSuperAdmin
     , HasLogMessage
+    , HasRollback
     )
 import qualified Docs.Database as DB
 import Docs.Document (Document, DocumentID)
@@ -186,6 +187,15 @@ squashRevisionsWithinMinutes = 15
 
 enableSquashing :: Bool
 enableSquashing = False
+
+rollbackOnError :: (HasRollback m) => m (Result a) -> m (Result a)
+rollbackOnError tx = do
+    result <- tx
+    case result of
+        Left _ -> do
+            DB.rollback
+            return result
+        Right _ -> return result
 
 logged :: (HasLogMessage m) => UserID -> Scope -> m (Result a) -> m (Result a)
 logged userID scope result = do
@@ -455,32 +465,34 @@ createTreeRevision
        , HasLogMessage m
        , HasGetTextElementRevision m
        , HasGetTreeRevision m
+       , HasRollback m
        )
     => UserID
     -> DocumentID
     -> Node TextElementID
     -> m (Result (TreeRevisionWithMetaData TextElementID))
-createTreeRevision userID docID root = logged userID Scope.docsTreeRevision $
-    runExceptT $ do
-        guardPermission Edit docID userID
-        guardExistsDocument docID
-        existsTextElement <- lift $ DB.existsTextElementInDocument docID
-        (TreeRevision header _) <- case firstFalse existsTextElement root of
-            Just textID -> throwError $ TextElementNotFound $ TextElementRef docID textID
-            Nothing -> lift $ DB.createTreeRevision userID docID root
-        newTree <-
-            getTreeRevision' userID
-                $ TreeRevisionRef
-                    docID
-                $ TreeRevision.Specific
-                    (TreeRevision.identifier header)
-        newTree' <-
-            ExceptT . pure $
-                maybe
-                    (Left (Custom "The revision I just created is gone :((("))
-                    Right
-                    newTree
-        return $ TextElement.identifier <$> newTree'
+createTreeRevision userID docID root = rollbackOnError $
+    logged userID Scope.docsTreeRevision $
+        runExceptT $ do
+            guardPermission Edit docID userID
+            guardExistsDocument docID
+            existsTextElement <- lift $ DB.existsTextElementInDocument docID
+            (TreeRevision header _) <- case firstFalse existsTextElement root of
+                Just textID -> throwError $ TextElementNotFound $ TextElementRef docID textID
+                Nothing -> lift $ DB.createTreeRevision userID docID root
+            newTree <-
+                getTreeRevision' userID
+                    $ TreeRevisionRef
+                        docID
+                    $ TreeRevision.Specific
+                        (TreeRevision.identifier header)
+            newTree' <-
+                ExceptT . pure $
+                    maybe
+                        (Left (Custom "The revision I just created is gone :((("))
+                        Right
+                        newTree
+            return $ TextElement.identifier <$> newTree'
   where
     firstFalse predicate = find (not . predicate)
 
@@ -957,6 +969,7 @@ newDefaultDocument
        , HasGetTreeRevision m
        , HasGetRevisionKey m
        , HasGetDocument m
+       , HasRollback m
        , DB.HasDraftTextRevision m
        )
     => UserID

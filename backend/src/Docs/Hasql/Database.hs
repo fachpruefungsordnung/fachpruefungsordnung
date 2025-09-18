@@ -10,7 +10,7 @@ module Docs.Hasql.Database
 import Hasql.Connection (Connection)
 import Hasql.Session (Session, SessionError)
 import qualified Hasql.Session as Session
-import Hasql.Transaction (Transaction)
+import Hasql.Transaction (Transaction, condemn)
 import Hasql.Transaction.Sessions
     ( IsolationLevel (..)
     , Mode (..)
@@ -143,6 +143,9 @@ runTransaction tx conn = do
     runUnlogged =
         (Session.run . transaction Serializable Write)
             . unHasqlTransaction
+
+instance HasRollback HasqlTransaction where
+    rollback = HasqlTransaction condemn
 
 -- access rights
 
