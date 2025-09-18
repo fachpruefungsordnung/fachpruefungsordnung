@@ -79,26 +79,20 @@ instance decodeJsonContent :: DecodeJson Content where
 instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
   decodeJson json = do
     obj <- decodeJson json
-    mEle <- obj .:? "element"
-    case mEle of
+    html <- obj .: "html"
+    ele <- obj .: "element"
+    mRev <- ele .:? "revision"
+    case mRev of
       -- Normal Content
-      Just ele -> do
-        mRev <- ele .:? "revision"
-        html <- obj .: "html"
-        case mRev of
-          Nothing -> do
-            -- TODO: How to handle this case?
-            pure $ Wrapper
-              { content: Content { content: "", parent: -1 }, comments: [], html }
-          Just rev -> do
-            con <- decodeJson (fromObject rev)
-            coms <- rev .: "commentAnchors"
-            pure $ Wrapper { content: con, comments: coms, html }
+      Just rev -> do
+        con <- decodeJson (fromObject rev)
+        coms <- rev .: "commentAnchors"
+        pure $ Wrapper { content: con, comments: coms, html }
       -- Draft
       Nothing -> do
-        con <- decodeJson (fromObject obj)
+        con <- decodeJson (fromObject ele)
         coms <- obj .: "draftCommentAnchors"
-        pure $ Wrapper { content: con, comments: coms, html: "" }
+        pure $ Wrapper { content: con, comments: coms, html }
 
 instance encodeJsonCommentAnchor :: EncodeJson CommentAnchor where
   encodeJson (CommentAnchor { id, startCol, startRow, endCol, endRow }) =
