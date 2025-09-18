@@ -198,9 +198,12 @@ failureContentWrapper :: ContentWrapper
 failureContentWrapper = Wrapper { content: failureContent, comments: [], html: "" }
 
 extractDraft
-  :: Content -> Json -> Either JsonDecodeError { content :: Content, typ :: String }
+  :: Content
+  -> Json
+  -> Either JsonDecodeError { content :: Content, typ :: String, html :: String }
 extractDraft (Content cont) json = do
   obj <- decodeJson json
+  html <- obj .: "html"
   ele <- obj .: "element"
   typ <- ele .: "type" :: Either JsonDecodeError String
   case typ of
@@ -208,15 +211,16 @@ extractDraft (Content cont) json = do
       newRev <- ele .: "newRevision"
       hdr <- newRev .: "header"
       pid <- hdr .: "identifier"
-      pure $ { content: Content $ cont { parent = pid }, typ: "noConflict" }
+      pure $ { content: Content $ cont { parent = pid }, typ: "noConflict", html }
     "draftCreated" -> do
       -- TODO update Commentmarkers
       draft <- ele .: "draft"
       newCon <- draft .: "draftContent"
-      pure $ { content: Content $ cont { content = newCon }, typ: "draftCreated" }
+      pure $
+        { content: Content $ cont { content = newCon }, typ: "draftCreated", html }
     _ -> -- "conflict"
 
-      pure { content: Content cont, typ: "conflict" }
+      pure { content: Content cont, typ: "conflict", html }
 
 convertToAnnotetedMarker
   :: CommentAnchor

@@ -867,9 +867,10 @@ editor = connect selectTranslator $ H.mkComponent
         Left err -> updateStore $ Store.AddError err
 
         -- extract and insert new parentID into newContent
-        Right { content: updatedContent, typ: typ } -> do
+        Right { content: updatedContent, typ: typ, html } -> do
 
-          H.modify_ _ { mContent = Just updatedContent }
+          H.modify_ _ { mContent = Just updatedContent, html = html }
+          H.raise $ ClickedQuery html
 
           -- Show saved icon or toast
           case isAutoSave, state.isEditorOutdated of
