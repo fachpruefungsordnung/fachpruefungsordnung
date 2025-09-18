@@ -722,9 +722,9 @@ getTextElementRevision =
                     u.name :: text?,
                     tr.content :: text?
                 from
-                    doc_text_revisions tr
-                    join doc_text_elements te on te.id = tr.text_element
-                    join users u on tr.author = u.id
+                    doc_text_elements te
+                    left join doc_text_revisions tr on te.id = tr.text_element
+                    left join users u on tr.author = u.id
                 where
                     te.document = $1 :: int8
                     and te.id = $2 :: int8
