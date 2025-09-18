@@ -1,5 +1,6 @@
 module Docs.Database
     ( HasNow (..)
+    , HasRollback (..)
     , HasCheckPermission (..)
     , HasIsGroupAdmin (..)
     , HasIsSuperAdmin (..)
@@ -59,6 +60,9 @@ import Docs.Tree (Node)
 import Docs.TreeRevision (TreeRevision, TreeRevisionHistory, TreeRevisionRef)
 import GHC.Int (Int64)
 import Logging.Logs (LogMessage, Scope, Severity)
+
+class (Monad m) => HasRollback m where
+    rollback :: m ()
 
 class (HasIsSuperAdmin m) => HasCheckPermission m where
     checkDocumentPermission :: UserID -> DocumentID -> Permission -> m Bool
