@@ -160,33 +160,54 @@ decodeDocumentWithMetaMap json = do
     , tree: root
     }
 
+-- Utility function for creating indentation
+indent :: Int -> String
+indent n = joinWith "" (map (const "  ") (1 .. n))
+
+-- | Pretty print with nice formatting and indentation
 prettyPrintMetaMap :: MetaMap -> String
 prettyPrintMetaMap metaMap =
-  intercalate "\n" $ map ppEntry metaMap
+  "MetaMap:\n" <> intercalate "\n\n" (map ppEntry metaMap)
   where
   ppEntry (Tuple fullTypeName properTypeMeta) =
-    "FullTypeName: " <> ppFullTypeName fullTypeName <> "\n => ProperTypeMeta: " <>
-      ppProperTypeMeta properTypeMeta
+    indent 1 <> "┌─ " <> ppFullTypeName fullTypeName <> "\n" <>
+    indent 1 <> "└─ " <> ppProperTypeMeta properTypeMeta 0
 
   ppFullTypeName (FullTypeName { kindName: kind, typeName: type_ }) =
     "(" <> kind <> ", " <> type_ <> ")"
 
-  ppProperTypeMeta (ProperTypeMeta (DisplayTypeName displayName) treeSyntax) =
-    "DisplayTypeName: " <> displayName <> ", TreeSyntax: " <> ppTreeSyntax treeSyntax
+  ppProperTypeMeta (ProperTypeMeta (DisplayTypeName displayName) treeSyntax) level =
+    "\"" <> displayName <> "\"\n" <>
+    indent (level + 2) <> "└─ " <> ppTreeSyntax treeSyntax (level + 1)
 
-  ppTreeSyntax = case _ of
-    LeafSyntax -> "LeafSyntax"
+  ppTreeSyntax treeSyntax level = case treeSyntax of
+    LeafSyntax ->
+      "LeafSyntax"
     TreeSyntax (HasEditableHeader hasEditableHeader) childrenOrder ->
-      "TreeSyntax(HasEditableHeader: " <> show hasEditableHeader
-        <> ", ChildrenOrder: "
-        <> ppChildrenOrder childrenOrder
-        <> ")"
+      "TreeSyntax\n" <>
+      indent (level + 2) <> "├─ HasEditableHeader: " <> show hasEditableHeader <> "\n" <>
+      indent (level + 2) <> "└─ " <> ppChildrenOrder childrenOrder (level + 1)
 
-  ppChildrenOrder = case _ of
+  ppChildrenOrder childrenOrder level = case childrenOrder of
     SequenceOrder disjunctions ->
-      "SequenceOrder[" <> intercalate ", " (map ppDisjunction disjunctions) <> "]"
+      "SequenceOrder\n" <> ppDisjunctions disjunctions (level + 1)
     StarOrder disjunction ->
-      "StarOrder[" <> ppDisjunction disjunction <> "]"
+      "StarOrder\n" <> ppSingleDisjunction disjunction (level + 1)
 
-  ppDisjunction (Disjunction arr) =
-    "[" <> intercalate ", " (map show arr) <> "]"
+  ppDisjunctions disjunctions level =
+    intercalate "\n" $ mapWithIndex (\i disj ->
+      indent (level + 2) <>
+      (if i == (length disjunctions - 1) then "└─ " else "├─ ") <>
+      "Step " <> show (i + 1) <> ": " <> ppDisjunctionContent disj (level + 2)
+    ) disjunctions
+
+  ppSingleDisjunction (Disjunction arr) level =
+    indent (level + 2) <> "└─ Options: " <> ppDisjunctionContent (Disjunction arr) (level + 2)
+
+  ppDisjunctionContent (Disjunction arr) level = case arr of
+    [singleItem] ->
+      show singleItem
+    multipleItems ->
+      "[\n" <>
+      intercalate ",\n" (map (\item -> indent (level + 2) <> show item) multipleItems) <>
+      "\n" <> indent (level + 1) <> "]"
