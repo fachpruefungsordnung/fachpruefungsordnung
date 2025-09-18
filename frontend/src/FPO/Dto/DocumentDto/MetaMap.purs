@@ -170,23 +170,32 @@ prettyPrintMetaMap metaMap =
   "MetaMap:\n" <> intercalate "\n\n" (map ppEntry metaMap)
   where
   ppEntry (Tuple fullTypeName properTypeMeta) =
-    indent 1 <> "┌─ " <> ppFullTypeName fullTypeName <> "\n" <>
-    indent 1 <> "└─ " <> ppProperTypeMeta properTypeMeta 0
+    indent 1 <> "┌─ " <> ppFullTypeName fullTypeName <> "\n"
+      <> indent 1
+      <> "└─ "
+      <> ppProperTypeMeta properTypeMeta 0
 
   ppFullTypeName (FullTypeName { kindName: kind, typeName: type_ }) =
     "(" <> kind <> ", " <> type_ <> ")"
 
   ppProperTypeMeta (ProperTypeMeta (DisplayTypeName displayName) treeSyntax) level =
-    "\"" <> displayName <> "\"\n" <>
-    indent (level + 2) <> "└─ " <> ppTreeSyntax treeSyntax (level + 1)
+    "\"" <> displayName <> "\"\n"
+      <> indent (level + 2)
+      <> "└─ "
+      <> ppTreeSyntax treeSyntax (level + 1)
 
   ppTreeSyntax treeSyntax level = case treeSyntax of
     LeafSyntax ->
       "LeafSyntax"
     TreeSyntax (HasEditableHeader hasEditableHeader) childrenOrder ->
-      "TreeSyntax\n" <>
-      indent (level + 2) <> "├─ HasEditableHeader: " <> show hasEditableHeader <> "\n" <>
-      indent (level + 2) <> "└─ " <> ppChildrenOrder childrenOrder (level + 1)
+      "TreeSyntax\n"
+        <> indent (level + 2)
+        <> "├─ HasEditableHeader: "
+        <> show hasEditableHeader
+        <> "\n"
+        <> indent (level + 2)
+        <> "└─ "
+        <> ppChildrenOrder childrenOrder (level + 1)
 
   ppChildrenOrder childrenOrder level = case childrenOrder of
     SequenceOrder disjunctions ->
@@ -195,19 +204,28 @@ prettyPrintMetaMap metaMap =
       "StarOrder\n" <> ppSingleDisjunction disjunction (level + 1)
 
   ppDisjunctions disjunctions level =
-    intercalate "\n" $ mapWithIndex (\i disj ->
-      indent (level + 2) <>
-      (if i == (length disjunctions - 1) then "└─ " else "├─ ") <>
-      "Step " <> show (i + 1) <> ": " <> ppDisjunctionContent disj (level + 2)
-    ) disjunctions
+    intercalate "\n" $ mapWithIndex
+      ( \i disj ->
+          indent (level + 2)
+            <> (if i == (length disjunctions - 1) then "└─ " else "├─ ")
+            <> "Step "
+            <> show (i + 1)
+            <> ": "
+            <> ppDisjunctionContent disj (level + 2)
+      )
+      disjunctions
 
   ppSingleDisjunction (Disjunction arr) level =
-    indent (level + 2) <> "└─ Options: " <> ppDisjunctionContent (Disjunction arr) (level + 2)
+    indent (level + 2) <> "└─ Options: " <> ppDisjunctionContent (Disjunction arr)
+      (level + 2)
 
   ppDisjunctionContent (Disjunction arr) level = case arr of
-    [singleItem] ->
+    [ singleItem ] ->
       show singleItem
     multipleItems ->
-      "[\n" <>
-      intercalate ",\n" (map (\item -> indent (level + 2) <> show item) multipleItems) <>
-      "\n" <> indent (level + 1) <> "]"
+      "[\n"
+        <> intercalate ",\n"
+          (map (\item -> indent (level + 2) <> show item) multipleItems)
+        <> "\n"
+        <> indent (level + 1)
+        <> "]"

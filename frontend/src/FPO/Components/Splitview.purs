@@ -34,10 +34,27 @@ import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
 import FPO.Dto.DocumentDto.MetaTree as MM
-import FPO.Dto.DocumentDto.TreeDto (Edge(..), RootTree(..), Tree(..), TreeHeader(..), errorMeta, findRootTree, modifyNodeRootTree)
+import FPO.Dto.DocumentDto.TreeDto
+  ( Edge(..)
+  , RootTree(..)
+  , Tree(..)
+  , TreeHeader(..)
+  , errorMeta
+  , findRootTree
+  , modifyNodeRootTree
+  )
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.Types (TOCEntry, TOCTree, documentTreeToTOCTree, emptyTOCEntry, findTOCEntry, findTitleTOCEntry, timeStampsVersions, tocTreeToDocumentTree)
+import FPO.Types
+  ( TOCEntry
+  , TOCTree
+  , documentTreeToTOCTree
+  , emptyTOCEntry
+  , findTOCEntry
+  , findTitleTOCEntry
+  , timeStampsVersions
+  , tocTreeToDocumentTree
+  )
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -644,7 +661,7 @@ splitview = connect selectTranslator $ H.mkComponent
         ("/docs/" <> show s.docID <> "/tree/latest")
       case maybeTree of
         Left err -> updateStore $ Store.AddError err
-        Right (MM.DocumentTreeWithMetaMap { tree, metaMap }) -> do
+        Right (MM.DocumentTreeWithMetaMap { tree {-, metaMap -} }) -> do
           let
             finalTree = documentTreeToTOCTree tree
             vMapping = map
@@ -652,7 +669,7 @@ splitview = connect selectTranslator $ H.mkComponent
                   { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
               )
               finalTree
-          H.liftEffect $ log (MM.prettyPrintMetaMap metaMap)
+          -- H.liftEffect $ log (MM.prettyPrintMetaMap metaMap)
           H.modify_ _
             { tocEntries = finalTree
             , versionMapping = vMapping
