@@ -49,7 +49,7 @@ module Language.Ltml.HTML.Common
     , exportLink
     , setHasErrors
 
-      -- * @ Delayed @ data type 
+      -- * @ Delayed @ data type
     , Delayed (..)
     , evalDelayed
     , returnNow
