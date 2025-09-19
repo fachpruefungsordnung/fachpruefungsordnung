@@ -43,7 +43,11 @@
           stack-wrapped
           pkgs.zlib # External C library needed by some Haskell packages
           pkgs.postgresql
+          pkgs.postgresql.dev
+          pkgs.postgresql.pg_config
           pkgs.sql-formatter
+          pkgs.pkg-config
+          pkgs.gcc
           # python
           (pkgs.python312.withPackages (python-pkgs: [
             python-pkgs.requests

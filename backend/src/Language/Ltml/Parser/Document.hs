@@ -10,14 +10,17 @@ import Language.Lsd.AST.Type.Document
 import Language.Ltml.AST.Document
     ( DocumentHeading (DocumentHeading)
     )
-import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
+import Language.Ltml.Parser.Footnote (FootnoteParser)
+import Language.Ltml.Parser.Footnote.Combinators (withSucceedingFootnotes)
 import Language.Ltml.Parser.Text (HangingTextP, hangingTextP')
 
 documentHeadingP
     :: (HangingTextP f)
     => Keyword
     -> DocumentHeadingType
-    -> Parser (f DocumentHeading)
+    -> FootnoteParser (f DocumentHeading)
 documentHeadingP kw (DocumentHeadingType tt) =
-    nLexeme $ fmap DocumentHeading <$> hangingTextP' kw tt
+    withSucceedingFootnotes $
+        nLexeme $
+            fmap DocumentHeading <$> hangingTextP' kw tt

@@ -4,12 +4,12 @@ module Language.Ltml.ToLaTeX.ToLaTeX (toLaTeX)
 where
 
 import qualified Data.Map as Map
-import qualified Data.Text.Lazy as LT
+import qualified Data.Text as T
 import Language.Ltml.AST.Label (Label (Label))
 import Language.Ltml.ToLaTeX.LaTeXType (LaTeX (..))
 import Language.Ltml.ToLaTeX.PreLaTeXType (PreLaTeX (..))
 
-toLaTeX :: Map.Map Label LT.Text -> PreLaTeX -> LaTeX
+toLaTeX :: Map.Map Label T.Text -> PreLaTeX -> LaTeX
 toLaTeX _ (IText t) = Text t
 toLaTeX _ (IRaw r) = Raw r
 toLaTeX _ (ICommandS n) = CommandS n
@@ -24,6 +24,6 @@ toLaTeX m (MissingRef l@(Label t)) =
             Command
                 "hyperlink"
                 []
-                [ Text (LT.fromStrict t)
+                [ Text t
                 , Text ref
                 ]

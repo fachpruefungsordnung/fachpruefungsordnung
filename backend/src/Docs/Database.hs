@@ -1,5 +1,6 @@
 module Docs.Database
     ( HasNow (..)
+    , HasRollback (..)
     , HasCheckPermission (..)
     , HasIsGroupAdmin (..)
     , HasIsSuperAdmin (..)
@@ -24,6 +25,7 @@ module Docs.Database
     , HasGetLogs (..)
     , HasLogMessage (..)
     , HasGetRevisionKey (..)
+    , HasDraftTextRevision (..)
     ) where
 
 import Data.Text (Text)
@@ -44,9 +46,11 @@ import Docs.TextElement
     , TextElementID
     , TextElementKind
     , TextElementRef
+    , TextElementType
     )
 import Docs.TextRevision
-    ( TextElementRevision
+    ( DraftRevision
+    , TextElementRevision
     , TextRevision
     , TextRevisionHistory
     , TextRevisionID
@@ -56,6 +60,9 @@ import Docs.Tree (Node)
 import Docs.TreeRevision (TreeRevision, TreeRevisionHistory, TreeRevisionRef)
 import GHC.Int (Int64)
 import Logging.Logs (LogMessage, Scope, Severity)
+
+class (Monad m) => HasRollback m where
+    rollback :: m ()
 
 class (HasIsSuperAdmin m) => HasCheckPermission m where
     checkDocumentPermission :: UserID -> DocumentID -> Permission -> m Bool
@@ -107,7 +114,11 @@ class
 
 class (HasCheckPermission m, HasExistsTextElement m) => HasGetTextHistory m where
     getTextHistory
-        :: TextElementRef -> Maybe UTCTime -> Int64 -> m TextRevisionHistory
+        :: TextElementRef
+        -> Maybe UTCTime
+        -> Maybe UTCTime
+        -> Int64
+        -> m TextRevisionHistory
 
 class (HasCheckPermission m, HasExistsDocument m) => HasGetTreeHistory m where
     getTreeHistory :: DocumentID -> Maybe UTCTime -> Int64 -> m TreeRevisionHistory
@@ -139,7 +150,11 @@ class (HasIsGroupAdmin m) => HasCreateDocument m where
     createDocument :: Text -> GroupID -> UserID -> m Document
 
 class (HasCheckPermission m, HasExistsDocument m) => HasCreateTextElement m where
-    createTextElement :: DocumentID -> TextElementKind -> m TextElement
+    createTextElement
+        :: DocumentID
+        -> TextElementKind
+        -> TextElementType
+        -> m TextElement
 
 class
     (HasCheckPermission m, HasExistsTextElement m, HasNow m) =>
@@ -166,6 +181,20 @@ class (HasCheckPermission m, HasExistsComment m) => HasCreateComment m where
     createComment :: UserID -> TextElementID -> Text -> m Comment
     resolveComment :: CommentID -> m ()
     createReply :: UserID -> CommentID -> Text -> m Message
+
+class
+    (HasCheckPermission m, HasExistsTextElement m) =>
+    HasDraftTextRevision m
+    where
+    createDraftTextRevision
+        :: UserID
+        -> TextElementRef
+        -> TextRevisionID
+        -> Text
+        -> Vector CommentAnchor
+        -> m DraftRevision
+    getDraftTextRevision :: UserID -> TextElementRef -> m (Maybe DraftRevision)
+    deleteDraftTextRevision :: UserID -> TextElementRef -> m ()
 
 class (Monad m) => HasLogMessage m where
     logMessage

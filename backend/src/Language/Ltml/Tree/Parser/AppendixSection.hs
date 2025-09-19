@@ -15,7 +15,6 @@ import Language.Ltml.Tree.Parser
     ( TreeParser
     , disjNFlaggedTreePF
     , nFlaggedTreePF
-    , treeError
     )
 import Language.Ltml.Tree.Parser.Document (documentTXP')
 
@@ -26,7 +25,7 @@ appendixSectionTP
 appendixSectionTP = nFlaggedTreePF aux
   where
     aux :: AppendixSectionType -> InputTree' -> TreeParser AppendixSection
-    aux _ (Leaf _) = treeError "Appendix section node is leaf"
-    aux _ (Tree (Just _) _) = treeError "Appendix section node has header"
+    aux _ (Leaf _) = fail "Appendix section node is leaf"
+    aux _ (Tree (Just _) _) = fail "Appendix section node has header"
     aux (AppendixSectionType fmt (Star t)) (Tree Nothing trees) =
         AppendixSection fmt <$> mapM (disjNFlaggedTreePF documentTXP' t) trees

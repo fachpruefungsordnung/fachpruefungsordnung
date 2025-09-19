@@ -7,6 +7,7 @@ module Language.Ltml.ToLaTeX.Format
     , emptyIdentifierFormat
     , emptyAppendixFormat
     , emptyHeadingFormat
+    , emptySectionFormat
     , formatHeading
     , formatKey
     , staticDocumentFormat
@@ -16,7 +17,7 @@ module Language.Ltml.ToLaTeX.Format
     ) where
 
 import Data.Char (chr)
-import qualified Data.Text.Lazy as LT
+import qualified Data.Text as T
 import Data.Typography
     ( FontSize (..)
     , FontStyle (..)
@@ -42,6 +43,7 @@ import Language.Lsd.AST.Type.DocumentContainer
     ( HeaderFooterFormatAtom (..)
     , HeaderFooterItemFormat (HeaderFooterItemFormat)
     )
+import Language.Lsd.AST.Type.Section (SectionFormat (SectionFormat))
 import Language.Ltml.ToLaTeX.PreLaTeXType
     ( PreLaTeX (IRaw, ISequence, IText)
     , bold
@@ -103,6 +105,9 @@ emptyAppendixFormat :: AppendixElementFormat
 emptyAppendixFormat =
     AppendixElementFormat emptyIdentifierFormat emptyTocKeyFormat emptyHeadingFormat
 
+emptySectionFormat :: SectionFormat
+emptySectionFormat = SectionFormat emptyIdentifierFormat emptyTocKeyFormat
+
 formatHeading
     :: FormatString (HeadingPlaceholderAtom b) -> PreLaTeX -> PreLaTeX -> PreLaTeX
 formatHeading (FormatString []) _ _ = mempty
@@ -110,7 +115,7 @@ formatHeading (FormatString (StringAtom s : rest)) i latex =
     ISequence (map replace s) <> formatHeading (FormatString rest) i latex
   where
     replace '\n' = linebreak
-    replace c = IText (LT.pack [c])
+    replace c = IText (T.pack [c])
 formatHeading (FormatString (PlaceholderAtom a : rest)) i latex =
     case a of
         HeadingTextPlaceholder -> latex <> formatHeading (FormatString rest) i latex
@@ -119,7 +124,7 @@ formatHeading (FormatString (PlaceholderAtom a : rest)) i latex =
 formatKey :: KeyFormat -> PreLaTeX -> PreLaTeX
 formatKey (FormatString []) _ = mempty
 formatKey (FormatString (StringAtom s : rest)) n =
-    IText (LT.pack s) <> formatKey (FormatString rest) n
+    IText (T.pack s) <> formatKey (FormatString rest) n
 formatKey (FormatString (PlaceholderAtom KeyIdentifierPlaceholder : rest)) n =
     n <> formatKey (FormatString rest) n
 
@@ -137,11 +142,7 @@ staticDocumentFormat =
             , "marginparwidth=1.75cm"
             ]
             "geometry"
-        , usepackage
-            [ "colorlinks=true"
-            , "allcolors=red"
-            ]
-            "hyperref"
+        , usepackage [] "hyperref"
         , usepackage [] "enumitem"
         , usepackage [] "tabularx"
         , usepackage ["T1"] "fontenc"
@@ -150,36 +151,37 @@ staticDocumentFormat =
         , usepackage [] "lastpage"
         , IRaw "\\pagestyle{fancy}"
         , IRaw "\\fancyhf{}"
+        , IRaw "\\setlist[enumerate]{align=left}"
         , setlistdepth
         , renewlist
         ]
 
-getIdentifier :: IdentifierFormat -> Int -> LT.Text
+getIdentifier :: IdentifierFormat -> Int -> T.Text
 getIdentifier (FormatString []) _ = mempty
 getIdentifier (FormatString (StringAtom s : rest)) i =
-    LT.pack s <> getIdentifier (FormatString rest) i
+    T.pack s <> getIdentifier (FormatString rest) i
 getIdentifier (FormatString (PlaceholderAtom a : rest)) i =
     case a of
-        Arabic -> LT.pack (show i) <> getIdentifier (FormatString rest) i
-        AlphabeticLower -> LT.pack [chr ((i - 1) `mod` 27 + 97)] <> getIdentifier (FormatString rest) i
-        AlphabeticUpper -> LT.pack [chr ((i - 1) `mod` 27 + 65)] <> getIdentifier (FormatString rest) i
+        Arabic -> T.pack (show i) <> getIdentifier (FormatString rest) i
+        AlphabeticLower -> T.pack [chr ((i - 1) `mod` 27 + 97)] <> getIdentifier (FormatString rest) i
+        AlphabeticUpper -> T.pack [chr ((i - 1) `mod` 27 + 65)] <> getIdentifier (FormatString rest) i
 
-getEnumStyle :: IdentifierFormat -> KeyFormat -> LT.Text
+getEnumStyle :: IdentifierFormat -> KeyFormat -> T.Text
 getEnumStyle ident key = "label=" <> buildKey (getEnumIdentifier' ident) key
   where
-    buildKey :: LT.Text -> KeyFormat -> LT.Text
+    buildKey :: T.Text -> KeyFormat -> T.Text
     buildKey _ ((FormatString [])) = mempty
     buildKey i ((FormatString (StringAtom s : rest))) =
-        LT.pack s <> buildKey i (FormatString rest)
+        T.pack s <> buildKey i (FormatString rest)
     buildKey
         i
         ((FormatString (PlaceholderAtom KeyIdentifierPlaceholder : rest))) =
             i <> buildKey i (FormatString rest)
 
-    getEnumIdentifier' :: IdentifierFormat -> LT.Text
+    getEnumIdentifier' :: IdentifierFormat -> T.Text
     getEnumIdentifier' (FormatString []) = mempty
     getEnumIdentifier' (FormatString (StringAtom s : rest)) =
-        LT.pack s <> getEnumIdentifier' (FormatString rest)
+        T.pack s <> getEnumIdentifier' (FormatString rest)
     getEnumIdentifier' (FormatString (PlaceholderAtom a : rest)) =
         case a of
             Arabic -> "\\arabic*" <> getEnumIdentifier' (FormatString rest)
@@ -199,7 +201,7 @@ formatHeaderFooterItem superTitle title date (HeaderFooterItemFormat fontsize st
         ISequence (map replace s) <> formatHeaderFooterFstring (FormatString rest)
       where
         replace '\n' = linebreak
-        replace c = IText (LT.pack [c])
+        replace c = IText (T.pack [c])
     formatHeaderFooterFstring (FormatString (PlaceholderAtom a : rest)) =
         case a of
             HeaderFooterSuperTitleAtom -> superTitle <> formatHeaderFooterFstring (FormatString rest)

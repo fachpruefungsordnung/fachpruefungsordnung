@@ -18,12 +18,16 @@ import Data.Time (UTCTime)
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Data.ByteString.Lazy.Char8 as LBS
+import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
 
 import Hasql.Connection (Connection)
 import qualified Hasql.Session as Session
 
 import Servant
     ( Capture
+    , Delete
+    , Description
     , Get
     , Handler
     , JSON
@@ -31,6 +35,7 @@ import Servant
     , QueryParam
     , ReqBody
     , Server
+    , Summary
     , err400
     , err403
     , err500
@@ -59,7 +64,9 @@ import Docs.TextElement
     )
 import Docs.TextRevision
     ( ConflictStatus
+    , DraftRevision
     , NewTextRevision (..)
+    , Rendered
     , TextElementRevision
     , TextRevisionHistory
     , TextRevisionRef (..)
@@ -83,6 +90,8 @@ import Docs.Comment
     , prettyPrintCommentRef
     )
 import Docs.FullDocument (FullDocument)
+import Docs.MetaTree (TreeRevisionWithMetaData)
+import Docs.Rendered (PDF, PDFBytes, Zip, ZipBytes)
 import Docs.Revision
     ( RevisionRef (RevisionRef)
     , RevisionSelector
@@ -105,7 +114,10 @@ import Server.DTOs.Documents
     , DocumentsQuery (DocumentsQuery)
     )
 import qualified Server.DTOs.Documents as Documents
-import Server.Handlers.RenderHandlers (RenderAPI, renderServer)
+import Server.Handlers.RenderHandlers
+    ( RenderAPI
+    , renderServer
+    )
 import UserManagement.Group (GroupID)
 
 type DocsAPI =
@@ -116,9 +128,12 @@ type DocsAPI =
                 :<|> PostTextElement
                 :<|> PostTextRevision
                 :<|> GetTextElementRevision
+                :<|> GetTextElementRevisionPDF
                 :<|> PostTreeRevision
                 :<|> GetTreeRevision
                 :<|> GetTreeRevisionFull
+                :<|> GetTreeRevisionPDF
+                :<|> GetTreeRevisionHTML
                 :<|> GetTextHistory
                 :<|> GetTreeHistory
                 :<|> GetDocumentHistory
@@ -127,23 +142,35 @@ type DocsAPI =
                 :<|> ResolveComment
                 :<|> PostReply
                 :<|> GetDocumentRevision
+                :<|> GetDocumentRevisionPDF
+                :<|> GetDocumentRevisionHTML
                 :<|> GetDocumentRevisionTree
                 :<|> GetDocumentRevisionText
+                :<|> GetDraftTextRevision
+                :<|> PublishDraftTextRevision
+                :<|> DiscardDraftTextRevision
                 :<|> RenderAPI
            )
 
 type PostDocument =
-    Auth AuthMethod Auth.Token
+    Summary "Create a new document"
+        :> Description "Create a new document with default content"
+        :> Auth AuthMethod Auth.Token
         :> ReqBody '[JSON] CreateDocument
-        :> Post '[JSON] FullDocument
+        :> Post '[JSON] (FullDocument (Rendered TextElementRevision))
 
 type GetDocument =
-    Auth AuthMethod Auth.Token
+    Summary "Get metadata for a document"
+        :> Description "Obtain a documents metadat"
+        :> Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> Get '[JSON] Document
 
 type GetDocuments =
-    Auth AuthMethod Auth.Token
+    Summary "Get all documents"
+        :> Description
+            "Get all documents visible for the user. For super admins, this does not contain all visible documents, as a super admin can see all documents."
+        :> Auth AuthMethod Auth.Token
         :> QueryParam "user" UserID
         :> QueryParam "group" GroupID
         :> Get '[JSON] Documents
@@ -161,8 +188,9 @@ type PostTextRevision =
         :> "text"
         :> Capture "textElementID" TextElementID
         :> "rev"
+        :> QueryParam "isAutoSave" Bool
         :> ReqBody '[JSON] CreateTextRevision
-        :> Post '[JSON] ConflictStatus
+        :> Post '[JSON] (Rendered ConflictStatus)
 
 type GetTextElementRevision =
     Auth AuthMethod Auth.Token
@@ -171,21 +199,31 @@ type GetTextElementRevision =
         :> Capture "textElementID" TextElementID
         :> "rev"
         :> Capture "textRevision" TextRevisionSelector
-        :> Get '[JSON] (Maybe TextElementRevision)
+        :> Get '[JSON] (Maybe (Rendered TextElementRevision))
+
+type GetTextElementRevisionPDF =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "rev"
+        :> Capture "textRevision" TextRevisionSelector
+        :> "pdf"
+        :> Get '[PDF] PDFBytes
 
 type PostTreeRevision =
     Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> "tree"
         :> ReqBody '[JSON] (Node TextElementID)
-        :> Post '[JSON] (TreeRevision TextElementID)
+        :> Post '[JSON] (TreeRevisionWithMetaData TextElementID)
 
 type GetTreeRevision =
     Auth AuthMethod Auth.Token
         :> Capture "documentID" DocumentID
         :> "tree"
         :> Capture "treeRevision" TreeRevisionSelector
-        :> Get '[JSON] (Maybe (TreeRevision TextElement))
+        :> Get '[JSON] (Maybe (TreeRevisionWithMetaData TextElement))
 
 type GetTreeRevisionFull =
     Auth AuthMethod Auth.Token
@@ -193,7 +231,23 @@ type GetTreeRevisionFull =
         :> "tree"
         :> Capture "treeRevision" TreeRevisionSelector
         :> "full"
-        :> Get '[JSON] (Maybe (TreeRevision TextElementRevision))
+        :> Get '[JSON] (Maybe (TreeRevisionWithMetaData TextElementRevision))
+
+type GetTreeRevisionPDF =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "tree"
+        :> Capture "treeRevision" TreeRevisionSelector
+        :> "pdf"
+        :> Get '[PDF] PDFBytes
+
+type GetTreeRevisionHTML =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "tree"
+        :> Capture "treeRevision" TreeRevisionSelector
+        :> "html"
+        :> Get '[Zip] ZipBytes
 
 type GetTextHistory =
     Auth AuthMethod Auth.Token
@@ -201,6 +255,7 @@ type GetTextHistory =
         :> "text"
         :> Capture "textElementID" TextElementID
         :> "history"
+        :> QueryParam "after" UTCTime
         :> QueryParam "before" UTCTime
         :> QueryParam "limit" Docs.Limit
         :> Get '[JSON] TextRevisionHistory
@@ -267,7 +322,23 @@ type GetDocumentRevision =
         :> Capture "documentID" DocumentID
         :> "rev"
         :> Capture "revision" RevisionSelector
-        :> Get '[JSON] FullDocument
+        :> Get '[JSON] (FullDocument TextElementRevision)
+
+type GetDocumentRevisionPDF =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "rev"
+        :> Capture "revision" RevisionSelector
+        :> "pdf"
+        :> Get '[PDF] PDFBytes
+
+type GetDocumentRevisionHTML =
+    Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "rev"
+        :> Capture "revision" RevisionSelector
+        :> "html"
+        :> Get '[Zip] ZipBytes
 
 type GetDocumentRevisionTree =
     Auth AuthMethod Auth.Token
@@ -286,6 +357,40 @@ type GetDocumentRevisionText =
         :> Capture "textElementID" TextElementID
         :> Get '[JSON] (Maybe TextElementRevision)
 
+type GetDraftTextRevision =
+    Summary "Get draft text revision"
+        :> Description
+            "Retrieve the user's draft text revision for a specific text element, if it exists"
+        :> Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "draft"
+        :> Get '[JSON] (Maybe (Rendered DraftRevision))
+
+type PublishDraftTextRevision =
+    Summary "Publish draft text revision"
+        :> Description
+            "Publish the user's draft text revision to the main revision tree, potentially creating conflicts"
+        :> Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "draft"
+        :> "publish"
+        :> Post '[JSON] (Rendered ConflictStatus)
+
+type DiscardDraftTextRevision =
+    Summary "Discard draft text revision"
+        :> Description
+            "Delete the user's draft text revision, discarding all unsaved changes"
+        :> Auth AuthMethod Auth.Token
+        :> Capture "documentID" DocumentID
+        :> "text"
+        :> Capture "textElementID" TextElementID
+        :> "draft"
+        :> Delete '[JSON] ()
+
 docsServer :: Server DocsAPI
 docsServer =
     {-    -} postDocumentHandler
@@ -294,9 +399,12 @@ docsServer =
         :<|> postTextElementHandler
         :<|> postTextRevisionHandler
         :<|> getTextElementRevisionHandler
+        :<|> getTextRevisionPDFHandler
         :<|> postTreeRevisionHandler
         :<|> getTreeRevisionHandler
         :<|> getTreeRevisionFullHandler
+        :<|> getTreeRevisionPDFHandler
+        :<|> getTreeRevisionHTMLHandler
         :<|> getTextHistoryHandler
         :<|> getTreeHistoryHandler
         :<|> getDocumentHistoryHandler
@@ -305,14 +413,19 @@ docsServer =
         :<|> resolveCommentHandler
         :<|> createReplyHandler
         :<|> getDocumentRevisionHandler
+        :<|> getDocumentRevisionPDFHandler
+        :<|> getDocumentRevisionHTMLHandler
         :<|> getDocumentRevisionTreeHandler
         :<|> getDocumentRevisionTextHandler
+        :<|> getDraftTextRevisionHandler
+        :<|> publishDraftTextRevisionHandler
+        :<|> discardDraftTextRevisionHandler
         :<|> renderServer
 
 postDocumentHandler
     :: AuthResult Auth.Token
     -> CreateDocument
-    -> Handler FullDocument
+    -> Handler (FullDocument (Rendered TextElementRevision))
 postDocumentHandler auth doc = do
     userID <- getUser auth
     withDB $
@@ -362,14 +475,17 @@ postTextElementHandler auth docID element = do
                 userID
                 docID
                 (CreateTextElement.kind element)
+                (CreateTextElement.type_ element)
 
 postTextRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TextElementID
+    -> Maybe Bool
     -> CreateTextRevision
-    -> Handler ConflictStatus
-postTextRevisionHandler auth docID textID revision = do
+    -> Handler (Rendered ConflictStatus)
+postTextRevisionHandler auth docID textID mIsAutoSave revision = do
+    let isAutoSave = fromMaybe False mIsAutoSave -- Default to False if not provided
     userID <- getUser auth
     withDB $
         runTransaction $
@@ -379,13 +495,14 @@ postTextRevisionHandler auth docID textID revision = do
                     (CreateTextRevision.parent revision)
                     (CreateTextRevision.content revision)
                     (CreateTextRevision.commentAnchors revision)
+                    isAutoSave
 
 getTextElementRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TextElementID
     -> TextRevisionSelector
-    -> Handler (Maybe TextElementRevision)
+    -> Handler (Maybe (Rendered TextElementRevision))
 getTextElementRevisionHandler auth docID textID revision = do
     userID <- getUser auth
     withDB $
@@ -393,11 +510,26 @@ getTextElementRevisionHandler auth docID textID revision = do
             Docs.getTextElementRevision userID $
                 TextRevisionRef (TextElementRef docID textID) revision
 
+getTextRevisionPDFHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> TextRevisionSelector
+    -> Handler PDFBytes
+getTextRevisionPDFHandler auth docID textID revision = do
+    userID <- getUser auth
+    withDB $
+        run $
+            Docs.getTextRevisionPDF userID $
+                TextRevisionRef
+                    (TextElementRef docID textID)
+                    revision
+
 postTreeRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> Node TextElementID
-    -> Handler (TreeRevision TextElementID)
+    -> Handler (TreeRevisionWithMetaData TextElementID)
 postTreeRevisionHandler auth docID node = do
     userID <- getUser auth
     withDB $ runTransaction $ Docs.createTreeRevision userID docID node
@@ -406,37 +538,57 @@ getTreeRevisionFullHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TreeRevisionSelector
-    -> Handler (Maybe (TreeRevision TextElementRevision))
+    -> Handler (Maybe (TreeRevisionWithMetaData TextElementRevision))
 getTreeRevisionFullHandler auth docID revision = do
     userID <- getUser auth
     withDB $
         run $
-            Docs.getTreeWithLatestTexts userID $
+            Docs.getFullTreeRevision userID $
                 TreeRevisionRef docID revision
 
 getTreeRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TreeRevisionSelector
-    -> Handler (Maybe (TreeRevision TextElement))
+    -> Handler (Maybe (TreeRevisionWithMetaData TextElement))
 getTreeRevisionHandler auth docID revision = do
     userID <- getUser auth
     withDB $ run $ Docs.getTreeRevision userID $ TreeRevisionRef docID revision
+
+getTreeRevisionPDFHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TreeRevisionSelector
+    -> Handler PDFBytes
+getTreeRevisionPDFHandler auth docID revision = do
+    userID <- getUser auth
+    withDB $ run $ Docs.getTreeRevisionPDF userID $ TreeRevisionRef docID revision
+
+getTreeRevisionHTMLHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TreeRevisionSelector
+    -> Handler ZipBytes
+getTreeRevisionHTMLHandler auth docID revision = do
+    userID <- getUser auth
+    withDB $ run $ Docs.getTreeRevisionHTML userID $ TreeRevisionRef docID revision
 
 getTextHistoryHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> TextElementID
     -> Maybe UTCTime
+    -> Maybe UTCTime
     -> Maybe Docs.Limit
     -> Handler TextRevisionHistory
-getTextHistoryHandler auth docID textID before limit = do
+getTextHistoryHandler auth docID textID after before limit = do
     userID <- getUser auth
     withDB $
         run $
             Docs.getTextHistory
                 userID
                 (TextElementRef docID textID)
+                after
                 before
                 limit
 
@@ -523,10 +675,34 @@ getDocumentRevisionHandler
     :: AuthResult Auth.Token
     -> DocumentID
     -> RevisionSelector
-    -> Handler FullDocument
+    -> Handler (FullDocument TextElementRevision)
 getDocumentRevisionHandler auth docID rev = do
     userID <- getUser auth
     withDB $ run $ Docs.getDocumentRevision userID (RevisionRef docID rev)
+
+getDocumentRevisionPDFHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> RevisionSelector
+    -> Handler PDFBytes
+getDocumentRevisionPDFHandler auth docID revision = do
+    userID <- getUser auth
+    withDB $
+        run $
+            Docs.getDocumentRevisionPDF userID $
+                RevisionRef docID revision
+
+getDocumentRevisionHTMLHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> RevisionSelector
+    -> Handler ZipBytes
+getDocumentRevisionHTMLHandler auth docID revision = do
+    userID <- getUser auth
+    withDB $
+        run $
+            Docs.getDocumentRevisionHTML userID $
+                RevisionRef docID revision
 
 getDocumentRevisionTreeHandler
     :: AuthResult Auth.Token
@@ -663,3 +839,58 @@ guardDocsResult (Left err) = throwError $ mapErr err
                         ++ prettyPrintCommentRef ref
                         ++ " not found!\n"
             }
+    mapErr (Docs.Custom msg) =
+        err400
+            { errBody =
+                LBS.pack $
+                    T.unpack msg ++ "\n"
+            }
+    mapErr (Docs.PDFError msg) =
+        err400
+            { errBody =
+                LBS.pack $
+                    T.unpack msg ++ "\n"
+            }
+    mapErr Docs.ZipHTMLError =
+        err400
+            { errBody = "Error creating html zip file.\n"
+            }
+
+-- | Get draft text revision for current user
+getDraftTextRevisionHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> Handler (Maybe (Rendered DraftRevision))
+getDraftTextRevisionHandler auth docID textID = do
+    userID <- getUser auth
+    withDB $
+        runTransaction $
+            Docs.getDraftTextRevision userID $
+                TextElementRef docID textID
+
+-- | Publish draft text revision to main revision tree
+publishDraftTextRevisionHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> Handler (Rendered ConflictStatus)
+publishDraftTextRevisionHandler auth docID textID = do
+    userID <- getUser auth
+    withDB $
+        runTransaction $
+            Docs.publishDraftTextRevision userID $
+                TextElementRef docID textID
+
+-- | Discard draft text revision
+discardDraftTextRevisionHandler
+    :: AuthResult Auth.Token
+    -> DocumentID
+    -> TextElementID
+    -> Handler ()
+discardDraftTextRevisionHandler auth docID textID = do
+    userID <- getUser auth
+    withDB $
+        runTransaction $
+            Docs.discardDraftTextRevision userID $
+                TextElementRef docID textID

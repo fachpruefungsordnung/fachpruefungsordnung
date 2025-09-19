@@ -53,7 +53,7 @@
 /* base class for comment section dragger handle */
 .ace_marker-layer .fpo-handle-start,
 .ace_marker-layer .fpo-handle-end {
-  position: relative;
+  position: absolute;
   background: transparent;   /* Text nicht überdecken */
   cursor: grab !important;   /* Hand-Cursor */
   pointer-events: auto;      /* Klickbar */
@@ -79,7 +79,7 @@
 
 /* selected comment section */
 .ace_marker-layer .my-marker.selected {
-  box-shadow: inset 0 0 0 2px #000;
+  box-shadow: inset 0 0 0 1.5px #000;
   outline: 1px dashed currentColor;
   outline-offset: -1px;
 }

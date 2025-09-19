@@ -7,6 +7,8 @@ module Docs.Revision
     , RevisionKey (..)
     , RevisionRef (..)
     , RevisionSelector (..)
+    , selectorFromTextRevision
+    , refFromTextRevision
     , specificRevision
     , latestRevisionAsOf
     , textRevisionRefFor
@@ -39,8 +41,11 @@ import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Time (UTCTime)
 import Docs.Document (DocumentID (unDocumentID))
-import Docs.TextElement (TextElementRef)
-import Docs.TextRevision (TextRevisionRef (TextRevisionRef))
+import Docs.TextElement (TextElementRef (TextElementRef))
+import Docs.TextRevision
+    ( TextRevisionRef (TextRevisionRef)
+    , TextRevisionSelector
+    )
 import qualified Docs.TextRevision as TextRevision
 import Docs.TreeRevision (TreeRevisionRef (TreeRevisionRef))
 import qualified Docs.TreeRevision as TreeRevision
@@ -83,6 +88,12 @@ data RevisionSelector
     | LatestAsOf UTCTime
     | Specific RevisionID
     deriving (Show)
+
+selectorFromTextRevision :: TextRevisionSelector -> RevisionSelector
+selectorFromTextRevision TextRevision.Latest = Latest
+selectorFromTextRevision (TextRevision.LatestAsOf time) = LatestAsOf time
+selectorFromTextRevision (TextRevision.Specific id_) =
+    Specific $ RevisionID $ TextRevision.unTextRevisionID id_
 
 instance ToJSON RevisionSelector where
     toJSON Latest = toJSON ("latest" :: Text)
@@ -153,6 +164,10 @@ data RevisionRef
     = RevisionRef DocumentID RevisionSelector
     deriving (Generic)
 
+refFromTextRevision :: TextRevisionRef -> RevisionRef
+refFromTextRevision (TextRevisionRef (TextElementRef docID _) selector) =
+    RevisionRef docID $ selectorFromTextRevision selector
+
 instance ToJSON RevisionRef
 
 instance FromJSON RevisionRef
@@ -195,7 +210,7 @@ textRevisionRefFor
             }
         )
         | textRef == forTextRef = ref
-        | undefined = TextRevisionRef forTextRef $ TextRevision.LatestAsOf ts
+        | otherwise = TextRevisionRef forTextRef $ TextRevision.LatestAsOf ts
 textRevisionRefFor forTextRef (RevisionKey {timestamp = ts}) =
     TextRevisionRef forTextRef $ TextRevision.LatestAsOf ts
 
@@ -208,6 +223,6 @@ treeRevisionRefFor
             }
         )
         | docID == forDocID = ref
-        | undefined = TreeRevisionRef forDocID $ TreeRevision.LatestAsOf ts
+        | otherwise = TreeRevisionRef forDocID $ TreeRevision.LatestAsOf ts
 treeRevisionRefFor forDocID (RevisionKey {timestamp = ts}) =
     TreeRevisionRef forDocID $ TreeRevision.LatestAsOf ts

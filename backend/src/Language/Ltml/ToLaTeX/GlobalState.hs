@@ -33,10 +33,12 @@ module Language.Ltml.ToLaTeX.GlobalState
     , sentenceCTR
     , footnoteCTR
     , appendixCTR
+    , tocLabelCTR
     , enumPosition
     , enumIdentifierFormat
     , appendixFormat
     , docHeadingFormat
+    , sectionFormat
     , onlyOneParagraph
     , isSupersection
     , flaggedParent
@@ -60,18 +62,19 @@ import Control.Monad.State (State)
 import qualified Data.DList as DList
 import Data.Map (Map, insert)
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as LT
 import Language.Lsd.AST.Format (IdentifierFormat, KeyFormat, MainHeadingFormat)
 import Language.Lsd.AST.Type.AppendixSection (AppendixElementFormat)
 import Language.Lsd.AST.Type.DocumentContainer
     ( HeaderFooterFormat (HeaderFooterFormat)
     )
+import Language.Lsd.AST.Type.Section (SectionFormat)
 import Language.Ltml.AST.Footnote (Footnote)
-import Language.Ltml.AST.Label (Label)
+import Language.Ltml.AST.Label (Label (Label))
 import Language.Ltml.ToLaTeX.Format
     ( emptyAppendixFormat
     , emptyHeadingFormat
     , emptyIdentifierFormat
+    , emptySectionFormat
     , formatHeaderFooterItem
     , formatKey
     , getIdentifier
@@ -81,6 +84,8 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     ( PreLaTeX (ISequence, IText)
     , fancyfoot
     , fancyhead
+    , hyperlink
+    , hypertarget
     , linebreak
     )
 
@@ -96,7 +101,7 @@ data GlobalState = GlobalState
     , {- since the style of the identifier is defined globally for an
          enumeration or appendix we need to pass it to the kids -}
       {- Maps for labels -}
-      _labelToRef :: Map Label LT.Text
+      _labelToRef :: Map Label T.Text
     , _labelToFootNote :: Map Label Footnote
     , {- functional list that builds the table of contents -}
       _toc :: DList.DList PreLaTeX
@@ -113,6 +118,7 @@ data CounterState = CounterState
     , _sentenceCTR :: Int
     , _footnoteCTR :: Int
     , _appendixCTR :: Int
+    , _tocLabelCTR :: Int
     }
     deriving (Show)
 
@@ -132,6 +138,7 @@ data FormatState = FormatState
     { _docHeadingFormat :: MainHeadingFormat
     , _appendixFormat :: AppendixElementFormat
     , _enumIdentifierFormat :: IdentifierFormat
+    , _sectionFormat :: SectionFormat
     }
     deriving (Show)
 
@@ -165,10 +172,15 @@ nextAppendix :: State GlobalState Int
 nextAppendix = do
     counterState . appendixCTR <+= 1
 
+nextTOCLabel :: State GlobalState Int
+nextTOCLabel = do
+    counterState . tocLabelCTR <+= 1
+
 resetCountersHard :: State GlobalState ()
 resetCountersHard = do
     counterState . supersectionCTR .= 0
     counterState . sectionCTR .= 0
+    counterState . paragraphCTR .= 0
     counterState . footnoteCTR .= 0
     counterState . appendixCTR .= 0
 
@@ -176,6 +188,7 @@ resetCountersSoft :: State GlobalState ()
 resetCountersSoft = do
     counterState . supersectionCTR .= 0
     counterState . sectionCTR .= 0
+    counterState . paragraphCTR .= 0
     counterState . footnoteCTR .= 0
 
 -- Get the next label at the current depth
@@ -196,22 +209,30 @@ descendEnumTree action = do
     enumPosition .= oldPath
     pure result
 
-insertRefLabel :: Maybe Label -> LT.Text -> State GlobalState ()
+insertRefLabel :: Maybe Label -> T.Text -> State GlobalState ()
 insertRefLabel mLabel ident =
     forM_ mLabel $ \l -> labelToRef %= insert l ident
 
 addTOCEntry
-    :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState ()
-addTOCEntry n keyident ident headingText =
+    :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState PreLaTeX
+addTOCEntry n keyident ident headingText = do
+    m <- nextTOCLabel
+    let tocLabel = Label $ T.pack $ "/" ++ show m ++ "/"
     toc
         %= ( <>
                 DList.fromList
-                    [ formatKey keyident (IText $ getIdentifier ident n)
-                    , IText " "
-                    , headingText
+                    [ hyperlink
+                        tocLabel
+                        ( ISequence
+                            [ formatKey keyident (IText $ getIdentifier ident n)
+                            , IText " "
+                            , headingText
+                            ]
+                        )
                     , linebreak
                     ]
            )
+    return $ hypertarget tocLabel mempty
 
 addAppendixHeaderEntry
     :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState ()
@@ -239,9 +260,9 @@ addHeaderFooter
     superTitle
     title
     date = do
-        let superTitle' = IText $ LT.fromStrict superTitle
-            title' = IText $ LT.fromStrict title
-            date' = IText $ LT.fromStrict date
+        let superTitle' = IText superTitle
+            title' = IText title
+            date' = IText date
             assemble items = ISequence $ map (formatHeaderFooterItem superTitle' title' date') items
         preDocument
             %= ( <>
@@ -276,6 +297,7 @@ initialCounterState =
         0
         0
         0
+        0
 
 initialFlagState :: FlagState
 initialFlagState =
@@ -292,3 +314,4 @@ initialFormatState =
         emptyHeadingFormat
         emptyAppendixFormat
         emptyIdentifierFormat
+        emptySectionFormat

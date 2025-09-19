@@ -92,42 +92,51 @@
   const TextMode = ace.require("ace/mode/text").Mode;
   const TextHighlightRules = ace.require("ace/mode/text_highlight_rules").TextHighlightRules;
 
-  function CustomHighlightRules() {
+ function CustomHighlightRules() {
   this.$rules = {
     start: [
-      // Order of rules is important
-
       // --- Comments ---
-      // special case of //*
-      { token: "comment", regex: /\/\/\*/, next: "comment" },
-      // special case of // ... /* 
-      { token: "comment", regex: /\/\/(?=.*\/\*)(.*?)(?=\/\*)/ },
-      { token: "comment", regex: /\/\*/, next: "comment" }, // /* multiline start
-      { token: "comment", regex: /\/\/.*$/ },               // -- single-line comment
+      { token: "comment.start", regex: /\/\*/, push: "comment" },
+      { token: "comment",       regex: /\/\/.*$/ },
 
       // --- Headings ---
       { token: "markup.heading.1", regex: /^# .+/ },
       { token: "markup.heading.2", regex: /^## .+/ },
 
-      // --- Style-Tags (LTML-like) ---
-      // nested tags are not supported. TODO: Maybe create custom tags for all combinations?
-      { token: "markup.bold", regex: /<\*[^>]+?>/ },        // <*bold>
-      { token: "markup.italic", regex: /<\/[^/>]+\/>/ },    // </italic/>
-      { token: "markup.underline", regex: /<_[^>]+?>/ },    // <_underline>
-      // Optional: fallback for any other style tag
-      { token: "markup.other", regex: /<[/\*_][^>]+?>/ },
+      // --- Styles: Prefix -> push Zustand (mehrzeilig bis '>') ---
+      { token: "markup.bold.tag",      regex: /<\*/,  push: "bold" },     // <* ... >
+      { token: "markup.italic.tag",    regex: /<\//,  push: "italic" },   // </ ... >
+      { token: "markup.underline.tag", regex: /<_/,   push: "underline" },// <_ ... >
+
+      // Fallback: andere <...> Tags (NACH den spezifischen Regeln!)
+      { token: "markup.other", regex: /<[^>]*>/ },
 
       // --- Keywords ---
-      { token: "keyword", regex: /\b(TODO|FIXME|NOTE)\b/ }  // TODO, FIXME, NOTE
+      { token: "keyword", regex: /\b(TODO|FIXME|NOTE)\b/ }
     ],
 
+    // Mehrzeilige Kommentare
     comment: [
-      { token: "comment", regex: /.*?\*\//, next: "start" }, 
-      { token: "comment", regex: /.*/ } 
+      { token: "comment.end", regex: /\*\//, next: "pop" },
+      { defaultToken: "comment" }
+    ],
+
+    // Mehrzeilige Styles: bis zum ersten '>' dann pop
+    bold: [
+      { token: "markup.bold.end", regex: />/, next: "pop" },
+      { defaultToken: "markup.bold" }
+    ],
+    italic: [
+      { token: "markup.italic.end", regex: />/, next: "pop" },
+      { defaultToken: "markup.italic" }
+    ],
+    underline: [
+      { token: "markup.underline.end", regex: />/, next: "pop" },
+      { defaultToken: "markup.underline" }
     ]
   };
-    this.normalizeRules();
-  }
+  this.normalizeRules();
+}
   CustomHighlightRules.prototype = Object.create(TextHighlightRules.prototype);
   CustomHighlightRules.prototype.constructor = CustomHighlightRules;
 

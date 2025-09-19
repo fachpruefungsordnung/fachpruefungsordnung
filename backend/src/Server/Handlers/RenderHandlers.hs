@@ -4,7 +4,14 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeOperators #-}
 
-module Server.Handlers.RenderHandlers (RenderAPI, renderServer, PDF, PDFByteString (..)) where
+module Server.Handlers.RenderHandlers
+    ( RenderAPI
+    , renderServer
+    , PDF
+    , PDFByteString (..)
+    , Zip
+    , ZipByteString (..)
+    ) where
 
 import Control.Exception (Exception (displayException), SomeException, try)
 import Control.Monad.IO.Class (MonadIO (liftIO))
@@ -19,7 +26,7 @@ import Data.OpenApi
     )
 import Data.Text (Text)
 import Language.Ltml.HTML.Pipeline (htmlPipeline)
-import Language.Ltml.ToLaTeX (generatePDFFromSection)
+import Language.Ltml.ToLaTeX.PDFGenerator (generatePDFFromSection)
 import Network.HTTP.Media.MediaType ((//))
 import Servant
 import Servant.Auth.Server
@@ -39,6 +46,14 @@ newtype PDFByteString = PDFByteString ByteString
 
 instance ToSchema PDFByteString where
     declareNamedSchema _ = pure $ NamedSchema (Just "PDF BinaryString") binarySchema
+
+--
+
+-- | Zip ByteString wrapper
+newtype ZipByteString = ZipByteString ByteString
+
+instance ToSchema ZipByteString where
+    declareNamedSchema _ = pure $ NamedSchema (Just "Zip BinaryString") binarySchema
 
 -- | API type for all render formats
 type RenderAPI =
@@ -64,6 +79,12 @@ data Plain
 -- | Format type for PDF
 data PDF
 
+-- | Format type for Zip
+data Zip
+
+instance Accept Zip where
+    contentType _ = "application" // "zip"
+
 instance Accept PDF where
     contentType _ = "application" // "pdf"
 
@@ -74,6 +95,9 @@ instance Accept HTML where
 -- | MIME type for plain text
 instance Accept Plain where
     contentType _ = "text" // "plain"
+
+instance MimeRender Zip ZipByteString where
+    mimeRender _ (ZipByteString bs) = bs
 
 instance MimeRender PDF PDFByteString where
     mimeRender _ (PDFByteString bs) = bs

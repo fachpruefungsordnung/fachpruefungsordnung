@@ -10,7 +10,7 @@ module Docs.Hasql.Database
 import Hasql.Connection (Connection)
 import Hasql.Session (Session, SessionError)
 import qualified Hasql.Session as Session
-import Hasql.Transaction (Transaction)
+import Hasql.Transaction (Transaction, condemn)
 import Hasql.Transaction.Sessions
     ( IsolationLevel (..)
     , Mode (..)
@@ -22,16 +22,19 @@ import Docs.Database
 import qualified UserManagement.Sessions as UserSessions
 import qualified UserManagement.Transactions as UserTransactions
 
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import qualified Docs.Hasql.Sessions as Sessions
 import qualified Docs.Hasql.Transactions as Transactions
 import Logging.Logs (Severity (..))
 import qualified Logging.Scope as Scope
 
-newtype HasqlSession a
-    = HasqlSession
+newtype HasqlSession a = HasqlSession
     { unHasqlSession :: Session a
     }
     deriving (Functor, Applicative, Monad)
+
+instance MonadIO HasqlSession where
+    liftIO = HasqlSession . liftIO
 
 run :: HasqlSession a -> Connection -> IO (Either SessionError a)
 run session conn = do
@@ -89,7 +92,7 @@ instance HasGetTextElementRevision HasqlSession where
     getTextElementRevision = HasqlSession . Sessions.getTextElementRevision
 
 instance HasGetTextHistory HasqlSession where
-    getTextHistory = ((HasqlSession .) .) . Sessions.getTextRevisionHistory
+    getTextHistory = (((HasqlSession .) .) .) . Sessions.getTextRevisionHistory
 
 instance HasGetTreeHistory HasqlSession where
     getTreeHistory = ((HasqlSession .) .) . Sessions.getTreeRevisionHistory
@@ -112,13 +115,12 @@ instance HasCreateDocument HasqlSession where
     createDocument = ((HasqlSession .) .) . Sessions.createDocument
 
 instance HasCreateTextElement HasqlSession where
-    createTextElement = (HasqlSession .) . Sessions.createTextElement
+    createTextElement = ((HasqlSession .) .) . Sessions.createTextElement
 
 instance HasLogMessage HasqlSession where
     logMessage = (((HasqlSession .) .) .) . Sessions.logMessage
 
-newtype HasqlTransaction a
-    = HasqlTransaction
+newtype HasqlTransaction a = HasqlTransaction
     { unHasqlTransaction :: Transaction a
     }
     deriving (Functor, Applicative, Monad)
@@ -141,6 +143,9 @@ runTransaction tx conn = do
     runUnlogged =
         (Session.run . transaction Serializable Write)
             . unHasqlTransaction
+
+instance HasRollback HasqlTransaction where
+    rollback = HasqlTransaction condemn
 
 -- access rights
 
@@ -178,6 +183,20 @@ instance HasGetTextElementRevision HasqlTransaction where
 instance HasGetTextElement HasqlTransaction where
     getTextElement = HasqlTransaction . Transactions.getTextElement
 
+instance HasGetTreeRevision HasqlTransaction where
+    getTreeRevision = HasqlTransaction . Transactions.getTreeRevision
+
+instance HasExistsTreeRevision HasqlTransaction where
+    existsTreeRevision = HasqlTransaction . Transactions.existsTreeRevision
+
+instance HasGetRevisionKey HasqlTransaction where
+    getRevisionKey = HasqlTransaction . Transactions.getRevisionKey
+
+instance HasGetDocument HasqlTransaction where
+    getDocument = HasqlTransaction . Transactions.getDocument
+    getDocuments = HasqlTransaction . Transactions.getDocuments
+    getDocumentsBy = (HasqlTransaction .) . Transactions.getDocumentsBy
+
 -- create
 
 instance HasCreateTextRevision HasqlTransaction where
@@ -196,6 +215,11 @@ instance HasCreateComment HasqlTransaction where
     resolveComment = HasqlTransaction . Transactions.resolveComment
     createReply = ((HasqlTransaction .) .) . Transactions.createReply
 
+instance HasDraftTextRevision HasqlTransaction where
+    createDraftTextRevision = ((((HasqlTransaction .) .) .) .) . Transactions.createDraftTextRevision
+    getDraftTextRevision = (HasqlTransaction .) . Transactions.getDraftTextRevision
+    deleteDraftTextRevision = (HasqlTransaction .) . Transactions.deleteDraftTextRevision
+
 instance HasLogMessage HasqlTransaction where
     logMessage = (((HasqlTransaction .) .) .) . Transactions.logMessage
 
@@ -203,4 +227,4 @@ instance HasCreateDocument HasqlTransaction where
     createDocument = ((HasqlTransaction .) .) . Transactions.createDocument
 
 instance HasCreateTextElement HasqlTransaction where
-    createTextElement = (HasqlTransaction .) . Transactions.createTextElement
+    createTextElement = ((HasqlTransaction .) .) . Transactions.createTextElement

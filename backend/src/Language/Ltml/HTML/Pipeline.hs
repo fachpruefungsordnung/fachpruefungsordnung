@@ -23,16 +23,7 @@ import Text.Megaparsec (MonadParsec (eof), errorBundlePretty, runParser)
 -- | Parse section and render HTML with inlined CSS
 htmlPipeline :: Text -> ByteString
 htmlPipeline input =
-    let NamedType _ _ footnoteT' = footnoteT
-        NamedType _ _ sectionT' = sectionT
-     in case runParser
-            (nSc *> runFootnoteWriterT (sectionP sectionT' eof) [footnoteT'])
-            ""
-            (input <> "\n") of
-            Left err -> renderBS $ errorHtml (errorBundlePretty err)
-            Right (nodeSection, footnoteMap) ->
-                let (body, css) = renderSectionHtmlCss nodeSection footnoteMap
-                 in renderBS $ addInlineCssHeader "Generated Document Preview" css body
+    renderBS $ addInlineCssHeader "Generated Document Preview" mempty (toHtml input)
 
 -------------------------------------------------------------------------------
 

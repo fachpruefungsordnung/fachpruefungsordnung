@@ -4,6 +4,7 @@ module Docs.TextElement
     ( TextElementID (..)
     , TextElement (..)
     , TextElementKind
+    , TextElementType
     , TextElementRef (..)
     , prettyPrintTextElementRef
     ) where
@@ -58,8 +59,7 @@ instance FromHttpApiData TextElementID where
     parseUrlPiece = (TextElementID <$>) . parseUrlPiece
 
 -- | Scoped identifier for a text element
-data TextElementRef
-    = TextElementRef
+data TextElementRef = TextElementRef
     { documentID :: DocumentID
     , textElementID :: TextElementID
     }
@@ -79,10 +79,13 @@ instance ToSchema TextElementRef
 
 type TextElementKind = Text
 
+type TextElementType = Text
+
 -- | Contains metadata about a text element.
 data TextElement = TextElement
     { identifier :: TextElementID
-    , kind :: TextElementKind
+    , textElementKind :: TextElementKind
+    , textElementType :: TextElementType
     }
     deriving (Generic)
 
