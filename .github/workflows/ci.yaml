@@ -4,8 +4,8 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "*"
+    tags-ignore:
+      - "prod"
   pull_request:
     branches:
       - "**"
@@ -51,6 +51,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Install Bullshit
+        run: apt-get install -y --no-install-recommends build-essential pkg-config
+
       - name: Check Formatting
         uses: haskell-actions/run-fourmolu@v9
         with:
@@ -68,12 +71,16 @@ jobs:
           fail-on: suggestion
 
       - name: Build Stack Project
-        uses: freckle/stack-action@v5
-        with:
-          working-directory: backend
-          stack-build-arguments: --no-test --fast
-          test: false
-          upgrade-stack: false
+        run: cd backend && stack build
+
+      # - name: Build Stack Project
+      #   uses: freckle/stack-action@v5
+      #   with:
+      #     working-directory: backend
+      #     stack-build-arguments: --no-test --fast --allow-newer
+      #     cache-prefix: v1/
+      #     test: false
+      #     upgrade-stack: false
 
   check-frontend:
     name: Check Frontend
@@ -87,7 +94,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: 20
 
       - name: Install PureScript tools
         working-directory: frontend
@@ -192,11 +199,11 @@ jobs:
           fi
           exit $RET_CODE
 
-  deploy:
-    name: Deploy to Server
+  deploy-staging:
+    name: Deploy to Staging Server
     runs-on: self-hosted
-    needs: [tests-pass]
     if: ${{ github.ref == 'refs/heads/main' }}
+    needs: [tests-pass]
     timeout-minutes: 60
     env:
       MAIL_HOST: ${{ secrets.MAIL_HOST }}
@@ -204,20 +211,20 @@ jobs:
       MAIL_ADDRESS: ${{ secrets.MAIL_ADDRESS }}
       MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
       MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
-      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_HOST: ${{ secrets.DEV_SERVER_HOST }}
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          password: ${{ secrets.REMOTE_PASSWORD }}
-          port: ${{ secrets.SSH_PORT }}
+          host: ${{ secrets.DEV_REMOTE_HOST }}
+          username: ${{ secrets.DEV_REMOTE_USER }}
+          password: ${{ secrets.DEV_REMOTE_PASSWORD }}
+          port: ${{ secrets.DEV_SSH_PORT }}
           envs: MAIL_HOST,MAIL_PORT,MAIL_ADDRESS,MAIL_USERNAME,MAIL_PASSWORD,SERVER_HOST
           command_timeout: 200m
           script: |
-            cd ${{ vars.REPO_PATH }}
+            cd ${{ vars.DEV_REPO_PATH }}
             git pull
-            docker compose -f docker-compose.yaml -f docker-compose.ssl.yaml build
+            docker compose build
             docker compose down
-            docker compose -f docker-compose.yaml -f docker-compose.ssl.yaml up -d
+            docker compose up -d

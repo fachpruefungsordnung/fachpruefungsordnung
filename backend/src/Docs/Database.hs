@@ -1,5 +1,6 @@
 module Docs.Database
     ( HasNow (..)
+    , HasRollback (..)
     , HasCheckPermission (..)
     , HasIsGroupAdmin (..)
     , HasIsSuperAdmin (..)
@@ -45,6 +46,7 @@ import Docs.TextElement
     , TextElementID
     , TextElementKind
     , TextElementRef
+    , TextElementType
     )
 import Docs.TextRevision
     ( DraftRevision
@@ -58,6 +60,9 @@ import Docs.Tree (Node)
 import Docs.TreeRevision (TreeRevision, TreeRevisionHistory, TreeRevisionRef)
 import GHC.Int (Int64)
 import Logging.Logs (LogMessage, Scope, Severity)
+
+class (Monad m) => HasRollback m where
+    rollback :: m ()
 
 class (HasIsSuperAdmin m) => HasCheckPermission m where
     checkDocumentPermission :: UserID -> DocumentID -> Permission -> m Bool
@@ -145,7 +150,11 @@ class (HasIsGroupAdmin m) => HasCreateDocument m where
     createDocument :: Text -> GroupID -> UserID -> m Document
 
 class (HasCheckPermission m, HasExistsDocument m) => HasCreateTextElement m where
-    createTextElement :: DocumentID -> TextElementKind -> m TextElement
+    createTextElement
+        :: DocumentID
+        -> TextElementKind
+        -> TextElementType
+        -> m TextElement
 
 class
     (HasCheckPermission m, HasExistsTextElement m, HasNow m) =>

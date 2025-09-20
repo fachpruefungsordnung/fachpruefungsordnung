@@ -5,9 +5,11 @@
 
 module Language.Ltml.Parser.Footnote
     ( FootnoteParser
+    , FootnoteMap
     , FootnoteWriterT
     , runFootnoteWriterT
     , mapFootnoteWriterT
+    , eitherMapFootnoteWriterT
     , footnoteP
     )
 where
@@ -16,7 +18,7 @@ import Control.Applicative (Alternative)
 import Control.Applicative.Combinators (choice)
 import Control.Monad (MonadPlus)
 import Control.Monad.Reader (ReaderT, ask, mapReaderT, runReaderT)
-import Control.Monad.State (StateT, get, mapStateT, put, runStateT)
+import Control.Monad.State (StateT, get, mapStateT, put, runStateT, state)
 import Control.Monad.Trans.Class (MonadTrans, lift)
 import Data.Map (Map)
 import qualified Data.Map as Map (empty)
@@ -56,6 +58,24 @@ mapFootnoteWriterT
     -> FootnoteWriterT n b
 mapFootnoteWriterT f (FootnoteWriterT p) =
     FootnoteWriterT $ mapReaderT (mapStateT f) p
+
+eitherMapFootnoteWriterT
+    :: (Monad n)
+    => (m (a, FootnoteMap) -> Either e (b, FootnoteMap))
+    -> FootnoteWriterT m a
+    -> FootnoteWriterT n (Either e b)
+eitherMapFootnoteWriterT f (FootnoteWriterT m) =
+    FootnoteWriterT $ mapReaderT (eitherMapStateT f) m
+
+eitherMapStateT
+    :: (Monad n)
+    => (m (a, s) -> Either e (b, s))
+    -> StateT s m a
+    -> StateT s n (Either e b)
+eitherMapStateT f p = state $ \s ->
+    case f (runStateT p s) of
+        Left e -> (Left e, s)
+        Right (y, s') -> (Right y, s')
 
 runFootnoteWriterT
     :: FootnoteWriterT m a

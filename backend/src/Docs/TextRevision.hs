@@ -14,6 +14,7 @@ module Docs.TextRevision
     , DraftRevisionID (..)
     , DraftRevision (..)
     , DraftRevisionHeader (..)
+    , Rendered (..)
     , contentsNotChanged
     , prettyPrintTextRevisionRef
     , textRevisionRef
@@ -406,3 +407,16 @@ instance ToSchema ConflictStatus where
             mempty
                 & type_ ?~ OpenApiString
                 & enum_ ?~ [toJSON val]
+
+data Rendered a
+    = Rendered
+    { element :: a
+    , html :: Text -- TODO: ByteString might be better suited!
+    }
+    deriving (Generic)
+
+instance (ToJSON a) => ToJSON (Rendered a)
+
+instance (FromJSON a) => FromJSON (Rendered a)
+
+instance (ToSchema a) => ToSchema (Rendered a)

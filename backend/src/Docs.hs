@@ -13,15 +13,20 @@ module Docs
     , createTextElement
     , createTextRevision
     , getTextElementRevision
+    , getTextRevisionPDF
     , getDocumentRevisionText
     , getTreeRevision
     , getDocumentRevisionTree
     , createTreeRevision
+    , getFullTreeRevision
     , getTextHistory
     , getTreeHistory
     , getDocumentHistory
-    , getTreeWithLatestTexts
     , getDocumentRevision
+    , getTreeRevisionPDF
+    , getTreeRevisionHTML
+    , getDocumentRevisionPDF
+    , getDocumentRevisionHTML
     , createComment
     , getComments
     , resolveComment
@@ -32,7 +37,7 @@ module Docs
     , discardDraftTextRevision
     ) where
 
-import Control.Monad (join, msum, unless)
+import Control.Monad (join, unless)
 import Control.Monad.Except (ExceptT (ExceptT), runExceptT, throwError)
 import Control.Monad.Trans.Class (lift)
 import Data.Foldable (find)
@@ -49,15 +54,17 @@ import qualified Language.Lsd.AST.Common as LSD
 import qualified Language.Ltml.Common as LTML
 import qualified Language.Ltml.Tree as LTML
 
-import Control.Applicative ((<|>))
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Aeson (FromJSON, ToJSON)
+import Data.Bifunctor (Bifunctor (bimap, first, second))
+import qualified Data.ByteString.Lazy as BL
 import Data.Maybe (fromMaybe)
 import Data.OpenApi (ToSchema)
 import qualified Data.Text as Text
+import qualified Data.Text.Encoding as TE
 import qualified Data.Vector as Vector
 import Docs.Comment (Comment, CommentRef (CommentRef), Message)
 import qualified Docs.Comment as Comment
-import Docs.Common (nodeWithoutText)
 import Docs.Database
     ( HasCheckPermission
     , HasCreateComment
@@ -75,7 +82,6 @@ import Docs.Database
     , HasGetDocumentHistory
     , HasGetLogs
     , HasGetRevisionKey
-    , HasGetTextElement
     , HasGetTextElementRevision
     , HasGetTextHistory
     , HasGetTreeHistory
@@ -83,6 +89,7 @@ import Docs.Database
     , HasIsGroupAdmin
     , HasIsSuperAdmin
     , HasLogMessage
+    , HasRollback
     )
 import qualified Docs.Database as DB
 import Docs.Document (Document, DocumentID)
@@ -90,31 +97,46 @@ import qualified Docs.Document as Document
 import Docs.DocumentHistory (DocumentHistory)
 import Docs.FullDocument (FullDocument (FullDocument))
 import qualified Docs.FullDocument as FullDocument
+import Docs.LTML
+    ( nodeToLtmlInputTreePred
+    , treeRevisionToMeta
+    )
+import Docs.MetaTree (TreeRevisionWithMetaData (TreeRevisionWithMetaData))
+import Docs.Renderable (directRenderable)
+import qualified Docs.Renderable as Renderable
+import Docs.Rendered
+    ( HTMLBytes (HTMLBytes, unHTMLBytes)
+    , PDFBytes (PDFBytes)
+    , ZipBytes (ZipBytes)
+    )
 import Docs.Revision
     ( RevisionRef (RevisionRef)
     , textRevisionRefFor
     , treeRevisionRefFor
     )
+import qualified Docs.Revision as Revision
 import Docs.TextElement
     ( TextElement
     , TextElementID
     , TextElementKind
     , TextElementRef (..)
+    , TextElementType
     )
 import qualified Docs.TextElement as TextElement
 import Docs.TextRevision
     ( ConflictStatus
     , DraftRevision
     , NewTextRevision (..)
+    , Rendered (Rendered)
     , TextElementRevision (TextElementRevision)
     , TextRevisionHistory
     , TextRevisionRef (..)
     )
 import qualified Docs.TextRevision as TextRevision
-import Docs.Tree (Edge (Edge), Node (Node), Tree, filterMapNode)
+import Docs.Tree (Node)
 import qualified Docs.Tree as Tree
 import Docs.TreeRevision
-    ( TreeRevision
+    ( TreeRevision (TreeRevision)
     , TreeRevisionHistory
     , TreeRevisionRef (..)
     )
@@ -122,6 +144,11 @@ import qualified Docs.TreeRevision as TreeRevision
 import qualified Docs.UserRef as UserRef
 import GHC.Generics (Generic)
 import GHC.Int (Int64)
+import qualified Language.Ltml.AST.DocumentContainer as LTML
+import qualified Language.Ltml.HTML as HTML
+import qualified Language.Ltml.HTML.Export as HTML
+import qualified Language.Ltml.ToLaTeX.PDFGenerator as PDF
+import qualified Language.Ltml.Tree.ToLtml as LTML
 import Logging.Logs (LogMessage, Severity (Warning))
 import Logging.Scope (Scope)
 import qualified Logging.Scope as Scope
@@ -137,6 +164,8 @@ data Error
     | TextRevisionNotFound TextRevisionRef
     | TreeRevisionNotFound TreeRevisionRef
     | CommentNotFound CommentRef
+    | PDFError Text
+    | ZipHTMLError
     | Custom Text
     deriving (Generic)
 
@@ -158,6 +187,15 @@ squashRevisionsWithinMinutes = 15
 
 enableSquashing :: Bool
 enableSquashing = False
+
+rollbackOnError :: (HasRollback m) => m (Result a) -> m (Result a)
+rollbackOnError tx = do
+    result <- tx
+    case result of
+        Left _ -> do
+            DB.rollback
+            return result
+        Right _ -> return result
 
 logged :: (HasLogMessage m) => UserID -> Scope -> m (Result a) -> m (Result a)
 logged userID scope result = do
@@ -229,11 +267,14 @@ createTextElement
     => UserID
     -> DocumentID
     -> TextElementKind
+    -> TextElementType
     -> m (Result TextElement)
-createTextElement userID docID kind = logged userID Scope.docsText $ runExceptT $ do
-    guardPermission Edit docID userID
-    guardExistsDocument docID
-    lift $ DB.createTextElement docID kind
+createTextElement userID docID kind type_ =
+    logged userID Scope.docsText $
+        runExceptT $ do
+            guardPermission Edit docID userID
+            guardExistsDocument docID
+            lift $ DB.createTextElement docID kind type_
 
 -- | Create a new 'TextRevision' in the Database.
 --
@@ -247,18 +288,19 @@ createTextRevision
        , HasGetTextElementRevision m
        , HasExistsComment m
        , HasLogMessage m
-       , HasGetTextElement m
+       , HasGetTreeRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
        , DB.HasDraftTextRevision m
        )
     => UserID
     -> NewTextRevision
-    -> m (Result ConflictStatus)
+    -> m (Result (Rendered ConflictStatus))
 createTextRevision userID revision = logged userID Scope.docsTextRevision $
     runExceptT $ do
-        let ref@(TextElementRef docID textID) = newTextRevisionElement revision
+        let ref@(TextElementRef docID _) = newTextRevisionElement revision
         guardPermission Edit docID userID
         guardExistsTextElement ref
-        textElement <- lift $ DB.getTextElement textID
         mapM_
             guardExistsComment
             (CommentRef ref . Comment.comment <$> newTextRevisionCommentAnchors revision)
@@ -271,62 +313,62 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                     <&> TextRevision.identifier . TextRevision.header
         let parentRevisionID = newTextRevisionParent revision
         let createRevision =
-                DB.createTextRevision
-                    userID
-                    ref
-                    (newTextRevisionContent revision)
-                    (newTextRevisionCommentAnchors revision)
-        lift $ do
-            now <- DB.now
-            let updateTitle rev =
-                    mapM_
-                        (DB.updateLatestTitle textID)
-                        ( textElement
-                            >>= throwTogetherTitle
-                                . (Tree.Leaf . flip TextElementRevision (Just rev))
-                        )
+                lift $
+                    DB.createTextRevision
+                        userID
+                        ref
+                        (newTextRevisionContent revision)
+                        (newTextRevisionCommentAnchors revision)
+        do
+            now <- lift DB.now
+            let render =
+                    rendered'
+                        userID
+                        (TextRevisionRef ref TextRevision.Latest)
+                        (newTextRevisionContent revision)
             case latestRevision of
                 -- first revision
                 Nothing -> do
-                    newRevision <- createRevision
-                    updateTitle newRevision
-                    return $ TextRevision.NoConflict newRevision
+                    createdRevision <- createRevision
+                    let result = TextRevision.NoConflict createdRevision
+                    render result
+                -- render . TextRevision.NoConflict <$> createRevision
                 Just latest
                     -- content has not changed? -> return latest
                     | TextRevision.contentsNotChanged latest revision ->
-                        return $ TextRevision.NoConflict latest
+                        render $ TextRevision.NoConflict latest
                     -- no conflict, and can update? -> update (squash)
                     | latestRevisionID == parentRevisionID && shouldUpdate now latest -> do
                         newRevision <-
-                            DB.updateTextRevision
-                                (identifier latest)
-                                (newTextRevisionContent revision)
-                                (newTextRevisionCommentAnchors revision)
-                        updateTitle newRevision
-                        return $ TextRevision.NoConflict newRevision
+                            lift $
+                                DB.updateTextRevision
+                                    (identifier latest)
+                                    (newTextRevisionContent revision)
+                                    (newTextRevisionCommentAnchors revision)
+                        render $ TextRevision.NoConflict newRevision
                     -- no conflict, but can not update? -> create new
                     | latestRevisionID == parentRevisionID -> do
-                        newRevision <- createRevision
-                        updateTitle newRevision
-                        return $ TextRevision.NoConflict newRevision
+                        createdRevision <- createRevision
+                        render $ TextRevision.NoConflict createdRevision
                     -- conflict
                     | otherwise ->
                         if newTextRevisionIsAutoSave revision
                             then do
                                 -- For autosave conflicts, create a draft revision
                                 draftRevision <-
-                                    DB.createDraftTextRevision
-                                        userID
-                                        ref
-                                        (identifier latest)
-                                        (newTextRevisionContent revision)
-                                        (newTextRevisionCommentAnchors revision)
-                                return $
+                                    lift $
+                                        DB.createDraftTextRevision
+                                            userID
+                                            ref
+                                            (identifier latest)
+                                            (newTextRevisionContent revision)
+                                            (newTextRevisionCommentAnchors revision)
+                                render $
                                     TextRevision.DraftCreated
                                         draftRevision
                                         (identifier latest)
                             else -- For manual save conflicts, return conflict
-                                return $
+                                render $
                                     TextRevision.Conflict $
                                         identifier latest
   where
@@ -346,16 +388,60 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                 $ timestamp latestRevision
 
 getTextElementRevision
-    :: (HasGetTextElementRevision m, HasLogMessage m)
+    :: ( HasGetTextElementRevision m
+       , HasGetTreeRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       )
     => UserID
     -> TextRevisionRef
-    -> m (Result (Maybe TextElementRevision))
+    -> m (Result (Maybe (Rendered TextElementRevision)))
 getTextElementRevision userID ref = logged userID Scope.docsTextRevision $
     runExceptT $ do
         let (TextRevisionRef (TextElementRef docID _) _) = ref
         guardPermission Read docID userID
         guardExistsTextRevision True ref
-        lift $ DB.getTextElementRevision ref
+        revision <- lift $ DB.getTextElementRevision ref
+        mapM (renderTextElementRevision userID ref) revision
+
+renderTextElementRevision
+    :: ( HasGetTreeRevision m
+       , HasLogMessage m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       )
+    => UserID
+    -> TextRevisionRef
+    -> TextElementRevision
+    -> ExceptT Error m (Rendered TextElementRevision)
+renderTextElementRevision userID ref rev = rendered' userID ref content rev
+  where
+    content = maybe "" TextRevision.content $ TextRevision.revision rev
+
+rendered'
+    :: ( HasGetTreeRevision m
+       , HasLogMessage m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       )
+    => UserID
+    -> TextRevisionRef
+    -> Text
+    -> a
+    -> ExceptT Error m (Rendered a)
+rendered' userID ref content element = do
+    html <- ExceptT $ getTextRevisionHTMLForCustomText userID ref content
+    let html' =
+            -- TODO: unHTMLBytes hier n bissl dumm, warum nicht den richtigen typen nuitzen????
+            either (const Nothing) Just . TE.decodeUtf8' . BL.toStrict . unHTMLBytes $ html
+    return $
+        Rendered
+            { TextRevision.element = element
+            , TextRevision.html = fromMaybe "" html'
+            }
 
 getDocumentRevisionText
     :: (HasGetTextElementRevision m, HasGetRevisionKey m, HasLogMessage m)
@@ -378,49 +464,263 @@ createTreeRevision
     :: ( HasCreateTreeRevision m
        , HasLogMessage m
        , HasGetTextElementRevision m
-       , HasGetTextElement m
+       , HasGetTreeRevision m
+       , HasRollback m
        )
     => UserID
     -> DocumentID
     -> Node TextElementID
-    -> m (Result (TreeRevision TextElementID))
-createTreeRevision userID docID root = logged userID Scope.docsTreeRevision $
-    runExceptT $ do
-        guardPermission Edit docID userID
-        guardExistsDocument docID
-        existsTextElement <- lift $ DB.existsTextElementInDocument docID
-        case firstFalse existsTextElement root of
-            Just textID -> throwError $ TextElementNotFound $ TextElementRef docID textID
-            Nothing -> do
-                rootWithText <- lift $ Tree.treeMapM getter' root <&> filterMapNode id
-                let updatedTitles = nodeWithTitle rootWithText
-                let mapped = nodeWithoutText updatedTitles
-                lift $ DB.createTreeRevision userID docID mapped
-  where
-    firstFalse predicate = find (not . predicate)
-    getter =
-        DB.getTextElementRevision
-            . (`TextRevisionRef` TextRevision.Latest)
-            . TextElementRef docID
-    getter' textID = do
-        bla <- getter textID
-        case bla of
-            Nothing -> do
-                textElement <- DB.getTextElement textID
-                return $ flip TextElementRevision Nothing <$> textElement
-            Just _ -> return bla
-
-getTreeRevision
-    :: (HasGetTreeRevision m, HasLogMessage m)
-    => UserID
-    -> TreeRevisionRef
-    -> m (Result (Maybe (TreeRevision TextElement)))
-getTreeRevision userID ref@(TreeRevisionRef docID _) =
+    -> m (Result (TreeRevisionWithMetaData TextElementID))
+createTreeRevision userID docID root = rollbackOnError $
     logged userID Scope.docsTreeRevision $
         runExceptT $ do
-            guardPermission Read docID userID
-            guardExistsTreeRevision True ref
-            lift $ DB.getTreeRevision ref
+            guardPermission Edit docID userID
+            guardExistsDocument docID
+            existsTextElement <- lift $ DB.existsTextElementInDocument docID
+            (TreeRevision header _) <- case firstFalse existsTextElement root of
+                Just textID -> throwError $ TextElementNotFound $ TextElementRef docID textID
+                Nothing -> lift $ DB.createTreeRevision userID docID root
+            newTree <-
+                getTreeRevision' userID
+                    $ TreeRevisionRef
+                        docID
+                    $ TreeRevision.Specific
+                        (TreeRevision.identifier header)
+            newTree' <-
+                ExceptT . pure $
+                    maybe
+                        (Left (Custom "The revision I just created is gone :((("))
+                        Right
+                        newTree
+            return $ TextElement.identifier <$> newTree'
+  where
+    firstFalse predicate = find (not . predicate)
+
+getFullTreeRevision
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
+    => UserID
+    -> TreeRevisionRef
+    -> m (Result (Maybe (TreeRevisionWithMetaData TextElementRevision)))
+getFullTreeRevision userID =
+    logged userID Scope.docsTreeRevision
+        . runExceptT
+        . getFullTreeRevision' userID
+
+getFullTreeRevision'
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
+    => UserID
+    -> TreeRevisionRef
+    -> ExceptT Error m (Maybe (TreeRevisionWithMetaData TextElementRevision))
+getFullTreeRevision' userID ref = do
+    fullTree <- getTreeWithLatestTexts userID ref
+    ExceptT . pure $ case fullTree of
+        Just tree -> bimap (Custom . Text.pack . show) Just (treeRevisionToMeta tree)
+        Nothing -> Right Nothing
+
+getTextRevisionPDF
+    :: ( HasGetTreeRevision m
+       , HasLogMessage m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , MonadIO m
+       )
+    => UserID
+    -> TextRevisionRef
+    -> m (Result PDFBytes)
+getTextRevisionPDF userID ref@(TextRevisionRef (TextElementRef _ textID) _) =
+    logged userID Scope.docsTreeRevision $ runExceptT $ do
+        guardExistsTextRevision True ref
+        let ref' = Revision.refFromTextRevision ref
+        maybeDocumentContainer <-
+            getDocumentRevisionDocumentContainerForTextElement userID ref' textID
+        documentContainer <-
+            ExceptT . pure $
+                maybe (Left $ RevisionNotFound ref') Right maybeDocumentContainer
+        toPDF documentContainer
+
+getTextRevisionHTMLForCustomText
+    :: ( HasGetTreeRevision m
+       , HasLogMessage m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       )
+    => UserID
+    -> TextRevisionRef
+    -> Text
+    -> m (Result HTMLBytes)
+getTextRevisionHTMLForCustomText userID ref@(TextRevisionRef (TextElementRef _ textID) _) text =
+    logged userID Scope.docsTreeRevision $ runExceptT $ do
+        guardExistsTextRevision True ref
+        let ref' = Revision.refFromTextRevision ref
+        maybeDocumentContainer <-
+            getDocumentRevisionDocumentContainerForCustomText userID ref' textID text
+        return $
+            HTMLBytes $
+                maybe "" HTML.renderHtmlCssBS maybeDocumentContainer
+
+getTreeRevisionPDF
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m, MonadIO m)
+    => UserID
+    -> TreeRevisionRef
+    -> m (Result PDFBytes)
+getTreeRevisionPDF userID ref = logged userID Scope.docsTreeRevision $ runExceptT $ do
+    maybeDocumentContainer <- getTreeRevisionDocumentContainer userID ref
+    documentContainer <-
+        ExceptT . pure $
+            maybe (Left $ TreeRevisionNotFound ref) Right maybeDocumentContainer
+    toPDF documentContainer
+
+getTreeRevisionHTML
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m, MonadIO m)
+    => UserID
+    -> TreeRevisionRef
+    -> m (Result ZipBytes)
+getTreeRevisionHTML userID ref = logged userID Scope.docsTreeRevision $ runExceptT $ do
+    maybeDocumentContainer <- getTreeRevisionDocumentContainer userID ref
+    documentContainer <-
+        ExceptT . pure $
+            maybe (Left $ TreeRevisionNotFound ref) Right maybeDocumentContainer
+    toHTML documentContainer
+
+toPDF
+    :: (MonadIO m)
+    => LTML.Flagged' LTML.DocumentContainer
+    -> ExceptT Error m PDFBytes
+toPDF documentContainer = do
+    pdf <- liftIO $ PDF.generatePDF documentContainer
+    ExceptT . pure $ bimap (PDFError . Text.pack) PDFBytes pdf
+
+toHTML
+    :: (MonadIO m)
+    => LTML.Flagged' LTML.DocumentContainer
+    -> ExceptT Error m ZipBytes
+toHTML documentContainer = do
+    zipBytes <- liftIO $ HTML.renderZip documentContainer
+    ExceptT . pure $ maybe (Left ZipHTMLError) (Right . ZipBytes) zipBytes
+
+getTreeRevisionDocumentContainer
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
+    => UserID
+    -> TreeRevisionRef
+    -> ExceptT Error m (Maybe (LTML.Flagged' LTML.DocumentContainer))
+getTreeRevisionDocumentContainer userID ref = do
+    fullRevision <- getTreeWithLatestTexts userID ref
+    ExceptT . pure $
+        maybe
+            (Right Nothing)
+            (second Just . toDocumentContainer)
+            fullRevision
+
+toDocumentContainer
+    :: TreeRevision TextElementRevision
+    -> Result (LTML.Flagged' LTML.DocumentContainer)
+toDocumentContainer fullRevision =
+    first (Custom . Text.pack . show) $
+        LTML.treeToLtml $
+            toInputTree fullRevision
+  where
+    toInputTree (TreeRevision _ node) =
+        nodeToLtmlInputTreePred (const True) (const True) node
+
+toDocumentContainerForCustomText
+    :: TextElementID
+    -> Text
+    -> TreeRevision TextElementRevision
+    -> Result (LTML.Flagged' LTML.DocumentContainer)
+toDocumentContainerForCustomText textID text fullRevision =
+    let overridenRevision = override <$> fullRevision
+     in first (Custom . Text.pack . show) $
+            LTML.treeToLtml $
+                toInputTree overridenRevision
+  where
+    toInputTree (TreeRevision _ node) =
+        nodeToLtmlInputTreePred
+            (const False)
+            ((textID ==) . Renderable.identifier)
+            node
+    override rev@(TextElementRevision textElement _) =
+        let id_ = TextElement.identifier textElement
+         in if id_ == textID
+                then
+                    (directRenderable rev id_)
+                        { Renderable.content = text
+                        }
+                else directRenderable rev id_
+
+toDocumentContainerForTextElement
+    :: TextElementID
+    -> TreeRevision TextElementRevision
+    -> Result (LTML.Flagged' LTML.DocumentContainer)
+toDocumentContainerForTextElement teID fullRevision =
+    first (Custom . Text.pack . show) $
+        LTML.treeToLtml $
+            toInputTree fullRevision
+  where
+    toInputTree (TreeRevision _ node) =
+        nodeToLtmlInputTreePred
+            (const False)
+            ((teID ==) . TextElement.identifier . TextRevision.textElement)
+            node
+
+getDocumentRevisionDocumentContainerForTextElement
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       )
+    => UserID
+    -> RevisionRef
+    -> TextElementID
+    -> ExceptT Error m (Maybe (LTML.Flagged' LTML.DocumentContainer))
+getDocumentRevisionDocumentContainerForTextElement userID ref textID = do
+    fullRevision <- getDocumentRevision' userID ref <&> FullDocument.body
+    ExceptT . pure $
+        maybe
+            (Right Nothing)
+            (second Just . toDocumentContainerForTextElement textID)
+            fullRevision
+
+getDocumentRevisionDocumentContainerForCustomText
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       )
+    => UserID
+    -> RevisionRef
+    -> TextElementID
+    -> Text
+    -> ExceptT Error m (Maybe (LTML.Flagged' LTML.DocumentContainer))
+getDocumentRevisionDocumentContainerForCustomText userID ref textID text = do
+    fullRevision <- getDocumentRevision' userID ref <&> FullDocument.body
+    ExceptT . pure $
+        maybe
+            (Right Nothing)
+            (second Just . toDocumentContainerForCustomText textID text)
+            fullRevision
+
+getTreeRevision
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
+    => UserID
+    -> TreeRevisionRef
+    -> m (Result (Maybe (TreeRevisionWithMetaData TextElement)))
+getTreeRevision userID =
+    logged userID Scope.docsTreeRevision
+        . runExceptT
+        . getTreeRevision' userID
+
+getTreeRevision'
+    :: (HasGetTreeRevision m, HasLogMessage m, HasGetTextElementRevision m)
+    => UserID
+    -> TreeRevisionRef
+    -> ExceptT Error m (Maybe (TreeRevisionWithMetaData TextElement))
+getTreeRevision' userID ref =
+    -- ich möchte nicht drüber reden.
+    ((TextRevision.textElement <$>) <$>) <$> getFullTreeRevision' userID ref
 
 getDocumentRevisionTree
     :: (HasGetTreeRevision m, HasGetRevisionKey m, HasLogMessage m)
@@ -481,8 +781,8 @@ getTreeWithLatestTexts
     :: (HasGetTreeRevision m, HasGetTextElementRevision m, HasLogMessage m)
     => UserID
     -> TreeRevisionRef
-    -> m (Result (Maybe (TreeRevision TextElementRevision)))
-getTreeWithLatestTexts userID revision = logged userID Scope.docs $ runExceptT $ do
+    -> ExceptT Error m (Maybe (TreeRevision TextElementRevision))
+getTreeWithLatestTexts userID revision = do
     guardPermission Read docID userID
     guardExistsDocument docID
     guardExistsTreeRevision True revision
@@ -498,6 +798,68 @@ getTreeWithLatestTexts userID revision = logged userID Scope.docs $ runExceptT $
     getter' = (<&> (>>= elementRevisionToRevision)) . getter
     elementRevisionToRevision (TextElementRevision _ rev) = rev
 
+getDocumentRevisionPDF
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       , MonadIO m
+       )
+    => UserID
+    -> RevisionRef
+    -> m (Result PDFBytes)
+getDocumentRevisionPDF userID ref =
+    logged userID Scope.docsTreeRevision $ runExceptT $ do
+        maybeDocumentContainer <- getDocumentRevisionDocumentContainer userID ref
+        documentContainer <-
+            ExceptT . pure $
+                maybe
+                    (Left $ RevisionNotFound ref)
+                    Right
+                    maybeDocumentContainer
+        toPDF documentContainer
+
+getDocumentRevisionHTML
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       , MonadIO m
+       )
+    => UserID
+    -> RevisionRef
+    -> m (Result ZipBytes)
+getDocumentRevisionHTML userID ref =
+    logged userID Scope.docsTreeRevision $ runExceptT $ do
+        maybeDocumentContainer <- getDocumentRevisionDocumentContainer userID ref
+        documentContainer <-
+            ExceptT . pure $
+                maybe
+                    (Left $ RevisionNotFound ref)
+                    Right
+                    maybeDocumentContainer
+        toHTML documentContainer
+
+getDocumentRevisionDocumentContainer
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       )
+    => UserID
+    -> RevisionRef
+    -> ExceptT Error m (Maybe (LTML.Flagged' LTML.DocumentContainer))
+getDocumentRevisionDocumentContainer userID ref = do
+    fullRevision <- getDocumentRevision' userID ref <&> FullDocument.body
+    ExceptT . pure $
+        maybe
+            (Right Nothing)
+            (second Just . toDocumentContainer)
+            fullRevision
+
 getDocumentRevision
     :: ( HasGetTreeRevision m
        , HasGetTextElementRevision m
@@ -507,23 +869,35 @@ getDocumentRevision
        )
     => UserID
     -> RevisionRef
-    -> m (Result FullDocument)
-getDocumentRevision userID ref@(RevisionRef docID _) =
-    logged userID Scope.docs $ runExceptT $ do
-        guardPermission Read docID userID
-        guardExistsDocument docID
-        maybeDocument <- lift $ DB.getDocument docID
-        document <- maybe (throwError $ DocumentNotFound docID) pure maybeDocument
-        lift $ do
-            key <- DB.getRevisionKey ref
-            result <- mapM (DB.getTreeRevision . treeRevisionRefFor docID) key
-            let tree = join result
-            body <- mapM (TreeRevision.withTextRevisions getter') tree
-            return
-                FullDocument
-                    { FullDocument.header = document
-                    , FullDocument.body = body
-                    }
+    -> m (Result (FullDocument TextElementRevision))
+getDocumentRevision userID =
+    logged userID Scope.docs . runExceptT . getDocumentRevision' userID
+
+getDocumentRevision'
+    :: ( HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasLogMessage m
+       )
+    => UserID
+    -> RevisionRef
+    -> ExceptT Error m (FullDocument TextElementRevision)
+getDocumentRevision' userID ref@(RevisionRef docID _) = do
+    guardPermission Read docID userID
+    guardExistsDocument docID
+    maybeDocument <- lift $ DB.getDocument docID
+    document <- maybe (throwError $ DocumentNotFound docID) pure maybeDocument
+    lift $ do
+        key <- DB.getRevisionKey ref
+        result <- mapM (DB.getTreeRevision . treeRevisionRefFor docID) key
+        let tree = join result
+        body <- mapM (TreeRevision.withTextRevisions getter') tree
+        return
+            FullDocument
+                { FullDocument.header = document
+                , FullDocument.body = body
+                }
   where
     getter textID = do
         key <- DB.getRevisionKey ref
@@ -592,14 +966,17 @@ newDefaultDocument
        , HasGetTextElementRevision m
        , HasExistsComment m
        , HasCreateTreeRevision m
-       , HasGetTextElement m
+       , HasGetTreeRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasRollback m
        , DB.HasDraftTextRevision m
        )
     => UserID
     -> GroupID
     -> Text
     -> LTML.FlaggedInputTree'
-    -> m (Result FullDocument)
+    -> m (Result (FullDocument (Rendered TextElementRevision)))
 newDefaultDocument userID groupID title tree = runExceptT $ do
     doc <- ExceptT $ createDocument userID groupID title
     let docID = Document.identifier doc
@@ -611,14 +988,15 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
                         Tree.Tree $
                             Tree.Node
                                 (Tree.NodeHeader (Text.pack kind) (Text.pack type_) heading)
-                                ( (\c -> Edge (fromMaybe "" (throwTogetherTitle c)) c)
-                                    <$> emplacedChildren
-                                )
+                                emplacedChildren
                 (LTML.Leaf text) -> do
                     textElement <-
                         ExceptT $
-                            createTextElement userID docID $
-                                Text.pack kind
+                            createTextElement
+                                userID
+                                docID
+                                (Text.pack kind)
+                                (Text.pack type_)
                     let textID = TextElement.identifier textElement
                     let textRev = TextElementRef docID textID
                     textRevision <-
@@ -631,62 +1009,28 @@ newDefaultDocument userID groupID title tree = runExceptT $ do
                                     , newTextRevisionCommentAnchors = Vector.empty
                                     , newTextRevisionIsAutoSave = False -- Document creation is not autosave
                                     }
-                    case textRevision of
+                    case TextRevision.element textRevision of
                         TextRevision.NoConflict revision ->
-                            return $ Tree.Leaf $ TextElementRevision textElement $ Just revision
+                            return $
+                                Tree.Leaf $
+                                    Rendered
+                                        (TextElementRevision textElement $ Just revision)
+                                        (TextRevision.html textRevision)
                         _ ->
                             throwError $ Custom "Text Revision Conflict During Initial Document Creation."
     root <- emplaceTexts tree
     case root of
         Tree.Tree node -> do
-            TreeRevision.TreeRevision header _ <-
+            TreeRevisionWithMetaData header _ <-
                 ExceptT $
                     createTreeRevision
                         userID
                         docID
-                        (TextElement.identifier . TextRevision.textElement <$> node)
+                        ( (TextElement.identifier . TextRevision.textElement) . TextRevision.element
+                            <$> node
+                        )
             return $ FullDocument doc $ Just $ TreeRevision.TreeRevision header node
         Tree.Leaf _ -> throwError $ Custom "Root is leaf :/"
-
-nodeWithTitle :: Node TextElementRevision -> Node TextElementRevision
-nodeWithTitle (Node content children) = Node content (edgeWithTitle <$> children)
-
-edgeWithTitle :: Edge TextElementRevision -> Edge TextElementRevision
-edgeWithTitle edge =
-    edge
-        { Tree.title =
-            fromMaybe (Tree.title edge) $ throwTogetherTitle $ Tree.content edge
-        }
-
--- Temporary function to get a somewhat usable title.
--- Should be replaced by a function provided by the language team later on.
--- Langfristig sollten die Titel wahrscheinlich beim Laden des Baums aus der Datenbank
--- angefragt werden :)
-throwTogetherTitle :: Tree TextElementRevision -> Maybe Text
-throwTogetherTitle x =
-    typeTitle x
-        <|> ((msum . (maybeTitle <$>) . Text.lines) =<< getContent x)
-  where
-    typeTitle :: Tree TextElementRevision -> Maybe Text
-    typeTitle (Tree.Tree (Node header _)) =
-        case (Tree.headerKind header, Tree.headerType header) of
-            (_, "appendix") -> Just "Appendix"
-            (_, "attachments") -> Just "Anlagen"
-            ("document-mainbody", "inner") -> Just "Hauptteil"
-            _ -> Nothing
-    typeTitle _ = Nothing
-    maybeTitle :: Text -> Maybe Text
-    maybeTitle txt
-        | "§" `Text.isPrefixOf` stripped = Just stripped
-        | "!" `Text.isPrefixOf` stripped = Just stripped
-        | "[intro]" `Text.isPrefixOf` stripped = Just "Intro"
-        | "[extro]" `Text.isPrefixOf` stripped = Just "Extro"
-        | otherwise = Nothing
-      where
-        stripped = Text.strip txt
-    getContent :: Tree TextElementRevision -> Maybe Text
-    getContent (Tree.Leaf (TextElementRevision _ rev)) = TextRevision.content <$> rev
-    getContent (Tree.Tree (Tree.Node header _)) = Tree.heading header
 
 -- guards
 
@@ -797,14 +1141,34 @@ guardExistsComment ref@(CommentRef textRef _) = do
 -- Returns Nothing if no draft exists for this user/element combination.
 -- Drafts are user-specific and element-specific (one draft per user per text element).
 getDraftTextRevision
-    :: (DB.HasDraftTextRevision m, HasLogMessage m)
+    :: ( DB.HasDraftTextRevision m
+       , HasLogMessage m
+       , HasGetTreeRevision m
+       , HasGetTextElementRevision m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       )
     => UserID
     -> TextElementRef
-    -> m (Result (Maybe DraftRevision))
+    -> m (Result (Maybe (Rendered DraftRevision)))
 getDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Scope.docsTextRevision $ runExceptT $ do
+    -- let render =
+    --         rendered'
+    --             userID
+    --             (TextRevisionRef ref TextRevision.Latest)
+    --             (newTextRevisionContent revision)
     guardPermission Read docID userID
     guardExistsTextElement ref
-    lift $ DB.getDraftTextRevision userID ref
+    revision <- lift $ DB.getDraftTextRevision userID ref
+    mapM
+        ( \rev ->
+            rendered'
+                userID
+                (TextRevisionRef ref TextRevision.Latest)
+                (TextRevision.draftContent rev)
+                rev
+        )
+        revision
 
 -- | Publish a draft text revision to the main revision tree.
 -- This attempts to create a regular text revision from the draft content.
@@ -815,12 +1179,14 @@ publishDraftTextRevision
        , HasCreateTextRevision m
        , HasGetTextElementRevision m
        , HasExistsComment m
+       , HasGetRevisionKey m
+       , HasGetDocument m
+       , HasGetTreeRevision m
        , HasLogMessage m
-       , HasGetTextElement m
        )
     => UserID
     -> TextElementRef
-    -> m (Result ConflictStatus)
+    -> m (Result (Rendered ConflictStatus))
 publishDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Scope.docsTextRevision $ runExceptT $ do
     guardPermission Edit docID userID
     guardExistsTextElement ref
@@ -846,7 +1212,7 @@ publishDraftTextRevision userID ref@(TextElementRef docID _) = logged userID Sco
             result <- ExceptT $ createTextRevision userID newRevision
 
             -- If successful, delete the draft
-            case result of
+            case TextRevision.element result of
                 TextRevision.NoConflict _ -> do
                     lift $ DB.deleteDraftTextRevision userID ref
                     return result

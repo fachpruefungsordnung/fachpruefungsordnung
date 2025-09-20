@@ -32,8 +32,10 @@ decodeDocument
   :: forall a. DecodeJson a => Json -> Either JsonDecodeError (DocumentTree a)
 decodeDocument json = do
   obj <- decodeJson json
-  -- TODO: We are ignoring `header` for now, but we might need it later.
-  root <- obj .: "root"
+  -- TODO: We are ignoring `revisionHeader` for now, but we might need it later.
+  --       We will also need the `metaMap` here!
+  rev <- obj .: "revision"
+  root <- rev .: "root"
   decodeJson root
 
 -- | Encodes a `DocumentTree NodeHeader` as a `DocumentTree TextElementID`.
