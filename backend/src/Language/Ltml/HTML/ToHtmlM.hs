@@ -724,7 +724,7 @@ renderToc (Just (TocFormat (TocHeading title))) entryFunc buttonFunc globalState
 
         -- \| [Delayed (Html ())] -> Delayed [Html ()] -> Delayed (Html ())
         tableBody = tbody_ . mconcat <$> sequence tocEntries
-     in (div_ <#> Class.TocContainer) . (table_ <#> Class.TableOfContents)
+     in (nav_ <#> Class.TocContainer) . (table_ <#> Class.TableOfContents)
             <$> (pure colGroup <> pure tableHead <> tableBody)
   where
     -- \| Build <tr><td>id</td> <td>title</td></tr> and wrap id and title seperatly

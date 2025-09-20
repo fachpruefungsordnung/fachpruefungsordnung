@@ -38,7 +38,7 @@ renderSectionHtmlCss
 renderSectionHtmlCss section fnMap =
     -- \| Render with given footnote context
     let readerState = initReaderState {footnoteMap = fnMap}
-        (delayedHtml, finalState) = runState (runReaderT (toHtmlM section) readerState) initGlobalState
+        (delayedHtml, finalState) = runReaderState (toHtmlM section) readerState initGlobalState
      in (evalDelayed finalState delayedHtml, mainStylesheet (enumStyles finalState))
 
 -- | Render @Flagged' DocumentContainer@ to @Html ()@ and @Css@
@@ -51,7 +51,7 @@ renderHtmlCssWith
     :: ReaderState -> GlobalState -> Flagged' DocumentContainer -> (Html (), Css)
 renderHtmlCssWith readerState globalState docContainer =
     -- \| Render with given footnote context
-    let (delayedHtml, finalState) = runState (runReaderT (toHtmlM docContainer) readerState) globalState
+    let (delayedHtml, finalState) = runReaderState (toHtmlM docContainer) readerState globalState
      in (evalDelayed finalState delayedHtml, mainStylesheet (enumStyles finalState))
 
 -- | Render a @Flagged' DocumentContainer@ with given states to main HTML, main CSS,
@@ -106,13 +106,13 @@ renderHtmlCssExport backPath readerState globalState exportReaderState docCon =
             then Nothing
             else Just (mainHtml, css, sections, rawMainDocTitle)
 
--------------------------------------------------------------------------------
-
 -- | Renders a @Flagged' DocumentContainer@ to HTML 'ByteString' with inlined CSS
 renderHtmlCssBS :: Flagged' DocumentContainer -> ByteString
 renderHtmlCssBS docCon =
     let (body, css) = renderHtmlCss docCon
      in renderBS $ addInlineCssHeader "Generated Document Preview" css body
+
+-------------------------------------------------------------------------------
 
 -- | Renders a global ToC (including appendices) as a list of
 --   either (@Maybe@ idHtml, @Result@ titleHtml) or a phantom result type
