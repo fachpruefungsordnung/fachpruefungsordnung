@@ -52,8 +52,6 @@ import FPO.Types
   , emptyTOCEntry
   , findTOCEntry
   , findTitleTOCEntry
-  , replaceTOCEntry
-  , timeStampsVersions
   , tocTreeToDocumentTree
   )
 import Halogen as H
