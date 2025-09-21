@@ -1,33 +1,29 @@
 module FPO.Data.Time
   ( adjustDateTime
   {-   , getEditTimestamp -}
+  , dateToDatetime
   , formatAbsoluteTimeDetailed
   , formatRelativeTime
-  , dateToDatetime
+  , defaultFormatter
+  , timeStampsVersions
   , genericDatetime
   ) where
 
 import Prelude
 
-{- import Data.Bounded (bottom) -}
 import Data.DateTime
   ( Date
   , DateTime(..)
   , Time(..)
   , adjust
   , canonicalDate
-  , date
-  , day
   , diff
-  , hour
-  , minute
-  , month
-  , second
-  , time
-  , year
   )
-import Data.Enum (fromEnum)
+import Data.Either (Either(..))
+import Data.Formatter.DateTime (Formatter, format, formatDateTime)
+import Data.Formatter.DateTime as FDT
 import Data.Int (floor)
+import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Time.Duration (class Duration, Seconds(..), negateDuration, toDuration)
 
@@ -60,22 +56,29 @@ getEditTimestamp = DocDate.docDateToDateTime <<< DocumentHeader.getLastEdited -}
 formatAbsoluteTimeDetailed :: forall d. Duration d => Maybe d -> DateTime -> String
 formatAbsoluteTimeDetailed offset dateTime =
   let
-    mDTime = case offset of
+    dTime = fromMaybe dateTime case offset of
       Just oSet -> adjust (negateDuration oSet) dateTime
       Nothing -> Just dateTime
-    dTime = fromMaybe
-      dateTime
-      mDTime
-    d' = date dTime
-    t' = time dTime
-    y = show $ fromEnum $ year d'
-    m = padZero $ fromEnum $ month d'
-    d = padZero $ fromEnum $ day d'
-    h = padZero $ fromEnum $ hour t'
-    min = padZero $ fromEnum $ minute t'
-    s = padZero $ fromEnum $ second t'
   in
-    d <> "." <> m <> "." <> y <> " " <> h <> ":" <> min <> ":" <> s
+    case formatDateTime "YYYY.MMM.DD HH:mm:ss" dTime of
+      Right time -> time
+      Left _ -> format defaultFormatter dTime
+
+defaultFormatter :: Formatter
+defaultFormatter =
+  ( FDT.YearFull
+      : FDT.Placeholder "."
+      : FDT.MonthShort
+      : FDT.Placeholder "."
+      : FDT.DayOfMonthTwoDigits
+      : FDT.Placeholder " "
+      : FDT.Hours24
+      : FDT.Placeholder ":"
+      : FDT.MinutesTwoDigits
+      : FDT.Placeholder ":"
+      : FDT.SecondsTwoDigits
+      : Nil
+  )
 
 -- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
 formatRelativeTime :: Maybe DateTime -> DateTime -> String
@@ -91,7 +94,9 @@ formatRelativeTime (Just current) updated =
     totalDays = floor (seconds / 86400.0)
   in
     if totalDays > 7 then
-      formatAbsoluteDate updated
+      case formatDateTime "DD.MMM.YYYY" updated of
+        Right time -> time
+        Left _ -> format formatAbsoluteDate updated
     else if totalDays >= 1 then
       show totalDays <> if totalDays == 1 then " day ago" else " days ago"
     else if totalHours >= 1 then
@@ -103,15 +108,25 @@ formatRelativeTime (Just current) updated =
       "Just now"
   where
   -- Format DateTime as absolute date (YYYY-MM-DD)
-  formatAbsoluteDate :: DateTime -> String
-  formatAbsoluteDate dt =
-    let
-      d' = date dt
-      y = show $ fromEnum $ year d'
-      m = padZero $ fromEnum $ month d'
-      d = padZero $ fromEnum $ day d'
-    in
-      d <> "." <> m <> "." <> y
+  formatAbsoluteDate :: Formatter
+  formatAbsoluteDate =
+    ( FDT.DayOfMonthTwoDigits
+        : FDT.Placeholder "."
+        : FDT.MonthShort
+        : FDT.Placeholder "."
+        : FDT.YearFull
+        : Nil
+    )
 
-padZero :: Int -> String
-padZero n = if n < 10 then "0" <> show n else show n
+-- TODO create more timestamps versions and discuss, where to store this
+timeStampsVersions :: Array String
+timeStampsVersions =
+  [ "DD.MMM.YY HH:mm"
+  , "DD.MM.YY HH:mm"
+  , "DD/MMM/YY HH:mm"
+  , "DD/MM/YY HH:mm"
+  , "MM/DD/YY HH:mm"
+  , "MMM/DD/YY HH:mm"
+  , "YY/MMM/DD HH:mm"
+  , "YY/MM/DD HH:mm"
+  ]

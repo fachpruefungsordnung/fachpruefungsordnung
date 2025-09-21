@@ -10,7 +10,7 @@ import Prelude
 
 import Data.Array (cons, deleteAt, head, insertAt, null, snoc, uncons, updateAt, (!!))
 import Data.Either (Either(..))
-import Data.Formatter.DateTime (Formatter)
+import Data.Formatter.DateTime (Formatter, parseFormatString)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String.Regex as Regex
@@ -30,6 +30,7 @@ import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (LoadState(..))
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
+import FPO.Data.Time (defaultFormatter, timeStampsVersions)
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
 import FPO.Dto.DocumentDto.MetaTree as MM
@@ -51,7 +52,6 @@ import FPO.Types
   , emptyTOCEntry
   , findTOCEntry
   , findTitleTOCEntry
-  , timeStampsVersions
   , tocTreeToDocumentTree
   )
 import Halogen as H
@@ -606,7 +606,12 @@ splitview = connect selectTranslator $ H.mkComponent
   handleAction = case _ of
 
     Init -> do
-      let timeFormatter = head timeStampsVersions
+      let
+        timeFormat = fromMaybe "" (head timeStampsVersions)
+        timeFormatter = Just $ case parseFormatString timeFormat of
+          Left _ -> defaultFormatter
+          Right formatter -> formatter
+
       H.modify_ \st -> do
         st { mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)

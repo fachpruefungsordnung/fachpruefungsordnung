@@ -96,7 +96,6 @@
   this.$rules = {
     start: [
       // --- Comments ---
-      { token: "comment.start", regex: /\/\*/, push: "comment" },
       { token: "comment",       regex: /\/\/.*$/ },
 
       // --- Headings ---
@@ -113,12 +112,6 @@
 
       // --- Keywords ---
       { token: "keyword", regex: /\b(TODO|FIXME|NOTE)\b/ }
-    ],
-
-    // Mehrzeilige Kommentare
-    comment: [
-      { token: "comment.end", regex: /\*\//, next: "pop" },
-      { defaultToken: "comment" }
     ],
 
     // Mehrzeilige Styles: bis zum ersten '>' dann pop

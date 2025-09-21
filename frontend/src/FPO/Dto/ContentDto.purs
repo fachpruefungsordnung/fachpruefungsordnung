@@ -8,6 +8,7 @@ import Data.Argonaut.Decode
   , JsonDecodeError
   , decodeJson
   , (.:)
+  , (.:!)
   , (.:?)
   )
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
@@ -81,10 +82,16 @@ instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
     obj <- decodeJson json
     html <- obj .: "html"
     ele <- obj .: "element"
-    mRev <- ele .:? "revision"
+    mRev <- ele .:! "revision"
     case mRev of
+      -- revision: null
+      Just Nothing -> do
+        tEle <- ele .: "textElement"
+        id <- tEle .: "identifier"
+        let con = Content { content: "", parent: id }
+        pure $ Wrapper { content: con, comments: [], html }
       -- Normal Content
-      Just rev -> do
+      Just (Just rev) -> do
         con <- decodeJson (fromObject rev)
         coms <- rev .: "commentAnchors"
         pure $ Wrapper { content: con, comments: coms, html }
