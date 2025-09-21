@@ -17,7 +17,8 @@ import Data.DateTime
   , Time(..)
   , adjust
   , canonicalDate
-  , diff)
+  , diff
+  )
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter, format, formatDateTime)
 import Data.Formatter.DateTime as FDT
@@ -66,17 +67,17 @@ formatAbsoluteTimeDetailed offset dateTime =
 defaultFormatter :: Formatter
 defaultFormatter =
   ( FDT.YearFull
-  : FDT.Placeholder "."
-  : FDT.MonthShort
-  : FDT.Placeholder "."
-  : FDT.DayOfMonthTwoDigits
-  : FDT.Placeholder " "
-  : FDT.Hours24
-  : FDT.Placeholder ":"
-  : FDT.MinutesTwoDigits
-  : FDT.Placeholder ":"
-  : FDT.SecondsTwoDigits
-  : Nil
+      : FDT.Placeholder "."
+      : FDT.MonthShort
+      : FDT.Placeholder "."
+      : FDT.DayOfMonthTwoDigits
+      : FDT.Placeholder " "
+      : FDT.Hours24
+      : FDT.Placeholder ":"
+      : FDT.MinutesTwoDigits
+      : FDT.Placeholder ":"
+      : FDT.SecondsTwoDigits
+      : Nil
   )
 
 -- | Formats DateTime as relative time ("3 hours ago") or absolute date if > 1 week.
@@ -110,11 +111,11 @@ formatRelativeTime (Just current) updated =
   formatAbsoluteDate :: Formatter
   formatAbsoluteDate =
     ( FDT.DayOfMonthTwoDigits
-    : FDT.Placeholder "."
-    : FDT.MonthShort
-    : FDT.Placeholder "."
-    : FDT.YearFull
-    : Nil
+        : FDT.Placeholder "."
+        : FDT.MonthShort
+        : FDT.Placeholder "."
+        : FDT.YearFull
+        : Nil
     )
 
 -- TODO create more timestamps versions and discuss, where to store this

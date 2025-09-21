@@ -611,7 +611,7 @@ splitview = connect selectTranslator $ H.mkComponent
         timeFormatter = Just $ case parseFormatString timeFormat of
           Left _ -> defaultFormatter
           Right formatter -> formatter
-      
+
       H.modify_ \st -> do
         st { mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
