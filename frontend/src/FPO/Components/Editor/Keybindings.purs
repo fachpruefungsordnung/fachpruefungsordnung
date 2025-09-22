@@ -10,7 +10,7 @@ import Ace.Types as Types
 import Data.Maybe (Maybe(..))
 import Data.String as String
 import Effect (Effect)
-import Web.Event.Event (Event)
+import Web.Event.Event (Event, preventDefault)
 import Web.UIEvent.KeyboardEvent (KeyboardEvent, ctrlKey, fromEvent, key, shiftKey)
 
 makeBold :: Types.Editor -> Effect Unit
@@ -45,6 +45,7 @@ underscore editor_ = do
 
 keyBinding :: Types.Editor -> Event -> Effect Unit
 keyBinding editor_ event = do
+  preventDefault event
   let keyboardEvent = fromEvent event :: Maybe KeyboardEvent
   case keyboardEvent of
     Nothing -> pure unit
