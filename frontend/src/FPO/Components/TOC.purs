@@ -17,6 +17,7 @@ import Data.Array
   , cons
   , drop
   , head
+  , index
   , last
   , length
   , mapWithIndex
@@ -25,7 +26,6 @@ import Data.Array
   , take
   , uncons
   , unsnoc
-  , index 
   )
 import Data.Date (Date)
 import Data.DateTime (DateTime, adjust)
@@ -34,6 +34,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Time.Duration (Days(..), Minutes)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
+import Effect.Console (log)
 import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
@@ -92,19 +93,17 @@ import Prelude
   , (-)
   , (/=)
   , (<)
+  , (<$>)
   , (<<<)
   , (<>)
   , (==)
   , (>)
   , (>=)
   , (||)
-  , (<$>)
   )
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
 import Web.HTML.Event.DragEvent (DragEvent, toEvent)
-
-import Effect.Console (log)
 
 type Input = DH.DocumentID
 
@@ -1453,7 +1452,7 @@ findMetaByPath path (RootTree { children }) = go path children
   where
   go :: Array Int -> Array (Edge TOCEntry) -> Maybe Meta
   go p cs = case uncons p of
-    Nothing -> Nothing 
+    Nothing -> Nothing
     Just { head: i, tail: rest } ->
       case index cs i of
         Nothing -> Nothing
@@ -1461,5 +1460,5 @@ findMetaByPath path (RootTree { children }) = go path children
           case rest, t of
             [], Leaf { meta } -> Just meta
             [], Node { meta } -> Just meta
-            _,  Node { children: nChildren } -> go rest nChildren
-            _,  Leaf _ -> Nothing
+            _, Node { children: nChildren } -> go rest nChildren
+            _, Leaf _ -> Nothing
