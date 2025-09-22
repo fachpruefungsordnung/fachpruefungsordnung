@@ -675,7 +675,6 @@ splitview = connect selectTranslator $ H.mkComponent
                   { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
               )
               finalTree
-          -- H.liftEffect $ log (MM.prettyPrintMetaMap metaMap)
           H.modify_ _
             { tocEntries = finalTree
             , versionMapping = vMapping

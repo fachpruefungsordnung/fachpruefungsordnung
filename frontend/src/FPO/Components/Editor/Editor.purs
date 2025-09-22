@@ -592,7 +592,6 @@ editor = connect selectTranslator $ H.mkComponent
       -- Do not load content, since no TOC has been selected yet
 
       -- create subscription for later use
-      state <- H.get
       { emitter, listener } <- H.liftEffect HS.create
       -- Subscribe to resize events and store subscription for cleanup
       subscription <- H.subscribe emitter
@@ -625,11 +624,8 @@ editor = connect selectTranslator $ H.mkComponent
           Editor.setTheme "ace/theme/github" editor_
           Session.setMode "ace/mode/custom_mode" session
           Editor.setEnableLiveAutocompletion true editor_
-          case state.compareToElement of
-            Just _ -> do
-              Editor.setReadOnly true editor_
-            Nothing ->
-              Editor.setReadOnly false editor_
+          -- set read only at the start to prevent users to write in not selected entry
+          Editor.setReadOnly true editor_
 
       -- New Ref for keeping track, if the content in editor has changed
       -- 1. since last save

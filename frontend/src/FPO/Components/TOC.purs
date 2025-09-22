@@ -34,7 +34,6 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Time.Duration (Days(..), Minutes)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
 import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
@@ -723,7 +722,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
             getFullTitle <$> findLeafMeta leafId entries
           Just (SelNode path _) ->
             getFullTitle <$> findMetaByPath path entries
-      H.liftEffect $ log $ show newMTitle
       H.modify_ _
         { searchData = sData, mTitle = newMTitle }
       case state.mSelectedTocEntry of
