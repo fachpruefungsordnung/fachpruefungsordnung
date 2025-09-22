@@ -206,6 +206,7 @@ data Output
   | PostPDF String
   | RenamedNode String Path
   | RequestComments Int Int
+  | RequestFullTitle
   | SelectedCommentSection Int Int
   | ShowAllCommentsOutput Int Int
   | RaiseDiscard
@@ -266,6 +267,7 @@ data Query a
   | RequestDirtyVersion (Boolean -> a)
   | ResetDirtyVersion a
   | ReceiveUpToDateUpdate (Maybe Version) a
+  | ReceiveFullTitle (Maybe String) a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -889,7 +891,6 @@ editor = connect selectTranslator $ H.mkComponent
           case isAutoSave, state.isEditorOutdated of
             -- auto save interaction
             true, _ -> do
-              -- H.modify_ _ { mContent = Just updatedContent }
               handleAction SavedIcon
               case typ of
                 "noConflict" -> pure unit
@@ -898,7 +899,6 @@ editor = connect selectTranslator $ H.mkComponent
                 _ -> pure unit
             -- manuell saving and working in latest version
             false, false -> do
-              -- H.modify_ _ { mContent = Just updatedContent }
               updateStore $ Store.AddSuccess "Saved successfully"
               case typ of
                 "noConflict" -> do
@@ -935,6 +935,8 @@ editor = connect selectTranslator $ H.mkComponent
 
           -- mDirtyRef := false
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
+          --update title 
+          H.raise RequestFullTitle
           pure unit
 
     SavedIcon -> do
@@ -1533,6 +1535,8 @@ editor = connect selectTranslator $ H.mkComponent
             -- Update state with new marker IDs
             H.modify_ \st -> st
               { commentState = st.commentState { liveMarkers = newLiveMarkers } }
+            -- lastly show html in preview
+            H.raise $ ClickedQuery state.html
 
   -- convert Hashmap to Annotations and show them
   -- H.liftEffect $ setAnnotations commentState.markerAnnoHS state.mEditor
@@ -1693,7 +1697,11 @@ editor = connect selectTranslator $ H.mkComponent
     ResetDirtyVersion a -> do
       state <- H.get
       for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
-      pure (Just a)
+      pure $ Just a
+
+    ReceiveFullTitle mTitle a -> do
+      H.modify_ \st -> st { mTitle = mTitle }
+      pure $ Just a
 
 -- | Change listener for the editor.
 --

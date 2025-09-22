@@ -25,6 +25,7 @@ import Data.Array
   , take
   , uncons
   , unsnoc
+  , index 
   )
 import Data.Date (Date)
 import Data.DateTime (DateTime, adjust)
@@ -97,10 +98,13 @@ import Prelude
   , (>)
   , (>=)
   , (||)
+  , (<$>)
   )
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
 import Web.HTML.Event.DragEvent (DragEvent, toEvent)
+
+import Effect.Console (log)
 
 type Input = DH.DocumentID
 
@@ -714,8 +718,15 @@ tocview = connect (selectEq identity) $ H.mkComponent
                   }
           )
           entries
+        newMTitle = case state.mSelectedTocEntry of
+          Nothing -> Nothing
+          Just (SelLeaf leafId) ->
+            getFullTitle <$> findLeafMeta leafId entries
+          Just (SelNode path _) ->
+            getFullTitle <$> findMetaByPath path entries
+      H.liftEffect $ log $ show newMTitle
       H.modify_ _
-        { searchData = sData }
+        { searchData = sData, mTitle = newMTitle }
       case state.mSelectedTocEntry of
         Just (SelLeaf id) ->
           if state.showHistoryMenu /= [ -1 ] then do
@@ -1416,3 +1427,39 @@ findLeafTitleInTree targetId = case _ of
     if id == targetId then getContent meta.title else Nothing
   Node { children } ->
     findLeafTitleInChildren targetId children
+
+-- find meta helper function
+
+findLeafMeta :: Int -> RootTree TOCEntry -> Maybe Meta
+findLeafMeta _ Empty = Nothing
+findLeafMeta targetId (RootTree { children }) =
+  goChildren children
+  where
+  goChildren :: Array (Edge TOCEntry) -> Maybe Meta
+  goChildren cs = case uncons cs of
+    Nothing -> Nothing
+    Just { head: Edge t, tail: rest } ->
+      case t of
+        Leaf { meta, node: { id } } ->
+          if id == targetId then Just meta else goChildren rest
+        Node { children: nChildren } ->
+          case goChildren nChildren of
+            Just m -> Just m
+            Nothing -> goChildren rest
+
+findMetaByPath :: Path -> RootTree TOCEntry -> Maybe Meta
+findMetaByPath _ Empty = Nothing
+findMetaByPath path (RootTree { children }) = go path children
+  where
+  go :: Array Int -> Array (Edge TOCEntry) -> Maybe Meta
+  go p cs = case uncons p of
+    Nothing -> Nothing 
+    Just { head: i, tail: rest } ->
+      case index cs i of
+        Nothing -> Nothing
+        Just (Edge t) ->
+          case rest, t of
+            [], Leaf { meta } -> Just meta
+            [], Node { meta } -> Just meta
+            _,  Node { children: nChildren } -> go rest nChildren
+            _,  Leaf _ -> Nothing

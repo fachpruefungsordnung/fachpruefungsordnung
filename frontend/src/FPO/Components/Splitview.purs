@@ -1139,6 +1139,12 @@ splitview = connect selectTranslator $ H.mkComponent
               Just entry -> H.tell _editor 0 (Editor.ChangeSection entry Nothing Nothing)
           _ -> pure unit
 
+      Editor.RequestFullTitle -> do
+        handleAction GET
+        mmTitle <- H.request _toc unit TOC.RequestFullTitle
+        H.tell _editor 0 (Editor.ReceiveFullTitle (join mmTitle))
+        H.tell _editor 1 (Editor.ReceiveFullTitle (join mmTitle))
+
     DeleteDraft -> do
       handleAction UpdateMSelectedTocEntry
       state <- H.get
@@ -1258,12 +1264,6 @@ splitview = connect selectTranslator $ H.mkComponent
       newTOCTree <- _.tocEntries <$> H.get
       handleAction UpdateVersionMapping
       H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
-
--- findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
--- findCommentSection tocEntries tocID markerID = do
---   tocEntry <- findTOCEntry tocID tocEntries
---   marker <- find (\m -> m.id == markerID) tocEntry.markers
---   marker.mCommentSection
 
 {- ------------------ Tree traversal and mutation function ------------------ -}
 {- --------------------- TODO: Move to seperate module  --------------------- -}
