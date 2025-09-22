@@ -12,20 +12,7 @@ module FPO.Components.TOC
   , tocview
   ) where
 
-import Data.Array
-  ( concat
-  , cons
-  , drop
-  , head
-  , last
-  , length
-  , mapWithIndex
-  , snoc
-  , tail
-  , take
-  , uncons
-  , unsnoc
-  )
+import Data.Array (concat, cons, drop, head, last, length, mapWithIndex, snoc, tail, take, uncons, unsnoc)
 import Data.Date (Date)
 import Data.DateTime (DateTime, adjust)
 import Data.Either (Either(..))
@@ -41,20 +28,10 @@ import FPO.Data.Store as Store
 import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.MetaTree (MetaMap, emptyMetaMap)
+import FPO.Dto.DocumentDto.MetaTree as MM
 import FPO.Dto.DocumentDto.TextElement as TE
-import FPO.Dto.DocumentDto.TreeDto
-  ( Edge(..)
-  , Meta(..)
-  , Result(..)
-  , RootTree(..)
-  , Tree(..)
-  , TreeHeader(..)
-  , findRootTree
-  , getContent
-  , getFullTitle
-  , getShortTitle
-  , modifyNodeRootTree
-  )
+import FPO.Dto.DocumentDto.TreeDto (Edge(..), Meta(..), Result(..), RootTree(..), Tree(..), TreeHeader(..), findRootTree, getContent, getFullTitle, getShortTitle, modifyNodeRootTree)
 import FPO.Dto.PostTextDto (createPostTextDto)
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
@@ -71,33 +48,7 @@ import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
 import Parsing (runParserT)
-import Prelude
-  ( class Eq
-  , Unit
-  , bind
-  , const
-  , discard
-  , identity
-  , map
-  , negate
-  , not
-  , pure
-  , show
-  , unit
-  , when
-  , ($)
-  , (&&)
-  , (+)
-  , (-)
-  , (/=)
-  , (<)
-  , (<<<)
-  , (<>)
-  , (==)
-  , (>)
-  , (>=)
-  , (||)
-  )
+import Prelude (class Eq, Unit, bind, const, discard, identity, map, negate, not, pure, show, unit, when, ($), (&&), (+), (-), (/=), (<), (<<<), (<>), (==), (>), (>=), (||))
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
 import Web.HTML.Event.DragEvent (DragEvent, toEvent)
@@ -167,7 +118,7 @@ data Action
 data EntityKind = Section | Paragraph
 
 data Query a
-  = ReceiveTOCs (TOCTree) a
+  = ReceiveTOCs TOCTree MetaMap a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
   | RequestUpToDateVersion (Maybe Version -> a)
@@ -184,6 +135,7 @@ type State = FPOState
   ( docID :: DH.DocumentID
   , documentName :: String
   , tocEntries :: RootTree TOCEntry
+  , metaMap :: MetaMap
   , mSelectedTocEntry :: Maybe SelectedEntity
   , now :: Maybe DateTime
   , showAddMenu :: Array Int
@@ -208,6 +160,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
   { initialState: \{ context: store, input } ->
       { documentName: ""
       , tocEntries: Empty
+      , metaMap: emptyMetaMap
       , mSelectedTocEntry: Nothing
       , now: Nothing
       , showAddMenu: [ -1 ]
@@ -694,9 +647,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
      . Query a
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
-    ReceiveTOCs entries a -> do
+    ReceiveTOCs entries metaMap a -> do
       state <- H.get
-      H.modify_ _ { tocEntries = entries }
+      H.modify_ _ { tocEntries = entries, metaMap = metaMap }
       let
         sData = map
           ( \elem ->
@@ -775,7 +728,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 [ HH.span
                     [ HP.classes [ HB.fwSemibold, HB.textTruncate, HB.fs4, HB.p2 ] ]
                     [ HH.text docName ]
-                , renderSectionButtonInterface menuPath [] false Section docName
                 ]
             ]
         , HH.div
@@ -813,7 +765,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     path
     now
     searchData = case _ of
-    Node { meta, children } ->
+    Node { meta, children, header } ->
       let
         selectedClasses =
           if selectedNodeHasPath path then
@@ -844,7 +796,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                       ]
                     )
                     [ HH.text $ getFullTitle meta ]
-                , renderSectionButtonInterface menuPath path true Section
+                , renderSectionButtonInterface state header menuPath path true Section
                     (getFullTitle meta)
                 ]
             ]
@@ -1318,13 +1270,15 @@ tocview = connect (selectEq identity) $ H.mkComponent
   -- Helper to render add button with dropdown, and optional delete button.
   renderSectionButtonInterface
     :: forall slots
-     . Array Int
+     . State
+    -> TreeHeader
+    -> Array Int
     -> Array Int
     -> Boolean
     -> EntityKind
     -> String
     -> H.ComponentHTML Action slots m
-  renderSectionButtonInterface menuPath currentPath renderDeleteBtn kind title =
+  renderSectionButtonInterface state header menuPath currentPath renderDeleteBtn kind title =
     HH.div
       [ HP.classes [ HB.positionRelative ] ] $
       [ HH.button
@@ -1355,9 +1309,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     ]
                 , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
                 ]
-                [ addSectionButton "Unterabschnitt" CreateNewSubsection
-                , addSectionButton "Abschnitt" CreateNewSection
-                ]
+                []
             else
               HH.text ""
           ]
@@ -1380,6 +1332,11 @@ tocview = connect (selectEq identity) $ H.mkComponent
       , HH.div [ HP.classes [ HB.fs6 ] ]
           [ HH.text str ]
       ]
+
+    -- buttons = do
+    --   propertyTypeMeta <- MM.lookupWithHeader header state.metaMap
+
+    --   pure []
 
 -- Helper function to extract the title from the current TOC entry
 getCurrentTocEntryTitle :: Maybe SelectedEntity -> RootTree TOCEntry -> Maybe String

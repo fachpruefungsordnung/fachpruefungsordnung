@@ -5,12 +5,14 @@ import Prelude
 
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson, (.:))
-import Data.Array (intercalate, length, mapWithIndex, (..))
+import Data.Array (find, intercalate, length, mapWithIndex, (..))
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe)
 import Data.Show.Generic (genericShow)
 import Data.String (joinWith)
 import Data.Tuple (Tuple(..))
+import FPO.Dto.Document.TreeDto (TreeHeader)
 import FPO.Dto.DocumentDto.TreeDto (RootTree)
 
 -- | Specifies the kind; e.g., "document", "section", "appendix-section", ...
@@ -131,6 +133,19 @@ instance DecodeJson FullTypeName where
 
 -- | Type alias for the complete meta map
 type MetaMap = Array (Tuple FullTypeName ProperTypeMeta)
+
+-- | An empty meta map.
+emptyMetaMap :: MetaMap
+emptyMetaMap = []
+
+-- | Lookup a `ProperTypeMeta` in the `MetaMap` using a `TreeHeader`.
+lookupWithHeader :: TreeHeader -> MetaMap -> Maybe ProperTypeMeta
+lookupWithHeader header metaMap = do
+  let kind = header.headerKind
+  let type_ = header.headerType
+  let fullTypeName = FullTypeName { kindName: kind, typeName: type_ }
+  Tuple _ properTypeMeta <- find (\(Tuple name _) -> name == fullTypeName) metaMap
+  pure properTypeMeta
 
 -- | Helper function to decode the entire meta map
 decodeMetaMap :: Json -> Either JsonDecodeError MetaMap
