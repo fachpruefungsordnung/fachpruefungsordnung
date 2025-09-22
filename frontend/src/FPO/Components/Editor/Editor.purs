@@ -538,7 +538,7 @@ editor = connect selectTranslator $ H.mkComponent
             [ HH.text $ 
               case state.mTitle of
                 Just title -> title
-                Nothing -> "No section selected"]
+                Nothing -> translate (label :: _ "editor_no_title") state.translator]
         ]
       , HH.div -- Editor container
 

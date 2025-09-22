@@ -22,6 +22,7 @@ type EditorLabels =
       ::: "editor_mergingInfo"
       ::: "editor_mergingInfoText"
       ::: "editor_mergingNow"
+      ::: "editor_no_title"
       ::: "editor_oldVersion"
       ::: "editor_pdf"
       ::: "editor_preview"
@@ -73,6 +74,7 @@ enEditor = fromRecord
         "If you do not wish to save your currently opened version, you can click on \"Discard\" to discard them and open the current version."
   , editor_mergingNow:
       "Copy over desired changes from the right and finish by clicking on \"Merge\""
+  , editor_no_title: "No section selected."
   , editor_oldVersion: "You are editing an old version"
   , editor_pdf: "Export PDF"
   , editor_preview: "Preview"
@@ -128,6 +130,7 @@ deEditor = fromRecord
         "Falls sie wünschen, ihre aktuellen änderungen zu verwerfen, so könne sie auf \"Verwerfen\" klicken um sie zu verwerfen und zur aktuellen Version zurückzukehren."
   , editor_mergingNow:
       "Bitte übernehmen sie gewünschten Änderungen der rechten Seite und klicken sie danach auf \"Vereinen\""
+  , editor_no_title: "Kein Abschnitt ausgewählt."
   , editor_oldVersion: "Sie bearbeiten eine alte Version"
   , editor_pdf: "PDF exportieren"
   , editor_preview: "Vorschau"

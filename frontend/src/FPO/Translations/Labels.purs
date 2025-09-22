@@ -170,6 +170,7 @@ type Labels =
       ::: "editor_mergingInfo"
       ::: "editor_mergingInfoText"
       ::: "editor_mergingNow"
+      ::: "editor_no_title"
       ::: "editor_oldVersion"
       ::: "editor_pdf"
       ::: "editor_preview"
