@@ -167,6 +167,7 @@ type State = FPOState
   , mTocEntry :: Maybe TOCEntry
   , currentVersion :: String
   , mNodePath :: Maybe Path
+  , mTitle :: Maybe String
   , mContent :: Maybe Content
   , html :: String
   -- comments
@@ -215,7 +216,7 @@ data Action
   = Init
   | DoNothing
   | Comment
-  | ChangeToSection TOCEntry (Maybe Int)
+  | ChangeToSection TOCEntry (Maybe Int) (Maybe String)
   | ContinueChangeToSection (Array FirstComment)
   | SelectComment
   | Font (Types.Editor -> Effect Unit)
@@ -255,7 +256,7 @@ data Query a
   -- | save the current content and send it to splitview
   | SaveSection a
   -- | receive the selected TOC and put its content into the editor
-  | ChangeSection TOCEntry (Maybe Int) a
+  | ChangeSection TOCEntry (Maybe Int) (Maybe String) a
   | ContinueChangeSection (Array FirstComment) a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
@@ -524,7 +525,19 @@ editor = connect selectTranslator $ H.mkComponent
                         (translate (label :: _ "editor_readonly") state.translator)
                     ]
                 ]
-
+      , HH.div
+        [ HP.classes [ HB.dFlex, HB.justifyContentBetween ]
+        , HP.style "padding: .5rem 1rem; border-bottom: 1px solid rgba(0,0,0,.1);"
+        ]
+        [ HH.h2
+            [ HP.classes [ HH.ClassName "text-truncate" ]
+            , HP.style "font-size: 1rem; margin: 0;"
+            ]
+            [ HH.text $ 
+              case state.mTitle of
+                Just title -> title
+                Nothing -> "No section selected"]
+        ]
       , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
@@ -662,7 +675,7 @@ editor = connect selectTranslator $ H.mkComponent
         Nothing
         -> pure unit
         Just { tocEntry: tocEntry, revID: revID }
-        -> handleAction (ChangeToSection tocEntry revID)
+        -> handleAction (ChangeToSection tocEntry revID Nothing)
 
       -- add and start Editor listeners
       H.gets _.mEditor >>= traverse_ \ed -> do
@@ -1394,7 +1407,7 @@ editor = connect selectTranslator $ H.mkComponent
       for_ state.saveState.mPendingDebounceF H.kill
       for_ state.saveState.mPendingMaxWaitF H.kill
 
-    ChangeToSection entry rev -> do
+    ChangeToSection entry rev mTitle -> do
       state <- H.get
       let
         version = case rev of
@@ -1436,6 +1449,7 @@ editor = connect selectTranslator $ H.mkComponent
 
             H.modify_ _
               { mTocEntry = Just entry
+              , mTitle = mTitle
               , mContent = Just content
               , html = html
               , isEditorOutdated = version /= "latest"
@@ -1540,8 +1554,8 @@ editor = connect selectTranslator $ H.mkComponent
         Just ed -> H.liftEffect $ Editor.resize (Just true) ed
       pure (Just a)
 
-    ChangeSection entry rev a -> do
-      handleAction (ChangeToSection entry rev)
+    ChangeSection entry rev mTitle a -> do
+      handleAction (ChangeToSection entry rev mTitle)
       pure (Just a)
 
     ContinueChangeSection fCs a -> do
@@ -1817,6 +1831,7 @@ initialState { context, input } =
   , mTocEntry: Nothing
   , currentVersion: ""
   , mNodePath: Nothing
+  , mTitle: Nothing
   , mContent: Nothing
   , html: ""
   , commentState: initialCommentState

@@ -108,7 +108,7 @@ type Version = { author :: DH.User, identifier :: Maybe Int, timestamp :: DD.Doc
 
 data Output
   -- | Opens the editor for some leaf node, that is, a subsection or paragraph.
-  = ChangeToLeaf Int
+  = ChangeToLeaf Int (Maybe String)
   -- | Used to tell the editor to update the path of the selected node
   --   during title renaming.
   | UpdateNodePosition Path
@@ -139,7 +139,7 @@ data Action
   | Both Action Action
   | Receive (Connected Store.Store Input)
   | DoNothing
-  | JumpToLeafSection Int (Array Int)
+  | JumpToLeafSection Int (Array Int) String
   | ToggleAddMenu Path
   | ToggleHistoryMenu (Array Int) Int
   | ToggleHistoryMenuOff (Array Int)
@@ -171,6 +171,7 @@ data Query a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
   | RequestUpToDateVersion (Maybe Version -> a)
+  | RequestFullTitle (Maybe String -> a)
 
 type SearchData =
   { elementID :: Int
@@ -184,6 +185,7 @@ type State = FPOState
   ( docID :: DH.DocumentID
   , documentName :: String
   , tocEntries :: RootTree TOCEntry
+  , mTitle :: Maybe String
   , mSelectedTocEntry :: Maybe SelectedEntity
   , now :: Maybe DateTime
   , showAddMenu :: Array Int
@@ -208,6 +210,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
   { initialState: \{ context: store, input } ->
       { documentName: ""
       , tocEntries: Empty
+      , mTitle: Nothing
       , mSelectedTocEntry: Nothing
       , now: Nothing
       , showAddMenu: [ -1 ]
@@ -467,13 +470,13 @@ tocview = connect (selectEq identity) $ H.mkComponent
     DoNothing -> do
       pure unit
 
-    JumpToLeafSection id path -> do
+    JumpToLeafSection id path title -> do
       handleAction (ToggleHistoryMenuOff path)
       mSelectedTocEntry <- H.gets _.mSelectedTocEntry
       when (mSelectedTocEntry /= Just (SelLeaf id)) do
         H.modify_ \state ->
-          state { mSelectedTocEntry = Just $ SelLeaf id }
-        H.raise (ChangeToLeaf id)
+          state { mSelectedTocEntry = Just $ SelLeaf id, mTitle = Just title }
+        H.raise (ChangeToLeaf id (Just title))
 
     ToggleAddMenu path -> do
       H.modify_ \state ->
@@ -743,6 +746,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
       state <- H.get
       pure (Just (reply state.upToDateVersion))
 
+    RequestFullTitle reply -> do
+      mTitle <- H.gets _.mTitle
+      pure (Just (reply mTitle))
+
   rootTreeToHTML
     :: forall slots
      . State
@@ -891,7 +898,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
           ] <>
             -- Stop to be able to click, if alredy selected (prevent spamming post requests)
             ( if level > 0 && mSelectedTocEntry /= Just (SelLeaf id) then
-                [ HE.onClick \_ -> JumpToLeafSection id path
+                [ HE.onClick \_ -> JumpToLeafSection id path (getFullTitle meta)
                 ]
               else
                 []
