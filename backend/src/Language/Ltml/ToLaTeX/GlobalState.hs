@@ -153,6 +153,7 @@ nextSupersection = do
 
 nextSection :: State GlobalState Int
 nextSection = do
+    counterState . paragraphCTR .= 0
     counterState . sectionCTR <+= 1
 
 nextParagraph :: State GlobalState Int

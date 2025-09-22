@@ -4,6 +4,7 @@
 module Language.Ltml.ToLaTeX.PDFGenerator
     ( generatePDFFromSection -- deprecated, use 'generatePDF' instead
     , generatePDF
+    , generateLaTeX
     --   generatePDFFromDocument
     ) where
 

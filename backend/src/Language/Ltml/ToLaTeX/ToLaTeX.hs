@@ -24,6 +24,6 @@ toLaTeX m (MissingRef l@(Label t)) =
             Command
                 "hyperlink"
                 []
-                [ Text t
+                [ Raw t
                 , Text ref
                 ]

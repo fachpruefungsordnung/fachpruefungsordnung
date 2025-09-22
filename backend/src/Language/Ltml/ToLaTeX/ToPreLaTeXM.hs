@@ -308,16 +308,22 @@ instance Labelable Section where
                 (SectionFormat ident (TocKeyFormat keyident)) <-
                     use (GS.formatState . GS.sectionFormat)
                 tt' <- toPreLaTeXM tt
+                
                 let headingText = tt'
                     buildHeading n = do
                         createHeading fmt headingText (IText $ getIdentifier ident n)
                     setLabel n = GS.insertRefLabel mLabel (T.pack (show n))
+                    filterFN xs = [y | y <- xs, not (isFN y)]
+                        where
+                            isFN (FootnoteRef _) = True
+                            isFN _        = False
+                tocEntry <- toPreLaTeXM $ filterFN tt
                 case nodes of
                     LeafSectionBody paragraphs -> do
                         n <- GS.nextSection
                         setLabel n
                         GS.flagState . GS.onlyOneParagraph .= (length paragraphs == 1)
-                        tocAnchor <- GS.addTOCEntry n keyident ident headingText
+                        tocAnchor <- GS.addTOCEntry n keyident ident tocEntry
                         headingDoc <- buildHeading n
                         content' <- toPreLaTeXM paragraphs
                         let refAnchor = maybe headingDoc (`hypertarget` headingDoc) mLabel
@@ -327,7 +333,7 @@ instance Labelable Section where
                         setLabel n
                         GS.flagState . GS.isSupersection .= True
                         GS.counterState . GS.supersectionCTR .= 0
-                        tocAnchor <- GS.addTOCEntry n keyident ident headingText
+                        tocAnchor <- GS.addTOCEntry n keyident ident tocEntry
                         headingDoc <- buildHeading n
                         content' <- toPreLaTeXM subsections
                         GS.flagState . GS.isSupersection .= False
