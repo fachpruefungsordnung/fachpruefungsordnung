@@ -12,12 +12,26 @@ module FPO.Components.TOC
   , tocview
   ) where
 
-import Data.Array (concat, cons, drop, head, last, length, mapWithIndex, snoc, tail, take, uncons, unsnoc)
-import Data.Date (Date)
-import Data.DateTime (DateTime, adjust)
+import Data.Array
+  ( concat
+  , cons
+  , drop
+  , head
+  , last
+  , length
+  , mapWithIndex
+  , null
+  , snoc
+  , tail
+  , take
+  , uncons
+  , unsnoc
+  )
+import Data.DateTime (Date, DateTime, adjust)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Time.Duration (Days(..), Minutes)
+import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Now (getTimezoneOffset, nowDateTime)
@@ -28,16 +42,27 @@ import FPO.Data.Store as Store
 import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
-import FPO.Dto.DocumentDto.MetaTree (MetaMap, emptyMetaMap)
 import FPO.Dto.DocumentDto.MetaTree as MM
 import FPO.Dto.DocumentDto.TextElement as TE
-import FPO.Dto.DocumentDto.TreeDto (Edge(..), Meta(..), Result(..), RootTree(..), Tree(..), TreeHeader(..), findRootTree, getContent, getFullTitle, getShortTitle, modifyNodeRootTree)
+import FPO.Dto.DocumentDto.TreeDto
+  ( Edge(..)
+  , Meta(..)
+  , RootTree(..)
+  , Tree(..)
+  , TreeHeader(..)
+  , findRootTree
+  , getContent
+  , getFullTitle
+  , getShortTitle
+  , modifyNodeRootTree
+  , unspecifiedMeta
+  )
 import FPO.Dto.PostTextDto (createPostTextDto)
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
 import FPO.Types (TOCEntry, TOCTree)
-import FPO.Util (isPrefixOf, prependIf)
+import FPO.Util (isPrefixOf, prependIf, singletonIf)
 import FPO.Util as Util
 import Halogen as H
 import Halogen.HTML as HH
@@ -48,7 +73,33 @@ import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
 import Parsing (runParserT)
-import Prelude (class Eq, Unit, bind, const, discard, identity, map, negate, not, pure, show, unit, when, ($), (&&), (+), (-), (/=), (<), (<<<), (<>), (==), (>), (>=), (||))
+import Prelude
+  ( class Eq
+  , Unit
+  , bind
+  , const
+  , discard
+  , identity
+  , map
+  , negate
+  , not
+  , pure
+  , show
+  , unit
+  , when
+  , ($)
+  , (&&)
+  , (+)
+  , (-)
+  , (/=)
+  , (<)
+  , (<<<)
+  , (<>)
+  , (==)
+  , (>)
+  , (>=)
+  , (||)
+  )
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
 import Web.HTML.Event.DragEvent (DragEvent, toEvent)
@@ -95,8 +146,7 @@ data Action
   | ToggleHistoryMenu (Array Int) Int
   | ToggleHistoryMenuOff (Array Int)
   | ToggleHistorySubmenu (Maybe Int)
-  | CreateNewSubsection Path
-  | CreateNewSection Path
+  | CreateNewMSection MM.FullTypeName MM.ProperTypeMeta Path
   | OpenVersion Int (Maybe Int)
   | CompareVersion Int (Maybe Int)
   | UpdateVersions (Maybe Date) (Maybe Date) Int
@@ -118,7 +168,7 @@ data Action
 data EntityKind = Section | Paragraph
 
 data Query a
-  = ReceiveTOCs TOCTree MetaMap a
+  = ReceiveTOCs TOCTree MM.MetaMap a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
   | RequestUpToDateVersion (Maybe Version -> a)
@@ -135,7 +185,7 @@ type State = FPOState
   ( docID :: DH.DocumentID
   , documentName :: String
   , tocEntries :: RootTree TOCEntry
-  , metaMap :: MetaMap
+  , metaMap :: MM.MetaMap
   , mSelectedTocEntry :: Maybe SelectedEntity
   , now :: Maybe DateTime
   , showAddMenu :: Array Int
@@ -160,7 +210,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
   { initialState: \{ context: store, input } ->
       { documentName: ""
       , tocEntries: Empty
-      , metaMap: emptyMetaMap
+      , metaMap: MM.emptyMetaMap
       , mSelectedTocEntry: Nothing
       , now: Nothing
       , showAddMenu: [ -1 ]
@@ -476,49 +526,48 @@ tocview = connect (selectEq identity) $ H.mkComponent
             else Nothing
         }
 
-    CreateNewSubsection path -> do
+    CreateNewMSection fullTypeName meta path -> do
       H.modify_ _ { showAddMenu = [ -1 ] }
-      s <- H.get
-      gotRes <- postJson PostTextDto.decodePostTextDto
-        ("/docs/" <> show s.docID <> "/text")
-        ( PostTextDto.encodePostTextDto -- TODO: choose type_ according to (still missing) meta map!
-            (createPostTextDto { kind: "section", type_: "section" })
-        )
-      case gotRes of
-        Left _ -> pure unit -- TODO error handling
-        Right dto -> do
-          let
-            newEntry =
-              Leaf
-                { meta: Meta
-                    { label: Nothing
-                    , title: Success $ Just "New Subsection (Meta)"
-                    }
-                , node:
-                    { id: PostTextDto.getID dto
-                    , name: "New Subsection"
-                    , paraID: 0 -- to be implemented later
-                    }
-                }
-          H.raise (AddNode path newEntry)
 
-    CreateNewSection path -> do
-      H.modify_ \st ->
-        st { showAddMenu = [ -1 ] }
-      let
-        newEntry = Node
-          { meta: Meta
-              { label: Nothing
-              , title: Success $ Just "New Section (Meta)"
-              }
-          , children: []
-          , header: TreeHeader
-              { headerKind: "section"
-              , headerType: "supersection"
-              , heading: "New Section"
-              }
-          }
-      H.raise (AddNode path newEntry)
+      if MM.isLeaf meta then do
+        -- Create new text element:
+        let
+          kind = MM.getKindName fullTypeName
+          type_ = MM.getTypeName fullTypeName
+        s <- H.get
+        gotRes <- postJson PostTextDto.decodePostTextDto
+          ("/docs/" <> show s.docID <> "/text")
+          ( PostTextDto.encodePostTextDto
+              (createPostTextDto { kind: kind, type_: type_ })
+          )
+        case gotRes of
+          Left _ -> pure unit
+          Right dto -> do
+            -- Add new leaf to the TOC tree:
+            let
+              newEntry =
+                Leaf
+                  { meta: unspecifiedMeta
+                  , node:
+                      { id: PostTextDto.getID dto
+                      , name: "New Subsection"
+                      , paraID: 0 -- TODO: Do we still need this?
+                      }
+                  }
+            H.raise (AddNode path newEntry)
+      else do
+        -- Add new node to the TOC tree:
+        let
+          newEntry = Node
+            { meta: unspecifiedMeta
+            , children: []
+            , header: TreeHeader
+                { headerKind: MM.getKindName fullTypeName
+                , headerType: MM.getTypeName fullTypeName
+                , heading: "// Specify your header name here! \nNew Header"
+                }
+            }
+        H.raise (AddNode path newEntry)
 
     RequestDeleteSection entity -> do
       H.modify_ _ { requestDelete = Just entity }
@@ -796,8 +845,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                       ]
                     )
                     [ HH.text $ getFullTitle meta ]
-                , renderSectionButtonInterface state header menuPath path true Section
-                    (getFullTitle meta)
+                , addItemInterface
                 ]
             ]
         ]
@@ -823,6 +871,20 @@ tocview = connect (selectEq identity) $ H.mkComponent
       selectedNodeHasPath p = case mSelectedTocEntry of
         Just (SelNode selectedPath _) -> selectedPath == p
         _ -> false
+
+      -- Adds the "+" button (for adding new sections or paragraphs) if
+      -- the section allows for (more) children and the "-" button, if
+      -- allowed for deletion.
+      addItemInterface =
+        renderSectionButtonInterface
+          items
+          menuPath
+          path
+          true
+          Section
+          (getFullTitle meta)
+        where
+        items = MM.findAllowedChildren header state.metaMap
 
     Leaf { meta, node: { id, paraID: _, name: _ } } ->
       let
@@ -1270,31 +1332,36 @@ tocview = connect (selectEq identity) $ H.mkComponent
   -- Helper to render add button with dropdown, and optional delete button.
   renderSectionButtonInterface
     :: forall slots
-     . State
-    -> TreeHeader
+     . Array (Tuple MM.FullTypeName MM.ProperTypeMeta)
     -> Array Int
     -> Array Int
     -> Boolean
     -> EntityKind
     -> String
     -> H.ComponentHTML Action slots m
-  renderSectionButtonInterface state header menuPath currentPath renderDeleteBtn kind title =
+  renderSectionButtonInterface
+    items
+    menuPath
+    currentPath
+    renderDeleteBtn
+    kind
+    title =
     HH.div
       [ HP.classes [ HB.positionRelative ] ] $
-      [ HH.button
-          [ HP.classes
-              [ HB.btn
-              , HB.btnSuccess
-              , HH.ClassName "toc-button"
-              , HH.ClassName "toc-add-wrapper"
-              ]
-          , HE.onClick \_ -> ToggleAddMenu currentPath
-          ]
-          [ HH.text "+" ]
-      ]
+      ( singletonIf (not $ null items) $
+          HH.button
+            [ HP.classes
+                [ HB.btn
+                , HB.btnSuccess
+                , HH.ClassName "toc-button"
+                , HH.ClassName "toc-add-wrapper"
+                ]
+            , HE.onClick \_ -> ToggleAddMenu currentPath
+            ]
+            [ HH.text "+" ]
+      )
         <>
-          ( if renderDeleteBtn then [ deleteSectionButton currentPath kind title ]
-            else []
+          ( singletonIf renderDeleteBtn $ deleteSectionButton currentPath kind title
           )
         <>
           [ if menuPath == currentPath then
@@ -1309,7 +1376,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     ]
                 , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
                 ]
-                []
+                buttons
             else
               HH.text ""
           ]
@@ -1333,10 +1400,12 @@ tocview = connect (selectEq identity) $ H.mkComponent
           [ HH.text str ]
       ]
 
-    -- buttons = do
-    --   propertyTypeMeta <- MM.lookupWithHeader header state.metaMap
-
-    --   pure []
+    -- Creates buttons for each allowed item type.
+    buttons = map createSectionButton items
+      where
+      createSectionButton (Tuple tyName meta) =
+        addSectionButton (MM.getDisplayNameAsString meta)
+          (CreateNewMSection tyName meta)
 
 -- Helper function to extract the title from the current TOC entry
 getCurrentTocEntryTitle :: Maybe SelectedEntity -> RootTree TOCEntry -> Maybe String
