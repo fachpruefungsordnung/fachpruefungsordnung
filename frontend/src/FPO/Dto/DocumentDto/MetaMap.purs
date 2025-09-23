@@ -5,13 +5,22 @@ import Prelude
 
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson, (.:))
-import Data.Array (intercalate, length, mapWithIndex, (..))
+import Data.Array
+  ( catMaybes
+  , find
+  , head
+  , intercalate
+  , length
+  , mapWithIndex
+  , (..)
+  )
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Show.Generic (genericShow)
 import Data.String (joinWith)
 import Data.Tuple (Tuple(..))
-import FPO.Dto.DocumentDto.TreeDto (RootTree)
+import FPO.Dto.DocumentDto.TreeDto (RootTree, TreeHeader(..))
 
 -- | Specifies the kind; e.g., "document", "section", "appendix-section", ...
 type KindName = String
@@ -19,6 +28,12 @@ type KindName = String
 type TypeName = String
 
 newtype FullTypeName = FullTypeName { kindName :: KindName, typeName :: TypeName }
+
+getKindName :: FullTypeName -> KindName
+getKindName (FullTypeName { kindName: kind }) = kind
+
+getTypeName :: FullTypeName -> TypeName
+getTypeName (FullTypeName { typeName: type_ }) = type_
 
 newtype DisplayTypeName = DisplayTypeName String
 
@@ -30,6 +45,17 @@ instance DecodeJson DisplayTypeName where
   decodeJson json = DisplayTypeName <$> decodeJson json
 
 data ProperTypeMeta = ProperTypeMeta DisplayTypeName (TreeSyntax FullTypeName)
+
+isLeaf :: ProperTypeMeta -> Boolean
+isLeaf (ProperTypeMeta _ syntax) = case syntax of
+  LeafSyntax -> true
+  TreeSyntax _ _ -> false
+
+getDisplayNameAsString :: ProperTypeMeta -> String
+getDisplayNameAsString (ProperTypeMeta (DisplayTypeName name) _) = name
+
+getTreeSyntax :: ProperTypeMeta -> TreeSyntax FullTypeName
+getTreeSyntax (ProperTypeMeta _ syntax) = syntax
 
 derive instance Generic ProperTypeMeta _
 instance Show ProperTypeMeta where
@@ -47,6 +73,9 @@ instance DecodeJson ProperTypeMeta where
         "Expected array with exactly 2 elements for ProperTypeMeta"
 
 newtype HasEditableHeader = HasEditableHeader Boolean
+
+isEditable :: HasEditableHeader -> Boolean
+isEditable (HasEditableHeader b) = b
 
 derive instance Generic HasEditableHeader _
 derive newtype instance Show HasEditableHeader
@@ -106,6 +135,12 @@ instance DecodeJson a => DecodeJson (ChildrenOrder a) where
 
 newtype Disjunction a = Disjunction (Array a)
 
+getAllowedItems :: ∀ a. Disjunction a -> Array a
+getAllowedItems (Disjunction arr) = arr
+
+instance Functor Disjunction where
+  map f (Disjunction arr) = Disjunction (map f arr)
+
 derive instance Generic (Disjunction a) _
 derive newtype instance Show a => Show (Disjunction a)
 derive newtype instance Eq a => Eq (Disjunction a)
@@ -131,6 +166,59 @@ instance DecodeJson FullTypeName where
 
 -- | Type alias for the complete meta map
 type MetaMap = Array (Tuple FullTypeName ProperTypeMeta)
+
+-- | An empty meta map.
+emptyMetaMap :: MetaMap
+emptyMetaMap = []
+
+-- | Lookup a `ProperTypeMeta` in the `MetaMap` using a `TreeHeader`.
+lookupWithHeader :: TreeHeader -> MetaMap -> Maybe ProperTypeMeta
+lookupWithHeader (TreeHeader header) metaMap = do
+  let kind = header.headerKind
+  let type_ = header.headerType
+  let fullTypeName = FullTypeName { kindName: kind, typeName: type_ }
+  lookupWithFullTypeName fullTypeName metaMap
+
+-- | Lookup a `ProperTypeMeta` in the `MetaMap` using a `FullTypeName`.
+lookupWithFullTypeName :: FullTypeName -> MetaMap -> Maybe ProperTypeMeta
+lookupWithFullTypeName fullTypeName metaMap = do
+  Tuple _ properTypeMeta <- find (\(Tuple name _) -> name == fullTypeName) metaMap
+  pure properTypeMeta
+
+findDefinition :: FullTypeName -> MetaMap -> Maybe (Tuple FullTypeName ProperTypeMeta)
+findDefinition fullTypeName metaMap =
+  find (\(Tuple name _) -> name == fullTypeName) metaMap
+
+-- | For a given `TreeHeader`, find all allowed child types based on the `MetaMap`.
+-- | Returns an array of tuples containing the `FullTypeName` and corresponding `ProperTypeMeta`.
+findAllowedChildren
+  :: TreeHeader -> MetaMap -> Array (Tuple FullTypeName ProperTypeMeta)
+findAllowedChildren header metaMap = fromMaybe [] $ do
+  propertyTypeMeta <- lookupWithHeader header metaMap
+  let treeSyntax = getTreeSyntax propertyTypeMeta
+  case treeSyntax of
+    LeafSyntax -> pure []
+    TreeSyntax _ co -> case co of
+      StarOrder d ->
+        pure $ catMaybes $ map (flip findDefinition metaMap) $
+          getAllowedItems d
+      SequenceOrder _ -> pure []
+
+-- | Returns all direct children that must be present according to a sequence order.
+getMandatoryChildren
+  :: ProperTypeMeta -> MetaMap -> Array (Tuple FullTypeName ProperTypeMeta)
+getMandatoryChildren propertyTypeMeta metaMap = case getTreeSyntax propertyTypeMeta of
+  LeafSyntax -> []
+  TreeSyntax _ co -> case co of
+    StarOrder _ -> []
+    SequenceOrder disjunctions ->
+      catMaybes $ map findMandatoryInDisjunction disjunctions
+  where
+  findMandatoryInDisjunction
+    :: Disjunction FullTypeName
+    -> Maybe (Tuple FullTypeName ProperTypeMeta)
+  findMandatoryInDisjunction (Disjunction arr) = do
+    head arr >>= flip findDefinition metaMap
 
 -- | Helper function to decode the entire meta map
 decodeMetaMap :: Json -> Either JsonDecodeError MetaMap
