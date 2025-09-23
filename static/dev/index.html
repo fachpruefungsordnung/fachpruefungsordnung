@@ -3,6 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <title>Links and Tools</title>
+    <!-- Font Awesome Free via jsDelivr (funktioniert ohne CORS/KIT) -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css"
+    />
+
     <style>
       body {
         background: #f3f4f6;
@@ -10,7 +16,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        height: 100vh;
+        min-height: 100vh;
         margin: 0;
       }
 
@@ -20,37 +26,94 @@
         border-radius: 16px;
         box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
         text-align: center;
+        max-width: 800px;
       }
 
       h1 {
         font-size: 1.8rem;
         color: #111827;
-        margin-bottom: 1.5rem;
+        margin-bottom: 2rem;
       }
 
-      a {
-        display: inline-block;
-        margin: 0.5rem 0;
-        padding: 0.75rem 1.5rem;
-        border-radius: 8px;
-        text-decoration: none;
-        color: #ffffff;
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 1.5rem;
+        justify-items: center;
+      }
+
+      .btn {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 120px;
+        height: 120px;
+        border-radius: 16px;
         background: #2563eb;
-        transition: background 0.3s ease;
-        font-size: 1rem;
+        color: #fff;
+        text-decoration: none;
+        font-size: 0.9rem;
+        transition:
+          background 0.3s ease,
+          transform 0.2s ease;
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+        padding: 0.5rem;
+        text-align: center;
       }
 
-      a:hover {
-        background: #1e40af;
+      .btn i {
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .btn:hover {
+        transform: translateY(-5px);
+      }
+
+      /* Farben für jedes Icon */
+      .btn.pgweb {
+        background: #1e3a8a;
+      }
+      .btn.swagger {
+        background: #059669;
+      }
+      .btn.logs {
+        background: #d97706;
+      }
+      .btn.backend {
+        background: #9333ea;
+      }
+      .btn.frontend {
+        background: #f43f5e;
       }
     </style>
   </head>
   <body>
     <div class="container">
       <h1>🔗 Links and Tools</h1>
-      <a href="/pgweb" target="_blank">PostgreSQL Web (pgweb)</a><br />
-      <a href="/swagger" target="_blank">API Documentation (Swagger)</a><br />
-      <a href="/dev/logs.html" target="_blank">Logs</a>
+      <div class="grid">
+        <a href="/pgweb" target="_blank" class="btn pgweb">
+          <i class="fas fa-database"></i>
+          PostgreSQL Web
+        </a>
+        <a href="/swagger" target="_blank" class="btn swagger">
+          <i class="fas fa-book-open"></i>
+          API Docs
+        </a>
+        <a href="/dev/haddock" target="_blank" class="btn backend">
+          <i class="fas fa-code"></i>
+          Backend Docs
+        </a>
+        <a href="/dev/purs" target="_blank" class="btn frontend">
+          <i class="fas fa-paint-brush"></i>
+          Frontend Docs
+        </a>
+        <a href="/dev/logs.html" target="_blank" class="btn logs">
+          <i class="fas fa-file-alt"></i>
+          Logs
+        </a>
+      </div>
     </div>
   </body>
 </html>
