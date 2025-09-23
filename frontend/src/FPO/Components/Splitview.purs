@@ -33,6 +33,7 @@ import FPO.Data.Store as Store
 import FPO.Data.Time (defaultFormatter, timeStampsVersions)
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
+import FPO.Dto.DocumentDto.MetaTree (emptyMetaMap)
 import FPO.Dto.DocumentDto.MetaTree as MM
 import FPO.Dto.DocumentDto.TreeDto
   ( Edge(..)
@@ -617,7 +618,7 @@ splitview = connect selectTranslator $ H.mkComponent
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
       H.tell _commentOverview unit
         (CommentOverview.ReceiveTimeFormatter timeFormatter)
-      H.tell _toc unit (TOC.ReceiveTOCs Empty)
+      H.tell _toc unit (TOC.ReceiveTOCs Empty emptyMetaMap)
       -- Load the initial TOC entries into the editor
       -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
       -- or rather, we don't use commit anymore in the API
@@ -667,7 +668,7 @@ splitview = connect selectTranslator $ H.mkComponent
         ("/docs/" <> show s.docID <> "/tree/latest")
       case maybeTree of
         Left err -> updateStore $ Store.AddError err
-        Right (MM.DocumentTreeWithMetaMap { tree {-, metaMap -} }) -> do
+        Right (MM.DocumentTreeWithMetaMap { tree, metaMap }) -> do
           let
             finalTree = documentTreeToTOCTree tree
             vMapping = map
@@ -679,7 +680,7 @@ splitview = connect selectTranslator $ H.mkComponent
             { tocEntries = finalTree
             , versionMapping = vMapping
             }
-          H.tell _toc unit (TOC.ReceiveTOCs finalTree)
+          H.tell _toc unit (TOC.ReceiveTOCs finalTree metaMap)
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -1254,17 +1255,18 @@ splitview = connect selectTranslator $ H.mkComponent
       --       the server.
       case maybeTree of
         Left err -> updateStore $ Store.AddError err
-        Right (MM.DocumentTreeWithMetaMap { tree {-, metaMap -} }) -> do
+        Right (MM.DocumentTreeWithMetaMap { tree, metaMap }) -> do
           let
             finalTree = documentTreeToTOCTree tree
           H.modify_ _
             { tocEntries = finalTree
             }
-          H.tell _toc unit (TOC.ReceiveTOCs finalTree)
 
-      newTOCTree <- _.tocEntries <$> H.get
+          -- liftEffect $ log $ prettyPrintMetaMap metaMap
+
+          H.tell _toc unit (TOC.ReceiveTOCs finalTree metaMap)
+
       handleAction UpdateVersionMapping
-      H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
 
 {- ------------------ Tree traversal and mutation function ------------------ -}
 {- --------------------- TODO: Move to seperate module  --------------------- -}

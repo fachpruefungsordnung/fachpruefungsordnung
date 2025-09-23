@@ -17,6 +17,7 @@ module FPO.Dto.DocumentDto.TreeDto
   , getShortTitle
   , modifyNodeRootTree
   , replaceNodeRootTree
+  , unspecifiedMeta
   ) where
 
 import Prelude
@@ -66,6 +67,9 @@ getContentOr b = fromMaybe b <<< getContent
 
 errorMeta :: Meta
 errorMeta = Meta { label: Nothing, title: Error $ Just "(error)" }
+
+unspecifiedMeta :: Meta
+unspecifiedMeta = Meta { label: Nothing, title: Error $ Just "(unspecified)" }
 
 -- | Returns the full title of the node, including the label if it exists.
 -- | Removes HTML tags.
