@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
+{-| Provides the GlobalState and everything to mutate it. -}
 module Language.Ltml.ToLaTeX.GlobalState
     ( GlobalState (..)
     , DocType (..)
@@ -40,7 +41,6 @@ module Language.Ltml.ToLaTeX.GlobalState
     , docHeadingFormat
     , sectionFormat
     , onlyOneParagraph
-    , isSupersection
     , flaggedParent
     , flaggedChildren
     , docType
@@ -89,24 +89,24 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     , linebreak
     )
 
--- State for labeling
+-- | State for generating and keeping track of context
 data GlobalState = GlobalState
-    { {- Counters to keep track of the position in the document -}
+    { {-| Counters to keep track of the position in the document -}
       _counterState :: CounterState
-    , {- Flags for special cases -}
+    , {-| Flags for special cases -}
       _flagState :: FlagState
     , _formatState :: FormatState
-    , {- Path for current enum position -}
+    , {-| Path for current enum position -}
       _enumPosition :: [Int]
-    , {- since the style of the identifier is defined globally for an
+    , {-| since the style of the identifier is defined globally for an
          enumeration or appendix we need to pass it to the kids -}
-      {- Maps for labels -}
+      {-| Maps for labels -}
       _labelToRef :: Map Label T.Text
     , _labelToFootNote :: Map Label Footnote
-    , {- functional list that builds the table of contents -}
+    , {-| functional list that builds the table of contents -}
       _toc :: DList.DList PreLaTeX
     , _appendixHeaders :: DList.DList PreLaTeX
-    , {- pre-document is used to store the header and footer of the document -}
+    , {-| pre-document is used to store the header and footer of the document -}
       _preDocument :: PreLaTeX
     }
     deriving (Show)
@@ -123,14 +123,14 @@ data CounterState = CounterState
     deriving (Show)
 
 data FlagState = FlagState
-    { _onlyOneParagraph :: Bool -- needed for sections with only one paragraph
-    , _isSupersection :: Bool -- needed for heading
+    { _onlyOneParagraph :: Bool -- | needed for sections with only one paragraph
     , _flaggedParent :: Bool
     , _flaggedChildren :: Bool
-    , _docType :: DocType -- needed to distinguish between main document and appendix
+    , _docType :: DocType -- | needed to distinguish between main document and appendix
     }
     deriving (Show)
 
+-- | introduced a datatype instead of using bool to make it easily extensible
 data DocType = Main | Appendix
     deriving (Show, Eq)
 
@@ -305,7 +305,6 @@ initialFlagState =
     FlagState
         False -- onlyOneParagraph
         False -- isSupersection
-        False
         False
         Main -- isAppendix
 
