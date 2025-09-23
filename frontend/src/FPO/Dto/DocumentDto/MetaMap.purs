@@ -12,13 +12,11 @@ import Data.Array
   , intercalate
   , length
   , mapWithIndex
-  , (!!)
   , (..)
-  , (:)
   )
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..), fromJust, fromMaybe)
+import Data.Maybe (Maybe, fromMaybe)
 import Data.Show.Generic (genericShow)
 import Data.String (joinWith)
 import Data.Tuple (Tuple(..))
@@ -214,13 +212,12 @@ getMandatoryChildren propertyTypeMeta metaMap = case getTreeSyntax propertyTypeM
   TreeSyntax _ co -> case co of
     StarOrder _ -> []
     SequenceOrder disjunctions ->
-      catMaybes $ map (findMandatoryInDisjunction metaMap) disjunctions
+      catMaybes $ map findMandatoryInDisjunction disjunctions
   where
   findMandatoryInDisjunction
-    :: MetaMap
-    -> Disjunction FullTypeName
+    :: Disjunction FullTypeName
     -> Maybe (Tuple FullTypeName ProperTypeMeta)
-  findMandatoryInDisjunction metaMap (Disjunction arr) = do
+  findMandatoryInDisjunction (Disjunction arr) = do
     head arr >>= flip findDefinition metaMap
 
 -- | Helper function to decode the entire meta map
