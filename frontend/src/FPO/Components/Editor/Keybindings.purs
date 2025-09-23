@@ -45,7 +45,6 @@ underscore editor_ = do
 
 keyBinding :: Types.Editor -> Event -> Effect Unit
 keyBinding editor_ event = do
-  preventDefault event
   let keyboardEvent = fromEvent event :: Maybe KeyboardEvent
   case keyboardEvent of
     Nothing -> pure unit
@@ -56,13 +55,19 @@ keyBinding editor_ event = do
 
       if ctrlKeyPressed && not shiftKeyPressed then
         case pressedKey of
-          "b" -> makeBold editor_
-          "i" -> makeItalic editor_
+          "b" -> do
+            preventDefault event
+            makeBold editor_
+          "i" -> do
+            preventDefault event
+            makeItalic editor_
           "z" -> do
+            preventDefault event
             Editor.undo editor_
             Editor.focus editor_
           "Z" -> do
-            Editor.undo editor_
+            preventDefault event
+            Editor.redo editor_
             Editor.focus editor_
           _ -> pure unit
       else pure unit
