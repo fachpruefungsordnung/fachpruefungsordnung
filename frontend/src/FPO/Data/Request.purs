@@ -37,6 +37,7 @@ module FPO.Data.Request
   , postJson
   , postRenderHtml
   , postString
+  , postText
   , putIgnore
   , putJson
   , removeUser
@@ -80,6 +81,7 @@ import FPO.Dto.GroupDto
   , GroupOverview
   , toGroupOverview
   )
+import FPO.Dto.PostTextDto as PT
 import FPO.Dto.UserDto
   ( FullUserDto
   , UserID
@@ -600,6 +602,18 @@ getUserDocuments userID = do
   case result of
     Left err -> pure $ Left err
     Right dq -> pure $ Right $ DQ.getDocuments dq
+
+postText
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => DH.DocumentID
+  -> PT.PostTextDto
+  -> H.HalogenM st act slots msg m (Either AppError PT.PostTextDto)
+postText docID pt = postJson PT.decodePostTextDto
+  ("/docs/" <> show docID <> "/text")
+  (PT.encodePostTextDto pt)
 
 addGroup
   :: forall st act slots msg m

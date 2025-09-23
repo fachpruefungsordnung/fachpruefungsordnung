@@ -17,7 +17,6 @@ import Data.String.Regex as Regex
 import Data.String.Regex.Flags as RegexFlags
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -34,7 +33,7 @@ import FPO.Data.Store as Store
 import FPO.Data.Time (defaultFormatter, timeStampsVersions)
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
-import FPO.Dto.DocumentDto.MetaTree (emptyMetaMap, prettyPrintMetaMap)
+import FPO.Dto.DocumentDto.MetaTree (emptyMetaMap)
 import FPO.Dto.DocumentDto.MetaTree as MM
 import FPO.Dto.DocumentDto.TreeDto
   ( Edge(..)
@@ -56,7 +55,6 @@ import FPO.Types
   , findTitleTOCEntry
   , tocTreeToDocumentTree
   )
-import Halogen (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -1251,7 +1249,7 @@ splitview = connect selectTranslator $ H.mkComponent
             { tocEntries = finalTree
             }
 
-          liftEffect $ log $ prettyPrintMetaMap metaMap
+          -- liftEffect $ log $ prettyPrintMetaMap metaMap
 
           H.tell _toc unit (TOC.ReceiveTOCs finalTree metaMap)
 

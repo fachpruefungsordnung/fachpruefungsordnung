@@ -5,10 +5,20 @@ import Prelude
 
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson, (.:))
-import Data.Array (catMaybes, find, intercalate, length, mapWithIndex, (..))
+import Data.Array
+  ( catMaybes
+  , find
+  , head
+  , intercalate
+  , length
+  , mapWithIndex
+  , (!!)
+  , (..)
+  , (:)
+  )
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Maybe (Maybe(..), fromJust, fromMaybe)
 import Data.Show.Generic (genericShow)
 import Data.String (joinWith)
 import Data.Tuple (Tuple(..))
@@ -195,6 +205,23 @@ findAllowedChildren header metaMap = fromMaybe [] $ do
         pure $ catMaybes $ map (flip findDefinition metaMap) $
           getAllowedItems d
       SequenceOrder _ -> pure []
+
+-- | Returns all direct children that must be present according to a sequence order.
+getMandatoryChildren
+  :: ProperTypeMeta -> MetaMap -> Array (Tuple FullTypeName ProperTypeMeta)
+getMandatoryChildren propertyTypeMeta metaMap = case getTreeSyntax propertyTypeMeta of
+  LeafSyntax -> []
+  TreeSyntax _ co -> case co of
+    StarOrder _ -> []
+    SequenceOrder disjunctions ->
+      catMaybes $ map (findMandatoryInDisjunction metaMap) disjunctions
+  where
+  findMandatoryInDisjunction
+    :: MetaMap
+    -> Disjunction FullTypeName
+    -> Maybe (Tuple FullTypeName ProperTypeMeta)
+  findMandatoryInDisjunction metaMap (Disjunction arr) = do
+    head arr >>= flip findDefinition metaMap
 
 -- | Helper function to decode the entire meta map
 decodeMetaMap :: Json -> Either JsonDecodeError MetaMap

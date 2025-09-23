@@ -13,7 +13,8 @@ module FPO.Components.TOC
   ) where
 
 import Data.Array
-  ( concat
+  ( catMaybes
+  , concat
   , cons
   , drop
   , head
@@ -31,13 +32,14 @@ import Data.DateTime (Date, DateTime, adjust)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Time.Duration (Days(..), Minutes)
+import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
-import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postJson)
+import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postText)
 import FPO.Data.Store as Store
 import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed)
 import FPO.Dto.DocumentDto.DocDate as DD
@@ -79,6 +81,7 @@ import Prelude
   , bind
   , const
   , discard
+  , flip
   , identity
   , map
   , negate
@@ -93,6 +96,7 @@ import Prelude
   , (-)
   , (/=)
   , (<)
+  , (<$>)
   , (<<<)
   , (<>)
   , (==)
@@ -529,45 +533,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
     CreateNewMSection fullTypeName meta path -> do
       H.modify_ _ { showAddMenu = [ -1 ] }
 
-      if MM.isLeaf meta then do
-        -- Create new text element:
-        let
-          kind = MM.getKindName fullTypeName
-          type_ = MM.getTypeName fullTypeName
-        s <- H.get
-        gotRes <- postJson PostTextDto.decodePostTextDto
-          ("/docs/" <> show s.docID <> "/text")
-          ( PostTextDto.encodePostTextDto
-              (createPostTextDto { kind: kind, type_: type_ })
-          )
-        case gotRes of
-          Left _ -> pure unit
-          Right dto -> do
-            -- Add new leaf to the TOC tree:
-            let
-              newEntry =
-                Leaf
-                  { meta: unspecifiedMeta
-                  , node:
-                      { id: PostTextDto.getID dto
-                      , name: "New Subsection"
-                      , paraID: 0 -- TODO: Do we still need this?
-                      }
-                  }
-            H.raise (AddNode path newEntry)
-      else do
-        -- Add new node to the TOC tree:
-        let
-          newEntry = Node
-            { meta: unspecifiedMeta
-            , children: []
-            , header: TreeHeader
-                { headerKind: MM.getKindName fullTypeName
-                , headerType: MM.getTypeName fullTypeName
-                , heading: "// Specify your header name here! \nNew Header"
-                }
-            }
-        H.raise (AddNode path newEntry)
+      s <- H.get
+      tree <- createNode fullTypeName meta s.metaMap
+
+      case tree of
+        Nothing ->
+          pure unit -- TODO: Error handling
+        Just t ->
+          H.raise (AddNode path t)
 
     RequestDeleteSection entity -> do
       H.modify_ _ { requestDelete = Just entity }
@@ -689,6 +662,69 @@ tocview = connect (selectEq identity) $ H.mkComponent
     Receive { context: store } -> do
       H.modify_ _
         { translator = fromFpoTranslator store.translator
+        }
+
+  -- Creates a new node (section) and returns its TOC node representation, not added to the TOC yet.
+  -- Creates a full subtree with all mandatory children.
+  createNode
+    :: forall slots
+     . MM.FullTypeName
+    -> MM.ProperTypeMeta
+    -> MM.MetaMap
+    -> H.HalogenM State Action slots Output m (Maybe (Tree TOCEntry))
+  createNode fullTypeName meta metaMap = do
+    let
+      header = TreeHeader
+        { headerKind: MM.getKindName fullTypeName
+        , headerType: MM.getTypeName fullTypeName
+        , heading: "// Specify your header name here! \nNew Header"
+        }
+    if MM.isLeaf meta then do
+      -- Create a new text element for the single child:
+      createLeaf fullTypeName
+    else do
+      let
+        mandatoryChildren = MM.getMandatoryChildren meta metaMap
+      children <- catMaybes <$> traverse (flip createNodeFromTuple metaMap)
+        mandatoryChildren
+
+      pure $ Just $ Node
+        { meta: unspecifiedMeta
+        , children: map Edge children
+        , header: header
+        }
+    where
+    -- A wrapper for `createNode` to work with tuples.
+    createNodeFromTuple
+      :: Tuple MM.FullTypeName MM.ProperTypeMeta
+      -> MM.MetaMap
+      -> H.HalogenM State Action slots Output m (Maybe (Tree TOCEntry))
+    createNodeFromTuple (Tuple ftm m) = createNode ftm m
+
+  -- Creates a new text element and returns its TOC leaf representation,
+  -- not added to the TOC yet.
+  createLeaf
+    :: forall slots
+     . MM.FullTypeName
+    -> H.HalogenM State Action slots Output m (Maybe (Tree TOCEntry))
+  createLeaf fullTypeName = do
+    s <- H.get
+    let
+      kind = MM.getKindName fullTypeName
+      type_ = MM.getTypeName fullTypeName
+    gotRes <- postText
+      s.docID
+      (createPostTextDto { kind: kind, type_: type_ })
+
+    case gotRes of
+      Left _ -> pure Nothing
+      Right dto -> pure $ Just $ Leaf
+        { meta: unspecifiedMeta
+        , node:
+            { id: PostTextDto.getID dto
+            , name: "New Subsection"
+            , paraID: 0 -- TODO: Do we still need this?
+            }
         }
 
   handleQuery
