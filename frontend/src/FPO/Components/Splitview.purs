@@ -361,7 +361,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 \z-index: 10;"
             , HE.onClick \_ -> ToggleComment
             ]
-            [ HH.text "x" ]
+            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -401,7 +401,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 \z-index: 10;"
             , HE.onClick \_ -> ToggleCommentOverview false (-1) (-1)
             ]
-            [ HH.text "x" ]
+            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -550,7 +550,7 @@ splitview = connect selectTranslator $ H.mkComponent
                       \z-index: 10;"
                   , HE.onClick \_ -> TogglePreview
                   ]
-                  [ HH.text "x" ]
+                  [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
               ]
           , HH.slot _preview unit Preview.preview
               { renderedHtml: state.renderedHtml

@@ -1118,7 +1118,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
           ]
       , HE.onClick $ const $ RequestDeleteSection { kind, path, title }
       ]
-      [ HH.text "-" ]
+      [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-dash" ] ] [] ]
 
   -- Creates a history button for a paragraph.
   historyButton
@@ -1408,7 +1408,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 ]
             , HE.onClick \_ -> ToggleAddMenu currentPath
             ]
-            [ HH.text "+" ]
+            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-plus" ] ] [] ]
       )
         <>
           ( singletonIf renderDeleteBtn $ deleteSectionButton currentPath kind title
