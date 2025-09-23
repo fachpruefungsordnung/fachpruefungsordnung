@@ -454,6 +454,22 @@ editor = connect selectTranslator $ H.mkComponent
                         (translate (label :: _ "editor_allComments") state.translator)
                     ]
             ]
+      -- show selected TOC title below tool bar
+      , HH.div
+          [ HP.classes [ HB.dFlex, HB.justifyContentBetween ]
+          , HP.style "padding: .5rem 1rem; border-bottom: 1px solid rgba(0,0,0,.1);"
+          ]
+          [ HH.h2
+              [ HP.classes [ HH.ClassName "text-truncate" ]
+              , HP.style "font-size: 1rem; margin: 0;"
+              ]
+              [ HH.text $
+                  case state.mTitle of
+                    Just title -> title
+                    Nothing -> translate (label :: _ "editor_no_title")
+                      state.translator
+              ]
+          ]
       , case state.compareToElement of
           Nothing ->
             if state.isEditorOutdated then
@@ -527,21 +543,6 @@ editor = connect selectTranslator $ H.mkComponent
                         (translate (label :: _ "editor_readonly") state.translator)
                     ]
                 ]
-      , HH.div
-          [ HP.classes [ HB.dFlex, HB.justifyContentBetween ]
-          , HP.style "padding: .5rem 1rem; border-bottom: 1px solid rgba(0,0,0,.1);"
-          ]
-          [ HH.h2
-              [ HP.classes [ HH.ClassName "text-truncate" ]
-              , HP.style "font-size: 1rem; margin: 0;"
-              ]
-              [ HH.text $
-                  case state.mTitle of
-                    Just title -> title
-                    Nothing -> translate (label :: _ "editor_no_title")
-                      state.translator
-              ]
-          ]
       , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
