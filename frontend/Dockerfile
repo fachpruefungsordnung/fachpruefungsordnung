@@ -35,13 +35,18 @@ COPY test test
 RUN --mount=type=cache,target=/build/node_modules/ \
     --mount=type=cache,target=/build/output/ \
     spago build && \
-    spago bundle --bundle-type app
+    spago bundle --bundle-type app &&\
+    spago docs
 
 # +------------------------------+
 # |            FINAL             |
 # +------------------------------+
 
 FROM nginx:alpine AS final
+
+WORKDIR /docs/dev/purs
+
+COPY --from=build /build/generated-docs/html/ ./
 
 WORKDIR /home
 

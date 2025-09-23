@@ -20,8 +20,8 @@ FROM base AS build
 RUN apt-get update
 RUN apt-get install -y --no-install-recommends \
     g++ gcc libc6-dev libffi-dev libgmp-dev make xz-utils zlib1g-dev git \
-    gnupg curl libexpat-dev libpq-dev ca-certificates \
-    build-essential pkg-config
+    gnupg curl libexpat-dev libpq-dev ca-certificates expect \
+    build-essential pkg-config libtinfo-dev libncurses-dev
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # install stack
@@ -54,6 +54,33 @@ RUN --mount=type=cache,target=/root/.stack/ \
     stack build --copy-bins --local-bin-path /build/bin\
     --extra-include-dirs=/usr/include/postgresql \
     --extra-lib-dirs=/usr/lib/x86_64-linux-gnu
+
+# +------------------------------+
+# |        BUILD HADDOCK         |
+# +------------------------------+
+
+FROM build AS build-haddock
+
+# build haddock
+RUN --mount=type=cache,target=/root/.stack/ \
+    --mount=type=cache,target=/build/.stack-work/ \
+    unbuffer stack haddock --no-haddock-deps && \
+    DOCROOT=$(stack path --local-install-root)/doc && \
+    mkdir -p /out-haddock && \
+    cp -r "$DOCROOT"/ /out-haddock/ && \
+    ls -R "$DOCROOT"
+
+# +------------------------------+
+# |        SERVE HADDOCK         |
+# +------------------------------+
+
+FROM python:3.12-slim AS serve-haddock
+
+COPY --from=build-haddock /out-haddock /haddock
+
+WORKDIR /haddock/doc
+
+CMD ["python", "-m", "http.server", "80"]
 
 # +------------------------------+
 # |            FINAL             |
