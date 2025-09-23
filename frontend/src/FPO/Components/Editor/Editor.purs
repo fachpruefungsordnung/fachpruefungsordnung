@@ -167,6 +167,7 @@ type State = FPOState
   , mTocEntry :: Maybe TOCEntry
   , currentVersion :: String
   , mNodePath :: Maybe Path
+  , mTitle :: Maybe String
   , mContent :: Maybe Content
   , html :: String
   -- comments
@@ -205,6 +206,7 @@ data Output
   | PostPDF String
   | RenamedNode String Path
   | RequestComments Int Int
+  | RequestFullTitle
   | SelectedCommentSection Int Int
   | ShowAllCommentsOutput Int Int
   | RaiseDiscard
@@ -215,7 +217,7 @@ data Action
   = Init
   | DoNothing
   | Comment
-  | ChangeToSection TOCEntry (Maybe Int)
+  | ChangeToSection TOCEntry (Maybe Int) (Maybe String)
   | ContinueChangeToSection (Array FirstComment)
   | SelectComment
   | Font (Types.Editor -> Effect Unit)
@@ -255,7 +257,7 @@ data Query a
   -- | save the current content and send it to splitview
   | SaveSection a
   -- | receive the selected TOC and put its content into the editor
-  | ChangeSection TOCEntry (Maybe Int) a
+  | ChangeSection TOCEntry (Maybe Int) (Maybe String) a
   | ContinueChangeSection (Array FirstComment) a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
@@ -265,6 +267,7 @@ data Query a
   | RequestDirtyVersion (Boolean -> a)
   | ResetDirtyVersion a
   | ReceiveUpToDateUpdate (Maybe Version) a
+  | ReceiveFullTitle (Maybe String) a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -451,6 +454,22 @@ editor = connect selectTranslator $ H.mkComponent
                         (translate (label :: _ "editor_allComments") state.translator)
                     ]
             ]
+      -- show selected TOC title below tool bar
+      , HH.div
+          [ HP.classes [ HB.dFlex, HB.justifyContentBetween ]
+          , HP.style "padding: .5rem 1rem; border-bottom: 1px solid rgba(0,0,0,.1);"
+          ]
+          [ HH.h2
+              [ HP.classes [ HH.ClassName "text-truncate" ]
+              , HP.style "font-size: 1rem; margin: 0;"
+              ]
+              [ HH.text $
+                  case state.mTitle of
+                    Just title -> title
+                    Nothing -> translate (label :: _ "editor_no_title")
+                      state.translator
+              ]
+          ]
       , case state.compareToElement of
           Nothing ->
             if state.isEditorOutdated then
@@ -524,7 +543,6 @@ editor = connect selectTranslator $ H.mkComponent
                         (translate (label :: _ "editor_readonly") state.translator)
                     ]
                 ]
-
       , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
@@ -575,7 +593,6 @@ editor = connect selectTranslator $ H.mkComponent
       -- Do not load content, since no TOC has been selected yet
 
       -- create subscription for later use
-      state <- H.get
       { emitter, listener } <- H.liftEffect HS.create
       -- Subscribe to resize events and store subscription for cleanup
       subscription <- H.subscribe emitter
@@ -608,11 +625,8 @@ editor = connect selectTranslator $ H.mkComponent
           Editor.setTheme "ace/theme/github" editor_
           Session.setMode "ace/mode/custom_mode" session
           Editor.setEnableLiveAutocompletion true editor_
-          case state.compareToElement of
-            Just _ -> do
-              Editor.setReadOnly true editor_
-            Nothing ->
-              Editor.setReadOnly false editor_
+          -- set read only at the start to prevent users to write in not selected entry
+          Editor.setReadOnly true editor_
 
       -- New Ref for keeping track, if the content in editor has changed
       -- 1. since last save
@@ -662,7 +676,7 @@ editor = connect selectTranslator $ H.mkComponent
         Nothing
         -> pure unit
         Just { tocEntry: tocEntry, revID: revID }
-        -> handleAction (ChangeToSection tocEntry revID)
+        -> handleAction (ChangeToSection tocEntry revID Nothing)
 
       -- add and start Editor listeners
       H.gets _.mEditor >>= traverse_ \ed -> do
@@ -876,7 +890,6 @@ editor = connect selectTranslator $ H.mkComponent
           case isAutoSave, state.isEditorOutdated of
             -- auto save interaction
             true, _ -> do
-              -- H.modify_ _ { mContent = Just updatedContent }
               handleAction SavedIcon
               case typ of
                 "noConflict" -> pure unit
@@ -885,7 +898,6 @@ editor = connect selectTranslator $ H.mkComponent
                 _ -> pure unit
             -- manuell saving and working in latest version
             false, false -> do
-              -- H.modify_ _ { mContent = Just updatedContent }
               updateStore $ Store.AddSuccess "Saved successfully"
               case typ of
                 "noConflict" -> do
@@ -922,6 +934,8 @@ editor = connect selectTranslator $ H.mkComponent
 
           -- mDirtyRef := false
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
+          --update title 
+          H.raise RequestFullTitle
           pure unit
 
     SavedIcon -> do
@@ -1394,7 +1408,7 @@ editor = connect selectTranslator $ H.mkComponent
       for_ state.saveState.mPendingDebounceF H.kill
       for_ state.saveState.mPendingMaxWaitF H.kill
 
-    ChangeToSection entry rev -> do
+    ChangeToSection entry rev mTitle -> do
       state <- H.get
       let
         version = case rev of
@@ -1436,6 +1450,7 @@ editor = connect selectTranslator $ H.mkComponent
 
             H.modify_ _
               { mTocEntry = Just entry
+              , mTitle = mTitle
               , mContent = Just content
               , html = html
               , isEditorOutdated = version /= "latest"
@@ -1519,6 +1534,8 @@ editor = connect selectTranslator $ H.mkComponent
             -- Update state with new marker IDs
             H.modify_ \st -> st
               { commentState = st.commentState { liveMarkers = newLiveMarkers } }
+            -- lastly show html in preview
+            H.raise $ ClickedQuery state.html
 
   -- convert Hashmap to Annotations and show them
   -- H.liftEffect $ setAnnotations commentState.markerAnnoHS state.mEditor
@@ -1540,8 +1557,8 @@ editor = connect selectTranslator $ H.mkComponent
         Just ed -> H.liftEffect $ Editor.resize (Just true) ed
       pure (Just a)
 
-    ChangeSection entry rev a -> do
-      handleAction (ChangeToSection entry rev)
+    ChangeSection entry rev mTitle a -> do
+      handleAction (ChangeToSection entry rev mTitle)
       pure (Just a)
 
     ContinueChangeSection fCs a -> do
@@ -1679,7 +1696,11 @@ editor = connect selectTranslator $ H.mkComponent
     ResetDirtyVersion a -> do
       state <- H.get
       for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
-      pure (Just a)
+      pure $ Just a
+
+    ReceiveFullTitle mTitle a -> do
+      H.modify_ \st -> st { mTitle = mTitle }
+      pure $ Just a
 
 -- | Change listener for the editor.
 --
@@ -1817,6 +1838,7 @@ initialState { context, input } =
   , mTocEntry: Nothing
   , currentVersion: ""
   , mNodePath: Nothing
+  , mTitle: Nothing
   , mContent: Nothing
   , html: ""
   , commentState: initialCommentState

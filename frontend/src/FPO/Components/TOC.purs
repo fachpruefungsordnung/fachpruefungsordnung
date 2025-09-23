@@ -18,6 +18,7 @@ import Data.Array
   , cons
   , drop
   , head
+  , index
   , last
   , length
   , mapWithIndex
@@ -114,7 +115,7 @@ type Version = { author :: DH.User, identifier :: Maybe Int, timestamp :: DD.Doc
 
 data Output
   -- | Opens the editor for some leaf node, that is, a subsection or paragraph.
-  = ChangeToLeaf Int
+  = ChangeToLeaf Int (Maybe String)
   -- | Used to tell the editor to update the path of the selected node
   --   during title renaming.
   | UpdateNodePosition Path
@@ -145,7 +146,7 @@ data Action
   | Both Action Action
   | Receive (Connected Store.Store Input)
   | DoNothing
-  | JumpToLeafSection Int (Array Int)
+  | JumpToLeafSection Int (Array Int) String
   | ToggleAddMenu Path
   | ToggleHistoryMenu (Array Int) Int
   | ToggleHistoryMenuOff (Array Int)
@@ -176,6 +177,7 @@ data Query a
   | RequestCurrentTocEntryTitle (Maybe String -> a)
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
   | RequestUpToDateVersion (Maybe Version -> a)
+  | RequestFullTitle (Maybe String -> a)
 
 type SearchData =
   { elementID :: Int
@@ -189,6 +191,7 @@ type State = FPOState
   ( docID :: DH.DocumentID
   , documentName :: String
   , tocEntries :: RootTree TOCEntry
+  , mTitle :: Maybe String
   , metaMap :: MM.MetaMap
   , mSelectedTocEntry :: Maybe SelectedEntity
   , now :: Maybe DateTime
@@ -214,6 +217,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
   { initialState: \{ context: store, input } ->
       { documentName: ""
       , tocEntries: Empty
+      , mTitle: Nothing
       , metaMap: MM.emptyMetaMap
       , mSelectedTocEntry: Nothing
       , now: Nothing
@@ -474,13 +478,13 @@ tocview = connect (selectEq identity) $ H.mkComponent
     DoNothing -> do
       pure unit
 
-    JumpToLeafSection id path -> do
+    JumpToLeafSection id path title -> do
       handleAction (ToggleHistoryMenuOff path)
       mSelectedTocEntry <- H.gets _.mSelectedTocEntry
       when (mSelectedTocEntry /= Just (SelLeaf id)) do
         H.modify_ \state ->
-          state { mSelectedTocEntry = Just $ SelLeaf id }
-        H.raise (ChangeToLeaf id)
+          state { mSelectedTocEntry = Just $ SelLeaf id, mTitle = Just title }
+        H.raise (ChangeToLeaf id (Just title))
 
     ToggleAddMenu path -> do
       H.modify_ \state ->
@@ -749,8 +753,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
                   }
           )
           entries
+        newMTitle = case state.mSelectedTocEntry of
+          Nothing -> Nothing
+          Just (SelLeaf leafId) ->
+            getFullTitle <$> findLeafMeta leafId entries
+          Just (SelNode path _) ->
+            getFullTitle <$> findMetaByPath path entries
       H.modify_ _
-        { searchData = sData }
+        { searchData = sData, mTitle = newMTitle }
       case state.mSelectedTocEntry of
         Just (SelLeaf id) ->
           if state.showHistoryMenu /= [ -1 ] then do
@@ -780,6 +790,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
       handleAction UpdateUpToDateVersion
       state <- H.get
       pure (Just (reply state.upToDateVersion))
+
+    RequestFullTitle reply -> do
+      mTitle <- H.gets _.mTitle
+      pure (Just (reply mTitle))
 
   rootTreeToHTML
     :: forall slots
@@ -941,7 +955,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
           ] <>
             -- Stop to be able to click, if alredy selected (prevent spamming post requests)
             ( if level > 0 && mSelectedTocEntry /= Just (SelLeaf id) then
-                [ HE.onClick \_ -> JumpToLeafSection id path
+                [ HE.onClick \_ -> JumpToLeafSection id path (getFullTitle meta)
                 ]
               else
                 []
@@ -1104,7 +1118,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
           ]
       , HE.onClick $ const $ RequestDeleteSection { kind, path, title }
       ]
-      [ HH.text "-" ]
+      [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-dash" ] ] [] ]
 
   -- Creates a history button for a paragraph.
   historyButton
@@ -1394,7 +1408,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 ]
             , HE.onClick \_ -> ToggleAddMenu currentPath
             ]
-            [ HH.text "+" ]
+            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-plus" ] ] [] ]
       )
         <>
           ( singletonIf renderDeleteBtn $ deleteSectionButton currentPath kind title
@@ -1471,3 +1485,39 @@ findLeafTitleInTree targetId = case _ of
     if id == targetId then getContent meta.title else Nothing
   Node { children } ->
     findLeafTitleInChildren targetId children
+
+-- find meta helper function
+
+findLeafMeta :: Int -> RootTree TOCEntry -> Maybe Meta
+findLeafMeta _ Empty = Nothing
+findLeafMeta targetId (RootTree { children }) =
+  goChildren children
+  where
+  goChildren :: Array (Edge TOCEntry) -> Maybe Meta
+  goChildren cs = case uncons cs of
+    Nothing -> Nothing
+    Just { head: Edge t, tail: rest } ->
+      case t of
+        Leaf { meta, node: { id } } ->
+          if id == targetId then Just meta else goChildren rest
+        Node { children: nChildren } ->
+          case goChildren nChildren of
+            Just m -> Just m
+            Nothing -> goChildren rest
+
+findMetaByPath :: Path -> RootTree TOCEntry -> Maybe Meta
+findMetaByPath _ Empty = Nothing
+findMetaByPath path (RootTree { children }) = go path children
+  where
+  go :: Array Int -> Array (Edge TOCEntry) -> Maybe Meta
+  go p cs = case uncons p of
+    Nothing -> Nothing
+    Just { head: i, tail: rest } ->
+      case index cs i of
+        Nothing -> Nothing
+        Just (Edge t) ->
+          case rest, t of
+            [], Leaf { meta } -> Just meta
+            [], Node { meta } -> Just meta
+            _, Node { children: nChildren } -> go rest nChildren
+            _, Leaf _ -> Nothing

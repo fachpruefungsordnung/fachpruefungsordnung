@@ -361,7 +361,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 \z-index: 10;"
             , HE.onClick \_ -> ToggleComment
             ]
-            [ HH.text "x" ]
+            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -401,7 +401,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 \z-index: 10;"
             , HE.onClick \_ -> ToggleCommentOverview false (-1) (-1)
             ]
-            [ HH.text "x" ]
+            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -550,7 +550,7 @@ splitview = connect selectTranslator $ H.mkComponent
                       \z-index: 10;"
                   , HE.onClick \_ -> TogglePreview
                   ]
-                  [ HH.text "x" ]
+                  [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
               ]
           , HH.slot _preview unit Preview.preview
               { renderedHtml: state.renderedHtml
@@ -646,7 +646,9 @@ splitview = connect selectTranslator $ H.mkComponent
       handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
       case (findTOCEntry elementID state.tocEntries) of
         Nothing -> pure unit
-        Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
+        Just entry -> do
+          mmTitle <- H.request _toc unit TOC.RequestFullTitle
+          H.tell _editor 0 (Editor.ChangeSection entry mVID (join mmTitle))
 
     -- API Actions
 
@@ -674,7 +676,6 @@ splitview = connect selectTranslator $ H.mkComponent
                   { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
               )
               finalTree
-          -- H.liftEffect $ log (MM.prettyPrintMetaMap metaMap)
           H.modify_ _
             { tocEntries = finalTree
             , versionMapping = vMapping
@@ -915,8 +916,9 @@ splitview = connect selectTranslator $ H.mkComponent
         ( ModifyVersionMapping elementID Nothing
             (Just (Just { tocEntry: tocEntry, revID: mVID, title: title }))
         )
+      mmTitle <- H.request _toc unit TOC.RequestFullTitle
       H.tell _editor 1
-        (Editor.ChangeSection tocEntry mVID)
+        (Editor.ChangeSection tocEntry mVID (join mmTitle))
 
     -- Query handler
 
@@ -1081,7 +1083,7 @@ splitview = connect selectTranslator $ H.mkComponent
               entry = case (findTOCEntry id state.tocEntries) of
                 Nothing -> emptyTOCEntry
                 Just e -> e
-            H.tell _editor 0 (Editor.ChangeSection entry Nothing)
+            H.tell _editor 0 (Editor.ChangeSection entry Nothing Nothing)
           _ -> do
             pure unit
 
@@ -1118,7 +1120,9 @@ splitview = connect selectTranslator $ H.mkComponent
                   entry = case (findTOCEntry id state.tocEntries) of
                     Nothing -> emptyTOCEntry
                     Just e -> e
-                H.tell _editor 1 (Editor.ChangeSection entry version.identifier)
+                mmTitle <- H.request _toc unit TOC.RequestFullTitle
+                H.tell _editor 1
+                  (Editor.ChangeSection entry version.identifier (join mmTitle))
               _ -> pure unit
           _ -> do
             pure unit
@@ -1133,8 +1137,15 @@ splitview = connect selectTranslator $ H.mkComponent
               (ModifyVersionMapping elementID (Just Nothing) (Just Nothing))
             case (findTOCEntry elementID state.tocEntries) of
               Nothing -> pure unit
-              Just entry -> H.tell _editor 0 (Editor.ChangeSection entry Nothing)
+              Just entry -> H.tell _editor 0
+                (Editor.ChangeSection entry Nothing Nothing)
           _ -> pure unit
+
+      Editor.RequestFullTitle -> do
+        handleAction GET
+        mmTitle <- H.request _toc unit TOC.RequestFullTitle
+        H.tell _editor 0 (Editor.ReceiveFullTitle (join mmTitle))
+        H.tell _editor 1 (Editor.ReceiveFullTitle (join mmTitle))
 
     DeleteDraft -> do
       handleAction UpdateMSelectedTocEntry
@@ -1166,12 +1177,14 @@ splitview = connect selectTranslator $ H.mkComponent
           handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
           case (findTOCEntry elementID state.tocEntries) of
             Nothing -> pure unit
-            Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
+            Just entry -> do
+              mmTitle <- H.request _toc unit TOC.RequestFullTitle
+              H.tell _editor 0 (Editor.ChangeSection entry mVID (join mmTitle))
 
       TOC.CompareTo elementID vID -> do
         handleAction (SetComparison elementID vID)
 
-      TOC.ChangeToLeaf selectedId -> do
+      TOC.ChangeToLeaf selectedId mTitle -> do
         H.tell _editor 0 Editor.SaveSection
         handleAction UpdateMSelectedTocEntry
         state <- H.get
@@ -1186,13 +1199,13 @@ splitview = connect selectTranslator $ H.mkComponent
               Nothing ->
                 { elementID: -1, versionID: Nothing, comparisonData: Nothing }
               Just elem -> elem
-        H.tell _editor 0 (Editor.ChangeSection entry ev.versionID)
+        H.tell _editor 0 (Editor.ChangeSection entry ev.versionID mTitle)
         case ev.comparisonData of
           Nothing -> do
             -- this case should be covered by mSelectedTocEntry being set to Nothing
             pure unit
           Just d ->
-            H.tell _editor 1 (Editor.ChangeSection d.tocEntry d.revID)
+            H.tell _editor 1 (Editor.ChangeSection d.tocEntry d.revID mTitle)
 
       TOC.UpdateNodePosition path -> do
         H.tell _editor 0 (Editor.UpdateNodePosition path)
@@ -1254,12 +1267,6 @@ splitview = connect selectTranslator $ H.mkComponent
           H.tell _toc unit (TOC.ReceiveTOCs finalTree metaMap)
 
       handleAction UpdateVersionMapping
-
--- findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
--- findCommentSection tocEntries tocID markerID = do
---   tocEntry <- findTOCEntry tocID tocEntries
---   marker <- find (\m -> m.id == markerID) tocEntry.markers
---   marker.mCommentSection
 
 {- ------------------ Tree traversal and mutation function ------------------ -}
 {- --------------------- TODO: Move to seperate module  --------------------- -}
