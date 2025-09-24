@@ -26,7 +26,11 @@ module Language.Ltml.HTML.Util
       -- * ToHtmlM Helpers
     , getNextRawTextTree
     , isSuper
+
+      -- * FilePaths
     , disjointRelative
+
+      -- * Textual Headings
     , headingText
     ) where
 

@@ -1,10 +1,15 @@
 module Language.Ltml.HTML.CSS.Color
-    ( tableDarkCell
+    ( -- * Table Colors
+      tableDarkCell
     , tableActiveRow
     , tableCellBorder
+
+      -- * Link Colors
     , linkText
     , linkTextHover
     , linkUnderline
+
+      -- * Error Colors
     , errorText
     , errorBoxBorder
     ) where

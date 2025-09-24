@@ -1,6 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Language.Ltml.HTML.Export (exportDocument, renderZip) where
+module Language.Ltml.HTML.Export
+    ( -- * Build ZIP Archive
+      renderZip
+    ) where
 
 import Clay (render)
 import Codec.Archive.Zip

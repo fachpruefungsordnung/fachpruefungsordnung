@@ -7,6 +7,8 @@ module Language.Ltml.HTML
     , renderHtmlCssWith
     , renderHtmlCssExport
     , renderHtmlCssBS
+
+      -- * Rendering ToC Headings
     , renderTocList
     ) where
 

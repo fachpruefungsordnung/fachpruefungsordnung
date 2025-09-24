@@ -95,6 +95,8 @@ data Class
       MinSizeColumn
     | -- | Table column that consumes maximum space possible
       MaxSizeColumn
+    | -- | Center entries in table columns
+      TableCentered
     deriving (Show, Eq, Enum, Bounded)
 
 -- | Maps Class to its css style definition
@@ -296,6 +298,9 @@ classStyle MinSizeColumn = do
 classStyle MaxSizeColumn = do
     toClassSelector MaxSizeColumn ? do
         width auto
+classStyle TableCentered =
+    toClassSelector TableCentered ? do
+        textAlign center
 
 -- | Returns the html class name of given Class
 className :: Class -> Text
