@@ -1,4 +1,8 @@
-module Language.Ltml.HTML.CSS (writeCss, mainStylesheet) where
+module Language.Ltml.HTML.CSS
+    ( -- * Finalizing and Rendering @Css@
+      writeCss
+    , mainStylesheet
+    ) where
 
 import Clay hiding (map)
 
@@ -8,10 +12,11 @@ import Language.Ltml.HTML.Common (EnumStyleMap)
 import Language.Ltml.HTML.FormatString (buildCssCounters)
 import Prelude hiding (writeFile)
 
+-- | Render @Css@ to given file
 writeCss :: Css -> FilePath -> IO ()
 writeCss css path = writeFile path (render css)
 
--- | List of all @Css@ Classes defined in 'Language.Ltml.HTML.CSS.Classes'
+-- | List of all Css Classes defined in 'Language.Ltml.HTML.CSS.Classes'
 cssClasses :: [Css]
 cssClasses = map classStyle [minBound .. maxBound]
 

@@ -172,7 +172,6 @@ library:
     - Language.Ltml.HTML.CSS.Color
     - Language.Ltml.HTML.CSS.CustomClay
     - Language.Ltml.HTML.CSS.Util
-    - Language.Ltml.HTML.Pipeline
     - Language.Ltml.HTML.References
     - Language.Ltml.HTML.CSS
     - Language.Ltml.Pretty

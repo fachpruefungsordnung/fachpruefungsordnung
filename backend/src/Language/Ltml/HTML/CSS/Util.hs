@@ -1,9 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Ltml.HTML.CSS.Util
-    ( (<#>)
+    ( -- * Convert CSS Classes to HTML Attributes
+      (<#>)
     , cssClass_
     , cssClasses_
+
+      -- * Wrap HTML Headers and Stylesheets
     , addHtmlHeader
     , addInlineCssHeader
     ) where
@@ -18,6 +21,8 @@ import Lucid
 -- | Constructs HTML element with given Class
 (<#>) :: ([Attributes] -> a) -> Class -> a
 htmlFunc <#> cssClass = htmlFunc [class_ (className cssClass)]
+
+infixl 9 <#>
 
 -- | Convert CSS Class to Lucid HTML Attribute
 cssClass_ :: Class -> Attributes

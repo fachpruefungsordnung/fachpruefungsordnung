@@ -5,10 +5,15 @@
 {-# OPTIONS_GHC -Wincomplete-patterns -Werror=incomplete-patterns #-}
 
 module Language.Ltml.HTML.CSS.Classes
-    ( Class (..)
+    ( -- * CSS Class Defintions
+      Class (..)
     , className
     , classStyle
+
+      -- * Enumeration Counter
     , enumCounter
+
+      -- * LTML AST to CSS Class Mapping
     , ToCssClass (..)
     , toCssClasses
     ) where
@@ -90,9 +95,11 @@ data Class
       MinSizeColumn
     | -- | Table column that consumes maximum space possible
       MaxSizeColumn
+    | -- | Center entries in table columns
+      TableCentered
     deriving (Show, Eq, Enum, Bounded)
 
--- | maps Class to its css style definition
+-- | Maps Class to its css style definition
 classStyle :: Class -> Css
 classStyle Body =
     toClassSelector Body ? do
@@ -291,6 +298,9 @@ classStyle MinSizeColumn = do
 classStyle MaxSizeColumn = do
     toClassSelector MaxSizeColumn ? do
         width auto
+classStyle TableCentered =
+    toClassSelector TableCentered ? do
+        textAlign center
 
 -- | Returns the html class name of given Class
 className :: Class -> Text
@@ -299,7 +309,7 @@ className cssClass = case show cssClass of
     -- \| This case can not happen with derived Show
     [] -> error "CSS Class has \"\" as show instance!"
 
--- | converts Class to Clay Selector and adds "." infront for css selection
+-- | Converts Class to Clay Selector and adds "." infront for css selection
 toClassSelector :: Class -> Selector
 toClassSelector c = fromString ("." ++ unpack (className c))
 

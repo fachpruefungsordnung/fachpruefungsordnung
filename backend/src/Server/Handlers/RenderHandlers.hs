@@ -25,7 +25,6 @@ import Data.OpenApi
     , declareNamedSchema
     )
 import Data.Text (Text)
-import Language.Ltml.HTML.Pipeline (htmlPipeline)
 import Language.Ltml.ToLaTeX.PDFGenerator (generatePDFFromSection)
 import Network.HTTP.Media.MediaType ((//))
 import Servant
@@ -58,8 +57,7 @@ instance ToSchema ZipByteString where
 -- | API type for all render formats
 type RenderAPI =
     "render"
-        :> ( "html" :> RenderRoute HTML
-                :<|> "plain" :> RenderRoute Plain
+        :> ( "plain" :> RenderRoute Plain
                 :<|> "pdf"
                     :> Auth AuthMethod Auth.Token
                     :> ReqBody '[JSON] Text
@@ -68,7 +66,7 @@ type RenderAPI =
 
 renderServer :: Server RenderAPI
 renderServer =
-    renderHandler htmlPipeline :<|> renderHandler renderPlain :<|> renderPDFHandler
+    renderHandler renderPlain :<|> renderPDFHandler
 
 -- | Format type for HTML
 data HTML

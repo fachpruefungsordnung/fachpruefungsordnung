@@ -3,13 +3,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Language.Ltml.HTML.FormatString
-    ( sectionFormat
-    , headingFormatId
+    ( -- * HeadingFormat Types
+      headingFormatId
     , headingFormat
+
+      -- * Section and Paragraph Format
+    , sectionFormat
     , paragraphFormat
+
+      -- * IdentifierFormat
     , identifierFormat
+
+      -- * Enum Counter Class Generation
     , enumFormat
+
+      -- * Building Enum Counters into CSS
     , buildCssCounters
+
+      -- * AppendixFormat
     , appendixFormat
     ) where
 
