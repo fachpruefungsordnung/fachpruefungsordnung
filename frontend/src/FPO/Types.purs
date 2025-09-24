@@ -1,4 +1,24 @@
-module FPO.Types where
+module FPO.Types
+  ( AnnotatedMarker
+  , Comment
+  , CommentSection
+  , FirstComment
+  , TOCEntry
+  , TOCTree
+  , cdCommentToComment
+  , documentTreeToTOCTree
+  , emptyComment
+  , emptyCommentSection
+  , emptyTOCEntry
+  , findTOCEntry
+  , findTitleTOCEntry
+  , markerToAnnotation
+  , nodeHeaderToTOCEntry
+  , replaceTOCEntry
+  , sectionDtoToCS
+  , tocEntryToNodeHeader
+  , tocTreeToDocumentTree
+  ) where
 
 import Prelude
 
@@ -111,9 +131,6 @@ findTitleTOCEntry tocID = findTitleRootTree (\e -> e.id == tocID)
 
 replaceTOCEntry :: Int -> TOCEntry -> TOCTree -> TOCTree
 replaceTOCEntry tocID = replaceNodeRootTree (\e -> e.id == tocID)
-
-sortMarkers :: Array AnnotatedMarker -> Array AnnotatedMarker
-sortMarkers = sortBy (comparing _.startRow <> comparing _.startCol)
 
 markerToAnnotation :: AnnotatedMarker -> Types.Annotation
 markerToAnnotation m =

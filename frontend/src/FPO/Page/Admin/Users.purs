@@ -12,7 +12,6 @@ import Effect.Aff.Class (class MonadAff)
 import FPO.Components.UI.UserFilter as Filter
 import FPO.Components.UI.UserList as UserList
 import FPO.Data.AppError (AppError(..))
-import FPO.Data.Email as Email
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (deleteIgnore, getUser, postString)
 import FPO.Data.Route (Route(..))
@@ -33,6 +32,7 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addButton, addCard, addColumn)
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
+import FPO.Util (isValidEmailStrict)
 import FPO.Util as Util
 import Halogen as H
 import Halogen.HTML as HH
@@ -304,4 +304,4 @@ isCreateUserFormValid createUserDto =
   not (null $ getName createUserDto)
     && not (null $ getEmail createUserDto)
     && not (null $ getPassword createUserDto)
-    && Email.isValidEmailStrict (getEmail createUserDto)
+    && isValidEmailStrict (getEmail createUserDto)
