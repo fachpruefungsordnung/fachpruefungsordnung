@@ -202,7 +202,6 @@ type Input = { docID :: DocumentID, elementData :: ElementData }
 data Output
   = AddComment Int Int
   | ClickedQuery String
-  | DeletedComment TOCEntry (Array Int)
   | PostPDF String
   | RenamedNode String Path
   | RequestComments Int Int

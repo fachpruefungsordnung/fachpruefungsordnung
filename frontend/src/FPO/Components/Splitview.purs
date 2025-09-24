@@ -145,7 +145,7 @@ type State = FPOState
   , renderedHtml :: Maybe (LoadState String)
   , testDownload :: String
 
-  -- Store tocEntries and send some parts to its children components
+  -- Store tocEntries tree and send some parts or whole to its children components
   , tocEntries :: TOCTree
 
   -- store for each element which version should be shown. Nothing means the most recent version should be shown
@@ -620,8 +620,6 @@ splitview = connect selectTranslator $ H.mkComponent
         (CommentOverview.ReceiveTimeFormatter timeFormatter)
       H.tell _toc unit (TOC.ReceiveTOCs Empty emptyMetaMap)
       -- Load the initial TOC entries into the editor
-      -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
-      -- or rather, we don't use commit anymore in the API
       handleAction GET
       handleAction UpdateMSelectedTocEntry
 
@@ -971,14 +969,6 @@ splitview = connect selectTranslator $ H.mkComponent
           _ -> pure unit
         H.modify_ _ { renderedHtml = Just Loading }
         H.modify_ _ { renderedHtml = Just (Loaded html) }
-
-      Editor.DeletedComment tocEntry deletedIDs -> do
-        H.modify_ \st ->
-          st
-            { tocEntries =
-                map (\e -> if e.id == tocEntry.id then tocEntry else e) st.tocEntries
-            }
-        H.tell _comment unit (Comment.DeletedComment deletedIDs)
 
       Editor.PostPDF _ -> do
         state <- H.get
