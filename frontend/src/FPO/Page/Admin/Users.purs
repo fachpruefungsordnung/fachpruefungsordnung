@@ -9,7 +9,6 @@ import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String (null)
 import Effect.Aff.Class (class MonadAff)
-import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.UI.UserFilter as Filter
 import FPO.Components.UI.UserList as UserList
 import FPO.Data.AppError (AppError(..))
@@ -33,6 +32,7 @@ import FPO.Dto.UserOverviewDto as UOD
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addButton, addCard, addColumn)
+import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Util as Util
 import Halogen as H
 import Halogen.HTML as HH

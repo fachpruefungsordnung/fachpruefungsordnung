@@ -1,4 +1,4 @@
-module FPO.Components.Modals.InfoModal
+module FPO.UI.Modals.InfoModal
   ( infoModal
   ) where
 

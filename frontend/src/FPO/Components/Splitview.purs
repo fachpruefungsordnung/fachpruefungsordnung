@@ -22,7 +22,6 @@ import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
 import FPO.Components.Editor as Editor
 import FPO.Components.Editor.Types (ElementData)
-import FPO.Components.Modals.DirtyVersionModal (dirtyVersionModal)
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC (Path, SelectedEntity(..), Version)
 import FPO.Components.TOC as TOC
@@ -55,6 +54,7 @@ import FPO.Types
   , findTitleTOCEntry
   , tocTreeToDocumentTree
   )
+import FPO.UI.Modals.DirtyVersionModal (dirtyVersionModal)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
