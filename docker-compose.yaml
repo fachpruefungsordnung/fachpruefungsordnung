@@ -22,6 +22,15 @@ services:
       postgres:
         condition: service_healthy
 
+  backend-haddock:
+    container_name: fpo-haddock
+    hostname: haddock
+    build:
+      context: ./backend
+      target: serve-haddock
+    networks:
+      - backend
+
   swagger-ui:
     container_name: fpo-swagger
     hostname: swagger

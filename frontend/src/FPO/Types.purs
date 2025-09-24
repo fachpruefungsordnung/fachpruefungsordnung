@@ -8,8 +8,6 @@ import Data.Date (canonicalDate)
 import Data.Date.Component (Day, Month(..), Year)
 import Data.DateTime (DateTime(..))
 import Data.Enum (toEnum)
-import Data.Formatter.DateTime (Formatter, FormatterCommand(..))
-import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), fromJust)
 import Data.Time (Time(..))
 import Data.Time.Component (Hour, Millisecond, Minute, Second)
@@ -124,59 +122,6 @@ markerToAnnotation m =
   , text: m.markerText
   , type: m.type
   }
-
--- TODO create more timestamps versions and discuss, where to store this
-timeStampsVersions :: Array Formatter
-timeStampsVersions =
-  [ -- DD.MM.YY HH:mm
-    ( DayOfMonthTwoDigits
-        : Placeholder "."
-        : MonthShort
-        : Placeholder "."
-        : YearTwoDigits
-        : Placeholder " "
-        : Hours24
-        : Placeholder ":"
-        : MinutesTwoDigits
-        : Nil
-    )
-  -- DD/MM/YY HH:mm
-  , ( DayOfMonthTwoDigits
-        : Placeholder "/"
-        : MonthShort
-        : Placeholder "/"
-        : YearTwoDigits
-        : Placeholder " "
-        : Hours24
-        : Placeholder ":"
-        : MinutesTwoDigits
-        : Nil
-    )
-  -- MM/DD/YY HH:mm
-  , ( MonthShort
-        : Placeholder "/"
-        : DayOfMonthTwoDigits
-        : Placeholder "/"
-        : YearTwoDigits
-        : Placeholder " "
-        : Hours24
-        : Placeholder ":"
-        : MinutesTwoDigits
-        : Nil
-    )
-  -- YY/MM/DD HH:mm
-  , ( YearTwoDigits
-        : Placeholder "/"
-        : MonthShort
-        : Placeholder "/"
-        : DayOfMonthTwoDigits
-        : Placeholder " "
-        : Hours24
-        : Placeholder ":"
-        : MinutesTwoDigits
-        : Nil
-    )
-  ]
 
 -- Tree functions for TOC
 

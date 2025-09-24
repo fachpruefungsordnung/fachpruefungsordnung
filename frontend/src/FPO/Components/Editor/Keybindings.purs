@@ -10,7 +10,7 @@ import Ace.Types as Types
 import Data.Maybe (Maybe(..))
 import Data.String as String
 import Effect (Effect)
-import Web.Event.Event (Event)
+import Web.Event.Event (Event, preventDefault)
 import Web.UIEvent.KeyboardEvent (KeyboardEvent, ctrlKey, fromEvent, key, shiftKey)
 
 makeBold :: Types.Editor -> Effect Unit
@@ -55,13 +55,19 @@ keyBinding editor_ event = do
 
       if ctrlKeyPressed && not shiftKeyPressed then
         case pressedKey of
-          "b" -> makeBold editor_
-          "i" -> makeItalic editor_
+          "b" -> do
+            preventDefault event
+            makeBold editor_
+          "i" -> do
+            preventDefault event
+            makeItalic editor_
           "z" -> do
+            preventDefault event
             Editor.undo editor_
             Editor.focus editor_
           "Z" -> do
-            Editor.undo editor_
+            preventDefault event
+            Editor.redo editor_
             Editor.focus editor_
           _ -> pure unit
       else pure unit

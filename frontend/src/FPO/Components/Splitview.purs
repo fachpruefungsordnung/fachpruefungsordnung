@@ -10,7 +10,7 @@ import Prelude
 
 import Data.Array (cons, deleteAt, head, insertAt, null, snoc, uncons, updateAt, (!!))
 import Data.Either (Either(..))
-import Data.Formatter.DateTime (Formatter)
+import Data.Formatter.DateTime (Formatter, parseFormatString)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String.Regex as Regex
@@ -30,8 +30,10 @@ import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (LoadState(..))
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
+import FPO.Data.Time (defaultFormatter, timeStampsVersions)
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.DocumentDto.DocumentTree as DT
+import FPO.Dto.DocumentDto.MetaTree (emptyMetaMap)
 import FPO.Dto.DocumentDto.MetaTree as MM
 import FPO.Dto.DocumentDto.TreeDto
   ( Edge(..)
@@ -51,7 +53,6 @@ import FPO.Types
   , emptyTOCEntry
   , findTOCEntry
   , findTitleTOCEntry
-  , timeStampsVersions
   , tocTreeToDocumentTree
   )
 import Halogen as H
@@ -360,7 +361,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 \z-index: 10;"
             , HE.onClick \_ -> ToggleComment
             ]
-            [ HH.text "x" ]
+            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -400,7 +401,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 \z-index: 10;"
             , HE.onClick \_ -> ToggleCommentOverview false (-1) (-1)
             ]
-            [ HH.text "x" ]
+            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -549,7 +550,7 @@ splitview = connect selectTranslator $ H.mkComponent
                       \z-index: 10;"
                   , HE.onClick \_ -> TogglePreview
                   ]
-                  [ HH.text "x" ]
+                  [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
               ]
           , HH.slot _preview unit Preview.preview
               { renderedHtml: state.renderedHtml
@@ -606,13 +607,18 @@ splitview = connect selectTranslator $ H.mkComponent
   handleAction = case _ of
 
     Init -> do
-      let timeFormatter = head timeStampsVersions
+      let
+        timeFormat = fromMaybe "" (head timeStampsVersions)
+        timeFormatter = Just $ case parseFormatString timeFormat of
+          Left _ -> defaultFormatter
+          Right formatter -> formatter
+
       H.modify_ \st -> do
         st { mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
       H.tell _commentOverview unit
         (CommentOverview.ReceiveTimeFormatter timeFormatter)
-      H.tell _toc unit (TOC.ReceiveTOCs Empty)
+      H.tell _toc unit (TOC.ReceiveTOCs Empty emptyMetaMap)
       -- Load the initial TOC entries into the editor
       -- TODO: Shoult use Get instead, but I (Eddy) don't understand GET
       -- or rather, we don't use commit anymore in the API
@@ -640,7 +646,9 @@ splitview = connect selectTranslator $ H.mkComponent
       handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
       case (findTOCEntry elementID state.tocEntries) of
         Nothing -> pure unit
-        Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
+        Just entry -> do
+          mmTitle <- H.request _toc unit TOC.RequestFullTitle
+          H.tell _editor 0 (Editor.ChangeSection entry mVID (join mmTitle))
 
     -- API Actions
 
@@ -660,7 +668,7 @@ splitview = connect selectTranslator $ H.mkComponent
         ("/docs/" <> show s.docID <> "/tree/latest")
       case maybeTree of
         Left err -> updateStore $ Store.AddError err
-        Right (MM.DocumentTreeWithMetaMap { tree {-, metaMap -} }) -> do
+        Right (MM.DocumentTreeWithMetaMap { tree, metaMap }) -> do
           let
             finalTree = documentTreeToTOCTree tree
             vMapping = map
@@ -668,12 +676,11 @@ splitview = connect selectTranslator $ H.mkComponent
                   { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
               )
               finalTree
-          -- H.liftEffect $ log (MM.prettyPrintMetaMap metaMap)
           H.modify_ _
             { tocEntries = finalTree
             , versionMapping = vMapping
             }
-          H.tell _toc unit (TOC.ReceiveTOCs finalTree)
+          H.tell _toc unit (TOC.ReceiveTOCs finalTree metaMap)
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -909,8 +916,9 @@ splitview = connect selectTranslator $ H.mkComponent
         ( ModifyVersionMapping elementID Nothing
             (Just (Just { tocEntry: tocEntry, revID: mVID, title: title }))
         )
+      mmTitle <- H.request _toc unit TOC.RequestFullTitle
       H.tell _editor 1
-        (Editor.ChangeSection tocEntry mVID)
+        (Editor.ChangeSection tocEntry mVID (join mmTitle))
 
     -- Query handler
 
@@ -1075,7 +1083,7 @@ splitview = connect selectTranslator $ H.mkComponent
               entry = case (findTOCEntry id state.tocEntries) of
                 Nothing -> emptyTOCEntry
                 Just e -> e
-            H.tell _editor 0 (Editor.ChangeSection entry Nothing)
+            H.tell _editor 0 (Editor.ChangeSection entry Nothing Nothing)
           _ -> do
             pure unit
 
@@ -1112,7 +1120,9 @@ splitview = connect selectTranslator $ H.mkComponent
                   entry = case (findTOCEntry id state.tocEntries) of
                     Nothing -> emptyTOCEntry
                     Just e -> e
-                H.tell _editor 1 (Editor.ChangeSection entry version.identifier)
+                mmTitle <- H.request _toc unit TOC.RequestFullTitle
+                H.tell _editor 1
+                  (Editor.ChangeSection entry version.identifier (join mmTitle))
               _ -> pure unit
           _ -> do
             pure unit
@@ -1127,8 +1137,15 @@ splitview = connect selectTranslator $ H.mkComponent
               (ModifyVersionMapping elementID (Just Nothing) (Just Nothing))
             case (findTOCEntry elementID state.tocEntries) of
               Nothing -> pure unit
-              Just entry -> H.tell _editor 0 (Editor.ChangeSection entry Nothing)
+              Just entry -> H.tell _editor 0
+                (Editor.ChangeSection entry Nothing Nothing)
           _ -> pure unit
+
+      Editor.RequestFullTitle -> do
+        handleAction GET
+        mmTitle <- H.request _toc unit TOC.RequestFullTitle
+        H.tell _editor 0 (Editor.ReceiveFullTitle (join mmTitle))
+        H.tell _editor 1 (Editor.ReceiveFullTitle (join mmTitle))
 
     DeleteDraft -> do
       handleAction UpdateMSelectedTocEntry
@@ -1160,12 +1177,14 @@ splitview = connect selectTranslator $ H.mkComponent
           handleAction (ModifyVersionMapping elementID (Just mVID) Nothing)
           case (findTOCEntry elementID state.tocEntries) of
             Nothing -> pure unit
-            Just entry -> H.tell _editor 0 (Editor.ChangeSection entry mVID)
+            Just entry -> do
+              mmTitle <- H.request _toc unit TOC.RequestFullTitle
+              H.tell _editor 0 (Editor.ChangeSection entry mVID (join mmTitle))
 
       TOC.CompareTo elementID vID -> do
         handleAction (SetComparison elementID vID)
 
-      TOC.ChangeToLeaf selectedId -> do
+      TOC.ChangeToLeaf selectedId mTitle -> do
         H.tell _editor 0 Editor.SaveSection
         handleAction UpdateMSelectedTocEntry
         state <- H.get
@@ -1180,13 +1199,13 @@ splitview = connect selectTranslator $ H.mkComponent
               Nothing ->
                 { elementID: -1, versionID: Nothing, comparisonData: Nothing }
               Just elem -> elem
-        H.tell _editor 0 (Editor.ChangeSection entry ev.versionID)
+        H.tell _editor 0 (Editor.ChangeSection entry ev.versionID mTitle)
         case ev.comparisonData of
           Nothing -> do
             -- this case should be covered by mSelectedTocEntry being set to Nothing
             pure unit
           Just d ->
-            H.tell _editor 1 (Editor.ChangeSection d.tocEntry d.revID)
+            H.tell _editor 1 (Editor.ChangeSection d.tocEntry d.revID mTitle)
 
       TOC.UpdateNodePosition path -> do
         H.tell _editor 0 (Editor.UpdateNodePosition path)
@@ -1236,23 +1255,18 @@ splitview = connect selectTranslator $ H.mkComponent
       --       the server.
       case maybeTree of
         Left err -> updateStore $ Store.AddError err
-        Right (MM.DocumentTreeWithMetaMap { tree {-, metaMap -} }) -> do
+        Right (MM.DocumentTreeWithMetaMap { tree, metaMap }) -> do
           let
             finalTree = documentTreeToTOCTree tree
           H.modify_ _
             { tocEntries = finalTree
             }
-          H.tell _toc unit (TOC.ReceiveTOCs finalTree)
 
-      newTOCTree <- _.tocEntries <$> H.get
+          -- liftEffect $ log $ prettyPrintMetaMap metaMap
+
+          H.tell _toc unit (TOC.ReceiveTOCs finalTree metaMap)
+
       handleAction UpdateVersionMapping
-      H.tell _toc unit (TOC.ReceiveTOCs newTOCTree)
-
--- findCommentSection :: TOCTree -> Int -> Int -> Maybe CommentSection
--- findCommentSection tocEntries tocID markerID = do
---   tocEntry <- findTOCEntry tocID tocEntries
---   marker <- find (\m -> m.id == markerID) tocEntry.markers
---   marker.mCommentSection
 
 {- ------------------ Tree traversal and mutation function ------------------ -}
 {- --------------------- TODO: Move to seperate module  --------------------- -}
