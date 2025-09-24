@@ -4,7 +4,7 @@
 -- | that jump to specific sections in the editor. The editor allows users to edit content,
 -- | and the preview area displays the output based on the editor's content.
 
-module FPO.Component.Splitview where
+module FPO.Components.Splitview where
 
 import Prelude
 
