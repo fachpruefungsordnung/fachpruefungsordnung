@@ -23,7 +23,6 @@ module FPO.Types
 import Prelude
 
 import Ace.Types as Types
-import Data.Array (sortBy)
 import Data.Date (canonicalDate)
 import Data.Date.Component (Day, Month(..), Year)
 import Data.DateTime (DateTime(..))
