@@ -681,7 +681,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       header = TreeHeader
         { headerKind: MM.getKindName fullTypeName
         , headerType: MM.getTypeName fullTypeName
-        , heading: "// Specify your header name here! \nNew Header"
+        , heading: "// Specify your heading here! \n! New Heading"
         }
     if MM.isLeaf meta then do
       -- Create a new text element for the single child:
