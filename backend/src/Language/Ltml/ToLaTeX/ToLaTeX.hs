@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | Provides a function to convert PreLaTeX into LaTeX
 module Language.Ltml.ToLaTeX.ToLaTeX (toLaTeX)
 where
 
@@ -9,6 +10,7 @@ import Language.Ltml.AST.Label (Label (Label))
 import Language.Ltml.ToLaTeX.LaTeXType (LaTeX (..))
 import Language.Ltml.ToLaTeX.PreLaTeXType (PreLaTeX (..))
 
+-- | function to convert the intermediate structure PreLaTeX into actual LaTeX
 toLaTeX :: Map.Map Label T.Text -> PreLaTeX -> LaTeX
 toLaTeX _ (IText t) = Text t
 toLaTeX _ (IRaw r) = Raw r
@@ -24,6 +26,6 @@ toLaTeX m (MissingRef l@(Label t)) =
             Command
                 "hyperlink"
                 []
-                [ Text t
+                [ Raw t
                 , Text ref
                 ]

@@ -4,6 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
+-- | Provides the GlobalState and everything to mutate it.
 module Language.Ltml.ToLaTeX.GlobalState
     ( GlobalState (..)
     , DocType (..)
@@ -40,7 +41,6 @@ module Language.Ltml.ToLaTeX.GlobalState
     , docHeadingFormat
     , sectionFormat
     , onlyOneParagraph
-    , isSupersection
     , flaggedParent
     , flaggedChildren
     , docType
@@ -89,25 +89,25 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     , linebreak
     )
 
--- State for labeling
+-- | State for generating and keeping track of context
 data GlobalState = GlobalState
-    { {- Counters to keep track of the position in the document -}
-      _counterState :: CounterState
-    , {- Flags for special cases -}
-      _flagState :: FlagState
+    { _counterState :: CounterState
+    -- ^ Counters to keep track of the position in the document
+    , _flagState :: FlagState
+    -- ^ Flags for special cases
     , _formatState :: FormatState
-    , {- Path for current enum position -}
-      _enumPosition :: [Int]
-    , {- since the style of the identifier is defined globally for an
-         enumeration or appendix we need to pass it to the kids -}
-      {- Maps for labels -}
+    , _enumPosition :: [Int]
+    -- ^ Path for current enum position
+    , -- \| Maps for labels
       _labelToRef :: Map Label T.Text
+    -- ^ since the style of the identifier is defined globally for an
+    --          enumeration or appendix we need to pass it to the kids
     , _labelToFootNote :: Map Label Footnote
-    , {- functional list that builds the table of contents -}
-      _toc :: DList.DList PreLaTeX
+    , _toc :: DList.DList PreLaTeX
+    -- ^ functional list that builds the table of contents
     , _appendixHeaders :: DList.DList PreLaTeX
-    , {- pre-document is used to store the header and footer of the document -}
-      _preDocument :: PreLaTeX
+    , _preDocument :: PreLaTeX
+    -- ^ pre-document is used to store the header and footer of the document
     }
     deriving (Show)
 
@@ -123,14 +123,17 @@ data CounterState = CounterState
     deriving (Show)
 
 data FlagState = FlagState
-    { _onlyOneParagraph :: Bool -- needed for sections with only one paragraph
-    , _isSupersection :: Bool -- needed for heading
+    { _onlyOneParagraph :: Bool
     , _flaggedParent :: Bool
+    -- ^ needed for sections with only one paragraph
     , _flaggedChildren :: Bool
-    , _docType :: DocType -- needed to distinguish between main document and appendix
+    , _docType :: DocType
     }
+    -- \| needed to distinguish between main document and appendix
+
     deriving (Show)
 
+-- | introduced a datatype instead of using bool to make it easily extensible
 data DocType = Main | Appendix
     deriving (Show, Eq)
 
@@ -153,6 +156,7 @@ nextSupersection = do
 
 nextSection :: State GlobalState Int
 nextSection = do
+    counterState . paragraphCTR .= 0
     counterState . sectionCTR <+= 1
 
 nextParagraph :: State GlobalState Int
@@ -191,7 +195,7 @@ resetCountersSoft = do
     counterState . paragraphCTR .= 0
     counterState . footnoteCTR .= 0
 
--- Get the next label at the current depth
+-- | Get the path to the current level
 nextEnumPosition :: State GlobalState [Int]
 nextEnumPosition = do
     prefix <- use enumPosition
@@ -200,7 +204,7 @@ nextEnumPosition = do
     enumPosition .= newPrefix
     pure newPrefix
 
--- Go one level deeper temporarily
+-- | Go one enum level deeper for the required action
 descendEnumTree :: State GlobalState a -> State GlobalState a
 descendEnumTree action = do
     oldPath <- use enumPosition
@@ -213,6 +217,9 @@ insertRefLabel :: Maybe Label -> T.Text -> State GlobalState ()
 insertRefLabel mLabel ident =
     forM_ mLabel $ \l -> labelToRef %= insert l ident
 
+-- | the state uses a dlist to keep track of the toc. so we render the (mostly) heading,
+--   wrap it in a hyperlink, to make the final pdf interactive. returns the corresponding
+--   hypertarget.
 addTOCEntry
     :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState PreLaTeX
 addTOCEntry n keyident ident headingText = do
@@ -234,6 +241,8 @@ addTOCEntry n keyident ident headingText = do
            )
     return $ hypertarget tocLabel mempty
 
+-- | since the toc is emptied for each document, but we need the headings of the appendices
+--   in the main document, we collect it with this function as well
 addAppendixHeaderEntry
     :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState ()
 addAppendixHeaderEntry n keyident ident headingText =
@@ -247,6 +256,7 @@ addAppendixHeaderEntry n keyident ident headingText =
                     ]
            )
 
+-- | function to fill the header and footer with the required content
 addHeaderFooter
     :: HeaderFooterFormat
     -> HeaderFooterFormat
@@ -275,6 +285,10 @@ addHeaderFooter
                         , fancyfoot ["r"] (assemble botRight)
                         ]
                )
+
+-- | state with everything set to 0 or mempty. only the
+--   staticDocumentFormat (which is used to build the final pdf)
+--   is preset in Format.hs
 initialGlobalState :: GlobalState
 initialGlobalState =
     GlobalState
@@ -304,7 +318,6 @@ initialFlagState =
     FlagState
         False -- onlyOneParagraph
         False -- isSupersection
-        False
         False
         Main -- isAppendix
 
