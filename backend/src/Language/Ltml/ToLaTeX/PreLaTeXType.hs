@@ -1,10 +1,9 @@
 {-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-{-| module that serves as an edsl to be used to write latex code. only that
-    the code is first transformed into the intermediate structure PreLaTeX. 
-    provides all necessary functions and can be extended if needed.
--}
+-- | module that serves as an edsl to be used to write latex code. only that
+--     the code is first transformed into the intermediate structure PreLaTeX.
+--     provides all necessary functions and can be extended if needed.
 module Language.Ltml.ToLaTeX.PreLaTeXType
     ( PreLaTeX (..)
     {- styling -}
@@ -53,14 +52,20 @@ import Language.Ltml.AST.Label (Label (Label))
 
 data PreLaTeX
     = IText T.Text
-    | IRaw T.Text -- ^ raw unescaped PreLaTeX
-    | ICommandS T.Text -- ^ \command
-    | ICommand T.Text [T.Text] [PreLaTeX] -- ^ \command[opts]{args}
-    | IEnvironment T.Text [T.Text] [PreLaTeX] -- ^ \begin{env}[opts] ... \end{env}
-    | IBraced PreLaTeX -- ^ used for wrapping in braces
-    | ISequence [PreLaTeX] -- ^ concatenation
-    {-| the reason why we introduced this intermediate data type -}
-    | MissingRef Label
+    | -- | raw unescaped PreLaTeX
+      IRaw T.Text
+    | -- | \command
+      ICommandS T.Text
+    | -- | \command[opts]{args}
+      ICommand T.Text [T.Text] [PreLaTeX]
+    | -- | \begin{env}[opts] ... \end{env}
+      IEnvironment T.Text [T.Text] [PreLaTeX]
+    | -- | used for wrapping in braces
+      IBraced PreLaTeX
+    | -- | concatenation
+      ISequence [PreLaTeX]
+    | -- | the reason why we introduced this intermediate data type
+      MissingRef Label
     deriving (Show, Eq)
 
 -- | We want to be able to connect PreLaTeX structures and avoid deeply rooted sequences.
@@ -73,7 +78,7 @@ instance Semigroup PreLaTeX where
             [x] -> x
             ys -> ISequence ys
 
-        -- Flatten nested Sequences as we build them
+        -- \| Flatten nested Sequences as we build them
         flatten :: [PreLaTeX] -> [PreLaTeX]
         flatten = concatMap go
           where

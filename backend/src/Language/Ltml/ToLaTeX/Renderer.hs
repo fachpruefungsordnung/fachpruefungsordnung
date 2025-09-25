@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-
-{-| Provides a function to render a LaTeX structure into LaTeX code as text. -}
+-- | Provides a function to render a LaTeX structure into LaTeX code as text.
 module Language.Ltml.ToLaTeX.Renderer
     ( renderLaTeX
     , renderLaTeXPretty

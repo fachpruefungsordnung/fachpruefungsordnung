@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-{-| Provides a function to convert PreLaTeX into LaTeX -}
+-- | Provides a function to convert PreLaTeX into LaTeX
 module Language.Ltml.ToLaTeX.ToLaTeX (toLaTeX)
 where
 

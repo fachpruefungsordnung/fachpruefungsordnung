@@ -2,7 +2,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-{-| This module provides helper functions to process LSD data types -}
+-- | This module provides helper functions to process LSD data types
 module Language.Ltml.ToLaTeX.Format
     ( Stylable (..)
     , emptyIdentifierFormat
@@ -64,7 +64,7 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     )
 
 -- | helper class to be able to apply typography, regardless of whether we know
---   which one. this also solves the problem that the style in TextTree is polymorphic. 
+--   which one. this also solves the problem that the style in TextTree is polymorphic.
 class Stylable a where
     applyTextStyle :: a -> PreLaTeX -> PreLaTeX
 
@@ -131,7 +131,7 @@ formatKey (FormatString (StringAtom s : rest)) n =
 formatKey (FormatString (PlaceholderAtom KeyIdentifierPlaceholder : rest)) n =
     n <> formatKey (FormatString rest) n
 
--- | needed to create a document. imports relevant packages. since some imports 
+-- | needed to create a document. imports relevant packages. since some imports
 --   and global setup is processed by the state, we pass this through the state
 --   and only use it after processing the ast.
 staticDocumentFormat :: PreLaTeX

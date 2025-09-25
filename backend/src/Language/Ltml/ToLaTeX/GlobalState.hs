@@ -4,7 +4,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
-{-| Provides the GlobalState and everything to mutate it. -}
+-- | Provides the GlobalState and everything to mutate it.
 module Language.Ltml.ToLaTeX.GlobalState
     ( GlobalState (..)
     , DocType (..)
@@ -91,23 +91,23 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
 
 -- | State for generating and keeping track of context
 data GlobalState = GlobalState
-    { {-| Counters to keep track of the position in the document -}
-      _counterState :: CounterState
-    , {-| Flags for special cases -}
-      _flagState :: FlagState
+    { _counterState :: CounterState
+    -- ^ Counters to keep track of the position in the document
+    , _flagState :: FlagState
+    -- ^ Flags for special cases
     , _formatState :: FormatState
-    , {-| Path for current enum position -}
-      _enumPosition :: [Int]
-    , {-| since the style of the identifier is defined globally for an
-         enumeration or appendix we need to pass it to the kids -}
-      {-| Maps for labels -}
+    , _enumPosition :: [Int]
+    -- ^ Path for current enum position
+    , -- \| Maps for labels
       _labelToRef :: Map Label T.Text
+    -- ^ since the style of the identifier is defined globally for an
+    --          enumeration or appendix we need to pass it to the kids
     , _labelToFootNote :: Map Label Footnote
-    , {-| functional list that builds the table of contents -}
-      _toc :: DList.DList PreLaTeX
+    , _toc :: DList.DList PreLaTeX
+    -- ^ functional list that builds the table of contents
     , _appendixHeaders :: DList.DList PreLaTeX
-    , {-| pre-document is used to store the header and footer of the document -}
-      _preDocument :: PreLaTeX
+    , _preDocument :: PreLaTeX
+    -- ^ pre-document is used to store the header and footer of the document
     }
     deriving (Show)
 
@@ -123,11 +123,14 @@ data CounterState = CounterState
     deriving (Show)
 
 data FlagState = FlagState
-    { _onlyOneParagraph :: Bool -- | needed for sections with only one paragraph
+    { _onlyOneParagraph :: Bool
     , _flaggedParent :: Bool
+    -- ^ needed for sections with only one paragraph
     , _flaggedChildren :: Bool
-    , _docType :: DocType -- | needed to distinguish between main document and appendix
+    , _docType :: DocType
     }
+    -- \| needed to distinguish between main document and appendix
+
     deriving (Show)
 
 -- | introduced a datatype instead of using bool to make it easily extensible
@@ -216,7 +219,7 @@ insertRefLabel mLabel ident =
 
 -- | the state uses a dlist to keep track of the toc. so we render the (mostly) heading,
 --   wrap it in a hyperlink, to make the final pdf interactive. returns the corresponding
---   hypertarget. 
+--   hypertarget.
 addTOCEntry
     :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState PreLaTeX
 addTOCEntry n keyident ident headingText = do
@@ -283,8 +286,8 @@ addHeaderFooter
                         ]
                )
 
--- | state with everything set to 0 or mempty. only the 
---   staticDocumentFormat (which is used to build the final pdf) 
+-- | state with everything set to 0 or mempty. only the
+--   staticDocumentFormat (which is used to build the final pdf)
 --   is preset in Format.hs
 initialGlobalState :: GlobalState
 initialGlobalState =

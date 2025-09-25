@@ -1,9 +1,9 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-{-| Provides a way to convert the AST into the intermediate structure PreLaTeX.
-To this end a polymorphic typeclass ToPreLaTeXM that provides the function toPreLaTeXM is introduced
-and instances for all datatypes of the AST are defined. -}
+-- | Provides a way to convert the AST into the intermediate structure PreLaTeX.
+-- To this end a polymorphic typeclass ToPreLaTeXM that provides the function toPreLaTeXM is introduced
+-- and instances for all datatypes of the AST are defined.
 module Language.Ltml.ToLaTeX.ToPreLaTeXM (ToPreLaTeXM (..))
 where
 
@@ -147,25 +147,25 @@ instance (ToPreLaTeXM a) => ToPreLaTeXM (Maybe a) where
 --   Everything else is just used to build up the needed context (labels, etc.)
 instance (ToPreLaTeXM a) => ToPreLaTeXM (Flagged' a) where
     toPreLaTeXM (Flagged b content) = do
-        {-| first check whether the global render flag (flaggedParent) is set -}
+        -- \| first check whether the global render flag (flaggedParent) is set
         b0 <- use (GS.flagState . GS.flaggedParent)
-        {-| set the scope for the content -}
+        -- \| set the scope for the content
         (GS.flagState . GS.flaggedParent) .= (b || b0)
         (GS.flagState . GS.flaggedChildren) .= False
-        {-| run the state to build the globalstate and get the potential result -}
+        -- \| run the state to build the globalstate and get the potential result
         res <- toPreLaTeXM content
-        {-| reset the scope -}
+        -- \| reset the scope
         (GS.flagState . GS.flaggedParent) .= b0
         isParent <- use (GS.flagState . GS.flaggedChildren)
         (GS.flagState . GS.flaggedChildren) .= True
-        {-| return the result if needed -}
+        -- \| return the result if needed
         if not isParent && not (b || b0)
             then pure mempty
             else pure res
 
 -------------------------------- Node -----------------------------------
 
--- | the provided label is passed to the content of the node using 
+-- | the provided label is passed to the content of the node using
 --   the helper class Labelable
 instance (Labelable a) => ToPreLaTeXM (Node a) where
     toPreLaTeXM (Node mLabel content) = attachLabel mLabel content
@@ -200,22 +200,22 @@ instance ToPreLaTeXM HardLineBreak where
 instance ToPreLaTeXM FootnoteReference where
     toPreLaTeXM (FootnoteReference l@(Label lt)) = do
         labelToRef <- use GS.labelToRef
-        {-| first check whether a footnote has already been seen -}
+        -- \| first check whether a footnote has already been seen
         case Map.lookup l labelToRef of
             Nothing -> do
-                {-| if the footnote has not been seen already then increase the counter,
-                    insert the label into the map for normal refs and lookup the content
-                    in the footnote map.
-                -}
+                -- \| if the footnote has not been seen already then increase the counter,
+                --                    insert the label into the map for normal refs and lookup the content
+                --                    in the footnote map.
+                --
                 n <- GS.nextFootnote
                 GS.insertRefLabel (Just l) (T.pack $ show n)
                 labelToFootNote <- use GS.labelToFootNote
                 case Map.lookup l labelToFootNote of
-                    -- | TODO: maybe throw error if the footnote doesnt 
-                    --   actually exist? shouldnt happen in reality, 
+                    -- \| TODO: maybe throw error if the footnote doesnt
+                    --   actually exist? shouldnt happen in reality,
                     --   otherwise the parser is broken
-                    Nothing -> pure mempty 
-                    -- | otherwise just get the content of the footnote
+                    Nothing -> pure mempty
+                    -- \| otherwise just get the content of the footnote
                     --   and add it to the output.
                     Just (Footnote _ tt) -> do
                         tt' <- toPreLaTeXM tt
@@ -224,10 +224,11 @@ instance ToPreLaTeXM FootnoteReference where
                                 hypertarget l mempty
                                     <> label lt
                                     <> tt'
-            Just _ -> pure $ footref lt 
-                {-| if the footnote has been seen then just insert a 
-                    superscript number, not the content again.
-                -}
+            Just _ -> pure $ footref lt
+
+-- \| if the footnote has been seen then just insert a
+--                    superscript number, not the content again.
+--
 
 -- | creates an enumeration in latex. the format of the enumerations is passed
 --   to the children via the state.
@@ -290,8 +291,10 @@ instance Labelable Paragraph where
         GS.insertRefLabel mLabel identifier
         GS.enumPosition .= [0]
         content' <- toPreLaTeXM content
-        let anchor = maybe mempty (`hypertarget` mempty) mLabel -- ^ attaches the label if it exists
-        b <- use (GS.flagState . GS.onlyOneParagraph) -- ^ not indented or numbered if there is only one paragraph
+        let anchor = maybe mempty (`hypertarget` mempty) mLabel
+        -- \^ attaches the label if it exists
+        b <- use (GS.flagState . GS.onlyOneParagraph)
+        -- \^ not indented or numbered if there is only one paragraph
         pure $
             anchor
                 <> if b
@@ -316,7 +319,7 @@ instance ToPreLaTeXM SimpleSection where
         pure $ (if hasHLine then hrule else mempty) <> content'
 
 -- | there is no instance for the Headingtype, as it would be complicated to manage
---   regarding there are different situations in which a heading is used and moving 
+--   regarding there are different situations in which a heading is used and moving
 --   all the context via the state or a helper class or some other way would be tedious.
 --   consequently we use a function that just builds the heading with the needed information.
 createHeading
@@ -340,24 +343,27 @@ instance ToPreLaTeXM Section where
 
 -- | one of the trickier instances. since every part of the SectionBody needs the provided
 --   context of the section it would be difficult to write a seperate SectionBody instance.
---   hence this instance got bloated a little 
+--   hence this instance got bloated a little
 instance Labelable Section where
     attachLabel mLabel (Section h nodes) =
-        case h of -- ^ if the parsing of the heading failed, we throw an error, otherwise proceed
+        case h of
+            -- \^ if the parsing of the heading failed, we throw an error, otherwise proceed
             Left e -> error (errorBundlePretty e)
             Right (Heading fmt tt) -> do
                 (SectionFormat ident (TocKeyFormat keyident)) <-
                     use (GS.formatState . GS.sectionFormat)
                 tt' <- toPreLaTeXM tt
-                -- | helper functions to reduce redundance
+                -- \| helper functions to reduce redundance
                 let headingText = tt'
                     buildHeading n = do
                         createHeading fmt headingText (IText $ getIdentifier ident n)
                     setLabel n = GS.insertRefLabel mLabel (T.pack (show n))
-                    filterFN xs = [y | y <- xs, not (isFN y)] -- ^ when the heading is added to the toc, we want to get rid of footnotes. (luckily Styled is not allowed in HeadingTextTree)
-                        where
-                            isFN (FootnoteRef _) = True
-                            isFN _        = False
+                    filterFN xs = [y | y <- xs, not (isFN y)]
+                      where
+                        -- \^ when the heading is added to the toc, we want to get rid of footnotes. (luckily Styled is not allowed in HeadingTextTree)
+
+                        isFN (FootnoteRef _) = True
+                        isFN _ = False
                 tocEntry <- toPreLaTeXM $ filterFN tt
                 case nodes of
                     LeafSectionBody paragraphs -> do
@@ -406,17 +412,17 @@ instance Labelable Document where
             case dh of
                 Left e -> error (errorBundlePretty e)
                 Right (DocumentHeading tt) -> do
-                    {-| build the heading text from the given HeadingFormat
-                    passed by the state and depending on the position we are in -}
+                    -- \| build the heading text from the given HeadingFormat
+                    --                    passed by the state and depending on the position we are in
                     tt' <- toPreLaTeXM tt
                     headingText <- buildHeading tt'
 
-                    {-| prepare the state for this document -}
+                    -- \| prepare the state for this document
                     GS.labelToFootNote .= footnotemap
                     GS.resetCountersSoft
                     GS.toc .= mempty
 
-                    {-| recursively receive the needed parts of the document -}
+                    -- \| recursively receive the needed parts of the document
                     intro' <- toPreLaTeXM intro
                     content' <- case content of
                         Left e -> error (errorBundlePretty e)
@@ -429,7 +435,7 @@ instance Labelable Document where
                                 toPreLaTeXM (Flagged b sections)
                     outro' <- toPreLaTeXM outro
 
-                    {-| if we need a toc then we assemble it. -}
+                    -- \| if we need a toc then we assemble it.
                     toc' <- case mTOC of
                         Nothing -> pure mempty
                         Just (TocFormat (TocHeading tocHeading)) -> buildTOC tocHeading
@@ -438,15 +444,16 @@ instance Labelable Document where
 
                     preamble <- if isFlagged then pure $ headingText <> toc' else pure mempty
 
-                    {-| assemble the final document -}
+                    -- \| assemble the final document
                     pure $
-                        resetfootnote -- ^ since footnotes are document scoped, we need to reset them in latex as well
+                        resetfootnote
+                            -- \^ since footnotes are document scoped, we need to reset them in latex as well
                             <> preamble
                             <> intro'
                             <> content'
                             <> outro'
           where
-            -- | helper function to create the heading depending on context
+            -- \| helper function to create the heading depending on context
             buildHeading :: PreLaTeX -> State GS.GlobalState PreLaTeX
             buildHeading tt' = do
                 docType <- use (GS.flagState . GS.docType)
@@ -457,7 +464,8 @@ instance Labelable Document where
                             use (GS.formatState . GS.appendixFormat)
                         let iText = getIdentifier ident n
                         GS.insertRefLabel mLabel iText
-                        tocAnchor <- GS.addTOCEntry n key ident tt' -- ^ inserts a toc entry and returns a hypertarget, so that it is possible to jump here from the toc
+                        tocAnchor <- GS.addTOCEntry n key ident tt'
+                        -- \^ inserts a toc entry and returns a hypertarget, so that it is possible to jump here from the toc
                         GS.addAppendixHeaderEntry n key ident tt'
                         heading <- createHeading fmt tt' (IText iText)
                         pure $ tocAnchor <> heading
@@ -465,7 +473,7 @@ instance Labelable Document where
                         fmt <- use (GS.formatState . GS.docHeadingFormat)
                         createHeading fmt tt' (IText " ")
 
-            -- | helper function to render the toc
+            -- \| helper function to render the toc
             buildTOC :: Text -> State GS.GlobalState PreLaTeX
             buildTOC tocHeading = do
                 t <- use (GS.flagState . GS.docType)
@@ -489,7 +497,8 @@ instance ToPreLaTeXM AppendixSection where
                     )
                 nodes
             ) = do
-            if null nodes -- ^ mainly to prevent the title to appear in the main toc, if there are no appendices
+            if null nodes
+                -- \^ mainly to prevent the title to appear in the main toc, if there are no appendices
                 then pure mempty
                 else do
                     GS.counterState . GS.appendixCTR .= 0
@@ -498,6 +507,7 @@ instance ToPreLaTeXM AppendixSection where
                     GS.appendixHeaders %= (<> DList.fromList [IText t, linebreak])
                     nodes' <- mapM toPreLaTeXM nodes
                     pure $ ISequence $ map (newpage <>) nodes'
+
 -------------------------------- DocumentContainer -----------------------------------
 
 instance ToPreLaTeXM DocumentContainer where
@@ -514,18 +524,19 @@ instance ToPreLaTeXM DocumentContainer where
             ) = case dch of
             Left e -> error (errorBundlePretty e)
             Right (DocumentContainerHeader pdfTitle superTitle title date) -> do
-                {-| prepare the state -}
+                -- \| prepare the state
                 GS.preDocument %= (<> setpdftitle pdfTitle)
                 GS.addHeaderFooter headerFmt footerFmt superTitle title date
                 GS.formatState . GS.docHeadingFormat .= headingFmt
                 GS.resetCountersHard
 
-                appendices' <- toPreLaTeXM appendices -- ^ appendices before main doc to gather the headings for the toc of main doc
+                appendices' <- toPreLaTeXM appendices
+                -- \^ appendices before main doc to gather the headings for the toc of main doc
 
                 GS.flagState . GS.docType .= GS.Main
                 doc' <- toPreLaTeXM doc
 
-                {-| assemble the final document container -}
+                -- \| assemble the final document container
                 pure $ doc' <> appendices'
 
 -------------------------------- NavTocHeaded -----------------------------------
