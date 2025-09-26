@@ -115,7 +115,7 @@ data GlobalState = GlobalState
     -- ^ Maps all used footnotes labels to their id as an Int as Html
     --   and their text as Delayed Html, since they can also include references;
     --   This map is build during rendering with entries from "footnoteMap"
-    --   from ReaderState and an additional id;
+    --   from 'ReaderState' and an additional id;
     --   Note: This map is document-scoped. Thus, it is reset when entering
     --         the next document.
     , locallyUsedFootnotes :: FootnoteSet
@@ -143,6 +143,9 @@ data GlobalState = GlobalState
     -- ^ Holds postfix id which makes enum counter class name unique
     , exportSections :: [(Text, Delayed Text, Delayed (Html ()))]
     -- ^ Collects all (non-super) sections as their their @htmlID@, their 'Html' and their title
+    , documentFallbackTitle :: Fallback NavTocHeading
+    -- ^ Holds a fallback ToC title to send to the Frontend, if parsing the main
+    --   Document failes. This is set by the DocumentContainer.
     , mainDocumentTitleHtml :: Delayed (Html ())
     -- ^ Styled title of the main Document for building exported sections
     , mainDocumentTitle :: Delayed Text
@@ -174,9 +177,6 @@ data ReaderState = ReaderState
     , documentHeadingFormat :: Either (HeadingFormat False) (HeadingFormat True)
     -- ^ Holds format for current document heading
     --   (comes from DocumentContainer or AppendixSection)
-    , documentFallbackTitle :: Fallback NavTocHeading
-    -- ^ Holds a fallback ToC title to send to the Frontend, if parsing the main
-    --   Document failes. This is set by the DocumentContainer.
     , localSectionFormat :: SectionFormat
     -- ^ Defines the local 'SectionFormat'; is set by the 'SectionFormatted' wrapper
     , isSingleParagraph :: Bool
@@ -221,6 +221,7 @@ initGlobalState =
         , mangledEnumCounterName = "_ENUM_STYLE_"
         , mangledEnumCounterID = 0
         , exportSections = []
+        , documentFallbackTitle = error "Undefined Main Document Fallback Heading!"
         , mainDocumentTitleHtml = mempty
         , mainDocumentTitle = mempty
         , hasErrors = False
@@ -237,7 +238,6 @@ initReaderState =
         , appendixElementTocKeyFormat = error "Undefined appendix element ToC format!"
         , appendixElementMLabel = Nothing
         , documentHeadingFormat = error "Undefined HeadingFormat!"
-        , documentFallbackTitle = error "Undefined Main Document Fallback Heading!"
         , localSectionFormat = error "Undefined SectionFormat!"
         , isSingleParagraph = False
         , currentEnumIDFormatString = error "Undefined enum id format!"

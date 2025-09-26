@@ -81,6 +81,7 @@ instance ToHtmlM DocumentContainer where
                 doc
                 appendices
             ) = do
+            modify (\s -> s {documentFallbackTitle = fallbackDocHeading})
             -- \| Header is rendered to mempty, but this might generate an error box
             headerHtml <- toHtmlM navTocParsedHeader
             -- \| Main Document has a global ToC, appendices typically do not
@@ -90,7 +91,6 @@ instance ToHtmlM DocumentContainer where
                         s
                             { hasGlobalToC = True
                             , documentHeadingFormat = Left docHeadingFormat
-                            , documentFallbackTitle = fallbackDocHeading
                             }
                     )
                     $ toHtmlM doc
@@ -186,7 +186,7 @@ instance ToHtmlM Document where
 instance ToHtmlM (Parsed DocumentHeading) where
     toHtmlM eErrDocumentHeading = do
         -- \| Title which is used if a parse error occurs
-        fallbackTitle <- asks documentFallbackTitle
+        fallbackTitle <- gets documentFallbackTitle
         (resType, titleHtml) <- case eErrDocumentHeading of
             Left _ -> do
                 setHasErrors
@@ -499,7 +499,8 @@ instance ToHtmlM FootnoteReference where
                 unusedFootnoteMap <- asks footnoteMap
                 case Map.lookup label unusedFootnoteMap of
                     -- \| Footnote Label does not exist
-                    Nothing ->
+                    Nothing -> do
+                        setHasErrors
                         returnNow $ htmlError $ "Footnote Label \"" <> unLabel label <> "\" not found!"
                     Just footnote -> do
                         footnoteID <- gets currentFootnoteID
