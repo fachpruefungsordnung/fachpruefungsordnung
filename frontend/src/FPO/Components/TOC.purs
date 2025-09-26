@@ -944,8 +944,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
         where
         items = MM.findAllowedChildren header state.metaMap
 
-      isDeletable = MM.allowsChildDeletion parentHeader state.metaMap
-
     Leaf { meta, node: { id, paraID: _, name: _ } } ->
       let
         selectedClasses =
