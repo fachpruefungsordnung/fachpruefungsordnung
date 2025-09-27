@@ -16,7 +16,7 @@ import Prelude
 import Data.Array (filter, length, null, replicate, slice)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.String (contains)
+import Data.String (contains, toLower)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
@@ -387,10 +387,11 @@ component =
       let
         filteredMembers =
           filter
-            (contains (Pattern mn) <<< getUserInfoName)
+            (contains (Pattern $ toLower mn) <<< toLower <<< getUserInfoName)
             allMembers
       H.modify_ _
         { filteredMembers = filteredMembers, page = 0, memberNameFilter = mn }
+      H.tell _pagination unit $ P.SetPageQ 0
     RequestRemoveMember memberID -> do
       H.modify_ _ { modalState = RemoveMemberModal memberID }
 
@@ -414,7 +415,6 @@ component =
             }
 
       handleAction ReloadGroupMembers
-      handleAction (FilterForMember "")
     ChangeSorting (TH.Clicked _ _) -> do
       -- TODO: enable filtering using the columns
       --       For this, we need to either change the group or additionally store
@@ -425,21 +425,23 @@ component =
       state <- H.get
       groupWithError <- getGroup state.groupID
       case groupWithError of
-        Left _ -> pure unit -- TODO 
-        Right group ->
+        Left _ -> pure unit
+        Right group -> do
+          let
+            newPage = min
+              state.page
+              (P.calculatePageCount (length (getGroupMembers group)) 10 - 1)
+
+          H.tell _pagination unit $ P.SetPageQ newPage
           H.modify_ _
             { group = Just group
             , filteredMembers = getGroupMembers group
-            , page = 0
+            , page = newPage
             }
     NavigateToDocuments -> do
       s <- H.get
       navigate (ViewGroupDocuments { groupID: s.groupID })
     SetUserRole member role -> do
-      -- TODO: Instead of writing code like this, we should resort to using only high-level
-      --       requests in components. These high-level requests must then be implemented
-      --       in another module, and the component should only call them and easily handle the
-      --       result.
       s <- H.get
       let userID = getUserInfoID member
       response <- changeRole s.groupID userID role
@@ -450,9 +452,7 @@ component =
             }
         Right _ -> do
           handleAction ReloadGroupMembers
-          handleAction (FilterForMember "")
       handleAction ReloadGroupMembers
-      handleAction (FilterForMember "")
     NavigateToUserAdder -> do
       s <- H.get
       navigate (GroupAddMembers { groupID: s.groupID })

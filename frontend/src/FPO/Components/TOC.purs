@@ -815,7 +815,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     mSelectedTocEntry
     now
     searchData
-    (RootTree { children }) =
+    (RootTree { children, header }) =
     [ HH.div
         [ HP.classes [ HB.bgWhite, HB.shadow ] ]
         [ HH.div
@@ -833,7 +833,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
             [ HP.classes [ HH.ClassName "toc-list" ] ]
             ( concat $ mapWithIndex
                 ( \ix (Edge child) ->
-                    treeToHTML state menuPath historyPath 1 mSelectedTocEntry [ ix ]
+                    treeToHTML header state menuPath historyPath 1 mSelectedTocEntry
+                      [ ix ]
                       now
                       searchData
                       child
@@ -845,17 +846,19 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
   treeToHTML
     :: forall slots
-     . State
-    -> Array Int
-    -> Array Int
+     . TreeHeader
+    -> State
+    -> Path
+    -> Path
     -> Int
     -> Maybe SelectedEntity
-    -> Array Int
+    -> Path
     -> Maybe DateTime
     -> RootTree SearchData
     -> Tree TOCEntry
     -> Array (H.ComponentHTML Action slots m)
   treeToHTML
+    parentHeader
     state
     menuPath
     historyPath
@@ -902,7 +905,12 @@ tocview = connect (selectEq identity) $ H.mkComponent
           <> concat
             ( mapWithIndex
                 ( \ix (Edge child) ->
-                    treeToHTML state menuPath historyPath (level + 1)
+                    treeToHTML
+                      header
+                      state
+                      menuPath
+                      historyPath
+                      (level + 1)
                       mSelectedTocEntry
                       (path <> [ ix ])
                       now
@@ -930,7 +938,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
           items
           menuPath
           path
-          true
+          isDeletable
           Section
           (getFullTitle meta)
         where
@@ -973,7 +981,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     , HP.style "align-self: stretch; flex-basis: 0;"
                     ]
                     [ HH.text $ getFullTitle meta ]
-                , renderParagraphButtonInterface historyPath path
+                , renderParagraphButtonInterface
+                    historyPath
+                    path
+                    isDeletable
                     state.versions
                     state.showHistorySubmenu
                     (getFullTitle meta)
@@ -984,6 +995,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
             ]
         ]
     where
+    isDeletable = MM.allowsChildDeletion parentHeader state.metaMap
+
     dragProps draggable =
       [ HP.draggable draggable
       , HE.onDragStart $ const $ StartDrag path
@@ -1142,6 +1155,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     :: forall slots
      . Path
     -> Path
+    -> Boolean
     -> Array Version
     -> Maybe (Maybe Int)
     -> String
@@ -1152,6 +1166,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
   renderParagraphButtonInterface
     historyPath
     path
+    renderDeleteBtn
     versions
     showHistorySubmenu
     title
@@ -1161,8 +1176,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
     HH.div
       [ HP.classes [ HB.positionRelative ] ] $
       [ historyButton path elementID
-      , deleteSectionButton path Paragraph title
       ]
+        <>
+          singletonIf renderDeleteBtn (deleteSectionButton path Paragraph title)
         <>
           [ if historyPath == path then
               HH.div

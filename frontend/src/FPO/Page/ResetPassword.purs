@@ -1,3 +1,5 @@
+-- | Password reset page component.
+
 module FPO.Page.ResetPassword (component) where
 
 import Prelude

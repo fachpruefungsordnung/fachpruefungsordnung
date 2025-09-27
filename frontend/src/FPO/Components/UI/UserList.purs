@@ -11,7 +11,7 @@ import Prelude
 import Data.Array (filter, length, replicate, slice)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
-import Data.String (Pattern(..), contains)
+import Data.String (Pattern(..), contains, toLower)
 import Data.String as String
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Pagination as P
@@ -25,6 +25,7 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addCard, emptyEntryGen)
 import FPO.UI.Style as Style
+import FPO.Util (prependIf, singletonIf)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -149,18 +150,25 @@ component = connect selectTranslator $ H.mkComponent
   render :: (State ba) -> H.ComponentHTML (Action ba) Slots m
   render state =
     addCard (translate (label :: _ "admin_users_listOfUsers") state.translator)
-      [ HP.classes [ HB.col12, HB.colMd6, HB.colLg6, HB.mb3 ] ] $ HH.div_
-      if state.loading then
-        [ HH.div [ HP.classes [ HB.textCenter, HB.mt5 ] ]
+      [ HP.classes [ HB.col12, HB.colMd6, HB.colLg6, HB.mb3 ] ] $ HH.div_ $
+      singletonIf state.loading
+        ( HH.div [ HP.classes [ HB.textCenter, HB.mt5 ] ]
             [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
-        ]
-      else
-        [ HH.ul [ HP.classes [ HB.listGroup ] ]
-            $ map (createUserEntry state) usrs
-                <> replicate (10 - length usrs)
-                  emptyUserEntry
-        , HH.slot _pagination unit P.component ps SetPage
-        ]
+        )
+        <>
+          -- Unfortunately, we have to render but hide the list while loading,
+          -- because otherwise the pagination component would be unmounted and
+          -- remounted, losing its state (current page), which completely breaks
+          -- everything.
+          [ HH.ul
+              ( prependIf state.loading (HP.style "visibility: hidden;")
+                  [ HP.classes [ HB.listGroup ] ]
+              )
+              $ map (createUserEntry state) usrs
+                  <> replicate (10 - length usrs)
+                    emptyUserEntry
+          , HH.slot _pagination unit P.component ps SetPage
+          ]
     where
     usrs = slice (state.page * 10) ((state.page + 1) * 10) state.filteredUsers
     ps =
@@ -251,11 +259,13 @@ component = connect selectTranslator $ H.mkComponent
                 let
                   nameMatches =
                     not (String.null f.username) &&
-                      contains (Pattern f.username) (UserOverviewDto.getName user)
+                      contains (Pattern $ toLower f.username)
+                        (toLower $ UserOverviewDto.getName user)
 
                   emailMatches =
                     not (String.null f.email) &&
-                      contains (Pattern f.email) (UserOverviewDto.getEmail user)
+                      contains (Pattern $ toLower f.email)
+                        (toLower $ UserOverviewDto.getEmail user)
                 in
                   if String.null f.username && String.null f.email then
                     true
