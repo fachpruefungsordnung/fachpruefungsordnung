@@ -20,6 +20,8 @@ isPrefixOf :: forall a. Eq a => Array a -> Array a -> Boolean
 isPrefixOf prefix arr =
   take (length prefix) arr == prefix
 
+-- | Checks if the first array is a proper prefix of the second array,
+-- | that is, the first array is non-empty and not equal to the second array.
 isRealPrefixOf :: forall a. Eq a => Array a -> Array a -> Boolean
 isRealPrefixOf prefix arr =
   let

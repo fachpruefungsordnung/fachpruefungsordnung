@@ -15,7 +15,8 @@ import Prelude
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson, (.:))
 import Data.Array
-  ( any
+  ( all
+  , any
   , catMaybes
   , find
   , head
@@ -26,7 +27,7 @@ import Data.Array
   )
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Show.Generic (genericShow)
 import Data.String (joinWith)
 import Data.Tuple (Tuple(..))
@@ -150,6 +151,13 @@ instance DecodeJson a => DecodeJson (ChildrenOrder a) where
       _ -> Left $ UnexpectedValue json
 
 newtype Disjunction a = Disjunction (Array a)
+
+-- | Checks if the first `Disjunction` is at least as general as the second,
+-- | i.e., if all items in the first are also present in the second.
+isAtLeastAsGeneral
+  :: ∀ a. Eq a => Disjunction a -> Disjunction a -> Boolean
+isAtLeastAsGeneral (Disjunction arr1) (Disjunction arr2) =
+  all (\item -> any ((==) item) arr2) arr1
 
 getAllowedItems :: ∀ a. Disjunction a -> Array a
 getAllowedItems (Disjunction arr) = arr
@@ -293,6 +301,26 @@ getMandatoryChildren propertyTypeMeta metaMap = case getTreeSyntax propertyTypeM
     -> Maybe (Tuple FullTypeName ProperTypeMeta)
   findMandatoryInDisjunction (Disjunction arr) = do
     head arr >>= flip findDefinition metaMap
+
+-- | If the `FullTypeName` corresponds to a `StarOrder` in the `MetaMap`,
+-- | returns the associated `Disjunction FullTypeName`.
+-- |
+-- | This can be viewed as the pendant to `findAllowedChildren` for `StarOrder` types.
+-- | It returns, if applicable, the `Disjunction` that specifies which children
+-- | may be added in any quantity and order.
+getDisjunction
+  :: ∀ a
+   . RepresentsFullTypeName a
+  => a
+  -> MetaMap
+  -> Maybe (Disjunction FullTypeName)
+getDisjunction fullTypeName metaMap = do
+  Tuple _ propertyTypeMeta <- findDefinition fullTypeName metaMap
+  case getTreeSyntax propertyTypeMeta of
+    LeafSyntax -> Nothing
+    TreeSyntax _ co -> case co of
+      StarOrder disjunction -> Just disjunction
+      SequenceOrder _ -> Nothing
 
 -- | Helper function to decode the entire meta map
 decodeMetaMap :: Json -> Either JsonDecodeError MetaMap

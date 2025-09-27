@@ -31,7 +31,7 @@ import Data.Array
   )
 import Data.DateTime (Date, DateTime, adjust)
 import Data.Either (Either(..))
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Time.Duration (Days(..), Minutes)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -160,8 +160,8 @@ data Action
   | CancelDeleteSection
   | ConfirmDeleteSection Path
   -- | Drag and Drop
-  | StartDrag Path
-  | HighlightDropZone Path DragEvent
+  | StartDrag Path (MM.Disjunction MM.FullTypeName)
+  | HighlightDropZone Path (MM.Disjunction MM.FullTypeName) DragEvent
   | ClearDropZones
   | CompleteDrop Path
   --| UpdateSearchBarInputs Int String String
@@ -199,7 +199,15 @@ type State = FPOState
   , showHistoryMenu :: Array Int
   , showHistorySubmenu :: Maybe (Maybe Int)
   , versions :: Array Version
-  , dragState :: Maybe { draggedId :: Path, hoveredId :: Path }
+  , dragState ::
+      Maybe
+        { draggedId :: Path
+        , draggedKind :: MM.Disjunction MM.FullTypeName
+        , hoveredId :: Path
+        }
+  -- ^ The current state of a drag-and-drop operation, if any. Includes the path of the dragged item,
+  --   its kind (the disjunction of the parent, i.e., the general type of the element), and the path
+  --   of the currently hovered item.
   , requestDelete :: Maybe EntityToDelete
   , searchData :: RootTree SearchData
   , timezoneOffset :: Maybe Minutes
@@ -558,13 +566,24 @@ tocview = connect (selectEq identity) $ H.mkComponent
       H.raise (DeleteNode path)
       H.modify_ _ { requestDelete = Nothing }
 
-    StartDrag id -> do
-      H.modify_ _ { dragState = Just { draggedId: id, hoveredId: id } }
+    StartDrag id k -> do
+      H.modify_ _
+        { dragState = Just { draggedId: id, draggedKind: k, hoveredId: id } }
 
-    HighlightDropZone targetId e -> do
+    HighlightDropZone targetId d e -> do
       -- We need to prevent the default behavior to allow dropping.
       H.liftEffect $ preventDefault (toEvent e)
-      H.modify_ \s -> s { dragState = map (_ { hoveredId = targetId }) s.dragState }
+
+      s <- H.get
+      case s.dragState of
+        Nothing -> pure unit
+        Just { draggedKind } -> do
+          -- Only allow highlighting (and, ultimately, dropping)
+          -- if the target can accept the dragged item:
+          when (MM.isAtLeastAsGeneral draggedKind d) do
+            pure unit
+            H.modify_ _
+              { dragState = map (_ { hoveredId = targetId }) s.dragState }
 
     ClearDropZones -> do
       H.modify_ _ { dragState = Nothing }
@@ -589,8 +608,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 -- where exactly the section is now.
                 let newPath = adjustPathAfterMove path draggedId
                 when (newPath /= path) $ do
-                  H.modify_ \s ->
-                    s { mSelectedTocEntry = Just (SelNode newPath title) }
+                  H.modify_
+                    _ { mSelectedTocEntry = Just (SelNode newPath title) }
                   H.raise (UpdateNodePosition newPath)
               Nothing -> pure unit
 
@@ -668,8 +687,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
         { translator = fromFpoTranslator store.translator
         }
 
-  -- Creates a new node (section) and returns its TOC node representation, not added to the TOC yet.
-  -- Creates a full subtree with all mandatory children.
+  -- Creates a new node (section) and returns its TOC node representation,
+  -- not added to the TOC yet.
+  -- Completely builds a full subtree with all mandatory children.
+  --
+  -- TODO: If the meta map is malformed, this might lead to infinite recursion!
+  --       We should add a cycle detection mechanism to prevent this. Notice that
+  --       the meta map usually just represents a tree and we're coolio, but this
+  --       is by no means guaranteed.
   createNode
     :: forall slots
      . MM.FullTypeName
@@ -883,7 +908,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                   selectedClasses
               ]
                 <>
-                  dragProps true
+                  dragProps
                 <>
                   [ HP.style "cursor: pointer;" ]
             )
@@ -922,8 +947,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
           <>
             -- Create a new end drop zone at the end of the section.
             -- It is handled like a normal element during drag and drop detection,
-            -- i.e., it has its own path.
-            [ addEndDropZone state (snoc path (length children)) level ]
+            -- i.e., it has its own path. Of course, this only happens if the parent
+            -- allows for changes to the children structure (i.e., has `StarOrder` syntax).
+            ( case MM.getDisjunction header state.metaMap of
+                Nothing ->
+                  []
+                Just pd ->
+                  [ addEndDropZone state (snoc path (length children)) level pd ]
+            )
       where
       selectedNodeHasPath :: Array Int -> Boolean
       selectedNodeHasPath p = case mSelectedTocEntry of
@@ -953,7 +984,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
         containerProps =
           ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <> selectedClasses
             , HP.title ("Jump to section " <> getShortTitle meta)
-            ] <> dragProps true
+            ] <> dragProps
           )
         innerDivBaseClasses =
           [ HB.dFlex, HB.alignItemsCenter, HB.py1, HB.positionRelative ]
@@ -995,22 +1026,32 @@ tocview = connect (selectEq identity) $ H.mkComponent
             ]
         ]
     where
+    -- Determines if the current section can be deleted.
     isDeletable = MM.allowsChildDeletion parentHeader state.metaMap
+    -- Determines the disjunction of the parent. If this is `Nothing`, the current
+    -- parent has tree syntax `SequenceOrder`, i.e., it allows for only specific children,
+    -- otherwise, it has `StarOrder` syntax and allows for any number of children of the
+    -- specified disjunction, meaning that we can drag and remove items.
+    mParentDisjunction = MM.getDisjunction parentHeader state.metaMap
 
-    dragProps draggable =
-      [ HP.draggable draggable
-      , HE.onDragStart $ const $ StartDrag path
-      , HE.onDragOver $ HighlightDropZone path
-      , HE.onDrop $ const $ CompleteDrop path
-      , HE.onDragEnd $ const $ ClearDropZones
-      ]
+    dragProps = case mParentDisjunction of
+      Nothing -> []
+      Just pk ->
+        [ HP.draggable true
+        , HE.onDragStart $ const $ StartDrag path pk
+        , HE.onDragOver $ HighlightDropZone path pk
+        , HE.onDrop $ const $ CompleteDrop path
+        , HE.onDragEnd $ const $ ClearDropZones
+        ]
 
-    dragHandle = HH.span
-      [ HP.classes
-          [ HH.ClassName "toc-drag-handle", HB.textMuted, HB.me2 ]
-      , HP.style ("margin-left: " <> show level <> "rem;")
-      ]
-      [ HH.text "⋮⋮" ]
+    -- Show the drag handle only if the parent allows changes to the children structure.
+    dragHandle =
+      HH.span
+        [ HP.classes
+            [ HH.ClassName "toc-drag-handle", HB.textMuted, HB.me2 ]
+        , HP.style ("margin-left: " <> show level <> "rem;")
+        ]
+        (singletonIf (isJust mParentDisjunction) $ HH.text "⋮⋮")
 
   -- Helper to check if the current path is the active dropzone.
   -- This is used to highlight the dropzone when dragging an item.
@@ -1093,8 +1134,16 @@ tocview = connect (selectEq identity) $ H.mkComponent
   --       but it could be used to adjust the styling or behavior of the drop zone based on
   --       the section level / depth (for example, to add padding or margin).
   addEndDropZone
-    :: forall slots. State -> Array Int -> Int -> H.ComponentHTML Action slots m
-  addEndDropZone state path _ =
+    :: forall slots
+     . State
+    -> Path
+    -- ^ The path where the drop zone is located.
+    -> Int
+    -- ^ The level of the section where the drop zone is located.
+    -> MM.Disjunction MM.FullTypeName
+    -- ^ The general type of acceptable children for this drop zone.
+    -> H.ComponentHTML Action slots m
+  addEndDropZone state path _ pd =
     HH.div
       ( [ HP.classes
             $ prependIf (activeEndDropzone state path) (H.ClassName "active")
@@ -1105,8 +1154,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       []
     where
     dragProps =
-      [ HE.onDragStart $ const $ StartDrag path
-      , HE.onDragOver $ HighlightDropZone path
+      [ HE.onDragOver $ HighlightDropZone path pd
       , HE.onDrop $ const $ CompleteDrop path
       , HE.onDragEnd $ const $ ClearDropZones
       , HP.attr (HH.AttrName "data-drop-text") $ translate
