@@ -158,7 +158,7 @@ component =
     GetUser userId -> do
       userResult <- getUser
       case userResult of
-        Left _ -> pure unit -- Ignore error like in editor
+        Left _ -> pure unit
         Right user -> navigate
           ( Profile
               { loginSuccessful: Nothing
