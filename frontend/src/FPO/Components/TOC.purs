@@ -38,7 +38,6 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Now (getTimezoneOffset, nowDateTime)
-import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postText)
 import FPO.Data.Store as Store
@@ -65,6 +64,7 @@ import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
 import FPO.Types (TOCEntry, TOCTree)
+import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Util (isPrefixOf, prependIf, singletonIf)
 import FPO.Util as Util
 import Halogen as H

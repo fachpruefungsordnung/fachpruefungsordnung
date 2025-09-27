@@ -4,7 +4,6 @@ import Prelude
 
 import Data.Maybe (Maybe(Just, Nothing))
 import Effect.Aff.Class (class MonadAff)
-import FPO.Components.Button (Output) as Button
 import FPO.Data.Request (LoadState(..))
 import Halogen as H
 import Halogen.HTML (iframe) as HH
@@ -17,8 +16,6 @@ type Output = Unit
 data Action = Receive Input
 
 data Query a = NoQuery a
-
-type Slots = (button :: forall query. H.Slot query Button.Output Int)
 
 type State =
   { renderedHtml :: Maybe (LoadState String)
@@ -43,7 +40,7 @@ preview = H.mkComponent
     , isDragging: isDragging
     }
 
-  render :: State -> H.ComponentHTML Action Slots m
+  render :: State -> H.ComponentHTML Action () m
   render state =
     HH.iframe
       [ HP.srcDoc $ case state.renderedHtml of
@@ -55,7 +52,7 @@ preview = H.mkComponent
       , if state.isDragging then HP.classes [ HB.peNone ] else HP.classes []
       ]
 
-  handleAction :: MonadAff m => Action -> H.HalogenM State Action Slots Unit m Unit
+  handleAction :: MonadAff m => Action -> H.HalogenM State Action () Unit m Unit
   handleAction = case _ of
     Receive { renderedHtml, isDragging } -> do
       H.modify_ _ { renderedHtml = renderedHtml, isDragging = isDragging }

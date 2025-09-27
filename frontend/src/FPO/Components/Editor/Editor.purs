@@ -65,8 +65,6 @@ import FPO.Components.Editor.Types
   , showHandlesFor
   , updateMarkers
   )
-import FPO.Components.Modals.DiscardModal (discardModal)
-import FPO.Components.Modals.InfoModal (infoModal)
 import FPO.Components.TOC (Version)
 import FPO.Data.AppError (AppError(..))
 import FPO.Data.Navigate (class Navigate)
@@ -93,6 +91,8 @@ import FPO.Types
   , TOCEntry
   , emptyTOCEntry
   )
+import FPO.UI.Modals.DiscardModal (discardModal)
+import FPO.UI.Modals.InfoModal (infoModal)
 import FPO.Util (prependIf)
 import Halogen as H
 import Halogen.HTML as HH

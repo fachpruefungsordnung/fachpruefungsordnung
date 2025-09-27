@@ -1,10 +1,7 @@
-module FPO.Components.Modals.DirtyVersionModal
-  ( dirtyVersionModal
-  ) where
+module FPO.UI.Modals.DiscardModal where
 
 import Prelude
 
-import Data.Maybe (Maybe)
 import FPO.Translations.Labels (Labels)
 import FPO.UI.HTML (addModal)
 import Halogen.HTML as HH
@@ -13,36 +10,31 @@ import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (Translator, label, translate)
 
--- | Modal for notifying the user of potentially lost changes.
+-- | Modal for confirming discarding the current draft.
 -- |
 -- | Requires:
 -- |  1. a translator for the UI texts
 -- |  2. an action to cancel discarding
 -- |  3. an action to proceed discarding
--- |  4. the element ID
--- |  5. the version ID to change to
-dirtyVersionModal
+-- |  4. a no-op action as a default do-nothing action
+discardModal
   :: forall w action
    . Translator Labels
   -> action
-  -> (Int -> Maybe Int -> action)
-  -> Int
-  -> Maybe Int
+  -> action
   -> action
   -> HH.HTML w action
-dirtyVersionModal
+discardModal
   translator
   cancelAction
   confirmAction
-  elementID
-  versionID
   doNothingAction =
-  addModal (translate (label :: _ "editor_confirmSwitch") translator)
+  addModal (translate (label :: _ "common_confirmDiscard") translator)
     cancelAction
     doNothingAction $
     [ HH.div
         [ HP.classes [ HB.modalBody ] ]
-        [ HH.text $ translate (label :: _ "editor_dirtySwitch") translator
+        [ HH.text $ translate (label :: _ "common_discardPhrase") translator
         ]
     , HH.div
         [ HP.classes [ HB.modalFooter ] ]
@@ -57,8 +49,9 @@ dirtyVersionModal
         , HH.button
             [ HP.type_ HP.ButtonButton
             , HP.classes [ HB.btn, HB.btnDanger ]
-            , HE.onClick (const $ confirmAction elementID versionID)
+            , HE.onClick (const confirmAction)
             ]
-            [ HH.text $ translate (label :: _ "editor_changeVersion") translator ]
+            [ HH.text $ translate (label :: _ "common_discard") translator ]
         ]
     ]
+

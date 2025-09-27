@@ -1,4 +1,4 @@
-module FPO.Components.Modals.DeleteModal
+module FPO.UI.Modals.DeleteModal
   ( deleteConfirmationModal
   ) where
 
