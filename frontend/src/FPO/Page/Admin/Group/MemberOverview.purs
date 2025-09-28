@@ -20,7 +20,7 @@ import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Pagination as P
-import FPO.Components.Table.Head as TH
+import FPO.Components.TableHead as TH
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (changeRole, deleteIgnore, getGroup, getUser)
 import FPO.Data.Route (Route(..))

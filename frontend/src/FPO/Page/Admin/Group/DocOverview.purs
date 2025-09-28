@@ -16,7 +16,7 @@ import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
-import FPO.Components.Table.Head as TH
+import FPO.Components.TableHead as TH
 import FPO.Data.AppError (AppError(..))
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request
