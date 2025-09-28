@@ -125,6 +125,7 @@ classStyle Document =
         gap (em 3)
 classStyle DocumentTitle =
     toClassSelector DocumentTitle ? do
+        fontWeight normal
         marginTop (em 0)
         marginBottom (em 0)
         fontSize (em 1.5)
@@ -142,6 +143,7 @@ classStyle Section =
         gap (em 1)
 classStyle Heading =
     toClassSelector Heading ? do
+        fontWeight normal
         marginTop (em 0)
         marginBottom (em 0)
         fontSize (em 1)
@@ -204,12 +206,18 @@ classStyle Footnote =
 classStyle FootnoteID =
     toClassSelector FootnoteID ? do
         userSelect none
-classStyle LeftAligned = toClassSelector LeftAligned ? textAlign alignLeft
+classStyle LeftAligned =
+    toClassSelector LeftAligned ? do
+        display block
+        textAlign alignLeft
 classStyle Centered =
     toClassSelector Centered ? do
         display block
         textAlign center
-classStyle RightAligned = toClassSelector RightAligned ? textAlign alignLeft
+classStyle RightAligned =
+    toClassSelector RightAligned ? do
+        display block
+        textAlign alignRight
 classStyle SmallFontSize = toClassSelector SmallFontSize ? fontSize (em 0.75)
 classStyle MediumFontSize = toClassSelector MediumFontSize ? fontSize (em 1)
 classStyle LargeFontSize = toClassSelector LargeFontSize ? fontSize (em 1.25)
