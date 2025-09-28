@@ -142,8 +142,6 @@ classStyle Section =
         gap (em 1)
 classStyle Heading =
     toClassSelector Heading ? do
-        textAlign center
-        fontWeight bold
         marginTop (em 0)
         marginBottom (em 0)
         fontSize (em 1)

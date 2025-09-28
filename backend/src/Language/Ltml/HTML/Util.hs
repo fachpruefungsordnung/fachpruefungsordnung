@@ -194,6 +194,7 @@ headingText = foldr ((<>) . translate) (Now "")
     translate htt = case htt of
         Word text -> Now text
         Space -> Now " "
+        -- TODO: textual non breaking space?
         NonBreakingSpace -> Now " "
         LineBreak void -> absurd void
         Special void -> absurd void
