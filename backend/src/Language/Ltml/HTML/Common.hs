@@ -76,7 +76,7 @@ import Language.Ltml.AST.Footnote (Footnote)
 import Language.Ltml.AST.Label (Label (unLabel))
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Language.Ltml.HTML.CSS.Util (cssClass_, (<#>))
-import Lucid (Html, a_, div_, href_, onclick_, span_, toHtml)
+import Lucid (Html, a_, div_, href_, span_, toHtml)
 
 -- TODO: Third ConfigState? With custom Reader Monad that is read only
 
@@ -347,7 +347,8 @@ addTocEntry mKey title mLabel cat = do
 addPhantomTocEntry
     :: Result (Html ()) -> ReaderStateMonad ()
 addPhantomTocEntry resHtml =
-    -- \| Phantom Entries do not have an ID and are not Delayed
+    -- \| Phantom Entries do not have an ID and are not Delayed;
+    --    Nothing is still needed to fit into the (ID, Title) scheme
     let tocEntry = (Nothing, resHtml)
      in modify (\s -> s {tableOfContents = snoc (tableOfContents s) (Left tocEntry)})
 
@@ -395,13 +396,7 @@ anchorLink label =
     a_
         [ cssClass_ Class.AnchorLink
         , href_ (cons '#' $ unLabel label)
-        , onclick_ scrollScript
         ]
-  where
-    scrollScript =
-        "event.preventDefault(); document.getElementById('"
-            <> unLabel label
-            <> "').scrollIntoView({behavior: 'smooth'});"
 
 -- | Converts 'Label' into @<a href = "<path>/<label>.html">@ for jumping
 --   to another page
