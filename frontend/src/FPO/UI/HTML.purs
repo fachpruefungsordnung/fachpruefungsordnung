@@ -51,26 +51,6 @@ addColumn val str placeholder bi for act =
             ]
         ]
 
--- Similar to AddColumn but creates textfields tailored towards the Version history dropdown.
-addField
-  :: forall w a
-   . String -- ^ value
-  -> String -- ^ placeholder
-  -> InputType -- ^ input type
-  -> (String -> a) -- ^ action (parametrized with the value)
-  -> HH.HTML w a
-addField val placeholder for act =
-  HH.div [ HP.classes [ HB.inputGroup, HB.inputGroupSm ] ]
-    [ HH.input
-        [ HP.type_ for
-        , HP.classes [ HB.formControl, HB.formControlSm ]
-        , HP.placeholder placeholder
-        , HP.value val
-        , HE.onValueInput act
-        ]
-
-    ]
-
 -- | Creates a button with an icon.
 addButton
   :: forall w a
@@ -84,30 +64,6 @@ addButton enabled text bi act =
     [ HH.button
         [ HP.type_ HP.ButtonButton
         , HP.classes [ HB.btn, HB.btnPrimary ]
-        , HE.onClick act
-        , HP.disabled (not enabled)
-        ]
-        [ case bi of
-            Just icon
-            -> HH.span [ HP.class_ (H.ClassName icon) ] [ HH.text $ " " <> text ]
-            Nothing
-            -> HH.text text
-        ]
-    ]
-
--- | Creates a button with an icon.
-addSmallButton
-  :: forall w a
-   . Boolean -- ^ whether the button is enabled
-  -> String -- ^ button text
-  -> Maybe String -- ^ optional, prepended icon
-  -> (MouseEvent -> a) -- ^ action
-  -> HH.HTML w a
-addSmallButton enabled text bi act =
-  HH.div [ HP.classes [ HB.inputGroup, HB.dFlex, HB.justifyContentEnd ] ]
-    [ HH.button
-        [ HP.type_ HP.ButtonButton
-        , HP.classes [ HB.btn, HB.btnSm, HB.btnPrimary ]
         , HE.onClick act
         , HP.disabled (not enabled)
         ]
@@ -203,20 +159,6 @@ addModal title cancelAction doNothingAction content =
         []
     ]
 
--- | Creates a delete button with an icon.
-deleteButton :: forall w a. (MouseEvent -> a) -> HH.HTML w a
-deleteButton action =
-  HH.button
-    [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm ]
-    , HE.onClick action
-    ]
-    [ HH.i [ HP.class_ $ HH.ClassName "bi-trash" ] [] ]
-
--- | Creates an empty entry for text-based lists.
--- | Used for padding.
-emptyEntryText :: forall w a. HH.HTML w a
-emptyEntryText = emptyEntryGen [ HH.text "(no entry)" ]
-
 -- | Creates an empty entry for lists with arbitrary content.
 -- | Used for padding.
 emptyEntryGen
@@ -240,21 +182,8 @@ emptyTableRow height cols =
         []
     ]
 
--- | Creates an empty list entry for padding (`li`).
-emptyListEntry :: forall w a. Int -> HH.HTML w a
-emptyListEntry height =
-  HH.li [ HP.style $ "height: " <> show height <> "px;" ]
-    []
-
 loadingSpinner :: forall w i. HH.HTML w i
 loadingSpinner =
   HH.div [ HP.classes [ HB.textCenter, HB.my5 ] ]
     [ HH.span [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] []
     ]
-
--- Use a data attribute to store the HTML
-rawHtml :: forall w i. String -> HH.HTML w i
-rawHtml html =
-  HH.element (H.ElemName "raw-html")
-    [ HP.attr (HH.AttrName "html") html ]
-    []

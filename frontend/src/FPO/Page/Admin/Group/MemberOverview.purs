@@ -19,9 +19,8 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (contains, toLower)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
-import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
-import FPO.Components.Table.Head as TH
+import FPO.Components.TableHead as TH
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (changeRole, deleteIgnore, getGroup, getUser)
 import FPO.Data.Route (Route(..))
@@ -42,6 +41,7 @@ import FPO.Dto.UserRoleDto (Role(..))
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn)
+import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.UI.Style as Style
 import FPO.Util as Util
 import Halogen as H

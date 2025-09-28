@@ -1,7 +1,7 @@
 -- | Generic table head component.
 --   Allows for sorting by clicking on the header.
 
-module FPO.Components.Table.Head
+module FPO.Components.TableHead
   ( Order(..)
   , Output(..)
   , SortingStyle(..)
