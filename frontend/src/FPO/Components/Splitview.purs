@@ -28,7 +28,6 @@ import Data.String.Regex as Regex
 import Data.String.Regex.Flags as RegexFlags
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -1077,7 +1076,6 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Editor.RenamedNode newName path -> do
         s <- H.get
-        liftEffect $ log $ "Renaming node at path " <> show path <> " to " <> newName
         updateTree $ changeNodeHeading path newName s.tocEntries
 
       Editor.ShowAllCommentsOutput docID tocID -> do
