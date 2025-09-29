@@ -55,6 +55,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , findRootTree
   , getContent
   , getFullTitle
+  , getHeading
   , getShortTitle
   , modifyNodeRootTree
   , unspecifiedMeta
@@ -116,6 +117,9 @@ type Version = { author :: DH.User, identifier :: Maybe Int, timestamp :: DD.Doc
 data Output
   -- | Opens the editor for some leaf node, that is, a subsection or paragraph.
   = ChangeToLeaf Int (Maybe String)
+  -- | Opens the editor for some non-leaf node. Used to rename sections
+  --   (i.e., changing the heading).
+  | ChangeToNode Path String
   -- | Used to tell the editor to update the path of the selected node
   --   during title renaming.
   | UpdateNodePosition Path
@@ -146,10 +150,11 @@ data Action
   | Both Action Action
   | Receive (Connected Store.Store Input)
   | DoNothing
-  | JumpToLeafSection Int (Array Int) String
+  | JumpToLeafSection Int Path String
+  | JumpToNodeSection Path String
   | ToggleAddMenu Path
-  | ToggleHistoryMenu (Array Int) Int
-  | ToggleHistoryMenuOff (Array Int)
+  | ToggleHistoryMenu Path Int
+  | ToggleHistoryMenuOff Path
   | ToggleHistorySubmenu (Maybe Int)
   | CreateNewMSection MM.FullTypeName MM.ProperTypeMeta Path
   | OpenVersion Int (Maybe Int)
@@ -493,6 +498,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
         H.modify_ \state ->
           state { mSelectedTocEntry = Just $ SelLeaf id, mTitle = Just title }
         H.raise (ChangeToLeaf id (Just title))
+
+    JumpToNodeSection path title -> do
+      H.modify_ _ { mSelectedTocEntry = Just $ SelNode path title }
+      H.raise (ChangeToNode path title)
 
     ToggleAddMenu path -> do
       H.modify_ \state ->
@@ -920,7 +929,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     ( [ HP.classes titleClasses
                       , HP.style "align-self: stretch; flex-basis: 0;"
                       , HP.title $ getFullTitle meta
-                      ]
+                      ] <>
+                        ( if canBeRenamed then
+                            [ HE.onClick \_ -> JumpToNodeSection path
+                                (getHeading header)
+                            ]
+                          else
+                            []
+                        )
                     )
                     [ HH.text $ getFullTitle meta ]
                 , addItemInterface
@@ -956,6 +972,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
                   [ addEndDropZone state (snoc path (length children)) level pd ]
             )
       where
+      canBeRenamed = MM.hasEditableHeader header state.metaMap
+
       selectedNodeHasPath :: Array Int -> Boolean
       selectedNodeHasPath p = case mSelectedTocEntry of
         Just (SelNode selectedPath _) -> selectedPath == p

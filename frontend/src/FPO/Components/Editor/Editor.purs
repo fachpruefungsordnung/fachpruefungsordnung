@@ -259,6 +259,10 @@ data Query a
   -- | receive the selected TOC and put its content into the editor
   | ChangeSection TOCEntry (Maybe Int) (Maybe String) a
   | ContinueChangeSection (Array FirstComment) a
+  -- | Open and edit a raw string outside the TOCEntry structure.
+  --   This is used to make the editor available for editing
+  --   the section names (headings) of non-leaf nodes.
+  | ChangeToNode String Path a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
   | UpdateComment CommentSection a
@@ -435,13 +439,13 @@ editor = connect selectTranslator $ H.mkComponent
                           true ->
                             (translate (label :: _ "editor_merge") state.translator)
                     , makeEditorToolbarButtonWithText
-                        true
+                        fullFeatures
                         state.showButtonText
                         (Render RenderHTML)
                         "bi-file-richtext"
                         (translate (label :: _ "editor_preview") state.translator)
                     , makeEditorToolbarButtonWithText
-                        true
+                        fullFeatures
                         state.showButtonText
                         (Render RenderPDF)
                         "bi-filetype-pdf"
@@ -811,7 +815,14 @@ editor = connect selectTranslator $ H.mkComponent
             contentLines = intercalate "\n" (fromMaybe [] allLines)
 
           case state.mTocEntry of
-            Nothing -> pure unit
+            Nothing -> do
+              -- No leaf entity was selected, so if a nodePath is set,
+              -- we can emit an event to rename the node.
+              case state.mNodePath of
+                Nothing -> do
+                  pure unit -- Nothing to do
+                Just path -> do
+                  H.raise $ RenamedNode contentLines path
             Just entry ->
               case state.mContent of
                 Nothing -> pure unit
@@ -934,7 +945,7 @@ editor = connect selectTranslator $ H.mkComponent
 
           -- mDirtyRef := false
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
-          --update title 
+          --update title
           H.raise RequestFullTitle
           pure unit
 
@@ -1565,11 +1576,35 @@ editor = connect selectTranslator $ H.mkComponent
       handleAction (ContinueChangeToSection fCs)
       pure (Just a)
 
+    ChangeToNode title path a -> do
+      -- Change the editor to a raw string outside the TOCEntry structure.
+      H.modify_ _ { mTocEntry = Nothing, mNodePath = Just path }
+      state <- H.get
+      H.gets _.mEditor >>= traverse_ \ed -> do
+        -- Set the content of the editor
+        H.liftEffect $ do
+          session <- Editor.getSession ed
+          document <- Session.getDocument session
+          Document.setValue title document
+          Editor.setReadOnly false ed
+
+          -- Reset Undo history
+          undoMgr <- Session.getUndoManager session
+          UndoMgr.reset undoMgr
+
+          -- Clear annotations
+          Session.clearAnnotations session
+
+      -- reset Ref, because loading new content is considered
+      -- changing the existing content, which would set the flag
+      for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
+      pure (Just a)
+
     UpdateNodePosition path a -> do
-      H.modify_ \state ->
-        case state.mNodePath of
-          Just _ -> state { mNodePath = Just path }
-          Nothing -> state
+      H.modify_ \s ->
+        case s.mNodePath of
+          Just _ -> s { mNodePath = Just path }
+          Nothing -> s
       pure (Just a)
 
     SaveSection a -> do

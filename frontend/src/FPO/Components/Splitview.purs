@@ -8,7 +8,18 @@ module FPO.Components.Splitview where
 
 import Prelude
 
-import Data.Array (cons, deleteAt, head, insertAt, null, snoc, uncons, updateAt, (!!))
+import Data.Array
+  ( cons
+  , deleteAt
+  , head
+  , insertAt
+  , mapWithIndex
+  , null
+  , snoc
+  , uncons
+  , updateAt
+  , (!!)
+  )
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter, parseFormatString)
 import Data.Int (toNumber)
@@ -17,6 +28,7 @@ import Data.String.Regex as Regex
 import Data.String.Regex.Flags as RegexFlags
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -42,6 +54,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , errorMeta
   , findRootTree
   , modifyNodeRootTree
+  , updateHeading
   )
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -55,6 +68,7 @@ import FPO.Types
   , tocTreeToDocumentTree
   )
 import FPO.UI.Modals.DirtyVersionModal (dirtyVersionModal)
+import Halogen (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -1061,10 +1075,10 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _comment unit
           (Comment.SelectedCommentSection state.docID tocID markerID)
 
-      Editor.RenamedNode _ _ -> do
-        -- s <- H.get
-        -- updateTree $ changeNodeName path newName s.tocEntries
-        pure unit
+      Editor.RenamedNode newName path -> do
+        s <- H.get
+        liftEffect $ log $ "Renaming node at path " <> show path <> " to " <> newName
+        updateTree $ changeNodeHeading path newName s.tocEntries
 
       Editor.ShowAllCommentsOutput docID tocID -> do
         handleAction $ ToggleCommentOverview true docID tocID
@@ -1209,6 +1223,9 @@ splitview = connect selectTranslator $ H.mkComponent
 
       TOC.UpdateNodePosition path -> do
         H.tell _editor 0 (Editor.UpdateNodePosition path)
+
+      TOC.ChangeToNode path heading -> do
+        H.tell _editor 0 (Editor.ChangeToNode heading path)
 
       TOC.AddNode path node -> do
         s <- H.get
@@ -1568,49 +1585,46 @@ insertNodeIntoEdgeAtPosition path node (Edge (Node { meta, children, header })) 
             in
               Edge (Node { meta, children: newChildren, header })
 
+-- Changes the heading of a node in the TOC root tree.
+changeNodeHeading
+  :: Path -> String -> TOCTree -> TOCTree
+changeNodeHeading _ _ Empty = Empty
+changeNodeHeading path newName (RootTree { children, header }) =
+  let
+    newChildren = mapWithIndex
+      ( \ix (Edge child) ->
+          case uncons path of
+            Just { head, tail } | ix == head ->
+              Edge $ changeNodeHeading' tail newName child
+            _ -> Edge child
+      )
+      children
+  in
+    RootTree { children: newChildren, header }
+  where
+  changeNodeHeading' :: Path -> String -> Tree TOCEntry -> Tree TOCEntry
+  changeNodeHeading' path newName tree = case path of
+    [] -> case tree of
+      Node r -> Node r { header = updateHeading newName r.header }
+      leaf -> leaf
+    _ -> case tree of
+      Node { meta, children, header } ->
+        case uncons path of
+          Just { head: index, tail } ->
+            let
+              newChildren = mapWithIndex
+                ( \ix (Edge child) ->
+                    if ix == index then Edge $ changeNodeHeading' tail newName child
+                    else Edge child
+                )
+                children
+            in
+              Node { meta, children: newChildren, header }
+          Nothing -> Node { meta, children, header }
+      leaf -> leaf
+
 stripHtmlTags :: String -> String
 stripHtmlTags input =
   case Regex.regex "<[^>]*>" (RegexFlags.global <> RegexFlags.ignoreCase) of
     Left _ -> input -- If regex compilation fails, return original string
     Right htmlRegex -> Regex.replace htmlRegex "" input
-
--- Changes the name of a node in the TOC root tree.
--- TODO: Do we need this? This should be done in the text element associated
---       with the node..
--- changeNodeName
---   :: Path -> String -> TOCTree -> TOCTree
--- changeNodeName _ _ Empty = Empty
--- changeNodeName path newName (RootTree { children, header }) =
---   let
---     newChildren = mapWithIndex
---       ( \ix (Edge child) ->
---           case uncons path of
---             Just { head, tail } | ix == head ->
---               Edge $ changeNodeName' tail newName child
---             _ -> Edge child
---       )
---       children
---   in
---     RootTree { children: newChildren, header }
-
--- -- Changes the name of a node in the TOC tree.
--- changeNodeName' :: Path -> String -> Tree TOCEntry -> Tree TOCEntry
--- changeNodeName' path newName tree = case path of
---   [] -> case tree of
---     Node record -> Node record { title = newName }
---     leaf -> leaf
---   _ -> case tree of
---     Node { title, children, header } ->
---       case uncons path of
---         Just { head: index, tail } ->
---           let
---             newChildren = mapWithIndex
---               ( \ix (Edge child) ->
---                   if ix == index then Edge $ changeNodeName' tail newName child
---                   else Edge child
---               )
---               children
---           in
---             Node { title, children: newChildren, header }
---         Nothing -> Node { title, children, header }
---     leaf -> leaf
