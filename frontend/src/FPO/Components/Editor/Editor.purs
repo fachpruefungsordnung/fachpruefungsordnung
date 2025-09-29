@@ -75,6 +75,7 @@ import FPO.Data.Store as Store
 import FPO.Dto.ContentDto
   ( Content
   , ContentWrapper
+  , getContentParent
   , getWrapperContent
   , setContentParent
   , setWrapperContent
@@ -212,6 +213,7 @@ data Output
   | RaiseDiscard
   | RaiseMergeMode
   | Merged
+  | RaiseUpdateVersion (Maybe Int)
 
 data Action
   = Init
@@ -904,7 +906,9 @@ editor = connect selectTranslator $ H.mkComponent
               handleAction SavedIcon
               case typ of
                 "noConflict" -> pure unit
-                "draftCreated" -> pure unit --raise something to update version
+                "draftCreated" -> do
+                  H.raise (RaiseUpdateVersion (Just $ getContentParent newContent))
+                  pure unit --raise something to update version
                 "conflict" -> pure unit --should not happen here also raise something just in case
                 _ -> pure unit
             -- manuell saving and working in latest version

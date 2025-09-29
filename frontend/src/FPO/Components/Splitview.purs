@@ -1138,6 +1138,21 @@ splitview = connect selectTranslator $ H.mkComponent
           _ -> do
             pure unit
 
+      Editor.RaiseUpdateVersion mVID-> do
+        handleAction UpdateMSelectedTocEntry
+        state <- H.get
+        case state.mSelectedTocEntry of
+          Just (SelLeaf elementID) -> do
+            handleAction
+              (ModifyVersionMapping elementID (Just mVID) Nothing)
+            case (findTOCEntry elementID state.tocEntries) of
+              Nothing -> pure unit
+              Just entry -> do 
+                mmTitle <- H.request _toc unit TOC.RequestFullTitle
+                H.tell _editor 0
+                  (Editor.ChangeSection entry mVID (join mmTitle))
+          _ -> pure unit
+
       Editor.Merged -> do
         handleAction UpdateMSelectedTocEntry
         state <- H.get
