@@ -124,8 +124,8 @@ foreign import _resize :: Types.Editor -> Effect Unit
 
 type CommentState =
   {
-    -- Hashmaps for Annotations
-    -- Row line -> Hashmap of Username -> how many times the use has comments in the line
+  -- Hashmaps for Annotations
+  -- Row line -> Hashmap of Username -> how many times the use has comments in the line
     markerAnnoHS :: HashMap Int (HashMap String Int)
   -- markerID -> old row position in Annotation
   , oldMarkerAnnoPos :: HashMap Int Int
@@ -231,7 +231,7 @@ data Action
   -- called by AutoSaveTimer subscription
   | AutoSave
   | TryStartDrag Number Number -- clientX, clientY
-  | StartDrag DragHandle LiveMarker Number Number -- mouse down: which, lm, clientX, clientY
+  | StartDrag DragHandle LiveMarker Number Number -- dragHandle, lm, clientX, clientY
   | DragMove Number Number -- mouse move: clientX, clientY
   | EndDrag -- mouse up
   | ShowHandles LiveMarker -- set Handles
@@ -1166,9 +1166,8 @@ editor = connect selectTranslator $ H.mkComponent
           Just ed -> do
             session <- H.liftEffect $ Editor.getSession ed
             container <- H.liftEffect $ Editor.getContainer ed
-            -- For CSS identification
+            -- For CSS identification and prevent from highlighting while dragging
             H.liftEffect do
-              addClass container "fpo-no-select"
               addClass container "fpo-dragging"
             -- remove old Handles
             H.liftEffect $ hideHandlesFrom session
@@ -1238,7 +1237,6 @@ editor = connect selectTranslator $ H.mkComponent
             container <- H.liftEffect $ Editor.getContainer ed
             -- For CSS styling
             H.liftEffect do
-              removeClass container "fpo-no-select"
               removeClass container "fpo-dragging"
               -- remove the selected text in editor
               clearSelection ed
