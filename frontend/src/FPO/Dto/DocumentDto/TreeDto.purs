@@ -14,10 +14,12 @@ module FPO.Dto.DocumentDto.TreeDto
   , getContentOr
   , getEdgeTree
   , getFullTitle
+  , getHeading
   , getShortTitle
   , modifyNodeRootTree
   , replaceNodeRootTree
   , unspecifiedMeta
+  , updateHeading
   ) where
 
 import Prelude
@@ -39,6 +41,14 @@ newtype TreeHeader = TreeHeader
   , heading :: String
   }
 
+-- | Updates the heading of a `TreeHeader`.
+updateHeading :: String -> TreeHeader -> TreeHeader
+updateHeading newHeading (TreeHeader header) =
+  TreeHeader $ header { heading = newHeading }
+
+getHeading :: TreeHeader -> String
+getHeading (TreeHeader header) = header.heading
+
 -- | Metadata for a tree node. `title` is a html-escaped string that represents
 -- | the title of the node. `label` is an optional html-escaped string that
 -- | represents the label of the node (e.g. "§x", etc.).
@@ -50,6 +60,8 @@ newtype TreeHeader = TreeHeader
 -- |       rendering (using, e.g., `getFullTitle`). This isn't a perfect solution,
 -- |       but easier than other approaches. We could use `FPO.UI.HTML.rawHtml`, but
 -- |       this would not work for tooltips...
+-- |       TODO: This workaround causes a bug where some special characters are not rendered
+-- |             correctly, see issue #656.
 newtype Meta = Meta
   { label :: Maybe String
   , title :: Result (Maybe String)
