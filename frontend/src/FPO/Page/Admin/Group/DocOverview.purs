@@ -15,9 +15,8 @@ import Data.String (contains)
 import Data.String.Pattern (Pattern(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
-import FPO.Components.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Components.Pagination as P
-import FPO.Components.Table.Head as TH
+import FPO.Components.TableHead as TH
 import FPO.Data.AppError (AppError(..))
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request
@@ -39,6 +38,7 @@ import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addColumn, addModal)
+import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.UI.Style as Style
 import FPO.Util (focusRef, handleKeyDown, singletonIf)
 import Halogen as H

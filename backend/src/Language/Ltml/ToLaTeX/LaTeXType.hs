@@ -1,3 +1,4 @@
+-- | Module that provides a LaTeX data type
 module Language.Ltml.ToLaTeX.LaTeXType
     ( LaTeX (..)
     ) where
@@ -6,10 +7,16 @@ import qualified Data.Text as T
 
 data LaTeX
     = Text T.Text
-    | Raw T.Text -- raw unescaped LaTeX
-    | CommandS T.Text -- \command
-    | Command T.Text [T.Text] [LaTeX] -- \command[opts]{args}
-    | Environment T.Text [T.Text] [LaTeX] -- \begin{env}[opts] ... \end{env}
-    | Braced LaTeX -- used for wrapping in braces
-    | Sequence [LaTeX] -- concatenation
+    | -- | raw unescaped LaTeX
+      Raw T.Text
+    | -- | \command
+      CommandS T.Text
+    | -- | \command[opts]{args}
+      Command T.Text [T.Text] [LaTeX]
+    | -- | \begin{env}[opts] ... \end{env}
+      Environment T.Text [T.Text] [LaTeX]
+    | -- | used for wrapping in braces
+      Braced LaTeX
+    | -- | concatenation
+      Sequence [LaTeX]
     deriving (Show)

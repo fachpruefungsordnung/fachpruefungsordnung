@@ -1,4 +1,8 @@
-module Language.Ltml.HTML.References (addMaybeLabelToState, buildEnumItemRefHtml) where
+module Language.Ltml.HTML.References
+    ( -- * Building References
+      addMaybeLabelToState
+    , buildEnumItemRefHtml
+    ) where
 
 import Control.Monad.Reader
 import Control.Monad.State

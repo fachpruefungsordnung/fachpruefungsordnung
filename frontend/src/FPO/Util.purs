@@ -6,7 +6,10 @@ import Prelude
 
 import Control.Alternative (guard)
 import Data.Array (length, take)
+import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Data.String.Regex (regex, test)
+import Data.String.Regex.Flags (noFlags)
 import Effect.Class (class MonadEffect)
 import Halogen as H
 import Web.HTML.HTMLElement as WHE
@@ -20,6 +23,8 @@ isPrefixOf :: forall a. Eq a => Array a -> Array a -> Boolean
 isPrefixOf prefix arr =
   take (length prefix) arr == prefix
 
+-- | Checks if the first array is a proper prefix of the second array,
+-- | that is, the first array is non-empty and not equal to the second array.
 isRealPrefixOf :: forall a. Eq a => Array a -> Array a -> Boolean
 isRealPrefixOf prefix arr =
   let
@@ -68,3 +73,15 @@ focusRef refLabel = do
     Just element -> do
       H.liftEffect $ WHE.focus element
     Nothing -> pure unit
+
+-- | Stricter email validation that requires a proper domain with TLD.
+-- | This validates that the email has:
+-- | - A local part (before @)
+-- | - A domain name (after @)
+-- | - A top-level domain (at least 2 characters after the last dot)
+isValidEmailStrict :: String -> Boolean
+isValidEmailStrict email =
+  case regex "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$" noFlags of
+    Right r -> test r email
+    Left _ -> false
+

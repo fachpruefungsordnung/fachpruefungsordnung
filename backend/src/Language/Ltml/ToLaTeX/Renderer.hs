@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- | Provides a function to render a LaTeX structure into LaTeX code as text.
 module Language.Ltml.ToLaTeX.Renderer
     ( renderLaTeX
     , renderLaTeXPretty
@@ -11,6 +12,8 @@ import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Builder as B
 import Language.Ltml.ToLaTeX.LaTeXType (LaTeX (..))
 
+-- | central function of the module. converts a given latex-structure into text
+--   by using the builder module.
 renderLaTeX :: LaTeX -> T.Text
 renderLaTeX = LT.toStrict . B.toLazyText . build
   where
@@ -36,6 +39,8 @@ renderLaTeX = LT.toStrict . B.toLazyText . build
     build (Braced latex) = wrapInBraces (build latex)
     build (Sequence xs) = mconcat (map build xs)
 
+-- | function to render latex code with linebreaks and indentation.
+--   mainly for finding bugs during development
 renderLaTeXPretty :: LaTeX -> T.Text
 renderLaTeXPretty = LT.toStrict . B.toLazyText . build 0
   where
@@ -72,25 +77,33 @@ renderLaTeXPretty = LT.toStrict . B.toLazyText . build 0
     build n (Braced latex) = wrapInBraces (build n latex)
     build n (Sequence xs) = mconcat (map (build n) xs)
 
+-- | seperates options with commata
 renderOpts :: [T.Text] -> B.Builder
 renderOpts [] = mempty
 renderOpts os = "[" <> B.fromText (T.intercalate "," os) <> "]"
 
+-- | puts braces around an argument
 wrapInBraces :: B.Builder -> B.Builder
 wrapInBraces b = "{" <> b <> "}"
 
+-- | function to be able to represent Text correctly in latex
 escape :: T.Text -> B.Builder
 escape = T.foldr escapeChar mempty
 
+-- | function to convert certain chars that would not be represented correctly in latex
 escapeChar :: Char -> B.Builder -> B.Builder
 escapeChar '#' acc = "\\#" <> acc
 escapeChar '$' acc = "\\$" <> acc
 escapeChar '%' acc = "\\%" <> acc
 escapeChar '&' acc = "\\&" <> acc
 escapeChar '~' acc = "\\~{}" <> acc
-escapeChar '_' acc = "-" <> acc
+escapeChar '_' acc = "\\verb|_|" <> acc
 escapeChar '^' acc = "\\^{}" <> acc
 escapeChar '\\' acc = "\\textbackslash{}" <> acc
 escapeChar '{' acc = "\\{" <> acc
 escapeChar '}' acc = "\\}" <> acc
+escapeChar '\'' acc = "\\string'|" <> acc
+escapeChar '`' acc = "\\string`" <> acc
+escapeChar '"' acc = "\\string\"" <> acc
+escapeChar '-' acc = "\\string-" <> acc
 escapeChar c acc = B.singleton c <> acc

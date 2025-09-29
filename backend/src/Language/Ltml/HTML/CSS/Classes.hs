@@ -5,10 +5,15 @@
 {-# OPTIONS_GHC -Wincomplete-patterns -Werror=incomplete-patterns #-}
 
 module Language.Ltml.HTML.CSS.Classes
-    ( Class (..)
+    ( -- * CSS Class Defintions
+      Class (..)
     , className
     , classStyle
+
+      -- * Enumeration Counter
     , enumCounter
+
+      -- * LTML AST to CSS Class Mapping
     , ToCssClass (..)
     , toCssClasses
     ) where
@@ -90,9 +95,11 @@ data Class
       MinSizeColumn
     | -- | Table column that consumes maximum space possible
       MaxSizeColumn
+    | -- | Center entries in table columns
+      TableCentered
     deriving (Show, Eq, Enum, Bounded)
 
--- | maps Class to its css style definition
+-- | Maps Class to its css style definition
 classStyle :: Class -> Css
 classStyle Body =
     toClassSelector Body ? do
@@ -118,6 +125,7 @@ classStyle Document =
         gap (em 3)
 classStyle DocumentTitle =
     toClassSelector DocumentTitle ? do
+        fontWeight normal
         marginTop (em 0)
         marginBottom (em 0)
         fontSize (em 1.5)
@@ -135,8 +143,7 @@ classStyle Section =
         gap (em 1)
 classStyle Heading =
     toClassSelector Heading ? do
-        textAlign center
-        fontWeight bold
+        fontWeight normal
         marginTop (em 0)
         marginBottom (em 0)
         fontSize (em 1)
@@ -199,12 +206,18 @@ classStyle Footnote =
 classStyle FootnoteID =
     toClassSelector FootnoteID ? do
         userSelect none
-classStyle LeftAligned = toClassSelector LeftAligned ? textAlign alignLeft
+classStyle LeftAligned =
+    toClassSelector LeftAligned ? do
+        display block
+        textAlign alignLeft
 classStyle Centered =
     toClassSelector Centered ? do
         display block
         textAlign center
-classStyle RightAligned = toClassSelector RightAligned ? textAlign alignLeft
+classStyle RightAligned =
+    toClassSelector RightAligned ? do
+        display block
+        textAlign alignRight
 classStyle SmallFontSize = toClassSelector SmallFontSize ? fontSize (em 0.75)
 classStyle MediumFontSize = toClassSelector MediumFontSize ? fontSize (em 1)
 classStyle LargeFontSize = toClassSelector LargeFontSize ? fontSize (em 1.25)
@@ -291,6 +304,9 @@ classStyle MinSizeColumn = do
 classStyle MaxSizeColumn = do
     toClassSelector MaxSizeColumn ? do
         width auto
+classStyle TableCentered =
+    toClassSelector TableCentered ? do
+        textAlign center
 
 -- | Returns the html class name of given Class
 className :: Class -> Text
@@ -299,7 +315,7 @@ className cssClass = case show cssClass of
     -- \| This case can not happen with derived Show
     [] -> error "CSS Class has \"\" as show instance!"
 
--- | converts Class to Clay Selector and adds "." infront for css selection
+-- | Converts Class to Clay Selector and adds "." infront for css selection
 toClassSelector :: Class -> Selector
 toClassSelector c = fromString ("." ++ unpack (className c))
 

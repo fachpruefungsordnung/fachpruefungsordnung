@@ -1,9 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- | Module that provides the relevant functions to render a given AST into
+--     a PDF-bytestring. Core function is the generatePDF function that takes
+--     part of an ast and returns either a bytestring or an errortext.
 module Language.Ltml.ToLaTeX.PDFGenerator
     ( generatePDFFromSection -- deprecated, use 'generatePDF' instead
     , generatePDF
+    , generateLaTeX
     --   generatePDFFromDocument
     ) where
 
@@ -37,6 +41,9 @@ import System.Process
 
 -------------------------------- Public -----------------------------------
 
+-- | top level function to generate a pdf bytestring from part of an ast.
+--   its main purpose is to catch all exceptions that might be thrown in
+--   compilePDF
 generatePDF
     :: (ToPreLaTeXM a) => a -> IO (Either String BSL.ByteString)
 generatePDF input = do
@@ -47,6 +54,10 @@ generatePDF input = do
 
 -------------------------------- Pipeline -----------------------------------
 
+-- | creates a temporary directory, turns the ast into latex code and writes
+--   that code into a .tex file in the temp-dir. at last it runs latexmk on
+--   the file and reads the resulting pdf as a bytestring. (or throws an
+--   exception, if latexmk fails.)
 compilePDF
     :: (ToPreLaTeXM p) => p -> IO BSL.ByteString
 compilePDF input =
@@ -54,13 +65,13 @@ compilePDF input =
         let texFile = tmpDir </> "input.tex"
             pdfFile = tmpDir </> "input.pdf"
 
-        -- Generate LaTeX source from input
+        -- \| Generate LaTeX source from input
         let latexSource = generateLaTeX input
 
-        -- Write LaTeX source
+        -- \| Write LaTeX source
         BS.writeFile texFile (TE.encodeUtf8 latexSource)
 
-        -- Compile with pdflatex
+        -- \| Compile with pdflatex
         (exitCode, stdout, _) <- runLatex texFile tmpDir
 
         case exitCode of
@@ -69,6 +80,8 @@ compilePDF input =
 
 -------------------------------- Helpers -----------------------------------
 
+-- | function that encapsules the state logic to generate latex code from
+--   the ast.
 generateLaTeX :: (ToPreLaTeXM a) => a -> Text
 generateLaTeX input =
     let (res, gs) = runState (toPreLaTeXM input) initialGlobalState
@@ -77,6 +90,8 @@ generateLaTeX input =
                 (view labelToRef gs)
                 (view preDocument gs <> document res)
 
+-- | basically readCreateProcessWithExitCode, but written to work inside the docker container
+--   because of encoding issues.
 runLatex :: FilePath -> FilePath -> IO (ExitCode, BS.ByteString, BS.ByteString)
 runLatex texFile workDir = do
     (Just hin, Just hout, Just herr, ph) <-

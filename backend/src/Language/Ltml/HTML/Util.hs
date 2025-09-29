@@ -6,18 +6,31 @@
 {-# HLINT ignore "Avoid lambda using `infix`" #-}
 
 module Language.Ltml.HTML.Util
-    ( intToLower
+    ( -- * ID Conversion
+      intToLower
     , intToCapital
+
+      -- * Monad Helpers
     , whenJust
     , mapState
     , withModified
     , nothingA2
+
+      -- * HTML Conversion
     , convertNewLine
+
+      -- * Lucid Attributes
     , mId_
     , mTextId_
+
+      -- * ToHtmlM Helpers
     , getNextRawTextTree
     , isSuper
+
+      -- * FilePaths
     , disjointRelative
+
+      -- * Textual Headings
     , headingText
     ) where
 
@@ -34,12 +47,40 @@ import Lucid
 import System.FilePath.Posix (splitDirectories, (</>))
 
 -- | Converts Int to corresponding lowercase letter in the alphabet.
---   If Int is (<= 0) or (>= 27), it returns "?"
+-- If Int is (<= 0) or (>= 27), it returns "?"
+--
+-- === __Examples__
+--
+-- >>> intToLower 0
+-- "?"
+--
+-- >>> intToLower 1
+-- "a"
+--
+-- >>> intToLower 26
+-- "z"
+--
+-- >>> intToLower 27
+-- "a"
 intToLower :: Int -> String
 intToLower = intToLetter 96
 
 -- | Converts Int to corresponding capital letter in the alphabet.
 --   If Int is (<= 0) or (>= 27), it returns "?"
+--
+-- === __Examples__
+--
+-- >>> intToCapital 0
+-- "?"
+--
+-- >>> intToCapital 1
+-- "A"
+--
+-- >>> intToCapital 26
+-- "Z"
+--
+-- >>> intToCapital 27
+-- "A"
 intToCapital :: Int -> String
 intToCapital = intToLetter 64
 
@@ -153,6 +194,7 @@ headingText = foldr ((<>) . translate) (Now "")
     translate htt = case htt of
         Word text -> Now text
         Space -> Now " "
+        -- TODO: textual non breaking space?
         NonBreakingSpace -> Now " "
         LineBreak void -> absurd void
         Special void -> absurd void

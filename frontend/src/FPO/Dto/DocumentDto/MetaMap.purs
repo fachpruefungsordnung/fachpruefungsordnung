@@ -1,4 +1,13 @@
 -- | This module defines the meta map structure for TOC trees.
+-- |
+-- | The meta map specifies the allowed structure of documents,
+-- | including which types of elements can contain which other elements,
+-- | how children are ordered and which can be added, whether headers
+-- | are editable, and if children can be deleted.
+-- |
+-- | This is imperative for enforcing document structure rules
+-- | in a flexible and extensible manner, and is used extensively
+-- | in the TOC component and related logic.
 module FPO.Dto.DocumentDto.MetaTree where
 
 import Prelude
@@ -6,7 +15,9 @@ import Prelude
 import Data.Argonaut.Core (Json)
 import Data.Argonaut.Decode (class DecodeJson, JsonDecodeError(..), decodeJson, (.:))
 import Data.Array
-  ( catMaybes
+  ( all
+  , any
+  , catMaybes
   , find
   , head
   , intercalate
@@ -16,7 +27,7 @@ import Data.Array
   )
 import Data.Either (Either(..))
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe, fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Show.Generic (genericShow)
 import Data.String (joinWith)
 import Data.Tuple (Tuple(..))
@@ -105,8 +116,8 @@ instance DecodeJson a => DecodeJson (TreeSyntax a) where
       "TreeSyntax" -> do
         contents <- obj .: "contents"
         case contents of
-          [ hasEditableHeader, childrenOrder ] -> do
-            header <- decodeJson hasEditableHeader
+          [ isEditableHeader, childrenOrder ] -> do
+            header <- decodeJson isEditableHeader
             order <- decodeJson childrenOrder
             pure $ TreeSyntax (HasEditableHeader header) order
           _ -> Left $ TypeMismatch
@@ -118,6 +129,12 @@ data ChildrenOrder a
   = SequenceOrder (Array (Disjunction a))
   -- | Children can appear in any order and quantity (e.g., multiple sections).
   | StarOrder (Disjunction a)
+
+-- | Returns true iff the `ChildrenOrder` is a `StarOrder`.
+isStarOrder :: ∀ a. ChildrenOrder a -> Boolean
+isStarOrder = case _ of
+  StarOrder _ -> true
+  SequenceOrder _ -> false
 
 derive instance Generic (ChildrenOrder a) _
 instance Show a => Show (ChildrenOrder a) where
@@ -134,6 +151,13 @@ instance DecodeJson a => DecodeJson (ChildrenOrder a) where
       _ -> Left $ UnexpectedValue json
 
 newtype Disjunction a = Disjunction (Array a)
+
+-- | Checks if the first `Disjunction` is at least as general as the second,
+-- | i.e., if all items in the first are also present in the second.
+isAtLeastAsGeneral
+  :: ∀ a. Eq a => Disjunction a -> Disjunction a -> Boolean
+isAtLeastAsGeneral (Disjunction arr1) (Disjunction arr2) =
+  all (\item -> any ((==) item) arr2) arr1
 
 getAllowedItems :: ∀ a. Disjunction a -> Array a
 getAllowedItems (Disjunction arr) = arr
@@ -164,6 +188,7 @@ instance DecodeJson FullTypeName where
       _ -> Left $ TypeMismatch
         "Expected array with exactly 2 elements for FullTypeName"
 
+--------------------------------------------------------------------------------
 -- | Type alias for the complete meta map
 type MetaMap = Array (Tuple FullTypeName ProperTypeMeta)
 
@@ -185,12 +210,21 @@ lookupWithFullTypeName fullTypeName metaMap = do
   Tuple _ properTypeMeta <- find (\(Tuple name _) -> name == fullTypeName) metaMap
   pure properTypeMeta
 
-findDefinition :: FullTypeName -> MetaMap -> Maybe (Tuple FullTypeName ProperTypeMeta)
-findDefinition fullTypeName metaMap =
+findDefinition
+  :: ∀ a
+   . RepresentsFullTypeName a
+  => a
+  -> MetaMap
+  -> Maybe (Tuple FullTypeName ProperTypeMeta)
+findDefinition typeName metaMap =
   find (\(Tuple name _) -> name == fullTypeName) metaMap
+  where
+  fullTypeName = toFullTypeName typeName
 
--- | For a given `TreeHeader`, find all allowed child types based on the `MetaMap`.
--- | Returns an array of tuples containing the `FullTypeName` and corresponding `ProperTypeMeta`.
+-- | For a given `TreeHeader`, find all allowed child types based on the
+-- | `MetaMap`.
+-- | Returns an array of tuples containing the `FullTypeName` and
+-- | corresponding `ProperTypeMeta`.
 findAllowedChildren
   :: TreeHeader -> MetaMap -> Array (Tuple FullTypeName ProperTypeMeta)
 findAllowedChildren header metaMap = fromMaybe [] $ do
@@ -203,6 +237,54 @@ findAllowedChildren header metaMap = fromMaybe [] $ do
         pure $ catMaybes $ map (flip findDefinition metaMap) $
           getAllowedItems d
       SequenceOrder _ -> pure []
+
+-- | Checks whether a given `FullTypeName` is an allowed child
+-- | of the specified parent `TreeHeader` according to the `MetaMap`.
+-- |
+-- | This can be used to check if a certain element can be added
+-- | as a child to a parent element (e.g., via a drag-and-drop interface).
+isAllowedChild
+  :: ∀ a. RepresentsFullTypeName a => a -> TreeHeader -> MetaMap -> Boolean
+isAllowedChild childFullTypeName parentHeader metaMap =
+  let
+    allowedChildren =
+      findAllowedChildren parentHeader metaMap
+  in
+    any (\(Tuple name _) -> name == toFullTypeName childFullTypeName) allowedChildren
+
+-- | Determines if children of the given `FullTypeName` can be deleted.
+-- | This is true if the element exists and has a tree syntax with `StarOrder`,
+-- | allowing for any number of children (including zero).
+allowsChildDeletion
+  :: ∀ a. RepresentsFullTypeName a => a -> MetaMap -> Boolean
+allowsChildDeletion = applyPredicateForTreeSyntax isStarOrder' <<< toFullTypeName
+  where
+  isStarOrder' :: TreeSyntax FullTypeName -> Boolean
+  isStarOrder' = case _ of
+    LeafSyntax -> false
+    TreeSyntax _ co -> isStarOrder co
+
+-- | Determines if the header of the given `FullTypeName` is editable.
+-- | This is true if the element exists and has a tree syntax with `HasEditableHeader true`.
+hasEditableHeader
+  :: ∀ a. RepresentsFullTypeName a => a -> MetaMap -> Boolean
+hasEditableHeader = applyPredicateForTreeSyntax isEditable' <<< toFullTypeName
+  where
+  isEditable' :: TreeSyntax FullTypeName -> Boolean
+  isEditable' = case _ of
+    LeafSyntax -> false
+    TreeSyntax (HasEditableHeader b) _ -> b
+
+-- | Generic lookup function that applies a predicate to the `TreeSyntax`
+-- | of the `ProperTypeMeta` associated with the given `FullTypeName`.
+-- | Returns false if the `FullTypeName` is not found in the `MetaMap`,
+-- | otherwise applies the predicate to the `TreeSyntax`.
+applyPredicateForTreeSyntax
+  :: (TreeSyntax FullTypeName -> Boolean) -> FullTypeName -> MetaMap -> Boolean
+applyPredicateForTreeSyntax predicate fullTypeName metaMap = fromMaybe false $ do
+  Tuple _ propertyTypeMeta <- findDefinition fullTypeName metaMap
+  let treeSyntax = getTreeSyntax propertyTypeMeta
+  pure $ predicate treeSyntax
 
 -- | Returns all direct children that must be present according to a sequence order.
 getMandatoryChildren
@@ -220,10 +302,32 @@ getMandatoryChildren propertyTypeMeta metaMap = case getTreeSyntax propertyTypeM
   findMandatoryInDisjunction (Disjunction arr) = do
     head arr >>= flip findDefinition metaMap
 
+-- | If the `FullTypeName` corresponds to a `StarOrder` in the `MetaMap`,
+-- | returns the associated `Disjunction FullTypeName`.
+-- |
+-- | This can be viewed as the pendant to `findAllowedChildren` for `StarOrder` types.
+-- | It returns, if applicable, the `Disjunction` that specifies which children
+-- | may be added in any quantity and order.
+getDisjunction
+  :: ∀ a
+   . RepresentsFullTypeName a
+  => a
+  -> MetaMap
+  -> Maybe (Disjunction FullTypeName)
+getDisjunction fullTypeName metaMap = do
+  Tuple _ propertyTypeMeta <- findDefinition fullTypeName metaMap
+  case getTreeSyntax propertyTypeMeta of
+    LeafSyntax -> Nothing
+    TreeSyntax _ co -> case co of
+      StarOrder disjunction -> Just disjunction
+      SequenceOrder _ -> Nothing
+
 -- | Helper function to decode the entire meta map
 decodeMetaMap :: Json -> Either JsonDecodeError MetaMap
 decodeMetaMap json = decodeJson json
 
+--------------------------------------------------------------------------------
+-- | Wrapper type to hold both the document tree and its associated meta map.
 newtype DocumentTreeWithMetaMap a = DocumentTreeWithMetaMap
   { metaMap :: MetaMap
   , tree :: RootTree a
@@ -248,10 +352,7 @@ decodeDocumentWithMetaMap json = do
     , tree: root
     }
 
--- Utility function for creating indentation
-indent :: Int -> String
-indent n = joinWith "" (map (const "  ") (1 .. n))
-
+--------------------------------------------------------------------------------
 -- | Pretty print with nice formatting and indentation
 prettyPrintMetaMap :: MetaMap -> String
 prettyPrintMetaMap metaMap =
@@ -275,11 +376,11 @@ prettyPrintMetaMap metaMap =
   ppTreeSyntax treeSyntax level = case treeSyntax of
     LeafSyntax ->
       "LeafSyntax"
-    TreeSyntax (HasEditableHeader hasEditableHeader) childrenOrder ->
+    TreeSyntax (HasEditableHeader hea) childrenOrder ->
       "TreeSyntax\n"
         <> indent (level + 2)
         <> "├─ HasEditableHeader: "
-        <> show hasEditableHeader
+        <> show hea
         <> "\n"
         <> indent (level + 2)
         <> "└─ "
@@ -317,3 +418,25 @@ prettyPrintMetaMap metaMap =
         <> "\n"
         <> indent (level + 1)
         <> "]"
+
+-- Utility function for creating indentation
+indent :: Int -> String
+indent n = joinWith "" (map (const "  ") (1 .. n))
+
+--------------------------------------------------------------------------------
+-- | Anything that can represent a full type name (i.e., has kind and type)
+-- | can implement this type class to provide a way to extract the
+-- | `FullTypeName`, i.e., implicitly convert itself to a `FullTypeName`.
+-- |
+-- | This way, one can use `TreeHeader` or other wrappers directly in
+-- | query/interfacing functions, rather than always having to convert manually
+-- | to `FullTypeName`.
+class RepresentsFullTypeName a where
+  toFullTypeName :: a -> FullTypeName
+
+instance RepresentsFullTypeName TreeHeader where
+  toFullTypeName (TreeHeader header) =
+    FullTypeName { kindName: header.headerKind, typeName: header.headerType }
+
+instance RepresentsFullTypeName FullTypeName where
+  toFullTypeName = identity
