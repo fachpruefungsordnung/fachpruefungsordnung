@@ -67,7 +67,6 @@ import FPO.Types
   , tocTreeToDocumentTree
   )
 import FPO.UI.Modals.DirtyVersionModal (dirtyVersionModal)
-import Halogen (liftEffect)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
