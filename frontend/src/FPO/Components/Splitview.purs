@@ -1601,27 +1601,27 @@ changeNodeHeading path newName (RootTree { children, header }) =
       children
   in
     RootTree { children: newChildren, header }
-  where
-  changeNodeHeading' :: Path -> String -> Tree TOCEntry -> Tree TOCEntry
-  changeNodeHeading' path newName tree = case path of
-    [] -> case tree of
-      Node r -> Node r { header = updateHeading newName r.header }
-      leaf -> leaf
-    _ -> case tree of
-      Node { meta, children, header } ->
-        case uncons path of
-          Just { head: index, tail } ->
-            let
-              newChildren = mapWithIndex
-                ( \ix (Edge child) ->
-                    if ix == index then Edge $ changeNodeHeading' tail newName child
-                    else Edge child
-                )
-                children
-            in
-              Node { meta, children: newChildren, header }
-          Nothing -> Node { meta, children, header }
-      leaf -> leaf
+
+changeNodeHeading' :: Path -> String -> Tree TOCEntry -> Tree TOCEntry
+changeNodeHeading' path newName tree = case path of
+  [] -> case tree of
+    Node r -> Node r { header = updateHeading newName r.header }
+    leaf -> leaf
+  _ -> case tree of
+    Node { meta, children, header } ->
+      case uncons path of
+        Just { head: index, tail } ->
+          let
+            newChildren = mapWithIndex
+              ( \ix (Edge child) ->
+                  if ix == index then Edge $ changeNodeHeading' tail newName child
+                  else Edge child
+              )
+              children
+          in
+            Node { meta, children: newChildren, header }
+        Nothing -> Node { meta, children, header }
+    leaf -> leaf
 
 stripHtmlTags :: String -> String
 stripHtmlTags input =
