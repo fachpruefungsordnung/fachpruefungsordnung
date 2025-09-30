@@ -30,6 +30,7 @@ import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
+import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -220,7 +221,7 @@ data Action
   | DoNothing
   | Comment
   | ChangeToSection TOCEntry (Maybe Int) (Maybe String)
-  | ContinueChangeToSection (Array FirstComment)
+  | ContinueChangeToSection (Array FirstComment) Boolean
   | SelectComment
   | Font (Types.Editor -> Effect Unit)
   | FontSize (Int -> Int)
@@ -786,6 +787,7 @@ editor = connect selectTranslator $ H.mkComponent
       case renderType of
         RenderHTML -> do
           html <- H.gets _.html
+          liftEffect $ log "Render action -> Reload html"
           H.raise (ClickedQuery html)
         -- TODO change this later when backend is ready
         RenderPDF -> do
@@ -895,6 +897,7 @@ editor = connect selectTranslator $ H.mkComponent
         Right { content: updatedContent, typ: typ, html } -> do
 
           H.modify_ _ { mContent = Just updatedContent, html = html }
+          liftEffect $ log "Upload action -> Reload html"
           H.raise $ ClickedQuery html
 
           -- Show saved icon or toast
@@ -1474,9 +1477,11 @@ editor = connect selectTranslator $ H.mkComponent
             -- Only secondary Editor has ElementData
             -- Only first Editor gets to load the comments
             if isJust state.compareToElement then do
-              handleAction $ ContinueChangeToSection []
+              liftEffect $ log "Skip loading comments in secondary editor"
+              handleAction $ ContinueChangeToSection [] false
             else do
               -- Get comments
+              liftEffect $ log "Loading comments in primary editor"
               let
                 comments = ContentDto.getWrapperComments wrapper
                 -- convert markers
@@ -1501,7 +1506,7 @@ editor = connect selectTranslator $ H.mkComponent
       pure unit
 
     -- After getting information from from Comment
-    ContinueChangeToSection fCs -> do
+    ContinueChangeToSection fCs showHtml -> do
       state <- H.get
       case state.mListener of
         Nothing -> pure unit
@@ -1549,7 +1554,9 @@ editor = connect selectTranslator $ H.mkComponent
             H.modify_ \st -> st
               { commentState = st.commentState { liveMarkers = newLiveMarkers } }
             -- lastly show html in preview
-            H.raise $ ClickedQuery state.html
+            when showHtml $ do
+              liftEffect $ log "ContinueChangeToSection action -> Reload html"
+              H.raise $ ClickedQuery state.html
 
   -- convert Hashmap to Annotations and show them
   -- H.liftEffect $ setAnnotations commentState.markerAnnoHS state.mEditor
@@ -1576,7 +1583,7 @@ editor = connect selectTranslator $ H.mkComponent
       pure (Just a)
 
     ContinueChangeSection fCs a -> do
-      handleAction (ContinueChangeToSection fCs)
+      handleAction (ContinueChangeToSection fCs true)
       pure (Just a)
 
     ChangeToNode title path a -> do
