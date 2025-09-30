@@ -30,7 +30,6 @@ import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-import Effect.Console (log)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
