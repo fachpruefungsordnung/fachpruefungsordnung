@@ -29,7 +29,7 @@ import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class as EC
+import Effect.Class (liftEffect)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -802,9 +802,9 @@ editor = connect selectTranslator $ H.mkComponent
     Save isAutoSave -> do
       state <- H.get
       when (state.compareToElement == Nothing) $ do
-        isDirty <- EC.liftEffect $ Ref.read =<< case state.saveState.mDirtyRef of
+        isDirty <- liftEffect $ Ref.read =<< case state.saveState.mDirtyRef of
           Just r -> pure r
-          Nothing -> EC.liftEffect $ Ref.new false
+          Nothing -> liftEffect $ Ref.new false
         -- Only save, when dirty flag is true or we are in older version
         -- TODO: Add another flag instead of using isEditorOutdated
         when (isDirty || state.isEditorOutdated) $ do
@@ -983,9 +983,9 @@ editor = connect selectTranslator $ H.mkComponent
       -- start a new fiber
       dFib <- H.fork do
         H.liftAff $ delay (Milliseconds 2000.0)
-        isDirty <- EC.liftEffect $ Ref.read =<< case saveState.mDirtyRef of
+        isDirty <- liftEffect $ Ref.read =<< case saveState.mDirtyRef of
           Just r -> pure r
-          Nothing -> EC.liftEffect $ Ref.new false
+          Nothing -> liftEffect $ Ref.new false
         when isDirty $ handleAction AutoSave
       H.modify_ _ { saveState = saveState { mPendingDebounceF = Just dFib } }
 
@@ -998,9 +998,9 @@ editor = connect selectTranslator $ H.mkComponent
         Nothing -> do
           mFib <- H.fork do
             H.liftAff $ delay (Milliseconds 20000.0)
-            isDirty <- EC.liftEffect $ Ref.read =<< case saveState.mDirtyRef of
+            isDirty <- liftEffect $ Ref.read =<< case saveState.mDirtyRef of
               Just r -> pure r
-              Nothing -> EC.liftEffect $ Ref.new false
+              Nothing -> liftEffect $ Ref.new false
             when isDirty $ handleAction AutoSave
           H.modify_ _ { saveState = saveState { mPendingMaxWaitF = Just mFib } }
 
