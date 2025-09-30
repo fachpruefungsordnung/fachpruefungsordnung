@@ -28,8 +28,6 @@ import Data.String.Regex as Regex
 import Data.String.Regex.Flags as RegexFlags
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class (liftEffect)
-import Effect.Console (log)
 import Effect.Unsafe (unsafePerformEffect)
 import FPO.Components.Comment as Comment
 import FPO.Components.CommentOverview as CommentOverview
@@ -741,8 +739,6 @@ splitview = connect selectTranslator $ H.mkComponent
             , versionMapping = vMapping
             }
           H.tell _toc unit (TOC.ReceiveTOCs finalTree metaMap)
-      liftEffect $ log
-        ("Finished GET with mCurrentTocEntry: " <> show s.mSelectedTocEntry)
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
@@ -939,15 +935,6 @@ splitview = connect selectTranslator $ H.mkComponent
       H.tell _editor 0 (Editor.EditorResize)
 
     ModifyVersionMapping tocID vID cData -> do
-      liftEffect $ log
-        ( "ModifyVersionMapping: tocID=" <> show tocID <> ", vID=" <> show vID
-            <> ", cData="
-            <> show (isJust cData)
-        )
-      case cData of
-        Just Nothing -> liftEffect $ log
-          "WARNING: Resetting comparison data to Nothing!"
-        _ -> pure unit
       state <- H.get
       when (not state.previewShown) $
         H.modify_ \st -> st
@@ -975,11 +962,6 @@ splitview = connect selectTranslator $ H.mkComponent
       H.modify_ _ { versionMapping = newVersionMapping }
 
     SetComparison elementID mVID -> do
-      liftEffect $ log
-        ( "SetComparison called for elementID: " <> show elementID
-            <> " with versionID: "
-            <> show mVID
-        )
       state <- H.get
       let
         tocEntry = fromMaybe
@@ -995,13 +977,6 @@ splitview = connect selectTranslator $ H.mkComponent
       mmTitle <- H.request _toc unit TOC.RequestFullTitle
       H.tell _editor 1
         (Editor.ChangeSection tocEntry mVID (join mmTitle))
-      liftEffect $ log
-        ( "SetComparison finished for elementID: " <> show elementID
-            <> " with versionID: "
-            <> show mVID
-            <> ". Current mSelectedTocEntry"
-            <> show state.mSelectedTocEntry
-        )
 
     -- Query handler
 
@@ -1047,7 +1022,6 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _comment unit (Comment.AddComment docID tocID)
 
       Editor.ClickedQuery html -> do
-        liftEffect $ log "Updating HTML"
         mSelectedTocEntry <- H.gets _.mSelectedTocEntry
         case mSelectedTocEntry of
           Just (SelLeaf tocID) -> do
@@ -1057,22 +1031,10 @@ splitview = connect selectTranslator $ H.mkComponent
               versionEntry = fromMaybe
                 { elementID: -1, versionID: Nothing, comparisonData: Nothing }
                 (findRootTree (\e -> e.elementID == tocID) state.versionMapping)
-            liftEffect $ log
-              ( "ClickedQuery: tocID=" <> show tocID <> ", comparisonData=" <> show
-                  (isJust versionEntry.comparisonData)
-              )
             case versionEntry.comparisonData of
-              Nothing -> do
-                liftEffect $ log
-                  "ClickedQuery: Resetting comparison data (was Nothing)"
-                handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
-              Just cData -> do
-                liftEffect $ log
-                  ( "ClickedQuery: Keeping comparison data (was Just with revID="
-                      <> show cData.revID
-                      <> ")"
-                  )
-                pure unit -- Don't reset comparison data when in comparison mode
+              Nothing -> handleAction
+                (ModifyVersionMapping tocID Nothing (Just Nothing))
+              Just _ -> pure unit -- Don't reset comparison data when in comparison mode
           _ -> pure unit
         H.modify_ _ { renderedHtml = Just (Loaded html) }
 
@@ -1224,8 +1186,6 @@ splitview = connect selectTranslator $ H.mkComponent
                 -- entry = case (findTOCEntry id state.tocEntries) of
                 --   Nothing -> emptyTOCEntry
                 --   Just e -> e
-                liftEffect $ log
-                  ("Merging mode (" <> show id <> ", " <> "Nothing" <> ")")
                 handleAction (SetComparison id Nothing)
               -- mmTitle <- H.request _toc unit TOC.RequestFullTitle
               -- H.tell _editor 1
@@ -1388,9 +1348,6 @@ splitview = connect selectTranslator $ H.mkComponent
           H.modify_ _
             { tocEntries = finalTree
             }
-
-          -- liftEffect $ log $ prettyPrintMetaMap metaMap
-
           H.tell _toc unit (TOC.ReceiveTOCs finalTree metaMap)
 
       handleAction UpdateVersionMapping
