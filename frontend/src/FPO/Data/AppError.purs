@@ -17,6 +17,7 @@ data AppError
   | DataError String
   | AccessDeniedError
   | MethodNotAllowedError String String
+  | ConflictError String
 
 type ErrorId = Int
 type AppErrorWithId = { errorId :: ErrorId, error :: AppError }
@@ -34,6 +35,7 @@ instance Show AppError where
       <> " (method: "
       <> method
       <> ")"
+    ConflictError _ -> "ConflictError"
 
 -- | Prints an error message based on the type of error.
 -- | The error message is prefixed with the provided string.
@@ -64,3 +66,8 @@ showToastError err translator = case err of
       <> " (method: "
       <> method
       <> ")"
+  ConflictError url -> (translate (label :: _ "error_conflictError") translator) <>
+    ( if url == "/groups" then
+        ((": ") <> (translate (label :: _ "error_conflictError_groups") translator))
+      else ""
+    )
