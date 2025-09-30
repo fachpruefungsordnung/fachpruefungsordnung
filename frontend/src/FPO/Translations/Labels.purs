@@ -177,6 +177,7 @@ type Labels =
       ::: "editor_readonly"
       ::: "editor_redo"
       ::: "editor_save"
+      ::: "editor_save_success"
       ::: "editor_textBold"
       ::: "editor_textItalic"
       ::: "editor_textUnderline"

@@ -190,7 +190,7 @@ type State = FPOState
   , isEditorOutdated :: Boolean
   , outdatedInfoPopup :: Boolean
   , discardPopup :: Boolean
-  -- similar to mDirtyRef, but for Drafts. causes popup is user tries changing version with open draft, as that would discard the draft.
+  -- similar to mDirtyRef, but for Drafts. causes popup if user tries changing version with open draft, as that would discard the draft.
   , mDirtyVersion :: Maybe (Ref Boolean)
   -- Determines whether the user is on the merge view
   , isOnMerge :: Boolean
@@ -797,8 +797,6 @@ editor = connect selectTranslator $ H.mkComponent
       let tocID = maybe (-1) _.id state.mTocEntry
       H.raise $ ShowAllCommentsOutput state.docID tocID
 
-    -- Save section
-
     Save isAutoSave -> do
       state <- H.get
       when (state.compareToElement == Nothing) $ do
@@ -913,7 +911,8 @@ editor = connect selectTranslator $ H.mkComponent
                 _ -> pure unit
             -- manuell saving and working in latest version
             false, false -> do
-              updateStore $ Store.AddSuccess "Saved successfully"
+              updateStore $ Store.AddSuccess
+                (translate (label :: _ "editor_save_success") state.translator)
               case typ of
                 "noConflict" -> do
                   H.modify_ _ { isOnMerge = false }
