@@ -60,9 +60,10 @@ data NodeHeader = NodeHeader
 instance Hashable NodeHeader where
     updateHash ctx nodeHeader =
         updateHash
-            (updateHash
+            ( updateHash
                 (updateHash ctx (headerType nodeHeader))
-                (headerKind nodeHeader))
+                (headerKind nodeHeader)
+            )
             (heading nodeHeader)
 
 instance ToJSON NodeHeader
