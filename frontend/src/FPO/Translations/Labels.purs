@@ -186,6 +186,8 @@ type Labels =
       -- | Errors 
       ::: "error_accessDeniedError"
       ::: "error_authError"
+      ::: "error_conflictError"
+      ::: "error_conflictError_groups"
       ::: "error_connectionFailed"
       ::: "error_dataError"
       ::: "error_invalidCredentials"

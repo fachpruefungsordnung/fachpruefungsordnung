@@ -180,6 +180,9 @@ handleRequest' url requestAction = do
         StatusCode 405 -> do
           handleAppError (MethodNotAllowedError url "Unknown")
           pure $ Left $ MethodNotAllowedError url "Unknown"
+        StatusCode 409 -> do
+          handleAppError (ConflictError url)
+          pure $ Left $ ConflictError url
         StatusCode code | code >= 500 && code < 600 -> do
           handleAppError (ServerError $ "Server error (status: " <> show code <> ")")
           pure $ Left $ ServerError $ "Server error (status: " <> show code <> ")"
@@ -213,6 +216,7 @@ handleAppError err = do
       DataError _ -> pure unit -- Let component handle this
       AccessDeniedError -> pure unit -- Let component handle this
       MethodNotAllowedError _ _ -> pure unit -- Let component handle this
+      ConflictError _ -> pure unit -- Let component handle this
 
 -- | Wrapper specifically for JSON responses with decode step
 handleJsonRequest'
