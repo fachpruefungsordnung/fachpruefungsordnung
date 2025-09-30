@@ -132,44 +132,6 @@ data Action
   | DeleteDraft
   | DoNothing
 
-instance showAction :: Show Action
-  where
-  show :: Action -> String
-  show Init = "Init"
-  show (Receive _) = "Receive"
-  show (StartResize _ _) = "StartResize"
-  show (StopResize _) = "StopResize"
-  show (HandleMouseMove _) = ""
-  show ToggleComment = "ToggleComment"
-  show (ToggleCommentOverview b eID vID) = "ToggleCommentOverview " <> show b <> " "
-    <> show eID
-    <> " "
-    <> show vID
-  show ToggleSidebar = "ToggleSidebar"
-  show TogglePreview = "TogglePreview"
-  show (HandleComment _) = "HandleComment"
-  show (HandleCommentOverview _) = "HandleCommentOverview"
-  show (HandleEditor _) = "HandleEditor"
-  show (HandlePreview _) = "HandlePreview"
-  show (HandleTOC _) = "HandleTOC"
-  show GET = "GET"
-  show POST = "POST"
-  show (ModifyVersionMapping eID mVID cData) = "ModifyVersionMapping " <> show eID
-    <> " "
-    <> show mVID
-    <> " "
-    <> show cData
-  show UpdateMSelectedTocEntry = "UpdateMSelectedTocEntry"
-  show (SetComparison eID mVID) = "SetComparison " <> show eID <> " " <> show mVID
-  show UpdateVersionMapping = "UpdateVersionMapping"
-  show UpdateDirtyVersion = "UpdateDirtyVersion"
-  show HideDirtyVersionModal = "HideDirtyVersionModal"
-  show (ModifyVersionFromModal eID mVID) = "ModifyVersionFromModal " <> show eID
-    <> " "
-    <> show mVID
-  show DeleteDraft = "DeleteDraft"
-  show DoNothing = "DoNothing"
-
 type State = FPOState
   ( docID :: DocumentID
   , mDragTarget :: Maybe DragTarget

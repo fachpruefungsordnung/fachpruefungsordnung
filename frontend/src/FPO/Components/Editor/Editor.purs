@@ -1447,13 +1447,21 @@ editor = connect selectTranslator $ H.mkComponent
 
         -- check, if draft is present. Otherwise get from version
         loadedContent <- case loadedDraftContent of
-          Right res -> pure (Right res)
-          Left _ -> Request.getJson
-            ContentDto.decodeContentWrapper
-            ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-                <> "/rev/"
-                <> version
-            )
+          Right res -> do
+            H.modify_ _
+              { isEditorOutdated = true
+              }
+            pure (Right res)
+          Left _ -> do
+            H.modify_ _
+              { isEditorOutdated = false
+              }
+            Request.getJson
+              ContentDto.decodeContentWrapper
+              ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+                  <> "/rev/"
+                  <> version
+              )
 
         case loadedContent of
           Left err -> updateStore $ Store.AddError err
@@ -1467,7 +1475,6 @@ editor = connect selectTranslator $ H.mkComponent
               , mTitle = mTitle
               , mContent = Just content
               , html = html
-              , isEditorOutdated = version /= "latest"
               , isOnMerge = false
               }
 
