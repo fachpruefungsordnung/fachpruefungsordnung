@@ -208,7 +208,7 @@ squashRevisionsWithinMinutes = 15
 
 -- | Wether subsequent revision by the same author should be squashed
 enableSquashing :: Bool
-enableSquashing = False
+enableSquashing = True
 
 -- | Performs an transaction and performs an rollback on error
 rollbackOnError :: (HasRollback m) => m (Result a) -> m (Result a)
