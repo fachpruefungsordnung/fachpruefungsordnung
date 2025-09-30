@@ -98,7 +98,7 @@ instance decodeJsonContentWrapper :: DecodeJson ContentWrapper where
       -- Draft
       Nothing -> do
         con <- decodeJson (fromObject ele)
-        coms <- obj .: "draftCommentAnchors"
+        coms <- ele .: "draftCommentAnchors"
         pure $ Wrapper { content: con, comments: coms, html }
 
 instance encodeJsonCommentAnchor :: EncodeJson CommentAnchor where
