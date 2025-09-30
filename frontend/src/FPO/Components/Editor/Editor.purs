@@ -29,7 +29,7 @@ import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class as EC
+import Effect.Class (liftEffect)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -190,7 +190,7 @@ type State = FPOState
   , isEditorOutdated :: Boolean
   , outdatedInfoPopup :: Boolean
   , discardPopup :: Boolean
-  -- similar to mDirtyRef, but for Drafts. causes popup is user tries changing version with open draft, as that would discard the draft.
+  -- similar to mDirtyRef, but for Drafts. causes popup if user tries changing version with open draft, as that would discard the draft.
   , mDirtyVersion :: Maybe (Ref Boolean)
   -- Determines whether the user is on the merge view
   , isOnMerge :: Boolean
@@ -220,7 +220,7 @@ data Action
   | DoNothing
   | Comment
   | ChangeToSection TOCEntry (Maybe Int) (Maybe String)
-  | ContinueChangeToSection (Array FirstComment)
+  | ContinueChangeToSection (Array FirstComment) Boolean
   | SelectComment
   | Font (Types.Editor -> Effect Unit)
   | FontSize (Int -> Int)
@@ -797,14 +797,12 @@ editor = connect selectTranslator $ H.mkComponent
       let tocID = maybe (-1) _.id state.mTocEntry
       H.raise $ ShowAllCommentsOutput state.docID tocID
 
-    -- Save section
-
     Save isAutoSave -> do
       state <- H.get
       when (state.compareToElement == Nothing) $ do
-        isDirty <- EC.liftEffect $ Ref.read =<< case state.saveState.mDirtyRef of
+        isDirty <- liftEffect $ Ref.read =<< case state.saveState.mDirtyRef of
           Just r -> pure r
-          Nothing -> EC.liftEffect $ Ref.new false
+          Nothing -> liftEffect $ Ref.new false
         -- Only save, when dirty flag is true or we are in older version
         -- TODO: Add another flag instead of using isEditorOutdated
         when (isDirty || state.isEditorOutdated) $ do
@@ -913,7 +911,8 @@ editor = connect selectTranslator $ H.mkComponent
                 _ -> pure unit
             -- manuell saving and working in latest version
             false, false -> do
-              updateStore $ Store.AddSuccess "Saved successfully"
+              updateStore $ Store.AddSuccess
+                (translate (label :: _ "editor_save_success") state.translator)
               case typ of
                 "noConflict" -> do
                   H.modify_ _ { isOnMerge = false }
@@ -983,9 +982,9 @@ editor = connect selectTranslator $ H.mkComponent
       -- start a new fiber
       dFib <- H.fork do
         H.liftAff $ delay (Milliseconds 2000.0)
-        isDirty <- EC.liftEffect $ Ref.read =<< case saveState.mDirtyRef of
+        isDirty <- liftEffect $ Ref.read =<< case saveState.mDirtyRef of
           Just r -> pure r
-          Nothing -> EC.liftEffect $ Ref.new false
+          Nothing -> liftEffect $ Ref.new false
         when isDirty $ handleAction AutoSave
       H.modify_ _ { saveState = saveState { mPendingDebounceF = Just dFib } }
 
@@ -998,9 +997,9 @@ editor = connect selectTranslator $ H.mkComponent
         Nothing -> do
           mFib <- H.fork do
             H.liftAff $ delay (Milliseconds 20000.0)
-            isDirty <- EC.liftEffect $ Ref.read =<< case saveState.mDirtyRef of
+            isDirty <- liftEffect $ Ref.read =<< case saveState.mDirtyRef of
               Just r -> pure r
-              Nothing -> EC.liftEffect $ Ref.new false
+              Nothing -> liftEffect $ Ref.new false
             when isDirty $ handleAction AutoSave
           H.modify_ _ { saveState = saveState { mPendingMaxWaitF = Just mFib } }
 
@@ -1475,7 +1474,7 @@ editor = connect selectTranslator $ H.mkComponent
             -- Only secondary Editor has ElementData
             -- Only first Editor gets to load the comments
             if isJust state.compareToElement then do
-              handleAction $ ContinueChangeToSection []
+              handleAction $ ContinueChangeToSection [] false
             else do
               -- Get comments
               let
@@ -1502,7 +1501,7 @@ editor = connect selectTranslator $ H.mkComponent
       pure unit
 
     -- After getting information from from Comment
-    ContinueChangeToSection fCs -> do
+    ContinueChangeToSection fCs showHtml -> do
       state <- H.get
       case state.mListener of
         Nothing -> pure unit
@@ -1550,7 +1549,8 @@ editor = connect selectTranslator $ H.mkComponent
             H.modify_ \st -> st
               { commentState = st.commentState { liveMarkers = newLiveMarkers } }
             -- lastly show html in preview
-            H.raise $ ClickedQuery state.html
+            when showHtml $ do
+              H.raise $ ClickedQuery state.html
 
   -- convert Hashmap to Annotations and show them
   -- H.liftEffect $ setAnnotations commentState.markerAnnoHS state.mEditor
@@ -1577,7 +1577,7 @@ editor = connect selectTranslator $ H.mkComponent
       pure (Just a)
 
     ContinueChangeSection fCs a -> do
-      handleAction (ContinueChangeToSection fCs)
+      handleAction (ContinueChangeToSection fCs true)
       pure (Just a)
 
     ChangeToNode title path a -> do
