@@ -14,6 +14,8 @@ module FPO.Dto.DocumentDto.TreeDto
   , getContentOr
   , getEdgeTree
   , getFullTitle
+  , getHeaderKind
+  , getHeaderType
   , getHeading
   , getShortTitle
   , modifyNodeRootTree
@@ -48,6 +50,12 @@ updateHeading newHeading (TreeHeader header) =
 
 getHeading :: TreeHeader -> String
 getHeading (TreeHeader header) = header.heading
+
+getHeaderKind :: TreeHeader -> String
+getHeaderKind (TreeHeader header) = header.headerKind
+
+getHeaderType :: TreeHeader -> String
+getHeaderType (TreeHeader header) = header.headerType
 
 -- | Metadata for a tree node. `title` is a html-escaped string that represents
 -- | the title of the node. `label` is an optional html-escaped string that

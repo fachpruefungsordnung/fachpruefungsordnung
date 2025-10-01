@@ -52,7 +52,9 @@ import FPO.Dto.DocumentDto.TreeDto
   , TreeHeader(..)
   , errorMeta
   , findRootTree
+  , getHeaderType
   , modifyNodeRootTree
+  , unspecifiedMeta
   , updateHeading
   )
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
@@ -1276,6 +1278,11 @@ splitview = connect selectTranslator $ H.mkComponent
         -- updateTree $ changeNodeName path newName s.tocEntries
         pure unit
 
+      TOC.UpdateDocumentType -> do
+        s <- H.get
+        -- DEMONSTRATION ONLY: Here, we just update the tree according to our fixed updating strategy.
+        updateTree $ updateDocumentType s.tocEntries
+
     where
     -- Communicates tree changes to the server and TOC component.
     updateTree newTree = do
@@ -1651,6 +1658,75 @@ changeNodeHeading' path newName tree = case path of
             Node { meta, children: newChildren, header }
         Nothing -> Node { meta, children, header }
     leaf -> leaf
+
+-- | DEMONSTRATION ONLY: Traverses the entire TOC and updates the entry(/entries)
+--   with type "simpledoc" to type "structured". This is just a demonstration to
+--   show how to manipulate the TOC structure programmatically. Because it doesn't
+--   take into account the actual meta map, it should not be used for any actual
+--   purpose, besides the FPO demo.
+--
+--   If the meta map changes, this function might lead to malformed and thus invalid
+--   TOC structures!
+updateDocumentType :: RootTree TOCEntry -> RootTree TOCEntry
+updateDocumentType Empty = Empty
+updateDocumentType (RootTree { children: c, header: h }) =
+  RootTree
+    { header: h
+    , children: map updateEdge c
+    }
+  where
+  -- TODO: It would be a great idea to add a functor instance for Tree and Edge,
+  --       or even better, remove the `Edge` wrapper entirely, because I don't
+  --       think we need this kind of indirection in the frontend.
+  updateEdge :: Edge TOCEntry -> Edge TOCEntry
+  updateEdge (Edge t) = Edge (updateNode t)
+
+  updateNode :: Tree TOCEntry -> Tree TOCEntry
+  updateNode = case _ of
+    Leaf l -> Leaf l
+    Node { meta, children, header } ->
+      if isSimpleDoc header then
+        -- Found a simple doc node (only one of those should ever exist in a valid TOC,
+        -- but we accept any number of them here).
+        -- Now we can update it to a structured doc node:
+        Node
+          { meta: meta
+          -- The children of the current node should only be leaf nodes, so we can just
+          -- place all of them inside a fresh section node, each:
+          , children:
+              map
+                ( \t -> Edge $
+                    Node
+                      { meta: unspecifiedMeta
+                      , children: [ t ]
+                      , header:
+                          TreeHeader
+                            { headerKind: "section"
+                            , headerType: "supersection"
+                            , heading:
+                                "//Specify the section name here\n! Fresh section"
+                            }
+                      }
+                )
+                children
+
+          , header: updateHeader header
+          }
+      else
+        -- Just recurse further, not the node we are looking for:
+        Node
+          { meta: meta
+          , children: map updateEdge children
+          , header: header
+          }
+
+  isSimpleDoc :: TreeHeader -> Boolean
+  isSimpleDoc th = getHeaderType th == "fpo-mainbody-simple"
+
+  -- Update to a structured document type.
+  updateHeader :: TreeHeader -> TreeHeader
+  updateHeader (TreeHeader th) = TreeHeader $
+    th { headerType = "fpo-mainbody-structured" }
 
 stripHtmlTags :: String -> String
 stripHtmlTags input =
