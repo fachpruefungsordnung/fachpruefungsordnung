@@ -1,3 +1,7 @@
+---
+sidebar_position: 2
+---
+
 # Configure
 
 All services are orchestrated using docker compose.
