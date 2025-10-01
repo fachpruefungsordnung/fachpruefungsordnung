@@ -1174,6 +1174,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
             $ prependIf (activeEndDropzone state path) (H.ClassName "active")
             $ prependIf (previewEndDropzone state path) (H.ClassName "preview")
             $ [ H.ClassName "drop-zone-end" ]
+        -- Give it a minimum height so it (i.e., the section)
+        -- can receive drag events even when empty.
+        , HP.style "min-height: 0.1px;"
         ] <> dragProps
       )
       []
