@@ -7,15 +7,8 @@ FROM node:20-bullseye-slim AS build-docs
 
 WORKDIR /build
 
-# Install git if you need it (for npx create-docusaurus)
-RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
-
-# Create Docusaurus project non-interactively
-RUN npx create-docusaurus@latest fpo classic
-
-# Copy your markdown files into the docs folder
-COPY README.md fpo/docs/README.md
-COPY docs/ fpo/docs/docs/
+COPY docusaurus fpo
+COPY docs/ fpo/docs/
 
 WORKDIR /build/fpo
 
@@ -31,7 +24,7 @@ RUN npm run build
 
 FROM python:3.12-slim AS serve-docs
 
-COPY --from=build-docs /build/fpo /home/fpo
+COPY --from=build-docs /build/fpo/build /home/fpo
 
 WORKDIR /home/fpo
 
