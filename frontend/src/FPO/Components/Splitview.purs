@@ -1704,7 +1704,7 @@ updateDocumentType (RootTree { children: c, header: h }) =
                             { headerKind: "section"
                             , headerType: "supersection"
                             , heading:
-                                "//Specify the section name here\n! Fresh section"
+                                "//Specify the section name here\n= Fresh section"
                             }
                       }
                 )
