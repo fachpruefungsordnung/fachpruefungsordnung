@@ -70,7 +70,7 @@ It has an additional **ShowHandles** and **HideHandles** Actions, which mainly u
 - dragColAS :: Int
 - mHandleBorder :: Maybe HandleBorder
 
-#### Annotated Marker sequence
+### Annotated Marker sequence
 
 After loading the comment from ContentWrapper in the GET request, it then converts to AnnotatedMarker and stored in markers. Since we need more information from the comments, we request the first message of the comment from [comment](Comment.md) comtainer at the end of the first Action. In the continuation Action, we filter with the aquired data for only having non resolved comments. Then with the help of the addAnchor function, the annoted marker is converted to live markers and added to the editor and stored in state. 
 
@@ -80,3 +80,7 @@ On the gutter on the left side of the editor, it shows the comment annotation. I
 
 - **markerAnnoHS**: It takes the line of the editor as its key and returns as value another hashmap. The returned hashmap represents the occurence of the user.
 - **oldMarkerAnnoPos**: To find out, on which line the comment lies. It uses the id of the marker as the key and the returned row number can then be used in markerAnnoHS
+
+### Creating Comment
+
+The user first selects a text and then click on the comment button. This puts it into the Comment Action. There it gets the user to use its name for later. It converts the selected text into range, from which the start and end postions are extracted. From this data, it creates a new AnnotatedMarker. With the help of the **addAnchor** it converts it into a liveMarker. This markers is then stored as current selected liveMarker and as a temporary liveMarker. Temporary as we do not want to send it to the backend, unitl the first message is sent in the conversation. When there existed a tmpLiveMarker, it just overwrites it. Afterwatrds saving the new marker in state it then sends a notification **AddComment** towards the [comment](Comment.md) component. When the first message was sent, this editor gets as a query **UpdateComment**. 
