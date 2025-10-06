@@ -60,7 +60,7 @@ createGroupHandler (Authenticated token@Auth.Token {..}) (Group.GroupCreate {..}
             liftIO $ Session.run (Sessions.checkGroupNameExistence groupCreateName) conn
         case eBool of
             Left _ -> throwError errDatabaseAccessFailed
-            Right True -> throwError $ err409 {errBody = "A group with that name exists already."}
+            Right True -> throwError $ err409 {errBody = "\"A group with that name exists already.\""}
             Right False -> do
                 eGroupID <-
                     liftIO $

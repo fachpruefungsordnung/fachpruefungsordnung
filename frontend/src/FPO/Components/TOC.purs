@@ -32,6 +32,7 @@ import Data.Array
 import Data.DateTime (Date, DateTime, adjust)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.Show (class Show)
 import Data.Time.Duration (Days(..), Minutes)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
@@ -142,6 +143,12 @@ type EntityToDelete = { path :: Path, kind :: EntityKind, title :: String }
 data SelectedEntity
   = SelLeaf Int
   | SelNode Path String
+
+instance showSelectedEntity :: Show SelectedEntity where
+  show = case _ of
+    SelLeaf id -> "Leaf " <> show id
+    SelNode path title ->
+      "Node " <> show path <> " (" <> title <> ")"
 
 derive instance eqSelectedEntity :: Eq SelectedEntity
 
@@ -1167,6 +1174,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
             $ prependIf (activeEndDropzone state path) (H.ClassName "active")
             $ prependIf (previewEndDropzone state path) (H.ClassName "preview")
             $ [ H.ClassName "drop-zone-end" ]
+        -- Give it a minimum height so it (i.e., the section)
+        -- can receive drag events even when empty.
+        , HP.style "min-height: 0.1px;"
         ] <> dragProps
       )
       []

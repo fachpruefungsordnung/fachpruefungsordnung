@@ -617,7 +617,6 @@ splitview = connect selectTranslator $ H.mkComponent
 
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
-
     Init -> do
       let
         timeFormat = fromMaybe "" (head timeStampsVersions)
@@ -681,9 +680,18 @@ splitview = connect selectTranslator $ H.mkComponent
         Right (MM.DocumentTreeWithMetaMap { tree, metaMap }) -> do
           let
             finalTree = documentTreeToTOCTree tree
+            -- Preserve existing version mapping data when updating the tree
             vMapping = map
               ( \elem ->
-                  { elementID: elem.id, versionID: Nothing, comparisonData: Nothing }
+                  case
+                    findRootTree (\v -> v.elementID == elem.id) s.versionMapping
+                    of
+                    Just existingEntry -> existingEntry -- Keep existing version and comparison data
+                    Nothing ->
+                      { elementID: elem.id
+                      , versionID: Nothing
+                      , comparisonData: Nothing
+                      } -- New entries get defaults
               )
               finalTree
           H.modify_ _
@@ -976,10 +984,18 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.ClickedQuery html -> do
         mSelectedTocEntry <- H.gets _.mSelectedTocEntry
         case mSelectedTocEntry of
-          Just (SelLeaf tocID) ->
-            handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
+          Just (SelLeaf tocID) -> do
+            -- Only reset comparison data if we're not currently in comparison mode
+            state <- H.get
+            let
+              versionEntry = fromMaybe
+                { elementID: -1, versionID: Nothing, comparisonData: Nothing }
+                (findRootTree (\e -> e.elementID == tocID) state.versionMapping)
+            case versionEntry.comparisonData of
+              Nothing -> handleAction
+                (ModifyVersionMapping tocID Nothing (Just Nothing))
+              Just _ -> pure unit -- Don't reset comparison data when in comparison mode
           _ -> pure unit
-        H.modify_ _ { renderedHtml = Just Loading }
         H.modify_ _ { renderedHtml = Just (Loaded html) }
 
       Editor.PostPDF _ -> do
@@ -1116,14 +1132,15 @@ splitview = connect selectTranslator $ H.mkComponent
                           )
                       )
                   )
-                let
-                  -- Nothing case should never occur
-                  entry = case (findTOCEntry id state.tocEntries) of
-                    Nothing -> emptyTOCEntry
-                    Just e -> e
-                mmTitle <- H.request _toc unit TOC.RequestFullTitle
-                H.tell _editor 1
-                  (Editor.ChangeSection entry version.identifier (join mmTitle))
+                -- let
+                -- Nothing case should never occur
+                -- entry = case (findTOCEntry id state.tocEntries) of
+                --   Nothing -> emptyTOCEntry
+                --   Just e -> e
+                handleAction (SetComparison id Nothing)
+              -- mmTitle <- H.request _toc unit TOC.RequestFullTitle
+              -- H.tell _editor 1
+              --   (Editor.ChangeSection entry version.identifier (join mmTitle))
               _ -> pure unit
           _ -> do
             pure unit
@@ -1184,7 +1201,9 @@ splitview = connect selectTranslator $ H.mkComponent
         state <- H.get
         let
           currentVersion =
-            case findRootTree (\e -> e.elementID == elementID) state.versionMapping of
+            case
+              findRootTree (\e -> e.elementID == elementID) state.versionMapping
+              of
               Nothing -> Nothing
               Just version -> version.versionID
         if state.dirtyVersion && currentVersion /= Nothing then do
@@ -1280,9 +1299,6 @@ splitview = connect selectTranslator $ H.mkComponent
           H.modify_ _
             { tocEntries = finalTree
             }
-
-          -- liftEffect $ log $ prettyPrintMetaMap metaMap
-
           H.tell _toc unit (TOC.ReceiveTOCs finalTree metaMap)
 
       handleAction UpdateVersionMapping

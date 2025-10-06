@@ -6,7 +6,7 @@ FROM debian:bookworm-slim AS build
 
 # install dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends locales git npm nodejs
+    apt-get install -y --no-install-recommends locales git npm nodejs python3
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN locale-gen de_DE.UTF-8 && update-locale
 
@@ -31,6 +31,9 @@ RUN --mount=type=cache,target=/build/node_modules/ \
 # build
 COPY src src
 COPY test test
+COPY README.md README.md
+COPY module_desc.py module_desc.py
+RUN python3 module_desc.py README.md src/FPO/FPO.purs
 
 RUN --mount=type=cache,target=/build/node_modules/ \
     --mount=type=cache,target=/build/output/ \

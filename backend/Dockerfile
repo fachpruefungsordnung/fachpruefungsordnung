@@ -47,6 +47,7 @@ RUN --mount=type=cache,target=/root/.stack/ \
 # copy source files
 COPY src/ src/
 COPY app/ app/
+COPY README.md README.md
 
 # build project
 RUN --mount=type=cache,target=/root/.stack/ \

@@ -177,6 +177,7 @@ type Labels =
       ::: "editor_readonly"
       ::: "editor_redo"
       ::: "editor_save"
+      ::: "editor_save_success"
       ::: "editor_textBold"
       ::: "editor_textItalic"
       ::: "editor_textUnderline"
@@ -186,6 +187,8 @@ type Labels =
       -- | Errors 
       ::: "error_accessDeniedError"
       ::: "error_authError"
+      ::: "error_conflictError"
+      ::: "error_conflictError_groups"
       ::: "error_connectionFailed"
       ::: "error_dataError"
       ::: "error_invalidCredentials"

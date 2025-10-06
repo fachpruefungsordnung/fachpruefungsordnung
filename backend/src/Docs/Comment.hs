@@ -34,6 +34,7 @@ import GHC.Generics (Generic)
 import GHC.Int (Int64)
 import Servant (FromHttpApiData (parseUrlPiece))
 
+-- | References a comment of a @TextElement@
 data CommentRef = CommentRef TextElementRef CommentID
     deriving (Generic)
 
@@ -43,10 +44,12 @@ instance FromJSON CommentRef
 
 instance ToSchema CommentRef
 
+-- | Obtain a human readable representation of a @CommentRef@
 prettyPrintCommentRef :: CommentRef -> String
 prettyPrintCommentRef (CommentRef textElementRef id_) =
     prettyPrintTextElementRef textElementRef ++ show id_
 
+-- | Unique identifier for a comment
 newtype CommentID = CommentID
     { unCommentID :: Int64
     }
@@ -74,6 +77,7 @@ instance ToParamSchema CommentID where
 instance FromHttpApiData CommentID where
     parseUrlPiece = (CommentID <$>) . parseUrlPiece
 
+-- | Wether a comment is still open or resolved
 data Status
     = Open
     | Resolved UTCTime
@@ -85,6 +89,7 @@ instance FromJSON Status
 
 instance ToSchema Status
 
+-- | An existing comment present in the database
 data Comment = Comment
     { identifier :: CommentID
     , status :: Status
@@ -99,6 +104,7 @@ instance FromJSON Comment
 
 instance ToSchema Comment
 
+-- | The message of a comment or a reply
 data Message = Message
     { author :: UserRef
     , timestamp :: UTCTime
@@ -112,6 +118,7 @@ instance FromJSON Message
 
 instance ToSchema Message
 
+-- | Ties a comment to a specific text passage
 data CommentAnchor = CommentAnchor
     { comment :: CommentID
     , anchor :: Range
@@ -124,6 +131,7 @@ instance FromJSON CommentAnchor
 
 instance ToSchema CommentAnchor
 
+-- | Text location
 data Anchor = Anchor
     { col :: Int64
     , row :: Int64
@@ -141,6 +149,7 @@ instance Ord Anchor where
         EQ -> compare (col a) (col b)
         ordering -> ordering
 
+-- | Text passage
 data Range = Range
     { start :: Anchor
     , end :: Anchor

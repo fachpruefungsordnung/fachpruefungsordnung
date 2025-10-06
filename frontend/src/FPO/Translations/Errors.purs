@@ -9,6 +9,8 @@ import Simple.I18n.Translation (Translation, fromRecord)
 type ErrorLabels =
   ( "error_accessDeniedError"
       ::: "error_authError"
+      ::: "error_conflictError"
+      ::: "error_conflictError_groups"
       ::: "error_connectionFailed"
       ::: "error_dataError"
       ::: "error_invalidCredentials"
@@ -24,6 +26,8 @@ enErrors :: Translation ErrorLabels
 enErrors = fromRecord
   { error_accessDeniedError: "Access denied"
   , error_authError: "Authentication error: "
+  , error_conflictError: "Conflict error"
+  , error_conflictError_groups: "A group with this name already exists"
   , error_connectionFailed: "Connection failed"
   , error_dataError: "Data error: "
   , error_methodNotAllowedError: "Method not allowed: "
@@ -38,6 +42,8 @@ deErrors :: Translation ErrorLabels
 deErrors = fromRecord
   { error_accessDeniedError: "Zugriff verweigert"
   , error_authError: "Authentifizierungsfehler: "
+  , error_conflictError: "Konfliktfehler"
+  , error_conflictError_groups: "Eine Gruppe mit diesem Namen existiert bereits"
   , error_connectionFailed: "Verbindungsfehler"
   , error_dataError: "Datenfehler: "
   , error_methodNotAllowedError: "Methode nicht erlaubt: "

@@ -1,6 +1,23 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : Docs
+-- Description : Document Management and Version Control
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module provides a high level api wrapper around "Docs.Database" to interact
+-- with the document control and version management, e.g., to create, view, edit,
+-- manage, discuss and version documents.
+--
+-- All @Docs@ api actions are abstracted over specific classes defined in
+-- "Docs.Database". A specific implementation for PostgreSQL databases are
+-- @HasqlSession@ and @HasqlTransaction@ in "Docs.Hasql.Database". These must be used
+-- together, as some Database Operations require to be executed in a transactional
+-- context. The PostgreSQL implementation can be used with the functions @run@ and
+-- @runTransaction@ in "Docs.Hasql.Database".
 module Docs
     ( Error (..)
     , Result
@@ -153,6 +170,7 @@ import Logging.Logs (LogMessage, Severity (Warning))
 import Logging.Scope (Scope)
 import qualified Logging.Scope as Scope
 
+-- | Represents an error of the docs api
 data Error
     = NoPermission DocumentID Permission
     | NoPermissionForUser UserID
@@ -179,15 +197,20 @@ type Result a = Either Error a
 
 type Limit = Int64
 
+-- | Default restriction for how many revisions are returned by default from the
+--   history functions
 defaultHistoryLimit :: Limit
 defaultHistoryLimit = 200
 
+-- | Subsequent revisions by the same authors are squashed within this time frame
 squashRevisionsWithinMinutes :: Float
 squashRevisionsWithinMinutes = 15
 
+-- | Wether subsequent revision by the same author should be squashed
 enableSquashing :: Bool
-enableSquashing = False
+enableSquashing = True
 
+-- | Performs an transaction and performs an rollback on error
 rollbackOnError :: (HasRollback m) => m (Result a) -> m (Result a)
 rollbackOnError tx = do
     result <- tx
@@ -197,6 +220,7 @@ rollbackOnError tx = do
             return result
         Right _ -> return result
 
+-- | Performs an action and logs the result on an error
 logged :: (HasLogMessage m) => UserID -> Scope -> m (Result a) -> m (Result a)
 logged userID scope result = do
     value <- result
@@ -207,6 +231,7 @@ logged userID scope result = do
             return $ Left err
         Right val -> return $ Right val
 
+-- | Logs a message
 logMessage
     :: (HasLogMessage m, ToJSON v)
     => Severity
@@ -216,6 +241,7 @@ logMessage
     -> m LogMessage
 logMessage = DB.logMessage
 
+-- | Obtain log messages
 getLogs
     :: (HasGetLogs m, HasLogMessage m)
     => UserID
@@ -226,6 +252,7 @@ getLogs userID offset limit = logged userID Scope.logging $ runExceptT $ do
     guardSuperAdmin userID
     lift $ DB.getLogs offset limit
 
+-- | Create a new document
 createDocument
     :: (HasCreateDocument m, HasLogMessage m)
     => UserID
@@ -236,6 +263,7 @@ createDocument userID groupID title = logged userID Scope.docs $ runExceptT $ do
     guardGroupAdmin groupID userID
     lift $ DB.createDocument title groupID userID
 
+-- | Get a document
 getDocument
     :: (HasGetDocument m, HasLogMessage m)
     => UserID
@@ -262,6 +290,7 @@ getDocuments userID byUserID byGroupID = logged userID Scope.docs $
             maybe (pure ()) (`guardGroupAdmin` userID) byGroupID
             lift $ DB.getDocumentsBy byUserID byGroupID
 
+-- | Create a new @TextElement@
 createTextElement
     :: (HasCreateTextElement m, HasLogMessage m)
     => UserID
@@ -387,6 +416,7 @@ createTextRevision userID revision = logged userID Scope.docsTextRevision $
                 . diffUTCTime tz
                 $ timestamp latestRevision
 
+-- | Get a specific revision for a @TextElement@
 getTextElementRevision
     :: ( HasGetTextElementRevision m
        , HasGetTreeRevision m
@@ -405,6 +435,7 @@ getTextElementRevision userID ref = logged userID Scope.docsTextRevision $
         revision <- lift $ DB.getTextElementRevision ref
         mapM (renderTextElementRevision userID ref) revision
 
+-- | Render HTML of a specific revision of a @TextElement@
 renderTextElementRevision
     :: ( HasGetTreeRevision m
        , HasLogMessage m

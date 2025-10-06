@@ -31,6 +31,15 @@ services:
     networks:
       - backend
 
+  docs:
+    container_name: fpo-docs
+    hostname: docs
+    build:
+      context: .
+      target: serve-docs
+    networks:
+      - backend
+
   swagger-ui:
     container_name: fpo-swagger
     hostname: swagger

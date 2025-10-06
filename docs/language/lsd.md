@@ -14,3 +14,5 @@
 
 * The syntax is defined by the [EBNF grammar](lsd/syntax.ebnf.txt) together
   with the set of [type constructors](lsd/type-constructors.md).
+* Parsing LSD is not yet implemented (TODO); relatedly, the syntax is likely
+  to change.
