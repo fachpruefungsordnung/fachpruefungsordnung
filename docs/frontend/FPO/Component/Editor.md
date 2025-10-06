@@ -83,4 +83,68 @@ On the gutter on the left side of the editor, it shows the comment annotation. I
 
 ### Creating Comment
 
-The user first selects a text and then click on the comment button. This puts it into the Comment Action. There it gets the user to use its name for later. It converts the selected text into range, from which the start and end postions are extracted. From this data, it creates a new AnnotatedMarker. With the help of the **addAnchor** it converts it into a liveMarker. This markers is then stored as current selected liveMarker and as a temporary liveMarker. Temporary as we do not want to send it to the backend, unitl the first message is sent in the conversation. When there existed a tmpLiveMarker, it just overwrites it. Afterwatrds saving the new marker in state it then sends a notification **AddComment** towards the [comment](Comment.md) component. When the first message was sent, this editor gets as a query **UpdateComment**. 
+The user first selects a text and then click on the Comment button. This puts it into the **Comment** Action. There it gets the data **user** to use its name for later. It converts the selected text into range, from which the start and end postions are extracted. From this data, it creates a new **AnnotatedMarker**. With the help of the **addAnchor** it converts it into a **liveMarker**. This marker is then stored as current selected **liveMarker** and as a temporary liveMarker **tmpLiveMarker**. Temporary as we do not want to send it to the backend, unitl the first message is sent in its conversation. When there existed a **tmpLiveMarker** prior to click the Comment button, it just overwrites **tmpLiveMarker** with the new one. After saving the new marker in state it then sends a notification **AddComment** towards the [comment](Comment.md) component. It then shows the handles of the **tmpLiveMarker**, as it is selected and clear the marked selection. When the first message was sent, this editor gets as a query **UpdateComment**. 
+
+#### Creating Comment uses the following Actions/Output/Query:
+
+- Comment
+  
+- AddComment
+
+- UpdateComment
+
+#### Creating Comment uses the following state labels:
+
+- markerAnnoHS
+- oldMarkerAnnoPos
+- tmpLiveMarker
+- selectedLiveMarker
+- markers
+- liveMarkers
+
+## Saving
+
+There are two ways to save in the editor. **Manual saving** and **auto saving**. Both of them have the same sequence of sending the **content** and the **position of the comments** in this section to the backend. The only difference is that manuell is done with the save button and other interactions while auto save is done with a timer. It also sends an **autoSave boolen** value to the backend. It can only be send, if the mutable value reference **mDirtyRed** is set to true. This action occurs in the added listener with the function **addChangeListenerWithRef**, which set multiple flags to true and starts a timer for auto save. Since saving uses a lot of state labels, it has a seperate type called **SaveState**.
+
+### Saving
+
+The user is able to save the changes with the help of the save button. It only works if the mutable value reference mDirtyRed is set to true prior. There we go first in the **Save** action, where it first checks, if it is the **main editor** or not. Only the main editor has the abilty to save the changes. It then checks the dirty flag. Only if the previous checks have turned to true it then starts to collect all the necessary data before uploading it. It first extract the text from the editor and update the **content** value, stored in **SaveState**. Afterwards it then updates the postions of the **array of AnnotatedMarker called markers** from its corresponding **array of LiveMarker called liveMarkers** with each **LiveMarker** having the same ID as its matching **AnnotatedMarker**. With both of the data, it then puts them into a wrapper defined in **[ContentDto](Dto/ContentDto.md)**. It then goes into the next Action **Upload**. (With the seperation we can call **Upload** again, in case of a failed upload attempt, wihtout extracting the data from editor again. This is however decprecated.) With the data it converts them into a JSON and send it to the backend. When an error is sent back, it displays it in a toast. 
+TODO: other cases
+At the end it sends the rendered html to [preview](Preview.md) component and update the section title, displayed above the editor, which is requested from the [TOC](TOC.md) component.
+
+#### Saving uses the following Actions/Output:
+
+- Save
+- Upload
+- SavedIcon
+
+- RequestFullTitle
+
+#### Saving uses the following state labels:
+
+- markers
+- liveMarkers
+- mDirtyRef
+- showSavedIcon
+- mSavedIconF
+  
+### Auto Save
+
+With every change in the text the **dirty flag** is set true and goes into the **AutorSaveTimer** Action. There two timers are started with the help of two fibers. A 2 and 20 seconds timer. The shorter timer is reset every time, when the user made another change. The longer one is used to save the changes regardless whether the user made some changes or not. When either of the timer had run out, it goes then into the Action **AutoSave**. There it kills all both fibers to stop the timers and goes into the **Save** Action, which is already described as above.
+
+#### Auto Save uses the following Actions:
+
+- AutoSaveTimer
+- AutoSave
+- Save
+
+#### Auto Save uses the following state labels:
+
+- mDirtyRef
+- mPendingDebounceF
+- mPendingMaxWaitF
+
+TODO: Add save interactions for example closing tab
+
+TODO: older Versions of section/ 
+
