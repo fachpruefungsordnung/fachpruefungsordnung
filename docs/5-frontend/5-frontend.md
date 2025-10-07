@@ -110,6 +110,7 @@ The `Home` Page is a bit different from the others, because you get a totally di
 ```hs
 userWithError <- Store.preventErrorHandlingLocally getUser
 ```
+
 and the following logic where the state of this component will get updated.
 
 ### Page404
