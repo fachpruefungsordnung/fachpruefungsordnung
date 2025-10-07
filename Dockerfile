@@ -5,6 +5,9 @@
 # Use official Node image to avoid issues with old npm
 FROM node:20-bullseye-slim AS build-docs
 
+ARG SERVER_HOST="http://localhost"
+ENV SERVER_HOST=$SERVER_HOST
+
 WORKDIR /build
 
 COPY docusaurus fpo
@@ -15,8 +18,6 @@ WORKDIR /build/fpo
 # Install dependencies & build
 RUN npm install
 RUN npm run build
-
-# The built site is now in /build/fpo/build
 
 # +------------------------------+
 # |            FINAL             |

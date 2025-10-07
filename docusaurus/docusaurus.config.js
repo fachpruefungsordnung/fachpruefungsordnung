@@ -6,7 +6,7 @@
 
 import { themes as prismThemes } from "prism-react-renderer";
 
-const url = "https://fpo.bahn.sh/"; // TODO: unschön, read from .env
+const url = process.env.SERVER_HOST || "http://localhost:8080";
 
 // This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
 

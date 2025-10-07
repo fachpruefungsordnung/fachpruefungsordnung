@@ -2,6 +2,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- |
+-- Module      : Docs.Hash
+-- Description : Hash Datatype and Utility
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains the definition of a @Hash@ datatype and some related
+-- utility funtions.
 module Docs.Hash
     ( Hashable (..)
     , Hashed (..)

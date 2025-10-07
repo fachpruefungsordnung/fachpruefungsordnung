@@ -1,6 +1,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : Docs.TextRevision
+-- Description : A Revision of a Text Element
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains definitions for revisions of @TextElement@s.
 module Docs.TextRevision
     ( TextRevisionID (..)
     , TextRevisionSelector (..)
@@ -72,6 +80,7 @@ import Docs.TextElement
 import Docs.UserRef (UserRef)
 import Parse (parseFlexibleTime)
 
+-- | A reference to a @TextRevision@
 data TextRevisionRef
     = TextRevisionRef
         TextElementRef
@@ -84,6 +93,7 @@ instance FromJSON TextRevisionRef
 
 instance ToSchema TextRevisionRef
 
+-- | Ein Schmackofatz für die Augen
 prettyPrintTextRevisionRef :: TextRevisionRef -> String
 prettyPrintTextRevisionRef (TextRevisionRef textElementRef selector) =
     prettyPrintTextElementRef textElementRef ++ prettyPrintSelector selector
@@ -92,6 +102,7 @@ prettyPrintTextRevisionRef (TextRevisionRef textElementRef selector) =
     prettyPrintSelector (LatestAsOf ts) = show ts
     prettyPrintSelector (Specific revID) = show $ unTextRevisionID revID
 
+-- | Constructor for a @TextRevisionRef@
 textRevisionRef
     :: DocumentID
     -> TextElementID
@@ -199,8 +210,11 @@ latestTextRevisionAsOf _ = Nothing
 --   Contains metadata for a text revision.
 data TextRevisionHeader = TextRevisionHeader
     { identifier :: TextRevisionID
+    -- ^ the id of the revision
     , timestamp :: UTCTime
+    -- ^ the creation timestamp of the revision
     , author :: UserRef
+    -- ^ the user who created the revision
     }
     deriving (Show, Generic)
 
@@ -213,8 +227,11 @@ instance ToSchema TextRevisionHeader
 -- | A text revision.
 data TextRevision = TextRevision
     { header :: TextRevisionHeader
+    -- ^ meta data about the revision
     , content :: Text
+    -- ^ the content of the revision
     , commentAnchors :: Vector CommentAnchor
+    -- ^ anchors for comments in the revisions text
     }
     deriving (Generic)
 
@@ -408,10 +425,14 @@ instance ToSchema ConflictStatus where
                 & type_ ?~ OpenApiString
                 & enum_ ?~ [toJSON val]
 
+-- | A element together with its rendered html representation.
 data Rendered a
     = Rendered
     { element :: a
-    , html :: Text -- TODO: ByteString might be better suited!
+    -- ^ the element itself
+    , html :: Text
+    -- ^ the html representation of the element.
+    -- TODO: @ByteString@ might be better suited!
     }
     deriving (Generic)
 
