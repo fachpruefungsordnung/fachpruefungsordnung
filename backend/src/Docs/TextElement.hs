@@ -1,5 +1,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 
+-- |
+-- Module      : Docs.TextElement
+-- Description : Contents of a Text Node
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains the definitions for the contents of a documen trees text
+-- nodes.
 module Docs.TextElement
     ( TextElementID (..)
     , TextElement (..)

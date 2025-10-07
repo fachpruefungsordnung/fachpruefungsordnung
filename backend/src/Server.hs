@@ -73,6 +73,7 @@ type LogsAPI =
         :> QueryParam "limit" Int64
         :> Get '[JSON] Logs
 
+-- | The handler used for the developer logs endpoint
 logsHandler
     :: AuthResult Auth.Token
     -> Maybe UTCTime
@@ -89,14 +90,17 @@ logsHandler auth offset limit = do
             , Logs.offset = offset
             }
 
+-- | A simple handler to test whether the API can be pinged
 pingHandler :: Handler String
 pingHandler = return "pong"
 
+-- | A handler to return a static PDF for testing
 documentHandler :: Handler PDFByteString
 documentHandler = liftIO $ do
     bs <- readFile "static/dummy.pdf"
     return $ PDFByteString bs
 
+-- | A handler used to protect certain endpoints against being access unauthorized
 protectedHandler :: AuthResult Auth.Token -> Handler String
 protectedHandler (Authenticated Auth.Token {..}) =
     return $ "This is very private content of " <> toString subject <> "!"
@@ -142,6 +146,7 @@ server cookieSett jwtSett =
 documentedAPI :: Proxy DocumentedAPI
 documentedAPI = Proxy
 
+-- | Used to construct the app with the given cookie and JWT settings.
 app :: CookieSettings -> JWTSettings -> Application
 app cookieSett jwtSett =
     serveWithContext
@@ -149,12 +154,15 @@ app cookieSett jwtSett =
         (cookieSett :. jwtSett :. EmptyContext)
         (server cookieSett jwtSett)
 
+-- | The JWT settings used for the app
 jwtSettings :: JWK -> JWTSettings
 jwtSettings = defaultJWTSettings
 
+-- | The cookie settings used for the app
 cookieSettings :: CookieSettings
 cookieSettings = defaultCookieSettings
 
+-- | Runs the server
 runServer :: IO ()
 runServer = do
     let port = 80

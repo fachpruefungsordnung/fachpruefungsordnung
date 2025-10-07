@@ -2,6 +2,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- |
+-- Module      : Docs.TreeRevision
+-- Description : A Revision of a Tree
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains definitions and related utility functions for revisions of the
+-- document structure tree.
 module Docs.TreeRevision
     ( TreeRevisionID (..)
     , TreeRevision (..)
@@ -65,6 +74,7 @@ import qualified Docs.Tree as Tree
 import Docs.UserRef (UserRef)
 import Parse (parseFlexibleTime)
 
+-- | References a @TreeRevision@
 data TreeRevisionRef
     = TreeRevisionRef
         DocumentID
@@ -77,6 +87,7 @@ instance FromJSON TreeRevisionRef
 
 instance ToSchema TreeRevisionRef
 
+-- | Optisch ansprechende Darstellung der Baum-Revisions-Referenz.
 prettyPrintTreeRevisionRef :: TreeRevisionRef -> String
 prettyPrintTreeRevisionRef (TreeRevisionRef treeElementRef selector) =
     show (unDocumentID treeElementRef) ++ prettyPrintSelector selector
@@ -87,9 +98,12 @@ prettyPrintTreeRevisionRef (TreeRevisionRef treeElementRef selector) =
 
 -- | Selector for a tree revision.
 data TreeRevisionSelector
-    = Latest
-    | LatestAsOf UTCTime
-    | Specific TreeRevisionID
+    = -- | select the latest revision
+      Latest
+    | -- | selects the latest revision at a given timestamp
+      LatestAsOf UTCTime
+    | -- | selects a specific revision by its id
+      Specific TreeRevisionID
 
 instance ToJSON TreeRevisionSelector where
     toJSON Latest = toJSON ("latest" :: Text)
@@ -148,10 +162,12 @@ instance FromHttpApiData TreeRevisionSelector where
                         Just ts -> Right $ LatestAsOf ts
                         Nothing -> Left $ "Invalid TreeRevisionSelector: " <> txt
 
+-- | Obtain id if selects a specific revision.
 specificTreeRevision :: TreeRevisionSelector -> Maybe TreeRevisionID
 specificTreeRevision (Specific id_) = Just id_
 specificTreeRevision _ = Nothing
 
+-- | Obtain timestamp if selects @LatestAsOf@.
 latestTreeRevisionAsOf :: TreeRevisionSelector -> Maybe UTCTime
 latestTreeRevisionAsOf (LatestAsOf ts) = Just ts
 latestTreeRevisionAsOf _ = Nothing

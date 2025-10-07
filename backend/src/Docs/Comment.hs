@@ -1,5 +1,13 @@
 {-# LANGUAGE DeriveGeneric #-}
 
+-- |
+-- Module      : Docs.Comment
+-- Description : Comment Types for Document Management
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains schemas and utility functions for comments.
 module Docs.Comment
     ( CommentID (..)
     , Status (..)
@@ -162,6 +170,8 @@ instance FromJSON Range
 
 instance ToSchema Range
 
+-- | Constructor for @Range@.
+-- Order of anchors does not matter.
 range :: Anchor -> Anchor -> Range
 range a b
     | a <= b = Range a b

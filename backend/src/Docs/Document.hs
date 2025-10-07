@@ -1,5 +1,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 
+-- |
+-- Module      : Docs.Document
+-- Description : Document and Related Datatypes
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains the definition of a @Document@ datatype as well as
+-- related datatypes
 module Docs.Document
     ( DocumentID (..)
     , Document (..)

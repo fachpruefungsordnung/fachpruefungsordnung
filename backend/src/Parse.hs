@@ -11,6 +11,7 @@ import Data.Text (Text)
 import Data.Time (UTCTime)
 import Data.Time.Format (defaultTimeLocale, parseTimeM)
 
+-- | Parse @UTCTime@ accepting different formats
 parseFlexibleTime :: String -> Maybe UTCTime
 parseFlexibleTime s =
     let fmts =
@@ -26,10 +27,12 @@ parseFlexibleTime s =
             Nothing
             fmts
 
+-- | Ensures input is not an empty string
 nonEmptyString :: String -> Maybe String
 nonEmptyString "" = Nothing
 nonEmptyString x = Just x
 
+-- | Ensures input is not an empty text
 nonEmptyText :: Text -> Maybe Text
 nonEmptyText "" = Nothing
 nonEmptyText x = Just x

@@ -1,6 +1,15 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : Docs.LTML
+-- Description : Utility for Working With LTML Datatypes
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains utility functions for working with LTML structures
+-- in the "Docs" module.
 module Docs.LTML
     ( treeToMeta
     , treeToMeta'
@@ -45,6 +54,7 @@ import Language.Ltml.Tree (FlaggedInputTree)
 import qualified Language.Ltml.Tree as LTML
 import qualified Language.Ltml.Tree.ToMeta as LTML
 
+-- | Obtain a @TreeRevisionWithMetaData@ from a @TreeRevision@.
 treeRevisionToMeta
     :: (Renderable r)
     => TreeRevision r
@@ -52,11 +62,13 @@ treeRevisionToMeta
 treeRevisionToMeta (TreeRevision header root) =
     TreeRevisionWithMetaData header <$> treeToMeta root
 
+-- | Obtain a @TreeWithMetaData@ from the root of a tree with @TextElementRevision@s.
 treeToMeta'
     :: Node TextElementRevision
     -> Either LTML.MetaError (TreeWithMetaData TextElement)
 treeToMeta' input = (TextRevision.textElement <$>) <$> treeToMeta input
 
+-- | Obtain a @TreeWithMetaData@ from the root af an arbitrary tree.
 treeToMeta
     :: (Renderable r)
     => Node r
@@ -75,6 +87,8 @@ treeToMeta input =
                         }
             Right (Nothing, _) -> Left $ LTML.MetaBug "Wurzel ist nich da :/"
 
+-- | Some useless boilerplate datatype needed since the ltml tree does not
+-- differienciate between inner nodes and leafs.
 data MetaFlag a
     = TreeFlag NodeHeader
     | LeafFlag a
@@ -83,6 +97,7 @@ instance Functor MetaFlag where
     fmap f (LeafFlag x) = LeafFlag $ f x
     fmap _ (TreeFlag x) = TreeFlag x
 
+-- | Obtains a tree node with label and title from a @FlaggedMetaTree@.
 treeFromFlaggedMetaTree
     :: LTML.FlaggedMetaTree (MetaFlag a)
     -> Maybe (Meta a)
@@ -118,12 +133,14 @@ treeFromFlaggedMetaTree
                     , MetaTree.title = title
                     }
 
+-- | Obtain an LTML @FlaggedInputTree@ from an arbitrary @TreeRevision@.
 treeRevisionToLtmlInputTree
     :: (Renderable r)
     => TreeRevision r
     -> FlaggedInputTree (MetaFlag r)
 treeRevisionToLtmlInputTree (TreeRevision _ node) = nodeToLtmlInputTree node
 
+-- | Obtain an LTML @FlaggedInputTree@ from the root of @TextElementRevision@ tree.
 nodeToLtmlInputTree'
     :: Node TextElementRevision
     -> FlaggedInputTree (MetaFlag TextElement)
@@ -134,6 +151,8 @@ nodeToLtmlInputTree' =
         id
         . nodeToLtmlInputTree
 
+-- | Obtain an LTML @FlaggedInputTree@ where nodes are flagged accordinig to the
+-- result of the given predicate functions.
 nodeToLtmlInputTreePred
     :: (Renderable r)
     => (NodeHeader -> Bool)
@@ -150,6 +169,7 @@ nodeToLtmlInputTreePred treePred leafPred =
     pred' (TreeFlag t) = treePred t
     pred' (LeafFlag l) = leafPred l
 
+-- | Obtain a LTML @FlaggedInputTree@ from the root of an arbitrary tree.
 nodeToLtmlInputTree
     :: (Renderable r)
     => Node r
@@ -164,6 +184,7 @@ nodeToLtmlInputTree (Node {Tree.header, Tree.children}) =
             $ LTML.Tree heading
             $ treeToLtmlInputTree <$> children
 
+-- | Obtain a LTML @FlaggedInputTree@ from an arbitrary tree.
 treeToLtmlInputTree
     :: (Renderable r)
     => Tree r

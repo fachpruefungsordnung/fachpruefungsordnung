@@ -1,6 +1,15 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : Docs.DocumentHistory
+-- Description : Datatypes Representing a Documents History
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains data type definitions representing the history
+-- (meaning chronological overview of revisions) of a @Document@
 module Docs.DocumentHistory
     ( DocumentHistory (..)
     , DocumentHistoryItem (..)
@@ -35,6 +44,9 @@ import Docs.TextElement (TextElementID)
 import Docs.TextRevision (TextRevisionHeader)
 import Docs.TreeRevision (TreeRevisionHeader)
 
+-- | An item in the @Document@s history.
+-- This represents a generic revision.
+-- This revision can either be a @Tree@ or a @TextElement@ revision.
 data DocumentHistoryItem
     = Tree TreeRevisionHeader
     | Text TextElementID TextRevisionHeader
@@ -99,6 +111,7 @@ instance ToSchema DocumentHistoryItem where
                 & type_ ?~ OpenApiString
                 & enum_ ?~ [toJSON val]
 
+-- | Chronological overview of a @Document@s history of revisions.
 data DocumentHistory = DocumentHistory
     { document :: DocumentID
     , history :: [DocumentHistoryItem]
