@@ -102,6 +102,10 @@ const config = {
           },
           // { to: "/blog", label: "Blog", position: "left" },
           {
+            href: `${url}/docs/fpo-documentation.pdf`,
+            label: "Download PDF",
+          },
+          {
             href: `${url}/swagger`,
             label: "Swagger",
           },

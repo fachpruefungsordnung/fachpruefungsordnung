@@ -1,4 +1,4 @@
-## GitHub Actions
+# GitHub Actions
 
 The repository contains GitHub actions to test and deploy the code. The actions
 are configured to run on self-hosted runners. We used the
@@ -8,11 +8,11 @@ and a production enviroment, which is only deployed to on tagged commits on `mai
 The setup works, although it could be improved to use a Docker container registry
 in the future.
 
-### Secrets
+## Secrets
 
 To get the actions up and running, there are a few secrets and variables to set up:
 
-#### Deployment server secrets
+### Deployment server secrets
 
 The current `main` branch is, pending passing tests, autodeployed to the dev server
 via SSH. To get this to work, you'll need the following secrets.
@@ -34,7 +34,7 @@ Similar properties exist for the production deployment server, namely:
 Deployment to the production server will only happen with commits on `main` tagged
 with the `prod` tag. Use the `scripts/deploy-prod` script to quickly trigger a deployment.
 
-#### Mail configuration settings
+### Mail configuration settings
 
 These secrets are needed if you want to use the mail service within the backend. These
 are currently supplied by the action, but could also be passed via the `.env` file.

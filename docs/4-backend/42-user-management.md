@@ -77,4 +77,4 @@ containing a link with a one-time token to their mail, should that mail exist. T
 link can be used to reset their password, as would be expected of such functionality.
 
 Note that for this to work, a valid
-[mail configuration](../configure.md#Mail-configuration-(optional)) has to be provided.
+[mail configuration](../configure#Mail-configuration-(optional)) has to be provided.

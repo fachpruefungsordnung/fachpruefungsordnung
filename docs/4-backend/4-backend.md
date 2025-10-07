@@ -10,5 +10,3 @@ For code documentation, see [haddock](https://fpo.bahn.sh/dev/haddock).
 For API documentation, see [swagger](https://fpo.bahn.sh/dev/purs).
 
 ## Architecture
-
-![Overview](image.svg)
