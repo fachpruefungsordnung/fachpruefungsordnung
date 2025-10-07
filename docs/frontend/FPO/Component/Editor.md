@@ -9,6 +9,10 @@ At the beginning, since no section has been selected, no content is loaded and t
 
 ## Important Interactions
 
+### Toolbar
+
+TODO: write the toolbar section
+
 ### Request
 
 This component directly loads the content for the selected entry directly from backend and does not communicate with its parent regarding this issue. The data is a wrapper defined in [ContentDto](ContentDto.md) which contains the content, comments and rendered preview in form of html. The content is stored in its state and the html string is sent to the preview component. The comments process are detailed on different point. To post data, the editor wraps only the content and comments into one data type, since html is only created in the backend. 
