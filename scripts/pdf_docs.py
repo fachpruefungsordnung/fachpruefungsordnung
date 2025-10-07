@@ -39,7 +39,7 @@ def fix_paths(text: str, md_file: Path) -> str:
         text
     )
 
-    text = text.replace("✅", "yes").replace("❌", "no")
+    text = text.replace("✅", "\\textbf{yes}").replace("❌", "no")
 
     return text
 
