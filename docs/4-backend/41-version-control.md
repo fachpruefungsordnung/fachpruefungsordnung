@@ -36,7 +36,7 @@ For more detailed information, see [user management](user-management).
 
 ## Documents
 
-A documents consists of a *tree structure* and *text elements*.
+A document consists of a *tree structure* and *text elements*.
 The tree structure is closely resembled by the Table of Contents.
 The structure of a document and the contents of the text elements are strictly separated.
 Text elements are referenced in leaf nodes of the structure tree only.
