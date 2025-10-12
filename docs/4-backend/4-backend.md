@@ -16,4 +16,5 @@ All services are behind an nginx reverse proxy.
 The following figure shows how the services are orchestrate.
 Dottet lines represent internal communication, solid lines are externally reachable through the nginx reverse proxy. The labels represent the locations.
 
+<!-- Hier sieht man richtig Finns Motivation bei dem Dateinamen -->
 ![](image.svg)
