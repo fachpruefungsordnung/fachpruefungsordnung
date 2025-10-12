@@ -57,6 +57,7 @@ for md_file in markdown_files:
 merged_path = BASE_DIR / "merged.md"
 merged_path.write_text("\n".join(merged_content), encoding="utf-8")
 
+# TODO: spawn process in `BASE_DIR`
 subprocess.run([
     x for x in [
         "pandoc",

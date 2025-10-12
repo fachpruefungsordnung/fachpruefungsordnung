@@ -10,3 +10,10 @@ For code documentation, see [haddock](https://fpo.bahn.sh/dev/haddock).
 For API documentation, see [swagger](https://fpo.bahn.sh/dev/purs).
 
 ## Architecture
+
+All services are behind an nginx reverse proxy.
+
+The following figure shows how the services are orchestrate.
+Dottet lines represent internal communication, solid lines are externally reachable through the nginx reverse proxy. The labels represent the locations.
+
+![](image.svg)

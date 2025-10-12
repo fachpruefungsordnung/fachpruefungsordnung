@@ -13,7 +13,8 @@ RUN apt-get update && \
     texlive-fonts-recommended \
     texlive-xetex \
     texlive-latex-extra \
-    lmodern
+    lmodern \
+    librsvg2-bin
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 ARG SERVER_HOST="http://localhost"
@@ -30,6 +31,8 @@ WORKDIR /build/fpo
 # Install dependencies & build
 RUN npm install
 RUN npm run build
+
+WORKDIR /build/fpo/docs
 
 RUN python3 \
     /scripts/pdf_docs.py \
