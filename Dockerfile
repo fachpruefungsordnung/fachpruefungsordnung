@@ -32,6 +32,11 @@ WORKDIR /build/fpo
 RUN npm install
 RUN npm run build
 
+# Replace localhost links with SERVER_HOST
+RUN find . -name "*.md" -type f -exec sed -i "s|http://localhost:8080|${SERVER_HOST}|g" {} \;
+RUN find . -name "*.html" -type f -exec sed -i "s|http://localhost:8080|${SERVER_HOST}|g" {} \;
+RUN find . -name "*.js" -type f -exec sed -i "s|http://localhost:8080|${SERVER_HOST}|g" {} \;
+
 WORKDIR /build/fpo/docs
 
 RUN python3 \
