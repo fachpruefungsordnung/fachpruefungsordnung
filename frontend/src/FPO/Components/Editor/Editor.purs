@@ -125,8 +125,8 @@ foreign import _resize :: Types.Editor -> Effect Unit
 
 type CommentState =
   {
-  -- Hashmaps for Annotations
-  -- Row line -> Hashmap of Username -> how many times the use has comments in the line
+    -- Hashmaps for Annotations
+    -- Row line -> Hashmap of Username -> how many times the use has comments in the line
     markerAnnoHS :: HashMap Int (HashMap String Int)
   -- markerID -> old row position in Annotation
   , oldMarkerAnnoPos :: HashMap Int Int
