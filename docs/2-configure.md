@@ -18,18 +18,18 @@ override to have SSL properly set up, see the appropriate section below
 
 ## Overview
 
-- the frontend user interface is available at `/`, e.g., [localhost:8080](http://localhost:8080/) for local development
-- the backend api is available at `/api/`, e.g., [localhost:8080/api/](http://localhost:8080/api/) for local development
+- the frontend user interface is available at `/`, e.g., [/](http://localhost:8080/)
+- the backend api is available at `/api/`, e.g., [/api/](http://localhost:8080/api/)
 - internally, the services are reachable by their respective hostnames:
     - Postgres: `postgres`
     - Backend: `api`
-- a collection of development tools and links is available at `/dev/`, e.g., [localhost:8080/dev/](http://localhost:8080/dev/)
-    - a simple database client is available at `/pgweb/`, e.g., [localhost:8080/pgweb/](http://localhost:8080/pgweb/) for local development. For deployment, this should be password protected, see [Environment](#Environment)
-    - the API documentation is available at `/swagger/`, e.g., [localhost:8080/swagger](http://localhost:8080/swagger/)
-    - the documentation hosted in its entirety at `/docs/`, e.g. [localhost:8080/docs/](http://localhost:8080/docs/)
-        - the hosted backend documentation is available at `/dev/haddock/`, e.g. [localhost:8080/dev/haddock/](http://localhost:8080/dev/haddock/)
-        - the hosted frontend documentation is available at `/dev/purs/`, e.g. [localhost:8080/dev/purs](http://localhost:8080/dev/purs/)
-    - backend logs can be found at `dev/logs.html`, e.g. [localhost:8080/dev/logs.html](http://localhost:8080/dev/logs.html). You can login here with any credentials that are also superadmins within the application.
+- a collection of development tools and links is available at `/dev/`, e.g., [/dev/](http://localhost:8080/dev/)
+    - a simple database client is available at `/pgweb/`, e.g., [/pgweb/](http://localhost:8080/pgweb/). For deployment, this should be password protected, see [Environment](#Environment)
+    - the API documentation is available at `/swagger/`, e.g., [/swagger/](http://localhost:8080/swagger/)
+    - the documentation hosted in its entirety at `/docs/`, e.g. [/docs/](http://localhost:8080/docs/)
+        - the hosted backend documentation is available at `/dev/haddock/`, e.g. [/dev/haddock/](http://localhost:8080/dev/haddock/)
+        - the hosted frontend documentation is available at `/dev/purs/`, e.g. [/dev/purs/](http://localhost:8080/dev/purs/)
+    - backend logs can be found at `dev/logs.html`, e.g. [/dev/logs.html](http://localhost:8080/dev/logs.html). You can login here with any credentials that are also superadmins within the application.
 
 ## Quick Setup
 
