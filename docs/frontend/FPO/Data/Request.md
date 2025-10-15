@@ -1,3 +1,3 @@
- # FPO.Data.Request
+# FPO.Data.Request
 
- This module defines request functions the other modules can use to send and request data from the backend.
+This module defines request functions that other modules can use to send and request data from the backend.
