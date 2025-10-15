@@ -3,6 +3,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- |
+-- Module      : Docs.Tree
+-- Description : The Tree Structure of a @Document@
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains the definition of the tree structure of a @Document@.
 module Docs.Tree
     ( Tree (..)
     , Node (..)
@@ -75,7 +83,9 @@ instance ToSchema NodeHeader
 -- | A node of a tree.
 data Node a = Node
     { header :: NodeHeader
+    -- ^ information about this node
     , children :: [Tree a]
+    -- ^ the children of this node
     }
     deriving (Generic)
 
@@ -180,6 +190,7 @@ withTextRevisions getTextRevision = withTextRevisions'
         getTextRevision (TextElement.identifier textElement)
             <&> Leaf . TextElementRevision textElement
 
+-- | Basically @mapM@ for a tree
 treeMapM
     :: (Monad m)
     => (a -> m b)
@@ -194,12 +205,14 @@ treeMapM getTextRevision = withTextRevisions'
         getTextRevision x
             <&> Leaf
 
+-- | Basically @fmap@ for the root node of a tree.
 filterMapNode :: (a -> Maybe b) -> Node a -> Node b
 filterMapNode f (Node header' children') = Node header' $ mapMaybe tree children'
   where
     tree (Tree n) = Just $ Tree $ filterMapNode f n
     tree (Leaf l) = Leaf <$> f l
 
+-- | Wrapper type to add a title to an element.
 data WithTitle a = WithTitle
     { title :: Text
     , content :: a

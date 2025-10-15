@@ -1,6 +1,15 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : Docs.Revision
+-- Description : Generic Revision (Text or Tree)
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains data types and related utility functions for a generic
+-- revision, meaning text or tree.
 module Docs.Revision
     ( RevisionID (..)
     , TextOrTree (..)
@@ -55,6 +64,7 @@ import Parse (parseFlexibleTime)
 import Servant (FromHttpApiData (parseUrlPiece))
 import Text.Read (readMaybe)
 
+-- | The id of a revision
 newtype RevisionID = RevisionID
     { unRevisionID :: Int64
     }
@@ -84,9 +94,12 @@ instance FromHttpApiData RevisionID where
 
 -- | Selector for a revision
 data RevisionSelector
-    = Latest
-    | LatestAsOf UTCTime
-    | Specific RevisionID
+    = -- | selects the latest revision
+      Latest
+    | -- | selects the latest revision at a specific point of time
+      LatestAsOf UTCTime
+    | -- | selects a specific revision by its id
+      Specific RevisionID
     deriving (Show)
 
 selectorFromTextRevision :: TextRevisionSelector -> RevisionSelector
@@ -152,18 +165,22 @@ instance FromHttpApiData RevisionSelector where
                         Just ts -> Right $ LatestAsOf ts
                         Nothing -> Left $ "Invalid RevisionSelector: " <> txt
 
+-- | The revision id if it is a @Specific@ selector; @Nothing@ otherwise.
 specificRevision :: RevisionSelector -> Maybe RevisionID
 specificRevision (Specific id_) = Just id_
 specificRevision _ = Nothing
 
+-- | The timestampt, if ti is a @LatestAsOf@ selector; @Nothing@ otherwise.
 latestRevisionAsOf :: RevisionSelector -> Maybe UTCTime
 latestRevisionAsOf (LatestAsOf ts) = Just ts
 latestRevisionAsOf _ = Nothing
 
+-- | Reference of a revision
 data RevisionRef
     = RevisionRef DocumentID RevisionSelector
     deriving (Generic)
 
+-- | Get an arbitrary ref from a @TextRevisionRef@.
 refFromTextRevision :: TextRevisionRef -> RevisionRef
 refFromTextRevision (TextRevisionRef (TextElementRef docID _) selector) =
     RevisionRef docID $ selectorFromTextRevision selector
@@ -174,10 +191,12 @@ instance FromJSON RevisionRef
 
 instance ToSchema RevisionRef
 
+-- | @RevisionRef@. Schöööööööön.
 prettyPrintRevisionRef :: RevisionRef -> String
 prettyPrintRevisionRef (RevisionRef docID revSelector) =
     show (unDocumentID docID) ++ ".rev." ++ show revSelector
 
+-- | A @TextRevisionRef@ or a @TreeRevisionRef@.
 data TextOrTree
     = Text TextRevisionRef
     | Tree TreeRevisionRef
@@ -189,6 +208,7 @@ instance FromJSON TextOrTree
 
 instance ToSchema TextOrTree
 
+-- | An arbitrary revision, but the type (tree or text) is known.
 data RevisionKey = RevisionKey
     { timestamp :: UTCTime
     , revision :: TextOrTree
@@ -201,6 +221,10 @@ instance FromJSON RevisionKey
 
 instance ToSchema RevisionKey
 
+-- | Get the ref for a given text revision with respect to a @RevisionKey@.
+-- If the revision key belongs to the given @TextElementRef@, it is returned as a
+-- @TextRevisionRef@. Otherwise, a selector for the latest revision for the given text
+-- element for the timestamp of the given @RevisionKey@ is returned.
 textRevisionRefFor :: TextElementRef -> RevisionKey -> TextRevisionRef
 textRevisionRefFor
     forTextRef
@@ -214,6 +238,10 @@ textRevisionRefFor
 textRevisionRefFor forTextRef (RevisionKey {timestamp = ts}) =
     TextRevisionRef forTextRef $ TextRevision.LatestAsOf ts
 
+-- | Get the ref for a given tree revision with respect to a @RevisionKey@.
+-- If the revision key belongs to the given @DocumentID@, it is returned as a
+-- @TreeRevisionRef@. Otherwise, a selector for the latest revision for the given tree
+-- element for the timestamp of the given @RevisionKey@ is returned.
 treeRevisionRefFor :: DocumentID -> RevisionKey -> TreeRevisionRef
 treeRevisionRefFor
     forDocID

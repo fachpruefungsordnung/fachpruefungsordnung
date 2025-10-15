@@ -1,5 +1,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 
+-- |
+-- Module      : Docs.MetaTree
+-- Description : Tree With Metadata
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains the definition of a tree with additional meta data
+-- such as labels, titles and allowed edit actions.
 module Docs.MetaTree
     ( MetaNode (..)
     , MetaTree (..)
@@ -22,10 +31,13 @@ import qualified Language.Lsd.AST.Common as LSD
 import qualified Language.Lsd.AST.Type as LSD
 import qualified Language.Ltml.HTML.Common as HTML
 
+-- | Like "Docs.TreeRevision.TreeRevision", but with ✨metadata✨.
 data TreeRevisionWithMetaData a
     = TreeRevisionWithMetaData
     { revisionHeader :: TreeRevisionHeader
+    -- ^ the tree revision meta data
     , revision :: TreeWithMetaData a
+    -- ^ tre revisions content
     }
     deriving (Generic)
 
@@ -38,10 +50,13 @@ instance (ToSchema a) => ToSchema (TreeRevisionWithMetaData a)
 instance Functor TreeRevisionWithMetaData where
     fmap f rev = rev {revision = f <$> revision rev}
 
+-- | Wrapper around the root of a tree, but with ✨metadata✨.
 data TreeWithMetaData a
     = TreeWithMetaData
     { root :: Meta a
+    -- ^ the root of the tree
     , metaMap :: Map LSD.FullTypeName LSD.ProperTypeMeta
+    -- ^ map of allowed edit actions i guess
     }
     deriving (Generic)
 
@@ -54,10 +69,13 @@ instance (ToSchema a) => ToSchema (TreeWithMetaData a)
 instance Functor TreeWithMetaData where
     fmap f tree' = tree' {root = f <$> root tree'}
 
+-- | Like "Docs.Tree.Node", but with ✨metadata✨.
 data MetaNode a
     = MetaNode
     { header :: NodeHeader
+    -- ^ metadata for the node
     , children :: [Meta a]
+    -- ^ children of the node
     }
     deriving (Generic)
 
@@ -67,9 +85,12 @@ instance (FromJSON a) => FromJSON (MetaNode a)
 
 instance (ToSchema a) => ToSchema (MetaNode a)
 
+-- | Information on how the node should be displayed in the Table of Contents.
 data TocEntry = TocEntry
     { label :: Maybe Text
+    -- ^ the label of the node
     , title :: HTML.Result (Maybe Text)
+    -- ^ the title the node should by displayed as in the ToC
     }
     deriving (Generic)
 
@@ -79,6 +100,7 @@ instance FromJSON TocEntry
 
 instance ToSchema TocEntry
 
+-- | Wrapper around a @MetaTree@, but with ✨metadata✨.
 data Meta a = Meta
     { meta :: TocEntry
     , tree :: MetaTree a
@@ -91,6 +113,7 @@ instance (FromJSON a) => FromJSON (Meta a)
 
 instance (ToSchema a) => ToSchema (Meta a)
 
+-- | Like "Docs.Tree.Tree", but with ✨metadata✨.
 data MetaTree a
     = MetaTree (MetaNode a)
     | MetaLeaf a

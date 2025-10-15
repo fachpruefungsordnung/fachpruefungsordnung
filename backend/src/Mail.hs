@@ -66,6 +66,7 @@ instance ToJSON Mail where
             , "body" .= (show <$> body)
             ]
 
+-- | An IO action to send a testmail to a test mail address.
 testMail :: IO ()
 testMail =
     sendMailTo
@@ -75,6 +76,7 @@ testMail =
             , body = [plainPart "email body", htmlPart "<h1>HTML</h1>"]
             }
 
+-- | Sends the given mail. If the mail settings are invalid, an error will be logged in the database.
 sendMailTo :: Mail -> IO ()
 sendMailTo mail = do
     settings <- envSettings
@@ -88,6 +90,7 @@ sendMailTo mail = do
                     db
             return ()
 
+-- | Helper to send mails
 sendMailTo' :: MailSettings -> Mail -> IO ()
 sendMailTo' settings mail = do
     print settings
@@ -105,6 +108,7 @@ sendMailTo' settings mail = do
     -- html = htmlPart "<h1>HTML</h1>"
     mail' = simpleMail from to [] [] (subject mail) (body mail)
 
+-- | Validates and checks the given setting to be non-empty
 completeSettings :: MailSettings -> Maybe MailSettings
 completeSettings x@(MailSettings {..}) = do
     _ <- nonEmptyString host
@@ -113,6 +117,8 @@ completeSettings x@(MailSettings {..}) = do
     _ <- nonEmptyString password
     pure x
 
+-- | Loads the mail settings from the environment by reading the associated environment
+-- variables.
 envSettings :: IO MailSettings
 envSettings = do
     host' <- getEnv "MAIL_HOST"

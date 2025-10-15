@@ -1,5 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : Docs.ExampleDoc
+-- Description : Definition of an Example Document
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains the definition of an example document.
 module Docs.ExampleDoc (exampleTree) where
 
 import Data.Text (Text, unlines)
@@ -12,6 +20,7 @@ import Language.Ltml.Tree
     )
 import Prelude hiding (unlines)
 
+-- | Example tree for an example document
 exampleTree :: FlaggedInputTree'
 exampleTree =
     Flagged False $

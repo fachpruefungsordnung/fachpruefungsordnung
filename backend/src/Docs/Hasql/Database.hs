@@ -1,5 +1,14 @@
 {-# LANGUAGE GeneralisedNewtypeDeriving #-}
 
+-- |
+-- Module      : Docs.Hasql.Database
+-- Description : PostgreSQL Implementation for Document Management
+-- License     : AGPL-3
+-- Maintainer  : stu235271@mail.uni-kiel.de
+--               stu236925@mail.uni-kiel.de
+--
+-- This module contains an implmenetation of "Docs.Database" for PostgreSQL
+-- using Hasql.
 module Docs.Hasql.Database
     ( HasqlSession (..)
     , HasqlTransaction (..)
@@ -28,6 +37,9 @@ import qualified Docs.Hasql.Transactions as Transactions
 import Logging.Logs (Severity (..))
 import qualified Logging.Scope as Scope
 
+-- * Session
+
+-- | Wrapper around a Hasql @Session@
 newtype HasqlSession a = HasqlSession
     { unHasqlSession :: Session a
     }
@@ -36,6 +48,7 @@ newtype HasqlSession a = HasqlSession
 instance MonadIO HasqlSession where
     liftIO = HasqlSession . liftIO
 
+-- | Runs a @HasqlSession@ and logs potential errors if possible
 run :: HasqlSession a -> Connection -> IO (Either SessionError a)
 run session conn = do
     result <- runUnlogged session conn
@@ -53,7 +66,7 @@ run session conn = do
   where
     runUnlogged = Session.run . unHasqlSession
 
--- access rights
+-- ** Access Right Queries
 
 instance HasCheckPermission HasqlSession where
     checkDocumentPermission = ((HasqlSession .) .) . Sessions.hasPermission
@@ -64,7 +77,7 @@ instance HasIsGroupAdmin HasqlSession where
 instance HasIsSuperAdmin HasqlSession where
     isSuperAdmin = HasqlSession . UserSessions.checkSuperadmin
 
--- exists
+-- ** Exists Queries
 
 instance HasExistsDocument HasqlSession where
     existsDocument = HasqlSession . Sessions.existsDocument
@@ -78,7 +91,7 @@ instance HasExistsTextRevision HasqlSession where
 instance HasExistsTreeRevision HasqlSession where
     existsTreeRevision = HasqlSession . Sessions.existsTreeRevision
 
--- get
+-- ** Get Queries
 
 instance HasGetDocument HasqlSession where
     getDocument = HasqlSession . Sessions.getDocument
@@ -109,7 +122,7 @@ instance HasGetLogs HasqlSession where
 instance HasGetRevisionKey HasqlSession where
     getRevisionKey = HasqlSession . Sessions.getRevisionKey
 
--- create
+-- ** Create Queries
 
 instance HasCreateDocument HasqlSession where
     createDocument = ((HasqlSession .) .) . Sessions.createDocument
@@ -120,11 +133,15 @@ instance HasCreateTextElement HasqlSession where
 instance HasLogMessage HasqlSession where
     logMessage = (((HasqlSession .) .) .) . Sessions.logMessage
 
+-- * Transaction
+
+-- | Wrapper around a Hasql @Transaction@
 newtype HasqlTransaction a = HasqlTransaction
     { unHasqlTransaction :: Transaction a
     }
     deriving (Functor, Applicative, Monad)
 
+-- | Runs a @HasqlTransaction@ and logs errors if possible.
 runTransaction :: HasqlTransaction a -> Connection -> IO (Either SessionError a)
 runTransaction tx conn = do
     result <- runUnlogged tx conn
@@ -147,7 +164,7 @@ runTransaction tx conn = do
 instance HasRollback HasqlTransaction where
     rollback = HasqlTransaction condemn
 
--- access rights
+-- ** Access Right Queries
 
 instance HasCheckPermission HasqlTransaction where
     checkDocumentPermission = ((HasqlTransaction .) .) . Transactions.hasPermission
@@ -161,7 +178,7 @@ instance HasIsSuperAdmin HasqlTransaction where
 instance HasNow HasqlTransaction where
     now = HasqlTransaction Transactions.now
 
--- exists
+-- ** Exists Queries
 
 instance HasExistsDocument HasqlTransaction where
     existsDocument = HasqlTransaction . Transactions.existsDocument
@@ -175,7 +192,7 @@ instance HasExistsTextRevision HasqlTransaction where
 instance HasExistsComment HasqlTransaction where
     existsComment = HasqlTransaction . Transactions.existsComment
 
--- get
+-- ** Get Queries
 
 instance HasGetTextElementRevision HasqlTransaction where
     getTextElementRevision = HasqlTransaction . Transactions.getTextElementRevision
@@ -197,7 +214,7 @@ instance HasGetDocument HasqlTransaction where
     getDocuments = HasqlTransaction . Transactions.getDocuments
     getDocumentsBy = (HasqlTransaction .) . Transactions.getDocumentsBy
 
--- create
+-- ** Create Queries
 
 instance HasCreateTextRevision HasqlTransaction where
     updateTextRevision = ((HasqlTransaction .) .) . Transactions.updateTextRevision

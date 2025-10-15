@@ -36,6 +36,8 @@ services:
     hostname: docs
     build:
       context: .
+      args:
+        SERVER_HOST: ${SERVER_HOST}
       target: serve-docs
     networks:
       - backend
