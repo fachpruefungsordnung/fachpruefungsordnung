@@ -7,12 +7,12 @@ The documents can be stored in any database, the current implmenetation uses Pos
 
 A FPO instance can manage multiple documents. Each document is owned by a *group*.
 Documents are visible and editable by each *member* of the group.
-External reviewers and editors can be manually added to a document.
+External reviewers and editors can be manually added to a document (this is not yet added to the system, but planned).
 
 Admins and Superadmins can manage their groups and, consequently, the projects within those groups. Core functionalities include:
 
 * Creating new projects
-* Archiving projects
+* Archiving projects (TODO)
 * Deleting projects
 * Assigning document permissions to users
 
@@ -21,7 +21,7 @@ Regular users of the application receive an overview of the projects they are as
 - Documents are assigned to a single group
 - All group members always have full access to all documents within the group
 - Individual external users can be added to collaborate on specific documents of the group
-  - The following permission levels exist: `Read`, `Review`, `Edit`
+  - The following permission levels exist: `Read`, `Review`, `Edit` (those rights are also planned, but not yet added)
 
 |                      | Read | Review | Edit |
 |----------------------|:----:|:------:|:----:|
