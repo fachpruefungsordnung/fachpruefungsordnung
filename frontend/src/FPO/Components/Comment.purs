@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Argonaut.Core (jsonEmptyObject)
 import Data.Argonaut.Encode (encodeJson)
-import Data.Array (elem, find, snoc)
+import Data.Array (find, snoc)
 import Data.Either (Either(..))
 import Data.Formatter.DateTime (Formatter, format)
 import Data.Maybe (Maybe(..), maybe)
@@ -56,7 +56,6 @@ data Action
 
 data Query a
   = AddComment Int Int a
-  | DeletedComment (Array Int) a
   | ReceiveTimeFormatter (Maybe Formatter) a
   | RequestComments Int Int a
   | SelectedCommentSection Int Int Int a
@@ -504,12 +503,6 @@ commentview = connect selectTranslator $ H.mkComponent
         , mCommentSection = Nothing
         , newComment = true
         }
-      pure (Just a)
-
-    DeletedComment deletedIDs a -> do
-      state <- H.get
-      when (elem state.markerID deletedIDs) $
-        H.raise CloseCommentSection
       pure (Just a)
 
     ReceiveTimeFormatter mTimeFormatter a -> do
