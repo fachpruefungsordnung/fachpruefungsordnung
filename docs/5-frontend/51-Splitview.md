@@ -1,6 +1,6 @@
 # FPO.Components.Splitview
 
-Splitview is the main component that is used in EditorPage. It is the parent component and has multiple child components, split into three separate views. Depending on the task, the child could be displayed either on the left, middle, or right side of the split view. The Splitview component is thus the coordinator for all the children. It either redirects data from one component to another (e.g. selecting an entry in TOC should notify the [editor](Editor.md) component by sending the corresponding ID), only gets data from its children (e.g. closing request from the Comment component), or only sends data to a child (e.g. sending a newly received tree from the backend to TOC). The middle view only has the main [editor](Editor.md) and is always visible. The other views can each only harbor one child component at a time and can also be closed by the user.
+Splitview is the main component that is used in EditorPage. It is the parent component and has multiple child components, split into three separate views. Depending on the task, the child could be displayed either on the left, middle, or right side of the split view. The Splitview component is thus the coordinator for all the children. It either redirects data from one component to another (e.g. selecting an entry in TOC should notify the [editor](52-Editor.md) component by sending the corresponding ID), only gets data from its children (e.g. closing request from the Comment component), or only sends data to a child (e.g. sending a newly received tree from the backend to TOC). The middle view only has the main [editor](52-Editor.md) and is always visible. The other views can each only harbor one child component at a time and can also be closed by the user.
 
 ### Splitview has the following children:
 
@@ -9,9 +9,9 @@ Splitview is the main component that is used in EditorPage. It is the parent com
   - Comment
   - CommentOverview
 - Middle view:
-  - [Editor](Editor.md) (0 is main editor)
+  - [Editor](52-Editor.md) (0 is main editor)
 - Right view:
-  - [Editor](Editor.md) (1 is compare editor)
+  - [Editor](52-Editor.md) (1 is compare editor)
   - Preview
 
 ## Important Interactions
@@ -51,7 +51,7 @@ The Splitview gives the user the ability to resize the size of the three split v
 
 ### Toggle visibility
 
-Since all other components of EditorPage are in Splitview as children, toggling their visibility is thus also a responsibility of Splitview. As the middle main [editor](Editor.md) view is always visible, there does not exist the ability to close this component. The other two views can be closed by the respective button on their resizer to close and reopen themselves. The right view additionally has a close button on its top right to close itself. However, each view can only have one component active at a time. The content of the right view can be changed depending on different button presses. The left view, however, can have "overlapping" components, which can be closed with a top-right close button. The order from bottom to top is the following: TOC, CommentOverview, and then Comment. The components are made invisible, but they are not deleted, so as not to delete their state and reload the information again if we open them up again.
+Since all other components of EditorPage are in Splitview as children, toggling their visibility is thus also a responsibility of Splitview. As the middle main [editor](52-Editor.md) view is always visible, there does not exist the ability to close this component. The other two views can be closed by the respective button on their resizer to close and reopen themselves. The right view additionally has a close button on its top right to close itself. However, each view can only have one component active at a time. The content of the right view can be changed depending on different button presses. The left view, however, can have "overlapping" components, which can be closed with a top-right close button. The order from bottom to top is the following: TOC, CommentOverview, and then Comment. The components are made invisible, but they are not deleted, so as not to delete their state and reload the information again if we open them up again.
 
 #### Toggle visibility uses the following Actions:
 
