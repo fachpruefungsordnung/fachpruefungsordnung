@@ -4,7 +4,6 @@ There are two types of editor. The editor, to which the [splitview](51-Splitview
 
 ## Main editor
 
-TODO: Rewrite this.  
 At the beginning, since no section has been selected, no content is loaded and the editor is set to read-only. When the TOC component selects an entry, it is then redirected to this editor and disables the read-only state. Then it requests the data from the backend with the help of ContentDto. This data contains the content, comment anchors, which are markers for the position of comments, and HTML, which is then sent to the [preview](55-Preview.md) component. The main editor has a lot of features, which are further explained later on.
 
 ## Important Interactions
@@ -106,7 +105,7 @@ The user first selects a text and then clicks on the Comment button. This trigge
 
 ## Saving
 
-There are two ways to save in the editor: **manual saving** and **auto-saving**. Both of them have the same sequence of sending the **content** and the **positions of the comments** in this section to the backend. The only difference is that manual saving is done with the save button and other interactions, while auto-save is done with a timer. It also sends an **autoSave boolean** value to the backend. It can only be sent if the mutable value reference **mDirtyRef** is set to true. This action occurs in the added listener with the function **addChangeListenerWithRef**, which sets multiple flags to true and starts a timer for auto-save. Since saving uses a lot of state labels, it has a separate type called **SaveState**.
+There are two ways to save in the editor: **manual saving** and **auto-saving**. Both of them have the same sequence of sending the **content** and the **positions of the comments** in this section to the backend. The only difference is that manual saving is done with the save button and other interactions, while auto-save is done with a timer. It also sends an **autoSave boolean** value to the backend, which is used for compare editor. It can only be sent if the mutable value reference **mDirtyRef** is set to true. This action occurs in the added listener with the function **addChangeListenerWithRef**, which sets multiple flags to true and starts a timer for auto-save. Since saving uses a lot of state labels, it has a separate type called **SaveState**.
 
 ### Saving
 
@@ -145,5 +144,13 @@ With every change in the text, the **dirty flag** is set to true and goes into t
 - mPendingDebounceF
 - mPendingMaxWaitF
 
-TODO: Add save interactions, for example, closing tab.  
+### The following actions triggers save:
+
+- Save button
+- Background timer of 20 seconds or 2 seconds after latest content change
+- Change to a diffrent Leaf
+- Closing tab
+- Send first message in a new comment
+- Change border of a comment
+- 
 TODO: Older versions of section.
