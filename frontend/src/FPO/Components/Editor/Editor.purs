@@ -114,10 +114,10 @@ import Web.Event.EventTarget
   , eventListener
   , removeEventListener
   )
-import Web.HTML (window)
+import Web.HTML (HTMLElement, window)
 import Web.HTML.HTMLElement (offsetWidth, toElement)
 import Web.HTML.Window as Win
-import Web.ResizeObserver as RO
+import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
 
@@ -153,7 +153,7 @@ type SaveState =
   {
     -- for saving when closing window
     mDirtyRef :: Maybe (Ref Boolean)
-  , mBeforeUnloadL :: Maybe EventListener
+  , mBeforeUnloadListener :: Maybe EventListener
   -- saved icon
   , showSavedIcon :: Boolean
   , mSavedIconF :: Maybe H.ForkId
@@ -175,8 +175,8 @@ type State = FPOState
   , commentState :: CommentState
   , fontSize :: Int
   , mListener :: Maybe (HS.Listener Action)
-  , resizeObserver :: Maybe RO.ResizeObserver
-  , resizeSubscription :: Maybe SubscriptionId
+  , mResizeObserver :: Maybe ResizeObserver
+  , mResizeSubscriptionId :: Maybe SubscriptionId
   , showButtonText :: Boolean
   , showButtons :: Boolean
   -- for autosave
@@ -595,19 +595,18 @@ editor = connect selectTranslator $ H.mkComponent
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
     Init -> do
-      -- Do not load content, since no TOC has been selected yet
-
-      -- create subscription for later use
-      { emitter, listener } <- H.liftEffect HS.create
       -- Subscribe to resize events and store subscription for cleanup
+      { emitter, listener } <- H.liftEffect HS.create
       subscription <- H.subscribe emitter
+
+      -- Setup editor functionality (keydown listeners, Ace editor stuff, etc.)
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
 
         H.modify_ _
           { mEditor = Just editor_
           , mListener = Just listener
-          , resizeSubscription = Just subscription
+          , mResizeSubscriptionId = Just subscription
           }
         fontSize <- H.gets _.fontSize
 
@@ -633,96 +632,40 @@ editor = connect selectTranslator $ H.mkComponent
           -- set read only at the start to prevent users to write in not selected entry
           Editor.setReadOnly true editor_
 
+        -- Setup ResizeObserver for the container element
+        let
+          callback _ _ = do
+            -- Get the current width directly from the element
+            width <- offsetWidth el
+            HS.notify listener (HandleResize width)
+
+        observer <- H.liftEffect $ resizeObserver callback
+        H.liftEffect $ observe (toElement el) {} observer
+        H.modify_ _ { mResizeObserver = Just observer }
+
+      -- If a comparison element is loaded, also load the current content in the primary editor
+      compareTo <- H.gets _.compareToElement
+      case compareTo of
+        Nothing -> pure unit
+        Just { tocEntry: tocEntry, revID: revID } -> handleAction
+          (ChangeToSection tocEntry revID Nothing)
+
       -- New Ref for keeping track, if the content in editor has changed
       -- 1. since last save
       -- 2. since opening version
       dref <- H.liftEffect $ Ref.new false
       vref <- H.liftEffect $ Ref.new false
-
-      win <- H.liftEffect window
-      let
-        winTarget = Win.toEventTarget win
-        -- creating EventTypes
-        beforeunload = EventType "beforeunload"
+      H.modify_ _ { mDirtyVersion = Just vref }
 
       -- create eventListener for preventing the tab from closing
       -- when content has not been saved (Not changing through Navbar)
-      buL <- H.liftEffect $ eventListener \ev -> do
-        readRef <- traverse Ref.read (Just dref)
-        case readRef of
-          -- Prevent the tab from closing in a certain way
-          Just true -> do
-            preventDefault ev
-            HS.notify listener (Save true)
-          _ -> pure unit
-      H.modify_ \st -> st
-        { saveState = st.saveState
-            { mDirtyRef = Just dref
-            , mBeforeUnloadL = Just buL
-            }
-        , mDirtyVersion = Just vref
-        }
-      H.liftEffect $ addEventListener beforeunload buL false winTarget
-
-      -- Setup ResizeObserver for the container element
-      H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \element -> do
-
-        let
-          callback _ _ = do
-            -- Get the current width directly from the element
-            width <- offsetWidth element
-            HS.notify listener (HandleResize width)
-
-        observer <- H.liftEffect $ RO.resizeObserver callback
-        H.liftEffect $ RO.observe (toElement element) {} observer
-        H.modify_ _ { resizeObserver = Just observer }
-      compareTo <- H.gets _.compareToElement
-      case compareTo of
-        Nothing
-        -> pure unit
-        Just { tocEntry: tocEntry, revID: revID }
-        -> handleAction (ChangeToSection tocEntry revID Nothing)
+      addBeforeUnloadListener dref listener
 
       -- add and start Editor listeners
       H.gets _.mEditor >>= traverse_ \ed -> do
-
-        -- change Editor content listener
         H.liftEffect $ addChangeListenerWithRef ed dref vref listener
         container <- H.liftEffect $ Editor.getContainer ed
-
-        -- Mouse events
-
-        downL <- H.liftEffect $ eventListener \ev -> do
-          case ME.fromEvent ev of
-            Just mev -> do
-              let
-                x = toNumber (ME.clientX mev)
-                y = toNumber (ME.clientY mev)
-              -- try to drag comment section dragger marker
-              HS.notify listener (TryStartDrag x y)
-            Nothing ->
-              pure unit
-        H.liftEffect $ addEventListener (EventType "mousedown") downL true
-          (toEventTarget $ toElement container)
-
-        moveL <- H.liftEffect $ eventListener \ev -> do
-          case ME.fromEvent ev of
-            Just mev -> do
-              let
-                x = toNumber (ME.clientX mev)
-                y = toNumber (ME.clientY mev)
-              HS.notify listener (DragMove x y)
-            Nothing -> pure unit
-        H.liftEffect $ addEventListener (EventType "mousemove") moveL true
-          (toEventTarget $ toElement container)
-
-        upL <- H.liftEffect $ eventListener \_ -> do
-          -- find potentially selected Comment
-          HS.notify listener SelectComment
-          -- stop dragging the comment dragger
-          HS.notify listener EndDrag
-        H.liftEffect $ addEventListener (EventType "mouseup") upL true
-          (toEventTarget $ toElement container)
+        H.liftEffect $ addMouseDragListeners container listener
 
     DoNothing -> do
       pure unit
@@ -1409,13 +1352,13 @@ editor = connect selectTranslator $ H.mkComponent
         tgt = Win.toEventTarget win
         beforeunload = EventType "beforeunload"
       -- Cleanup observer and subscription
-      H.liftEffect $ case state.resizeObserver of
-        Just obs -> RO.disconnect obs
+      H.liftEffect $ case state.mResizeObserver of
+        Just obs -> disconnect obs
         Nothing -> pure unit
-      case state.resizeSubscription of
+      case state.mResizeSubscriptionId of
         Just subscription -> H.unsubscribe subscription
         Nothing -> pure unit
-      case state.saveState.mBeforeUnloadL of
+      case state.saveState.mBeforeUnloadListener of
         Just l -> H.liftEffect $ removeEventListener beforeunload l false tgt
         _ -> pure unit
       for_ state.saveState.mPendingDebounceF H.kill
@@ -1868,7 +1811,7 @@ initialCommentState =
 initialSaveState :: SaveState
 initialSaveState =
   { mDirtyRef: Nothing
-  , mBeforeUnloadL: Nothing
+  , mBeforeUnloadListener: Nothing
   , showSavedIcon: false
   , mSavedIconF: Nothing
   , mPendingDebounceF: Nothing
@@ -1889,8 +1832,8 @@ initialState { context, input } =
   , commentState: initialCommentState
   , fontSize: 12
   , mListener: Nothing
-  , resizeObserver: Nothing
-  , resizeSubscription: Nothing
+  , mResizeObserver: Nothing
+  , mResizeSubscriptionId: Nothing
   , showButtonText: true
   , showButtons: true
   , saveState: initialSaveState
@@ -1948,3 +1891,67 @@ makeEditorToolbarButtonWithText enabled asText action biName smallText = HH.butt
           []
       ]
   )
+
+addMouseDragListeners :: HTMLElement -> HS.Listener Action -> Effect Unit
+addMouseDragListeners container listener = do
+  downL <- H.liftEffect $ eventListener \ev -> do
+    case ME.fromEvent ev of
+      Just mev -> do
+        let
+          x = toNumber (ME.clientX mev)
+          y = toNumber (ME.clientY mev)
+        -- try to drag comment section dragger marker
+        HS.notify listener (TryStartDrag x y)
+      Nothing ->
+        pure unit
+  H.liftEffect $ addEventListener (EventType "mousedown") downL true
+    (toEventTarget $ toElement container)
+
+  moveL <- H.liftEffect $ eventListener \ev -> do
+    case ME.fromEvent ev of
+      Just mev -> do
+        let
+          x = toNumber (ME.clientX mev)
+          y = toNumber (ME.clientY mev)
+        HS.notify listener (DragMove x y)
+      Nothing -> pure unit
+  H.liftEffect $ addEventListener (EventType "mousemove") moveL true
+    (toEventTarget $ toElement container)
+
+  upL <- H.liftEffect $ eventListener \_ -> do
+    -- find potentially selected Comment
+    HS.notify listener SelectComment
+    -- stop dragging the comment dragger
+    HS.notify listener EndDrag
+  H.liftEffect $ addEventListener (EventType "mouseup") upL true
+    (toEventTarget $ toElement container)
+
+addBeforeUnloadListener
+  :: forall slots m
+   . MonadAff m
+  => Ref Boolean
+  -> HS.Listener Action
+  -> H.HalogenM State Action slots Output m Unit
+addBeforeUnloadListener dref listener = do
+  win <- H.liftEffect window
+  let
+    winTarget = Win.toEventTarget win
+    -- creating EventTypes
+    beforeunload = EventType "beforeunload"
+
+  beforeUnloadListener <- H.liftEffect $ eventListener \ev -> do
+    readRef <- traverse Ref.read (Just dref)
+    case readRef of
+      -- Prevent the tab from closing in a certain way
+      Just true -> do
+        preventDefault ev
+        HS.notify listener (Save true)
+      _ -> pure unit
+  H.modify_ \st -> st
+    { saveState = st.saveState
+        { mDirtyRef = Just dref
+        , mBeforeUnloadListener = Just beforeUnloadListener
+        }
+    }
+  H.liftEffect $ addEventListener beforeunload beforeUnloadListener false
+    winTarget
