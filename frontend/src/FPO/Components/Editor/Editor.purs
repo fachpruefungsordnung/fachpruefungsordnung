@@ -117,7 +117,7 @@ import Web.Event.EventTarget
 import Web.HTML (window)
 import Web.HTML.HTMLElement (offsetWidth, toElement)
 import Web.HTML.Window as Win
-import Web.ResizeObserver as RO
+import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
 
@@ -175,7 +175,7 @@ type State = FPOState
   , commentState :: CommentState
   , fontSize :: Int
   , mListener :: Maybe (HS.Listener Action)
-  , resizeObserver :: Maybe RO.ResizeObserver
+  , mResizeObserver :: Maybe ResizeObserver
   , mResizeSubscriptionId :: Maybe SubscriptionId
   , showButtonText :: Boolean
   , showButtons :: Boolean
@@ -672,9 +672,9 @@ editor = connect selectTranslator $ H.mkComponent
             width <- offsetWidth element
             HS.notify listener (HandleResize width)
 
-        observer <- H.liftEffect $ RO.resizeObserver callback
-        H.liftEffect $ RO.observe (toElement element) {} observer
-        H.modify_ _ { resizeObserver = Just observer }
+        observer <- H.liftEffect $ resizeObserver callback
+        H.liftEffect $ observe (toElement element) {} observer
+        H.modify_ _ { mResizeObserver = Just observer }
       compareTo <- H.gets _.compareToElement
       case compareTo of
         Nothing
@@ -1408,8 +1408,8 @@ editor = connect selectTranslator $ H.mkComponent
         tgt = Win.toEventTarget win
         beforeunload = EventType "beforeunload"
       -- Cleanup observer and subscription
-      H.liftEffect $ case state.resizeObserver of
-        Just obs -> RO.disconnect obs
+      H.liftEffect $ case state.mResizeObserver of
+        Just obs -> disconnect obs
         Nothing -> pure unit
       case state.mResizeSubscriptionId of
         Just subscription -> H.unsubscribe subscription
@@ -1888,7 +1888,7 @@ initialState { context, input } =
   , commentState: initialCommentState
   , fontSize: 12
   , mListener: Nothing
-  , resizeObserver: Nothing
+  , mResizeObserver: Nothing
   , mResizeSubscriptionId: Nothing
   , showButtonText: true
   , showButtons: true
