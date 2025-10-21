@@ -559,8 +559,6 @@ updateTextRevision =
                         updated
                     WHERE
                         doc_comment_anchors.comment = $1 :: int8
-                    RETURNING
-                        doc_comment_anchors.id
                 )
                 SELECT
                     updated.id :: int8,
