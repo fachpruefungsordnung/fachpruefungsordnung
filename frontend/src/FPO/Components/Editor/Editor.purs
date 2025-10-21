@@ -153,7 +153,7 @@ type SaveState =
   {
     -- for saving when closing window
     mDirtyRef :: Maybe (Ref Boolean)
-  , mBeforeUnloadL :: Maybe EventListener
+  , mBeforeUnloadListener :: Maybe EventListener
   -- saved icon
   , showSavedIcon :: Boolean
   , mSavedIconF :: Maybe H.ForkId
@@ -646,7 +646,7 @@ editor = connect selectTranslator $ H.mkComponent
 
       -- create eventListener for preventing the tab from closing
       -- when content has not been saved (Not changing through Navbar)
-      buL <- H.liftEffect $ eventListener \ev -> do
+      beforeUnloadListener <- H.liftEffect $ eventListener \ev -> do
         readRef <- traverse Ref.read (Just dref)
         case readRef of
           -- Prevent the tab from closing in a certain way
@@ -657,11 +657,12 @@ editor = connect selectTranslator $ H.mkComponent
       H.modify_ \st -> st
         { saveState = st.saveState
             { mDirtyRef = Just dref
-            , mBeforeUnloadL = Just buL
+            , mBeforeUnloadListener = Just beforeUnloadListener
             }
         , mDirtyVersion = Just vref
         }
-      H.liftEffect $ addEventListener beforeunload buL false winTarget
+      H.liftEffect $ addEventListener beforeunload beforeUnloadListener false
+        winTarget
 
       -- Setup ResizeObserver for the container element
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \element -> do
@@ -1414,7 +1415,7 @@ editor = connect selectTranslator $ H.mkComponent
       case state.mResizeSubscriptionId of
         Just subscription -> H.unsubscribe subscription
         Nothing -> pure unit
-      case state.saveState.mBeforeUnloadL of
+      case state.saveState.mBeforeUnloadListener of
         Just l -> H.liftEffect $ removeEventListener beforeunload l false tgt
         _ -> pure unit
       for_ state.saveState.mPendingDebounceF H.kill
@@ -1867,7 +1868,7 @@ initialCommentState =
 initialSaveState :: SaveState
 initialSaveState =
   { mDirtyRef: Nothing
-  , mBeforeUnloadL: Nothing
+  , mBeforeUnloadListener: Nothing
   , showSavedIcon: false
   , mSavedIconF: Nothing
   , mPendingDebounceF: Nothing
