@@ -1401,6 +1401,8 @@ editor = connect selectTranslator $ H.mkComponent
         { showButtonText = width >= cutoff, showButtons = width >= noButtonsCutoff }
 
     Finalize -> do
+      -- Save in case, the user changes the page (via Navbar)
+      handleAction $ Save true
       state <- H.get
       win <- H.liftEffect window
       let
