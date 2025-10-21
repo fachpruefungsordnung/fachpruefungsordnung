@@ -539,7 +539,7 @@ updateTextRevision =
                     UPDATE
                         doc_text_revisions
                     SET
-                        id = nextval('doc_text_revision_seq'),
+                        id = nextval('doc_revision_seq'),
                         creation_ts = now(),
                         content = $2 :: text
                     WHERE
