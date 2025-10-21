@@ -176,7 +176,7 @@ type State = FPOState
   , fontSize :: Int
   , mListener :: Maybe (HS.Listener Action)
   , resizeObserver :: Maybe RO.ResizeObserver
-  , resizeSubscription :: Maybe SubscriptionId
+  , mResizeSubscriptionId :: Maybe SubscriptionId
   , showButtonText :: Boolean
   , showButtons :: Boolean
   -- for autosave
@@ -597,9 +597,8 @@ editor = connect selectTranslator $ H.mkComponent
     Init -> do
       -- Do not load content, since no TOC has been selected yet
 
-      -- create subscription for later use
-      { emitter, listener } <- H.liftEffect HS.create
       -- Subscribe to resize events and store subscription for cleanup
+      { emitter, listener } <- H.liftEffect HS.create
       subscription <- H.subscribe emitter
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
@@ -607,7 +606,7 @@ editor = connect selectTranslator $ H.mkComponent
         H.modify_ _
           { mEditor = Just editor_
           , mListener = Just listener
-          , resizeSubscription = Just subscription
+          , mResizeSubscriptionId = Just subscription
           }
         fontSize <- H.gets _.fontSize
 
@@ -1412,7 +1411,7 @@ editor = connect selectTranslator $ H.mkComponent
       H.liftEffect $ case state.resizeObserver of
         Just obs -> RO.disconnect obs
         Nothing -> pure unit
-      case state.resizeSubscription of
+      case state.mResizeSubscriptionId of
         Just subscription -> H.unsubscribe subscription
         Nothing -> pure unit
       case state.saveState.mBeforeUnloadL of
@@ -1890,7 +1889,7 @@ initialState { context, input } =
   , fontSize: 12
   , mListener: Nothing
   , resizeObserver: Nothing
-  , resizeSubscription: Nothing
+  , mResizeSubscriptionId: Nothing
   , showButtonText: true
   , showButtons: true
   , saveState: initialSaveState
