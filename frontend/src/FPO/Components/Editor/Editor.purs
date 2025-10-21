@@ -643,6 +643,13 @@ editor = connect selectTranslator $ H.mkComponent
         H.liftEffect $ observe (toElement el) {} observer
         H.modify_ _ { mResizeObserver = Just observer }
 
+      -- If a comparison element is loaded, also load the current content in the primary editor
+      compareTo <- H.gets _.compareToElement
+      case compareTo of
+        Nothing -> pure unit
+        Just { tocEntry: tocEntry, revID: revID } -> handleAction
+          (ChangeToSection tocEntry revID Nothing)
+
       -- New Ref for keeping track, if the content in editor has changed
       -- 1. since last save
       -- 2. since opening version
