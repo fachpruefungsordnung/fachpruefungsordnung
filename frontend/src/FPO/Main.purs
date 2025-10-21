@@ -204,9 +204,6 @@ component =
 main :: Effect Unit
 main = HA.runHalogenAff do
   body <- HA.awaitBody
-  -- Load logged in user from the localstorage
-  -- response <- getString "/get-user" -- TODO wait for backend to support this
-  -- let user = handleInitialResponse response
   savedLang <- H.liftEffect loadLanguage
   browserLang <- H.liftEffect detectBrowserLanguage
   let defaultLang = fromMaybe browserLang savedLang :: String
