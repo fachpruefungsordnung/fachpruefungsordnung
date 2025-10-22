@@ -551,8 +551,7 @@ editor = connect selectTranslator $ H.mkComponent
       , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
-          , HP.classes [ HB.flexGrow1 ]
-          , HP.style "min-height: 0; flex-grow: 1; flex-basis: 0"
+          , HP.style "flex:1 1 0; min-height:0; position:relative;"
           ]
           [ -- Add overlay when right side
             case state.compareToElement of
@@ -1569,6 +1568,8 @@ editor = connect selectTranslator $ H.mkComponent
 
     ReceiveUpToDateUpdate mVersion a -> do
       H.modify_ _ { upToDateVersion = mVersion }
+      -- there is a new container above the editor. Resize editor to be able to scroll all the way down
+      handleAction Resize
       pure (Just a)
 
     EditorResize a -> do
