@@ -49,6 +49,8 @@ module Language.Ltml.ToLaTeX.PreLaTeXType
 
 import qualified Data.Text as T
 import Language.Ltml.AST.Label (Label (Label))
+import Data.DList (DList)
+import qualified Data.DList as DList
 
 data PreLaTeX
     = IText T.Text
@@ -71,19 +73,16 @@ data PreLaTeX
 -- | We want to be able to connect PreLaTeX structures and avoid deeply rooted sequences.
 --   Here we are using a monoid to be able to concat PreLaTeX structures while flattening sequences.
 instance Semigroup PreLaTeX where
-    a <> b = sequence' [a, b]
-      where
-        sequence' :: [PreLaTeX] -> PreLaTeX
-        sequence' xs = case flatten xs of
-            [x] -> x
-            ys -> ISequence ys
+  a <> b = case DList.toList (flattenD [a, b]) of
+             [x] -> x
+             xs  -> ISequence xs
+    where
+      flattenD :: [PreLaTeX] -> DList PreLaTeX
+      flattenD = foldMap go
 
-        -- \| Flatten nested Sequences as we build them
-        flatten :: [PreLaTeX] -> [PreLaTeX]
-        flatten = concatMap go
-          where
-            go (ISequence ys) = flatten ys
-            go x = [x]
+      go :: PreLaTeX -> DList PreLaTeX
+      go (ISequence ys) = flattenD ys
+      go x              = DList.singleton x
 
 instance Monoid PreLaTeX where
     mempty = ISequence []
