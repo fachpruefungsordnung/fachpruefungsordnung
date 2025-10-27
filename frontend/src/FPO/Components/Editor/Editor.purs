@@ -600,8 +600,9 @@ editor = connect selectTranslator $ H.mkComponent
       { emitter, listener } <- H.liftEffect HS.create
       -- Subscribe to resize events and store subscription for cleanup
       subscription <- H.subscribe emitter
-      let onSave :: Effect Unit
-          onSave = HS.notify listener (Save false)
+      let
+        onSave :: Effect Unit
+        onSave = HS.notify listener (Save false)
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
 
