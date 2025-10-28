@@ -255,6 +255,7 @@ data Action
 -- We use a query to get the content of the editor
 data Query a
   = EditorResize a
+  | SetDirtyFlag a
   -- | save the current content and send it to splitview
   | SaveSection a
   -- | receive the selected TOC and put its content into the editor
@@ -1624,6 +1625,11 @@ editor = connect selectTranslator $ H.mkComponent
         case s.mNodePath of
           Just _ -> s { mNodePath = Just path }
           Nothing -> s
+      pure (Just a)
+
+    SetDirtyFlag a -> do
+      state <- H.get
+      for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
       pure (Just a)
 
     SaveSection a -> do

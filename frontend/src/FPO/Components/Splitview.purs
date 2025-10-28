@@ -1259,6 +1259,8 @@ splitview = connect selectTranslator $ H.mkComponent
       TOC.ReorderItems { from, to } -> do
         s <- H.get
         updateTree $ reorderTocEntries from to s.tocEntries
+        H.tell _editor 0 Editor.SetDirtyFlag
+        H.tell _editor 0 Editor.SaveSection
 
       TOC.RenameNode _ -> do
         -- s <- H.get
