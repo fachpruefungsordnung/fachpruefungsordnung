@@ -57,7 +57,7 @@ services:
   postgres:
     container_name: fpo-postgres
     hostname: postgres
-    image: postgres:latest
+    image: postgres:17
     restart: unless-stopped
     environment:
       TZ: "GMT+2"
