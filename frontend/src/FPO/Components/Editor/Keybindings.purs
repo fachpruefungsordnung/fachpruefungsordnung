@@ -43,8 +43,8 @@ underscore editor_ = do
     -- Otherwise, surround the selection with bold tags
     surroundSelection "<_" ">" editor_
 
-keyBinding :: Types.Editor -> Event -> Effect Unit
-keyBinding editor_ event = do
+keyBinding :: Effect Unit -> Types.Editor -> Event -> Effect Unit
+keyBinding onSave editor_ event = do
   let keyboardEvent = fromEvent event :: Maybe KeyboardEvent
   case keyboardEvent of
     Nothing -> pure unit
@@ -69,6 +69,9 @@ keyBinding editor_ event = do
             preventDefault event
             Editor.redo editor_
             Editor.focus editor_
+          "s" -> do
+            preventDefault event
+            onSave
           _ -> pure unit
       else pure unit
   pure unit
