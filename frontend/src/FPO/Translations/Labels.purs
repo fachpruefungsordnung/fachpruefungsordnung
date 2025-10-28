@@ -157,6 +157,7 @@ type Labels =
 
       -- | Editor Page
       ::: "editor_allComments"
+      ::: "editor_already_saved"
       ::: "editor_changeVersion"
       ::: "editor_comment"
       ::: "editor_compareVersion"

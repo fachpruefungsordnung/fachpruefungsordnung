@@ -9,6 +9,7 @@ import Simple.I18n.Translation (Translation, fromRecord)
 
 type EditorLabels =
   ( "editor_allComments"
+      ::: "editor_already_saved"
       ::: "editor_changeVersion"
       ::: "editor_comment"
       ::: "editor_compareVersion"
@@ -41,6 +42,7 @@ type EditorLabels =
 enEditor :: Translation EditorLabels
 enEditor = fromRecord
   { editor_allComments: "All comments"
+  , editor_already_saved: "Already Saved"
   , editor_changeVersion: "Change Version"
   , editor_confirmSwitch: "Switching Version"
   , editor_comment: "Comment"
@@ -94,6 +96,7 @@ enEditor = fromRecord
 deEditor :: Translation EditorLabels
 deEditor = fromRecord
   { editor_allComments: "Alle Kommentare"
+  , editor_already_saved: "Bereits gespeichert"
   , editor_changeVersion: "Version Wechseln"
   , editor_confirmSwitch: "Version Wechseln"
   , editor_comment: "Kommentar"

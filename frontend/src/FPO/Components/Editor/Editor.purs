@@ -551,8 +551,7 @@ editor = connect selectTranslator $ H.mkComponent
       , HH.div -- Editor container
 
           [ HP.ref (H.RefLabel "container")
-          , HP.classes [ HB.flexGrow1 ]
-          , HP.style "min-height: 0; flex-grow: 1; flex-basis: 0"
+          , HP.style "flex:1 1 0; min-height:0; position:relative;"
           ]
           [ -- Add overlay when right side
             case state.compareToElement of
@@ -601,6 +600,9 @@ editor = connect selectTranslator $ H.mkComponent
       { emitter, listener } <- H.liftEffect HS.create
       -- Subscribe to resize events and store subscription for cleanup
       subscription <- H.subscribe emitter
+      let
+        onSave :: Effect Unit
+        onSave = HS.notify listener (Save false)
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
 
@@ -613,7 +615,7 @@ editor = connect selectTranslator $ H.mkComponent
 
         H.liftEffect $ do
           Editor.setFontSize (show fontSize <> "px") editor_
-          eventListen <- eventListener (keyBinding editor_)
+          eventListen <- eventListener (keyBinding onSave editor_)
           container <- Editor.getContainer editor_
           addEventListener keydown eventListen true
             (toEventTarget $ toElement container)
@@ -804,7 +806,7 @@ editor = connect selectTranslator $ H.mkComponent
           Nothing -> liftEffect $ Ref.new false
         -- Only save, when dirty flag is true or we are in older version
         -- TODO: Add another flag instead of using isEditorOutdated
-        when (isDirty || state.isEditorOutdated) $ do
+        if (isDirty || state.isEditorOutdated) then do
           allLines <- H.gets _.mEditor >>= traverse \ed -> do
             H.liftEffect $ Editor.getSession ed
               >>= Session.getDocument
@@ -857,6 +859,11 @@ editor = connect selectTranslator $ H.mkComponent
                     newWrapper = ContentDto.setWrapper newContent comments
                   -- Try to upload
                   handleAction $ Upload entry newWrapper isAutoSave
+        -- Users want to have a visual indicator, that they have saved. So when manual saving without any changes since
+        -- last Save, just show the notificatioin
+        else when (not isAutoSave && isJust state.mTocEntry) do
+          updateStore $ Store.AddSuccess
+            (translate (label :: _ "editor_already_saved") state.translator)
 
     Upload newEntry newWrapper isAutoSave -> do
       state <- H.get
@@ -1569,6 +1576,8 @@ editor = connect selectTranslator $ H.mkComponent
 
     ReceiveUpToDateUpdate mVersion a -> do
       H.modify_ _ { upToDateVersion = mVersion }
+      -- there is a new container above the editor. Resize editor to be able to scroll all the way down
+      handleAction Resize
       pure (Just a)
 
     EditorResize a -> do
@@ -1618,7 +1627,7 @@ editor = connect selectTranslator $ H.mkComponent
       pure (Just a)
 
     SaveSection a -> do
-      handleAction $ Save false
+      handleAction $ Save true
       pure (Just a)
 
     -- Repurpose it to confirm, that the first comment was sent
