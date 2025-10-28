@@ -51,3 +51,5 @@ cabal.project.local~
 
 # HTML and CSS Testfiles
 backend/src/Language/Ltml/HTML/Test
+# Language Testfile
+backend/src/Language/Test.hs
