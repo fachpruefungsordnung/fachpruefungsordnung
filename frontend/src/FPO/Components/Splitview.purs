@@ -108,6 +108,7 @@ data Action
   | ToggleComment
   | ToggleCommentOverview Boolean Int Int
   | ToggleSidebar
+  | SwitchPreview
   | TogglePreview
   -- Query Output
   | HandleComment Comment.Output
@@ -495,42 +496,35 @@ splitview = connect selectTranslator $ H.mkComponent
           [ HH.text if state.previewShown then "⟩" else "⟨" ]
       ]
 
+  rightSwitchPreviewButton :: H.ComponentHTML Action Slots m
+  rightSwitchPreviewButton =
+    HH.div
+      [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
+      , HP.style "padding-right: 0.5rem;"
+      ]
+      [ HH.button
+          [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+          , HP.style
+              "position: absolute; \
+              \top: 0.5rem; \
+              \right: 0.5rem; \
+              \background-color: #fdecea; \
+              \color: #b71c1c; \
+              \padding: 0.2rem 0.4rem; \
+              \font-size: 0.75rem; \
+              \line-height: 1; \
+              \border: 1px solid #f5c6cb; \
+              \border-radius: 0.2rem; \
+              \z-index: 10;"
+          , HE.onClick \_ -> SwitchPreview
+          ]
+          [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
+      ]
+
   renderPreview :: State -> Array (H.ComponentHTML Action Slots m)
   renderPreview state =
     [ -- Right Resizer
-      HH.div
-        [ HE.onMouseDown (StartResize ResizeRight)
-        , HP.style
-            "width: 8px; \
-            \cursor: col-resize; \
-            \background:rgba(0, 0, 0, 0.3); \
-            \display: flex; \
-            \align-items: center; \
-            \justify-content: center; \
-            \position: relative;"
-        ]
-        [ HH.button
-            [ HP.style
-                "background:rgba(255, 255, 255, 0.8); \
-                \border: 0.2px solid #aaa; \
-                \padding: 0.1rem 0.1rem; \
-                \font-size: 8px; \
-                \font-weight: bold; \
-                \line-height: 1; \
-                \color:rgba(0, 0, 0, 0.7); \
-                \border-radius: 3px; \
-                \cursor: pointer; \
-                \height: 40px; \
-                \width: 8px;"
-            -- To prevent the resizer event under the button
-            , HE.handler' (EventType "mousedown") \ev ->
-                unsafePerformEffect do
-                  stopPropagation ev
-                  pure Nothing -- Do not trigger the mouse down event under the button
-            , HE.onClick \_ -> TogglePreview
-            ]
-            [ HH.text if state.previewShown then "⟩" else "⟨" ]
-        ]
+      rightResizer state
 
     -- Preview
     , if state.previewShown then
@@ -542,28 +536,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 <>
                   "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
           ]
-          [ HH.div
-              [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
-              , HP.style "padding-right: 0.5rem;"
-              ]
-              [ HH.button
-                  [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
-                  , HP.style
-                      "position: absolute; \
-                      \top: 0.5rem; \
-                      \right: 0.5rem; \
-                      \background-color: #fdecea; \
-                      \color: #b71c1c; \
-                      \padding: 0.2rem 0.4rem; \
-                      \font-size: 0.75rem; \
-                      \line-height: 1; \
-                      \border: 1px solid #f5c6cb; \
-                      \border-radius: 0.2rem; \
-                      \z-index: 10;"
-                  , HE.onClick \_ -> TogglePreview
-                  ]
-                  [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
-              ]
+          [ rightSwitchPreviewButton
           , HH.slot _preview unit Preview.preview
               { renderedHtml: state.renderedHtml
               , isDragging: state.mDragTarget /= Nothing
@@ -588,28 +561,7 @@ splitview = connect selectTranslator $ H.mkComponent
               <>
                 "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
         ]
-        [ HH.div
-            [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
-            , HP.style "padding-right: 0.5rem;"
-            ]
-            [ HH.button
-                [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
-                , HP.style
-                    "position: absolute; \
-                    \top: 0.5rem; \
-                    \right: 0.5rem; \
-                    \background-color: #fdecea; \
-                    \color: #b71c1c; \
-                    \padding: 0.2rem 0.4rem; \
-                    \font-size: 0.75rem; \
-                    \line-height: 1; \
-                    \border: 1px solid #f5c6cb; \
-                    \border-radius: 0.2rem; \
-                    \z-index: 10;"
-                , HE.onClick \_ -> TogglePreview
-                ]
-                [ HH.text "×" ]
-            ]
+        [ rightSwitchPreviewButton
         , HH.slot_ _editor 1 Editor.editor
             { docID: state.docID, elementData: cData }
         ]
@@ -845,44 +797,35 @@ splitview = connect selectTranslator $ H.mkComponent
     DoNothing -> do
       pure unit
 
+    -- Switch between CompareEditor, Preview and TogglePreview
+    SwitchPreview -> do
+      state <- H.get
+      case state.mSelectedTocEntry of
+        Just _ -> H.modify_ _ { mSelectedTocEntry = Nothing }
+        Nothing -> handleAction TogglePreview
+
+
     -- Toggle the preview area
     TogglePreview -> do
       state <- H.get
-      -- all this, in order for not overlapping the left resizer (to not make it disappear)
-      win <- H.liftEffect Web.HTML.window
-      totalWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
-      let
-        w = toNumber totalWidth
-        -- resizer size is 8, but there are 2 resizers.
-        -- Also resizer size is not in sidebarRatio
-        resizerWidth = 16.0
-        resizerRatio = resizerWidth / w
       -- close preview
-      if state.previewShown then
-        -- just hide the compare to element if it is shown
+      if state.previewShown then do
+        -- all this, in order for not overlapping the left resizer (to not make it disappear)
+        win <- H.liftEffect Web.HTML.window
+        totalWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
         let
+          w = toNumber totalWidth
+          -- resizer size is 8, but there are 2 resizers.
+          -- Also resizer size is not in sidebarRatio
+          resizerWidth = 16.0
+          resizerRatio = resizerWidth / w
           oldPreviewRatio = state.previewRatio
-          mod = do
-            H.modify_ \st -> st
-              { previewRatio = resizerRatio
-              , lastExpandedPreviewRatio = oldPreviewRatio
-              , previewShown = false
-              }
-        in
-          case state.mSelectedTocEntry of
-            Nothing -> mod
-            Just (SelNode _ _) -> mod
-            Just (SelLeaf tocID) ->
-              let
-                versionEntry = fromMaybe
-                  { elementID: -1, versionID: Nothing, comparisonData: Nothing }
-                  (findRootTree (\e -> e.elementID == tocID) state.versionMapping)
-              in
-                case versionEntry.comparisonData of
-                  Nothing -> mod
-                  Just _ -> do
-                    handleAction (ModifyVersionMapping tocID Nothing (Just Nothing))
-      -- open preview
+        H.modify_ \st -> st
+          { previewRatio = resizerRatio
+          , lastExpandedPreviewRatio = oldPreviewRatio
+          , previewShown = false
+          }
+        -- open preview
       else do
         -- restore the last expanded middle ratio, when toggling preview back on
         H.modify_ \st -> st
