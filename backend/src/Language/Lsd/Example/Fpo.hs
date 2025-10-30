@@ -349,7 +349,7 @@ paragraphT =
 simpleBlockT :: NamedType SimpleBlockType
 simpleBlockT =
     NamedType "simple_block" "Einfacher Block" $
-        SimpleBlockType simpleParagraphT (Disjunction [dummyTableT])
+        SimpleBlockType simpleParagraphT (Disjunction [tableT])
 
 simpleParagraphT :: NamedType SimpleParagraphType
 simpleParagraphT = simpleParagraphTF LeftAligned MediumFontSize
@@ -374,10 +374,16 @@ simpleParagraphTF alignment fsize =
         DisplayTypeName $
             "Einfacher Absatz (" ++ show alignment ++ ", " ++ show fsize ++ ")"
 
-dummyTableT :: NamedType TableType
-dummyTableT =
-    NamedType "dummy_table" "Dummy Tabelle" $
-        TableType (Keyword "[dummy_table]")
+tableT :: NamedType TableType
+tableT =
+    NamedType "table" "Tabelle" $
+        TableType (Keyword "") (Star rowTypeT)
+  where
+    rowTypeT :: RowType
+    rowTypeT = RowType (Star cellTypeT)
+
+    cellTypeT :: CellType
+    cellTypeT = CellType richTextT
 
 plainTextT :: TextType Void
 plainTextT = TextType (Disjunction [])

@@ -73,7 +73,7 @@ import Language.Ltml.AST.SimpleBlock
     )
 import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (SimpleParagraph))
 import Language.Ltml.AST.SimpleSection (SimpleSection (SimpleSection))
-import Language.Ltml.AST.Table (Table (Table))
+import Language.Ltml.AST.Table (Table)
 import Language.Ltml.AST.Text
     ( EnumItem (..)
     , Enumeration (..)
@@ -309,7 +309,7 @@ instance Labelable Paragraph where
 --------------------------------- Table ------------------------------------
 
 instance ToPreLaTeXM Table where
-    toPreLaTeXM Table = undefined -- TODO
+    toPreLaTeXM = undefined -- TODO
 
 -------------------------------- Section -----------------------------------
 

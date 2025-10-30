@@ -14,8 +14,10 @@ import Language.Ltml.Parser.SimpleParagraph (simpleParagraphP)
 import Language.Ltml.Parser.Table (tableP)
 
 simpleBlockP :: SimpleBlockType -> Parser SimpleBlock
-simpleBlockP (SimpleBlockType parT (Disjunction tableTs)) =
-    -- Parsing a paragraph must be attempted last, for it does not have a
-    -- keyword; i.e., generally treats a keyword as plain text.
-    TableBlock <$> choice (map (tableP . unwrapNT) tableTs)
-        <|> SimpleParagraphBlock <$> simpleParagraphP (unwrapNT parT)
+simpleBlockP (SimpleBlockType parT (Disjunction tableTs)) = undefined -- TODO
+-- Parsing a paragraph must be attempted last, for it does not have a
+-- keyword; i.e., generally treats a keyword as plain text.
+{-
+TableBlock <$> choice (map (tableP . unwrapNT) tableTs)
+    <|> SimpleParagraphBlock <$> simpleParagraphP (unwrapNT parT)
+-}
