@@ -307,12 +307,7 @@ splitview = connect selectTranslator $ H.mkComponent
             <>
               -- Preview Section
               case state.mSelectedTocEntry of
-                Nothing
-                -> renderPreview state
-                Just (SelNode _ _)
-                -> renderPreview state
-                Just (SelLeaf tocID)
-                ->
+                Just (SelLeaf tocID) ->
                   let
                     versionEntry = fromMaybe
                       { elementID: -1, versionID: Nothing, comparisonData: Nothing }
@@ -321,6 +316,7 @@ splitview = connect selectTranslator $ H.mkComponent
                     case versionEntry.comparisonData of
                       Nothing -> renderPreview state
                       Just cData -> renderSecondEditor state (Just cData)
+                _ -> renderPreview state
         )
 
   -- Render both TOC and Comment but make them visable depending of the flags
@@ -358,23 +354,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 else
                   "display: none;"
         ]
-        [ HH.button
-            [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
-            , HP.style
-                "position: absolute; \
-                \top: 0.5rem; \
-                \right: 0.5rem; \
-                \background-color: #fdecea; \
-                \color: #b71c1c; \
-                \padding: 0.2rem 0.4rem; \
-                \font-size: 0.75rem; \
-                \line-height: 1; \
-                \border: 1px solid #f5c6cb; \
-                \border-radius: 0.2rem; \
-                \z-index: 10;"
-            , HE.onClick \_ -> ToggleComment
-            ]
-            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
+        [ closeButton ToggleComment
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -398,23 +378,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 else
                   "display: none;"
         ]
-        [ HH.button
-            [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
-            , HP.style
-                "position: absolute; \
-                \top: 0.5rem; \
-                \right: 0.5rem; \
-                \background-color: #fdecea; \
-                \color: #b71c1c; \
-                \padding: 0.2rem 0.4rem; \
-                \font-size: 0.75rem; \
-                \line-height: 1; \
-                \border: 1px solid #f5c6cb; \
-                \border-radius: 0.2rem; \
-                \z-index: 10;"
-            , HE.onClick \_ -> ToggleCommentOverview false (-1) (-1)
-            ]
-            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
+        [ closeButton $ ToggleCommentOverview false (-1) (-1)
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -496,31 +460,6 @@ splitview = connect selectTranslator $ H.mkComponent
           [ HH.text if state.previewShown then "⟩" else "⟨" ]
       ]
 
-  rightSwitchPreviewButton :: H.ComponentHTML Action Slots m
-  rightSwitchPreviewButton =
-    HH.div
-      [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
-      , HP.style "padding-right: 0.5rem;"
-      ]
-      [ HH.button
-          [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
-          , HP.style
-              "position: absolute; \
-              \top: 0.5rem; \
-              \right: 0.5rem; \
-              \background-color: #fdecea; \
-              \color: #b71c1c; \
-              \padding: 0.2rem 0.4rem; \
-              \font-size: 0.75rem; \
-              \line-height: 1; \
-              \border: 1px solid #f5c6cb; \
-              \border-radius: 0.2rem; \
-              \z-index: 10;"
-          , HE.onClick \_ -> SwitchPreview
-          ]
-          [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
-      ]
-
   renderPreview :: State -> Array (H.ComponentHTML Action Slots m)
   renderPreview state =
     [ -- Right Resizer
@@ -536,7 +475,11 @@ splitview = connect selectTranslator $ H.mkComponent
                 <>
                   "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
           ]
-          [ rightSwitchPreviewButton
+          [ HH.div
+            [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
+            , HP.style "padding-right: 0.5rem;"
+            ]
+            [ closeButton SwitchPreview ]
           , HH.slot _preview unit Preview.preview
               { renderedHtml: state.renderedHtml
               , isDragging: state.mDragTarget /= Nothing
@@ -561,11 +504,35 @@ splitview = connect selectTranslator $ H.mkComponent
               <>
                 "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
         ]
-        [ rightSwitchPreviewButton
+        [ HH.div
+            [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
+            , HP.style "padding-right: 0.5rem;"
+            ]
+            [ closeButton SwitchPreview ]
         , HH.slot_ _editor 1 Editor.editor
             { docID: state.docID, elementData: cData }
         ]
     ]
+
+  closeButton :: Action -> H.ComponentHTML Action Slots m
+  closeButton action =
+    HH.button
+      [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+      , HP.style
+          "position: absolute; \
+          \top: 0.5rem; \
+          \right: 0.5rem; \
+          \background-color: #fdecea; \
+          \color: #b71c1c; \
+          \padding: 0.2rem 0.4rem; \
+          \font-size: 0.75rem; \
+          \line-height: 1; \
+          \border: 1px solid #f5c6cb; \
+          \border-radius: 0.2rem; \
+          \z-index: 10;"
+      , HE.onClick \_ -> action
+      ]
+      [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
