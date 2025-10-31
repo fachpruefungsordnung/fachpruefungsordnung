@@ -1,7 +1,7 @@
-module Language.Lsd.AST.Type.Module (SchemaType (..), ModuleType (..)) where
+module Language.Lsd.AST.Type.Module (ModuleSchemaType (..), ModuleType (..)) where
 
 import Language.Lsd.AST.Common (Keyword)
 
-newtype SchemaType = SchemaType Keyword
+newtype ModuleSchemaType = ModuleSchemaType Keyword
 
 newtype ModuleType = ModuleType Keyword
