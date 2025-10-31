@@ -892,11 +892,10 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _comment unit (Comment.AddComment docID tocID)
 
       Editor.ClickedQuery html -> do
-        mSelectedTocEntry <- H.gets _.mSelectedTocEntry
-        case mSelectedTocEntry of
+        state <- H.get
+        case state.mSelectedTocEntry of
           Just (SelLeaf tocID) -> do
             -- Only reset comparison data if we're not currently in comparison mode
-            state <- H.get
             let
               versionEntry = fromMaybe
                 { elementID: -1, versionID: Nothing, comparisonData: Nothing }
@@ -906,7 +905,18 @@ splitview = connect selectTranslator $ H.mkComponent
                 (ModifyVersionMapping tocID Nothing (Just Nothing))
               Just _ -> pure unit -- Don't reset comparison data when in comparison mode
           _ -> pure unit
-        H.modify_ _ { renderedHtml = Just (Loaded html) }
+        if state.previewShown then do
+          H.modify_ \st -> st
+            { mSelectedTocEntry = Nothing
+            , renderedHtml = Just (Loaded html)
+            }
+        else do
+          H.modify_ \st -> st
+            { mSelectedTocEntry = Nothing
+            , renderedHtml = Just (Loaded html)
+            , previewRatio = st.lastExpandedPreviewRatio
+            , previewShown = true
+            }
 
       Editor.PostPDF _ -> do
         state <- H.get
