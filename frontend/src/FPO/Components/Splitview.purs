@@ -476,10 +476,10 @@ splitview = connect selectTranslator $ H.mkComponent
                   "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
           ]
           [ HH.div
-            [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
-            , HP.style "padding-right: 0.5rem;"
-            ]
-            [ closeButton SwitchPreview ]
+              [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
+              , HP.style "padding-right: 0.5rem;"
+              ]
+              [ closeButton SwitchPreview ]
           , HH.slot _preview unit Preview.preview
               { renderedHtml: state.renderedHtml
               , isDragging: state.mDragTarget /= Nothing
@@ -771,7 +771,6 @@ splitview = connect selectTranslator $ H.mkComponent
         Just _ -> H.modify_ _ { mSelectedTocEntry = Nothing }
         Nothing -> handleAction TogglePreview
 
-
     -- Toggle the preview area
     TogglePreview -> do
       state <- H.get
@@ -792,7 +791,7 @@ splitview = connect selectTranslator $ H.mkComponent
           , lastExpandedPreviewRatio = oldPreviewRatio
           , previewShown = false
           }
-        -- open preview
+      -- open preview
       else do
         -- restore the last expanded middle ratio, when toggling preview back on
         H.modify_ \st -> st
