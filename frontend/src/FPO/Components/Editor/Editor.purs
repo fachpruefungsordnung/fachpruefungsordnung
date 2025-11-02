@@ -1623,7 +1623,7 @@ editor = connect selectTranslator $ H.mkComponent
           Just _ -> s { mNodePath = Just path }
           Nothing -> s
       pure (Just a)
-    
+
     ReceiveFullTitle mTitle a -> do
       H.modify_ _ { mTitle = mTitle }
       pure (Just a)
