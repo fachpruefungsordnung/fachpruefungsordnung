@@ -3,7 +3,13 @@
 module Language.Ltml.Parser.Module (moduleBlockP, moduleP) where
 
 import qualified Data.Char as Char
-import Language.Lsd.AST.Type.Module (ModuleSchemaType (..), ModuleType (..))
+import Data.Text (stripEnd)
+import Language.Lsd.AST.Common (Keyword)
+import Language.Lsd.AST.Type.Module
+    ( ModuleBlockType (ModuleBlockType)
+    , ModuleSchemaType (..)
+    , ModuleType (..)
+    )
 import Language.Ltml.AST.Module
     ( Attribute (..)
     , Module (..)
@@ -11,51 +17,47 @@ import Language.Ltml.AST.Module
     , ModuleSchema (..)
     )
 import Language.Ltml.Parser (MonadParser, Parser)
-import Language.Ltml.Parser.Common.Indent (someIndented)
-import Language.Ltml.Parser.Common.Lexeme (lexeme, nLexeme)
+import Language.Ltml.Parser.Common.Lexeme (nLexeme)
 import Language.Ltml.Parser.Keyword (keywordP)
 import Text.Megaparsec (many, sepBy1, takeWhile1P, (<?>))
 import Text.Megaparsec.Char (char)
-import Text.Megaparsec.Char.Lexer (indentLevel)
 
-schemaP :: (MonadParser m) => ModuleSchemaType -> m ModuleSchema
-schemaP (ModuleSchemaType kw) = do
-    lexeme $ keywordP kw
-    ModuleSchema
-        <$> lexeme attributeP `sepBy1` lexeme (char ',') <?> "module schema"
+attributeListP :: (MonadParser m) => Keyword -> m [Attribute]
+attributeListP kw = do
+    nLexeme $ keywordP kw
+    nLexeme attributeP `sepBy1` nLexeme (char ';')
 
--- | Permits ASCII Lower / Upper / Digit and '_', '-', '?', '/' characters.
+-- | Permits ASCII Lower / Upper / Digit and special characters.
 --   This is used for schema attributes AND module values of those attributes.
+--
+-- Currently the syntax is very free:
+-- module:
+-- A; 5
+-- module: A
+-- ;
+--   5
 attributeP :: (MonadParser m) => m Attribute
-attributeP = Attribute <$> tokenP <?> "attribute"
+attributeP = Attribute . stripEnd <$> validP <?> "attribute"
   where
+    -- TODO: parse TextTree, not raw Text
     isValid c =
         Char.isAsciiLower c
             || Char.isAsciiUpper c
             || Char.isDigit c
-            || c `elem` "_-?/"
-    tokenP = takeWhile1P (Just "attribute character") isValid
+            || c `elem` "üöäÜÖÄ _-/,.!?:\""
+    validP = takeWhile1P (Just "attribute character") isValid
 
 -------------------------------------------------------------------------------
 
+schemaP :: (MonadParser m) => ModuleSchemaType -> m ModuleSchema
+schemaP (ModuleSchemaType kw) = ModuleSchema <$> attributeListP kw <?> "module schema"
+
 moduleP :: ModuleType -> Parser Module
-moduleP (ModuleType kw) = do
-    lvl <- indentLevel
-    nLexeme $ keywordP kw
-    values <- someIndented (Just lvl) valueListP
-    return $ Module $ concat values
-  where
-    -- The ',' consumes trailing newlines which allows stuff like:
-    --
-    -- keyword: ValueA,
-    --   ValueB
-    --
-    -- But note that the ',' has to occur before the newline
-    valueListP = lexeme attributeP `sepBy1` nLexeme (char ',')
+moduleP (ModuleType kw) = Module <$> attributeListP kw <?> "module"
 
 moduleBlockP
-    :: ModuleSchemaType -> ModuleType -> Parser ModuleBlock
-moduleBlockP sType mType = do
+    :: ModuleBlockType -> Parser ModuleBlock
+moduleBlockP (ModuleBlockType sType mType) = do
     schema <- nLexeme (schemaP sType)
     modules <- many (nLexeme (moduleP mType)) <?> "module block"
     return $ ModuleBlock schema modules

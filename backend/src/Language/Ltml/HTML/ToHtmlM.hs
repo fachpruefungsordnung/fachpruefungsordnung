@@ -387,6 +387,7 @@ instance ToHtmlM SimpleBlock where
     toHtmlM simpleBlock = case simpleBlock of
         SimpleParagraphBlock simpleParagraph -> toHtmlM simpleParagraph
         TableBlock table -> toHtmlM table
+        ModuleBlock moduleBlock -> return $ Now $ toHtml $ show moduleBlock
 
 -- | Section without Heading and Identifier
 instance ToHtmlM SimpleSection where

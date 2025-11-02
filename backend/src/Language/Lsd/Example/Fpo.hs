@@ -24,6 +24,7 @@ import Language.Lsd.AST.Type.Document
 import Language.Lsd.AST.Type.DocumentContainer
 import Language.Lsd.AST.Type.Enum
 import Language.Lsd.AST.Type.Footnote
+import Language.Lsd.AST.Type.Module
 import Language.Lsd.AST.Type.Paragraph
 import Language.Lsd.AST.Type.Section
 import Language.Lsd.AST.Type.SimpleBlock
@@ -349,7 +350,7 @@ paragraphT =
 simpleBlockT :: NamedType SimpleBlockType
 simpleBlockT =
     NamedType "simple_block" "Einfacher Block" $
-        SimpleBlockType simpleParagraphT (Disjunction [dummyTableT])
+        SimpleBlockType simpleParagraphT (Disjunction [dummyTableT]) moduleBlockT
 
 simpleParagraphT :: NamedType SimpleParagraphType
 simpleParagraphT = simpleParagraphTF LeftAligned MediumFontSize
@@ -378,6 +379,13 @@ dummyTableT :: NamedType TableType
 dummyTableT =
     NamedType "dummy_table" "Dummy Tabelle" $
         TableType (Keyword "[dummy_table]")
+
+moduleBlockT :: NamedType ModuleBlockType
+moduleBlockT =
+    NamedType "module_block" "Modulblock" $
+        ModuleBlockType
+            (ModuleSchemaType (Keyword "schema:"))
+            (ModuleType (Keyword "module:"))
 
 plainTextT :: TextType Void
 plainTextT = TextType (Disjunction [])
