@@ -10,5 +10,5 @@ import Language.Ltml.AST.Table (Table)
 data SimpleBlock
     = SimpleParagraphBlock SimpleParagraph
     | TableBlock Table
-    | ModuleBlock ModuleBlock
+    | ModuleSchemaBlock ModuleBlock
     deriving (Show)

@@ -19,5 +19,5 @@ simpleBlockP (SimpleBlockType parT (Disjunction tableTs) moduleBT) =
     -- Parsing a paragraph must be attempted last, for it does not have a
     -- keyword; i.e., generally treats a keyword as plain text.
     TableBlock <$> choice (map (tableP . unwrapNT) tableTs)
-        <|> ModuleBlock <$> moduleBlockP (unwrapNT moduleBT)
+        <|> ModuleSchemaBlock <$> moduleBlockP (unwrapNT moduleBT)
         <|> SimpleParagraphBlock <$> simpleParagraphP (unwrapNT parT)

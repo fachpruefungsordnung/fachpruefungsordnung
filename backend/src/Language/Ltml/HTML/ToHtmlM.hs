@@ -45,6 +45,12 @@ import Language.Ltml.AST.DocumentContainer
     )
 import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label (Label (..))
+import Language.Ltml.AST.Module
+    ( Attribute (..)
+    , Module (..)
+    , ModuleBlock (..)
+    , ModuleSchema (..)
+    )
 import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.AST.Paragraph (Paragraph (..))
 import Language.Ltml.AST.Section
@@ -205,7 +211,7 @@ instance ToHtmlM (Parsed DocumentHeading) where
             Left headFormat -> buildMainHeading titleHtml headFormat
             Right headFormatId -> buildAppendixHeading titleHtml headFormatId
         htmlId <- addTocEntry mIdHtml (resType titleHtml) mLabel Other
-        -- \| In case of a parse error, output and error box
+        -- \| In case of a parse error, output an error box
         return $
             either
                 (Now . parseErrorHtml (Just htmlId))
@@ -387,7 +393,7 @@ instance ToHtmlM SimpleBlock where
     toHtmlM simpleBlock = case simpleBlock of
         SimpleParagraphBlock simpleParagraph -> toHtmlM simpleParagraph
         TableBlock table -> toHtmlM table
-        ModuleBlock moduleBlock -> return $ Now $ toHtml $ show moduleBlock
+        ModuleSchemaBlock moduleBlock -> toHtmlM moduleBlock
 
 -- | Section without Heading and Identifier
 instance ToHtmlM SimpleSection where
@@ -416,6 +422,19 @@ instance ToHtmlM SimpleParagraph where
 instance ToHtmlM Table where
     toHtmlM _ =
         returnNow $ htmlError "Tables are not implemented yet :("
+
+instance ToHtmlM ModuleBlock where
+    toHtmlM (ModuleBlock (ModuleSchema features) modules) = do
+        let thead = thead_ $ tr_ $ mconcat $ map (th_ . toHtml . unAttribute) features
+            tbody = tbody_ $ mconcat $ map moduleRow modules
+        return $
+            Now $
+                div_ <#> Class.TocContainer $
+                    table_ <#> Class.TableOfContents $
+                        thead <> tbody
+      where
+        moduleRow :: Module -> Html ()
+        moduleRow (Module attr) = tr_ $ mconcat $ map (td_ . toHtml . unAttribute) attr
 
 -------------------------------------------------------------------------------
 

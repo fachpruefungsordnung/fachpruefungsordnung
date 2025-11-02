@@ -5,7 +5,7 @@ import Data.Text (Text)
 newtype ModuleSchema = ModuleSchema [Attribute]
     deriving (Show)
 
-newtype Attribute = Attribute Text
+newtype Attribute = Attribute {unAttribute :: Text}
     deriving (Show)
 
 -- TODO: Use  TextType instead of Attribute to support footnoteRefs etc.
