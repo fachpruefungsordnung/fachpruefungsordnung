@@ -764,7 +764,7 @@ editor = connect selectTranslator $ H.mkComponent
       H.gets _.mEditor >>= traverse_ \ed -> do
         state <- H.get
         let newSize = change state.fontSize
-        H.modify_ \st -> st { fontSize = newSize }
+        H.modify_ _ { fontSize = newSize }
         -- Set the new font size in the editor
         H.liftEffect $ do
           Editor.setFontSize (show newSize <> "px") ed
@@ -1744,7 +1744,7 @@ editor = connect selectTranslator $ H.mkComponent
                   lm
                   state.commentState.liveMarkers
               }
-          H.modify_ \st -> st
+          H.modify_ _
             { commentState = newCommentState }
         _, _ -> pure unit
       pure (Just a)

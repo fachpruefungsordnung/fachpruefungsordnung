@@ -776,7 +776,7 @@ splitview = connect selectTranslator $ H.mkComponent
       previewShown <- H.gets _.previewShown
       previewRatio <- H.gets _.previewRatio
       -- close preview
-      if state.previewShown then do
+      if previewShown then do
         -- all this, in order for not overlapping the left resizer (to not make it disappear)
         win <- H.liftEffect Web.HTML.window
         totalWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
