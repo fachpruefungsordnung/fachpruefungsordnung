@@ -623,8 +623,8 @@ splitview = connect selectTranslator $ H.mkComponent
     -- (Or until the browser detects the mouse is released)
     StartResize which mouse -> do
       case which of
-        ResizeLeft -> H.modify_ \st -> st { sidebarShown = true }
-        ResizeRight -> H.modify_ \st -> st { previewShown = true }
+        ResizeLeft -> H.modify_ _ { sidebarShown = true }
+        ResizeRight -> H.modify_ _ { previewShown = true }
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let
@@ -641,7 +641,7 @@ splitview = connect selectTranslator $ H.mkComponent
 
     -- Stop resizing, when mouse is released (is detected by browser)
     StopResize _ -> do
-      H.modify_ \st -> st { mDragTarget = Nothing }
+      H.modify_ _ { mDragTarget = Nothing }
 
     -- While mouse is hold down, resizer move to position of mouse
     -- (with certain rules)
@@ -723,7 +723,7 @@ splitview = connect selectTranslator $ H.mkComponent
             state.tocEntries
       H.modify_ _ { versionMapping = newVersionMapping }
 
-    ToggleComment -> H.modify_ \st -> st { commentShown = false }
+    ToggleComment -> H.modify_ _ { commentShown = false }
 
     ToggleCommentOverview shown docID tocID -> do
       sidebarShown <- H.gets _.sidebarShown
@@ -739,15 +739,15 @@ splitview = connect selectTranslator $ H.mkComponent
             }
         H.tell _comment unit (Comment.Overview docID tocID)
       else
-        H.modify_ \st -> st { commentOverviewShown = false }
+        H.modify_ _ { commentOverviewShown = false }
 
     -- Toggle the sidebar
     -- Add logic in calculating the middle ratio
     -- to restore the last expanded middle ratio, when toggling preview back on
     ToggleSidebar -> do
-      state <- H.get
+      sidebarShown <- H.gets _.sidebarShown
       -- close sidebar
-      if state.sidebarShown then
+      if sidebarShown then
         H.modify_ \st -> st
           { sidebarRatio = 0.0
           , lastExpandedSidebarRatio = st.sidebarRatio
@@ -773,7 +773,8 @@ splitview = connect selectTranslator $ H.mkComponent
 
     -- Toggle the preview area
     TogglePreview -> do
-      state <- H.get
+      previewShown <- H.gets _.previewShown
+      previewRatio <- H.gets _.previewRatio
       -- close preview
       if state.previewShown then do
         -- all this, in order for not overlapping the left resizer (to not make it disappear)
@@ -785,8 +786,8 @@ splitview = connect selectTranslator $ H.mkComponent
           -- Also resizer size is not in sidebarRatio
           resizerWidth = 16.0
           resizerRatio = resizerWidth / w
-          oldPreviewRatio = state.previewRatio
-        H.modify_ \st -> st
+          oldPreviewRatio = previewRatio
+        H.modify_ _
           { previewRatio = resizerRatio
           , lastExpandedPreviewRatio = oldPreviewRatio
           , previewShown = false
@@ -804,8 +805,9 @@ splitview = connect selectTranslator $ H.mkComponent
       H.tell _editor 0 (Editor.EditorResize)
 
     ModifyVersionMapping tocID vID cData -> do
-      state <- H.get
-      when (not state.previewShown) $
+      previewShown <- H.gets _.previewShown
+      versionMapping <- H.gets _.versionMapping
+      when (not previewShown) $
         H.modify_ \st -> st
           { previewRatio = st.lastExpandedPreviewRatio
           , previewShown = true
@@ -827,7 +829,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 , comparisonData: newComparisonData v.comparisonData
                 }
             )
-            state.versionMapping
+            versionMapping
       H.modify_ _ { versionMapping = newVersionMapping }
 
     SetComparison elementID mVID -> do
@@ -852,7 +854,7 @@ splitview = connect selectTranslator $ H.mkComponent
     HandleComment output -> case output of
 
       Comment.CloseCommentSection -> do
-        H.modify_ \st -> st { commentShown = false }
+        H.modify_ _ { commentShown = false }
 
       -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
       Comment.UpdateComment newCommentSection -> do
@@ -871,7 +873,7 @@ splitview = connect selectTranslator $ H.mkComponent
 
       CommentOverview.JumpToCommentSection tocID markerID -> do
         docID <- H.gets _.docID
-        H.modify_ \st -> st { commentShown = true }
+        H.modify_ _ { commentShown = true }
         H.tell _comment unit
           (Comment.SelectedCommentSection docID tocID markerID)
         H.tell _editor 0 (Editor.SelectCommentSection markerID)
@@ -879,8 +881,8 @@ splitview = connect selectTranslator $ H.mkComponent
     HandleEditor output -> case output of
 
       Editor.AddComment docID tocID -> do
-        state <- H.get
-        if state.sidebarShown then
+        sidebarShown <- H.gets _.sidebarShown
+        if sidebarShown then
           H.modify_ _ { commentShown = true }
         else
           H.modify_ \st -> st
@@ -905,15 +907,15 @@ splitview = connect selectTranslator $ H.mkComponent
               Just _ -> pure unit -- Don't reset comparison data when in comparison mode
           _ -> pure unit
         if state.previewShown then do
-          H.modify_ \st -> st
+          H.modify_ _
             { mSelectedTocEntry = Nothing
             , renderedHtml = Just (Loaded html)
             }
         else do
-          H.modify_ \st -> st
+          H.modify_ _
             { mSelectedTocEntry = Nothing
             , renderedHtml = Just (Loaded html)
-            , previewRatio = st.lastExpandedPreviewRatio
+            , previewRatio = state.lastExpandedPreviewRatio
             , previewShown = true
             }
 
@@ -990,8 +992,8 @@ splitview = connect selectTranslator $ H.mkComponent
         if state.sidebarShown then
           H.modify_ _ { commentShown = true }
         else
-          H.modify_ \st -> st
-            { sidebarRatio = st.lastExpandedSidebarRatio
+          H.modify_ _
+            { sidebarRatio = state.lastExpandedSidebarRatio
             , sidebarShown = true
             , commentShown = true
             }
