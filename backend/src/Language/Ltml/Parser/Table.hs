@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module Language.Ltml.Parser.Table
     ( tableP
@@ -6,49 +7,61 @@ module Language.Ltml.Parser.Table
     )
 where
 
-import Control.Monad (void)
 import qualified Data.Text as T
-import Language.Ltml.AST.Table (Cell (Cell), Row (Row), Table (Table))
+import Language.Ltml.AST.Table (Cell_ (Cell_, EmptyCell, MergeLeft, MergeUp), Row_ (Row_), Table_ (Table_))
 import Language.Ltml.Parser (Parser)
 import Text.Megaparsec
-import Text.Megaparsec.Char
+    ( MonadParsec(eof, takeWhileP, try, hidden),
+      runParser,
+      errorBundlePretty,
+      manyTill,
+      some )
+import Text.Megaparsec.Char ( char, space, string )
+import Language.Lsd.AST.Type.Table (CellType (CellType), RowType (RowType), TableType (TableType))
+import Language.Ltml.Parser.Text (textForestP)
+import Language.Lsd.AST.SimpleRegex (Star(Star))
+import Language.Ltml.Parser.Common.Lexeme (nLexeme)
+import Language.Ltml.AST.Text (TextTree(Word))
+import Data.Text (pack)
 
--- tableP :: TableType -> Parser Table
--- tableP (TableType kw) = undefined --Table <$ nLexeme1 (keywordP kw)
 
-textCellP :: Parser T.Text
-textCellP = T.strip <$> takeWhileP (Just "cell text") (`notElem` ['|', '&', '\n'])
+cellP :: CellType -> Parser Cell_
+cellP (CellType tt) = do
+  _ <- char '|'
+  space
+  -- Take everything until we *see* a table boundary
+  chunk <- takeWhileP (Just "cell text") (`notElem` ['|'])
+  if
+    | T.null chunk        -> pure EmptyCell
+    | T.strip chunk == "<"        -> pure MergeLeft
+    | T.strip chunk == "^"        -> pure MergeUp
+    | otherwise         ->
+        case runParser (textForestP tt) "" (chunk <> "\n") of
+          Left err     -> pure (Cell_ [Word $ pack $ errorBundlePretty err])
+          Right forest -> pure (Cell_ forest)
 
--- parse a single cell
-cellP :: Parser Cell
-cellP = do
-    void $ char '|'
-    space
-    content <- textCellP
-    space
-    pure (Cell content)
 
 -- parse a row ending with |&
-rowP :: Parser Row
-rowP = do
-    cells <- manyTill cellP (try (string "|&"))
-    space
-    pure (Row cells)
+rowP :: RowType -> Parser Row_
+rowP (RowType (Star t))= do
+    cells <- nLexeme $ manyTill (cellP t) (try (string "|&"))
+    pure (Row_ cells)
 
 -- parse an entire table
-tableP :: Parser Table
-tableP = do
+tableP :: TableType -> Parser Table_
+tableP (TableType _ (Star t)) = do
     space
-    rows <- some rowP
+    rows <- nLexeme $ some (rowP t)
+    hidden space
     eof
-    pure (Table rows)
+    pure (Table_ rows)
 
 -- pad rows to equal length
-padTable :: Table -> Table
-padTable (Table rows) =
+padTable :: Table_ -> Table_
+padTable (Table_ rows) =
     let maxLen = maximum (map rowLen rows)
-     in Table (map (padRow maxLen) rows)
+     in Table_ (map (padRow maxLen) rows)
   where
-    rowLen (Row cs) = length cs
-    padRow n (Row cs) =
-        Row (cs ++ replicate (n - length cs) (Cell T.empty))
+    rowLen (Row_ cs) = length cs
+    padRow n (Row_ cs) =
+        Row_ (cs ++ replicate (n - length cs) EmptyCell)
