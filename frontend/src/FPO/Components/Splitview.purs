@@ -906,16 +906,15 @@ splitview = connect selectTranslator $ H.mkComponent
                 (ModifyVersionMapping tocID Nothing (Just Nothing))
               Just _ -> pure unit -- Don't reset comparison data when in comparison mode
           _ -> pure unit
-        if state.previewShown then do
-          H.modify_ _
-            { mSelectedTocEntry = Nothing
-            , renderedHtml = Just (Loaded html)
-            }
-        else do
-          H.modify_ _
-            { mSelectedTocEntry = Nothing
-            , renderedHtml = Just (Loaded html)
-            , previewRatio = state.lastExpandedPreviewRatio
+        -- Always set mSelectedTocEntry and renderedHtml
+        H.modify_ _
+          { mSelectedTocEntry = Nothing
+          , renderedHtml = Just (Loaded html)
+          }
+        -- Only update previewRatio and previewShown if preview is not already shown
+        unless state.previewShown do
+          H.modify_ \st -> st
+            { previewRatio = state.lastExpandedPreviewRatio
             , previewShown = true
             }
 
