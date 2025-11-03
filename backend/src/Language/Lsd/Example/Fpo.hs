@@ -383,7 +383,7 @@ tableT =
     rowTypeT = RowType (Star cellTypeT)
 
     cellTypeT :: CellType
-    cellTypeT = CellType richTextT
+    cellTypeT = CellType plainTextT
 
 plainTextT :: TextType Void
 plainTextT = TextType (Disjunction [])
