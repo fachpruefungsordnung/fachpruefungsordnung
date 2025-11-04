@@ -1,8 +1,11 @@
+# check=skip=FromPlatformFlagConstDisallowed
+# We skip this because the image does not build currently for arm64
+#
 # +------------------------------+
 # |             BASE             |
 # +------------------------------+
 
-FROM debian:bookworm-slim AS base
+FROM --platform=x86_64 debian:bookworm-slim AS base
 
 # install dependencies needed by both build and final
 RUN apt-get update && \
