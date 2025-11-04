@@ -5,7 +5,7 @@
 # |             BASE             |
 # +------------------------------+
 
-FROM --platform=x86_64 debian:bookworm-slim  AS base
+FROM --platform=x86_64 debian:bookworm-slim AS base
 
 # install dependencies needed by both build and final
 RUN apt-get update && \
