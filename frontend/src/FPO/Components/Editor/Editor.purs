@@ -206,7 +206,6 @@ data Output
   | PostPDF String
   | RenamedNode String Path
   | RequestComments Int Int
-  | RequestFullTitle
   | SelectedCommentSection Int Int
   | ShowAllCommentsOutput Int Int
   | RaiseDiscard
@@ -255,6 +254,8 @@ data Action
 -- We use a query to get the content of the editor
 data Query a
   = EditorResize a
+  | ReceiveFullTitle (Maybe String) a
+  | SetDirtyFlag a
   -- | save the current content and send it to splitview
   | SaveSection a
   -- | receive the selected TOC and put its content into the editor
@@ -272,7 +273,6 @@ data Query a
   | RequestDirtyVersion (Boolean -> a)
   | ResetDirtyVersion a
   | ReceiveUpToDateUpdate (Maybe Version) a
-  | ReceiveFullTitle (Maybe String) a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -764,7 +764,7 @@ editor = connect selectTranslator $ H.mkComponent
       H.gets _.mEditor >>= traverse_ \ed -> do
         state <- H.get
         let newSize = change state.fontSize
-        H.modify_ \st -> st { fontSize = newSize }
+        H.modify_ _ { fontSize = newSize }
         -- Set the new font size in the editor
         H.liftEffect $ do
           Editor.setFontSize (show newSize <> "px") ed
@@ -954,8 +954,6 @@ editor = connect selectTranslator $ H.mkComponent
 
           -- mDirtyRef := false
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
-          --update title
-          H.raise RequestFullTitle
           pure unit
 
     SavedIcon -> do
@@ -1626,6 +1624,15 @@ editor = connect selectTranslator $ H.mkComponent
           Nothing -> s
       pure (Just a)
 
+    ReceiveFullTitle mTitle a -> do
+      H.modify_ _ { mTitle = mTitle }
+      pure (Just a)
+
+    SetDirtyFlag a -> do
+      state <- H.get
+      for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
+      pure (Just a)
+
     SaveSection a -> do
       handleAction $ Save true
       pure (Just a)
@@ -1737,7 +1744,7 @@ editor = connect selectTranslator $ H.mkComponent
                   lm
                   state.commentState.liveMarkers
               }
-          H.modify_ \st -> st
+          H.modify_ _
             { commentState = newCommentState }
         _, _ -> pure unit
       pure (Just a)
@@ -1750,10 +1757,6 @@ editor = connect selectTranslator $ H.mkComponent
     ResetDirtyVersion a -> do
       state <- H.get
       for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
-      pure $ Just a
-
-    ReceiveFullTitle mTitle a -> do
-      H.modify_ \st -> st { mTitle = mTitle }
       pure $ Just a
 
 -- | Change listener for the editor.
