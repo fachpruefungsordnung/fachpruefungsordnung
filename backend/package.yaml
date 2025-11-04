@@ -76,6 +76,7 @@ dependencies:
   - pandoc-types
   - process
   - temporary
+  - array
 
 ghc-options:
   - -Wall
