@@ -71,7 +71,7 @@ services:
     networks:
       - backend
     volumes:
-      - database:/var/lib/postgresql/data
+      - database:/var/lib/postgresql
 
   pgweb:
     container_name: fpo-pgweb
