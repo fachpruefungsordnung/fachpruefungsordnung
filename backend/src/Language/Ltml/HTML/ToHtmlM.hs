@@ -426,25 +426,36 @@ instance ToHtmlM Table where
 
 instance ToHtmlM ModuleBlock where
     toHtmlM (ModuleBlock (ModuleSchema features) categories) = do
-        let thead = thead_ $ tr_ $ mconcat $ map (th_ . toHtml . unAttribute) features
+        -- add single empty cell to thead for category offset
+        let colgroup = colgroup_ $ col_ <#> Class.MinSizeColumn
+            thead =
+                thead_ $
+                    tr_ $
+                        (th_ mempty <>) $
+                            mconcat $
+                                map (th_ . toHtml . unAttribute) features
             tbody = tbody_ $ mconcat $ map categoryRows categories
         return $
             Now $
-                div_ <#> Class.TocContainer $
-                    table_ <#> Class.TableOfContents $
-                        thead <> tbody
+                div_ <#> Class.TableContainer $
+                    table_ <#> Class.Table $
+                        colgroup <> thead <> tbody
       where
         categoryRows :: Category -> Html ()
         categoryRows (Category name modules) = do
             -- TODO: use iToT here
-            let categoryCell = td_ [rowspan_ (pack . show . length $ modules)] (toHtml $ unAttribute name)
+            let categoryCell =
+                    td_
+                        [rowspan_ (pack . show . length $ modules), cssClass_ Class.TableCentered]
+                        (toHtml $ unAttribute name)
 
             case map moduleRow modules of
                 [] -> categoryCell
                 (m : ms) -> mconcat $ map tr_ (categoryCell <> m : ms)
 
         moduleRow :: Module -> Html ()
-        moduleRow (Module attr) = mconcat $ map (td_ . toHtml . unAttribute) attr
+        moduleRow (Module attr) =
+            mconcat $ map ((td_ <#> Class.TableCentered) . toHtml . unAttribute) attr
 
 -------------------------------------------------------------------------------
 
@@ -755,7 +766,7 @@ renderToc (Just (TocFormat (TocHeading title))) entryFunc buttonFunc globalState
 
         -- \| [Delayed (Html ())] -> Delayed [Html ()] -> Delayed (Html ())
         tableBody = tbody_ . mconcat <$> sequence tocEntries
-     in (nav_ <#> Class.TocContainer) . (table_ <#> Class.TableOfContents)
+     in (nav_ <#> Class.TableContainer) . (table_ <#> Class.TableOfContents)
             <$> (pure colGroup <> pure tableHead <> tableBody)
   where
     -- \| Build <tr><td>id</td> <td>title</td></tr> and wrap id and title seperatly

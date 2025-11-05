@@ -87,9 +87,11 @@ data Class
       ButtonLink
     | -- | Class for elements that have HTML anchors (adds scroll-margin)
       Anchor
-    | -- | Wrapper around ToC, which places the Table on the page
-      TocContainer
-    | -- | Class for <table> element of ToC
+    | -- | Wrapper around 'Table', which places it on the page
+      TableContainer
+    | -- | Class for @<table>@ element of in-text tables
+      Table
+    | -- | Class for @<table>@ element of ToC
       TableOfContents
     | -- | Table column thats only as wide as needed
       MinSizeColumn
@@ -265,14 +267,36 @@ classStyle ButtonLink = do
 
     toClassSelector ButtonLink # hover ? do
         color Color.linkTextHover
-        backgroundColor Color.tableDarkCell
+        backgroundColor Color.tocDarkCell
 classStyle Anchor =
     toClassSelector Anchor ? do
         scrollMarginTop (em 2)
-classStyle TocContainer = do
-    toClassSelector TocContainer ? do
+classStyle TableContainer = do
+    toClassSelector TableContainer ? do
         display flex
         justifyContent center
+classStyle Table = do
+    let cellPadding = padding (px 12) (px 12) (px 12) (px 12)
+        cellBorder = border (px 1) solid Color.tableCellBorder
+
+    toClassSelector Table ? do
+        -- width (pct 80)
+        tableLayout autoLayout
+        borderCollapse collapse
+
+    toClassSelector Table |> thead |> tr |> th ? do
+        textAlign alignLeft
+        backgroundColor Color.tocDarkCell
+        cellPadding
+        cellBorder
+
+    toClassSelector Table |> tbody |> tr # hover ? do
+        backgroundColor Color.tocActiveRow
+
+    toClassSelector Table |> tbody |> tr |> td ? do
+        whiteSpace nowrap
+        cellPadding
+        cellBorder
 classStyle TableOfContents = do
     toClassSelector TableOfContents ? do
         width (pct 100)
@@ -294,10 +318,10 @@ classStyle TableOfContents = do
         padding (px 10) (px 10) (px 10) (px 10)
 
     toClassSelector TableOfContents |> tbody |> tr # nthOfType "odd" ? do
-        backgroundColor Color.tableDarkCell
+        backgroundColor Color.tocDarkCell
 
     toClassSelector TableOfContents |> tbody |> tr # hover ? do
-        backgroundColor Color.tableActiveRow
+        backgroundColor Color.tocActiveRow
 classStyle MinSizeColumn = do
     toClassSelector MinSizeColumn ? do
         width (pct 1)
