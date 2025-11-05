@@ -1903,7 +1903,7 @@ makeEditorToolbarButtonWithText enabled asText action biName smallText = HH.butt
 
 addMouseDragListeners :: HTMLElement -> HS.Listener Action -> Effect Unit
 addMouseDragListeners container listener = do
-  downL <- H.liftEffect $ eventListener \ev -> do
+  downL <- eventListener \ev -> do
     case ME.fromEvent ev of
       Just mev -> do
         let
@@ -1913,7 +1913,7 @@ addMouseDragListeners container listener = do
         HS.notify listener (TryStartDrag x y)
       Nothing ->
         pure unit
-  H.liftEffect $ addEventListener (EventType "mousedown") downL true
+  addEventListener (EventType "mousedown") downL true
     (toEventTarget $ toElement container)
 
   moveL <- H.liftEffect $ eventListener \ev -> do
@@ -1924,7 +1924,7 @@ addMouseDragListeners container listener = do
           y = toNumber (ME.clientY mev)
         HS.notify listener (DragMove x y)
       Nothing -> pure unit
-  H.liftEffect $ addEventListener (EventType "mousemove") moveL true
+  addEventListener (EventType "mousemove") moveL true
     (toEventTarget $ toElement container)
 
   upL <- H.liftEffect $ eventListener \_ -> do
@@ -1932,7 +1932,7 @@ addMouseDragListeners container listener = do
     HS.notify listener SelectComment
     -- stop dragging the comment dragger
     HS.notify listener EndDrag
-  H.liftEffect $ addEventListener (EventType "mouseup") upL true
+  addEventListener (EventType "mouseup") upL true
     (toEventTarget $ toElement container)
 
 addBeforeUnloadListener
