@@ -684,4 +684,4 @@ handleAppError
   => AppError
   -> H.HalogenM State act slots msg m Unit
 handleAppError appError = do
-  updateStore $ Store.AddError appError
+  Store.addError appError

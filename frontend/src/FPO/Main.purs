@@ -9,6 +9,7 @@ module Main where
 
 import Data.Either (hush)
 import Data.Function (const)
+import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
@@ -216,6 +217,7 @@ main = HA.runHalogenAff do
       , translator: FPOTranslator translator
       , language: defaultLang
       , toasts: []
+      , errorCooldowns: Map.empty
       , totalToasts: 0
       , handleRequestError: true
       } :: Store.Store

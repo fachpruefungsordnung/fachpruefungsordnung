@@ -257,7 +257,7 @@ component =
           )
         case response of
           Left _ -> pure unit
-          Right (Left msg) -> updateStore $ Store.AddError $ ServerError msg
+          Right (Left msg) -> Store.addError $ ServerError msg
           Right (Right _) -> do
             updateStore $ Store.AddSuccess $ translate
               (label :: _ "common_passwordUpdated")

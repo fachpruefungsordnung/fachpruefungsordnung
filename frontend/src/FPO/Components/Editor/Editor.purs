@@ -838,7 +838,7 @@ editor = connect selectTranslator $ H.mkComponent
       -- handle errors in pos and decodeJson
       case response of
         -- if error, try to Save again (Maybe ParentID is lost?)
-        Left err -> updateStore $ Store.AddError err
+        Left err -> Store.addError err
 
         -- extract and insert new parentID into newContent
         Right { content: updatedContent, typ: typ, html } -> do
@@ -1413,7 +1413,7 @@ editor = connect selectTranslator $ H.mkComponent
               )
 
         case loadedContent of
-          Left err -> updateStore $ Store.AddError err
+          Left err -> Store.addError err
           Right wrapper -> do
             let
               content = ContentDto.getWrapperContent wrapper
