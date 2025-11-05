@@ -51,7 +51,7 @@ import Language.Ltml.AST.Section
 import Language.Ltml.AST.SimpleBlock (SimpleBlock (..))
 import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (..))
 import Language.Ltml.AST.SimpleSection (SimpleSection (..))
-import Language.Ltml.AST.Table (Table)
+import Language.Ltml.AST.Table (Cell (..), Row (..), Table (..))
 import Language.Ltml.AST.Text
 import Language.Ltml.Common (Flagged (..), Flagged', NavTocHeaded (..), Parsed)
 import Language.Ltml.HTML.CSS.Classes (ToCssClass (toCssClass))
@@ -413,8 +413,23 @@ instance ToHtmlM SimpleParagraph where
 -------------------------------------------------------------------------------
 
 instance ToHtmlM Table where
-    toHtmlM _ =
-        returnNow $ htmlError "Tables are not implemented yet :("
+    toHtmlM (Table rows) = do
+        rowsHtml <- mconcat <$> mapM row rows
+        return $ (table_ <#> Class.TableOfContents) . tbody_ <$> rowsHtml
+      where
+        row :: Row -> HtmlReaderState
+        row (Row cells) = do
+            cellsHtml <- mconcat <$> mapM cell cells
+            return $ tr_ <$> cellsHtml
+
+        cell :: Cell -> HtmlReaderState
+        cell (Cell _ 0 0) = returnNow mempty
+        cell (Cell text 1 1) = do
+            textHtml <- toHtmlM text
+            return $ td_ <$> textHtml
+        cell (Cell text colspan rowspan) = do
+            textHtml <- toHtmlM text
+            return $ td_ [colspan_ (iToT colspan), rowspan_ (iToT rowspan)] <$> textHtml
 
 -------------------------------------------------------------------------------
 
