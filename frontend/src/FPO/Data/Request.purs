@@ -207,7 +207,7 @@ handleAppError
 handleAppError err = do
   s <- getStore
   when s.handleRequestError $ do
-    _ <- Store.addError err
+    Store.addError err
     case err of
       NetworkError _ -> pure unit -- Let component handle this
       AuthError _ -> navigate Login
