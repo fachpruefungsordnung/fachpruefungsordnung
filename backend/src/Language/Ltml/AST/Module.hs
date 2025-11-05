@@ -1,16 +1,19 @@
-module Language.Ltml.AST.Module (ModuleSchema (..), Attribute (..), Module (..), ModuleBlock (..)) where
+module Language.Ltml.AST.Module (ModuleBlock (..), ModuleSchema (..), Category (..), Module (..), Attribute (..)) where
 
 import Data.Text (Text)
+
+data ModuleBlock = ModuleBlock ModuleSchema [Category]
+    deriving (Show)
 
 newtype ModuleSchema = ModuleSchema [Attribute]
     deriving (Show)
 
-newtype Attribute = Attribute {unAttribute :: Text}
+data Category = Category Attribute [Module]
     deriving (Show)
 
 -- TODO: Use  TextType instead of Attribute to support footnoteRefs etc.
 newtype Module = Module [Attribute]
     deriving (Show)
 
-data ModuleBlock = ModuleBlock ModuleSchema [Module]
+newtype Attribute = Attribute {unAttribute :: Text}
     deriving (Show)

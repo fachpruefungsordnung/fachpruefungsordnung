@@ -1,9 +1,16 @@
-module Language.Lsd.AST.Type.Module (ModuleBlockType (..), ModuleSchemaType (..), ModuleType (..)) where
+module Language.Lsd.AST.Type.Module
+    ( ModuleBlockType (..)
+    , ModuleSchemaType (..)
+    , CategoryType (..)
+    , ModuleType (..)
+    ) where
 
 import Language.Lsd.AST.Common (Keyword)
 
-data ModuleBlockType = ModuleBlockType ModuleSchemaType ModuleType
+data ModuleBlockType = ModuleBlockType ModuleSchemaType CategoryType
 
 newtype ModuleSchemaType = ModuleSchemaType Keyword
+
+data CategoryType = CategoryType Keyword ModuleType
 
 newtype ModuleType = ModuleType Keyword

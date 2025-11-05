@@ -12,7 +12,7 @@ import Data.Either (rights)
 import qualified Data.Map as Map
 import Data.Maybe (isJust)
 import qualified Data.Set as Set
-import Data.Text (Text, unpack)
+import Data.Text (Text, pack, unpack)
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Common (Fallback (..), NavTocHeading (..))
 import Language.Lsd.AST.Format (HeadingFormat)
@@ -47,6 +47,7 @@ import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Module
     ( Attribute (..)
+    , Category (..)
     , Module (..)
     , ModuleBlock (..)
     , ModuleSchema (..)
@@ -424,17 +425,26 @@ instance ToHtmlM Table where
         returnNow $ htmlError "Tables are not implemented yet :("
 
 instance ToHtmlM ModuleBlock where
-    toHtmlM (ModuleBlock (ModuleSchema features) modules) = do
+    toHtmlM (ModuleBlock (ModuleSchema features) categories) = do
         let thead = thead_ $ tr_ $ mconcat $ map (th_ . toHtml . unAttribute) features
-            tbody = tbody_ $ mconcat $ map moduleRow modules
+            tbody = tbody_ $ mconcat $ map categoryRows categories
         return $
             Now $
                 div_ <#> Class.TocContainer $
                     table_ <#> Class.TableOfContents $
                         thead <> tbody
       where
+        categoryRows :: Category -> Html ()
+        categoryRows (Category name modules) = do
+            -- TODO: use iToT here
+            let categoryCell = td_ [rowspan_ (pack . show . length $ modules)] (toHtml $ unAttribute name)
+
+            case map moduleRow modules of
+                [] -> categoryCell
+                (m : ms) -> mconcat $ map tr_ (categoryCell <> m : ms)
+
         moduleRow :: Module -> Html ()
-        moduleRow (Module attr) = tr_ $ mconcat $ map (td_ . toHtml . unAttribute) attr
+        moduleRow (Module attr) = mconcat $ map (td_ . toHtml . unAttribute) attr
 
 -------------------------------------------------------------------------------
 

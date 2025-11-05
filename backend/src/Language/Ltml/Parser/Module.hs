@@ -6,12 +6,14 @@ import qualified Data.Char as Char
 import Data.Text (stripEnd)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.Type.Module
-    ( ModuleBlockType (ModuleBlockType)
+    ( CategoryType (..)
+    , ModuleBlockType (..)
     , ModuleSchemaType (..)
     , ModuleType (..)
     )
 import Language.Ltml.AST.Module
     ( Attribute (..)
+    , Category (..)
     , Module (..)
     , ModuleBlock (..)
     , ModuleSchema (..)
@@ -40,11 +42,12 @@ attributeP :: (MonadParser m) => m Attribute
 attributeP = Attribute . stripEnd <$> validP <?> "attribute"
   where
     -- TODO: parse TextTree, not raw Text
+    --       also keyword ':' is currently not allowed in attributes
     isValid c =
         Char.isAsciiLower c
             || Char.isAsciiUpper c
             || Char.isDigit c
-            || c `elem` "üöäÜÖÄ _-/,.!?:\""
+            || c `elem` "üöäÜÖÄ _-/,.!?\""
     validP = takeWhile1P (Just "attribute character") isValid
 
 -------------------------------------------------------------------------------
@@ -55,9 +58,16 @@ schemaP (ModuleSchemaType kw) = ModuleSchema <$> attributeListP kw <?> "module s
 moduleP :: ModuleType -> Parser Module
 moduleP (ModuleType kw) = Module <$> attributeListP kw <?> "module"
 
+categoryP :: CategoryType -> Parser Category
+categoryP (CategoryType kw moduleType) = do
+    category <- attributeP
+    nLexeme $ keywordP kw
+    modules <- many (nLexeme (moduleP moduleType))
+    return $ Category category modules
+
 moduleBlockP
     :: ModuleBlockType -> Parser ModuleBlock
-moduleBlockP (ModuleBlockType sType mType) = do
-    schema <- nLexeme (schemaP sType)
-    modules <- many (nLexeme (moduleP mType)) <?> "module block"
-    return $ ModuleBlock schema modules
+moduleBlockP (ModuleBlockType schemaType categoryType) = do
+    schema <- nLexeme (schemaP schemaType)
+    groups <- many $ nLexeme (categoryP categoryType)
+    return $ ModuleBlock schema groups
