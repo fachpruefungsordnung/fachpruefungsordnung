@@ -143,8 +143,7 @@ reduce store = case _ of
     , totalToasts = store.totalToasts + 1
     }
   AddErrorWithCooldown error currentTime ->
-    if isErrorOnCooldown error currentTime store.errorCooldowns then store -- Don't show toast if error is on cooldown
-    else store
+    store
       { toasts = store.toasts <> [ { id: store.totalToasts + 1, toast: Error error } ]
       , totalToasts = store.totalToasts + 1
       , errorCooldowns = Map.insert (show error) currentTime store.errorCooldowns
