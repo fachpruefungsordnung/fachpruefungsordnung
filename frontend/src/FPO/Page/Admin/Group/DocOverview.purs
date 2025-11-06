@@ -484,7 +484,7 @@ component =
 
         createResponse <- createNewDocument dto
         case createResponse of
-          Left err -> updateStore $ Store.AddError $ DataError $
+          Left err -> Store.addError $ DataError $
             "Failed to create document: " <> show err
           Right h -> do
             H.modify_ _ { modalState = NoModal, newDocumentName = "" }

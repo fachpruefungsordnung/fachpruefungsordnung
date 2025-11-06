@@ -595,7 +595,7 @@ splitview = connect selectTranslator $ H.mkComponent
       maybeTree <- Request.getJson MM.decodeDocumentWithMetaMap
         ("/docs/" <> show s.docID <> "/tree/latest")
       case maybeTree of
-        Left err -> updateStore $ Store.AddError err
+        Left err -> Store.addError err
         Right (MM.DocumentTreeWithMetaMap { tree, metaMap }) -> do
           let
             finalTree = documentTreeToTOCTree tree
@@ -1212,7 +1212,7 @@ splitview = connect selectTranslator $ H.mkComponent
       --       or action to handle receiving a new tree and meta map from
       --       the server.
       case maybeTree of
-        Left err -> updateStore $ Store.AddError err
+        Left err -> Store.addError err
         Right (MM.DocumentTreeWithMetaMap { tree, metaMap }) -> do
           let
             finalTree = documentTreeToTOCTree tree
