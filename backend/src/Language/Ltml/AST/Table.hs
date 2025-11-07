@@ -5,43 +5,19 @@ module Language.Ltml.AST.Table
     ( Table (..)
     , Row (..)
     , Cell (..)
-    , mergeTable_
-    , Table_ (..)
-    , Row_ (..)
-    , Cell_ (..)
+    , Table' (..)
+    , Row' (..)
+    , Cell' (..)
+    , mergeCells
     )
 where
 
-import Language.Ltml.AST.Text (TableTextTree)
+import Language.Ltml.AST.Text (TableTextTree, TextTree (Word))
 import Control.Monad.State (State, get, put, execState)
-import Control.Monad
-import Data.Array
+import Control.Monad ( forM_ )
+import Data.Array ( Array, (!), (//), array, bounds )
 
-newtype Table_ = Table_ [Row_]
-
-instance Show Table_ where
-    show (Table_ rows) = unlines $ map show rows
-
-newtype Row_ = Row_ [Cell_]
-    deriving (Show)
-
-data Cell_ = Cell_ [TableTextTree] | EmptyCell | MergeLeft | MergeUp
-    deriving (Show)
-
-mergeTable_ :: Table_ -> Table
-mergeTable_ (Table_ rows_) = undefined
-  where
-    initState = []
-    
-    mergeHorizontal :: [Cell_] -> State [Cell] [Cell]
-    mergeHorizontal [] = return []
-    mergeHorizontal (EmptyCell:xs) = do
-        rest <- mergeHorizontal xs
-        pure (Cell [] 1 1 : rest)
-    mergeHorizontal _ = undefined
-  
-
-
+-- the internal representation of a table
 newtype Table = Table [Row]
 
 instance Show Table where
@@ -56,79 +32,112 @@ data Cell = Cell
   , cellRowSpan :: Int
   } deriving (Show)
 
+-- the rawly parsed representation of a table
+newtype Table' = Table' {unTable' :: [Row']}
+    deriving (Show)
+
+newtype Row' = Row' {unRow' :: [Cell']}
+    deriving (Show)
+
+data Cell' = Cell' [TableTextTree] | EmptyCell | MergeLeft | MergeUp
+    deriving (Show)
+
+instance Eq Cell' where
+    (Cell' _) == (Cell' _) = True
+    EmptyCell == EmptyCell = True
+    MergeLeft == MergeLeft = True
+    MergeUp == MergeUp = True
+    _ == _ = False
+
+
+-- everything to merge cells and compute spans
 
 type Matrix a = Array (Int, Int) a
 type Visited = (Int, Int) -> Bool
-type Value = (Int, Int)
 type Position = (Int, Int)
 
--- Convert a list of lists to an array
-listToArray :: [[a]] -> Matrix a
-listToArray xss =
-    let n = length xss
-        m = if n == 0 then 0 else length (head xss)
-    in array ((0,0), (n-1,m-1))
-             [ ((i,j), (xss !! i) !! j) | i <- [0..n-1], j <- [0..m-1] ]
-
--- Convert array back to list of lists (optional)
-arrayToList :: Matrix a -> [[a]]
-arrayToList arr =
-    let ((i0,j0),(in_,jn)) = bounds arr
-    in [[ arr ! (i,j) | j <- [j0..jn]] | i <- [i0..in_]]
-
-tableToArray :: Table_ -> Matrix Cell_
-tableToArray (Table_ rows_) =
-    let n = length rows_
-        m = if n == 0 then 0 else length (let (Row_ cells) = rows_ !! 0 in cells)
-    in array ((0,0), (n-1,m-1))
-             [ ((i,j), (rows_ !! i) `getCell` j) | i <- [0..n-1], j <- [0..m-1] ]
-  where
-    getCell (Row_ cells) j = cells !! j
-
-
--- Your rewritten function
-findEqualSubSquares :: Eq a => Matrix a -> Matrix Value
-findEqualSubSquares matrix =
-    let matrix' = array ((0,0),(n1,m1)) [((i,j), emptyEntry) | i <- [0..n1], j <- [0..m1]]
+mergeCells :: Table' -> Table
+mergeCells table =
+    let matrix' = array ((0,0),(n,m)) [((i,j), emptyEntry) | i <- [0..n], j <- [0..m]]
         visited0 (_,_) = False
-    in snd $ execState process (visited0, matrix')
+    in arrayToTable $ snd $ execState process (visited0, matrix')
   where
-    ((0,0),(n1,m1)) = bounds matrix
-    n = n1 + 1
-    m = m1 + 1
-    emptyEntry = (0,0)
+    table' = padTable table
+    rawMatrix = tableToArray table'
+    ((0,0),(n,m)) = bounds rawMatrix
+    emptyEntry = Cell [] 0 0
 
-    updateVisited :: Position -> State (Visited, Matrix Value) ()
+    updateVisited :: Position -> State (Visited, Matrix Cell) ()
     updateVisited (i, j) = do
         (visited, mat) <- get
         let newVisited (x,y) = (y == i && x == j) || visited (x,y)
         put (newVisited, mat)
 
-    updateMatrix :: Position -> Value -> State (Visited, Matrix Value) ()
+    updateMatrix :: Position -> Cell -> State (Visited, Matrix Cell) ()
     updateMatrix pos val = do
         (visited, mat) <- get
         let newMat = mat // [(pos, val)]
         put (visited, newMat)
 
-    maxWidth (i, j) val = length $ takeWhile (\x -> x < m && matrix ! (i,x) == val) [j..m-1]
+    maxWidth (i, j) = (1+) $ length $ takeWhile (\x -> x <= m && rawMatrix ! (i,x) == MergeLeft) [j+1..m] 
 
-    maxHeight (i, j) w val =
-        length $ takeWhile (\y -> y < n && all (\x -> matrix ! (y,x) == val) [j..j+w-1]) [i..n-1]
+    maxHeight (i, j) w =
+        (1+) $ length $ takeWhile (\y -> y <= n && rawMatrix ! (y, j) == MergeUp 
+                                        && all (\x -> let val = rawMatrix ! (y,x)
+                                                      in val == MergeLeft || val == MergeUp) [j+1..j+w-1]) [i+1..n]
 
     process =
-        forM_ [0..n-1] $ \i ->
-          forM_ [0..m-1] $ \j -> do
+        forM_ [0..n] $ \i ->
+          forM_ [0..m] $ \j -> do
             let pos = (i, j)
             (visited, _) <- get
             if visited pos
                 then updateMatrix pos emptyEntry
                 else do
-                    let val = matrix ! pos
-                    let w = maxWidth pos val
-                    let h = maxHeight pos w val
+                    case rawMatrix ! pos of
+                      EmptyCell -> do
+                          updateVisited pos
+                          updateMatrix pos emptyEntry
+                      MergeLeft -> do
+                          updateVisited pos
+                          updateMatrix pos (Cell [Word "<"] 1 1)
+                      MergeUp -> do
+                          updateVisited pos
+                          updateMatrix pos (Cell [Word "^"] 1 1)
+                      Cell' content -> do
+                        let w = maxWidth pos
+                        let h = maxHeight pos w
 
-                    forM_ [i..i+h-1] $ \y ->
-                        forM_ [j..j+w-1] $ \x ->
-                            updateVisited (x, y)
+                        forM_ [i..i+h-1] $ \y ->
+                            forM_ [j..j+w-1] $ \x ->
+                                updateVisited (x, y)
 
-                    updateMatrix pos (w,h)
+                        updateMatrix pos (Cell content w h)
+
+-- Convert a list of lists to an array
+tableToArray :: Table' -> Matrix Cell'
+tableToArray t =
+    let n = length (unTable' t) - 1
+        m = if n < 0 then 0 else length (unRow' (head (unTable' t))) - 1
+    in
+    array ((0,0), (n,m))
+            [ ((i,j), getCell i j) | i <- [0..n], j <- [0..m] ]
+    where
+    rows = unTable' t
+    getCell i j = unRow' (rows !! i) !! j
+
+-- Convert array back to list of lists (optional)
+arrayToTable :: Matrix Cell -> Table
+arrayToTable arr =
+    let ((i0,j0),(in_,jn)) = bounds arr
+    in Table [ Row [ arr ! (i,j) | j <- [j0..jn]] | i <- [i0..in_]]
+
+-- pad rows to equal length
+padTable :: Table' -> Table'
+padTable (Table' rows) =
+    let maxLen = maximum (map rowLen rows)
+    in Table' (map (padRow maxLen) rows)
+    where
+    rowLen (Row' cs) = length cs
+    padRow n (Row' cs) =
+        Row' (cs ++ replicate (n - length cs) EmptyCell)
