@@ -57,7 +57,7 @@ services:
   postgres:
     container_name: fpo-postgres
     hostname: postgres
-    image: postgres:17
+    image: postgres:18
     restart: unless-stopped
     environment:
       TZ: "GMT+2"
@@ -71,7 +71,7 @@ services:
     networks:
       - backend
     volumes:
-      - database:/var/lib/postgresql/data
+      - database:/var/lib/postgresql
 
   pgweb:
     container_name: fpo-pgweb

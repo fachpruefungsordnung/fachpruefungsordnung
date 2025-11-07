@@ -27,6 +27,7 @@ package:
     - maybe
     - newtype
     - now
+    - ordered-collections
     - parsing
     - partial
     - prelude

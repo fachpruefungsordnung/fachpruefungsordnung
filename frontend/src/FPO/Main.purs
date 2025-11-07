@@ -9,6 +9,7 @@ module Main where
 
 import Data.Either (hush)
 import Data.Function (const)
+import Data.Map as Map
 import Data.Maybe (Maybe(..), fromMaybe)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
@@ -204,9 +205,6 @@ component =
 main :: Effect Unit
 main = HA.runHalogenAff do
   body <- HA.awaitBody
-  -- Load logged in user from the localstorage
-  -- response <- getString "/get-user" -- TODO wait for backend to support this
-  -- let user = handleInitialResponse response
   savedLang <- H.liftEffect loadLanguage
   browserLang <- H.liftEffect detectBrowserLanguage
   let defaultLang = fromMaybe browserLang savedLang :: String
@@ -219,6 +217,7 @@ main = HA.runHalogenAff do
       , translator: FPOTranslator translator
       , language: defaultLang
       , toasts: []
+      , errorCooldowns: Map.empty
       , totalToasts: 0
       , handleRequestError: true
       } :: Store.Store

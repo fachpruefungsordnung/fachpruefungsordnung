@@ -181,7 +181,7 @@ component =
       response <- postString "/register" (encodeJson state.createUserDto) -- could be a postIgnore
       case response of
         Left err -> do
-          updateStore $ Store.AddError $ ServerError
+          Store.addError $ ServerError
             ( ( translate (label :: _ "admin_users_failedToCreateUser")
                   state.translator
               ) <> ": " <> (show err)
