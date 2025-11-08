@@ -1,4 +1,10 @@
-module Language.Ltml.AST.Module (ModuleBlock (..), ModuleSchema (..), Category (..), Module (..), Attribute (..)) where
+module Language.Ltml.AST.Module
+    ( ModuleBlock (..)
+    , ModuleSchema (..)
+    , Category (..)
+    , Module (..)
+    , Attribute (..)
+    ) where
 
 import Data.Text (Text)
 

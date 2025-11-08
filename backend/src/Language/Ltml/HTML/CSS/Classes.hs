@@ -280,7 +280,7 @@ classStyle Table = do
         cellBorder = border (px 1) solid Color.tableCellBorder
 
     toClassSelector Table ? do
-        -- width (pct 80)
+        maxWidth (pct 90)
         tableLayout autoLayout
         borderCollapse collapse
 
@@ -289,6 +289,7 @@ classStyle Table = do
         backgroundColor Color.tocDarkCell
         cellPadding
         cellBorder
+        whiteSpace normal
 
     toClassSelector Table |> tbody |> tr # hover ? do
         backgroundColor Color.tocActiveRow
@@ -297,6 +298,7 @@ classStyle Table = do
         whiteSpace nowrap
         cellPadding
         cellBorder
+        whiteSpace normal
 classStyle TableOfContents = do
     toClassSelector TableOfContents ? do
         width (pct 100)

@@ -7,7 +7,7 @@ module Language.Lsd.AST.Type.Module
 
 import Language.Lsd.AST.Common (Keyword)
 
-data ModuleBlockType = ModuleBlockType ModuleSchemaType CategoryType
+data ModuleBlockType = ModuleBlockType Keyword Keyword ModuleSchemaType CategoryType
 
 newtype ModuleSchemaType = ModuleSchemaType Keyword
 

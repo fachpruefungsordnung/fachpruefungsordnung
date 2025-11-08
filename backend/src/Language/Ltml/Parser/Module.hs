@@ -21,7 +21,7 @@ import Language.Ltml.AST.Module
 import Language.Ltml.Parser (MonadParser, Parser)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
 import Language.Ltml.Parser.Keyword (keywordP)
-import Text.Megaparsec (many, sepBy1, takeWhile1P, (<?>))
+import Text.Megaparsec (many, sepBy1, (<?>), takeWhileP)
 import Text.Megaparsec.Char (char)
 
 attributeListP :: (MonadParser m) => Keyword -> m [Attribute]
@@ -48,7 +48,7 @@ attributeP = Attribute . stripEnd <$> validP <?> "attribute"
             || Char.isAsciiUpper c
             || Char.isDigit c
             || c `elem` "üöäÜÖÄ _-/,.!?\""
-    validP = takeWhile1P (Just "attribute character") isValid
+    validP = takeWhileP (Just "attribute character") isValid
 
 -------------------------------------------------------------------------------
 
@@ -67,7 +67,9 @@ categoryP (CategoryType kw moduleType) = do
 
 moduleBlockP
     :: ModuleBlockType -> Parser ModuleBlock
-moduleBlockP (ModuleBlockType schemaType categoryType) = do
+moduleBlockP (ModuleBlockType beginKw endKw schemaType categoryType) = do
+    nLexeme (keywordP beginKw)
     schema <- nLexeme (schemaP schemaType)
     groups <- many $ nLexeme (categoryP categoryType)
+    nLexeme (keywordP endKw)
     return $ ModuleBlock schema groups
