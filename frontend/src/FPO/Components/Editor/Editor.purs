@@ -735,13 +735,20 @@ editor = connect selectTranslator $ H.mkComponent
         RenderPDF -> do
           state <- H.get
           H.raise (PostPDF state.currentVersion)
+      H.gets _.mEditor >>= traverse_ \ed ->
+        H.liftEffect $ Editor.focus ed
 
     ShowAllComments -> do
       state <- H.get
       let tocID = maybe (-1) _.id state.mTocEntry
       H.raise $ ShowAllCommentsOutput state.docID tocID
+      H.gets _.mEditor >>= traverse_ \ed ->
+        H.liftEffect $ Editor.focus ed
 
     Save isAutoSave -> do
+      when (not isAutoSave) $
+        H.gets _.mEditor >>= traverse_ \ed ->
+          H.liftEffect $ Editor.focus ed
       state <- H.get
       when (state.compareToElement == Nothing) $ do
         isDirty <- liftEffect $ Ref.read =<< case state.saveState.mDirtyRef of
