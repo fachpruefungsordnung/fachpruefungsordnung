@@ -29,7 +29,6 @@ import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class (liftEffect)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -751,9 +750,7 @@ editor = connect selectTranslator $ H.mkComponent
           H.liftEffect $ Editor.focus ed
       state <- H.get
       when (state.compareToElement == Nothing) $ do
-        isDirty <- liftEffect $ Ref.read =<< case state.saveState.mDirtyRef of
-          Just r -> pure r
-          Nothing -> liftEffect $ Ref.new false
+        isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.saveState.mDirtyRef
         -- Only save, when dirty flag is true or we are in older version
         -- TODO: Add another flag instead of using isEditorOutdated
         if (isDirty || state.isEditorOutdated) then do
@@ -928,53 +925,64 @@ editor = connect selectTranslator $ H.mkComponent
         }
 
     AutoSaveTimer -> do
-      saveState <- H.gets _.saveState
       -- restart 2 sec timer after every new input
       -- first kill the maybe running fiber (kinda like a thread)
-      for_ saveState.mPendingDebounceF H.kill
+      debounce <- H.gets _.saveState.mPendingDebounceF
+      traverse_ H.kill debounce
 
       -- start a new fiber
       dFib <- H.fork do
         H.liftAff $ delay (Milliseconds 2000.0)
-        isDirty <- liftEffect $ Ref.read =<< case saveState.mDirtyRef of
-          Just r -> pure r
-          Nothing -> liftEffect $ Ref.new false
+        mMax <- H.gets _.saveState.mPendingMaxWaitF
+        traverse_ H.kill mMax
+        H.modify_ \st -> st
+          { saveState = st.saveState
+              { mPendingDebounceF = Nothing
+              , mPendingMaxWaitF = Nothing
+              }
+          }
+        isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.saveState.mDirtyRef
         when isDirty $ handleAction AutoSave
-      H.modify_ _ { saveState = saveState { mPendingDebounceF = Just dFib } }
+      H.modify_ \st -> st{ saveState = st.saveState { mPendingDebounceF = Just dFib } }
 
       -- This is a seperate 20 sec timer, which forces to save, in case of a long edit
       -- does not reset with new input
-      case saveState.mPendingMaxWaitF of
+      mPendingMaxWaitF <- H.gets _.saveState.mPendingMaxWaitF
+      case mPendingMaxWaitF of
         -- timer already running
         Just _ -> pure unit
         -- no timer there
         Nothing -> do
           mFib <- H.fork do
             H.liftAff $ delay (Milliseconds 20000.0)
-            isDirty <- liftEffect $ Ref.read =<< case saveState.mDirtyRef of
-              Just r -> pure r
-              Nothing -> liftEffect $ Ref.new false
+            latestDebounce <- H.gets _.saveState.mPendingDebounceF
+            traverse_ H.kill latestDebounce
+            H.modify_ \st -> st
+              { saveState = st.saveState
+                  { mPendingDebounceF = Nothing
+                  , mPendingMaxWaitF = Nothing
+                  }
+              }
+            isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.saveState.mDirtyRef
             when isDirty $ handleAction AutoSave
-          H.modify_ _ { saveState = saveState { mPendingMaxWaitF = Just mFib } }
+          H.modify_ \st -> st{ saveState = st.saveState { mPendingMaxWaitF = Just mFib } }
 
     AutoSave -> do
+      mDeb <- H.gets _.saveState.mPendingDebounceF
+      traverse_ H.kill mDeb
+      mMax <- H.gets _.saveState.mPendingMaxWaitF
+      traverse_ H.kill mMax
+      H.modify_ \st -> st
+        { saveState = st.saveState
+            { mPendingDebounceF = Nothing
+            , mPendingMaxWaitF = Nothing
+            }
+        }
       -- only save, if dirty
       isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
         _.saveState.mDirtyRef
       when isDirty do
         handleAction $ Save true
-        -- after Save: dirty false + stop timer
-        mRef <- H.gets _.saveState.mDirtyRef
-        for_ mRef \r -> H.liftEffect $ Ref.write false r
-        saveState <- H.gets _.saveState
-        for_ saveState.mPendingDebounceF H.kill
-        for_ saveState.mPendingMaxWaitF H.kill
-        H.modify_ _
-          { saveState = saveState
-              { mPendingDebounceF = Nothing
-              , mPendingMaxWaitF = Nothing
-              }
-          }
 
     Comment -> do
       state <- H.get
@@ -1508,7 +1516,12 @@ editor = connect selectTranslator $ H.mkComponent
 
             -- Update state with new marker IDs
             H.modify_ \st -> st
-              { commentState = st.commentState { liveMarkers = newLiveMarkers } }
+              { commentState = st.commentState { liveMarkers = newLiveMarkers }
+              , saveState = st.saveState
+                { mPendingDebounceF = Nothing
+                , mPendingMaxWaitF = Nothing
+                } 
+              }
             -- lastly show html in preview
             when showHtml $ do
               H.raise $ ClickedQuery state.html
