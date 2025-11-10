@@ -7,7 +7,7 @@ module Language.Ltml.Parser.Table
 where
 
 import Control.Monad (forM_)
-import Control.Monad.State (State, execState, get, put)
+import Control.Monad.State (State, execState, get, modify)
 import Data.Array (Array, array, bounds, (!), (//))
 import Data.Text (pack)
 import qualified Data.Text as T
@@ -27,7 +27,7 @@ import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
 import Language.Ltml.Parser.Text (textForestP)
 import Text.Megaparsec
-    ( MonadParsec (eof, hidden, takeWhileP, try)
+    ( MonadParsec ( hidden, takeWhileP, try)
     , errorBundlePretty
     , manyTill
     , runParser
@@ -60,10 +60,10 @@ rowP (RowType (Star t)) = do
 tableP' :: TableType -> Parser Table'
 tableP' (TableType _ (Star t)) = do
     space
-    rows <- nLexeme $ some (rowP t)
+    nRows <- nLexeme $ some (rowP t)
     hidden space
-    eof
-    pure (Table' rows)
+    _ <- char '&'
+    pure (Table' nRows)
 
 tableP :: TableType -> Parser Table
 tableP tt = do
@@ -95,100 +95,123 @@ type Position = (Int, Int)
 
 mergeCells :: Table' -> Table
 mergeCells table =
-    let matrix' = array ((0, 0), (n, m)) [((i, j), emptyEntry) | i <- [0 .. n], j <- [0 .. m]]
+    let matrix' = array ((0, 0), (nRows, mCols)) [((row, col), emptyEntry) | row <- [0 .. nRows], col <- [0 .. mCols]]
         visited0 (_, _) = False
-     in arrayToTable $ snd $ execState process (visited0, matrix')
+     in arrayToTable $ snd $ process (0, 0) (visited0, matrix')
   where
     table' = padTable table
     rawMatrix = tableToArray table'
-    ((0, 0), (n, m)) = bounds rawMatrix
+    ((0, 0), (nRows, mCols)) = bounds rawMatrix
     emptyEntry = Cell [] 0 0
 
-    updateVisited :: Position -> State (Visited, Matrix Cell) ()
-    updateVisited (i, j) = do
-        (visited, mat) <- get
-        let newVisited (x, y) = (y == i && x == j) || visited (x, y)
-        put (newVisited, mat)
-
-    updateMatrix :: Position -> Cell -> State (Visited, Matrix Cell) ()
-    updateMatrix pos val = do
-        (visited, mat) <- get
-        let newMat = mat // [(pos, val)]
-        put (visited, newMat)
-
-    maxWidth (i, j) =
+    maxWidth :: Position -> Int
+    maxWidth (row, col) =
         (1 +) $
             length $
-                takeWhile (\x -> x <= m && rawMatrix ! (i, x) == MergeLeft) [j + 1 .. m]
+                takeWhile (\col' -> col' <= mCols && rawMatrix ! (row, col') == MergeLeft) [col + 1 .. mCols]
 
-    maxHeight (i, j) w =
+    maxHeight :: Position -> Int -> Int
+    maxHeight (row, col) w =
         (1 +) $
             length $
                 takeWhile
-                    ( \y ->
-                        y <= n
-                            && rawMatrix ! (y, j) == MergeUp
+                    ( \row' ->
+                        row' <= nRows
+                            && rawMatrix ! (row', col) == MergeUp
                             && all
-                                ( \x ->
-                                    let val = rawMatrix ! (y, x)
+                                ( \col' ->
+                                    let val = rawMatrix ! (row', col')
                                      in val == MergeLeft || val == MergeUp
                                 )
-                                [j + 1 .. j + w - 1]
+                                [col + 1 .. col + w - 1]
                     )
-                    [i + 1 .. n]
+                    [row + 1 .. nRows]
+        
+    updateVisited :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
+    updateVisited p0 (visited, mat) = (\p -> p == p0 || visited p, mat )
 
-    process =
-        forM_ [0 .. n] $ \i ->
-            forM_ [0 .. m] $ \j -> do
-                let pos = (i, j)
-                (visited, _) <- get
-                if visited pos
-                    then updateMatrix pos emptyEntry
-                    else do
-                        case rawMatrix ! pos of
-                            EmptyCell -> do
-                                updateVisited pos
-                                updateMatrix pos emptyEntry
-                            MergeLeft -> do
-                                updateVisited pos
-                                updateMatrix pos (Cell [Word "<"] 1 1)
-                            MergeUp -> do
-                                updateVisited pos
-                                updateMatrix pos (Cell [Word "^"] 1 1)
-                            Cell' content -> do
-                                let w = maxWidth pos
-                                let h = maxHeight pos w
+    updateMatrix :: Position -> Cell -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
+    updateMatrix pos val (visited, mat) = (visited, mat // [(pos, val)])
 
-                                forM_ [i .. i + h - 1] $ \y ->
-                                    forM_ [j .. j + w - 1] $ \x ->
-                                        updateVisited (x, y)
-
-                                updateMatrix pos (Cell content w h)
+    process :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
+    process (row, col) s@(visited, _) 
+        | row > nRows = s 
+        | col > mCols = process (row+1, 0) s
+        | visited (row, col) = process (row, col + 1) s
+        | otherwise =
+            let createCell content =
+                    let w = maxWidth (row, col)
+                        h = maxHeight (row, col) w
+                        s' = foldl
+                                (\acc (x, y) -> updateVisited (x, y) acc)
+                                s
+                                [ (row', col')
+                                | col' <- [col .. col + w - 1]
+                                , row' <- [row .. row + h - 1]
+                                ]
+                     in updateMatrix (row, col) (Cell content w h) s'
+                res = case rawMatrix ! (row, col) of
+                        EmptyCell -> createCell []
+                        MergeLeft -> createCell [Word "<"]
+                        MergeUp -> createCell [Word "^"]
+                        Cell' content -> createCell content
+             in process (row, col+1) res
 
 -- Convert a list of lists to an array
 tableToArray :: Table' -> Matrix Cell'
 tableToArray t =
-    let n = length (unTable' t) - 1
-        m = if n < 0 then 0 else length (unRow' (head (unTable' t))) - 1
+    let nRows = length (unTable' t) - 1
+        mCols = if nRows < 0 then 0 else length (unRow' (head (unTable' t))) - 1
      in array
-            ((0, 0), (n, m))
-            [((i, j), getCell i j) | i <- [0 .. n], j <- [0 .. m]]
+            ((0, 0), (nRows, mCols))
+            [((row, col), getCell row col) | row <- [0 .. nRows], col <- [0 .. mCols]]
   where
-    rows = unTable' t
-    getCell i j = unRow' (rows !! i) !! j
+    nRows = unTable' t
+    getCell row col = unRow' (nRows !! row) !! col
 
 -- Convert array back to list of lists (optional)
 arrayToTable :: Matrix Cell -> Table
 arrayToTable arr =
     let ((i0, j0), (in_, jn)) = bounds arr
-     in Table [Row [arr ! (i, j) | j <- [j0 .. jn]] | i <- [i0 .. in_]]
+     in Table [Row [arr ! (row, col) | col <- [j0 .. jn]] | row <- [i0 .. in_]]
 
--- pad rows to equal length
+-- pad nRows to equal length
 padTable :: Table' -> Table'
 padTable (Table' rows) =
     let maxLen = maximum (map rowLen rows)
      in Table' (map (padRow maxLen) rows)
   where
     rowLen (Row' cs) = length cs
-    padRow n (Row' cs) =
-        Row' (cs ++ replicate (n - length cs) EmptyCell)
+    padRow rows (Row' cs) =
+        Row' (cs ++ replicate (rows - length cs) EmptyCell)
+
+
+-- first attempt using State monad (commented out)
+    -- updateVisited :: Position -> State (Visited, Matrix Cell) ()
+    -- updateVisited p0 = modify $ \(visited, mat) -> (\p -> p == p0 || visited p, mat )
+
+    -- updateMatrix :: Position -> Cell -> State (Visited, Matrix Cell) ()
+    -- updateMatrix pos val = modify $ \(visited, mat) -> (visited, mat // [(pos, val)])
+
+    -- process =
+    --     forM_ [0 .. nRows] $ \row ->
+    --         forM_ [0 .. mCols] $ \col -> do
+    --             let pos = (row, col)
+    --             (visited, _) <- get
+    --             if visited pos
+    --                 then updateMatrix pos emptyEntry
+    --                 else do
+    --                     let createCell content = do
+    --                             let w = maxWidth pos
+    --                             let h = maxHeight pos w
+
+    --                             forM_ [row .. row + h - 1] $ \y ->
+    --                                 forM_ [col .. col + w - 1] $ \x ->
+    --                                     updateVisited (x, y)
+
+    --                             updateMatrix pos (Cell content w h)
+    --                     case rawMatrix ! pos of
+    --                         EmptyCell -> createCell []
+    --                         MergeLeft -> createCell [Word "<"]
+    --                         MergeUp -> createCell [Word "^"]
+    --                         Cell' content -> createCell content
