@@ -1745,12 +1745,12 @@ editor = connect selectTranslator $ H.mkComponent
       state <- H.get
       for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure $ Just a
-  
+
   -- free up the save flags for the next save session
   -- check if there are new requests for saving during saving
   freeSaveFlagsAndMaybeRerun
     :: forall slots
-      . Boolean
+     . Boolean
     -> H.HalogenM State Action slots Output m Unit
   freeSaveFlagsAndMaybeRerun isAutoSave = do
     -- free up the save flags for the next save session
