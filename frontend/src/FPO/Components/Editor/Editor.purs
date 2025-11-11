@@ -940,14 +940,14 @@ editor = connect selectTranslator $ H.mkComponent
         }
 
     AutoSaveTimer -> do
-      -- restart 2 sec timer after every new input
+      -- restart 5 sec timer after every new input
       -- first kill the maybe running fiber (kinda like a thread)
       debounce <- H.gets _.saveState.mPendingDebounceF
       traverse_ H.kill debounce
 
       -- start a new fiber
       dFib <- H.fork do
-        H.liftAff $ delay (Milliseconds 2000.0)
+        H.liftAff $ delay (Milliseconds 5000.0)
         mMax <- H.gets _.saveState.mPendingMaxWaitF
         traverse_ H.kill mMax
         H.modify_ \st -> st
@@ -962,7 +962,7 @@ editor = connect selectTranslator $ H.mkComponent
       H.modify_ \st -> st
         { saveState = st.saveState { mPendingDebounceF = Just dFib } }
 
-      -- This is a seperate 20 sec timer, which forces to save, in case of a long edit
+      -- This is a seperate 60 sec timer, which forces to save, in case of a long edit
       -- does not reset with new input
       mPendingMaxWaitF <- H.gets _.saveState.mPendingMaxWaitF
       case mPendingMaxWaitF of
@@ -971,7 +971,7 @@ editor = connect selectTranslator $ H.mkComponent
         -- no timer there
         Nothing -> do
           mFib <- H.fork do
-            H.liftAff $ delay (Milliseconds 20000.0)
+            H.liftAff $ delay (Milliseconds 60000.0)
             latestDebounce <- H.gets _.saveState.mPendingDebounceF
             traverse_ H.kill latestDebounce
             H.modify_ \st -> st
