@@ -751,8 +751,10 @@ editor = connect selectTranslator $ H.mkComponent
           H.liftEffect $ Editor.focus ed
       state <- H.get
       when (state.compareToElement == Nothing) $ do
-        isSaving <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.saveState.mIsSaving
-        isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.saveState.mDirtyRef
+        isSaving <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+          _.saveState.mIsSaving
+        isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+          _.saveState.mDirtyRef
         -- Only save, when dirty flag is true or we are in older version
         -- TODO: Add another flag instead of using isEditorOutdated
         if ((not isSaving) && (isDirty || state.isEditorOutdated)) then do
@@ -946,9 +948,11 @@ editor = connect selectTranslator $ H.mkComponent
               , mPendingMaxWaitF = Nothing
               }
           }
-        isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.saveState.mDirtyRef
+        isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+          _.saveState.mDirtyRef
         when isDirty $ handleAction AutoSave
-      H.modify_ \st -> st{ saveState = st.saveState { mPendingDebounceF = Just dFib } }
+      H.modify_ \st -> st
+        { saveState = st.saveState { mPendingDebounceF = Just dFib } }
 
       -- This is a seperate 20 sec timer, which forces to save, in case of a long edit
       -- does not reset with new input
@@ -968,9 +972,11 @@ editor = connect selectTranslator $ H.mkComponent
                   , mPendingMaxWaitF = Nothing
                   }
               }
-            isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.saveState.mDirtyRef
+            isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+              _.saveState.mDirtyRef
             when isDirty $ handleAction AutoSave
-          H.modify_ \st -> st{ saveState = st.saveState { mPendingMaxWaitF = Just mFib } }
+          H.modify_ \st -> st
+            { saveState = st.saveState { mPendingMaxWaitF = Just mFib } }
 
     AutoSave -> do
       mDeb <- H.gets _.saveState.mPendingDebounceF
@@ -1528,9 +1534,9 @@ editor = connect selectTranslator $ H.mkComponent
             H.modify_ \st -> st
               { commentState = st.commentState { liveMarkers = newLiveMarkers }
               , saveState = st.saveState
-                { mPendingDebounceF = Nothing
-                , mPendingMaxWaitF = Nothing
-                } 
+                  { mPendingDebounceF = Nothing
+                  , mPendingMaxWaitF = Nothing
+                  }
               }
             -- lastly show html in preview
             when showHtml $ do
@@ -1990,7 +1996,7 @@ addBeforeUnloadListener dref listener = do
         preventDefault ev
         HS.notify listener (Save true)
       _ -> pure unit
-  
+
   sref <- H.liftEffect $ Ref.new false
   H.modify_ \st -> st
     { saveState = st.saveState
