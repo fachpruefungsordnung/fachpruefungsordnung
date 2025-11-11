@@ -787,7 +787,8 @@ editor = connect selectTranslator $ H.mkComponent
               -- check if there are new request for saving during saving
               for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false r
               when qSaving do
-                for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write false r
+                for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write false
+                  r
                 handleAction $ Save isAutoSave
             Just entry ->
               case state.mContent of
@@ -796,9 +797,12 @@ editor = connect selectTranslator $ H.mkComponent
                   qSaving <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
                     _.saveState.mQueuedSave
                   -- check if there are new request for saving during saving
-                  for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false r
+                  for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false
+                    r
                   when qSaving do
-                    for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write false r
+                    for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write
+                      false
+                      r
                     handleAction $ Save isAutoSave
                   pure unit
                 Just content -> do
