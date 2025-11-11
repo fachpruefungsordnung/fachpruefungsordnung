@@ -426,36 +426,48 @@ instance ToHtmlM Table where
 
 instance ToHtmlM ModuleBlock where
     toHtmlM (ModuleBlock (ModuleSchema features) categories) = do
-        -- add single empty cell to thead for category offset
-        let colgroup = colgroup_ $ col_ <#> Class.MinSizeColumn
-            thead =
-                thead_ $
-                    tr_ $
-                        (th_ mempty <>) $
-                            mconcat $
-                                map (th_ . toHtml . unAttribute) features
-            tbody = tbody_ $ mconcat $ map categoryRows categories
-        return $
+        featureDHtmls <- mapM (toHtmlM . unAttribute) features
+        categoryDHtmls <- mapM categoryRows categories
+
+        return $ do
+            featureHtmls <- sequence featureDHtmls
+            categoryHtmls <- sequence categoryDHtmls
+
+            -- add single empty cell to thead for category offset
+            let colgroup = colgroup_ $ col_ <#> Class.MinSizeColumn
+                thead = thead_ $ tr_ $ (th_ mempty <>) $ mconcat $ map th_ featureHtmls
+                tbody = tbody_ $ mconcat categoryHtmls
             Now $
                 div_ <#> Class.TableContainer $
                     table_ <#> Class.Table $
                         colgroup <> thead <> tbody
       where
-        categoryRows :: Category -> Html ()
+        categoryRows :: Category -> HtmlReaderState
         categoryRows (Category name modules) = do
-            -- TODO: use iToT here
-            let categoryCell =
-                    td_
-                        [rowspan_ (pack . show . length $ modules), cssClass_ Class.TableCentered]
-                        (toHtml $ unAttribute name)
+            categoryHtml <- toHtmlM $ unAttribute name
+            moduleDHtmls <- mapM moduleRow modules
 
-            case map moduleRow modules of
-                [] -> categoryCell
-                (m : ms) -> mconcat $ map tr_ (categoryCell <> m : ms)
+            return $ do
+                moduleHtmls <- sequence moduleDHtmls
+                cat <- categoryHtml
+                let
+                    -- TODO: use iToT here
+                    categoryCell =
+                        td_
+                            [rowspan_ (pack . show . length $ modules), cssClass_ Class.TableCentered]
+                            cat
 
-        moduleRow :: Module -> Html ()
-        moduleRow (Module attr) =
-            mconcat $ map ((td_ <#> Class.TableCentered) . toHtml . unAttribute) attr
+                    categoryRow = case moduleHtmls of
+                        [] -> [tr_ categoryCell]
+                        (m : ms) -> map tr_ (categoryCell <> m : ms)
+                return $ mconcat categoryRow
+
+        moduleRow :: Module -> HtmlReaderState
+        moduleRow (Module attr) = do
+            attrDHtmls <- mapM (toHtmlM . unAttribute) attr
+            return $ do
+                attrHtmls <- sequence attrDHtmls
+                return $ mconcat $ map (td_ <#> Class.TableCentered) attrHtmls
 
 -------------------------------------------------------------------------------
 

@@ -384,9 +384,11 @@ moduleBlockT :: NamedType ModuleBlockType
 moduleBlockT =
     NamedType "module_block" "Modulblock" $
         ModuleBlockType
+            (Keyword "|")
+            (TextType (Disjunction []))
             (ModuleSchemaType (Keyword "schema:"))
             ( CategoryType
-                (Keyword ":")
+                (Keyword "category:")
                 (ModuleType (Keyword "module:"))
             )
 

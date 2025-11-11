@@ -9,6 +9,7 @@
 module Language.Ltml.Parser.Text
     ( ParagraphParser
     , textForestP
+    , seperatedTextForestsP
     , hangingTextP
     , HangingTextP
     , hangingTextP'
@@ -60,6 +61,7 @@ import Language.Ltml.Parser.MiTree
     , Restricted
     , hangingBlock'
     , hangingBlock_
+    , keywordSeparated
     , miForest
     , unbracketed
     , unrestricted
@@ -94,6 +96,19 @@ textForestP
     => TextType enumType
     -> m [TextTree lbrk fnref style enum special]
 textForestP t = miForest inlinePs (blockPF t)
+
+seperatedTextForestsP
+    :: ( ParserWrapper m
+       , LineBreakP lbrk
+       , FootnoteRefP fnref
+       , StyleP style
+       , EnumP enumType enum
+       , SpecialP m special
+       )
+    => Keyword
+    -> TextType enumType
+    -> m [[TextTree lbrk fnref style enum special]]
+seperatedTextForestsP kw tt = keywordSeparated (keywordP kw) inlinePs (blockPF tt)
 
 -- Note on sentence start tokens (SSTs):
 --  * Labeled SSTs are permitted anywhere, while unlabeled SSTs are only

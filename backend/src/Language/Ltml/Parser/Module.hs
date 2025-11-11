@@ -1,16 +1,17 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Language.Ltml.Parser.Module (moduleBlockP, moduleP) where
 
-import qualified Data.Char as Char
-import Data.Text (stripEnd)
 import Language.Lsd.AST.Common (Keyword)
+import Language.Lsd.AST.Type.Enum (EnumType)
 import Language.Lsd.AST.Type.Module
     ( CategoryType (..)
     , ModuleBlockType (..)
     , ModuleSchemaType (..)
     , ModuleType (..)
     )
+import Language.Lsd.AST.Type.Text (TextType)
 import Language.Ltml.AST.Module
     ( Attribute (..)
     , Category (..)
@@ -18,58 +19,36 @@ import Language.Ltml.AST.Module
     , ModuleBlock (..)
     , ModuleSchema (..)
     )
-import Language.Ltml.Parser (MonadParser, Parser)
-import Language.Ltml.Parser.Common.Lexeme (nLexeme)
+import Language.Ltml.Parser (Parser)
+import Language.Ltml.Parser.Common.Lexeme (lexeme, nLexeme)
 import Language.Ltml.Parser.Keyword (keywordP)
-import Text.Megaparsec (many, sepBy1, (<?>), takeWhileP)
-import Text.Megaparsec.Char (char)
+import Language.Ltml.Parser.Text
+import Text.Megaparsec (many, (<?>))
 
-attributeListP :: (MonadParser m) => Keyword -> m [Attribute]
-attributeListP kw = do
-    nLexeme $ keywordP kw
-    nLexeme attributeP `sepBy1` nLexeme (char ';')
-
--- | Permits ASCII Lower / Upper / Digit and special characters.
---   This is used for schema attributes AND module values of those attributes.
---
--- Currently the syntax is very free:
--- module:
--- A; 5
--- module: A
--- ;
---   5
-attributeP :: (MonadParser m) => m Attribute
-attributeP = Attribute . stripEnd <$> validP <?> "attribute"
-  where
-    -- TODO: parse TextTree, not raw Text
-    --       also keyword ':' is currently not allowed in attributes
-    isValid c =
-        Char.isAsciiLower c
-            || Char.isAsciiUpper c
-            || Char.isDigit c
-            || c `elem` "üöäÜÖÄ _-/,.!?\""
-    validP = takeWhileP (Just "attribute character") isValid
+attributeListP :: Keyword -> Keyword -> TextType EnumType -> Parser [Attribute]
+attributeListP kw sepKw tt = do
+    lexeme $ keywordP kw
+    fmap Attribute <$> seperatedTextForestsP sepKw tt
 
 -------------------------------------------------------------------------------
 
-schemaP :: (MonadParser m) => ModuleSchemaType -> m ModuleSchema
-schemaP (ModuleSchemaType kw) = ModuleSchema <$> attributeListP kw <?> "module schema"
+schemaP
+    :: ModuleSchemaType -> Keyword -> TextType EnumType -> Parser ModuleSchema
+schemaP (ModuleSchemaType kw) sepKw tt = ModuleSchema <$> attributeListP kw sepKw tt <?> "module schema"
 
-moduleP :: ModuleType -> Parser Module
-moduleP (ModuleType kw) = Module <$> attributeListP kw <?> "module"
+moduleP :: ModuleType -> Keyword -> TextType EnumType -> Parser Module
+moduleP (ModuleType kw) sepKw tt = Module <$> attributeListP kw sepKw tt <?> "module"
 
-categoryP :: CategoryType -> Parser Category
-categoryP (CategoryType kw moduleType) = do
-    category <- attributeP
-    nLexeme $ keywordP kw
-    modules <- many (nLexeme (moduleP moduleType))
+categoryP :: CategoryType -> Keyword -> TextType EnumType -> Parser Category
+categoryP (CategoryType kw moduleType) sepKw tt = do
+    category <- Attribute <$> nLexeme (hangingTextP kw tt)
+    modules <- many (nLexeme (moduleP moduleType sepKw tt))
     return $ Category category modules
 
+-- | Parse a schema and 0 to n module definitions. The block is terminated by an empty line.
 moduleBlockP
     :: ModuleBlockType -> Parser ModuleBlock
-moduleBlockP (ModuleBlockType beginKw endKw schemaType categoryType) = do
-    nLexeme (keywordP beginKw)
-    schema <- nLexeme (schemaP schemaType)
-    groups <- many $ nLexeme (categoryP categoryType)
-    nLexeme (keywordP endKw)
+moduleBlockP (ModuleBlockType sepKw tt schemaType categoryType) = do
+    schema <- lexeme (schemaP schemaType sepKw tt)
+    groups <- many $ nLexeme $ categoryP categoryType sepKw tt
     return $ ModuleBlock schema groups
