@@ -781,29 +781,11 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit -- Nothing to do
                 Just path -> do
                   H.raise $ RenamedNode contentLines path
-              -- free up the save flags for the next save session
-              qSaving <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
-                _.saveState.mQueuedSave
-              -- check if there are new request for saving during saving
-              for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false r
-              when qSaving do
-                for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write false
-                  r
-                handleAction $ Save isAutoSave
+              freeSaveFlagsAndMaybeRerun isAutoSave
             Just entry ->
               case state.mContent of
                 Nothing -> do
-                  -- free up the save flags for the next save session
-                  qSaving <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
-                    _.saveState.mQueuedSave
-                  -- check if there are new request for saving during saving
-                  for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false
-                    r
-                  when qSaving do
-                    for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write
-                      false
-                      r
-                    handleAction $ Save isAutoSave
+                  freeSaveFlagsAndMaybeRerun isAutoSave
                   pure unit
                 Just content -> do
                   -- Save the current content of the editor and send it to the server
@@ -838,7 +820,7 @@ editor = connect selectTranslator $ H.mkComponent
                   -- Try to upload
                   handleAction $ Upload entry newWrapper isAutoSave
         -- Users want to have a visual indicator, that they have saved. So when manual saving without any changes since
-        -- last Save, just show the notificatioin
+        -- last Save, just show the notification
         else if (not isAutoSave && isJust state.mTocEntry) then
           updateStore $ Store.AddSuccess
             (translate (label :: _ "editor_already_saved") state.translator)
@@ -934,14 +916,7 @@ editor = connect selectTranslator $ H.mkComponent
 
           pure unit
 
-      -- mIsSaving := false
-      qSaving <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
-        _.saveState.mQueuedSave
-      -- check if there are new request for saving during saving
-      for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false r
-      when qSaving do
-        for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write false r
-        handleAction $ Save isAutoSave
+      freeSaveFlagsAndMaybeRerun isAutoSave
 
     SavedIcon -> do
       mSavedIconF <- H.gets _.saveState.mSavedIconF
@@ -1770,6 +1745,23 @@ editor = connect selectTranslator $ H.mkComponent
       state <- H.get
       for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure $ Just a
+  
+  -- free up the save flags for the next save session
+  -- check if there are new requests for saving during saving
+  freeSaveFlagsAndMaybeRerun
+    :: forall slots
+      . Boolean
+    -> H.HalogenM State Action slots Output m Unit
+  freeSaveFlagsAndMaybeRerun isAutoSave = do
+    -- free up the save flags for the next save session
+    qSaving <- maybe (pure false) (H.liftEffect <<< Ref.read)
+      =<< H.gets _.saveState.mQueuedSave
+    st <- H.get
+    -- check if there are new requests for saving during saving
+    for_ st.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false r
+    when qSaving do
+      for_ st.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write false r
+      handleAction $ Save isAutoSave
 
 -- | Change listener for the editor.
 --
