@@ -154,8 +154,8 @@ type SaveState =
     mDirtyRef :: Maybe (Ref Boolean)
   -- Prevent to have multiple saving processes at the same time
   , mIsSaving :: Maybe (Ref Boolean)
-  -- Are there new changes durring saving?
-  , mQSaving :: Maybe (Ref Boolean)
+  -- Are there new changes during saving?
+  , mQueuedSave :: Maybe (Ref Boolean)
   , mBeforeUnloadListener :: Maybe EventListener
   -- saved icon
   , showSavedIcon :: Boolean
@@ -781,11 +781,26 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit -- Nothing to do
                 Just path -> do
                   H.raise $ RenamedNode contentLines path
-              -- mIsSaving := false
+              -- free up the save flags for the next save session
+              qSaving <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+                _.saveState.mQueuedSave
+              -- check if there are new request for saving during saving
               for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false r
+              when qSaving do
+                for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write false r
+                handleAction $ Save isAutoSave
             Just entry ->
               case state.mContent of
-                Nothing -> pure unit
+                Nothing -> do
+                  -- free up the save flags for the next save session
+                  qSaving <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+                    _.saveState.mQueuedSave
+                  -- check if there are new request for saving during saving
+                  for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false r
+                  when qSaving do
+                    for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write false r
+                    handleAction $ Save isAutoSave
+                  pure unit
                 Just content -> do
                   -- Save the current content of the editor and send it to the server
                   let
@@ -823,8 +838,8 @@ editor = connect selectTranslator $ H.mkComponent
         else if (not isAutoSave && isJust state.mTocEntry) then
           updateStore $ Store.AddSuccess
             (translate (label :: _ "editor_already_saved") state.translator)
-        else when (isDirty && isSaving) $
-          for_ state.saveState.mQSaving \r -> H.liftEffect $ Ref.write true r
+        else when (isSaving && (isDirty || state.isEditorOutdated)) $
+          for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write true r
 
     Upload newEntry newWrapper isAutoSave -> do
       state <- H.get
@@ -917,10 +932,12 @@ editor = connect selectTranslator $ H.mkComponent
 
       -- mIsSaving := false
       qSaving <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
-        _.saveState.mQSaving
+        _.saveState.mQueuedSave
       -- check if there are new request for saving during saving
       for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false r
-      when qSaving $ handleAction $ Save isAutoSave
+      when qSaving do
+        for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write false r
+        handleAction $ Save isAutoSave
 
     SavedIcon -> do
       mSavedIconF <- H.gets _.saveState.mSavedIconF
@@ -1872,7 +1889,7 @@ initialSaveState :: SaveState
 initialSaveState =
   { mDirtyRef: Nothing
   , mIsSaving: Nothing
-  , mQSaving: Nothing
+  , mQueuedSave: Nothing
   , mBeforeUnloadListener: Nothing
   , showSavedIcon: false
   , mSavedIconF: Nothing
@@ -2016,7 +2033,7 @@ addBeforeUnloadListener dref listener = do
     { saveState = st.saveState
         { mDirtyRef = Just dref
         , mIsSaving = Just sref
-        , mQSaving = Just qref
+        , mQueuedSave = Just qref
         , mBeforeUnloadListener = Just beforeUnloadListener
         }
     }
