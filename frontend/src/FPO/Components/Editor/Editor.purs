@@ -152,6 +152,7 @@ type SaveState =
   {
     -- for saving when closing window
     mDirtyRef :: Maybe (Ref Boolean)
+  , mIsSaving :: Maybe (Ref Boolean)
   , mBeforeUnloadListener :: Maybe EventListener
   -- saved icon
   , showSavedIcon :: Boolean
@@ -750,10 +751,14 @@ editor = connect selectTranslator $ H.mkComponent
           H.liftEffect $ Editor.focus ed
       state <- H.get
       when (state.compareToElement == Nothing) $ do
+        isSaving <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.saveState.mIsSaving
         isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets _.saveState.mDirtyRef
         -- Only save, when dirty flag is true or we are in older version
         -- TODO: Add another flag instead of using isEditorOutdated
-        if (isDirty || state.isEditorOutdated) then do
+        if ((not isSaving) && (isDirty || state.isEditorOutdated)) then do
+          -- mIsSaving := true, mDirtyRef := false
+          for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write true r
+          for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
           allLines <- H.gets _.mEditor >>= traverse \ed -> do
             H.liftEffect $ Editor.getSession ed
               >>= Session.getDocument
@@ -899,8 +904,8 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit
                 _ -> pure unit
 
-          -- mDirtyRef := false
-          for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
+          -- mIsSaving := false
+          for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false r
           pure unit
 
     SavedIcon -> do
@@ -1434,6 +1439,7 @@ editor = connect selectTranslator $ H.mkComponent
 
             H.modify_ _
               { mTocEntry = Just entry
+              , currentVersion = version
               , mTitle = mTitle
               , mContent = Just content
               , html = html
@@ -1515,6 +1521,10 @@ editor = connect selectTranslator $ H.mkComponent
               pure (catMaybes tmp)
 
             -- Update state with new marker IDs
+            mDeb <- H.gets _.saveState.mPendingDebounceF
+            traverse_ H.kill mDeb
+            mMax <- H.gets _.saveState.mPendingMaxWaitF
+            traverse_ H.kill mMax
             H.modify_ \st -> st
               { commentState = st.commentState { liveMarkers = newLiveMarkers }
               , saveState = st.saveState
@@ -1843,6 +1853,7 @@ initialCommentState =
 initialSaveState :: SaveState
 initialSaveState =
   { mDirtyRef: Nothing
+  , mIsSaving: Nothing
   , mBeforeUnloadListener: Nothing
   , showSavedIcon: false
   , mSavedIconF: Nothing
@@ -1979,9 +1990,12 @@ addBeforeUnloadListener dref listener = do
         preventDefault ev
         HS.notify listener (Save true)
       _ -> pure unit
+  
+  sref <- H.liftEffect $ Ref.new false
   H.modify_ \st -> st
     { saveState = st.saveState
         { mDirtyRef = Just dref
+        , mIsSaving = Just sref
         , mBeforeUnloadListener = Just beforeUnloadListener
         }
     }
