@@ -220,7 +220,7 @@ jobs:
           username: ${{ secrets.DEV_REMOTE_USER }}
           password: ${{ secrets.DEV_REMOTE_PASSWORD }}
           port: ${{ secrets.DEV_SSH_PORT }}
-          envs: MAIL_HOST,MAIL_PORT,MAIL_ADDRESS,MAIL_USERNAME,MAIL_PASSWORD,SERVER_HOST
+          envs: MAIL_HOST,MAIL_PORT,MAIL_ADDRESS,MAIL_USERNAME,MAIL_PASSWORD
           command_timeout: 200m
           script: |
             cd ${{ vars.DEV_REPO_PATH }}
