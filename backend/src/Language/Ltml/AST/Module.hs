@@ -1,5 +1,6 @@
 module Language.Ltml.AST.Module
     ( ModuleBlock (..)
+    , ModuleTable (..)
     , ModuleSchema (..)
     , Category (..)
     , Module (..)
@@ -8,7 +9,12 @@ module Language.Ltml.AST.Module
 
 import Language.Ltml.AST.Text (RichTextTree)
 
-data ModuleBlock = ModuleBlock ModuleSchema [Category]
+data ModuleBlock = ModuleBlock ModuleSchema ModuleTable
+    deriving (Show)
+
+data ModuleTable
+    = Categorized [Category]
+    | Plain [Module]
     deriving (Show)
 
 newtype ModuleSchema = ModuleSchema [Attribute]

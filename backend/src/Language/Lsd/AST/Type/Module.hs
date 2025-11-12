@@ -11,8 +11,6 @@ import Language.Lsd.AST.Type.Text (TextType)
 
 data ModuleBlockType
     = ModuleBlockType
-        Keyword
-        -- ^ Seperation Keyword for Category and Module Attribute lists
         (TextType EnumType)
         ModuleSchemaType
         CategoryType

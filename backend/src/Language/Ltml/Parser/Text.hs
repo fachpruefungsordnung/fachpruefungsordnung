@@ -9,7 +9,7 @@
 module Language.Ltml.Parser.Text
     ( ParagraphParser
     , textForestP
-    , seperatedTextForestsP
+    , pipeSeperatedTextForestsP
     , hangingTextP
     , HangingTextP
     , hangingTextP'
@@ -61,8 +61,8 @@ import Language.Ltml.Parser.MiTree
     , Restricted
     , hangingBlock'
     , hangingBlock_
-    , keywordSeparated
     , miForest
+    , pipeSeparated
     , unbracketed
     , unrestricted
     )
@@ -97,7 +97,7 @@ textForestP
     -> m [TextTree lbrk fnref style enum special]
 textForestP t = miForest inlinePs (blockPF t)
 
-seperatedTextForestsP
+pipeSeperatedTextForestsP
     :: ( ParserWrapper m
        , LineBreakP lbrk
        , FootnoteRefP fnref
@@ -105,10 +105,9 @@ seperatedTextForestsP
        , EnumP enumType enum
        , SpecialP m special
        )
-    => Keyword
-    -> TextType enumType
+    => TextType enumType
     -> m [[TextTree lbrk fnref style enum special]]
-seperatedTextForestsP kw tt = keywordSeparated (keywordP kw) inlinePs (blockPF tt)
+pipeSeperatedTextForestsP tt = pipeSeparated inlinePs (blockPF tt)
 
 -- Note on sentence start tokens (SSTs):
 --  * Labeled SSTs are permitted anywhere, while unlabeled SSTs are only
@@ -381,6 +380,7 @@ isWordChar c = not $ Char.isControl c
 isWordSemiSpecialChar :: Char -> Bool
 isWordSemiSpecialChar '{' = True
 isWordSemiSpecialChar '<' = True
+isWordSemiSpecialChar '|' = True
 isWordSemiSpecialChar c = isLineCommentPrefixFirstChar c
 
 isWordSpecialChar :: Char -> Bool

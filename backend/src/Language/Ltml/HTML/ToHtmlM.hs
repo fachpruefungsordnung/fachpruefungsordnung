@@ -51,6 +51,7 @@ import Language.Ltml.AST.Module
     , Module (..)
     , ModuleBlock (..)
     , ModuleSchema (..)
+    , ModuleTable (..)
     )
 import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.AST.Paragraph (Paragraph (..))
@@ -425,18 +426,25 @@ instance ToHtmlM Table where
         returnNow $ htmlError "Tables are not implemented yet :("
 
 instance ToHtmlM ModuleBlock where
-    toHtmlM (ModuleBlock (ModuleSchema features) categories) = do
+    toHtmlM (ModuleBlock (ModuleSchema features) moduleTable) = do
         featureDHtmls <- mapM (toHtmlM . unAttribute) features
-        categoryDHtmls <- mapM categoryRows categories
+
+        rowDHtmls <- case moduleTable of
+            Plain modules -> mapM moduleRow modules
+            Categorized categories -> mapM categoryRows categories
 
         return $ do
             featureHtmls <- sequence featureDHtmls
-            categoryHtmls <- sequence categoryDHtmls
+            rowHtmls <- sequence rowDHtmls
 
             -- add single empty cell to thead for category offset
-            let colgroup = colgroup_ $ col_ <#> Class.MinSizeColumn
-                thead = thead_ $ tr_ $ (th_ mempty <>) $ mconcat $ map th_ featureHtmls
-                tbody = tbody_ $ mconcat categoryHtmls
+            let headerPlaceholder =
+                    case moduleTable of
+                        Plain _ -> mempty
+                        Categorized _ -> th_ mempty
+                colgroup = colgroup_ $ col_ <#> Class.MinSizeColumn
+                thead = thead_ $ tr_ $ (headerPlaceholder <>) $ mconcat $ map th_ featureHtmls
+                tbody = tbody_ $ mconcat rowHtmls
             Now $
                 div_ <#> Class.TableContainer $
                     table_ <#> Class.Table $
@@ -445,7 +453,7 @@ instance ToHtmlM ModuleBlock where
         categoryRows :: Category -> HtmlReaderState
         categoryRows (Category name modules) = do
             categoryHtml <- toHtmlM $ unAttribute name
-            moduleDHtmls <- mapM moduleRow modules
+            moduleDHtmls <- mapM moduleHtml modules
 
             return $ do
                 moduleHtmls <- sequence moduleDHtmls
@@ -462,12 +470,17 @@ instance ToHtmlM ModuleBlock where
                         (m : ms) -> map tr_ (categoryCell <> m : ms)
                 return $ mconcat categoryRow
 
-        moduleRow :: Module -> HtmlReaderState
-        moduleRow (Module attr) = do
+        moduleHtml :: Module -> HtmlReaderState
+        moduleHtml (Module attr) = do
             attrDHtmls <- mapM (toHtmlM . unAttribute) attr
             return $ do
                 attrHtmls <- sequence attrDHtmls
                 return $ mconcat $ map (td_ <#> Class.TableCentered) attrHtmls
+
+        moduleRow :: Module -> HtmlReaderState
+        moduleRow m = do
+            attrsHtml <- moduleHtml m
+            return $ tr_ <$> attrsHtml
 
 -------------------------------------------------------------------------------
 
