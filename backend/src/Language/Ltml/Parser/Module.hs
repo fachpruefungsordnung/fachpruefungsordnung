@@ -31,7 +31,7 @@ import Text.Megaparsec (choice, many, some, (<?>))
 
 attributeListP :: Keyword -> TextType EnumType -> Parser [Attribute]
 attributeListP kw tt = do
-    lexeme $ keywordP kw
+    nLexeme $ keywordP kw
     fmap Attribute <$> pipeSeperatedTextForestsP tt
 
 -------------------------------------------------------------------------------

@@ -28,7 +28,7 @@ import Language.Ltml.Parser.Common.Indent
     ( checkIndentGT
     , nli
     )
-import Language.Ltml.Parser.Common.Lexeme (sp)
+import Language.Ltml.Parser.Common.Lexeme (nLexeme, sp)
 import Text.Megaparsec (Pos, empty, lookAhead, many, try, (<?>))
 import Text.Megaparsec.Char (char)
 import Text.Megaparsec.Char.Lexer (indentLevel)
@@ -254,6 +254,8 @@ hangingBlock_ = hangingBlock . fmap (const id)
 
 -- | Parse a list of '|' seperated TextForests.
 --   At least one element will be parsed.
+--   The list can also be defined across multiple lines
+--   and contain empty lines.
 --   The initial (minimum) indentation is set to none.
 pipeSeparated
     :: forall m a
@@ -277,5 +279,5 @@ pipeSeparatedFrom
     -> m [[a]]
 pipeSeparatedFrom inlinePs blockP lvl = do
     first <- miForestFrom False True inlinePs blockP lvl
-    rest <- many (char '|' *> miForestFrom True True inlinePs blockP lvl)
+    rest <- many (nLexeme (char '|') *> miForestFrom True True inlinePs blockP lvl)
     return (first : rest)
