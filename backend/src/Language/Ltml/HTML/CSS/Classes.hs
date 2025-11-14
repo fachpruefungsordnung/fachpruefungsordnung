@@ -15,7 +15,7 @@ module Language.Ltml.HTML.CSS.Classes
 
       -- * LTML AST to CSS Class Mapping
     , ToCssClass (..)
-    , toCssClasses
+    , ToCssClasses (..)
     ) where
 
 import Clay hiding (i, map, size)
@@ -25,6 +25,7 @@ import Data.String (fromString)
 import Data.Text (Text, pack, unpack)
 import qualified Data.Typography as Ltml
 import Data.Void (Void, absurd)
+import qualified Language.Lsd.AST.Type.Table as Ltml
 import qualified Language.Ltml.HTML.CSS.Color as Color
 import Language.Ltml.HTML.CSS.CustomClay
 
@@ -99,6 +100,8 @@ data Class
       MaxSizeColumn
     | -- | Center entries in table columns
       TableCentered
+    | -- | Highlight table cells with darker background color
+      TableDarkCell
     deriving (Show, Eq, Enum, Bounded)
 
 -- | Maps Class to its css style definition
@@ -291,7 +294,7 @@ classStyle Table = do
         cellBorder
         whiteSpace normal
 
-    toClassSelector Table |> tbody |> tr # hover ? do
+    toClassSelector Table |> tbody |> tr # hover |> td ? do
         backgroundColor Color.tocActiveRow
 
     toClassSelector Table |> tbody |> tr |> td ? do
@@ -333,6 +336,9 @@ classStyle MaxSizeColumn = do
 classStyle TableCentered =
     toClassSelector TableCentered ? do
         textAlign center
+classStyle TableDarkCell =
+    toClassSelector TableDarkCell ? do
+        backgroundColor Color.tocDarkCell
 
 -- | Returns the html class name of given Class
 className :: Class -> Text
@@ -382,8 +388,16 @@ instance ToCssClass Ltml.FontStyle where
 instance ToCssClass Void where
     toCssClass = absurd
 
--- | Converts Typography into list of CSS classes that implement each feature
-toCssClasses :: Ltml.Typography -> [Class]
-toCssClasses (Ltml.Typography align size styles) =
-    let styleClasses = map toCssClass styles
-     in toCssClass align : toCssClass size : styleClasses
+-- | Convert 'a' into list of CSS classes that implement each feature
+class ToCssClasses a where
+    toCssClasses :: a -> [Class]
+
+instance ToCssClasses Ltml.Typography where
+    toCssClasses (Ltml.Typography align size styles) =
+        let styleClasses = map toCssClass styles
+         in toCssClass align : toCssClass size : styleClasses
+
+instance ToCssClasses Ltml.BGColor where
+    toCssClasses bgColor = case bgColor of
+        Ltml.White -> []
+        Ltml.Gray -> [TableDarkCell]
