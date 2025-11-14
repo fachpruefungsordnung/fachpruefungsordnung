@@ -1346,7 +1346,7 @@ putCommentAnchor =
                 ON CONFLICT (comment, revision)
                 DO UPDATE SET
                     start_col = EXCLUDED.start_col,
-                    start_row = EXCLUDED.start_col,
+                    start_row = EXCLUDED.start_row,
                     end_col = EXCLUDED.end_col,
                     end_row = EXCLUDED.end_row
                 RETURNING

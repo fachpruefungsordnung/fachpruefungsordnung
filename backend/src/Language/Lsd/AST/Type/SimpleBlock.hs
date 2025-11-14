@@ -5,6 +5,7 @@ where
 
 import Language.Lsd.AST.SimpleRegex (Disjunction)
 import Language.Lsd.AST.Type (NamedType)
+import Language.Lsd.AST.Type.Module (ModuleBlockType)
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphType)
 import Language.Lsd.AST.Type.Table (TableType)
 
@@ -13,3 +14,4 @@ data SimpleBlockType
     = SimpleBlockType
         (NamedType SimpleParagraphType)
         (Disjunction (NamedType TableType))
+        (NamedType ModuleBlockType)
