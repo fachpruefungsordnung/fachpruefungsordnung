@@ -383,18 +383,24 @@ tableT =
     rowTypeT = RowType (Keyword "&") (Star (Disjunction [hcellTypeT]))
 
     cellTypeT :: CellType
-    cellTypeT = CellType (Keyword "") 
-                         (CellFormat 
-                            White 
-                            (Typography LeftAligned MediumFontSize [])) 
-                         plainTextT
+    cellTypeT =
+        CellType
+            (Keyword "")
+            ( CellFormat
+                White
+                (Typography LeftAligned MediumFontSize [])
+            )
+            plainTextT
 
     hcellTypeT :: CellType
-    hcellTypeT = CellType (Keyword "*") 
-                         (CellFormat 
-                            Gray 
-                            (Typography LeftAligned LargeFontSize [])) 
-                         plainTextT
+    hcellTypeT =
+        CellType
+            (Keyword "*")
+            ( CellFormat
+                Gray
+                (Typography LeftAligned LargeFontSize [])
+            )
+            plainTextT
 
 plainTextT :: TextType Void
 plainTextT = TextType (Disjunction [])

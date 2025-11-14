@@ -5,8 +5,8 @@ module Language.Ltml.AST.Table
     )
 where
 
-import Language.Ltml.AST.Text (TableTextTree)
 import Language.Lsd.AST.Type.Table (CellFormat)
+import Language.Ltml.AST.Text (TableTextTree)
 
 -- the internal representation of a table
 newtype Table = Table [Row]
@@ -17,7 +17,8 @@ instance Show Table where
 newtype Row = Row [Cell]
     deriving (Show)
 
-data Cell = Cell CellFormat [TableTextTree] Int Int 
-          | SpannedCell -- for merged cells. equivalent to Cell _ [] 0 0, 
-                        -- but since they dont need a format, we use a separate constructor
+data Cell
+    = Cell CellFormat [TableTextTree] Int Int
+    | SpannedCell -- for merged cells. equivalent to Cell _ [] 0 0,
+    -- but since they dont need a format, we use a separate constructor
     deriving (Show)

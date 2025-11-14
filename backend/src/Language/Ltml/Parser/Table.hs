@@ -9,11 +9,14 @@ where
 import Data.Array (Array, array, bounds, (!), (//))
 import Data.Text (pack)
 import qualified Data.Text as T
-import Language.Lsd.AST.SimpleRegex (Star (Star), Disjunction (Disjunction))
+import Language.Lsd.AST.Common (Keyword (Keyword))
+import Language.Lsd.AST.SimpleRegex (Disjunction (Disjunction), Star (Star))
 import Language.Lsd.AST.Type.Table
-    ( CellType (CellType)
+    ( CellFormat
+    , CellType (CellType)
+    , DefaultCellType (DefaultCellType)
     , RowType (RowType)
-    , TableType (TableType), CellFormat, DefaultCellType (DefaultCellType)
+    , TableType (TableType)
     )
 import Language.Ltml.AST.Table
     ( Cell (..)
@@ -25,14 +28,15 @@ import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
 import Language.Ltml.Parser.Text (textForestP)
 import Text.Megaparsec
-    ( MonadParsec ( hidden, takeWhileP, lookAhead, try)
+    ( MonadParsec (hidden, lookAhead, takeWhileP, try)
+    , choice
     , errorBundlePretty
     , manyTill
     , runParser
-    , some, choice, (<|>)
+    , some
+    , (<|>)
     )
-import Text.Megaparsec.Char (space, string, char)
-import Language.Lsd.AST.Common (Keyword(Keyword))
+import Text.Megaparsec.Char (char, space, string)
 
 cellP :: Keyword -> CellType -> Parser Cell'
 cellP (Keyword tkw) (CellType (Keyword ckw) fmt tt) = do
@@ -52,12 +56,14 @@ cellP (Keyword tkw) (CellType (Keyword ckw) fmt tt) = do
 -- parse a row ending with |&
 rowP :: Keyword -> DefaultCellType -> RowType -> Parser Row'
 rowP k@(Keyword tkw) (DefaultCellType defaultCellT) (RowType (Keyword rkw) (Star (Disjunction t))) = do
-    cells <- nLexeme $ 
-                manyTill 
-                    (choice 
-                        (map (cellP k) t) 
-                        <|> cellP k defaultCellT) 
-                    (try (string (tkw <> rkw)))
+    cells <-
+        nLexeme $
+            manyTill
+                ( choice
+                    (map (cellP k) t)
+                    <|> cellP k defaultCellT
+                )
+                (try (string (tkw <> rkw)))
     -- _ <- string (tkw <> rkw)
     pure (Row' cells)
 
@@ -94,7 +100,10 @@ type Position = (Int, Int)
 
 mergeCells :: DefaultCellType -> Table' -> Table
 mergeCells (DefaultCellType defaultCellT) table =
-    let matrix' = array ((0, 0), (nRows, mCols)) [((row, col), emptyEntry) | row <- [0 .. nRows], col <- [0 .. mCols]]
+    let matrix' =
+            array
+                ((0, 0), (nRows, mCols))
+                [((row, col), emptyEntry) | row <- [0 .. nRows], col <- [0 .. mCols]]
         visited0 (_, _) = False
      in arrayToTable $ snd $ process (0, 0) (visited0, matrix')
   where
@@ -109,7 +118,9 @@ mergeCells (DefaultCellType defaultCellT) table =
     maxWidth (row, col) =
         (1 +) $
             length $
-                takeWhile (\col' -> col' <= mCols && unpackCell' (rawMatrix ! (row, col')) == MergeLeft) [col + 1 .. mCols]
+                takeWhile
+                    (\col' -> col' <= mCols && unpackCell' (rawMatrix ! (row, col')) == MergeLeft)
+                    [col + 1 .. mCols]
 
     maxHeight :: Position -> Int -> Int
     maxHeight (row, col) w =
@@ -129,33 +140,35 @@ mergeCells (DefaultCellType defaultCellT) table =
                     [row + 1 .. nRows]
 
     updateVisited :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
-    updateVisited p0 (visited, mat) = (\p -> p == p0 || visited p, mat )
+    updateVisited p0 (visited, mat) = (\p -> p == p0 || visited p, mat)
 
-    updateMatrix :: Position -> Cell -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
+    updateMatrix
+        :: Position -> Cell -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
     updateMatrix pos val (visited, mat) = (visited, mat // [(pos, val)])
 
     process :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
     process (row, col) s@(visited, _)
         | row > nRows = s
-        | col > mCols = process (row+1, 0) s
+        | col > mCols = process (row + 1, 0) s
         | visited (row, col) = process (row, col + 1) s
         | otherwise =
             let createCell fmt content =
                     let w = maxWidth (row, col)
                         h = maxHeight (row, col) w
-                        s' = foldl
+                        s' =
+                            foldl
                                 (\acc (x, y) -> updateVisited (x, y) acc)
                                 s
                                 [ (row', col')
                                 | col' <- [col .. col + w - 1]
                                 , row' <- [row .. row + h - 1]
                                 ]
-                    in updateMatrix (row, col) (Cell fmt content w h) s'
+                     in updateMatrix (row, col) (Cell fmt content w h) s'
                 res = case rawMatrix ! (row, col) of
-                        Cell' fmt MergeLeft -> createCell fmt [Word "<"]
-                        Cell' fmt MergeUp -> createCell fmt [Word "^"]
-                        Cell' fmt (Cell'' content) -> createCell fmt content
-             in process (row, col+1) res
+                    Cell' fmt MergeLeft -> createCell fmt [Word "<"]
+                    Cell' fmt MergeUp -> createCell fmt [Word "^"]
+                    Cell' fmt (Cell'' content) -> createCell fmt content
+             in process (row, col + 1) res
 
 -- Convert a list of lists to an array
 tableToArray :: Table' -> Matrix Cell'
@@ -185,33 +198,32 @@ padTable (CellType _ fmt _) (Table' rows) =
     padRow row (Row' cs) =
         Row' (cs ++ replicate (row - length cs) (Cell' fmt (Cell'' [])))
 
-
 -- first attempt using State monad (commented out)
-    -- updateVisited :: Position -> State (Visited, Matrix Cell) ()
-    -- updateVisited p0 = modify $ \(visited, mat) -> (\p -> p == p0 || visited p, mat )
+-- updateVisited :: Position -> State (Visited, Matrix Cell) ()
+-- updateVisited p0 = modify $ \(visited, mat) -> (\p -> p == p0 || visited p, mat )
 
-    -- updateMatrix :: Position -> Cell -> State (Visited, Matrix Cell) ()
-    -- updateMatrix pos val = modify $ \(visited, mat) -> (visited, mat // [(pos, val)])
+-- updateMatrix :: Position -> Cell -> State (Visited, Matrix Cell) ()
+-- updateMatrix pos val = modify $ \(visited, mat) -> (visited, mat // [(pos, val)])
 
-    -- process =
-    --     forM_ [0 .. nRows] $ \row ->
-    --         forM_ [0 .. mCols] $ \col -> do
-    --             let pos = (row, col)
-    --             (visited, _) <- get
-    --             if visited pos
-    --                 then updateMatrix pos emptyEntry
-    --                 else do
-    --                     let createCell content = do
-    --                             let w = maxWidth pos
-    --                             let h = maxHeight pos w
+-- process =
+--     forM_ [0 .. nRows] $ \row ->
+--         forM_ [0 .. mCols] $ \col -> do
+--             let pos = (row, col)
+--             (visited, _) <- get
+--             if visited pos
+--                 then updateMatrix pos emptyEntry
+--                 else do
+--                     let createCell content = do
+--                             let w = maxWidth pos
+--                             let h = maxHeight pos w
 
-    --                             forM_ [row .. row + h - 1] $ \y ->
-    --                                 forM_ [col .. col + w - 1] $ \x ->
-    --                                     updateVisited (x, y)
+--                             forM_ [row .. row + h - 1] $ \y ->
+--                                 forM_ [col .. col + w - 1] $ \x ->
+--                                     updateVisited (x, y)
 
-    --                             updateMatrix pos (Cell content w h)
-    --                     case rawMatrix ! pos of
-    --                         EmptyCell -> createCell []
-    --                         MergeLeft -> createCell [Word "<"]
-    --                         MergeUp -> createCell [Word "^"]
-    --                         Cell' content -> createCell content
+--                             updateMatrix pos (Cell content w h)
+--                     case rawMatrix ! pos of
+--                         EmptyCell -> createCell []
+--                         MergeLeft -> createCell [Word "<"]
+--                         MergeUp -> createCell [Word "^"]
+--                         Cell' content -> createCell content
