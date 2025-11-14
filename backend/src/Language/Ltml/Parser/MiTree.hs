@@ -14,6 +14,7 @@ module Language.Ltml.Parser.MiTree
     , hangingBlock
     , hangingBlock'
     , hangingBlock_
+    , pipeSeparated
     )
 where
 
@@ -27,8 +28,10 @@ import Language.Ltml.Parser.Common.Indent
     ( checkIndentGT
     , nli
     )
-import Language.Ltml.Parser.Common.Lexeme (sp)
-import Text.Megaparsec (Pos, empty, (<?>))
+import Language.Ltml.Parser.Common.Lexeme (nLexeme, sp)
+import Text.Megaparsec (Pos, empty, lookAhead, many, try, (<?>))
+import Text.Megaparsec.Char (char)
+import Text.Megaparsec.Char.Lexer (indentLevel)
 import qualified Text.Megaparsec.Char.Lexer as L (indentLevel)
 
 -- | Configuration on how to handle an element (node in a mi-tree).
@@ -110,7 +113,7 @@ miForest
     --   'Language.Ltml.Parser.Common.Indent.someIndented' and/or
     --   'Control.Applicative.<|>'), which satisfies these requirements.
     -> m [a]
-miForest inlinePs blockP = miForestFrom False inlinePs blockP Nothing
+miForest inlinePs blockP = miForestFrom False False inlinePs blockP Nothing
 
 -- | Information on whitespace separating two elements.
 data Sep
@@ -131,13 +134,16 @@ miForestFrom
     --   parsing any element is possible.
     --   If @False@, the parser is expected to be run at the start of an
     --   (indented) non-empty line.
+    -> Bool
+    -- ^ Whether the miForest should be ended when encountering a '|',
+    --   which is a semi-special word character.
     -> [Restricted (InlineParser m a)]
     -> (Maybe Pos -> m a)
     -> Maybe Pos
     -- ^ Parent indentation level.  Only input indented strictly further is
     --   accepted.
     -> m [a]
-miForestFrom rootIsHeaded rInlinePs blockP lvl = do
+miForestFrom rootIsHeaded untilPipe rInlinePs blockP lvl = do
     (x, sep) <- go rootIsHeaded (filterRestricted (const True) rInlinePs)
     case sep of
         Sep True _ -> return x
@@ -172,17 +178,22 @@ miForestFrom rootIsHeaded rInlinePs blockP lvl = do
       where
         goInline :: Text -> m ([a], Sep)
         goInline precWS = do
-            ((cfg, e), s) <- choice $ map mkP inlinePs
+            -- check if '|' is next and should terminate the forest
+            mStop <- optional $ lookAhead (try $ char '|')
+            case (mStop, untilPipe) of
+                (Just _, True) -> goEnd (Sep True precWS)
+                _ -> do
+                    ((cfg, e), s) <- choice $ map mkP inlinePs
 
-            let precWS' :: [a]
-                precWS' =
-                    if miecRetainPrecedingWhitespace cfg
-                        then fromWhitespace precWS
-                        else []
+                    let precWS' :: [a]
+                        precWS' =
+                            if miecRetainPrecedingWhitespace cfg
+                                then fromWhitespace precWS
+                                else []
 
-            (es, s') <- goTail (miecRetainTrailingWhitespace cfg) s
+                    (es, s') <- goTail (miecRetainTrailingWhitespace cfg) s
 
-            return (precWS' ++ e ++ es, s')
+                    return (precWS' ++ e ++ es, s')
 
         goTail :: Bool -> Sep -> m ([a], Sep)
         goTail retainWS (Sep lineEnded precWS) =
@@ -219,7 +230,7 @@ hangingBlock
     -> m b
 hangingBlock keywordP inlinePs blockP = do
     lvl' <- L.indentLevel
-    keywordP <*> miForestFrom True inlinePs blockP (Just lvl')
+    keywordP <*> miForestFrom True False inlinePs blockP (Just lvl')
 
 -- | Version of 'hangingBlock' where the keyword parser may yield any value,
 --   which is paired with the parsed mi-forest.
@@ -240,3 +251,33 @@ hangingBlock_
     -> (Maybe Pos -> m a)
     -> m [a]
 hangingBlock_ = hangingBlock . fmap (const id)
+
+-- | Parse a list of '|' seperated TextForests.
+--   At least one element will be parsed.
+--   The list can also be defined across multiple lines
+--   and contain empty lines.
+--   The initial (minimum) indentation is set to none.
+pipeSeparated
+    :: forall m a
+     . (MonadParser m, FromWhitespace [a])
+    => [Restricted (InlineParser m a)]
+    -> (Maybe Pos -> m a)
+    -- ^ Block parser. Documentation of 'miForest' applies.
+    -> m [[a]]
+pipeSeparated inlinePs blockP = do
+    lvl <- indentLevel
+    pipeSeparatedFrom inlinePs blockP (Just lvl)
+
+pipeSeparatedFrom
+    :: forall m a
+     . (MonadParser m, FromWhitespace [a])
+    => [Restricted (InlineParser m a)]
+    -> (Maybe Pos -> m a)
+    -- ^ Block parser. Documentation of 'miForest' applies.
+    -> Maybe Pos
+    -- ^ Parent indentation level. Documentation of 'miForestFrom' applies.
+    -> m [[a]]
+pipeSeparatedFrom inlinePs blockP lvl = do
+    first <- miForestFrom False True inlinePs blockP lvl
+    rest <- many (nLexeme (char '|') *> miForestFrom True True inlinePs blockP lvl)
+    return (first : rest)

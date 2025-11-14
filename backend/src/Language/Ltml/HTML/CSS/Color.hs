@@ -1,7 +1,8 @@
 module Language.Ltml.HTML.CSS.Color
     ( -- * Table Colors
-      tableDarkCell
-    , tableActiveRow
+      tocDarkCell
+    , tocActiveRow
+    , tocCellBorder
     , tableCellBorder
 
       -- * Link Colors
@@ -16,14 +17,17 @@ module Language.Ltml.HTML.CSS.Color
 
 import Clay
 
-tableDarkCell :: Color
-tableDarkCell = grayish 225
+tocDarkCell :: Color
+tocDarkCell = grayish 225
 
-tableActiveRow :: Color
-tableActiveRow = darken 0.2 tableDarkCell
+tocActiveRow :: Color
+tocActiveRow = darken 0.2 tocDarkCell
+
+tocCellBorder :: Color
+tocCellBorder = grayish 180
 
 tableCellBorder :: Color
-tableCellBorder = grayish 180
+tableCellBorder = grayish 40
 
 -------------------------------------------------------------------------------
 

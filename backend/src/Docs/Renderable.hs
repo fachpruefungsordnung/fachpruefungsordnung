@@ -22,7 +22,7 @@ import Docs.TextRevision (TextElementRevision)
 import qualified Docs.TextRevision as TextRevision
 import qualified Language.Lsd.AST.Common as LSD
 
--- | Class for all types renerable as a text element.
+-- | Class for all types renderable as a text element.
 class Renderable r where
     -- | The kind of the text
     kindOf :: r -> LSD.KindName

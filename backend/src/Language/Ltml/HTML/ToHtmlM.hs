@@ -12,7 +12,7 @@ import Data.Either (rights)
 import qualified Data.Map as Map
 import Data.Maybe (isJust)
 import qualified Data.Set as Set
-import Data.Text (Text, unpack)
+import Data.Text (Text, pack, unpack)
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Common (Fallback (..), NavTocHeading (..))
 import Language.Lsd.AST.Format (HeadingFormat)
@@ -45,6 +45,14 @@ import Language.Ltml.AST.DocumentContainer
     )
 import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label (Label (..))
+import Language.Ltml.AST.Module
+    ( Attribute (..)
+    , Category (..)
+    , Module (..)
+    , ModuleBlock (..)
+    , ModuleSchema (..)
+    , ModuleTable (..)
+    )
 import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.AST.Paragraph (Paragraph (..))
 import Language.Ltml.AST.Section
@@ -205,7 +213,7 @@ instance ToHtmlM (Parsed DocumentHeading) where
             Left headFormat -> buildMainHeading titleHtml headFormat
             Right headFormatId -> buildAppendixHeading titleHtml headFormatId
         htmlId <- addTocEntry mIdHtml (resType titleHtml) mLabel Other
-        -- \| In case of a parse error, output and error box
+        -- \| In case of a parse error, output an error box
         return $
             either
                 (Now . parseErrorHtml (Just htmlId))
@@ -387,6 +395,7 @@ instance ToHtmlM SimpleBlock where
     toHtmlM simpleBlock = case simpleBlock of
         SimpleParagraphBlock simpleParagraph -> toHtmlM simpleParagraph
         TableBlock table -> toHtmlM table
+        ModuleSchemaBlock moduleBlock -> toHtmlM moduleBlock
 
 -- | Section without Heading and Identifier
 instance ToHtmlM SimpleSection where
@@ -430,6 +439,63 @@ instance ToHtmlM Table where
         cell (Cell text colspan rowspan) = do
             textHtml <- toHtmlM text
             return $ td_ [colspan_ (iToT colspan), rowspan_ (iToT rowspan)] <$> textHtml
+
+instance ToHtmlM ModuleBlock where
+    toHtmlM (ModuleBlock (ModuleSchema features) moduleTable) = do
+        featureDHtmls <- mapM (toHtmlM . unAttribute) features
+
+        rowDHtmls <- case moduleTable of
+            Plain modules -> mapM moduleRow modules
+            Categorized categories -> mapM categoryRows categories
+
+        return $ do
+            featureHtmls <- sequence featureDHtmls
+            rowHtmls <- sequence rowDHtmls
+
+            -- add single empty cell to thead for category offset
+            let headerPlaceholder =
+                    case moduleTable of
+                        Plain _ -> mempty
+                        Categorized _ -> th_ mempty
+                colgroup = colgroup_ $ col_ <#> Class.MinSizeColumn
+                thead = thead_ $ tr_ $ (headerPlaceholder <>) $ mconcat $ map th_ featureHtmls
+                tbody = tbody_ $ mconcat rowHtmls
+            Now $
+                div_ <#> Class.TableContainer $
+                    table_ <#> Class.Table $
+                        colgroup <> thead <> tbody
+      where
+        categoryRows :: Category -> HtmlReaderState
+        categoryRows (Category name modules) = do
+            categoryHtml <- toHtmlM $ unAttribute name
+            moduleDHtmls <- mapM moduleHtml modules
+
+            return $ do
+                moduleHtmls <- sequence moduleDHtmls
+                cat <- categoryHtml
+                let
+                    -- TODO: use iToT here
+                    categoryCell =
+                        td_
+                            [rowspan_ (pack . show . length $ modules), cssClass_ Class.TableCentered]
+                            cat
+
+                    categoryRow = case moduleHtmls of
+                        [] -> [tr_ categoryCell]
+                        (m : ms) -> map tr_ (categoryCell <> m : ms)
+                return $ mconcat categoryRow
+
+        moduleHtml :: Module -> HtmlReaderState
+        moduleHtml (Module attr) = do
+            attrDHtmls <- mapM (toHtmlM . unAttribute) attr
+            return $ do
+                attrHtmls <- sequence attrDHtmls
+                return $ mconcat $ map (td_ <#> Class.TableCentered) attrHtmls
+
+        moduleRow :: Module -> HtmlReaderState
+        moduleRow m = do
+            attrsHtml <- moduleHtml m
+            return $ tr_ <$> attrsHtml
 
 -------------------------------------------------------------------------------
 
@@ -740,7 +806,7 @@ renderToc (Just (TocFormat (TocHeading title))) entryFunc buttonFunc globalState
 
         -- \| [Delayed (Html ())] -> Delayed [Html ()] -> Delayed (Html ())
         tableBody = tbody_ . mconcat <$> sequence tocEntries
-     in (nav_ <#> Class.TocContainer) . (table_ <#> Class.TableOfContents)
+     in (nav_ <#> Class.TableContainer) . (table_ <#> Class.TableOfContents)
             <$> (pure colGroup <> pure tableHead <> tableBody)
   where
     -- \| Build <tr><td>id</td> <td>title</td></tr> and wrap id and title seperatly
