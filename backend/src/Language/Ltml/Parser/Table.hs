@@ -6,16 +6,14 @@ module Language.Ltml.Parser.Table
     )
 where
 
-import Control.Monad (forM_)
-import Control.Monad.State (State, execState, get, modify)
 import Data.Array (Array, array, bounds, (!), (//))
 import Data.Text (pack)
 import qualified Data.Text as T
-import Language.Lsd.AST.SimpleRegex (Star (Star))
+import Language.Lsd.AST.SimpleRegex (Star (Star), Disjunction (Disjunction))
 import Language.Lsd.AST.Type.Table
     ( CellType (CellType)
     , RowType (RowType)
-    , TableType (TableType)
+    , TableType (TableType), CellFormat, DefaultCellType (DefaultCellType)
     )
 import Language.Ltml.AST.Table
     ( Cell (..)
@@ -27,62 +25,63 @@ import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
 import Language.Ltml.Parser.Text (textForestP)
 import Text.Megaparsec
-    ( MonadParsec ( hidden, takeWhileP, try)
+    ( MonadParsec ( hidden, takeWhileP, lookAhead, try)
     , errorBundlePretty
     , manyTill
     , runParser
-    , some
+    , some, choice, (<|>)
     )
-import Text.Megaparsec.Char (char, space, string)
+import Text.Megaparsec.Char (space, string, char)
+import Language.Lsd.AST.Common (Keyword(Keyword))
 
-cellP :: CellType -> Parser Cell'
-cellP (CellType tt) = do
-    _ <- char '|'
+cellP :: Keyword -> CellType -> Parser Cell'
+cellP (Keyword tkw) (CellType (Keyword ckw) fmt tt) = do
+    _ <- string (tkw <> ckw)
     space
     -- Take everything until we *see* a table boundary
     chunk <- takeWhileP (Just "cell text") (`notElem` ['|'])
     if
-        | T.null chunk -> pure EmptyCell
-        | T.strip chunk == "<" -> pure MergeLeft
-        | T.strip chunk == "^" -> pure MergeUp
+        | T.null chunk -> pure $ Cell' fmt (Cell'' [])
+        | T.strip chunk == "<" -> pure $ Cell' fmt MergeLeft
+        | T.strip chunk == "^" -> pure $ Cell' fmt MergeUp
         | otherwise ->
             case runParser (textForestP tt) "" (chunk <> "\n") of
-                Left err -> pure (Cell' [Word $ pack $ errorBundlePretty err])
-                Right forest -> pure (Cell' forest)
+                Left err -> pure $ Cell' fmt (Cell'' [Word $ pack $ errorBundlePretty err])
+                Right forest -> pure $ Cell' fmt (Cell'' forest)
 
 -- parse a row ending with |&
-rowP :: RowType -> Parser Row'
-rowP (RowType (Star t)) = do
-    cells <- nLexeme $ manyTill (cellP t) (try (string "|&"))
+rowP :: Keyword -> DefaultCellType -> RowType -> Parser Row'
+rowP k@(Keyword tkw) (DefaultCellType defaultCellT) (RowType (Keyword rkw) (Star (Disjunction t))) = do
+    cells <- nLexeme $ 
+                manyTill 
+                    (choice 
+                        (map (cellP k) t) 
+                        <|> cellP k defaultCellT) 
+                    (try (string (tkw <> rkw)))
+    -- _ <- string (tkw <> rkw)
     pure (Row' cells)
 
 -- parse an entire table
-tableP' :: TableType -> Parser Table'
-tableP' (TableType _ (Star t)) = do
-    space
-    nRows <- nLexeme $ some (rowP t)
-    hidden space
-    _ <- char '&'
-    pure (Table' nRows)
-
 tableP :: TableType -> Parser Table
-tableP tt = do
-    tbl' <- tableP' tt
-    pure (mergeCells tbl')
+tableP (TableType kw defaultCellT (Star t)) = do
+    space
+    nRows <- nLexeme $ some (rowP kw defaultCellT t)
+    hidden space
+    -- _ <- char '&'
+    pure (mergeCells defaultCellT $ Table' nRows)
 
 -- the rawly parsed representation of a table
 newtype Table' = Table' {unTable' :: [Row']}
-    deriving (Show)
 
 newtype Row' = Row' {unRow' :: [Cell']}
+
+data Cell' = Cell' CellFormat Cell''
+
+data Cell'' = Cell'' [TableTextTree] | MergeLeft | MergeUp
     deriving (Show)
 
-data Cell' = Cell' [TableTextTree] | EmptyCell | MergeLeft | MergeUp
-    deriving (Show)
-
-instance Eq Cell' where
-    (Cell' _) == (Cell' _) = True
-    EmptyCell == EmptyCell = True
+instance Eq Cell'' where
+    (Cell'' _) == (Cell'' _) = True
     MergeLeft == MergeLeft = True
     MergeUp == MergeUp = True
     _ == _ = False
@@ -93,22 +92,24 @@ type Matrix a = Array (Int, Int) a
 type Visited = (Int, Int) -> Bool
 type Position = (Int, Int)
 
-mergeCells :: Table' -> Table
-mergeCells table =
+mergeCells :: DefaultCellType -> Table' -> Table
+mergeCells (DefaultCellType defaultCellT) table =
     let matrix' = array ((0, 0), (nRows, mCols)) [((row, col), emptyEntry) | row <- [0 .. nRows], col <- [0 .. mCols]]
         visited0 (_, _) = False
      in arrayToTable $ snd $ process (0, 0) (visited0, matrix')
   where
-    table' = padTable table
+    table' = padTable defaultCellT table
     rawMatrix = tableToArray table'
     ((0, 0), (nRows, mCols)) = bounds rawMatrix
-    emptyEntry = Cell [] 0 0
+    emptyEntry = SpannedCell
+
+    unpackCell' (Cell' _ c) = c
 
     maxWidth :: Position -> Int
     maxWidth (row, col) =
         (1 +) $
             length $
-                takeWhile (\col' -> col' <= mCols && rawMatrix ! (row, col') == MergeLeft) [col + 1 .. mCols]
+                takeWhile (\col' -> col' <= mCols && unpackCell' (rawMatrix ! (row, col')) == MergeLeft) [col + 1 .. mCols]
 
     maxHeight :: Position -> Int -> Int
     maxHeight (row, col) w =
@@ -117,16 +118,16 @@ mergeCells table =
                 takeWhile
                     ( \row' ->
                         row' <= nRows
-                            && rawMatrix ! (row', col) == MergeUp
+                            && unpackCell' (rawMatrix ! (row', col)) == MergeUp
                             && all
                                 ( \col' ->
-                                    let val = rawMatrix ! (row', col')
+                                    let val = unpackCell' (rawMatrix ! (row', col'))
                                      in val == MergeLeft || val == MergeUp
                                 )
                                 [col + 1 .. col + w - 1]
                     )
                     [row + 1 .. nRows]
-        
+
     updateVisited :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
     updateVisited p0 (visited, mat) = (\p -> p == p0 || visited p, mat )
 
@@ -134,12 +135,12 @@ mergeCells table =
     updateMatrix pos val (visited, mat) = (visited, mat // [(pos, val)])
 
     process :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
-    process (row, col) s@(visited, _) 
-        | row > nRows = s 
+    process (row, col) s@(visited, _)
+        | row > nRows = s
         | col > mCols = process (row+1, 0) s
         | visited (row, col) = process (row, col + 1) s
         | otherwise =
-            let createCell content =
+            let createCell fmt content =
                     let w = maxWidth (row, col)
                         h = maxHeight (row, col) w
                         s' = foldl
@@ -149,12 +150,11 @@ mergeCells table =
                                 | col' <- [col .. col + w - 1]
                                 , row' <- [row .. row + h - 1]
                                 ]
-                     in updateMatrix (row, col) (Cell content w h) s'
+                    in updateMatrix (row, col) (Cell fmt content w h) s'
                 res = case rawMatrix ! (row, col) of
-                        EmptyCell -> createCell []
-                        MergeLeft -> createCell [Word "<"]
-                        MergeUp -> createCell [Word "^"]
-                        Cell' content -> createCell content
+                        Cell' fmt MergeLeft -> createCell fmt [Word "<"]
+                        Cell' fmt MergeUp -> createCell fmt [Word "^"]
+                        Cell' fmt (Cell'' content) -> createCell fmt content
              in process (row, col+1) res
 
 -- Convert a list of lists to an array
@@ -166,8 +166,8 @@ tableToArray t =
             ((0, 0), (nRows, mCols))
             [((row, col), getCell row col) | row <- [0 .. nRows], col <- [0 .. mCols]]
   where
-    nRows = unTable' t
-    getCell row col = unRow' (nRows !! row) !! col
+    rows = unTable' t
+    getCell row col = unRow' (rows !! row) !! col
 
 -- Convert array back to list of lists (optional)
 arrayToTable :: Matrix Cell -> Table
@@ -176,14 +176,14 @@ arrayToTable arr =
      in Table [Row [arr ! (row, col) | col <- [j0 .. jn]] | row <- [i0 .. in_]]
 
 -- pad nRows to equal length
-padTable :: Table' -> Table'
-padTable (Table' rows) =
+padTable :: CellType -> Table' -> Table'
+padTable (CellType _ fmt _) (Table' rows) =
     let maxLen = maximum (map rowLen rows)
      in Table' (map (padRow maxLen) rows)
   where
     rowLen (Row' cs) = length cs
-    padRow rows (Row' cs) =
-        Row' (cs ++ replicate (rows - length cs) EmptyCell)
+    padRow row (Row' cs) =
+        Row' (cs ++ replicate (row - length cs) (Cell' fmt (Cell'' [])))
 
 
 -- first attempt using State monad (commented out)

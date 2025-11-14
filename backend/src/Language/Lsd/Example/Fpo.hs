@@ -377,13 +377,24 @@ simpleParagraphTF alignment fsize =
 tableT :: NamedType TableType
 tableT =
     NamedType "table" "Tabelle" $
-        TableType (Keyword "") (Star rowTypeT)
+        TableType (Keyword "|") (DefaultCellType cellTypeT) (Star rowTypeT)
   where
     rowTypeT :: RowType
-    rowTypeT = RowType (Star cellTypeT)
+    rowTypeT = RowType (Keyword "&") (Star (Disjunction [hcellTypeT]))
 
     cellTypeT :: CellType
-    cellTypeT = CellType plainTextT
+    cellTypeT = CellType (Keyword "") 
+                         (CellFormat 
+                            White 
+                            (Typography LeftAligned MediumFontSize [])) 
+                         plainTextT
+
+    hcellTypeT :: CellType
+    hcellTypeT = CellType (Keyword "*") 
+                         (CellFormat 
+                            Gray 
+                            (Typography LeftAligned LargeFontSize [])) 
+                         plainTextT
 
 plainTextT :: TextType Void
 plainTextT = TextType (Disjunction [])
