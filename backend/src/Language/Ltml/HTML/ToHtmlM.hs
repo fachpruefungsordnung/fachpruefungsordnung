@@ -180,6 +180,12 @@ instance ToHtmlM Document where
                                     localTocHtml <- renderLocalToc mTocFormat
                                     return (localTocHtml, introHtml, mainHtml, outroHtml)
 
+                -- Print footnotes that appear directly inside the 'DocumentMainBody'.
+                -- For example inside of appendice tables (SimpleBlocks).
+                usedFootnotes <- gets locallyUsedFootnotes
+                footnotesHtml <- toHtmlM usedFootnotes
+                modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
+
                 -- \| Render DocumentHeading / ToC only if renderFlag was set by parent
                 return $
                     div_ <#> Class.Document
@@ -188,6 +194,7 @@ instance ToHtmlM Document where
                                 <> (if renderToC then tocHtml else mempty)
                                 <> mainHtml
                                 <> outroHtml
+                                <> (if renderDoc then footnotesHtml else mempty)
                             )
 
 -- | Does not only produce the default error box on error,
@@ -722,7 +729,7 @@ instance (ToHtmlM a) => ToHtmlM (Flagged' a) where
         parentRender <- asks shouldRender
         let render = renderFlag || hasFlaggedChild || parentRender
         -- \| Tell parent that we exist
-        modify (\s -> s {hasFlagged = True})
+        modify (\s -> s {hasFlagged = True}) -- TODO: Only set this True if render? Why all the time?
         return $ if render then aHtml else mempty
 
 -------------------------------------------------------------------------------
