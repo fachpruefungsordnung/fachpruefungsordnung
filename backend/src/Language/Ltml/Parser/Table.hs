@@ -28,7 +28,7 @@ import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (nLexeme)
 import Language.Ltml.Parser.Text (textForestP)
 import Text.Megaparsec
-    ( MonadParsec (hidden, lookAhead, takeWhileP, try)
+    ( MonadParsec (hidden, takeWhileP, try)
     , choice
     , errorBundlePretty
     , manyTill
@@ -36,7 +36,7 @@ import Text.Megaparsec
     , some
     , (<|>)
     )
-import Text.Megaparsec.Char (char, space, string)
+import Text.Megaparsec.Char (space, string)
 
 cellP :: Keyword -> CellType -> Parser Cell'
 cellP (Keyword tkw) (CellType (Keyword ckw) fmt tt) = do
@@ -198,32 +198,323 @@ padTable (CellType _ fmt _) (Table' rows) =
     padRow row (Row' cs) =
         Row' (cs ++ replicate (row - length cs) (Cell' fmt (Cell'' [])))
 
--- first attempt using State monad (commented out)
--- updateVisited :: Position -> State (Visited, Matrix Cell) ()
--- updateVisited p0 = modify $ \(visited, mat) -> (\p -> p == p0 || visited p, mat )
+{-
+Example table Ltml representation:
+|* <*PHF-phil-BA1>         |* <*Philosophische Fach- und Vermittlungskompetenzen>                                    |<|<|<|<|<|<|&
+| <*Semesterlage>          | <*Dauer>                 |<|<| <*Status> | <*Zugangsvoraussetzung> | <*LP/Workload>               |<|&
+| 1. und 2. Semester       | 2 Semester               |<|<| Pflicht   | -                       | 9 LP / 270 Stunden           |<|&
+| <*Lehrveranstaltunge(n)> | <*Lehrform> | <*SWS> | <*LP> | <*Status> | <*Prüfungsleistungen>   | <*Bewertungsart> | <*Wichtung> |&
+| Einführung in die 
+  Philosophie              | Vorlesung   | 2      | 2     | Pflicht   | -                       | -                | -           |&
+| Logik, Argumentation, 
+  Sprache                  | *Seminar    | 2      | 4     | Pflicht   | Take-home-Klausur (ca. 
+                                                                        5 Seiten) oder Klausur 
+                                                                        (3 Std.)                | unbenotet        | -           |&
+| Einführung in das 
+  Verfassen 
+  wissenschaftlicher 
+  Texte im Fach 
+  Philosophie              | *Übung      | 2      | 3     | Wahl-
+                                                            pflicht   | Portfolio-Leistungen    | unbenotet        | -           |&  
+| Einführung in die 
+  Interpretation 
+  philosophischer Texte    | *Übung      | 2      | 3     | Wahl-
+                                                            pflicht   | Portfolio-Leistungen    | unbenotet        | -           |&  
+| <*Weitere Angaben> {nl}
+  Die Studierenden wählen eine der beiden Übungen. {nl}
+  *=Anwesenheitspflicht                                                                                             |<|<|<|<|<|<|<|&  
+|* <*PHF-phil-BA2>         |* <*Geschichte der Philosophie>                                                           |<|<|<|<|<|<|&
+| <*Semesterlage>          | <*Dauer>                 |<|<| <*Status> | <*Zugangsvoraussetzung>| <*LP/Workload>                 |<|&
+| 1. und 2. Semester       | 2 Semester               |<|<| Pflicht   | -                      | 6 LP / 180 Stunden             |<|&
+| <*Lehrveranstaltunge(n)> | <*Lehrform> | <*SWS> | <*LP> | <*Status> | <*Prüfungsleistungen>  | <*Bewertungsart>   | <*Wichtung> |&
+| Zentrale Themen der
+  Philosophie der Antike 
+  / des Mittelalters       |Seminar      | 2      | 2     | Pflicht   | Protokoll              | unbenotet          | -           |&
+| Zentrale Themen der
+  Philosophie der Neuzeit 
+  / des 20. Jahrhunderts   |Seminar      | 2      | 2     | Pflicht   | Protokoll              | unbenotet          | -           |&
+| <*Weitere Angaben> {nl} 
+  Die Wahl der Epoche ist mit der Anmeldung zu den Prüfungen verbindlich.                                           |<|<|<|<|<|<|<|&  
+|* <*PHF-phil-BA3>         |* <*Einführung in die Theoretische Philosophie>                                           |<|<|<|<|<|<|&
+| <*Semesterlage>          | <*Dauer>                 |<|<| <*Status> | <*Zugangsvoraussetzung>| <*LP/Workload>                 |<|&
+| 1. und 2. Semester       | 1 Semester               |<|<| Pflicht   | -                      | 5 LP / 150 Stunden             |<|&
+| <*Lehrveranstaltunge(n)> | <*Lehrform> | <*SWS> | <*LP> | <*Status> | <*Prüfungsleistungen>  | <*Bewertungsart>   | <*Wichtung> |&
+| Einführung in die 
+  theoretische Philosophie |Vorlesung    | 2      | 2     | Pflicht   | Take-home-Klausur (ca. 
+                                                                        5 Seiten) im Rahmen 
+                                                                        des Seminars           | unbenotet          | -           |&
+| Einführung in die 
+  theoretische Philosophie |Seminar      | 2      | 3     | Pflicht   | ^                      | ^                  | ^           |&
 
--- updateMatrix :: Position -> Cell -> State (Visited, Matrix Cell) ()
--- updateMatrix pos val = modify $ \(visited, mat) -> (visited, mat // [(pos, val)])
 
--- process =
---     forM_ [0 .. nRows] $ \row ->
---         forM_ [0 .. mCols] $ \col -> do
---             let pos = (row, col)
---             (visited, _) <- get
---             if visited pos
---                 then updateMatrix pos emptyEntry
---                 else do
---                     let createCell content = do
---                             let w = maxWidth pos
---                             let h = maxHeight pos w
+Example 2:
 
---                             forM_ [row .. row + h - 1] $ \y ->
---                                 forM_ [col .. col + w - 1] $ \x ->
---                                     updateVisited (x, y)
+// headings
+|*
+|* <*Bereich> 
+|* <*Modul~(Modulcode)>~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+|* <*SWS und Veranstaltungs-form>
+|* <*Prüfungs-leistung>{^:fn1}
+|* <*LP {nl} Modul>
+|* <*LP Bereich>
+|&
+// Pflicht
+// VWL
+|* Pflicht-bereich
+| VWL
+| EInführung in die Volkswirtschaftslehre (VWL-EVWL)
+| 4V+2Ü
+| K
+| 10
+| 35
+|&
+| ^
+| ^
+| Grundzüge der mikroökonomischen Theorie I (VWLvwlMikro1-01a)
+| 2V+ 1-2Ü
+| K
+| 5
+| ^
+|&
+| ^
+| ^
+| Grundzüge der mikroökonomischen Theorie II (VWLvwlMikro1-02a)
+| 2V+ 1-2Ü
+| K
+| 5
+| ^
+|&
+| ^
+| ^
+| Grundzüge der makroökonomischen Theorie I (VWLvwlMakro1-01a)
+| 2V+ 1-2Ü
+| K
+| 5
+| ^
+|&
+| ^
+| ^
+| Grundzüge der makroökonomischen Theorie II (VWLvwlMakro1-02a)
+| 2V+ 1-2Ü
+| K
+| 5
+| ^
+|&
+| ^
+| ^
+| Einführung in die Wirtschaftspolitik (VWLvwlEiWiPo-01a)
+| 2V
+| K
+| 5
+| ^
+|&
+// BWL
+| ^
+| BWL
+| Grundlagen der Betriebswirtschaftslehre (BWL-GrundBWL)
+| 2V+1Ü
+| K
+| 5
+| 20
+|&
+| ^
+| ^
+| Buchführung und Abschnluss (BWL-BA)
+| 2V+ 1Ü
+| K
+| 5
+| ^
+|&
+| ^
+| ^
+| Jahresabschluss (BWL-JA) 
+| 2V+ 1Ü
+| K
+| 5
+| ^
+|&
+| ^
+| ^
+| Grundlagen der Finanzwirtschaft (BWL-Fiwi1) 
+| 2V+ 1Ü
+| K
+| 5
+| ^
+|&
+// Mathe etc
+| ^
+| Mathematik, Statistik und Ökonometrie
+| Mathematik I (VWL-MATH1) 
+| 2V+2Ü
+| K
+| 5
+| 35
+|&
+| ^
+| ^
+| Mathematik II (VWL-MATH2) 
+| 2V+ 2Ü
+| K
+| 5
+| ^
+|&
+| ^
+| ^
+| Methodenlehre der Statistik I (VWL-STAT1) 
+| 4V+ 2Ü
+| K
+| 10
+| ^
+|&
+| ^
+| ^
+| Methodenlehre der Statistik II (VWL-STAT2)
+| 4V + 2Ü + 1PC 
+| K
+| 10
+| ^
+|&
+| ^
+| ^
+| Einführung in die Ökonometrie (VWL-EIÖK) 
+| 2V + 1Ü + 1PC
+| K
+| 5
+| ^
+|&
+// Wiss. Arbeiten
+| ^
+| Wiss. Arbeiten
+| Wissenschaftliches Arbeiten (VWLwiWiAr-01a) 
+| 2Ü
+| MP
+| 5
+| 5
+|&
+// Wahlfplichtbereich
+// VWL 
+|* Wahl-pflicht-bereich
+| VWL
+| Wahlpflichtmodul 1 
+| 2V + 0-2Ü 
+| MP
+| 5
+| 40 bis 60
+|&
+| ^
+| ^
+| Wahlpflichtmodul 2
+| 2V + 0-2Ü 
+| MP
+| 5
+| ^
+|&
+| ^
+| ^
+| Wahlpflichtmodul 3
+| 2V + 0-2Ü 
+| MP
+| 5
+| ^
+|&
+| ^
+| ^
+| Wahlpflichtmodul 4
+| 2V + 0-2Ü 
+| MP
+| 5
+| ^
+|&
+| ^
+| ^
+| Wahlpflichtmodul 5
+| 2V + 0-2Ü 
+| MP
+| 5
+| ^
+|&
+| ^
+| ^
+| Wahlpflichtmodul 6 oder Seminar 3
+| 2V + 0-2Ü oder 2 S{^:fn2}
+| MP oder S
+| 5
+| ^
+|&
+| ^
+| ^
+| Seminar 1
+| 2 S{^:fn2}
+| S
+| 5
+| ^
+|&
+| ^
+| ^
+| Seminar 2
+| 2 S{^:fn2}
+| S
+| 5
+| ^
+|&
+// BWL
+| ^
+| BWL
+| Wahlpflichtmodul 1 
+| 2V + 0-2Ü 
+| MP
+| 5
+| 10 bis 20{^:fn4}
+|&
+| ^
+| ^
+| Wahlpflichtmodul 2
+| 2V + 0-2Ü 
+| MP
+| 5
+| ^
+|&
+// Datenanalyse
+| ^
+| Datenanalyse
+| Wahlpflichtmodul 
+| 2V + 0-2Ü + 0-1PC 
+| MP
+| 5
+| 5 bist 10
+|&
+// Ergänzungsbereich
+| ^
+| Ergänzungsbereich
+| Die wählbaren Module werden rechtzeitig und in geeigneter Weise bekannt gemacht.
+| < 
+| <
+| verschieden
+| 0 bis 20{^:fn4}
+|&
+| Bachelorarbeit {^:fn3}
+| < 
+| <
+| <
+| <
+| <
+| 10 
+|&
+| Summe
+| < 
+| <
+| <
+| <
+| <
+| 180
+|&
 
---                             updateMatrix pos (Cell content w h)
---                     case rawMatrix ! pos of
---                         EmptyCell -> createCell []
---                         MergeLeft -> createCell [Word "<"]
---                         MergeUp -> createCell [Word "^"]
---                         Cell' content -> createCell content
+^{fn1:} Die am schlechtesten bewerteten Module im Umfang von maximal 10 Leistungspunkten, mit Ausnahme der  Bachelorarbeit, werden in unbenotete Module umgewandelt, gemäß § 15 Abs. 3.
+
+^{fn2:} Regelmäßige Teilnahme gemäß § 12 Abs. 1 ist erforderlich
+
+^{fn3:} Für Zulassungsvoraussetzungen zur Bachelorarbeit siehe §14.
+
+^{fn4:} In Wahlfplichtbereich und Ergänzungsbereich dürfen insgesamt nicht mehr als 20 LP an BWL-Modulen erbracht werden.
+
+-}
