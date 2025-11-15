@@ -29,7 +29,6 @@ import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
-import Effect.Class (liftEffect)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
 import FPO.Components.Editor.AceExtra
@@ -151,8 +150,12 @@ type CommentState =
 
 type SaveState =
   {
-    -- for saving when closing window
+    -- only save when there are new changes in editor
     mDirtyRef :: Maybe (Ref Boolean)
+  -- Prevent to have multiple saving processes at the same time
+  , mIsSaving :: Maybe (Ref Boolean)
+  -- Are there new changes during saving?
+  , mQueuedSave :: Maybe (Ref Boolean)
   , mBeforeUnloadListener :: Maybe EventListener
   -- saved icon
   , showSavedIcon :: Boolean
@@ -735,21 +738,32 @@ editor = connect selectTranslator $ H.mkComponent
         RenderPDF -> do
           state <- H.get
           H.raise (PostPDF state.currentVersion)
+      H.gets _.mEditor >>= traverse_ \ed ->
+        H.liftEffect $ Editor.focus ed
 
     ShowAllComments -> do
       state <- H.get
       let tocID = maybe (-1) _.id state.mTocEntry
       H.raise $ ShowAllCommentsOutput state.docID tocID
+      H.gets _.mEditor >>= traverse_ \ed ->
+        H.liftEffect $ Editor.focus ed
 
     Save isAutoSave -> do
+      when (not isAutoSave) $
+        H.gets _.mEditor >>= traverse_ \ed ->
+          H.liftEffect $ Editor.focus ed
       state <- H.get
       when (state.compareToElement == Nothing) $ do
-        isDirty <- liftEffect $ Ref.read =<< case state.saveState.mDirtyRef of
-          Just r -> pure r
-          Nothing -> liftEffect $ Ref.new false
+        isSaving <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+          _.saveState.mIsSaving
+        isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+          _.saveState.mDirtyRef
         -- Only save, when dirty flag is true or we are in older version
         -- TODO: Add another flag instead of using isEditorOutdated
-        if (isDirty || state.isEditorOutdated) then do
+        if ((not isSaving) && (isDirty || state.isEditorOutdated)) then do
+          -- mIsSaving := true, mDirtyRef := false
+          for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write true r
+          for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
           allLines <- H.gets _.mEditor >>= traverse \ed -> do
             H.liftEffect $ Editor.getSession ed
               >>= Session.getDocument
@@ -767,9 +781,12 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit -- Nothing to do
                 Just path -> do
                   H.raise $ RenamedNode contentLines path
+              freeSaveFlagsAndMaybeRerun isAutoSave
             Just entry ->
               case state.mContent of
-                Nothing -> pure unit
+                Nothing -> do
+                  freeSaveFlagsAndMaybeRerun isAutoSave
+                  pure unit
                 Just content -> do
                   -- Save the current content of the editor and send it to the server
                   let
@@ -803,10 +820,12 @@ editor = connect selectTranslator $ H.mkComponent
                   -- Try to upload
                   handleAction $ Upload entry newWrapper isAutoSave
         -- Users want to have a visual indicator, that they have saved. So when manual saving without any changes since
-        -- last Save, just show the notificatioin
-        else when (not isAutoSave && isJust state.mTocEntry) do
+        -- last Save, just show the notification
+        else if (not isAutoSave && isJust state.mTocEntry) then
           updateStore $ Store.AddSuccess
             (translate (label :: _ "editor_already_saved") state.translator)
+        else when (isSaving && (isDirty || state.isEditorOutdated)) $
+          for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write true r
 
     Upload newEntry newWrapper isAutoSave -> do
       state <- H.get
@@ -895,9 +914,9 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit
                 _ -> pure unit
 
-          -- mDirtyRef := false
-          for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
           pure unit
+
+      freeSaveFlagsAndMaybeRerun isAutoSave
 
     SavedIcon -> do
       mSavedIconF <- H.gets _.saveState.mSavedIconF
@@ -921,53 +940,68 @@ editor = connect selectTranslator $ H.mkComponent
         }
 
     AutoSaveTimer -> do
-      saveState <- H.gets _.saveState
-      -- restart 2 sec timer after every new input
+      -- restart 5 sec timer after every new input
       -- first kill the maybe running fiber (kinda like a thread)
-      for_ saveState.mPendingDebounceF H.kill
+      debounce <- H.gets _.saveState.mPendingDebounceF
+      traverse_ H.kill debounce
 
       -- start a new fiber
       dFib <- H.fork do
-        H.liftAff $ delay (Milliseconds 2000.0)
-        isDirty <- liftEffect $ Ref.read =<< case saveState.mDirtyRef of
-          Just r -> pure r
-          Nothing -> liftEffect $ Ref.new false
+        H.liftAff $ delay (Milliseconds 5000.0)
+        mMax <- H.gets _.saveState.mPendingMaxWaitF
+        traverse_ H.kill mMax
+        H.modify_ \st -> st
+          { saveState = st.saveState
+              { mPendingDebounceF = Nothing
+              , mPendingMaxWaitF = Nothing
+              }
+          }
+        isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+          _.saveState.mDirtyRef
         when isDirty $ handleAction AutoSave
-      H.modify_ _ { saveState = saveState { mPendingDebounceF = Just dFib } }
+      H.modify_ \st -> st
+        { saveState = st.saveState { mPendingDebounceF = Just dFib } }
 
-      -- This is a seperate 20 sec timer, which forces to save, in case of a long edit
+      -- This is a seperate 60 sec timer, which forces to save, in case of a long edit
       -- does not reset with new input
-      case saveState.mPendingMaxWaitF of
+      mPendingMaxWaitF <- H.gets _.saveState.mPendingMaxWaitF
+      case mPendingMaxWaitF of
         -- timer already running
         Just _ -> pure unit
         -- no timer there
         Nothing -> do
           mFib <- H.fork do
-            H.liftAff $ delay (Milliseconds 20000.0)
-            isDirty <- liftEffect $ Ref.read =<< case saveState.mDirtyRef of
-              Just r -> pure r
-              Nothing -> liftEffect $ Ref.new false
+            H.liftAff $ delay (Milliseconds 60000.0)
+            latestDebounce <- H.gets _.saveState.mPendingDebounceF
+            traverse_ H.kill latestDebounce
+            H.modify_ \st -> st
+              { saveState = st.saveState
+                  { mPendingDebounceF = Nothing
+                  , mPendingMaxWaitF = Nothing
+                  }
+              }
+            isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
+              _.saveState.mDirtyRef
             when isDirty $ handleAction AutoSave
-          H.modify_ _ { saveState = saveState { mPendingMaxWaitF = Just mFib } }
+          H.modify_ \st -> st
+            { saveState = st.saveState { mPendingMaxWaitF = Just mFib } }
 
     AutoSave -> do
+      mDeb <- H.gets _.saveState.mPendingDebounceF
+      traverse_ H.kill mDeb
+      mMax <- H.gets _.saveState.mPendingMaxWaitF
+      traverse_ H.kill mMax
+      H.modify_ \st -> st
+        { saveState = st.saveState
+            { mPendingDebounceF = Nothing
+            , mPendingMaxWaitF = Nothing
+            }
+        }
       -- only save, if dirty
       isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
         _.saveState.mDirtyRef
       when isDirty do
         handleAction $ Save true
-        -- after Save: dirty false + stop timer
-        mRef <- H.gets _.saveState.mDirtyRef
-        for_ mRef \r -> H.liftEffect $ Ref.write false r
-        saveState <- H.gets _.saveState
-        for_ saveState.mPendingDebounceF H.kill
-        for_ saveState.mPendingMaxWaitF H.kill
-        H.modify_ _
-          { saveState = saveState
-              { mPendingDebounceF = Nothing
-              , mPendingMaxWaitF = Nothing
-              }
-          }
 
     Comment -> do
       state <- H.get
@@ -1419,6 +1453,7 @@ editor = connect selectTranslator $ H.mkComponent
 
             H.modify_ _
               { mTocEntry = Just entry
+              , currentVersion = version
               , mTitle = mTitle
               , mContent = Just content
               , html = html
@@ -1500,8 +1535,17 @@ editor = connect selectTranslator $ H.mkComponent
               pure (catMaybes tmp)
 
             -- Update state with new marker IDs
+            mDeb <- H.gets _.saveState.mPendingDebounceF
+            traverse_ H.kill mDeb
+            mMax <- H.gets _.saveState.mPendingMaxWaitF
+            traverse_ H.kill mMax
             H.modify_ \st -> st
-              { commentState = st.commentState { liveMarkers = newLiveMarkers } }
+              { commentState = st.commentState { liveMarkers = newLiveMarkers }
+              , saveState = st.saveState
+                  { mPendingDebounceF = Nothing
+                  , mPendingMaxWaitF = Nothing
+                  }
+              }
             -- lastly show html in preview
             when showHtml $ do
               H.raise $ ClickedQuery state.html
@@ -1702,6 +1746,23 @@ editor = connect selectTranslator $ H.mkComponent
       for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure $ Just a
 
+  -- free up the save flags for the next save session
+  -- check if there are new requests for saving during saving
+  freeSaveFlagsAndMaybeRerun
+    :: forall slots
+     . Boolean
+    -> H.HalogenM State Action slots Output m Unit
+  freeSaveFlagsAndMaybeRerun isAutoSave = do
+    -- free up the save flags for the next save session
+    qSaving <- maybe (pure false) (H.liftEffect <<< Ref.read)
+      =<< H.gets _.saveState.mQueuedSave
+    st <- H.get
+    -- check if there are new requests for saving during saving
+    for_ st.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false r
+    when qSaving do
+      for_ st.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write false r
+      handleAction $ Save isAutoSave
+
 -- | Change listener for the editor.
 --
 --   This function should implement stuff like parsing and syntax analysis,
@@ -1823,6 +1884,8 @@ initialCommentState =
 initialSaveState :: SaveState
 initialSaveState =
   { mDirtyRef: Nothing
+  , mIsSaving: Nothing
+  , mQueuedSave: Nothing
   , mBeforeUnloadListener: Nothing
   , showSavedIcon: false
   , mSavedIconF: Nothing
@@ -1959,9 +2022,14 @@ addBeforeUnloadListener dref listener = do
         preventDefault ev
         HS.notify listener (Save true)
       _ -> pure unit
+
+  sref <- H.liftEffect $ Ref.new false
+  qref <- H.liftEffect $ Ref.new false
   H.modify_ \st -> st
     { saveState = st.saveState
         { mDirtyRef = Just dref
+        , mIsSaving = Just sref
+        , mQueuedSave = Just qref
         , mBeforeUnloadListener = Just beforeUnloadListener
         }
     }
