@@ -393,7 +393,8 @@ instance Labelable Section where
 
 instance ToPreLaTeXM SimpleBlock where
     toPreLaTeXM (SimpleParagraphBlock b) = toPreLaTeXM b
-    toPreLaTeXM (TableBlock b) = toPreLaTeXM b
+    toPreLaTeXM (TableBlock b) = pure mempty -- TODO table
+    toPreLaTeXM _ = pure mempty -- TODO modules
 
 -------------------------------- Document -----------------------------------
 
