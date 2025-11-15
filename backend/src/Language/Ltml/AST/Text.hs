@@ -6,6 +6,7 @@ module Language.Ltml.AST.Text
     , HeadingTextTree
     , FootnoteTextTree
     , RichTextTree
+    , TableTextTree
     , ParagraphTextTree
     , HardLineBreak (..)
     , Enumeration (..)
@@ -45,6 +46,9 @@ type FootnoteTextTree = TextTree HardLineBreak Void FontStyle Void Void
 
 type RichTextTree =
     TextTree HardLineBreak FootnoteReference FontStyle Enumeration Void
+
+type TableTextTree =
+    TextTree HardLineBreak FootnoteReference FontStyle Void Void
 
 type ParagraphTextTree =
     TextTree

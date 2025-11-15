@@ -5,6 +5,7 @@ module Language.Ltml.HTML.CSS.Util
       (<#>)
     , cssClass_
     , cssClasses_
+    , toCssClasses_
 
       -- * Wrap HTML Headers and Stylesheets
     , addHtmlHeader
@@ -14,7 +15,12 @@ module Language.Ltml.HTML.CSS.Util
 import Clay (Css, render)
 import Data.Text (pack)
 import Data.Text.Lazy (toStrict)
-import Language.Ltml.HTML.CSS.Classes (Class, className)
+import Language.Ltml.HTML.CSS.Classes
+    ( Class
+    , ToCssClasses
+    , className
+    , toCssClasses
+    )
 import qualified Language.Ltml.HTML.CSS.Classes as Class
 import Lucid
 
@@ -33,6 +39,10 @@ cssClass_ = class_ . className
 --   class attribute.
 cssClasses_ :: [Class] -> [Attributes]
 cssClasses_ = map (class_ . className)
+
+-- | Convert 'a' to list of 'Attributes' via 'ToCssClasses' instance.
+toCssClasses_ :: (ToCssClasses a) => a -> [Attributes]
+toCssClasses_ = cssClasses_ . toCssClasses
 
 -------------------------------------------------------------------------------
 
