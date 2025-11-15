@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS doc_comment_replies (
 
 CREATE TABLE IF NOT EXISTS doc_comment_anchors (
     comment BIGINT NOT NULL REFERENCES doc_comments (id),
-    revision BIGINT NOT NULL REFERENCES doc_text_revisions (id),
+    revision BIGINT NOT NULL REFERENCES doc_text_revisions (id) ON UPDATE CASCADE,
     start_col BIGINT NOT NULL,
     start_row BIGINT NOT NULL,
     end_col BIGINT NOT NULL,
