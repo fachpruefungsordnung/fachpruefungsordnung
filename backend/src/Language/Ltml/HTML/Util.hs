@@ -9,6 +9,7 @@ module Language.Ltml.HTML.Util
     ( -- * ID Conversion
       intToLower
     , intToCapital
+    , iToT
 
       -- * Monad Helpers
     , whenJust
@@ -36,7 +37,7 @@ module Language.Ltml.HTML.Util
 
 import Control.Monad.State (MonadState, gets, modify)
 import Data.Char (chr)
-import Data.Text (Text)
+import Data.Text (Text, pack)
 import Data.Text.Lazy (toStrict)
 import Data.Void (absurd)
 import Language.Ltml.AST.Label (Label (..))
@@ -91,6 +92,10 @@ intToLetter shift n
     | n == 0 = "?"
     | n <= 26 = (: []) $ chr (n + shift)
     | otherwise = intToLetter shift (mod n 27 + 1)
+
+-- | Converts 'Int' to 'Text'
+iToT :: Int -> Text
+iToT = pack . show
 
 -------------------------------------------------------------------------------
 

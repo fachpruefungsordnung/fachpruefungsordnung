@@ -12,7 +12,7 @@ import Data.Either (rights)
 import qualified Data.Map as Map
 import Data.Maybe (isJust)
 import qualified Data.Set as Set
-import Data.Text (Text, pack, unpack)
+import Data.Text (Text, unpack)
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Common (Fallback (..), NavTocHeading (..))
 import Language.Lsd.AST.Format (HeadingFormat)
@@ -37,6 +37,7 @@ import Language.Lsd.AST.Type.Footnote
 import Language.Lsd.AST.Type.Section (SectionFormatted (..))
 import Language.Lsd.AST.Type.SimpleParagraph (SimpleParagraphFormat (..))
 import Language.Lsd.AST.Type.SimpleSection (SimpleSectionFormat (..))
+import Language.Lsd.AST.Type.Table (CellFormat (..))
 import Language.Ltml.AST.AppendixSection (AppendixSection (..))
 import Language.Ltml.AST.Document
 import Language.Ltml.AST.DocumentContainer
@@ -59,7 +60,7 @@ import Language.Ltml.AST.Section
 import Language.Ltml.AST.SimpleBlock (SimpleBlock (..))
 import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (..))
 import Language.Ltml.AST.SimpleSection (SimpleSection (..))
-import Language.Ltml.AST.Table (Table)
+import Language.Ltml.AST.Table (Cell (..), Row (..), Table (..))
 import Language.Ltml.AST.Text
 import Language.Ltml.Common (Flagged (..), Flagged', NavTocHeaded (..), Parsed)
 import Language.Ltml.HTML.CSS.Classes (ToCssClass (toCssClass))
@@ -416,14 +417,36 @@ instance ToHtmlM SimpleParagraph where
         childText <- toHtmlM textTrees
         return $
             div_
-                (cssClass_ Class.TextContainer : cssClasses_ (Class.toCssClasses typography))
+                (cssClass_ Class.TextContainer : toCssClasses_ typography)
                 <$> childText
 
 -------------------------------------------------------------------------------
 
 instance ToHtmlM Table where
-    toHtmlM _ =
-        returnNow $ htmlError "Tables are not implemented yet :("
+    toHtmlM (Table rows) = do
+        rowsHtml <- mconcat <$> mapM row rows
+        return $
+            (div_ <#> Class.TableContainer)
+                . (table_ <#> Class.Table)
+                . tbody_
+                <$> rowsHtml
+      where
+        row :: Row -> HtmlReaderState
+        row (Row cells) = do
+            cellsHtml <- mconcat <$> mapM cell cells
+            return $ tr_ <$> cellsHtml
+
+        cell :: Cell -> HtmlReaderState
+        cell SpannedCell = returnNow mempty
+        cell (Cell _ _ 0 0) = returnNow mempty
+        cell (Cell (CellFormat bgColor typography) text colspan rowspan) = do
+            textHtml <- toHtmlM text
+            let bgClass = toCssClasses_ bgColor
+                innerContainer = div_ (toCssClasses_ typography)
+                tableData = case (colspan, rowspan) of
+                    (1, 1) -> td_ bgClass
+                    _ -> td_ (colspan_ (iToT colspan) : rowspan_ (iToT rowspan) : bgClass)
+            return $ tableData . innerContainer <$> textHtml
 
 instance ToHtmlM ModuleBlock where
     toHtmlM (ModuleBlock (ModuleSchema features) moduleTable) = do
@@ -459,10 +482,9 @@ instance ToHtmlM ModuleBlock where
                 moduleHtmls <- sequence moduleDHtmls
                 cat <- categoryHtml
                 let
-                    -- TODO: use iToT here
                     categoryCell =
                         td_
-                            [rowspan_ (pack . show . length $ modules), cssClass_ Class.TableCentered]
+                            [rowspan_ (iToT . length $ modules), cssClass_ Class.TableCentered]
                             cat
 
                     categoryRow = case moduleHtmls of
