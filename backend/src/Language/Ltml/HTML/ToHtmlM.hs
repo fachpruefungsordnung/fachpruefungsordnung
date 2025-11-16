@@ -180,6 +180,12 @@ instance ToHtmlM Document where
                                     localTocHtml <- renderLocalToc mTocFormat
                                     return (localTocHtml, introHtml, mainHtml, outroHtml)
 
+                -- Print footnotes that appear directly inside the 'DocumentMainBody'.
+                -- For example inside of appendice tables (SimpleBlocks).
+                usedFootnotes <- gets locallyUsedFootnotes
+                footnotesHtml <- toHtmlM usedFootnotes
+                modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
+
                 -- \| Render DocumentHeading / ToC only if renderFlag was set by parent
                 return $
                     div_ <#> Class.Document
@@ -188,6 +194,7 @@ instance ToHtmlM Document where
                                 <> (if renderToC then tocHtml else mempty)
                                 <> mainHtml
                                 <> outroHtml
+                                <> (if renderDoc then footnotesHtml else mempty)
                             )
 
 -- | Does not only produce the default error box on error,
@@ -712,6 +719,8 @@ instance ToHtmlM AppendixSection where
 --   Everything else is just used to build up the needed context (labels, etc.)
 instance (ToHtmlM a) => ToHtmlM (Flagged' a) where
     toHtmlM (Flagged renderFlag a) = do
+        -- \| track if any sibling Flaggeds are True
+        siblingFlagged <- gets hasFlagged
         -- \| Set False to see if child sets it True again
         modify (\s -> s {hasFlagged = False})
         -- \| Set True for children if renderFlag is True, else keep value
@@ -721,8 +730,8 @@ instance (ToHtmlM a) => ToHtmlM (Flagged' a) where
         hasFlaggedChild <- gets hasFlagged
         parentRender <- asks shouldRender
         let render = renderFlag || hasFlaggedChild || parentRender
-        -- \| Tell parent that we exist
-        modify (\s -> s {hasFlagged = True})
+        -- \| Tell parent if we or any sibling is True
+        modify (\s -> s {hasFlagged = render || siblingFlagged})
         return $ if render then aHtml else mempty
 
 -------------------------------------------------------------------------------

@@ -279,7 +279,7 @@ classStyle TableContainer = do
         display flex
         justifyContent center
 classStyle Table = do
-    let cellPadding = padding (px 12) (px 12) (px 12) (px 12)
+    let cellPadding = padding (px 2) (px 12) (px 2) (px 12)
         cellBorder = border (px 1) solid Color.tableCellBorder
 
     toClassSelector Table ? do
