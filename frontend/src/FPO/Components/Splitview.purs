@@ -649,25 +649,25 @@ splitview = connect selectTranslator $ H.mkComponent
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let
-        x = toNumber $ clientX mouse
+        mouseXPos = toNumber $ clientX mouse
         width = toNumber intWidth
-        ratioX = x / width
+        ratioX = mouseXPos / width
 
         minRatio = 0.05 -- 5%
-        maxRatio = 0.7 -- 70%
+        maxRatio = 0.8 -- 80%
 
         clamp :: Number -> Number -> Number -> Number
         clamp minVal maxVal xval = max minVal (min maxVal xval)
 
-      mt <- H.gets _.mDragTarget
-      mx <- H.gets _.startMouseRatio
+      dragTargetAction <- H.gets _.mDragTarget
+      startMouseRatio <- H.gets _.startMouseRatio
 
-      case mt of
+      case dragTargetAction of
         Just ResizeLeft -> do
-          s <- H.gets _.startSidebarRatio
+          startSidebarRatio <- H.gets _.startSidebarRatio
           let
-            rawSidebarRatio = s + (ratioX - mx)
-            newSidebar = clamp minRatio 0.2 rawSidebarRatio
+            rawSidebarRatio = startSidebarRatio + (ratioX - startMouseRatio)
+            newSidebar = clamp minRatio maxRatio rawSidebarRatio
           when (newSidebar >= minRatio && newSidebar <= maxRatio) do
             H.modify_ \st -> st
               { sidebarRatio = newSidebar
@@ -677,13 +677,13 @@ splitview = connect selectTranslator $ H.mkComponent
               }
 
         Just ResizeRight -> do
-          p <- H.gets _.startPreviewRatio
-          s <- H.gets _.sidebarRatio
+          startPreviewRatio <- H.gets _.startPreviewRatio
+          sidebarRatio <- H.gets _.sidebarRatio
 
           let
-            delta = ratioX - mx
-            rawPreview = p - delta
-            maxPreview = 1.0 - s - minRatio
+            delta = ratioX - startMouseRatio
+            rawPreview = startPreviewRatio - delta
+            maxPreview = 1.0 - sidebarRatio - minRatio
             newPreview = clamp minRatio maxPreview rawPreview
 
           when (rawPreview >= minRatio && rawPreview <= maxPreview) do
@@ -696,7 +696,7 @@ splitview = connect selectTranslator $ H.mkComponent
 
         _ -> pure unit
 
-      when (isJust mt) do
+      when (isJust dragTargetAction) do
         H.tell _editor 0 (Editor.EditorResize)
         H.tell _editor 1 (Editor.EditorResize)
 
