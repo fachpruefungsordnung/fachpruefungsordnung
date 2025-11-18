@@ -630,10 +630,10 @@ splitview = connect selectTranslator $ H.mkComponent
       let
         x = toNumber $ clientX mouse
         width = toNumber intWidth
-        ratioX = x / width
+        mouseXRatio = x / width
       H.modify_ \st -> st
         { mDragTarget = Just which
-        , startMouseRatio = ratioX
+        , startMouseRatio = mouseXRatio
         , startSidebarRatio = st.sidebarRatio
         , startPreviewRatio = st.previewRatio
         }
@@ -645,28 +645,35 @@ splitview = connect selectTranslator $ H.mkComponent
 
     -- While mouse is hold down, resizer move to position of mouse
     -- (with certain rules)
+    -- Mouse here is a HTML MouseEvent
     HandleMouseMove mouse -> do
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let
         mouseXPos = toNumber $ clientX mouse
         width = toNumber intWidth
-        ratioX = mouseXPos / width
+        mouseXRatio = mouseXPos / width
 
+        -- A window should always have at least 5% width for each section
+        -- and at most 80% for sidebar and preview
         minRatio = 0.05 -- 5%
         maxRatio = 0.8 -- 80%
 
+        -- Clamp function to keep a value within min and max
         clamp :: Number -> Number -> Number -> Number
-        clamp minVal maxVal xval = max minVal (min maxVal xval)
+        clamp minVal maxVal valueToClamp = max minVal (min maxVal valueToClamp)
 
       dragTargetAction <- H.gets _.mDragTarget
+      -- Starting position of mouse when drag started
       startMouseRatio <- H.gets _.startMouseRatio
 
       case dragTargetAction of
+        -- Resizing TOC or Comment Sidebar
         Just ResizeLeft -> do
           startSidebarRatio <- H.gets _.startSidebarRatio
           let
-            rawSidebarRatio = startSidebarRatio + (ratioX - startMouseRatio)
+            -- Calculate the new sidebar ratio based on mouse movement
+            rawSidebarRatio = startSidebarRatio + (mouseXRatio - startMouseRatio)
             newSidebar = clamp minRatio maxRatio rawSidebarRatio
           when (newSidebar >= minRatio && newSidebar <= maxRatio) do
             H.modify_ \st -> st
@@ -676,12 +683,13 @@ splitview = connect selectTranslator $ H.mkComponent
                   else st.lastExpandedSidebarRatio
               }
 
+        -- Resizing Preview Area
         Just ResizeRight -> do
           startPreviewRatio <- H.gets _.startPreviewRatio
           sidebarRatio <- H.gets _.sidebarRatio
 
           let
-            delta = ratioX - startMouseRatio
+            delta = mouseXRatio - startMouseRatio
             rawPreview = startPreviewRatio - delta
             maxPreview = 1.0 - sidebarRatio - minRatio
             newPreview = clamp minRatio maxPreview rawPreview
