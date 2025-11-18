@@ -162,7 +162,7 @@ jwtSettings = defaultJWTSettings
 cookieSettings :: CookieSettings
 cookieSettings = defaultCookieSettings
 
--- | Runs the server
+-- | Runs the server.
 runServer :: IO ()
 runServer = do
     let port = 80
