@@ -28,12 +28,7 @@ RUN apt-get install -y --no-install-recommends \
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # install stack
-# RUN curl -sSL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | \
-#     tar -xz --wildcards --strip-components=1 -C \
-#     /usr/local/bin 'stack-*-linux-x86_64/stack'
-
-# get.haskellstack.org und stackage.org sind gerade down...
-RUN curl -sSL https://github.com/commercialhaskell/stack/releases/download/v3.7.1/stack-3.7.1-linux-x86_64.tar.gz | \
+RUN curl -sSL https://get.haskellstack.org/stable/linux-x86_64.tar.gz | \
     tar -xz --wildcards --strip-components=1 -C \
     /usr/local/bin 'stack-*-linux-x86_64/stack'
 
