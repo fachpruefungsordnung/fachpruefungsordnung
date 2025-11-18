@@ -28,7 +28,7 @@ import Language.Ltml.Parser.Common.Indent
     ( checkIndentGT
     , nli
     )
-import Language.Ltml.Parser.Common.Lexeme (nLexeme, sp)
+import Language.Ltml.Parser.Common.Lexeme (lexeme, sp)
 import Text.Megaparsec (Pos, empty, lookAhead, many, try, (<?>))
 import Text.Megaparsec.Char (char)
 import Text.Megaparsec.Char.Lexer (indentLevel)
@@ -279,5 +279,5 @@ pipeSeparatedFrom
     -> m [[a]]
 pipeSeparatedFrom inlinePs blockP lvl = do
     first <- miForestFrom False True inlinePs blockP lvl
-    rest <- many (nLexeme (char '|') *> miForestFrom True True inlinePs blockP lvl)
+    rest <- many (lexeme (char '|') *> miForestFrom True True inlinePs blockP lvl)
     return (first : rest)
