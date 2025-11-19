@@ -148,6 +148,11 @@ instance ToHtmlM Document where
                             , currentSuperSectionID = currentSuperSectionID initGlobalState
                             }
                     )
+                -- Note: Footnotes referenced in this Heading
+                --       are rendered in the first child SectionBody
+                -- TODO: This might be hacky and leads to export views
+                --       of the first child having a footnote that is not
+                --       referenced. But for now this is acceptable (imho)
                 titleHtml <- toHtmlM documentHeading
                 renderDoc <- asks shouldRender
                 -- \| mTocFormat = Nothing, means that no ToC should be rendered
@@ -180,12 +185,6 @@ instance ToHtmlM Document where
                                     localTocHtml <- renderLocalToc mTocFormat
                                     return (localTocHtml, introHtml, mainHtml, outroHtml)
 
-                -- Print footnotes that appear directly inside the 'DocumentMainBody'.
-                -- For example inside of appendice tables (SimpleBlocks).
-                usedFootnotes <- gets locallyUsedFootnotes
-                footnotesHtml <- toHtmlM usedFootnotes
-                modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
-
                 -- \| Render DocumentHeading / ToC only if renderFlag was set by parent
                 return $
                     div_ <#> Class.Document
@@ -194,7 +193,6 @@ instance ToHtmlM Document where
                                 <> (if renderToC then tocHtml else mempty)
                                 <> mainHtml
                                 <> outroHtml
-                                <> (if renderDoc then footnotesHtml else mempty)
                             )
 
 -- | Does not only produce the default error box on error,
@@ -285,15 +283,7 @@ instance ToHtmlM (Node Section) where
                     -- \| Render parsed Heading, which also creates ToC Entry
                     (headingHtml, tocId, rawTitle) <-
                         buildHeadingHtml sectionIDHtml mLabel sectionTocKeyHtml parsedHeading
-                    headingState <- get
                     childrenHtml <- toHtmlM sectionBody
-                    -- \| Also render footnotes in super-sections, since their heading
-                    --    could contain footnoteRefs
-                    childrensGlobalState <- get
-                    let footNoteState = addUsedFootnotes childrensGlobalState headingState
-                    footnotesHtml <- toHtmlM (locallyUsedFootnotes footNoteState)
-                    -- \| Reset locally used set to inital value
-                    modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
                     -- \| increment (super)SectionID for next section
                     incrementSectionID
 
@@ -304,7 +294,7 @@ instance ToHtmlM (Node Section) where
 
                         sectionHtml =
                             section_ [cssClass_ sectionCssClass]
-                                <$> (headingHtml <> childrenHtml <> footnotesHtml <> exportLinkHtml)
+                                <$> (headingHtml <> childrenHtml <> exportLinkHtml)
                     -- \| Collects all sections for possible export
                     collectExportSection tocId rawTitle sectionHtml
 
@@ -352,27 +342,34 @@ instance ToHtmlM (Node Section) where
                 createTocEntryH mIdHtml rTitle = addTocEntry mIdHtml rTitle mLabelH SomeSection
 
 instance ToHtmlM SectionBody where
-    toHtmlM sectionBody = case sectionBody of
-        -- \| Super Section
-        -- \| We have to save the super-section counter, since super-sections are counted locally
-        InnerSectionBody nodeSections -> do
-            superSectionID <- gets currentSuperSectionID
-            modify (\s -> s {currentSuperSectionID = currentSuperSectionID initGlobalState})
-            bodyHtml <- toHtmlM nodeSections
-            modify (\s -> s {currentSuperSectionID = superSectionID})
-            return bodyHtml
+    toHtmlM sectionBody = do
+        sectionBodyHtml <- case sectionBody of
+            -- \| Super Section
+            -- \| We have to save the super-section counter, since super-sections are counted locally
+            InnerSectionBody nodeSections -> do
+                superSectionID <- gets currentSuperSectionID
+                modify (\s -> s {currentSuperSectionID = currentSuperSectionID initGlobalState})
+                bodyHtml <- toHtmlM nodeSections
+                modify (\s -> s {currentSuperSectionID = superSectionID})
+                return bodyHtml
 
-        -- \| Section
-        -- \| In this case the children are paragraphs, so we set the needed flag for them
-        --    to decide if the should have a visible id
-        LeafSectionBody nodeParagraphs -> do
-            paragraphsHtml <-
-                local (\s -> s {isSingleParagraph = length nodeParagraphs == 1}) $
-                    toHtmlM nodeParagraphs
-            -- \| reset paragraphID for next section
-            modify (\s -> s {currentParagraphID = 1})
-            return paragraphsHtml
-        SimpleLeafSectionBody simpleBlocks -> toHtmlM simpleBlocks
+            -- \| Section
+            -- \| In this case the children are paragraphs, so we set the needed flag for them
+            --    to decide if the should have a visible id
+            LeafSectionBody nodeParagraphs -> do
+                paragraphsHtml <-
+                    local (\s -> s {isSingleParagraph = length nodeParagraphs == 1}) $
+                        toHtmlM nodeParagraphs
+                -- \| reset paragraphID for next section
+                modify (\s -> s {currentParagraphID = 1})
+                return paragraphsHtml
+            SimpleLeafSectionBody simpleBlocks -> toHtmlM simpleBlocks
+
+        sectionBodyFootnotes <- gets locallyUsedFootnotes
+        footnotesHtml <- toHtmlM sectionBodyFootnotes
+        modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
+
+        return $ sectionBodyHtml <> footnotesHtml
 
 -- | Combined instance since the paragraphIDHtml has to be build before the reference is generated
 instance ToHtmlM (Node Paragraph) where
