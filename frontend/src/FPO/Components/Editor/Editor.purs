@@ -276,6 +276,7 @@ data Query a
   | RequestDirtyVersion (Boolean -> a)
   | ResetDirtyVersion a
   | ReceiveUpToDateUpdate (Maybe Version) a
+  | IsOnMerge (Boolean -> a)
 
 -- | UpdateCompareToElement ElementData a
 
@@ -1745,6 +1746,10 @@ editor = connect selectTranslator $ H.mkComponent
       state <- H.get
       for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure $ Just a
+
+    IsOnMerge reply -> do
+      isOnMerge <- H.gets _.isOnMerge
+      pure $ Just $ reply isOnMerge
 
   -- free up the save flags for the next save session
   -- check if there are new requests for saving during saving
