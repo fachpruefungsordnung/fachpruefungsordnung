@@ -22,6 +22,7 @@ module Language.Ltml.ToLaTeX.PreLaTeXType
     {- commands to structure the text -}
     , medskip
     , hrule
+    , hline
     , linebreak
     , newpage
     {- setup and metadata -}
@@ -39,6 +40,9 @@ module Language.Ltml.ToLaTeX.PreLaTeXType
     , flushright
     , minipage
     , document
+    , tabular
+    , multirow
+    , multicolumn
     {- other -}
     , setindent
     , setlistdepth
@@ -163,6 +167,9 @@ medskip = IText "\n" <> ICommandS "medskip" <> IRaw "\n"
 hrule :: PreLaTeX
 hrule = ICommandS "hrule"
 
+hline :: PreLaTeX
+hline = ICommandS "hline"
+
 -------------------------------------------------------------------------------
 {-                              environments                                 -}
 
@@ -186,6 +193,16 @@ minipage = IEnvironment "minipage"
 
 document :: PreLaTeX -> PreLaTeX
 document content = IEnvironment "document" [] [content]
+
+tabular :: T.Text -> PreLaTeX -> PreLaTeX
+tabular cols = IEnvironment "tabular" [cols] . (: [])
+
+------------------- tabular commands ------------------------
+multirow :: Int -> PreLaTeX -> PreLaTeX
+multirow n content = ICommand "multirow" [] [IText (T.pack (show n)), content]
+
+multicolumn :: Int -> T.Text -> PreLaTeX -> PreLaTeX
+multicolumn n cols content = ICommand "multicolumn" [] [IText (T.pack (show n)), IText cols, content]
 
 -------------------------------------------------------------------------------
 {-                              other                                        -}

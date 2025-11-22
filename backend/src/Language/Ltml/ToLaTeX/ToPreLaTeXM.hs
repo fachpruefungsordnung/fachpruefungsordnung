@@ -73,7 +73,7 @@ import Language.Ltml.AST.SimpleBlock
     )
 import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (SimpleParagraph))
 import Language.Ltml.AST.SimpleSection (SimpleSection (SimpleSection))
-import Language.Ltml.AST.Table (Table)
+import Language.Ltml.AST.Table (Table (Table), Row (Row), Cell (Cell, SpannedCell))
 import Language.Ltml.AST.Text
     ( EnumItem (..)
     , Enumeration (..)
@@ -108,7 +108,7 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     , linebreak
     , newpage
     , resetfootnote
-    , setpdftitle
+    , setpdftitle, tabular, hline
     )
 import Text.Megaparsec (errorBundlePretty)
 
@@ -306,11 +306,6 @@ instance Labelable Paragraph where
                             ]
                             [content']
 
---------------------------------- Table ------------------------------------
-
-instance ToPreLaTeXM Table where
-    toPreLaTeXM = undefined -- TODO
-
 -------------------------------- Section -----------------------------------
 
 instance ToPreLaTeXM SimpleSection where
@@ -395,6 +390,35 @@ instance ToPreLaTeXM SimpleBlock where
     toPreLaTeXM (SimpleParagraphBlock b) = toPreLaTeXM b
     toPreLaTeXM (TableBlock b) = pure mempty -- TODO table
     toPreLaTeXM _ = pure mempty -- TODO modules
+
+-------------------------------- Table ----------------------------------
+
+instance ToPreLaTeXM Table where
+    toPreLaTeXM (Table rows) = do
+        let Row c = head rows
+            n = length c
+            option = T.replicate n "|l" <> "|"
+        rows' <- mapM toPreLaTeXM rows
+        pure $ tabular option $ ISequence rows'
+
+instance ToPreLaTeXM Row where
+    toPreLaTeXM (Row cells) = do
+        cells' <- mapM toPreLaTeXM (filter (/= SpannedCell) cells)
+        let rowContent = mconcat $ intersperse (IText " & ") cells'
+        pure $ rowContent <> IText " \\\\ " <> hline
+    
+      where 
+        intersperse _ [] = []
+        intersperse sep (x:xs) = x : prependToAll sep xs
+
+        prependToAll _ [] = []
+        prependToAll sep (y:ys) = sep : y : prependToAll sep ys
+
+instance ToPreLaTeXM Cell where
+    toPreLaTeXM (Cell fmt content w h) = do
+        content' <- mapM toPreLaTeXM content
+        pure $ mconcat content'
+    toPreLaTeXM SpannedCell = pure mempty
 
 -------------------------------- Document -----------------------------------
 
