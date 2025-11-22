@@ -22,11 +22,13 @@ type Height = Int
 
 data Cell
     = Cell CellFormat [TableTextTree] Width Height
-    | SpannedCell -- for merged cells. equivalent to Cell _ [] 0 0,
+    | VSpannedCell Int 
+    | HSpannedCell -- for merged cells. equivalent to Cell _ [] 0 0,
     -- but since they dont need a format, we use a separate constructor
     deriving (Show)
 
 instance Eq Cell where
     (Cell {}) == (Cell {}) = True
-    SpannedCell == SpannedCell = True
+    VSpannedCell {} == VSpannedCell {} = True
+    HSpannedCell {} == HSpannedCell {} = True
     _ == _ = False

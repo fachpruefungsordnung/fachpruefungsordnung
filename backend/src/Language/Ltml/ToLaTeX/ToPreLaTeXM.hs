@@ -73,7 +73,7 @@ import Language.Ltml.AST.SimpleBlock
     )
 import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (SimpleParagraph))
 import Language.Ltml.AST.SimpleSection (SimpleSection (SimpleSection))
-import Language.Ltml.AST.Table (Table (Table), Row (Row), Cell (Cell, SpannedCell))
+import Language.Ltml.AST.Table (Table (Table), Row (Row), Cell (Cell, HSpannedCell, VSpannedCell))
 import Language.Ltml.AST.Text
     ( EnumItem (..)
     , Enumeration (..)
@@ -96,7 +96,7 @@ import Language.Ltml.ToLaTeX.Format
     )
 import qualified Language.Ltml.ToLaTeX.GlobalState as GS
 import Language.Ltml.ToLaTeX.PreLaTeXType
-    ( PreLaTeX (ISequence, IText, MissingRef)
+    ( PreLaTeX (ISequence, IText, MissingRef, IRaw)
     , bold
     , enumerate
     , footnote
@@ -108,9 +108,11 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     , linebreak
     , newpage
     , resetfootnote
-    , setpdftitle, tabular, hline
+    , setpdftitle, tabular, hline, multicolumn, multirow, cellcolor, makecell
     )
 import Text.Megaparsec (errorBundlePretty)
+import Language.Lsd.AST.Type.Table (CellFormat(CellFormat), BGColor (White, Gray))
+import Data.Typography (Typography(Typography), TextAlignment (LeftAligned, Centered, RightAligned))
 
 -- | class to convert AST objects into PreLaTeX. To be able to automatically generate
 --   numbers and context for each object, the class function toPreLaTeXM works
@@ -388,7 +390,7 @@ instance Labelable Section where
 
 instance ToPreLaTeXM SimpleBlock where
     toPreLaTeXM (SimpleParagraphBlock b) = toPreLaTeXM b
-    toPreLaTeXM (TableBlock b) = pure mempty -- TODO table
+    toPreLaTeXM (TableBlock b) = toPreLaTeXM b -- TODO table
     toPreLaTeXM _ = pure mempty -- TODO modules
 
 -------------------------------- Table ----------------------------------
@@ -397,15 +399,15 @@ instance ToPreLaTeXM Table where
     toPreLaTeXM (Table rows) = do
         let Row c = head rows
             n = length c
-            option = T.replicate n "|l" <> "|"
+            option = T.replicate n "|L" <> "|"
         rows' <- mapM toPreLaTeXM rows
-        pure $ tabular option $ ISequence rows'
+        pure $ tabular option $ ISequence $ [hline] <> rows'
 
 instance ToPreLaTeXM Row where
     toPreLaTeXM (Row cells) = do
-        cells' <- mapM toPreLaTeXM (filter (/= SpannedCell) cells)
-        let rowContent = mconcat $ intersperse (IText " & ") cells'
-        pure $ rowContent <> IText " \\\\ " <> hline
+        cells' <- mapM toPreLaTeXM (filter (/= HSpannedCell) cells)
+        let rowContent = mconcat $ intersperse (IRaw " & ") cells'
+        pure $ rowContent <> linebreak <> hline <> IText " "
     
       where 
         intersperse _ [] = []
@@ -415,10 +417,21 @@ instance ToPreLaTeXM Row where
         prependToAll sep (y:ys) = sep : y : prependToAll sep ys
 
 instance ToPreLaTeXM Cell where
-    toPreLaTeXM (Cell fmt content w h) = do
+    toPreLaTeXM (Cell (CellFormat bg (Typography _ fontsize _)) content w h) = do
         content' <- mapM toPreLaTeXM content
-        pure $ mconcat content'
-    toPreLaTeXM SpannedCell = pure mempty
+        let content'' = applyTextStyle fontsize (mconcat content') <> cellcolor (getColor bg)
+        pure $ if w > 1 && h > 1 
+               then multicolumn w "|l|" $ multirow h content''
+               else if w > 1 
+                    then multicolumn w "|l|" content''
+                    else if h > 1 
+                         then multirow h content''
+                         else content''
+      where
+        getColor White = "white"
+        getColor Gray = "gray!30"
+    toPreLaTeXM (VSpannedCell w) = pure $ if w > 1 then multicolumn w "|l|" mempty else mempty
+    toPreLaTeXM HSpannedCell = pure mempty
 
 -------------------------------- Document -----------------------------------
 

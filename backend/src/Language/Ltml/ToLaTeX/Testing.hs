@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- | provides functions to render the example tree from Language.Ltml.Tree.Example.Fpo into pdf or latex-code
-module Language.Ltml.ToLaTeX.Testing (parseTest, texTest)
+module Language.Ltml.ToLaTeX.Testing (parseTest, texTest, tableTest)
 where
 
 import qualified Data.ByteString.Lazy as BSL
@@ -10,6 +10,7 @@ import Language.Ltml.ToLaTeX.PDFGenerator (generateLaTeX, generatePDF)
 import Language.Ltml.Tree.Example.Fpo (fpoTree)
 import Language.Ltml.Tree.Parser (TreeError (TreeError))
 import Language.Ltml.Tree.ToLtml (treeToLtml)
+import Language.Ltml.Parser.Auxiliary.Test (table)
 
 -- | renders the fpoTree into a pdf (or fails)
 parseTest :: IO ()
@@ -31,3 +32,10 @@ texTest = do
             T.writeFile
                 "./src/Language/Ltml/ToLaTeX/Auxiliary/out.tex"
                 (generateLaTeX markedDocCon)
+
+tableTest :: IO ()
+tableTest = do
+    tbl <- table
+    T.writeFile
+        "./src/Language/Ltml/ToLaTeX/Auxiliary/table.tex"
+        (generateLaTeX tbl)

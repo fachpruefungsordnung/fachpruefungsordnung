@@ -41,8 +41,10 @@ module Language.Ltml.ToLaTeX.PreLaTeXType
     , minipage
     , document
     , tabular
+    , cellcolor
     , multirow
     , multicolumn
+    , makecell
     {- other -}
     , setindent
     , setlistdepth
@@ -195,14 +197,20 @@ document :: PreLaTeX -> PreLaTeX
 document content = IEnvironment "document" [] [content]
 
 tabular :: T.Text -> PreLaTeX -> PreLaTeX
-tabular cols = IEnvironment "tabular" [cols] . (: [])
+tabular cols content = IEnvironment "tabulary" [] [IBraced $ IRaw "\\textwidth", IBraced $ IRaw cols, content] 
 
 ------------------- tabular commands ------------------------
+cellcolor :: T.Text -> PreLaTeX
+cellcolor color = ICommand "cellcolor" [] [IText color]
+
 multirow :: Int -> PreLaTeX -> PreLaTeX
-multirow n content = ICommand "multirow" [] [IText (T.pack (show n)), content]
+multirow n content = ICommand "multirow" [] [IText (T.pack (show n)), IRaw "=", content]
 
 multicolumn :: Int -> T.Text -> PreLaTeX -> PreLaTeX
 multicolumn n cols content = ICommand "multicolumn" [] [IText (T.pack (show n)), IText cols, content]
+
+makecell :: PreLaTeX -> PreLaTeX
+makecell content = ICommand "makecell" ["l"] [IBraced content]
 
 -------------------------------------------------------------------------------
 {-                              other                                        -}
