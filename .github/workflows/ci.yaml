@@ -223,6 +223,7 @@ jobs:
           envs: MAIL_HOST,MAIL_PORT,MAIL_ADDRESS,MAIL_USERNAME,MAIL_PASSWORD
           command_timeout: 200m
           script: |
+            set -euxo pipefail
             cd ${{ vars.DEV_REPO_PATH }}
             git pull
             docker compose build
