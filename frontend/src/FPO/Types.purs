@@ -38,9 +38,9 @@ import FPO.Dto.DocumentDto.DocumentTree as DT
 import FPO.Dto.DocumentDto.NodeHeader as NH
 import FPO.Dto.DocumentDto.TreeDto
   ( RootTree
-  , firstLeafRootTree
   , findRootTree
   , findTitleRootTree
+  , firstLeafRootTree
   , replaceNodeRootTree
   )
 import Partial.Unsafe (unsafePartial)

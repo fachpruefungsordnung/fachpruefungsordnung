@@ -847,8 +847,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
             leafId = entry.id
             mTitle = findLeafTitle leafId state.tocEntries
           H.modify_ \st ->
-            st { mSelectedTocEntry = Just (SelLeaf leafId)
-              , mTitle            = mTitle
+            st
+              { mSelectedTocEntry = Just (SelLeaf leafId)
+              , mTitle = mTitle
               }
           H.raise (ChangeToLeaf leafId mTitle)
           pure (Just a)

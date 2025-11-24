@@ -1438,7 +1438,7 @@ editor = connect selectTranslator $ H.mkComponent
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
         -- See, why and fix it
 
-        H.modify_ _ {isLoading = true}
+        H.modify_ _ { isLoading = true }
 
         --first we look whether a draft to load is present. The right editor does not load drafts
         loadedDraftContent <- case state.compareToElement of
@@ -1470,7 +1470,7 @@ editor = connect selectTranslator $ H.mkComponent
 
         case loadedContent of
           Left err -> do
-            H.modify_ _ {isLoading=false}
+            H.modify_ _ { isLoading = false }
             Store.addError err
           Right wrapper -> do
             let

@@ -353,6 +353,7 @@ firstLeafRootTree (RootTree { children }) =
         case firstLeafTree t of
           Just x -> Just x
           Nothing -> goChildren rest
+
   firstLeafTree :: Tree a -> Maybe a
   firstLeafTree = case _ of
     Leaf { node } -> Just node
