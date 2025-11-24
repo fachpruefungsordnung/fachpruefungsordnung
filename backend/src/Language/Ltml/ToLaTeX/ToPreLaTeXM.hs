@@ -13,6 +13,11 @@ import qualified Data.DList as DList
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
+import Data.Typography
+    ( FontSize (LargeFontSize, MediumFontSize)
+    , TextAlignment (LeftAligned)
+    , Typography (Typography)
+    )
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Format
     ( EnumItemKeyFormat (EnumItemKeyFormat)
@@ -49,6 +54,10 @@ import Language.Lsd.AST.Type.SimpleParagraph
 import Language.Lsd.AST.Type.SimpleSection
     ( SimpleSectionFormat (SimpleSectionFormat)
     )
+import Language.Lsd.AST.Type.Table
+    ( BGColor (Gray, White)
+    , CellFormat (CellFormat)
+    )
 import Language.Ltml.AST.AppendixSection (AppendixSection (AppendixSection))
 import Language.Ltml.AST.Document
     ( Document (..)
@@ -61,6 +70,14 @@ import Language.Ltml.AST.DocumentContainer
     )
 import Language.Ltml.AST.Footnote (Footnote (Footnote))
 import Language.Ltml.AST.Label (Label (..))
+import Language.Ltml.AST.Module
+    ( Attribute (unAttribute)
+    , Category (Category)
+    , Module (unModule)
+    , ModuleBlock (ModuleBlock)
+    , ModuleSchema (ModuleSchema)
+    , ModuleTable (Categorized, Plain)
+    )
 import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.AST.Paragraph (Paragraph (..))
 import Language.Ltml.AST.Section
@@ -69,11 +86,15 @@ import Language.Ltml.AST.Section
     , SectionBody (InnerSectionBody, LeafSectionBody, SimpleLeafSectionBody)
     )
 import Language.Ltml.AST.SimpleBlock
-    ( SimpleBlock (SimpleParagraphBlock, TableBlock)
+    ( SimpleBlock (ModuleSchemaBlock, SimpleParagraphBlock, TableBlock)
     )
 import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (SimpleParagraph))
 import Language.Ltml.AST.SimpleSection (SimpleSection (SimpleSection))
-import Language.Ltml.AST.Table (Table (Table), Row (Row), Cell (Cell, HSpannedCell, VSpannedCell))
+import Language.Ltml.AST.Table
+    ( Cell (Cell, HSpannedCell, VSpannedCell)
+    , Row (Row)
+    , Table (Table)
+    )
 import Language.Ltml.AST.Text
     ( EnumItem (..)
     , Enumeration (..)
@@ -96,23 +117,27 @@ import Language.Ltml.ToLaTeX.Format
     )
 import qualified Language.Ltml.ToLaTeX.GlobalState as GS
 import Language.Ltml.ToLaTeX.PreLaTeXType
-    ( PreLaTeX (ISequence, IText, MissingRef, IRaw)
+    ( PreLaTeX (IRaw, ISequence, IText, MissingRef)
     , bold
+    , cellcolor
     , enumerate
     , footnote
     , footref
+    , hline
     , hrule
     , hyperlink
     , hypertarget
     , label
     , linebreak
+    , makecell
+    , multicolumn
+    , multirow
     , newpage
     , resetfootnote
-    , setpdftitle, tabular, hline, multicolumn, multirow, cellcolor, makecell
+    , setpdftitle
+    , tabular
     )
 import Text.Megaparsec (errorBundlePretty)
-import Language.Lsd.AST.Type.Table (CellFormat(CellFormat), BGColor (White, Gray))
-import Data.Typography (Typography(Typography), TextAlignment (LeftAligned, Centered, RightAligned))
 
 -- | class to convert AST objects into PreLaTeX. To be able to automatically generate
 --   numbers and context for each object, the class function toPreLaTeXM works
@@ -391,7 +416,79 @@ instance Labelable Section where
 instance ToPreLaTeXM SimpleBlock where
     toPreLaTeXM (SimpleParagraphBlock b) = toPreLaTeXM b
     toPreLaTeXM (TableBlock b) = toPreLaTeXM b -- TODO table
-    toPreLaTeXM _ = pure mempty -- TODO modules
+    toPreLaTeXM (ModuleSchemaBlock b) = toPreLaTeXM b -- TODO modules
+
+-------------------------------- Modules ----------------------------------
+instance ToPreLaTeXM ModuleBlock where
+    toPreLaTeXM mb = do
+        toPreLaTeXM $ toTable mb
+      where
+        defaultCellFormat = CellFormat White (Typography LeftAligned MediumFontSize [])
+        headerCellFormat = CellFormat Gray (Typography LeftAligned LargeFontSize [])
+        toTable (ModuleBlock (ModuleSchema colHeaders) (Plain rows)) =
+            let headerRow =
+                    Row
+                        ( map
+                            ( convertToCell
+                                headerCellFormat
+                            )
+                            colHeaders
+                        )
+                tableRows =
+                    map
+                        ( Row
+                            . map
+                                ( convertToCell
+                                    defaultCellFormat
+                                )
+                            . unModule
+                        )
+                        rows
+             in padTable $ Table (headerRow : tableRows)
+        toTable (ModuleBlock (ModuleSchema colHeaders) (Categorized categories)) =
+            let headerRow =
+                    Row
+                        ( Cell headerCellFormat [] 1 1
+                            : map
+                                ( convertToCell
+                                    headerCellFormat
+                                )
+                                colHeaders
+                        )
+                categoryRows = concatMap toCategory categories
+             in padTable $ Table (headerRow : categoryRows)
+          where
+            toCategory (Category catAttr mods) =
+                let n = length mods
+                    catCell = Cell defaultCellFormat (unAttribute catAttr) 1 n
+                    modCells = case map
+                        ( Row
+                            . (VSpannedCell 1 :)
+                            . map
+                                ( convertToCell
+                                    defaultCellFormat
+                                )
+                            . unModule
+                        )
+                        mods of
+                        [] -> []
+                        (Row []) : rs -> Row [] : rs
+                        (Row (_ : xs)) : rs -> Row (catCell : xs) : rs
+                 in modCells
+        convertToCell fmt attr = Cell fmt (unAttribute attr) 1 1
+
+        padTable (Table rows) =
+            let maxLen = maximum (map rowLen rows)
+             in Table (map (padRow maxLen) rows)
+          where
+            rowLen (Row cs) = length cs
+            padRow row (Row cs) =
+                Row
+                    ( cs
+                        ++ replicate
+                            (row - length cs)
+                            (Cell (CellFormat White (Typography LeftAligned MediumFontSize [])) [] 1 1)
+                    )
 
 -------------------------------- Table ----------------------------------
 
@@ -401,35 +498,49 @@ instance ToPreLaTeXM Table where
             n = length c
             option = T.replicate n "|L" <> "|"
         rows' <- mapM toPreLaTeXM rows
-        pure $ tabular option $ ISequence $ [hline] <> rows'
+        pure $
+            IRaw
+                "\\textcolor{orange}{Attention: Tables are currently not fully supported!}\n\n"
+                <> tabular option (ISequence $ [hline] <> rows')
 
 instance ToPreLaTeXM Row where
     toPreLaTeXM (Row cells) = do
         cells' <- mapM toPreLaTeXM (filter (/= HSpannedCell) cells)
         let rowContent = mconcat $ intersperse (IRaw " & ") cells'
         pure $ rowContent <> linebreak <> hline <> IText " "
-    
-      where 
+      where
         intersperse _ [] = []
-        intersperse sep (x:xs) = x : prependToAll sep xs
+        intersperse sep (x : xs) = x : prependToAll sep xs
 
         prependToAll _ [] = []
-        prependToAll sep (y:ys) = sep : y : prependToAll sep ys
+        prependToAll sep (y : ys) = sep : y : prependToAll sep ys
 
 instance ToPreLaTeXM Cell where
     toPreLaTeXM (Cell (CellFormat bg (Typography _ fontsize _)) content w h) = do
         content' <- mapM toPreLaTeXM content
-        let content'' = applyTextStyle fontsize (mconcat content') <> cellcolor (getColor bg)
-        pure $ if w > 1 && h > 1 
-               then multicolumn w "|l|" $ multirow h content''
-               else if w > 1 
-                    then multicolumn w "|l|" content''
-                    else if h > 1 
-                         then multirow h content''
-                         else content''
+        let lineBreakCase =
+                if any findLineBreak content
+                    then makecell
+                    else id
+            stylizedContent =
+                lineBreakCase $
+                    applyTextStyle fontsize (mconcat content')
+                        <> getColor bg
+        pure $
+            if w > 1 && h > 1
+                then multicolumn w "|l|" $ multirow h stylizedContent
+                else
+                    if w > 1
+                        then multicolumn w "|l|" stylizedContent
+                        else
+                            if h > 1
+                                then multirow h stylizedContent
+                                else stylizedContent
       where
-        getColor White = "white"
-        getColor Gray = "gray!30"
+        getColor White = mempty
+        getColor Gray = cellcolor "gray!30"
+        findLineBreak (LineBreak _) = True
+        findLineBreak _ = False
     toPreLaTeXM (VSpannedCell w) = pure $ if w > 1 then multicolumn w "|l|" mempty else mempty
     toPreLaTeXM HSpannedCell = pure mempty
 

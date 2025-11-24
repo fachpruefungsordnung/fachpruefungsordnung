@@ -161,18 +161,23 @@ mergeCells (DefaultCellType defaultCellT) table =
         | row > nRows = s
         | col > mCols = process (row + 1, 0) s
         | visited ! (row, col) == Visited = process (row, col + 1) s
-        | visited ! (row, col) == InSpan 0 = let InSpan w = visited ! (row, col) 
-                                                 matrix' = matrix // [((row, col), VSpannedCell w)]
-                                             in process (row, col + 1) (visited, matrix')
+        | visited ! (row, col) == InSpan 0 =
+            let InSpan w = visited ! (row, col)
+                matrix' = matrix // [((row, col), VSpannedCell w)]
+             in process (row, col + 1) (visited, matrix')
         | otherwise =
             let createCell fmt content =
                     let w = maxWidth (row, col)
                         h = maxHeight (row, col) w
                         s' =
                             foldl
-                                (\(v, m) (x, y) -> (if y == col && row < x
-                                                 then v // [((x, y), InSpan w)]
-                                                 else v // [((x, y), Visited)], m))
+                                ( \(v, m) (x, y) ->
+                                    ( if y == col && row < x
+                                        then v // [((x, y), InSpan w)]
+                                        else v // [((x, y), Visited)]
+                                    , m
+                                    )
+                                )
                                 s
                                 [ (row', col')
                                 | col' <- [col .. col + w - 1]

@@ -5,13 +5,13 @@ module Language.Lsd.AST.Type.Module
     , ModuleType (..)
     ) where
 
+import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
-import Language.Lsd.AST.Type.Enum (EnumType)
 import Language.Lsd.AST.Type.Text (TextType)
 
 data ModuleBlockType
     = ModuleBlockType
-        (TextType EnumType)
+        (TextType Void)
         ModuleSchemaType
         CategoryType
 

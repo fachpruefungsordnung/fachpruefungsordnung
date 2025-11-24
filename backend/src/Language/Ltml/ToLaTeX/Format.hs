@@ -160,6 +160,7 @@ staticDocumentFormat =
         , usepackage ["htt"] "hyphenat"
         , usepackage ["table"] "xcolor"
         , usepackage [] "makecell"
+        , usepackage [] "color"
         , IRaw "\\pagestyle{fancy}"
         , IRaw "\\fancyhf{}"
         , IRaw "\\setlist[enumerate]{align=left}"

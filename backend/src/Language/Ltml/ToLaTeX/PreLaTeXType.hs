@@ -197,7 +197,11 @@ document :: PreLaTeX -> PreLaTeX
 document content = IEnvironment "document" [] [content]
 
 tabular :: T.Text -> PreLaTeX -> PreLaTeX
-tabular cols content = IEnvironment "tabulary" [] [IBraced $ IRaw "\\textwidth", IBraced $ IRaw cols, content] 
+tabular cols content =
+    IEnvironment
+        "tabulary"
+        []
+        [IBraced $ IRaw "\\textwidth", IBraced $ IRaw cols, content]
 
 ------------------- tabular commands ------------------------
 cellcolor :: T.Text -> PreLaTeX
@@ -210,7 +214,7 @@ multicolumn :: Int -> T.Text -> PreLaTeX -> PreLaTeX
 multicolumn n cols content = ICommand "multicolumn" [] [IText (T.pack (show n)), IText cols, content]
 
 makecell :: PreLaTeX -> PreLaTeX
-makecell content = ICommand "makecell" ["l"] [IBraced content]
+makecell content = ICommand "makecell" ["l"] [content]
 
 -------------------------------------------------------------------------------
 {-                              other                                        -}
