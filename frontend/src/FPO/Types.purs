@@ -12,6 +12,7 @@ module FPO.Types
   , emptyTOCEntry
   , findTOCEntry
   , findTitleTOCEntry
+  , firstTOCEntry
   , markerToAnnotation
   , nodeHeaderToTOCEntry
   , replaceTOCEntry
@@ -37,6 +38,7 @@ import FPO.Dto.DocumentDto.DocumentTree as DT
 import FPO.Dto.DocumentDto.NodeHeader as NH
 import FPO.Dto.DocumentDto.TreeDto
   ( RootTree
+  , firstLeafRootTree
   , findRootTree
   , findTitleRootTree
   , replaceNodeRootTree
@@ -177,3 +179,6 @@ sectionDtoToCS (Section { id, firstComment, replies, status }) =
     resolved = status == "Resolved"
   in
     { markerID: id, first: Just fst, replies: rep, resolved: resolved }
+
+firstTOCEntry :: TOCTree -> Maybe TOCEntry
+firstTOCEntry = firstLeafRootTree

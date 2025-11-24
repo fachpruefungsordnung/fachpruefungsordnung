@@ -552,6 +552,7 @@ splitview = connect selectTranslator $ H.mkComponent
       -- Load the initial TOC entries into the editor
       handleAction GET
       handleAction UpdateMSelectedTocEntry
+      H.tell _toc unit (TOC.SelectFirstEntry)
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }

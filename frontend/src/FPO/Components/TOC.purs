@@ -65,7 +65,7 @@ import FPO.Dto.PostTextDto (createPostTextDto)
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
-import FPO.Types (TOCEntry, TOCTree)
+import FPO.Types (TOCEntry, TOCTree, firstTOCEntry)
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Util (isPrefixOf, prependIf, singletonIf)
 import FPO.Util as Util
@@ -190,6 +190,7 @@ data Query a
   | RequestCurrentTocEntry (Maybe SelectedEntity -> a)
   | RequestUpToDateVersion (Maybe Version -> a)
   | RequestFullTitle (Maybe String -> a)
+  | SelectFirstEntry a
 
 type SearchData =
   { elementID :: Int
@@ -835,6 +836,22 @@ tocview = connect (selectEq identity) $ H.mkComponent
     RequestFullTitle reply -> do
       mTitle <- H.gets _.mTitle
       pure (Just (reply mTitle))
+
+    SelectFirstEntry a -> do
+      state <- H.get
+      case firstTOCEntry state.tocEntries of
+        Nothing ->
+          pure (Just a)
+        Just entry -> do
+          let
+            leafId = entry.id
+            mTitle = findLeafTitle leafId state.tocEntries
+          H.modify_ \st ->
+            st { mSelectedTocEntry = Just (SelLeaf leafId)
+              , mTitle            = mTitle
+              }
+          H.raise (ChangeToLeaf leafId mTitle)
+          pure (Just a)
 
   rootTreeToHTML
     :: forall slots
