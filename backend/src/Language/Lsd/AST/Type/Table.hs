@@ -29,7 +29,7 @@ data RowType
         (Star (Disjunction CellType))
 
 data BGColor = White | Gray
-    deriving (Show)
+    deriving (Show, Eq)
 
 data CellFormat
     = CellFormat

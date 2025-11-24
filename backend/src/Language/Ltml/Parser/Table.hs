@@ -95,8 +95,15 @@ instance Eq Cell'' where
 -- everything to merge cells and compute spans
 
 type Matrix a = Array (Int, Int) a
-type Visited = (Int, Int) -> Bool
+type Visited = Array (Int, Int) VisitedCell
 type Position = (Int, Int)
+data VisitedCell = Unvisited | Visited | InSpan Int deriving (Show)
+
+instance Eq VisitedCell where
+    Unvisited == Unvisited = True
+    Visited == Visited = True
+    (InSpan {}) == (InSpan {}) = True
+    _ == _ = False
 
 mergeCells :: DefaultCellType -> Table' -> Table
 mergeCells (DefaultCellType defaultCellT) table =
@@ -104,13 +111,16 @@ mergeCells (DefaultCellType defaultCellT) table =
             array
                 ((0, 0), (nRows, mCols))
                 [((row, col), emptyEntry) | row <- [0 .. nRows], col <- [0 .. mCols]]
-        visited0 (_, _) = False
+        visited0 =
+            array
+                ((0, 0), (nRows, mCols))
+                [((row, col), Unvisited) | row <- [0 .. nRows], col <- [0 .. mCols]]
      in arrayToTable $ snd $ process (0, 0) (visited0, matrix')
   where
     table' = padTable defaultCellT table
     rawMatrix = tableToArray table'
     ((0, 0), (nRows, mCols)) = bounds rawMatrix
-    emptyEntry = SpannedCell
+    emptyEntry = HSpannedCell
 
     unpackCell' (Cell' _ c) = c
 
@@ -139,25 +149,35 @@ mergeCells (DefaultCellType defaultCellT) table =
                     )
                     [row + 1 .. nRows]
 
-    updateVisited :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
-    updateVisited p0 (visited, mat) = (\p -> p == p0 || visited p, mat)
+    -- updateVisited :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
+    -- updateVisited p0 (visited, mat) = (\p -> p == p0 || visited p, mat)
 
     updateMatrix
         :: Position -> Cell -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
     updateMatrix pos val (visited, mat) = (visited, mat // [(pos, val)])
 
     process :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
-    process (row, col) s@(visited, _)
+    process (row, col) s@(visited, matrix)
         | row > nRows = s
         | col > mCols = process (row + 1, 0) s
-        | visited (row, col) = process (row, col + 1) s
+        | visited ! (row, col) == Visited = process (row, col + 1) s
+        | visited ! (row, col) == InSpan 0 =
+            let InSpan w = visited ! (row, col)
+                matrix' = matrix // [((row, col), VSpannedCell w)]
+             in process (row, col + 1) (visited, matrix')
         | otherwise =
             let createCell fmt content =
                     let w = maxWidth (row, col)
                         h = maxHeight (row, col) w
                         s' =
                             foldl
-                                (\acc (x, y) -> updateVisited (x, y) acc)
+                                ( \(v, m) (x, y) ->
+                                    ( if y == col && row < x
+                                        then v // [((x, y), InSpan w)]
+                                        else v // [((x, y), Visited)]
+                                    , m
+                                    )
+                                )
                                 s
                                 [ (row', col')
                                 | col' <- [col .. col + w - 1]

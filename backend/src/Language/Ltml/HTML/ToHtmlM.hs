@@ -441,7 +441,8 @@ instance ToHtmlM Table where
             return $ tr_ <$> cellsHtml
 
         cell :: Cell -> HtmlReaderState
-        cell SpannedCell = returnNow mempty
+        cell HSpannedCell = returnNow mempty
+        cell (VSpannedCell _) = returnNow mempty
         cell (Cell _ _ 0 0) = returnNow mempty
         cell (Cell (CellFormat bgColor typography) text colspan rowspan) = do
             textHtml <- toHtmlM text

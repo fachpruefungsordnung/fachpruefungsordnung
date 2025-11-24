@@ -22,6 +22,7 @@ module Language.Ltml.ToLaTeX.PreLaTeXType
     {- commands to structure the text -}
     , medskip
     , hrule
+    , hline
     , linebreak
     , newpage
     {- setup and metadata -}
@@ -39,6 +40,11 @@ module Language.Ltml.ToLaTeX.PreLaTeXType
     , flushright
     , minipage
     , document
+    , tabular
+    , cellcolor
+    , multirow
+    , multicolumn
+    , makecell
     {- other -}
     , setindent
     , setlistdepth
@@ -163,6 +169,9 @@ medskip = IText "\n" <> ICommandS "medskip" <> IRaw "\n"
 hrule :: PreLaTeX
 hrule = ICommandS "hrule"
 
+hline :: PreLaTeX
+hline = ICommandS "hline"
+
 -------------------------------------------------------------------------------
 {-                              environments                                 -}
 
@@ -186,6 +195,26 @@ minipage = IEnvironment "minipage"
 
 document :: PreLaTeX -> PreLaTeX
 document content = IEnvironment "document" [] [content]
+
+tabular :: T.Text -> PreLaTeX -> PreLaTeX
+tabular cols content =
+    IEnvironment
+        "tabulary"
+        []
+        [IBraced $ IRaw "\\textwidth", IBraced $ IRaw cols, content]
+
+------------------- tabular commands ------------------------
+cellcolor :: T.Text -> PreLaTeX
+cellcolor color = ICommand "cellcolor" [] [IText color]
+
+multirow :: Int -> PreLaTeX -> PreLaTeX
+multirow n content = ICommand "multirow" [] [IText (T.pack (show n)), IRaw "=", content]
+
+multicolumn :: Int -> T.Text -> PreLaTeX -> PreLaTeX
+multicolumn n cols content = ICommand "multicolumn" [] [IText (T.pack (show n)), IText cols, content]
+
+makecell :: PreLaTeX -> PreLaTeX
+makecell content = ICommand "makecell" ["l"] [content]
 
 -------------------------------------------------------------------------------
 {-                              other                                        -}
