@@ -3,8 +3,8 @@
 
 module Language.Ltml.Parser.Module (moduleBlockP, moduleP) where
 
+import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
-import Language.Lsd.AST.Type.Enum (EnumType)
 import Language.Lsd.AST.Type.Module
     ( CategoryType (..)
     , ModuleBlockType (..)
@@ -29,7 +29,7 @@ import Language.Ltml.Parser.Text
     )
 import Text.Megaparsec (choice, many, some, (<?>))
 
-attributeListP :: Keyword -> TextType EnumType -> Parser [Attribute]
+attributeListP :: Keyword -> TextType Void -> Parser [Attribute]
 attributeListP kw tt = do
     nLexeme $ keywordP kw
     fmap Attribute <$> pipeSeperatedTextForestsP tt
@@ -37,13 +37,13 @@ attributeListP kw tt = do
 -------------------------------------------------------------------------------
 
 schemaP
-    :: ModuleSchemaType -> TextType EnumType -> Parser ModuleSchema
+    :: ModuleSchemaType -> TextType Void -> Parser ModuleSchema
 schemaP (ModuleSchemaType kw) tt = ModuleSchema <$> attributeListP kw tt <?> "module schema"
 
-moduleP :: ModuleType -> TextType EnumType -> Parser Module
+moduleP :: ModuleType -> TextType Void -> Parser Module
 moduleP (ModuleType kw) tt = Module <$> attributeListP kw tt <?> "module"
 
-categoryP :: CategoryType -> TextType EnumType -> Parser Category
+categoryP :: CategoryType -> TextType Void -> Parser Category
 categoryP (CategoryType kw moduleType) tt = do
     category <- Attribute <$> nLexeme (hangingTextP kw tt)
     modules <- many (nLexeme (moduleP moduleType tt))

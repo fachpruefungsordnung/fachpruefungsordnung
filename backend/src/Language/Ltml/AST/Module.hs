@@ -7,7 +7,7 @@ module Language.Ltml.AST.Module
     , Attribute (..)
     ) where
 
-import Language.Ltml.AST.Text (RichTextTree)
+import Language.Ltml.AST.Text (TableTextTree)
 
 data ModuleBlock = ModuleBlock ModuleSchema ModuleTable
     deriving (Show)
@@ -23,8 +23,8 @@ newtype ModuleSchema = ModuleSchema [Attribute]
 data Category = Category Attribute [Module]
     deriving (Show)
 
-newtype Module = Module [Attribute]
+newtype Module = Module {unModule :: [Attribute]}
     deriving (Show)
 
-newtype Attribute = Attribute {unAttribute :: [RichTextTree]}
+newtype Attribute = Attribute {unAttribute :: [TableTextTree]}
     deriving (Show)

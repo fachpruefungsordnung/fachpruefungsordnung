@@ -179,7 +179,6 @@ library:
     - Language.Ltml.ToLaTeX.LaTeXType
     - Language.Ltml.ToLaTeX.PDFGenerator
     - Language.Ltml.ToLaTeX.Format
-    - Language.Ltml.ToLaTeX.Testing
     - Language.Ltml.ToLaTeX.GlobalState
     - Language.Ltml.ToLaTeX.Renderer
     - Language.Ltml.ToLaTeX.PreLaTeXType
