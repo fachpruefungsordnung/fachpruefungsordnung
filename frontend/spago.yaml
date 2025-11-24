@@ -55,6 +55,9 @@ package:
     main: Test.Main
     dependencies:
       - console
+      - spec
+      - spec-discovery
+      - spec-node
 workspace:
   packageSet:
     registry: 64.6.0

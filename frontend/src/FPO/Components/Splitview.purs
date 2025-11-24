@@ -146,10 +146,12 @@ type State = FPOState
   , startMouseRatio :: Number
   , startSidebarRatio :: Number
   , startPreviewRatio :: Number
+  , startEditorRatio :: Number
 
   -- The current widths of the sidebar and middle content (as percentage ratios)
   , sidebarRatio :: Number
   , previewRatio :: Number
+  , editorRatio :: Number
 
   -- The last expanded sidebar width, used to restore the sidebar when toggling
   , lastExpandedSidebarRatio :: Number
@@ -224,8 +226,10 @@ splitview = connect selectTranslator $ H.mkComponent
     , startMouseRatio: 0.0
     , startSidebarRatio: 0.0
     , startPreviewRatio: 0.0
+    , startEditorRatio: 0.0
     , sidebarRatio: 0.2
     , previewRatio: 0.4
+    , editorRatio: 0.4
     , lastExpandedSidebarRatio: 0.2
     , lastExpandedPreviewRatio: 0.4
     , renderedHtml: Nothing
@@ -288,8 +292,7 @@ splitview = connect selectTranslator $ H.mkComponent
               [ -- Editor
                 HH.div
                   [ HP.style $ "position: relative; flex: 0 0 "
-                      <> show
-                        ((1.0 - state.sidebarRatio - state.previewRatio) * 100.0)
+                      <> show (state.editorRatio * 100.0)
                       <> "%;"
                   ]
                   [ -- The actual editor area
