@@ -199,6 +199,7 @@ type State = FPOState
   , isOnMerge :: Boolean
   -- obtained from TOC. Used when merging. Set to the version details of the Version loaded into the right editor.
   , upToDateVersion :: Maybe Version
+  , isLoading :: Boolean
   )
 
 type Input = { docID :: DocumentID, elementData :: ElementData }
@@ -276,6 +277,7 @@ data Query a
   | RequestDirtyVersion (Boolean -> a)
   | ResetDirtyVersion a
   | ReceiveUpToDateUpdate (Maybe Version) a
+  | IsOnMerge (Boolean -> a)
 
 -- | UpdateCompareToElement ElementData a
 
@@ -556,7 +558,27 @@ editor = connect selectTranslator $ H.mkComponent
           [ HP.ref (H.RefLabel "container")
           , HP.style "flex:1 1 0; min-height:0; position:relative;"
           ]
-          [ -- Add overlay when right side
+          [ -- Loading-Overlay nur, wenn isLoading
+            if state.isLoading then
+              HH.div
+                [ HP.classes
+                    [ HB.positionAbsolute
+                    , HB.top0
+                    , HB.start0
+                    , HB.w100
+                    , HB.h100
+                    , HB.dFlex
+                    , HB.justifyContentCenter
+                    , HB.alignItemsCenter
+                    ]
+                , HP.style
+                    "background: rgba(255,255,255,0.8); z-index: 30;"
+                ]
+                [ HH.text "Loading…" ]
+            else
+              HH.text ""
+          ,
+            -- Add overlay when right side
             case state.compareToElement of
               Just _ ->
                 HH.div
@@ -1416,6 +1438,8 @@ editor = connect selectTranslator $ H.mkComponent
         -- TODO: After creating a new Leaf, we get Nothing in loadedContent
         -- See, why and fix it
 
+        H.modify_ _ { isLoading = true }
+
         --first we look whether a draft to load is present. The right editor does not load drafts
         loadedDraftContent <- case state.compareToElement of
           Nothing ->
@@ -1445,7 +1469,9 @@ editor = connect selectTranslator $ H.mkComponent
               )
 
         case loadedContent of
-          Left err -> Store.addError err
+          Left err -> do
+            H.modify_ _ { isLoading = false }
+            Store.addError err
           Right wrapper -> do
             let
               content = ContentDto.getWrapperContent wrapper
@@ -1545,6 +1571,7 @@ editor = connect selectTranslator $ H.mkComponent
                   { mPendingDebounceF = Nothing
                   , mPendingMaxWaitF = Nothing
                   }
+              , isLoading = false
               }
             -- lastly show html in preview
             when showHtml $ do
@@ -1746,6 +1773,10 @@ editor = connect selectTranslator $ H.mkComponent
       for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure $ Just a
 
+    IsOnMerge reply -> do
+      isOnMerge <- H.gets _.isOnMerge
+      pure $ Just $ reply isOnMerge
+
   -- free up the save flags for the next save session
   -- check if there are new requests for saving during saving
   freeSaveFlagsAndMaybeRerun
@@ -1919,6 +1950,7 @@ initialState { context, input } =
   , mDirtyVersion: Nothing
   , isOnMerge: false
   , upToDateVersion: Nothing
+  , isLoading: true
   }
 
 makeEditorToolbarButton

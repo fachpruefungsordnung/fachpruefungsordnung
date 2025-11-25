@@ -8,6 +8,7 @@ module FPO.Dto.DocumentDto.TreeDto
   , Tree(..)
   , TreeHeader(..)
   , errorMeta
+  , firstLeafRootTree
   , findRootTree
   , findTitleRootTree
   , getContent
@@ -29,6 +30,7 @@ import Control.Monad.Except (throwError)
 import Data.Argonaut.Decode (class DecodeJson, decodeJson, (.:), (.:?))
 import Data.Argonaut.Decode.Error (JsonDecodeError(TypeMismatch))
 import Data.Argonaut.Encode (class EncodeJson, encodeJson)
+import Data.Array (uncons)
 import Data.Foldable (foldr)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (length, splitAt)
@@ -338,3 +340,21 @@ replaceNodeRootTree
 replaceNodeRootTree predicate newNode tree =
   modifyNodeRootTree predicate (const newNode) tree
 
+firstLeafRootTree :: forall a. RootTree a -> Maybe a
+firstLeafRootTree Empty = Nothing
+firstLeafRootTree (RootTree { children }) =
+  goChildren children
+  where
+  goChildren :: Array (Edge a) -> Maybe a
+  goChildren cs =
+    case uncons cs of
+      Nothing -> Nothing
+      Just { head: Edge t, tail: rest } ->
+        case firstLeafTree t of
+          Just x -> Just x
+          Nothing -> goChildren rest
+
+  firstLeafTree :: Tree a -> Maybe a
+  firstLeafTree = case _ of
+    Leaf { node } -> Just node
+    Node { children: children' } -> goChildren children'
