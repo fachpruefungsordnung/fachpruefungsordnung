@@ -437,7 +437,7 @@ editor = connect selectTranslator $ H.mkComponent
                         true
                         (translate (label :: _ "editor_wrapToggle") state.translator)
                         WrapToggle
-                        "bi-chat-square-text"
+                        "bi-text-wrap"
                 ]
             , case state.compareToElement of
                 Just _ -> HH.text ""
