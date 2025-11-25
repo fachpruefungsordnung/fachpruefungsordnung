@@ -184,6 +184,7 @@ type Labels =
       ::: "editor_textUnderline"
       ::: "editor_undo"
       ::: "editor_viewVersion"
+      ::: "editor_wrapToggle"
 
       -- | Errors 
       ::: "error_accessDeniedError"
