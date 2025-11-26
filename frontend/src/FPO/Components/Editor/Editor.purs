@@ -227,6 +227,7 @@ data Action
   | Font (Types.Editor -> Effect Unit)
   | FontSize (Int -> Int)
   | History HistoryOp
+  | WrapToggle
   | Save Boolean
   -- Subsection of Save
   | Upload TOCEntry ContentWrapper Boolean
@@ -426,6 +427,19 @@ editor = connect selectTranslator $ H.mkComponent
                         Comment
                         "bi-chat-square-text"
 
+                , case state.compareToElement of
+                    Just _ -> HH.text ""
+                    Nothing ->
+                      buttonDivisor
+
+                , case state.compareToElement of
+                    Just _ -> HH.text ""
+                    Nothing ->
+                      makeEditorToolbarButton
+                        true
+                        (translate (label :: _ "editor_wrapToggle") state.translator)
+                        WrapToggle
+                        "bi-text-wrap"
                 ]
             , case state.compareToElement of
                 Just _ -> HH.text ""
@@ -747,6 +761,16 @@ editor = connect selectTranslator $ H.mkComponent
               HUndo -> Editor.undo ed
               HRedo -> Editor.redo ed
             Editor.focus ed
+
+    WrapToggle -> do
+      editor_ <- H.gets _.mEditor
+      H.liftEffect
+        case editor_ of
+          Nothing -> pure unit
+          Just e -> do
+            session <- Editor.getSession e
+            wrapState <- H.liftEffect (Session.getUseWrapMode session)
+            Session.setUseWrapMode (not wrapState) session
 
     Discard ->
       H.modify_ _ { discardPopup = true }

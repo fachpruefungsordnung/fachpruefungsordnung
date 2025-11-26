@@ -36,6 +36,7 @@ type EditorLabels =
       ::: "editor_textUnderline"
       ::: "editor_undo"
       ::: "editor_viewVersion"
+      ::: "editor_wrapToggle"
       ::: SNil
   )
 
@@ -91,6 +92,7 @@ enEditor = fromRecord
   , editor_textUnderline: "Underline text"
   , editor_undo: "Undo (Ctrl+Z)"
   , editor_viewVersion: "View Version"
+  , editor_wrapToggle: "Automatic Line Wrap"
   }
 
 deEditor :: Translation EditorLabels
@@ -149,4 +151,5 @@ deEditor = fromRecord
   , editor_textUnderline: "Text unterstreichen"
   , editor_undo: "Zurück (Strg+Z)"
   , editor_viewVersion: "Zu Version Wechseln"
+  , editor_wrapToggle: "Automatischer Zeilenumsprung"
   }
