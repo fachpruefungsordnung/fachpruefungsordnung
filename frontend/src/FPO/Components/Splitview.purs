@@ -638,6 +638,7 @@ splitview = connect selectTranslator $ H.mkComponent
         { mDragTarget = Just which
         , startMouseRatio = mouseXRatio
         , startSidebarRatio = st.sidebarRatio
+        , startEditorRatio = st.editorRatio
         , startPreviewRatio = st.previewRatio
         }
       handleAction $ HandleMouseMove mouse
@@ -660,50 +661,49 @@ splitview = connect selectTranslator $ H.mkComponent
         -- A window should always have at least 5% width for each section
         -- and at most 80% for sidebar and preview
         minRatio = 0.05 -- 5%
-        maxRatio = 0.8 -- 80%
-
-        -- Clamp function to keep a value within min and max
-        clamp :: Number -> Number -> Number -> Number
-        clamp minVal maxVal valueToClamp = max minVal (min maxVal valueToClamp)
 
       dragTargetAction <- H.gets _.mDragTarget
       -- Starting position of mouse when drag started
-      startMouseRatio <- H.gets _.startMouseRatio
+      startSidebarRatio <- H.gets _.startSidebarRatio
+      startEditorRatio <- H.gets _.startEditorRatio
+      startPreviewRatio <- H.gets _.startPreviewRatio
 
       case dragTargetAction of
         -- Resizing TOC or Comment Sidebar
         Just ResizeLeft -> do
-          startSidebarRatio <- H.gets _.startSidebarRatio
           let
-            -- Calculate the new sidebar ratio based on mouse movement
-            rawSidebarRatio = startSidebarRatio + (mouseXRatio - startMouseRatio)
-            newSidebar = clamp minRatio maxRatio rawSidebarRatio
-          when (newSidebar >= minRatio && newSidebar <= maxRatio) do
-            H.modify_ \st -> st
-              { sidebarRatio = newSidebar
-              , lastExpandedSidebarRatio =
-                  if newSidebar > minRatio then newSidebar
-                  else st.lastExpandedSidebarRatio
-              }
+            { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
+              startSidebarRatio
+              startEditorRatio
+              startPreviewRatio
+              mouseXRatio
+
+          H.modify_ \st -> st
+            { sidebarRatio = newSidebarRatio
+            , editorRatio = newEditorRatio
+            , previewRatio = newPreviewRatio
+            , lastExpandedSidebarRatio =
+                if newSidebarRatio > minRatio then newSidebarRatio
+                else st.lastExpandedSidebarRatio
+            }
 
         -- Resizing Preview Area
         Just ResizeRight -> do
-          startPreviewRatio <- H.gets _.startPreviewRatio
-          sidebarRatio <- H.gets _.sidebarRatio
-
           let
-            delta = mouseXRatio - startMouseRatio
-            rawPreview = startPreviewRatio - delta
-            maxPreview = 1.0 - sidebarRatio - minRatio
-            newPreview = clamp minRatio maxPreview rawPreview
+            { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
+              startSidebarRatio
+              startEditorRatio
+              startPreviewRatio
+              (1.0 - mouseXRatio)
 
-          when (rawPreview >= minRatio && rawPreview <= maxPreview) do
-            H.modify_ \st -> st
-              { previewRatio = newPreview
-              , lastExpandedPreviewRatio =
-                  if newPreview > minRatio then newPreview
-                  else st.lastExpandedPreviewRatio
-              }
+          H.modify_ \st -> st
+            { sidebarRatio = newSidebarRatio
+            , editorRatio = newEditorRatio
+            , previewRatio = newPreviewRatio
+            , lastExpandedSidebarRatio =
+                if newSidebarRatio > minRatio then newSidebarRatio
+                else st.lastExpandedSidebarRatio
+            }
 
         _ -> pure unit
 
@@ -1577,3 +1577,65 @@ stripHtmlTags input =
   case Regex.regex "<[^>]*>" (RegexFlags.global <> RegexFlags.ignoreCase) of
     Left _ -> input -- If regex compilation fails, return original string
     Right htmlRegex -> Regex.replace htmlRegex "" input
+
+resizeFromLeft
+  :: Number
+  -> Number
+  -> Number
+  -> Number
+  -> { newSidebarRatio :: Number
+     , newEditorRatio :: Number
+     , newPreviewRatio :: Number
+     }
+resizeFromLeft startSidebarSize startEditorSize startPreviewSize mousePercentFromLeft =
+  let
+    sidebarAndEditor = startSidebarSize + startEditorSize
+  in
+    if mousePercentFromLeft <= startSidebarSize then -- resizing to the left of initial sidebar size
+      if mousePercentFromLeft <= 0.05 then -- close enough to hide sidebar
+        { newSidebarRatio: 0.0
+        , newEditorRatio: sidebarAndEditor
+        , newPreviewRatio: startPreviewSize
+        }
+      else -- resizing to the left but not close enough to hide sidebar
+        { newSidebarRatio: mousePercentFromLeft
+        , newEditorRatio: sidebarAndEditor - mousePercentFromLeft
+        , newPreviewRatio: startPreviewSize
+        }
+    else if
+      startSidebarSize + startEditorSize - mousePercentFromLeft >= startPreviewSize then -- resizing to the right but editor still bigger than preview
+      { newSidebarRatio: mousePercentFromLeft
+      , newEditorRatio: sidebarAndEditor - mousePercentFromLeft
+      , newPreviewRatio: startPreviewSize
+      }
+    else -- resizing to the right and preview bigger than editor
+      { newSidebarRatio: mousePercentFromLeft
+      , newEditorRatio: (1.0 - mousePercentFromLeft) / 2.0
+      , newPreviewRatio: (1.0 - mousePercentFromLeft) / 2.0
+      }
+
+resizeFromRight
+  :: Number
+  -> Number
+  -> Number
+  -> Number
+  -> { newSidebarRatio :: Number
+     , newEditorRatio :: Number
+     , newPreviewRatio :: Number
+     }
+resizeFromRight
+  startSidebarSize
+  startEditorSize
+  startPreviewSize
+  mousePercentFromRight =
+  let
+    { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
+      startPreviewSize
+      startEditorSize
+      startSidebarSize
+      mousePercentFromRight
+  in
+    { newSidebarRatio: newPreviewRatio
+    , newEditorRatio
+    , newPreviewRatio: newSidebarRatio
+    }
