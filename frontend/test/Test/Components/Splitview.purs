@@ -34,7 +34,7 @@ resizeFromLeftTest =
       newPreviewRatio `shouldBeNear` 0.4
 
     it
-      "when dragging to the left more than 5% close to the left side, then hide sidebar"
+      "when dragging to the left more than 5% close to the left side, then sidebar ratio is 0"
       do
 
         let startSidebarSize = 0.2
@@ -52,6 +52,24 @@ resizeFromLeftTest =
         newSidebarRatio `shouldBeNear` 0.0
         newEditorRatio `shouldBeNear` 0.6
         newPreviewRatio `shouldBeNear` 0.4
+
+    it
+      "when dragging to the left more than 5% close to the left side, then hide sidebar"
+      do
+
+        let startSidebarSize = 0.2
+        let startEditorSize = 0.4
+        let startPreviewSize = 0.4
+        let mousePercentFromLeft = 0.04887
+
+        let
+          { sidebarClosed } = resizeFromLeft
+            startSidebarSize
+            startEditorSize
+            startPreviewSize
+            mousePercentFromLeft
+
+        sidebarClosed `shouldEqual` true
 
     it
       "when dragging to the right so that the editor is still bigger than preview just resize editor"
@@ -93,6 +111,24 @@ resizeFromLeftTest =
         newEditorRatio `shouldBeNear` 0.25
         newPreviewRatio `shouldBeNear` 0.25
 
+    it
+      "when dragging to the right so that the preview is smaller than 10%, hide it"
+      do
+
+        let startSidebarSize = 0.2
+        let startEditorSize = 0.4
+        let startPreviewSize = 0.4
+        let mousePercentFromLeft = 0.85
+
+        let
+          { previewClosed } = resizeFromLeft
+            startSidebarSize
+            startEditorSize
+            startPreviewSize
+            mousePercentFromLeft
+
+        previewClosed `shouldEqual` true
+
 resizeFromRightTest :: Spec Unit
 resizeFromRightTest =
   describe "resizeFromRight" do
@@ -115,7 +151,7 @@ resizeFromRightTest =
       newPreviewRatio `shouldBeNear` 0.12
 
     it
-      "when dragging to the left more than 5% close to the left side, then hide sidebar"
+      "when dragging to the right more than 5% close to the left side, then set preview ratio to 0"
       do
 
         let startSidebarSize = 0.2
@@ -133,6 +169,24 @@ resizeFromRightTest =
         newSidebarRatio `shouldBeNear` 0.2
         newEditorRatio `shouldBeNear` 0.8
         newPreviewRatio `shouldBeNear` 0.0
+
+    it
+      "when dragging to the right more than 5% close to the left side, then hide preview"
+      do
+
+        let startSidebarSize = 0.2
+        let startEditorSize = 0.4
+        let startPreviewSize = 0.4
+        let mousePercentFromRight = 0.04887
+
+        let
+          { previewClosed } = resizeFromRight
+            startSidebarSize
+            startEditorSize
+            startPreviewSize
+            mousePercentFromRight
+
+        previewClosed `shouldEqual` true
 
     it
       "when dragging to the right so that the editor is still bigger than preview just resize editor"
@@ -173,6 +227,24 @@ resizeFromRightTest =
         newSidebarRatio `shouldBeNear` 0.25
         newEditorRatio `shouldBeNear` 0.25
         newPreviewRatio `shouldBeNear` 0.5
+
+    it
+      "when dragging to the left so that the sidebar is smaller than 10%, hide it"
+      do
+
+        let startSidebarSize = 0.4
+        let startEditorSize = 0.4
+        let startPreviewSize = 0.2
+        let mousePercentFromRight = 0.85
+
+        let
+          { sidebarClosed } = resizeFromRight
+            startSidebarSize
+            startEditorSize
+            startPreviewSize
+            mousePercentFromRight
+
+        sidebarClosed `shouldEqual` true
 
 shouldBeNear :: forall m. MonadThrow Error m => Number -> Number -> m Unit
 shouldBeNear expected actual = (abs (expected - actual) < 0.0001) `shouldEqual` true
