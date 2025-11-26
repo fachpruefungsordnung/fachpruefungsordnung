@@ -429,7 +429,7 @@ editor = connect selectTranslator $ H.mkComponent
                     Just _ -> HH.text ""
                     Nothing ->
                       buttonDivisor
-                
+
                 , case state.compareToElement of
                     Just _ -> HH.text ""
                     Nothing ->
@@ -749,10 +749,7 @@ editor = connect selectTranslator $ H.mkComponent
             session <- Editor.getSession e
             wrapState <- H.liftEffect (Session.getUseWrapMode session)
             Session.setUseWrapMode (not wrapState) session
-            
 
-      
-      
     Discard ->
       H.modify_ _ { discardPopup = true }
 
