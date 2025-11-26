@@ -46,14 +46,6 @@ import Language.Ltml.AST.DocumentContainer
     )
 import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label (Label (..))
-import Language.Ltml.AST.Module
-    ( Attribute (..)
-    , Category (..)
-    , Module (..)
-    , ModuleBlock (..)
-    , ModuleSchema (..)
-    , ModuleTable (..)
-    )
 import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.AST.Paragraph (Paragraph (..))
 import Language.Ltml.AST.Section
@@ -400,7 +392,6 @@ instance ToHtmlM SimpleBlock where
     toHtmlM simpleBlock = case simpleBlock of
         SimpleParagraphBlock simpleParagraph -> toHtmlM simpleParagraph
         TableBlock table -> toHtmlM table
-        ModuleSchemaBlock moduleBlock -> toHtmlM moduleBlock
 
 -- | Section without Heading and Identifier
 instance ToHtmlM SimpleSection where
@@ -452,62 +443,6 @@ instance ToHtmlM Table where
                     (1, 1) -> td_ bgClass
                     _ -> td_ (colspan_ (iToT colspan) : rowspan_ (iToT rowspan) : bgClass)
             return $ tableData . innerContainer <$> textHtml
-
-instance ToHtmlM ModuleBlock where
-    toHtmlM (ModuleBlock (ModuleSchema features) moduleTable) = do
-        featureDHtmls <- mapM (toHtmlM . unAttribute) features
-
-        rowDHtmls <- case moduleTable of
-            Plain modules -> mapM moduleRow modules
-            Categorized categories -> mapM categoryRows categories
-
-        return $ do
-            featureHtmls <- sequence featureDHtmls
-            rowHtmls <- sequence rowDHtmls
-
-            -- add single empty cell to thead for category offset
-            let headerPlaceholder =
-                    case moduleTable of
-                        Plain _ -> mempty
-                        Categorized _ -> th_ mempty
-                colgroup = colgroup_ $ col_ <#> Class.MinSizeColumn
-                thead = thead_ $ tr_ $ (headerPlaceholder <>) $ mconcat $ map th_ featureHtmls
-                tbody = tbody_ $ mconcat rowHtmls
-            Now $
-                div_ <#> Class.TableContainer $
-                    table_ <#> Class.Table $
-                        colgroup <> thead <> tbody
-      where
-        categoryRows :: Category -> HtmlReaderState
-        categoryRows (Category name modules) = do
-            categoryHtml <- toHtmlM $ unAttribute name
-            moduleDHtmls <- mapM moduleHtml modules
-
-            return $ do
-                moduleHtmls <- sequence moduleDHtmls
-                cat <- categoryHtml
-                let
-                    categoryCell =
-                        td_
-                            [rowspan_ (iToT . length $ modules), cssClass_ Class.TableCentered]
-                            cat
-
-                    categoryRow = case moduleHtmls of
-                        [] -> [tr_ categoryCell]
-                        (m : ms) -> map tr_ (categoryCell <> m : ms)
-                return $ mconcat categoryRow
-
-        moduleHtml :: Module -> HtmlReaderState
-        moduleHtml (Module attr) = do
-            attrDHtmls <- mapM (toHtmlM . unAttribute) attr
-            return $ do
-                attrHtmls <- sequence attrDHtmls
-                return $ mconcat $ map (td_ <#> Class.TableCentered) attrHtmls
-
-        moduleRow :: Module -> HtmlReaderState
-        moduleRow m = do
-            attrsHtml <- moduleHtml m
-            return $ tr_ <$> attrsHtml
 
 -------------------------------------------------------------------------------
 
