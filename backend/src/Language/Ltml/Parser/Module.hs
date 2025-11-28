@@ -11,15 +11,9 @@ import Language.Lsd.AST.Type.Module
     , ModuleSchemaType (..)
     , ModuleType (..)
     )
+import Language.Lsd.AST.Type.Table (CellFormat)
 import Language.Lsd.AST.Type.Text (TextType)
-import Language.Ltml.AST.Module
-    ( Attribute (..)
-    , Category (..)
-    , Module (..)
-    , ModuleBlock (..)
-    , ModuleSchema (..)
-    , ModuleTable (..)
-    )
+import Language.Ltml.AST.Table (Cell (..), Row (..), Table (..))
 import Language.Ltml.Parser (Parser)
 import Language.Ltml.Parser.Common.Lexeme (lexeme, nLexeme)
 import Language.Ltml.Parser.Keyword (keywordP)
@@ -27,40 +21,54 @@ import Language.Ltml.Parser.Text
     ( hangingTextP
     , pipeSeperatedTextForestsP
     )
-import Text.Megaparsec (choice, many, some, (<?>))
+import Text.Megaparsec (choice, many, some, try, (<?>))
 
-attributeListP :: Keyword -> TextType Void -> Parser [Attribute]
-attributeListP kw tt = do
+attributeListP :: Keyword -> CellFormat -> TextType Void -> Parser [Cell]
+attributeListP kw cf tt = do
     nLexeme $ keywordP kw
-    fmap Attribute <$> pipeSeperatedTextForestsP tt
+    fmap (\tf -> Cell cf tf 1 1) <$> pipeSeperatedTextForestsP tt
 
 -------------------------------------------------------------------------------
 
 schemaP
-    :: ModuleSchemaType -> TextType Void -> Parser ModuleSchema
-schemaP (ModuleSchemaType kw) tt = ModuleSchema <$> attributeListP kw tt <?> "module schema"
+    :: ModuleSchemaType -> TextType Void -> Parser Row
+schemaP (ModuleSchemaType kw cf) tt = Row <$> attributeListP kw cf tt <?> "module schema"
 
-moduleP :: ModuleType -> TextType Void -> Parser Module
-moduleP (ModuleType kw) tt = Module <$> attributeListP kw tt <?> "module"
+moduleP :: ModuleType -> TextType Void -> Parser [Cell]
+moduleP (ModuleType kw cf) tt = attributeListP kw cf tt <?> "module"
 
-categoryP :: CategoryType -> TextType Void -> Parser Category
-categoryP (CategoryType kw moduleType) tt = do
-    category <- Attribute <$> nLexeme (hangingTextP kw tt)
+categoryP :: CategoryType -> TextType Void -> Parser [Row]
+categoryP (CategoryType kw cf moduleType) tt = do
+    categoryTree <- nLexeme (hangingTextP kw tt)
     modules <- many (nLexeme (moduleP moduleType tt))
-    return $ Category category modules
+    return $ case modules of
+        [] -> [Row [Cell cf categoryTree 1 1]]
+        (m : ms) -> Row (Cell cf categoryTree 1 (length modules) : m) : fmap Row ms
 
 -- | Parse a schema and 0 to n module definitions. The block is terminated by an empty line.
 moduleBlockP
-    :: ModuleBlockType -> Parser ModuleBlock
-moduleBlockP (ModuleBlockType tt schemaType categoryType@(CategoryType _ moduleType)) = do
-    schema <- lexeme (schemaP schemaType tt)
-    groups <- choice moduleTablePs
-    return $ ModuleBlock schema groups
-  where
-    moduleTablePs :: [Parser ModuleTable]
-    moduleTablePs =
+    :: ModuleBlockType -> Parser Table
+moduleBlockP
+    ( ModuleBlockType
+            tt
+            schemaType@(ModuleSchemaType _ schemaCellFormat)
+            categoryType@(CategoryType _ _ moduleType)
+        ) = do
+        -- categorized has to be tried first (see below)!
+        Table <$> choice [try categorizedP, plainP]
+      where
         -- If categorized failes (due to the 'some' requirement), we try plain.
         -- Thus, empty categorizeds are not allowed
-        [ Categorized <$> some (nLexeme $ categoryP categoryType tt)
-        , Plain <$> many (nLexeme $ moduleP moduleType tt)
-        ]
+        categorizedP :: Parser [Row]
+        categorizedP = do
+            (Row schemaCells) <- lexSchemaP
+            categoryRows <- concat <$> some (nLexeme $ categoryP categoryType tt)
+            return $ Row (Cell schemaCellFormat [] 1 1 : schemaCells) : categoryRows
+
+        plainP :: Parser [Row]
+        plainP = do
+            schemaRow <- lexSchemaP
+            groups <- fmap Row <$> many (nLexeme $ moduleP moduleType tt)
+            return $ schemaRow : groups
+
+        lexSchemaP = lexeme (schemaP schemaType tt)

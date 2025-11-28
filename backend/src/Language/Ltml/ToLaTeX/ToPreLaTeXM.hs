@@ -13,11 +13,7 @@ import qualified Data.DList as DList
 import qualified Data.Map as Map
 import Data.Text (Text)
 import qualified Data.Text as T
-import Data.Typography
-    ( FontSize (LargeFontSize, MediumFontSize)
-    , TextAlignment (LeftAligned)
-    , Typography (Typography)
-    )
+import Data.Typography (Typography (Typography))
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Format
     ( EnumItemKeyFormat (EnumItemKeyFormat)
@@ -70,14 +66,6 @@ import Language.Ltml.AST.DocumentContainer
     )
 import Language.Ltml.AST.Footnote (Footnote (Footnote))
 import Language.Ltml.AST.Label (Label (..))
-import Language.Ltml.AST.Module
-    ( Attribute (unAttribute)
-    , Category (Category)
-    , Module (unModule)
-    , ModuleBlock (ModuleBlock)
-    , ModuleSchema (ModuleSchema)
-    , ModuleTable (Categorized, Plain)
-    )
 import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.AST.Paragraph (Paragraph (..))
 import Language.Ltml.AST.Section
@@ -86,7 +74,7 @@ import Language.Ltml.AST.Section
     , SectionBody (InnerSectionBody, LeafSectionBody, SimpleLeafSectionBody)
     )
 import Language.Ltml.AST.SimpleBlock
-    ( SimpleBlock (ModuleSchemaBlock, SimpleParagraphBlock, TableBlock)
+    ( SimpleBlock (SimpleParagraphBlock, TableBlock)
     )
 import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (SimpleParagraph))
 import Language.Ltml.AST.SimpleSection (SimpleSection (SimpleSection))
@@ -416,79 +404,6 @@ instance Labelable Section where
 instance ToPreLaTeXM SimpleBlock where
     toPreLaTeXM (SimpleParagraphBlock b) = toPreLaTeXM b
     toPreLaTeXM (TableBlock b) = toPreLaTeXM b -- TODO table
-    toPreLaTeXM (ModuleSchemaBlock b) = toPreLaTeXM b -- TODO modules
-
--------------------------------- Modules ----------------------------------
-instance ToPreLaTeXM ModuleBlock where
-    toPreLaTeXM mb = do
-        toPreLaTeXM $ toTable mb
-      where
-        defaultCellFormat = CellFormat White (Typography LeftAligned MediumFontSize [])
-        headerCellFormat = CellFormat Gray (Typography LeftAligned LargeFontSize [])
-        toTable (ModuleBlock (ModuleSchema colHeaders) (Plain rows)) =
-            let headerRow =
-                    Row
-                        ( map
-                            ( convertToCell
-                                headerCellFormat
-                            )
-                            colHeaders
-                        )
-                tableRows =
-                    map
-                        ( Row
-                            . map
-                                ( convertToCell
-                                    defaultCellFormat
-                                )
-                            . unModule
-                        )
-                        rows
-             in padTable $ Table (headerRow : tableRows)
-        toTable (ModuleBlock (ModuleSchema colHeaders) (Categorized categories)) =
-            let headerRow =
-                    Row
-                        ( Cell headerCellFormat [] 1 1
-                            : map
-                                ( convertToCell
-                                    headerCellFormat
-                                )
-                                colHeaders
-                        )
-                categoryRows = concatMap toCategory categories
-             in padTable $ Table (headerRow : categoryRows)
-          where
-            toCategory (Category catAttr mods) =
-                let n = length mods
-                    catCell = Cell defaultCellFormat (unAttribute catAttr) 1 n
-                    modCells = case map
-                        ( Row
-                            . (VSpannedCell 1 :)
-                            . map
-                                ( convertToCell
-                                    defaultCellFormat
-                                )
-                            . unModule
-                        )
-                        mods of
-                        [] -> []
-                        (Row []) : rs -> Row [] : rs
-                        (Row (_ : xs)) : rs -> Row (catCell : xs) : rs
-                 in modCells
-        convertToCell fmt attr = Cell fmt (unAttribute attr) 1 1
-
-        padTable (Table rows) =
-            let maxLen = maximum (map rowLen rows)
-             in Table (map (padRow maxLen) rows)
-          where
-            rowLen (Row cs) = length cs
-            padRow row (Row cs) =
-                Row
-                    ( cs
-                        ++ replicate
-                            (row - length cs)
-                            (Cell (CellFormat White (Typography LeftAligned MediumFontSize [])) [] 1 1)
-                    )
 
 -------------------------------- Table ----------------------------------
 
