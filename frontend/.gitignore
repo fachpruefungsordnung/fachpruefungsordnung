@@ -12,3 +12,4 @@ generated-docs/
 .idea/
 index.js
 .VSCodeCounter/
+.spec-results
