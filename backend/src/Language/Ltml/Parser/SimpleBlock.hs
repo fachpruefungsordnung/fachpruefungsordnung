@@ -13,9 +13,9 @@ import Language.Ltml.Parser.SimpleParagraph (simpleParagraphP)
 import Language.Ltml.Parser.Table (tableP)
 
 simpleBlockP :: SimpleBlockType -> Parser SimpleBlock
-simpleBlockP (SimpleBlockType parT tableTs moduleBT) =
+simpleBlockP (SimpleBlockType parT tableT moduleBT) =
     -- Parsing a paragraph must be attempted last, for it does not have a
     -- keyword; i.e., generally treats a keyword as plain text.
-    TableBlock <$> choice (map (tableP . unwrapNT) tableTs)
+    TableBlock <$> tableP (unwrapNT tableT)
         <|> TableBlock <$> moduleBlockP (unwrapNT moduleBT)
         <|> SimpleParagraphBlock <$> simpleParagraphP (unwrapNT parT)

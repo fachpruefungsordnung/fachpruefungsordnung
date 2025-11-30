@@ -32,9 +32,10 @@ import Text.Megaparsec
     , choice
     , errorBundlePretty
     , manyTill
+    , optional
     , runParser
     , some
-    , (<|>), optional
+    , (<|>)
     )
 import Text.Megaparsec.Char (space, string)
 import Text.Megaparsec.Char.Lexer (decimal)
@@ -79,13 +80,12 @@ tableP (TableType kw defaultCellT (Star t)) = do
     pure (mergeCells mProps defaultCellT $ Table' nRows)
   where
     propP :: Parser Int
-    propP = do 
+    propP = do
         _ <- string "|="
         space
         n <- decimal
         space
         return n
-
 
 -- the rawly parsed representation of a table
 newtype Table' = Table' {unTable' :: [Row']}
@@ -107,15 +107,7 @@ instance Eq Cell'' where
 
 type Matrix a = Array (Int, Int) a
 type Visited = Array (Int, Int) VisitedCell
-type Visited = Array (Int, Int) VisitedCell
 type Position = (Int, Int)
-data VisitedCell = Unvisited | Visited | InSpan Int deriving (Show)
-
-instance Eq VisitedCell where
-    Unvisited == Unvisited = True
-    Visited == Visited = True
-    (InSpan {}) == (InSpan {}) = True
-    _ == _ = False
 data VisitedCell = Unvisited | Visited | InSpan Int deriving (Show)
 
 instance Eq VisitedCell where
@@ -139,7 +131,6 @@ mergeCells mProps (DefaultCellType defaultCellT) table =
     table' = padTable defaultCellT table
     rawMatrix = tableToArray table'
     ((0, 0), (nRows, mCols)) = bounds rawMatrix
-    emptyEntry = HSpannedCell
     emptyEntry = HSpannedCell
 
     unpackCell' (Cell' _ c) = c
@@ -180,11 +171,11 @@ mergeCells mProps (DefaultCellType defaultCellT) table =
 
     process :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
     process (row, col) s@(visited, matrix)
-    process (row, col) s@(visited, matrix)
         | row > nRows = s
         | col > mCols = process (row + 1, 0) s
         | visited ! (row, col) == Visited = process (row, col + 1) s
-        | visited ! (row, col) == InSpan 0 = -- this is safe, regard the def of Eq VisitedCell. (even though maybe a little dirty...)
+        | visited ! (row, col) == InSpan 0 -- this is safe, regard the def of Eq VisitedCell. (even though maybe a little dirty...)
+            =
             let InSpan w = visited ! (row, col)
                 matrix' = matrix // [((row, col), VSpannedCell w)]
              in process (row, col + 1) (visited, matrix')
@@ -217,7 +208,7 @@ mergeCells mProps (DefaultCellType defaultCellT) table =
     arrayToTable :: Matrix Cell -> [Row]
     arrayToTable arr =
         let ((i0, j0), (in_, jn)) = bounds arr
-        in [Row [arr ! (row, col) | col <- [j0 .. jn]] | row <- [i0 .. in_]]
+         in [Row [arr ! (row, col) | col <- [j0 .. jn]] | row <- [i0 .. in_]]
 
 -- Convert a list of lists to an array
 tableToArray :: Table' -> Matrix Cell'
@@ -230,7 +221,6 @@ tableToArray t =
   where
     rows = unTable' t
     getCell row col = unRow' (rows !! row) !! col
-
 
 -- pad nRows to equal length
 padTable :: CellType -> Table' -> Table'

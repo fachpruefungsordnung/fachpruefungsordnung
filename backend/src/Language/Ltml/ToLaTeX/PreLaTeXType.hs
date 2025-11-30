@@ -23,7 +23,6 @@ module Language.Ltml.ToLaTeX.PreLaTeXType
     , medskip
     , hrule
     , hline
-    , hline
     , linebreak
     , newpage
     {- setup and metadata -}
@@ -171,9 +170,6 @@ medskip = IText "\n" <> ICommandS "medskip" <> IRaw "\n"
 
 hrule :: PreLaTeX
 hrule = ICommandS "hrule"
-
-hline :: PreLaTeX
-hline = ICommandS "hline"
 
 hline :: PreLaTeX
 hline = ICommandS "hline"

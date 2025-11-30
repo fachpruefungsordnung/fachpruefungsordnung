@@ -8,6 +8,7 @@ module Language.Ltml.ToLaTeX.ToPreLaTeXM (ToPreLaTeXM (..))
 where
 
 import Control.Lens (use, (%=), (.=))
+import Control.Monad (foldM)
 import Control.Monad.State (State)
 import qualified Data.DList as DList
 import qualified Data.Map as Map
@@ -54,10 +55,6 @@ import Language.Lsd.AST.Type.Table
     ( BGColor (Gray, White)
     , CellFormat (CellFormat)
     )
-import Language.Lsd.AST.Type.Table
-    ( BGColor (Gray, White)
-    , CellFormat (CellFormat)
-    )
 import Language.Ltml.AST.AppendixSection (AppendixSection (AppendixSection))
 import Language.Ltml.AST.Document
     ( Document (..)
@@ -70,14 +67,6 @@ import Language.Ltml.AST.DocumentContainer
     )
 import Language.Ltml.AST.Footnote (Footnote (Footnote))
 import Language.Ltml.AST.Label (Label (..))
-import Language.Ltml.AST.Module
-    ( Attribute (unAttribute)
-    , Category (Category)
-    , Module (unModule)
-    , ModuleBlock (ModuleBlock)
-    , ModuleSchema (ModuleSchema)
-    , ModuleTable (Categorized, Plain)
-    )
 import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.AST.Paragraph (Paragraph (..))
 import Language.Ltml.AST.Section
@@ -86,15 +75,10 @@ import Language.Ltml.AST.Section
     , SectionBody (InnerSectionBody, LeafSectionBody, SimpleLeafSectionBody)
     )
 import Language.Ltml.AST.SimpleBlock
-    ( SimpleBlock (ModuleSchemaBlock, SimpleParagraphBlock, TableBlock)
+    ( SimpleBlock (SimpleParagraphBlock, TableBlock)
     )
 import Language.Ltml.AST.SimpleParagraph (SimpleParagraph (SimpleParagraph))
 import Language.Ltml.AST.SimpleSection (SimpleSection (SimpleSection))
-import Language.Ltml.AST.Table
-    ( Cell (Cell, HSpannedCell, VSpannedCell)
-    , Row (Row)
-    , Table (Table)
-    )
 import Language.Ltml.AST.Table
     ( Cell (Cell, HSpannedCell, VSpannedCell)
     , Row (Row)
@@ -123,14 +107,12 @@ import Language.Ltml.ToLaTeX.Format
 import qualified Language.Ltml.ToLaTeX.GlobalState as GS
 import Language.Ltml.ToLaTeX.PreLaTeXType
     ( PreLaTeX (IRaw, ISequence, IText, MissingRef)
-    ( PreLaTeX (IRaw, ISequence, IText, MissingRef)
     , bold
     , cellcolor
-    , cellcolor
+    , cline
     , enumerate
     , footnote
     , footref
-    , hline
     , hline
     , hrule
     , hyperlink
@@ -140,17 +122,13 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     , makecell
     , multicolumn
     , multirow
-    , makecell
-    , multicolumn
-    , multirow
     , newpage
     , resetfootnote
     , setpdftitle
-    , tabular, cline
+    , tabular
     )
-import Text.Megaparsec (errorBundlePretty)
-import Control.Monad (foldM)
 import Numeric (showFFloat)
+import Text.Megaparsec (errorBundlePretty)
 
 -- | class to convert AST objects into PreLaTeX. To be able to automatically generate
 --   numbers and context for each object, the class function toPreLaTeXM works
@@ -436,13 +414,14 @@ instance ToPreLaTeXM Table where
     toPreLaTeXM (Table mProps rows) = do
         let Row c = head rows
             n = length c
-            props = take n $ case mProps of 
-                                Nothing -> repeat 1
-                                Just xs -> xs ++ repeat 1
+            props = take n $ case mProps of
+                Nothing -> repeat 1
+                Just xs -> xs ++ repeat 1
             total = sum props
-            applyMargin x = let margin = max ((fromIntegral x / fromIntegral total) - 0.02) 0.01
-                                marginS = showFFloat (Just 2) margin ""
-                            in "|p{" <> marginS <> "\\textwidth}"
+            applyMargin x =
+                let margin = max ((fromIntegral x / fromIntegral total) - 0.02) 0.01
+                    marginS = showFFloat (Just 2) margin ""
+                 in "|p{" <> marginS <> "\\textwidth}"
             option = T.pack (concatMap applyMargin props) <> "|"
         rows' <- mapM toPreLaTeXM rows
         pure $
@@ -463,25 +442,31 @@ instance ToPreLaTeXM Row where
         prependToAll sep (y : ys) = sep : y : prependToAll sep ys
 
         allcLines :: PreLaTeX
-        allcLines  = let (res, _, _) = go mempty 1 1 cells
-                        in res
-            where 
-                go :: PreLaTeX -> Int -> Int -> [Cell] -> (PreLaTeX, Int, Int)
-                go latex _ _ [] = (latex, 0, 0)
-                go latex i j (VSpannedCell w : cs) = go latex (i + 1) (j + w) cs
-                go latex i j (_:cs) = if i == j then go (latex <> cline i i) (i + 1) (j + 1) cs
-                                    else go latex (i + 1) j cs
+        allcLines =
+            let (res, _, _) = go mempty 1 1 cells
+             in res
+          where
+            go :: PreLaTeX -> Int -> Int -> [Cell] -> (PreLaTeX, Int, Int)
+            go latex _ _ [] = (latex, 0, 0)
+            go latex i j (VSpannedCell w : cs) = go latex (i + 1) (j + w) cs
+            go latex i j (_ : cs) =
+                if i == j
+                    then go (latex <> cline i i) (i + 1) (j + 1) cs
+                    else go latex (i + 1) j cs
 
 instance ToPreLaTeXM Cell where
     toPreLaTeXM (Cell (CellFormat bg (Typography _ fontsize _)) content w h) = do
-        content' <- foldM 
-                        (\acc x -> 
-                            toPreLaTeXM x 
-                            >>= \r -> if any findLineBreak x
+        content' <-
+            foldM
+                ( \acc x ->
+                    toPreLaTeXM x
+                        >>= \r ->
+                            if any findLineBreak x
                                 then pure (acc <> r)
-                                else pure $ acc <> applyTextStyle fontsize r) 
-                        mempty 
-                        (surfaceLineBreaks content) -- TODO
+                                else pure $ acc <> applyTextStyle fontsize r
+                )
+                mempty
+                (surfaceLineBreaks content) -- TODO
         let lineBreakCase =
                 if any findLineBreak content
                     then makecell
@@ -501,24 +486,30 @@ instance ToPreLaTeXM Cell where
       where
         getColor White = mempty
         getColor Gray = cellcolor "gray!30"
-        
+
         findLineBreak (LineBreak _) = True
         findLineBreak (Styled _ tt) = any findLineBreak tt
         findLineBreak _ = False
 
-        surfaceLineBreaks :: [TextTree lbrk fnref style enum special] -> [[TextTree lbrk fnref style enum special]]
-        surfaceLineBreaks = foldr (\tt acc -> 
-            case tt of
-                LineBreak lb -> [LineBreak lb] : acc
-                Styled style innerTTs ->
-                    let innerSplits = surfaceLineBreaks innerTTs
-                        wrappedSplits = map (\zs -> if any findLineBreak zs then zs else [Styled style zs]) innerSplits
-                    in wrappedSplits ++ acc
-                other -> case acc of
-                    [] -> [[other]]
-                    ([LineBreak lb]:xs) -> [other] : [LineBreak lb] : xs
-                    (x:xs) -> (other:x):xs) []
-
+        surfaceLineBreaks
+            :: [TextTree lbrk fnref style enum special]
+            -> [[TextTree lbrk fnref style enum special]]
+        surfaceLineBreaks =
+            foldr
+                ( \tt acc ->
+                    case tt of
+                        LineBreak lb -> [LineBreak lb] : acc
+                        Styled style innerTTs ->
+                            let innerSplits = surfaceLineBreaks innerTTs
+                                wrappedSplits =
+                                    map (\zs -> if any findLineBreak zs then zs else [Styled style zs]) innerSplits
+                             in wrappedSplits ++ acc
+                        other -> case acc of
+                            [] -> [[other]]
+                            ([LineBreak lb] : xs) -> [other] : [LineBreak lb] : xs
+                            (x : xs) -> (other : x) : xs
+                )
+                []
     toPreLaTeXM (VSpannedCell w) = pure $ if w > 1 then multicolumn w "|l|" mempty else mempty
     toPreLaTeXM HSpannedCell = pure mempty
 
