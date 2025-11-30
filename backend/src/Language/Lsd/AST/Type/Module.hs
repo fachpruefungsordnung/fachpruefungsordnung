@@ -7,6 +7,7 @@ module Language.Lsd.AST.Type.Module
 
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
+import Language.Lsd.AST.Type.Table (CellFormat)
 import Language.Lsd.AST.Type.Text (TextType)
 
 data ModuleBlockType
@@ -15,8 +16,8 @@ data ModuleBlockType
         ModuleSchemaType
         CategoryType
 
-newtype ModuleSchemaType = ModuleSchemaType Keyword
+data ModuleSchemaType = ModuleSchemaType Keyword CellFormat
 
-data CategoryType = CategoryType Keyword ModuleType
+data CategoryType = CategoryType Keyword CellFormat ModuleType
 
-newtype ModuleType = ModuleType Keyword
+data ModuleType = ModuleType Keyword CellFormat

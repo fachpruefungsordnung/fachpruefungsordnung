@@ -408,11 +408,16 @@ moduleBlockT =
     NamedType "module_block" "Modulblock" $
         ModuleBlockType
             (TextType (Disjunction []))
-            (ModuleSchemaType (Keyword "schema:"))
+            (ModuleSchemaType (Keyword "schema:") schemaCellFormat)
             ( CategoryType
                 (Keyword "category:")
-                (ModuleType (Keyword "module:"))
+                categoryCellFormat
+                (ModuleType (Keyword "module:") moduleCellFormat)
             )
+  where
+    schemaCellFormat = CellFormat Gray (Typography LeftAligned MediumFontSize [Bold])
+    categoryCellFormat = CellFormat White (Typography LeftAligned MediumFontSize [Bold])
+    moduleCellFormat = CellFormat White (Typography Centered MediumFontSize [])
 
 plainTextT :: TextType Void
 plainTextT = TextType (Disjunction [])

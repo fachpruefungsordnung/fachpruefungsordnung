@@ -107,7 +107,15 @@ instance Eq Cell'' where
 
 type Matrix a = Array (Int, Int) a
 type Visited = Array (Int, Int) VisitedCell
+type Visited = Array (Int, Int) VisitedCell
 type Position = (Int, Int)
+data VisitedCell = Unvisited | Visited | InSpan Int deriving (Show)
+
+instance Eq VisitedCell where
+    Unvisited == Unvisited = True
+    Visited == Visited = True
+    (InSpan {}) == (InSpan {}) = True
+    _ == _ = False
 data VisitedCell = Unvisited | Visited | InSpan Int deriving (Show)
 
 instance Eq VisitedCell where
@@ -131,6 +139,7 @@ mergeCells mProps (DefaultCellType defaultCellT) table =
     table' = padTable defaultCellT table
     rawMatrix = tableToArray table'
     ((0, 0), (nRows, mCols)) = bounds rawMatrix
+    emptyEntry = HSpannedCell
     emptyEntry = HSpannedCell
 
     unpackCell' (Cell' _ c) = c
@@ -162,12 +171,15 @@ mergeCells mProps (DefaultCellType defaultCellT) table =
 
     -- updateVisited :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
     -- updateVisited p0 (visited, mat) = (\p -> p == p0 || visited p, mat)
+    -- updateVisited :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
+    -- updateVisited p0 (visited, mat) = (\p -> p == p0 || visited p, mat)
 
     updateMatrix
         :: Position -> Cell -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
     updateMatrix pos val (visited, mat) = (visited, mat // [(pos, val)])
 
     process :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
+    process (row, col) s@(visited, matrix)
     process (row, col) s@(visited, matrix)
         | row > nRows = s
         | col > mCols = process (row + 1, 0) s

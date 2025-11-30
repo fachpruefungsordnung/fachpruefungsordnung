@@ -552,6 +552,7 @@ splitview = connect selectTranslator $ H.mkComponent
       -- Load the initial TOC entries into the editor
       handleAction GET
       handleAction UpdateMSelectedTocEntry
+      H.tell _toc unit (TOC.SelectFirstEntry)
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -1136,7 +1137,10 @@ splitview = connect selectTranslator $ H.mkComponent
         handleAction (SetComparison elementID vID)
 
       TOC.ChangeToLeaf selectedId mTitle -> do
-        H.tell _editor 0 Editor.SaveSection
+        -- check to avoid weird merge/save race conditions
+        isOnMerge <- H.request _editor 0 Editor.IsOnMerge
+        when (not $ fromMaybe false isOnMerge) $
+          H.tell _editor 0 Editor.SaveSection
         handleAction UpdateMSelectedTocEntry
         state <- H.get
         let

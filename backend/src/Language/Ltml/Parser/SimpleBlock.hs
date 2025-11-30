@@ -16,6 +16,6 @@ simpleBlockP :: SimpleBlockType -> Parser SimpleBlock
 simpleBlockP (SimpleBlockType parT tableTs moduleBT) =
     -- Parsing a paragraph must be attempted last, for it does not have a
     -- keyword; i.e., generally treats a keyword as plain text.
-    TableBlock <$> tableP (unwrapNT tableTs)
-        <|> ModuleSchemaBlock <$> moduleBlockP (unwrapNT moduleBT)
+    TableBlock <$> choice (map (tableP . unwrapNT) tableTs)
+        <|> TableBlock <$> moduleBlockP (unwrapNT moduleBT)
         <|> SimpleParagraphBlock <$> simpleParagraphP (unwrapNT parT)

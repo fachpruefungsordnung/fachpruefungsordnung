@@ -46,14 +46,6 @@ import Language.Ltml.AST.DocumentContainer
     )
 import Language.Ltml.AST.Footnote (Footnote (..))
 import Language.Ltml.AST.Label (Label (..))
-import Language.Ltml.AST.Module
-    ( Attribute (..)
-    , Category (..)
-    , Module (..)
-    , ModuleBlock (..)
-    , ModuleSchema (..)
-    , ModuleTable (..)
-    )
 import Language.Ltml.AST.Node (Node (..))
 import Language.Ltml.AST.Paragraph (Paragraph (..))
 import Language.Ltml.AST.Section
@@ -148,6 +140,11 @@ instance ToHtmlM Document where
                             , currentSuperSectionID = currentSuperSectionID initGlobalState
                             }
                     )
+                -- Note: Footnotes referenced in this Heading
+                --       are rendered in the first child SectionBody
+                -- TODO: This might be hacky and leads to export views
+                --       of the first child having a footnote that is not
+                --       referenced. But for now this is acceptable (imho)
                 titleHtml <- toHtmlM documentHeading
                 renderDoc <- asks shouldRender
                 -- \| mTocFormat = Nothing, means that no ToC should be rendered
@@ -180,12 +177,6 @@ instance ToHtmlM Document where
                                     localTocHtml <- renderLocalToc mTocFormat
                                     return (localTocHtml, introHtml, mainHtml, outroHtml)
 
-                -- Print footnotes that appear directly inside the 'DocumentMainBody'.
-                -- For example inside of appendice tables (SimpleBlocks).
-                usedFootnotes <- gets locallyUsedFootnotes
-                footnotesHtml <- toHtmlM usedFootnotes
-                modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
-
                 -- \| Render DocumentHeading / ToC only if renderFlag was set by parent
                 return $
                     div_ <#> Class.Document
@@ -194,7 +185,6 @@ instance ToHtmlM Document where
                                 <> (if renderToC then tocHtml else mempty)
                                 <> mainHtml
                                 <> outroHtml
-                                <> (if renderDoc then footnotesHtml else mempty)
                             )
 
 -- | Does not only produce the default error box on error,
@@ -285,15 +275,7 @@ instance ToHtmlM (Node Section) where
                     -- \| Render parsed Heading, which also creates ToC Entry
                     (headingHtml, tocId, rawTitle) <-
                         buildHeadingHtml sectionIDHtml mLabel sectionTocKeyHtml parsedHeading
-                    headingState <- get
                     childrenHtml <- toHtmlM sectionBody
-                    -- \| Also render footnotes in super-sections, since their heading
-                    --    could contain footnoteRefs
-                    childrensGlobalState <- get
-                    let footNoteState = addUsedFootnotes childrensGlobalState headingState
-                    footnotesHtml <- toHtmlM (locallyUsedFootnotes footNoteState)
-                    -- \| Reset locally used set to inital value
-                    modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
                     -- \| increment (super)SectionID for next section
                     incrementSectionID
 
@@ -304,7 +286,7 @@ instance ToHtmlM (Node Section) where
 
                         sectionHtml =
                             section_ [cssClass_ sectionCssClass]
-                                <$> (headingHtml <> childrenHtml <> footnotesHtml <> exportLinkHtml)
+                                <$> (headingHtml <> childrenHtml <> exportLinkHtml)
                     -- \| Collects all sections for possible export
                     collectExportSection tocId rawTitle sectionHtml
 
@@ -352,27 +334,34 @@ instance ToHtmlM (Node Section) where
                 createTocEntryH mIdHtml rTitle = addTocEntry mIdHtml rTitle mLabelH SomeSection
 
 instance ToHtmlM SectionBody where
-    toHtmlM sectionBody = case sectionBody of
-        -- \| Super Section
-        -- \| We have to save the super-section counter, since super-sections are counted locally
-        InnerSectionBody nodeSections -> do
-            superSectionID <- gets currentSuperSectionID
-            modify (\s -> s {currentSuperSectionID = currentSuperSectionID initGlobalState})
-            bodyHtml <- toHtmlM nodeSections
-            modify (\s -> s {currentSuperSectionID = superSectionID})
-            return bodyHtml
+    toHtmlM sectionBody = do
+        sectionBodyHtml <- case sectionBody of
+            -- \| Super Section
+            -- \| We have to save the super-section counter, since super-sections are counted locally
+            InnerSectionBody nodeSections -> do
+                superSectionID <- gets currentSuperSectionID
+                modify (\s -> s {currentSuperSectionID = currentSuperSectionID initGlobalState})
+                bodyHtml <- toHtmlM nodeSections
+                modify (\s -> s {currentSuperSectionID = superSectionID})
+                return bodyHtml
 
-        -- \| Section
-        -- \| In this case the children are paragraphs, so we set the needed flag for them
-        --    to decide if the should have a visible id
-        LeafSectionBody nodeParagraphs -> do
-            paragraphsHtml <-
-                local (\s -> s {isSingleParagraph = length nodeParagraphs == 1}) $
-                    toHtmlM nodeParagraphs
-            -- \| reset paragraphID for next section
-            modify (\s -> s {currentParagraphID = 1})
-            return paragraphsHtml
-        SimpleLeafSectionBody simpleBlocks -> toHtmlM simpleBlocks
+            -- \| Section
+            -- \| In this case the children are paragraphs, so we set the needed flag for them
+            --    to decide if the should have a visible id
+            LeafSectionBody nodeParagraphs -> do
+                paragraphsHtml <-
+                    local (\s -> s {isSingleParagraph = length nodeParagraphs == 1}) $
+                        toHtmlM nodeParagraphs
+                -- \| reset paragraphID for next section
+                modify (\s -> s {currentParagraphID = 1})
+                return paragraphsHtml
+            SimpleLeafSectionBody simpleBlocks -> toHtmlM simpleBlocks
+
+        sectionBodyFootnotes <- gets locallyUsedFootnotes
+        footnotesHtml <- toHtmlM sectionBodyFootnotes
+        modify (\s -> s {locallyUsedFootnotes = locallyUsedFootnotes initGlobalState})
+
+        return $ sectionBodyHtml <> footnotesHtml
 
 -- | Combined instance since the paragraphIDHtml has to be build before the reference is generated
 instance ToHtmlM (Node Paragraph) where
@@ -403,7 +392,6 @@ instance ToHtmlM SimpleBlock where
     toHtmlM simpleBlock = case simpleBlock of
         SimpleParagraphBlock simpleParagraph -> toHtmlM simpleParagraph
         TableBlock table -> toHtmlM table
-        ModuleSchemaBlock moduleBlock -> toHtmlM moduleBlock
 
 -- | Section without Heading and Identifier
 instance ToHtmlM SimpleSection where
@@ -455,62 +443,6 @@ instance ToHtmlM Table where
                     (1, 1) -> td_ bgClass
                     _ -> td_ (colspan_ (iToT colspan) : rowspan_ (iToT rowspan) : bgClass)
             return $ tableData . innerContainer <$> textHtml
-
-instance ToHtmlM ModuleBlock where
-    toHtmlM (ModuleBlock (ModuleSchema features) moduleTable) = do
-        featureDHtmls <- mapM (toHtmlM . unAttribute) features
-
-        rowDHtmls <- case moduleTable of
-            Plain modules -> mapM moduleRow modules
-            Categorized categories -> mapM categoryRows categories
-
-        return $ do
-            featureHtmls <- sequence featureDHtmls
-            rowHtmls <- sequence rowDHtmls
-
-            -- add single empty cell to thead for category offset
-            let headerPlaceholder =
-                    case moduleTable of
-                        Plain _ -> mempty
-                        Categorized _ -> th_ mempty
-                colgroup = colgroup_ $ col_ <#> Class.MinSizeColumn
-                thead = thead_ $ tr_ $ (headerPlaceholder <>) $ mconcat $ map th_ featureHtmls
-                tbody = tbody_ $ mconcat rowHtmls
-            Now $
-                div_ <#> Class.TableContainer $
-                    table_ <#> Class.Table $
-                        colgroup <> thead <> tbody
-      where
-        categoryRows :: Category -> HtmlReaderState
-        categoryRows (Category name modules) = do
-            categoryHtml <- toHtmlM $ unAttribute name
-            moduleDHtmls <- mapM moduleHtml modules
-
-            return $ do
-                moduleHtmls <- sequence moduleDHtmls
-                cat <- categoryHtml
-                let
-                    categoryCell =
-                        td_
-                            [rowspan_ (iToT . length $ modules), cssClass_ Class.TableCentered]
-                            cat
-
-                    categoryRow = case moduleHtmls of
-                        [] -> [tr_ categoryCell]
-                        (m : ms) -> map tr_ (categoryCell <> m : ms)
-                return $ mconcat categoryRow
-
-        moduleHtml :: Module -> HtmlReaderState
-        moduleHtml (Module attr) = do
-            attrDHtmls <- mapM (toHtmlM . unAttribute) attr
-            return $ do
-                attrHtmls <- sequence attrDHtmls
-                return $ mconcat $ map (td_ <#> Class.TableCentered) attrHtmls
-
-        moduleRow :: Module -> HtmlReaderState
-        moduleRow m = do
-            attrsHtml <- moduleHtml m
-            return $ tr_ <$> attrsHtml
 
 -------------------------------------------------------------------------------
 

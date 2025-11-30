@@ -36,6 +36,7 @@ import Server.Auth (AuthMethod)
 import qualified Server.Auth as Auth
 import Server.DTOs.Logs (Logs (Logs))
 import qualified Server.DTOs.Logs as Logs
+import Server.Dump (DumpAPI, dumpHandler)
 import Server.Handlers.AuthHandlers
 import Server.Handlers.DocsHandlers (DocsAPI, docsServer, getUser, withDB)
 import Server.Handlers.GroupHandlers
@@ -50,6 +51,7 @@ type PublicAPI =
         :<|> "document" :> Get '[PDF] PDFByteString
         :<|> AuthAPI
         :<|> PasswordResetAPI
+        :<|> DumpAPI
 
 type ProtectedAPI =
     Auth AuthMethod Auth.Token
@@ -133,6 +135,7 @@ server cookieSett jwtSett =
                 :<|> documentHandler
                 :<|> authServer cookieSett jwtSett
                 :<|> passwordResetServer
+                :<|> dumpHandler
              )
         :<|> ( protectedHandler
                 :<|> userServer
