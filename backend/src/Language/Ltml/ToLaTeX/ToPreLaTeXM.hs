@@ -446,7 +446,7 @@ instance ToPreLaTeXM ModuleBlock where
                             . unModule
                         )
                         rows
-             in padTable $ Table (headerRow : tableRows)
+             in padTable $ Table Nothing (headerRow : tableRows)
         toTable (ModuleBlock (ModuleSchema colHeaders) (Categorized categories)) =
             let headerRow =
                     Row
@@ -458,7 +458,7 @@ instance ToPreLaTeXM ModuleBlock where
                                 colHeaders
                         )
                 categoryRows = concatMap toCategory categories
-             in padTable $ Table (headerRow : categoryRows)
+             in padTable $ Table Nothing (headerRow : categoryRows)
           where
             toCategory (Category catAttr mods) =
                 let n = length mods
@@ -479,9 +479,9 @@ instance ToPreLaTeXM ModuleBlock where
                  in modCells
         convertToCell fmt attr = Cell fmt (unAttribute attr) 1 1
 
-        padTable (Table rows) =
+        padTable (Table p rows) =
             let maxLen = maximum (map rowLen rows)
-             in Table (map (padRow maxLen) rows)
+             in Table p (map (padRow maxLen) rows)
           where
             rowLen (Row cs) = length cs
             padRow row (Row cs) =
@@ -495,10 +495,17 @@ instance ToPreLaTeXM ModuleBlock where
 -------------------------------- Table ----------------------------------
 
 instance ToPreLaTeXM Table where
-    toPreLaTeXM (Table rows) = do
+    toPreLaTeXM (Table mProps rows) = do
         let Row c = head rows
             n = length c
-            option = T.replicate n ("|p{" <> T.pack (showFFloat (Just 2) ((1.0 / fromIntegral n) - 0.02) "")<> "\\textwidth}") <> "|"
+            props = take n $ case mProps of 
+                                Nothing -> repeat 1
+                                Just xs -> xs ++ repeat 1
+            total = sum props
+            applyMargin x = let margin = max ((fromIntegral x / fromIntegral total) - 0.02) 0.01
+                                marginS = showFFloat (Just 2) margin ""
+                            in "|p{" <> marginS <> "\\textwidth}"
+            option = T.pack (concatMap applyMargin props) <> "|"
         rows' <- mapM toPreLaTeXM rows
         pure $
             IRaw
