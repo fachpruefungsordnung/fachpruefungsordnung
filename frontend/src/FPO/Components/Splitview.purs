@@ -668,7 +668,12 @@ splitview = connect selectTranslator $ H.mkComponent
         -- Resizing TOC or Comment Sidebar
         Just ResizeLeft -> do
           let
-            { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
+            { newSidebarRatio
+            , newEditorRatio
+            , newPreviewRatio
+            , sidebarClosed
+            , previewClosed
+            } = resizeFromLeft
               state
               mouseXRatio
 
@@ -676,6 +681,8 @@ splitview = connect selectTranslator $ H.mkComponent
             { sidebarRatio = newSidebarRatio
             , editorRatio = newEditorRatio
             , previewRatio = newPreviewRatio
+            , sidebarShown = not sidebarClosed
+            , previewShown = not previewClosed
             , lastExpandedSidebarRatio =
                 if newSidebarRatio > minRatio then newSidebarRatio
                 else st.lastExpandedSidebarRatio
@@ -1594,21 +1601,21 @@ resizeFromLeft
   let
     sidebarAndEditor = startSidebarRatio + startEditorRatio
   in
-    if mousePercentFromLeft <= startSidebarRatio then -- resizing to the left of initial sidebar size
-      if mousePercentFromLeft <= 0.05 then -- close enough to hide sidebar
-        { newSidebarRatio: 0.0
-        , newEditorRatio: sidebarAndEditor
-        , newPreviewRatio: startPreviewRatio
-        , sidebarClosed: true
-        , previewClosed: false
-        }
-      else -- resizing to the left but not close enough to hide sidebar
-        { newSidebarRatio: mousePercentFromLeft
-        , newEditorRatio: sidebarAndEditor - mousePercentFromLeft
-        , newPreviewRatio: startPreviewRatio
-        , sidebarClosed: false
-        , previewClosed: false
-        }
+    if mousePercentFromLeft <= 0.05 then -- close enough to hide sidebar
+      { newSidebarRatio: 0.0
+      , newEditorRatio: sidebarAndEditor
+      , newPreviewRatio: startPreviewRatio
+      , sidebarClosed: true
+      , previewClosed: false
+      }
+    else if mousePercentFromLeft <= startSidebarRatio then -- resizing to the left of initial sidebar size
+      -- resizing to the left but not close enough to hide sidebar
+      { newSidebarRatio: mousePercentFromLeft
+      , newEditorRatio: sidebarAndEditor - mousePercentFromLeft
+      , newPreviewRatio: startPreviewRatio
+      , sidebarClosed: false
+      , previewClosed: false
+      }
     else if
       startSidebarRatio + startEditorRatio - mousePercentFromLeft >= startPreviewRatio then -- resizing to the right but editor still bigger than preview
       { newSidebarRatio: mousePercentFromLeft

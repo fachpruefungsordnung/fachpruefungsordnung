@@ -173,6 +173,52 @@ resizeFromLeftTest =
 
         previewClosed `shouldEqual` true
 
+    it
+      "when starting with very slim sidebar and dragging to the right more than 5%, open it"
+      do
+
+        let
+          startSidebarSize = 0.014209591474245116 -- real number from the system after opening the sidebar
+          startEditorSize = 0.6
+          startPreviewSize = 0.4 - startSidebarSize
+          mousePercentFromLeft = 0.4
+
+        let
+          { sidebarClosed, newSidebarRatio } = resizeFromLeft
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
+            mousePercentFromLeft
+
+        sidebarClosed `shouldEqual` false
+        newSidebarRatio `shouldBeNear` 0.4
+
+    it
+      "when starting with very slim sidebar and dragging to the right less than 5%, still close it"
+      do
+
+        let
+          startSidebarSize = 0.014209591474245116 -- real number from the system after opening the sidebar
+          startEditorSize = 0.6
+          startPreviewSize = 0.4 - startSidebarSize
+          mousePercentFromLeft = 0.04
+          sidebarShown = false
+
+        let
+          { sidebarClosed, newSidebarRatio } = resizeFromLeft
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              , sidebarShown = sidebarShown
+              }
+            mousePercentFromLeft
+
+        sidebarClosed `shouldEqual` true
+        newSidebarRatio `shouldBeNear` 0.0
+
 resizeFromRightTest :: Spec Unit
 resizeFromRightTest =
   describe "resizeFromRight" do
