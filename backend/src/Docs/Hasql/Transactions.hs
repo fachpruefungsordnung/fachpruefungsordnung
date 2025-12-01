@@ -131,8 +131,7 @@ updateTextRevision rev text commentAnchors = do
     textRevision <- statement (rev, text) Statements.updateTextRevision
     textRevision $
         \newRev ->
-            mapM (`statement` Statements.
-            putCommentAnchor) ((newRev,) <$> commentAnchors)
+            mapM (`statement` Statements.putCommentAnchor) ((newRev,) <$> commentAnchors)
 
 createTextRevision
     :: UserID
