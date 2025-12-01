@@ -130,8 +130,9 @@ updateTextRevision rev text commentAnchors = do
         Statements.deleteCommentAnchorsExcept
     textRevision <- statement (rev, text) Statements.updateTextRevision
     textRevision $
-        const $
-            mapM (`statement` Statements.putCommentAnchor) ((rev,) <$> commentAnchors)
+        \newRev ->
+            mapM (`statement` Statements.
+            putCommentAnchor) ((newRev,) <$> commentAnchors)
 
 createTextRevision
     :: UserID
