@@ -659,23 +659,17 @@ splitview = connect selectTranslator $ H.mkComponent
         mouseXRatio = mouseXPos / width
 
         -- A window should always have at least 5% width for each section
-        -- and at most 80% for sidebar and preview
         minRatio = 0.05 -- 5%
 
       dragTargetAction <- H.gets _.mDragTarget
-      -- Starting position of mouse when drag started
-      startSidebarRatio <- H.gets _.startSidebarRatio
-      startEditorRatio <- H.gets _.startEditorRatio
-      startPreviewRatio <- H.gets _.startPreviewRatio
+      state <- H.get
 
       case dragTargetAction of
         -- Resizing TOC or Comment Sidebar
         Just ResizeLeft -> do
           let
             { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
-              startSidebarRatio
-              startEditorRatio
-              startPreviewRatio
+              state
               mouseXRatio
 
           H.modify_ \st -> st
@@ -696,11 +690,7 @@ splitview = connect selectTranslator $ H.mkComponent
             , newPreviewRatio
             , sidebarClosed
             , previewClosed
-            } = resizeFromRight
-              startSidebarRatio
-              startEditorRatio
-              startPreviewRatio
-              (1.0 - mouseXRatio)
+            } = resizeFromRight state (1.0 - mouseXRatio)
 
           H.modify_ \st -> st
             { sidebarRatio = newSidebarRatio
@@ -1595,35 +1585,35 @@ type ResizeResult =
   }
 
 resizeFromLeft
-  :: Number
-  -> Number
-  -> Number
+  :: State
   -> Number
   -> ResizeResult
-resizeFromLeft startSidebarSize startEditorSize startPreviewSize mousePercentFromLeft =
+resizeFromLeft
+  { startSidebarRatio, startPreviewRatio, startEditorRatio }
+  mousePercentFromLeft =
   let
-    sidebarAndEditor = startSidebarSize + startEditorSize
+    sidebarAndEditor = startSidebarRatio + startEditorRatio
   in
-    if mousePercentFromLeft <= startSidebarSize then -- resizing to the left of initial sidebar size
+    if mousePercentFromLeft <= startSidebarRatio then -- resizing to the left of initial sidebar size
       if mousePercentFromLeft <= 0.05 then -- close enough to hide sidebar
         { newSidebarRatio: 0.0
         , newEditorRatio: sidebarAndEditor
-        , newPreviewRatio: startPreviewSize
+        , newPreviewRatio: startPreviewRatio
         , sidebarClosed: true
         , previewClosed: false
         }
       else -- resizing to the left but not close enough to hide sidebar
         { newSidebarRatio: mousePercentFromLeft
         , newEditorRatio: sidebarAndEditor - mousePercentFromLeft
-        , newPreviewRatio: startPreviewSize
+        , newPreviewRatio: startPreviewRatio
         , sidebarClosed: false
         , previewClosed: false
         }
     else if
-      startSidebarSize + startEditorSize - mousePercentFromLeft >= startPreviewSize then -- resizing to the right but editor still bigger than preview
+      startSidebarRatio + startEditorRatio - mousePercentFromLeft >= startPreviewRatio then -- resizing to the right but editor still bigger than preview
       { newSidebarRatio: mousePercentFromLeft
       , newEditorRatio: sidebarAndEditor - mousePercentFromLeft
-      , newPreviewRatio: startPreviewSize
+      , newPreviewRatio: startPreviewRatio
       , sidebarClosed: false
       , previewClosed: false
       }
@@ -1647,22 +1637,18 @@ resizeFromLeft startSidebarSize startEditorSize startPreviewSize mousePercentFro
           }
 
 resizeFromRight
-  :: Number
-  -> Number
-  -> Number
+  :: State
   -> Number
   -> ResizeResult
-resizeFromRight
-  startSidebarSize
-  startEditorSize
-  startPreviewSize
-  mousePercentFromRight =
+resizeFromRight state mousePercentFromRight =
   let
     { newSidebarRatio, newEditorRatio, newPreviewRatio, sidebarClosed, previewClosed } =
       resizeFromLeft
-        startPreviewSize
-        startEditorSize
-        startSidebarSize
+        ( state
+            { startSidebarRatio = state.startPreviewRatio
+            , startPreviewRatio = state.startSidebarRatio
+            }
+        )
         mousePercentFromRight
   in
     { newSidebarRatio: newPreviewRatio

@@ -6,11 +6,43 @@ module Test.Components.Splitview
 import Prelude
 
 import Control.Monad.Error.Class (class MonadThrow)
+import Data.Maybe (Maybe(..))
 import Data.Number (abs)
 import Effect.Exception (Error)
-import FPO.Components.Splitview (resizeFromLeft, resizeFromRight)
+import FPO.Components.Splitview (State, resizeFromLeft, resizeFromRight)
+import FPO.Dto.DocumentDto.TreeDto (RootTree(..))
+import FPO.Translations.Translator (fromFpoTranslator, translator)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
+
+defaultState =
+  { docID: 0
+  , translator: fromFpoTranslator translator
+  , mDragTarget: Nothing
+  , startMouseRatio: 0.0
+  , startSidebarRatio: 0.0
+  , startPreviewRatio: 0.0
+  , startEditorRatio: 0.0
+  , sidebarRatio: 0.2
+  , previewRatio: 0.4
+  , editorRatio: 0.4
+  , lastExpandedSidebarRatio: 0.2
+  , lastExpandedPreviewRatio: 0.4
+  , renderedHtml: Nothing
+  , testDownload: ""
+  , tocEntries: Empty
+  , versionMapping: Empty
+  , mTimeFormatter: Nothing
+  , sidebarShown: true
+  , tocShown: true
+  , commentOverviewShown: false
+  , commentShown: false
+  , previewShown: true
+  , mSelectedTocEntry: Nothing
+  , dirtyVersion: false
+  , modalData: Nothing
+  , upToDateVersion: Nothing
+  } :: State
 
 resizeFromLeftTest :: Spec Unit
 resizeFromLeftTest =
@@ -24,9 +56,11 @@ resizeFromLeftTest =
 
       let
         { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
-          startSidebarSize
-          startEditorSize
-          startPreviewSize
+          defaultState
+            { startSidebarRatio = startSidebarSize
+            , startEditorRatio = startEditorSize
+            , startPreviewRatio = startPreviewSize
+            }
           mousePercentFromLeft
 
       newSidebarRatio `shouldBeNear` 0.12
@@ -44,9 +78,11 @@ resizeFromLeftTest =
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
-            startSidebarSize
-            startEditorSize
-            startPreviewSize
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
             mousePercentFromLeft
 
         newSidebarRatio `shouldBeNear` 0.0
@@ -64,9 +100,11 @@ resizeFromLeftTest =
 
         let
           { sidebarClosed } = resizeFromLeft
-            startSidebarSize
-            startEditorSize
-            startPreviewSize
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
             mousePercentFromLeft
 
         sidebarClosed `shouldEqual` true
@@ -82,9 +120,11 @@ resizeFromLeftTest =
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
-            startSidebarSize
-            startEditorSize
-            startPreviewSize
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
             mousePercentFromLeft
 
         newSidebarRatio `shouldBeNear` 0.45
@@ -102,9 +142,11 @@ resizeFromLeftTest =
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
-            startSidebarSize
-            startEditorSize
-            startPreviewSize
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
             mousePercentFromLeft
 
         newSidebarRatio `shouldBeNear` 0.5
@@ -122,9 +164,11 @@ resizeFromLeftTest =
 
         let
           { previewClosed } = resizeFromLeft
-            startSidebarSize
-            startEditorSize
-            startPreviewSize
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
             mousePercentFromLeft
 
         previewClosed `shouldEqual` true
@@ -141,9 +185,11 @@ resizeFromRightTest =
 
       let
         { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
-          startSidebarSize
-          startEditorSize
-          startPreviewSize
+          defaultState
+            { startSidebarRatio = startSidebarSize
+            , startEditorRatio = startEditorSize
+            , startPreviewRatio = startPreviewSize
+            }
           mousePercentFromRight
 
       newSidebarRatio `shouldBeNear` 0.2
@@ -161,9 +207,11 @@ resizeFromRightTest =
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
-            startSidebarSize
-            startEditorSize
-            startPreviewSize
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
             mousePercentFromRight
 
         newSidebarRatio `shouldBeNear` 0.2
@@ -181,9 +229,11 @@ resizeFromRightTest =
 
         let
           { previewClosed } = resizeFromRight
-            startSidebarSize
-            startEditorSize
-            startPreviewSize
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
             mousePercentFromRight
 
         previewClosed `shouldEqual` true
@@ -199,9 +249,11 @@ resizeFromRightTest =
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
-            startSidebarSize
-            startEditorSize
-            startPreviewSize
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
             mousePercentFromRight
 
         newSidebarRatio `shouldBeNear` 0.2
@@ -219,9 +271,11 @@ resizeFromRightTest =
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
-            startSidebarSize
-            startEditorSize
-            startPreviewSize
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
             mousePercentFromRight
 
         newSidebarRatio `shouldBeNear` 0.25
@@ -239,9 +293,11 @@ resizeFromRightTest =
 
         let
           { sidebarClosed } = resizeFromRight
-            startSidebarSize
-            startEditorSize
-            startPreviewSize
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
             mousePercentFromRight
 
         sidebarClosed `shouldEqual` true
