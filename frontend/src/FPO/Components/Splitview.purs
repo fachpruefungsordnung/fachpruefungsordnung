@@ -183,6 +183,7 @@ type State = FPOState
   , modalData :: Maybe { elementID :: Int, versionID :: Maybe Int }
   -- obtained from TOC
   , upToDateVersion :: Maybe Version
+  , pendingUpdateElementID :: Maybe Int
   )
 
 type ElemVersion =
@@ -246,6 +247,7 @@ splitview = connect selectTranslator $ H.mkComponent
     , dirtyVersion: false
     , modalData: Nothing
     , upToDateVersion: Nothing
+    , pendingUpdateElementID: Nothing
     }
 
   render :: State -> H.ComponentHTML Action Slots m
@@ -1032,7 +1034,7 @@ splitview = connect selectTranslator $ H.mkComponent
           Just (SelLeaf id) -> do
             _ <- Request.deleteIgnore
               ("/docs/" <> show state.docID <> "/text/" <> show id <> "/draft")
-            handleAction (ModifyVersionMapping id (Just Nothing) Nothing)
+            handleAction (ModifyVersionMapping id (Just Nothing) (Just Nothing))
             let
               -- Nothing case should never occur
               entry = case (findTOCEntry id state.tocEntries) of
@@ -1087,8 +1089,18 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.RaiseUpdateVersion mVID -> do
         handleAction UpdateMSelectedTocEntry
         state <- H.get
-        case state.mSelectedTocEntry of
-          Just (SelLeaf elementID) -> do
+        let
+          targetElementID =
+            case state.pendingUpdateElementID of
+              Just id -> Just id
+              Nothing ->
+                case state.mSelectedTocEntry of
+                  Just (SelLeaf id) -> Just id
+                  _ -> Nothing
+        case targetElementID of
+          Just elementID -> do
+            H.modify_ _ { pendingUpdateElementID = Nothing }
+
             handleAction
               (ModifyVersionMapping elementID (Just mVID) Nothing)
             case (findTOCEntry elementID state.tocEntries) of
@@ -1105,6 +1117,7 @@ splitview = connect selectTranslator $ H.mkComponent
         handleAction DeleteDraft
         case state.mSelectedTocEntry of
           Just (SelLeaf elementID) -> do
+            H.modify_ _ { pendingUpdateElementID = Just elementID }
             handleAction
               (ModifyVersionMapping elementID (Just Nothing) (Just Nothing))
             case (findTOCEntry elementID state.tocEntries) of
@@ -1154,6 +1167,13 @@ splitview = connect selectTranslator $ H.mkComponent
         handleAction (SetComparison elementID vID)
 
       TOC.ChangeToLeaf selectedId mTitle -> do
+        stateBefore <- H.get
+        let
+          currentElementID =
+            case stateBefore.mSelectedTocEntry of
+              Just (SelLeaf id) -> Just id
+              _ -> Nothing
+        H.modify_ _ { pendingUpdateElementID = currentElementID }
         -- check to avoid weird merge/save race conditions
         isOnMerge <- H.request _editor 0 Editor.IsOnMerge
         when (not $ fromMaybe false isOnMerge) $
