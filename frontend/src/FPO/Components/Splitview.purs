@@ -936,6 +936,7 @@ splitview = connect selectTranslator $ H.mkComponent
             }
 
       Editor.PostPDF _ -> do
+        handleAction UpdateMSelectedTocEntry
         state <- H.get
         upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
         let

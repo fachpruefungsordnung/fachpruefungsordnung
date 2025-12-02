@@ -15,6 +15,9 @@ import FPO.Translations.Translator (fromFpoTranslator, translator)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 
+shouldBeNear :: forall m. MonadThrow Error m => Number -> Number -> m Unit
+shouldBeNear expected actual = (abs (expected - actual) < 0.0001) `shouldEqual` true
+
 defaultState =
   { docID: 0
   , translator: fromFpoTranslator translator
@@ -348,5 +351,3 @@ resizeFromRightTest =
 
         sidebarClosed `shouldEqual` true
 
-shouldBeNear :: forall m. MonadThrow Error m => Number -> Number -> m Unit
-shouldBeNear expected actual = (abs (expected - actual) < 0.0001) `shouldEqual` true
