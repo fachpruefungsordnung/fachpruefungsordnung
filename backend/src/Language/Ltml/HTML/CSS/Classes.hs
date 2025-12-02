@@ -244,8 +244,7 @@ classStyle CenteredBox =
         marginTop (em 2)
         marginBottom (em 2)
         display inlineGrid
-        alignItems center
-        justifyContent center
+        justifyItems center
         width (pct 100)
 classStyle ErrorBox =
     toClassSelector ErrorBox ? do
@@ -276,8 +275,8 @@ classStyle Anchor =
         scrollMarginTop (em 2)
 classStyle TableContainer = do
     toClassSelector TableContainer ? do
-        display flex
-        justifyContent center
+        display grid
+        justifyItems center
 classStyle Table = do
     let cellPadding = padding (px 2) (px 12) (px 2) (px 12)
         cellBorder = border (px 1) solid Color.tableCellBorder

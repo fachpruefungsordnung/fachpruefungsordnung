@@ -24,6 +24,7 @@ module Language.Ltml.HTML.CSS.CustomClay
     , gap
     , scrollMarginTop
     , tableLayout
+    , justifyItems
     ) where
 
 import Clay hiding (a, b, s)
@@ -91,3 +92,6 @@ scrollMarginTop s = "scroll-margin-top" -: unPlain (unValue $ value s)
 
 tableLayout :: Position -> Css
 tableLayout arg = "table-layout" -: unPlain (unValue $ value arg)
+
+justifyItems :: JustifyContentValue -> Css
+justifyItems arg = "justify-items" -: unPlain (unValue $ value arg)
