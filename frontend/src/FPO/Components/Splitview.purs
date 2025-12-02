@@ -1033,7 +1033,7 @@ splitview = connect selectTranslator $ H.mkComponent
           Just (SelLeaf id) -> do
             _ <- Request.deleteIgnore
               ("/docs/" <> show state.docID <> "/text/" <> show id <> "/draft")
-            handleAction (ModifyVersionMapping id (Just Nothing) Nothing)
+            handleAction (ModifyVersionMapping id (Just Nothing) (Just Nothing))
             let
               -- Nothing case should never occur
               entry = case (findTOCEntry id state.tocEntries) of
