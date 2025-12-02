@@ -54,7 +54,10 @@ package:
   test:
     main: Test.Main
     dependencies:
-      - console
+      - exceptions
+      - numbers
+      - spec
+      - spec-node
 workspace:
   packageSet:
     registry: 64.6.0
