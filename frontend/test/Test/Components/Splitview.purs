@@ -42,6 +42,7 @@ defaultState =
   , dirtyVersion: false
   , modalData: Nothing
   , upToDateVersion: Nothing
+  , pendingUpdateElementID: Nothing
   } :: State
 
 resizeFromLeftTest :: Spec Unit
