@@ -1087,6 +1087,7 @@ splitview = connect selectTranslator $ H.mkComponent
             pure unit
 
       Editor.RaiseUpdateVersion mVID -> do
+        handleAction UpdateMSelectedTocEntry
         state <- H.get
         let
           targetElementID =
@@ -1113,10 +1114,10 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.Merged -> do
         handleAction UpdateMSelectedTocEntry
         state <- H.get
+        handleAction DeleteDraft
         case state.mSelectedTocEntry of
           Just (SelLeaf elementID) -> do
             H.modify_ _ { pendingUpdateElementID = Just elementID }
-            handleAction DeleteDraft
             handleAction
               (ModifyVersionMapping elementID (Just Nothing) (Just Nothing))
             case (findTOCEntry elementID state.tocEntries) of
