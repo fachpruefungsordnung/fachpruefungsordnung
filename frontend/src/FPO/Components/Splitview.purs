@@ -1205,8 +1205,8 @@ splitview = connect selectTranslator $ H.mkComponent
       TOC.UpdateNodePosition path -> do
         H.tell _editor 0 (Editor.UpdateNodePosition path)
 
-      TOC.ChangeToNode path heading -> do
-        H.tell _editor 0 (Editor.ChangeToNode heading path)
+      TOC.ChangeToNode path heading mTitle -> do
+        H.tell _editor 0 (Editor.ChangeToNode heading path mTitle)
 
       TOC.AddNode path node -> do
         s <- H.get

@@ -120,7 +120,7 @@ data Output
   = ChangeToLeaf Int (Maybe String)
   -- | Opens the editor for some non-leaf node. Used to rename sections
   --   (i.e., changing the heading).
-  | ChangeToNode Path String
+  | ChangeToNode Path String (Maybe String)
   -- | Used to tell the editor to update the path of the selected node
   --   during title renaming.
   | UpdateNodePosition Path
@@ -158,7 +158,7 @@ data Action
   | Receive (Connected Store.Store Input)
   | DoNothing
   | JumpToLeafSection Int Path String
-  | JumpToNodeSection Path String
+  | JumpToNodeSection Path String String
   | ToggleAddMenu Path
   | ToggleHistoryMenu Path Int
   | ToggleHistoryMenuOff Path
@@ -507,9 +507,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
           state { mSelectedTocEntry = Just $ SelLeaf id, mTitle = Just title }
         H.raise (ChangeToLeaf id (Just title))
 
-    JumpToNodeSection path title -> do
-      H.modify_ _ { mSelectedTocEntry = Just $ SelNode path title }
-      H.raise (ChangeToNode path title)
+    JumpToNodeSection path heading title -> do
+      H.modify_ _ { mSelectedTocEntry = Just $ SelNode path heading }
+      H.raise (ChangeToNode path heading (Just title))
 
     ToggleAddMenu path -> do
       H.modify_ \state ->
@@ -958,6 +958,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                         ( if canBeRenamed then
                             [ HE.onClick \_ -> JumpToNodeSection path
                                 (getHeading header)
+                                (getFullTitle meta)
                             ]
                           else
                             []
