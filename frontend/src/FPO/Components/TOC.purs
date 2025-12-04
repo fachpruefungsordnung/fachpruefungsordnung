@@ -851,7 +851,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
               }
           H.raise (ChangeToLeaf leafId mTitle)
           pure (Just a)
-    
+
     UpdateMSelectedTocEntry entry mTitle a -> do
       H.modify_ _ { mSelectedTocEntry = Just entry, mTitle = mTitle }
       pure (Just a)

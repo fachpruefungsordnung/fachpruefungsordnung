@@ -814,7 +814,10 @@ editor = connect selectTranslator $ H.mkComponent
           _.saveState.mManualSaveRef
         -- Only save, when dirty flag is true or we are in older version
         -- TODO: Add another flag instead of using isEditorOutdated
-        if ((not isSaving) && (isDirty || (not isManualSaved) || state.isEditorOutdated)) then do
+        if
+          ( (not isSaving) &&
+              (isDirty || (not isManualSaved) || state.isEditorOutdated)
+          ) then do
           -- mIsSaving := true, mDirtyRef := false
           for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write true r
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
@@ -881,9 +884,10 @@ editor = connect selectTranslator $ H.mkComponent
             for_ state.saveState.mManualSaveRef \r -> H.liftEffect $ Ref.write true r
         -- Users want to have a visual indicator, that they have saved. So when manual saving without any changes since
         -- last Save, just show the notification
-        else when (not isAutoSave && isManualSaved && isJust state.mTocEntry) $
-          updateStore $ Store.AddSuccess
-            (translate (label :: _ "editor_already_saved") state.translator)
+        else when (not isAutoSave && isManualSaved && isJust state.mTocEntry)
+          $ updateStore
+          $ Store.AddSuccess
+              (translate (label :: _ "editor_already_saved") state.translator)
 
     Upload newEntry newWrapper isAutoSave -> do
       state <- H.get
@@ -947,6 +951,7 @@ editor = connect selectTranslator $ H.mkComponent
                     true -> H.raise Merged
                   pure unit
                 "draftCreated" -> --should not happen here. just copy autosave case in case
+
                   setIsOnMerge true
                 "conflict" -> do --raise something to update version
                   setIsOnMerge true
@@ -963,6 +968,7 @@ editor = connect selectTranslator $ H.mkComponent
                     true -> H.raise Merged
                   pure unit
                 "draftCreated" -> --should not happen here. just copy autosave case in case
+
                   setIsOnMerge true
                 "conflict" -> do --raise something to update version
                   setIsOnMerge true
@@ -1579,7 +1585,8 @@ editor = connect selectTranslator $ H.mkComponent
               -- reset Ref, because loading new content is considered
               -- changing the existing content, which would set the flag
               for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
-              for_ state.saveState.mManualSaveRef \r -> H.liftEffect $ Ref.write true r
+              for_ state.saveState.mManualSaveRef \r -> H.liftEffect $ Ref.write true
+                r
 
               -- Reset Undo history
               undoMgr <- Session.getUndoManager session
@@ -1837,16 +1844,15 @@ editor = connect selectTranslator $ H.mkComponent
     when qSaving do
       for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write false r
       handleAction $ Save (not isManualSaved)
-  
+
   setIsOnMerge
     :: forall slots
-    . Boolean
+     . Boolean
     -> H.HalogenM State Action slots Output m Unit
   setIsOnMerge flag = do
     H.modify_ _ { isOnMerge = flag }
     mRef <- H.gets _.saveState.mIsOnMergeRef
     for_ mRef \r -> H.liftEffect $ Ref.write flag r
-
 
 -- | Change listener for the editor.
 --

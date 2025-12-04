@@ -1207,7 +1207,8 @@ splitview = connect selectTranslator $ H.mkComponent
         isOnMerge <- H.request _editor 0 Editor.IsOnMerge
         when (not $ fromMaybe false isOnMerge) $ do
           H.tell _editor 0 (Editor.ChangeToNode heading path)
-          H.tell _toc unit $ TOC.UpdateMSelectedTocEntry (SelNode path heading) (Just heading)
+          H.tell _toc unit $ TOC.UpdateMSelectedTocEntry (SelNode path heading)
+            (Just heading)
 
       TOC.AddNode path node -> do
         s <- H.get
