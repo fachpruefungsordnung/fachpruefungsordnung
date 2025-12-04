@@ -845,7 +845,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
         Just entry -> do
           let
             leafId = entry.id
-            mTitle = findLeafTitle leafId state.tocEntries
+            mTitle = getFullTitle <$> findLeafMeta leafId state.tocEntries
           H.modify_ \st ->
             st
               { mSelectedTocEntry = Just (SelLeaf leafId)
