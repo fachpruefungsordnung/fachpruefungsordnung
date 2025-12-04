@@ -216,6 +216,7 @@ data Output
   | RaiseMergeMode
   | Merged
   | RaiseUpdateVersion (Maybe Int)
+  | UpdateFullTitle
 
 data Action
   = Init
@@ -910,6 +911,7 @@ editor = connect selectTranslator $ H.mkComponent
 
           H.modify_ _ { mContent = Just updatedContent, html = html }
           H.raise $ ClickedQuery html
+          H.raise UpdateFullTitle
 
           -- Show saved icon or toast
           case isAutoSave, state.isEditorOutdated of

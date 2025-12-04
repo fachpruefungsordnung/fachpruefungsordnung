@@ -1124,6 +1124,11 @@ splitview = connect selectTranslator $ H.mkComponent
                 mmTitle <- H.request _toc unit TOC.RequestFullTitle
                 H.tell _editor 0 (Editor.ChangeSection entry Nothing (join mmTitle))
           _ -> pure unit
+      
+      Editor.UpdateFullTitle -> do
+        handleAction GET
+        mmTitle <- H.request _toc unit TOC.RequestFullTitle
+        H.tell _editor 0 $ Editor.ReceiveFullTitle (join mmTitle)
 
     DeleteDraft -> do
       handleAction UpdateMSelectedTocEntry
