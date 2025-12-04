@@ -153,7 +153,7 @@ type SaveState =
     -- only save when there are new changes in editor
     mDirtyRef :: Maybe (Ref Boolean)
   , mManualSaveRef :: Maybe (Ref Boolean)
-  -- copy of isOneMerge state label only used for beforeUnload
+  -- copy of isOnMerge state label only used for beforeUnload
   , mIsOnMergeRef :: Maybe (Ref Boolean)
   -- Prevent to have multiple saving processes at the same time
   , mIsSaving :: Maybe (Ref Boolean)
@@ -2114,8 +2114,8 @@ addBeforeUnloadListener dref mref oref listener = do
 
   beforeUnloadListener <- H.liftEffect $ eventListener \ev -> do
     isDirty <- traverse Ref.read (Just dref)
-    isOneMerge <- traverse Ref.read (Just oref)
-    case isOneMerge, isDirty of
+    isOnMerge <- traverse Ref.read (Just oref)
+    case isOnMerge, isDirty of
       -- Prevent the tab from closing in a certain way
       Just true, _ -> do
         preventDefault ev
