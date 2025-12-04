@@ -77,7 +77,7 @@ enEditor = fromRecord
       <>
         "If you do not wish to save your currently opened version, you can click on \"Discard\" to discard them and open the current version."
   , editor_mergingNow:
-      "Copy over desired changes from the right and finish by clicking on \"Merge\""
+      "Copy over desired changes from the right and finish by clicking on \"Merge\". Leaving this window now will discard all your previous changes."
   , editor_no_title: "No section selected."
   , editor_oldVersion: "You are editing an old version"
   , editor_pdf: "Export PDF"
