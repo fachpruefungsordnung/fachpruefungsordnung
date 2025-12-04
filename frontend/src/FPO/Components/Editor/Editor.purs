@@ -1447,9 +1447,10 @@ editor = connect selectTranslator $ H.mkComponent
     Finalize -> do
       -- Save in case, the user changes the page (via Navbar)
       state <- H.get
-      when state.isOnMerge $
+      if state.isOnMerge then
         handleAction ConfirmDiscardAction
-      handleAction $ Save true
+      else
+        handleAction $ Save true
       win <- H.liftEffect window
       let
         tgt = Win.toEventTarget win

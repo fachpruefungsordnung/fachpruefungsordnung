@@ -1173,7 +1173,7 @@ splitview = connect selectTranslator $ H.mkComponent
               _ -> Nothing
         -- check to avoid weird merge/save race conditions
         isOnMerge <- H.request _editor 0 Editor.IsOnMerge
-        if (fromMaybe false isOnMerge) then do
+        if (fromMaybe false isOnMerge) then
           H.tell _editor 0 Editor.PreventChangeSection
         else do
           H.modify_ _ { pendingUpdateElementID = currentElementID }
@@ -1205,7 +1205,9 @@ splitview = connect selectTranslator $ H.mkComponent
 
       TOC.ChangeToNode path heading -> do
         isOnMerge <- H.request _editor 0 Editor.IsOnMerge
-        when (not $ fromMaybe false isOnMerge) $ do
+        if (fromMaybe false isOnMerge) then
+          H.tell _editor 0 Editor.PreventChangeSection
+        else do
           H.tell _editor 0 (Editor.ChangeToNode heading path)
           H.tell _toc unit $ TOC.UpdateMSelectedTocEntry (SelNode path heading)
             (Just heading)
