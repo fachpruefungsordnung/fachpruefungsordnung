@@ -152,7 +152,6 @@ type SaveState =
   {
     -- only save when there are new changes in editor
     mDirtyRef :: Maybe (Ref Boolean)
-  , mManualSaveRef :: Maybe (Ref Boolean)
   -- copy of isOnMerge state label only used for beforeUnload
   , mIsOnMergeRef :: Maybe (Ref Boolean)
   -- Prevent to have multiple saving processes at the same time
@@ -160,6 +159,7 @@ type SaveState =
   -- Are there new changes during saving?
   , mQueuedSave :: Maybe (Ref Boolean)
   , mBeforeUnloadListener :: Maybe EventListener
+  , isManualSaved :: Boolean
   -- saved icon
   , showSavedIcon :: Boolean
   , mSavedIconF :: Maybe H.ForkId
@@ -234,6 +234,7 @@ data Action
   | Save Boolean
   -- Subsection of Save
   | Upload TOCEntry ContentWrapper Boolean
+  | SetManualSavedFlag Boolean
   | SavedIcon
   -- new change in editor -> reset timer
   | AutoSaveTimer
@@ -698,19 +699,18 @@ editor = connect selectTranslator $ H.mkComponent
       -- New Ref for keeping track, if the content in editor has changed
       -- 1. since last save
       -- 2. since opening version
-      dref <- H.liftEffect $ Ref.new false
-      mref <- H.liftEffect $ Ref.new false
-      oref <- H.liftEffect $ Ref.new false
-      vref <- H.liftEffect $ Ref.new false
-      H.modify_ _ { mDirtyVersion = Just vref }
+      dirtyRef <- H.liftEffect $ Ref.new false
+      isOnMergeRef <- H.liftEffect $ Ref.new false
+      versionRef <- H.liftEffect $ Ref.new false
+      H.modify_ _ { mDirtyVersion = Just versionRef }
 
       -- create eventListener for preventing the tab from closing
       -- when content has not been saved (Not changing through Navbar)
-      addBeforeUnloadListener dref mref oref listener
+      addBeforeUnloadListener dirtyRef isOnMergeRef listener
 
       -- add and start Editor listeners
       H.gets _.mEditor >>= traverse_ \ed -> do
-        H.liftEffect $ addChangeListenerWithRef ed dref vref mref listener
+        H.liftEffect $ addChangeListenerWithRef ed dirtyRef versionRef listener
         container <- H.liftEffect $ Editor.getContainer ed
         H.liftEffect $ addMouseDragListeners container listener
 
@@ -810,19 +810,17 @@ editor = connect selectTranslator $ H.mkComponent
           _.saveState.mIsSaving
         isDirty <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
           _.saveState.mDirtyRef
-        isManualSaved <- maybe (pure false) (H.liftEffect <<< Ref.read) =<< H.gets
-          _.saveState.mManualSaveRef
         -- Only save, when dirty flag is true or we are in older version
         -- TODO: Add another flag instead of using isEditorOutdated
         if
           ( (not isSaving) &&
-              (isDirty || (not isManualSaved) || state.isEditorOutdated)
+              (isDirty || (not state.saveState.isManualSaved) || state.isEditorOutdated)
           ) then do
           -- mIsSaving := true, mDirtyRef := false
           for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write true r
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
           when (not isAutoSave) $
-            for_ state.saveState.mManualSaveRef \r -> H.liftEffect $ Ref.write true r
+            handleAction $ SetManualSavedFlag true
           allLines <- H.gets _.mEditor >>= traverse \ed -> do
             H.liftEffect $ Editor.getSession ed
               >>= Session.getDocument
@@ -878,13 +876,13 @@ editor = connect selectTranslator $ H.mkComponent
                     newWrapper = ContentDto.setWrapper newContent comments
                   -- Try to upload
                   handleAction $ Upload entry newWrapper isAutoSave
-        else if (isSaving && (isDirty || not isManualSaved)) then do
+        else if (isSaving && (isDirty || not state.saveState.isManualSaved)) then do
           for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write true r
           when (not isAutoSave) $
-            for_ state.saveState.mManualSaveRef \r -> H.liftEffect $ Ref.write true r
+            handleAction $ SetManualSavedFlag true
         -- Users want to have a visual indicator, that they have saved. So when manual saving without any changes since
         -- last Save, just show the notification
-        else when (not isAutoSave && isManualSaved && isJust state.mTocEntry)
+        else when (not isAutoSave && state.saveState.isManualSaved && isJust state.mTocEntry)
           $ updateStore
           $ Store.AddSuccess
               (translate (label :: _ "editor_already_saved") state.translator)
@@ -979,6 +977,9 @@ editor = connect selectTranslator $ H.mkComponent
           pure unit
 
       freeSaveFlagsAndMaybeRerun
+
+    SetManualSavedFlag flag ->
+      H.modify_ \st -> st { saveState = st.saveState { isManualSaved = flag }}
 
     SavedIcon -> do
       mSavedIconF <- H.gets _.saveState.mSavedIconF
@@ -1301,7 +1302,7 @@ editor = connect selectTranslator $ H.mkComponent
 
             -- Auto save
             case state.commentState.mPrevHandler, state.saveState.mDirtyRef of
-              Just prev, Just dref -> do
+              Just prev, Just dirtyRef -> do
                 let
                   pRow = Types.getRow prev
                   pCol = Types.getColumn prev
@@ -1313,7 +1314,8 @@ editor = connect selectTranslator $ H.mkComponent
                     H.modify_ \st -> st
                       { commentState = st.commentState { mPrevHandler = Nothing } }
                     -- set dirty flag and autosave
-                    H.liftEffect $ Ref.write true dref
+                    H.liftEffect $ Ref.write true dirtyRef
+                    handleAction $ SetManualSavedFlag false
                     handleAction AutoSaveTimer
               _, _ -> pure unit
           Nothing -> pure unit
@@ -1586,8 +1588,6 @@ editor = connect selectTranslator $ H.mkComponent
               -- reset Ref, because loading new content is considered
               -- changing the existing content, which would set the flag
               for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
-              for_ state.saveState.mManualSaveRef \r -> H.liftEffect $ Ref.write true
-                r
 
               -- Reset Undo history
               undoMgr <- Session.getUndoManager session
@@ -1616,6 +1616,7 @@ editor = connect selectTranslator $ H.mkComponent
               , saveState = st.saveState
                   { mPendingDebounceF = Nothing
                   , mPendingMaxWaitF = Nothing
+                  , isManualSaved = true
                   }
               , isLoading = false
               }
@@ -1675,7 +1676,7 @@ editor = connect selectTranslator $ H.mkComponent
       -- reset Ref, because loading new content is considered
       -- changing the existing content, which would set the flag
       for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
-      for_ state.saveState.mManualSaveRef \r -> H.liftEffect $ Ref.write false r
+      handleAction $ SetManualSavedFlag false
       pure (Just a)
 
     UpdateNodePosition path a -> do
@@ -1750,7 +1751,8 @@ editor = connect selectTranslator $ H.mkComponent
           -- Save new created comment
           -- set dirty to true to be able to save
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
-          handleAction $ Save false
+          handleAction $ SetManualSavedFlag false
+          handleAction $ Save true
         _, _, _, _ -> pure unit
       pure (Just a)
 
@@ -1837,8 +1839,7 @@ editor = connect selectTranslator $ H.mkComponent
     -- free up the save flags for the next save session
     qSaving <- maybe (pure false) (H.liftEffect <<< Ref.read)
       =<< H.gets _.saveState.mQueuedSave
-    isManualSaved <- maybe (pure false) (H.liftEffect <<< Ref.read)
-      =<< H.gets _.saveState.mManualSaveRef
+    isManualSaved <- H.gets _.saveState.isManualSaved
     state <- H.get
     -- check if there are new requests for saving during saving
     for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write false r
@@ -1861,24 +1862,23 @@ editor = connect selectTranslator $ H.mkComponent
 --   linting, code completion, etc.
 --   For now, it puts "  " in front of "#", if it is placed at the
 --   beginning of a line
---  Update: it also detects, when content is changed and set dref flag
+--  Update: it also detects, when content is changed and set dirtyRef flag
 addChangeListenerWithRef
   :: Types.Editor
   -> Ref Boolean
   -> Ref Boolean
-  -> Ref Boolean
   -> HS.Listener Action
   -> Effect Unit
-addChangeListenerWithRef editor_ dref vref mref listener = do
+addChangeListenerWithRef editor_ dirtyRef versionRef listener = do
   session <- Editor.getSession editor_
   -- in order to prevent an ifinite loop with this listener
   guardRef <- Ref.new false
   Session.onChange session \(Types.DocumentEvent { action, start, end: _, lines }) ->
     do
       -- set dirty flag
-      Ref.write true dref
-      Ref.write true vref
-      Ref.write false mref
+      Ref.write true dirtyRef
+      Ref.write true versionRef
+      HS.notify listener $ SetManualSavedFlag false
       HS.notify listener AutoSaveTimer
 
       -- '#' → '  #' at beginning of a line with Reentrancy-Guard
@@ -1978,11 +1978,11 @@ initialCommentState =
 initialSaveState :: SaveState
 initialSaveState =
   { mDirtyRef: Nothing
-  , mManualSaveRef: Nothing
   , mIsOnMergeRef: Nothing
   , mIsSaving: Nothing
   , mQueuedSave: Nothing
   , mBeforeUnloadListener: Nothing
+  , isManualSaved: true
   , showSavedIcon: false
   , mSavedIconF: Nothing
   , mPendingDebounceF: Nothing
@@ -2103,10 +2103,9 @@ addBeforeUnloadListener
    . MonadAff m
   => Ref Boolean
   -> Ref Boolean
-  -> Ref Boolean
   -> HS.Listener Action
   -> H.HalogenM State Action slots Output m Unit
-addBeforeUnloadListener dref mref oref listener = do
+addBeforeUnloadListener dirtyRef isOnMergeRef listener = do
   win <- H.liftEffect window
   let
     winTarget = Win.toEventTarget win
@@ -2114,8 +2113,8 @@ addBeforeUnloadListener dref mref oref listener = do
     beforeunload = EventType "beforeunload"
 
   beforeUnloadListener <- H.liftEffect $ eventListener \ev -> do
-    isDirty <- traverse Ref.read (Just dref)
-    isOnMerge <- traverse Ref.read (Just oref)
+    isDirty <- traverse Ref.read (Just dirtyRef)
+    isOnMerge <- traverse Ref.read (Just isOnMergeRef)
     case isOnMerge, isDirty of
       -- Prevent the tab from closing in a certain way
       Just true, _ -> do
@@ -2129,9 +2128,8 @@ addBeforeUnloadListener dref mref oref listener = do
   qref <- H.liftEffect $ Ref.new false
   H.modify_ \st -> st
     { saveState = st.saveState
-        { mDirtyRef = Just dref
-        , mManualSaveRef = Just mref
-        , mIsOnMergeRef = Just oref
+        { mDirtyRef = Just dirtyRef
+        , mIsOnMergeRef = Just isOnMergeRef
         , mIsSaving = Just sref
         , mQueuedSave = Just qref
         , mBeforeUnloadListener = Just beforeUnloadListener
