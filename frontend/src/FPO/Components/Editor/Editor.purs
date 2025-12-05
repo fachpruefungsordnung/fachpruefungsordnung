@@ -216,6 +216,7 @@ data Output
   | RaiseMergeMode
   | Merged
   | RaiseUpdateVersion (Maybe Int)
+  | UpdateFullTitle
 
 data Action
   = Init
@@ -269,7 +270,7 @@ data Query a
   -- | Open and edit a raw string outside the TOCEntry structure.
   --   This is used to make the editor available for editing
   --   the section names (headings) of non-leaf nodes.
-  | ChangeToNode String Path a
+  | ChangeToNode String Path (Maybe String) a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
   | UpdateComment CommentSection a
@@ -910,6 +911,7 @@ editor = connect selectTranslator $ H.mkComponent
 
           H.modify_ _ { mContent = Just updatedContent, html = html }
           H.raise $ ClickedQuery html
+          H.raise UpdateFullTitle
 
           -- Show saved icon or toast
           case isAutoSave, state.isEditorOutdated of
@@ -1631,16 +1633,21 @@ editor = connect selectTranslator $ H.mkComponent
       handleAction (ContinueChangeToSection fCs true)
       pure (Just a)
 
-    ChangeToNode title path a -> do
+    ChangeToNode heading path mTitle a -> do
       -- Change the editor to a raw string outside the TOCEntry structure.
-      H.modify_ _ { mTocEntry = Nothing, mNodePath = Just path }
+      H.modify_ _
+        { mTocEntry = Nothing
+        , mNodePath = Just path
+        , mTitle = mTitle
+        , isLoading = true
+        }
       state <- H.get
       H.gets _.mEditor >>= traverse_ \ed -> do
         -- Set the content of the editor
         H.liftEffect $ do
           session <- Editor.getSession ed
           document <- Session.getDocument session
-          Document.setValue title document
+          Document.setValue heading document
           Editor.setReadOnly false ed
 
           -- Reset Undo history
@@ -1653,6 +1660,7 @@ editor = connect selectTranslator $ H.mkComponent
       -- reset Ref, because loading new content is considered
       -- changing the existing content, which would set the flag
       for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
+      H.modify_ _ { isLoading = false }
       pure (Just a)
 
     UpdateNodePosition path a -> do
