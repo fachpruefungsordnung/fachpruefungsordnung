@@ -814,13 +814,16 @@ editor = connect selectTranslator $ H.mkComponent
         -- TODO: Add another flag instead of using isEditorOutdated
         if
           ( (not isSaving) &&
-              (isDirty || (not state.saveState.isManualSaved) || state.isEditorOutdated)
+              ( isDirty || (not state.saveState.isManualSaved) ||
+                  state.isEditorOutdated
+              )
           ) then do
           -- mIsSaving := true, mDirtyRef := false
           for_ state.saveState.mIsSaving \r -> H.liftEffect $ Ref.write true r
           for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
-          when (not isAutoSave) $
-            handleAction $ SetManualSavedFlag true
+          when (not isAutoSave)
+            $ handleAction
+            $ SetManualSavedFlag true
           allLines <- H.gets _.mEditor >>= traverse \ed -> do
             H.liftEffect $ Editor.getSession ed
               >>= Session.getDocument
@@ -878,14 +881,19 @@ editor = connect selectTranslator $ H.mkComponent
                   handleAction $ Upload entry newWrapper isAutoSave
         else if (isSaving && (isDirty || not state.saveState.isManualSaved)) then do
           for_ state.saveState.mQueuedSave \r -> H.liftEffect $ Ref.write true r
-          when (not isAutoSave) $
-            handleAction $ SetManualSavedFlag true
+          when (not isAutoSave)
+            $ handleAction
+            $ SetManualSavedFlag true
         -- Users want to have a visual indicator, that they have saved. So when manual saving without any changes since
         -- last Save, just show the notification
-        else when (not isAutoSave && state.saveState.isManualSaved && isJust state.mTocEntry)
-          $ updateStore
-          $ Store.AddSuccess
-              (translate (label :: _ "editor_already_saved") state.translator)
+        else
+          when
+            ( not isAutoSave && state.saveState.isManualSaved && isJust
+                state.mTocEntry
+            )
+            $ updateStore
+            $ Store.AddSuccess
+                (translate (label :: _ "editor_already_saved") state.translator)
 
     Upload newEntry newWrapper isAutoSave -> do
       state <- H.get
@@ -979,7 +987,7 @@ editor = connect selectTranslator $ H.mkComponent
       freeSaveFlagsAndMaybeRerun
 
     SetManualSavedFlag flag ->
-      H.modify_ \st -> st { saveState = st.saveState { isManualSaved = flag }}
+      H.modify_ \st -> st { saveState = st.saveState { isManualSaved = flag } }
 
     SavedIcon -> do
       mSavedIconF <- H.gets _.saveState.mSavedIconF
