@@ -1176,37 +1176,46 @@ splitview = connect selectTranslator $ H.mkComponent
             case stateBefore.mSelectedTocEntry of
               Just (SelLeaf id) -> Just id
               _ -> Nothing
-        H.modify_ _ { pendingUpdateElementID = currentElementID }
         -- check to avoid weird merge/save race conditions
         isOnMerge <- H.request _editor 0 Editor.IsOnMerge
-        when (not $ fromMaybe false isOnMerge) $
+        if (fromMaybe false isOnMerge) then
+          H.tell _editor 0 Editor.PreventChangeSection
+        else do
+          H.modify_ _ { pendingUpdateElementID = currentElementID }
           H.tell _editor 0 Editor.SaveSection
-        handleAction UpdateMSelectedTocEntry
-        state <- H.get
-        let
-          entry = case (findTOCEntry selectedId state.tocEntries) of
-            Nothing -> emptyTOCEntry
-            Just e -> e
-          ev =
-            case
-              findRootTree (\e -> e.elementID == selectedId) state.versionMapping
-              of
-              Nothing ->
-                { elementID: -1, versionID: Nothing, comparisonData: Nothing }
-              Just elem -> elem
-        H.tell _editor 0 (Editor.ChangeSection entry ev.versionID mTitle)
-        case ev.comparisonData of
-          Nothing -> do
-            -- this case should be covered by mSelectedTocEntry being set to Nothing
-            pure unit
-          Just d ->
-            H.tell _editor 1 (Editor.ChangeSection d.tocEntry d.revID mTitle)
+          handleAction UpdateMSelectedTocEntry
+          state <- H.get
+          let
+            entry = case (findTOCEntry selectedId state.tocEntries) of
+              Nothing -> emptyTOCEntry
+              Just e -> e
+            ev =
+              case
+                findRootTree (\e -> e.elementID == selectedId) state.versionMapping
+                of
+                Nothing ->
+                  { elementID: -1, versionID: Nothing, comparisonData: Nothing }
+                Just elem -> elem
+          H.tell _editor 0 (Editor.ChangeSection entry ev.versionID mTitle)
+          H.tell _toc unit $ TOC.UpdateMSelectedTocEntry (SelLeaf selectedId) mTitle
+          case ev.comparisonData of
+            Nothing -> do
+              -- this case should be covered by mSelectedTocEntry being set to Nothing
+              pure unit
+            Just d ->
+              H.tell _editor 1 (Editor.ChangeSection d.tocEntry d.revID mTitle)
 
       TOC.UpdateNodePosition path -> do
         H.tell _editor 0 (Editor.UpdateNodePosition path)
 
       TOC.ChangeToNode path heading mTitle -> do
-        H.tell _editor 0 (Editor.ChangeToNode heading path mTitle)
+        isOnMerge <- H.request _editor 0 Editor.IsOnMerge
+        if (fromMaybe false isOnMerge) then
+          H.tell _editor 0 Editor.PreventChangeSection
+        else do
+          H.tell _editor 0 (Editor.ChangeToNode heading path mTitle)
+          H.tell _toc unit $ TOC.UpdateMSelectedTocEntry (SelNode path heading)
+            (Just heading)
 
       TOC.AddNode path node -> do
         s <- H.get

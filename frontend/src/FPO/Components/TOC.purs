@@ -191,6 +191,7 @@ data Query a
   | RequestUpToDateVersion (Maybe Version -> a)
   | RequestFullTitle (Maybe String -> a)
   | SelectFirstEntry a
+  | UpdateMSelectedTocEntry SelectedEntity (Maybe String) a
 
 type SearchData =
   { elementID :: Int
@@ -503,8 +504,6 @@ tocview = connect (selectEq identity) $ H.mkComponent
       handleAction (ToggleHistoryMenuOff path)
       mSelectedTocEntry <- H.gets _.mSelectedTocEntry
       when (mSelectedTocEntry /= Just (SelLeaf id)) do
-        H.modify_ \state ->
-          state { mSelectedTocEntry = Just $ SelLeaf id, mTitle = Just title }
         H.raise (ChangeToLeaf id (Just title))
 
     JumpToNodeSection path heading title -> do
@@ -853,6 +852,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
               }
           H.raise (ChangeToLeaf leafId mTitle)
           pure (Just a)
+
+    UpdateMSelectedTocEntry entry mTitle a -> do
+      H.modify_ _ { mSelectedTocEntry = Just entry, mTitle = mTitle }
+      pure (Just a)
 
   rootTreeToHTML
     :: forall slots
