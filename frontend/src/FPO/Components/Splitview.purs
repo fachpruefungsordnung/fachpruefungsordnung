@@ -1125,6 +1125,11 @@ splitview = connect selectTranslator $ H.mkComponent
                 H.tell _editor 0 (Editor.ChangeSection entry Nothing (join mmTitle))
           _ -> pure unit
 
+      Editor.UpdateFullTitle -> do
+        handleAction GET
+        mmTitle <- H.request _toc unit TOC.RequestFullTitle
+        H.tell _editor 0 $ Editor.ReceiveFullTitle (join mmTitle)
+
     DeleteDraft -> do
       handleAction UpdateMSelectedTocEntry
       state <- H.get
@@ -1203,12 +1208,12 @@ splitview = connect selectTranslator $ H.mkComponent
       TOC.UpdateNodePosition path -> do
         H.tell _editor 0 (Editor.UpdateNodePosition path)
 
-      TOC.ChangeToNode path heading -> do
+      TOC.ChangeToNode path heading mTitle -> do
         isOnMerge <- H.request _editor 0 Editor.IsOnMerge
         if (fromMaybe false isOnMerge) then
           H.tell _editor 0 Editor.PreventChangeSection
         else do
-          H.tell _editor 0 (Editor.ChangeToNode heading path)
+          H.tell _editor 0 (Editor.ChangeToNode heading path mTitle)
           H.tell _toc unit $ TOC.UpdateMSelectedTocEntry (SelNode path heading)
             (Just heading)
 
