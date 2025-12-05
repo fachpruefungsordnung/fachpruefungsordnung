@@ -48,7 +48,7 @@ renderLaTeXPretty = LT.toStrict . B.toLazyText . build 0
     build _ (Text t) = escape t
     build _ (Raw t) = B.fromText t
     build _ (CommandS name) =
-        "\\" <> B.fromText name
+        "\\" <> B.fromText name <> " "
     build n (Command name opts args) =
         "\\"
             <> B.fromText name

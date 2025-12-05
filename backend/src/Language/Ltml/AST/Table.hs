@@ -9,10 +9,11 @@ import Language.Lsd.AST.Type.Table (CellFormat)
 import Language.Ltml.AST.Text (TableTextTree)
 
 -- the internal representation of a table
-newtype Table = Table [Row]
+type ColumnProps = Maybe [Int]
+data Table = Table ColumnProps [Row]
 
 instance Show Table where
-    show (Table rows) = unlines $ map show rows
+    show (Table _ rows) = unlines $ map show rows
 
 newtype Row = Row [Cell]
     deriving (Show)

@@ -350,7 +350,7 @@ paragraphT =
 simpleBlockT :: NamedType SimpleBlockType
 simpleBlockT =
     NamedType "simple_block" "Einfacher Block" $
-        SimpleBlockType simpleParagraphT (Disjunction [tableT]) moduleBlockT
+        SimpleBlockType simpleParagraphT tableT moduleBlockT
 
 simpleParagraphT :: NamedType SimpleParagraphType
 simpleParagraphT = simpleParagraphTF LeftAligned MediumFontSize

@@ -32,11 +32,13 @@ import Text.Megaparsec
     , choice
     , errorBundlePretty
     , manyTill
+    , optional
     , runParser
     , some
     , (<|>)
     )
 import Text.Megaparsec.Char (space, string)
+import Text.Megaparsec.Char.Lexer (decimal)
 
 cellP :: Keyword -> CellType -> Parser Cell'
 cellP (Keyword tkw) (CellType (Keyword ckw) fmt tt) = do
@@ -71,10 +73,19 @@ rowP k@(Keyword tkw) (DefaultCellType defaultCellT) (RowType (Keyword rkw) (Star
 tableP :: TableType -> Parser Table
 tableP (TableType kw defaultCellT (Star t)) = do
     space
+    mProps <- optional $ nLexeme $ some propP
     nRows <- nLexeme $ some (rowP kw defaultCellT t)
     hidden space
     -- _ <- char '&'
-    pure (mergeCells defaultCellT $ Table' nRows)
+    pure (mergeCells mProps defaultCellT $ Table' nRows)
+  where
+    propP :: Parser Int
+    propP = do
+        _ <- string "|="
+        space
+        n <- decimal
+        space
+        return n
 
 -- the rawly parsed representation of a table
 newtype Table' = Table' {unTable' :: [Row']}
@@ -105,8 +116,8 @@ instance Eq VisitedCell where
     (InSpan {}) == (InSpan {}) = True
     _ == _ = False
 
-mergeCells :: DefaultCellType -> Table' -> Table
-mergeCells (DefaultCellType defaultCellT) table =
+mergeCells :: Maybe [Int] -> DefaultCellType -> Table' -> Table
+mergeCells mProps (DefaultCellType defaultCellT) table =
     let matrix' =
             array
                 ((0, 0), (nRows, mCols))
@@ -115,7 +126,7 @@ mergeCells (DefaultCellType defaultCellT) table =
             array
                 ((0, 0), (nRows, mCols))
                 [((row, col), Unvisited) | row <- [0 .. nRows], col <- [0 .. mCols]]
-     in arrayToTable $ snd $ process (0, 0) (visited0, matrix')
+     in Table mProps $ arrayToTable $ snd $ process (0, 0) (visited0, matrix')
   where
     table' = padTable defaultCellT table
     rawMatrix = tableToArray table'
@@ -151,6 +162,8 @@ mergeCells (DefaultCellType defaultCellT) table =
 
     -- updateVisited :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
     -- updateVisited p0 (visited, mat) = (\p -> p == p0 || visited p, mat)
+    -- updateVisited :: Position -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
+    -- updateVisited p0 (visited, mat) = (\p -> p == p0 || visited p, mat)
 
     updateMatrix
         :: Position -> Cell -> (Visited, Matrix Cell) -> (Visited, Matrix Cell)
@@ -161,7 +174,8 @@ mergeCells (DefaultCellType defaultCellT) table =
         | row > nRows = s
         | col > mCols = process (row + 1, 0) s
         | visited ! (row, col) == Visited = process (row, col + 1) s
-        | visited ! (row, col) == InSpan 0 =
+        | visited ! (row, col) == InSpan 0 -- this is safe, regard the def of Eq VisitedCell. (even though maybe a little dirty...)
+            =
             let InSpan w = visited ! (row, col)
                 matrix' = matrix // [((row, col), VSpannedCell w)]
              in process (row, col + 1) (visited, matrix')
@@ -190,6 +204,12 @@ mergeCells (DefaultCellType defaultCellT) table =
                     Cell' fmt (Cell'' content) -> createCell fmt content
              in process (row, col + 1) res
 
+    -- Convert array back to list of lists (optional)
+    arrayToTable :: Matrix Cell -> [Row]
+    arrayToTable arr =
+        let ((i0, j0), (in_, jn)) = bounds arr
+         in [Row [arr ! (row, col) | col <- [j0 .. jn]] | row <- [i0 .. in_]]
+
 -- Convert a list of lists to an array
 tableToArray :: Table' -> Matrix Cell'
 tableToArray t =
@@ -201,12 +221,6 @@ tableToArray t =
   where
     rows = unTable' t
     getCell row col = unRow' (rows !! row) !! col
-
--- Convert array back to list of lists (optional)
-arrayToTable :: Matrix Cell -> Table
-arrayToTable arr =
-    let ((i0, j0), (in_, jn)) = bounds arr
-     in Table [Row [arr ! (row, col) | col <- [j0 .. jn]] | row <- [i0 .. in_]]
 
 -- pad nRows to equal length
 padTable :: CellType -> Table' -> Table'
