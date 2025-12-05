@@ -73,7 +73,26 @@ appendixTree :: FlaggedInputTree'
 appendixTree =
     Flagged False $
         TypedTree "appendix-section" "appendix" $
-            Tree Nothing []
+            Tree Nothing [Flagged False appendixDocument]
+  where
+    appendixDocument :: TypedInputTree'
+    appendixDocument =
+        TypedTree "document" "simpledoc" $
+            Tree
+                (Just appendixHeading)
+                [Flagged False appendixDocumentBody]
+
+    appendixDocumentBody :: TypedInputTree'
+    appendixDocumentBody =
+        TypedTree "document-mainbody" "simpledoc-mainbody" $
+            Leaf simpleBlockText
+
+    appendixHeading :: Text
+    appendixHeading =
+        unlines
+            [ "// Only the appendix document's heading is permitted here."
+            , "! Beispiel Anhang"
+            ]
 
 attachmentsTree :: FlaggedInputTree'
 attachmentsTree =
@@ -154,4 +173,59 @@ extroText =
         , ""
         , "<*Artikel 42 der Änderungssatzung vom 19. Januar 2038:>"
         , "Diese Satzung tritt am Tag nach ihrer Bekanntmachung in Kraft."
+        ]
+
+simpleBlockText :: Text
+simpleBlockText =
+    unlines
+        [ "// Here goes all text regarding this appendix section."
+        , "// An appendix section consists of regular paragraphs and tables."
+        , -- , "// For better readability, an appendix section"
+          -- , "// should contain only a single table."
+          ""
+        , "This an appendix section. Here, many useful pieces of information are specified."
+        , ""
+        , "// A simple table could look like this:"
+        , ""
+        , "| A | B |&"
+        , "| C | D |&"
+        , ""
+        , "// The '&' symbol is used to mark the end of a row."
+        , ""
+        , "// Cells can also be merged across rows and columns"
+        , "// using the arrow symbols '<' and '^':"
+        , ""
+        , "Vertically merged cells look like this: "
+        , ""
+        , "| A | < |&"
+        , "| C | D |&"
+        , ""
+        , "Horizontally merged cells look like this:"
+        , ""
+        , "| A | B |&"
+        , "| ^ | D |&"
+        , ""
+        , ""
+        , "// There is also a special syntax for module definitions and studyplans:"
+        , "The following is a simple list of module definitions."
+        , ""
+        , "// First, a schema is defined:"
+        , "schema: Name | ECTS | Score"
+        , "// A list of modules follows:"
+        , "module: ABC | 8 | A"
+        , "module: DEFG | 4 | B"
+        , ""
+        , "Furthermore, a studyplan is defined."
+        , ""
+        , "// Additionally modules can be grouped into categories:"
+        , "schema: Name | ECTS | Score"
+        , "category: 1. Semester"
+        , "module: ABC | 8 | A"
+        , "module: DEFG | 4 | B"
+        , ""
+        , "category: 2. Semester"
+        , "module: ABC II | 5-8 | "
+        , "module: D I | | C{^:c_grade}"
+        , ""
+        , "^{c_grade:} A footnote!"
         ]
