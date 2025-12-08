@@ -150,7 +150,7 @@ staticDocumentFormat =
             "geometry"
         , usepackage [] "hyperref"
         , usepackage [] "enumitem"
-        , usepackage [] "tabulary"
+        , usepackage [] "longtable"
         , usepackage ["T1"] "fontenc"
         , usepackage ["utf8"] "inputenc"
         , usepackage [] "fancyhdr"

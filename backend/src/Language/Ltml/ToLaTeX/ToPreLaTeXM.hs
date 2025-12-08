@@ -8,6 +8,7 @@ module Language.Ltml.ToLaTeX.ToPreLaTeXM (ToPreLaTeXM (..))
 where
 
 import Control.Lens (use, (%=), (.=))
+import Control.Monad (foldM)
 import Control.Monad.State (State)
 import qualified Data.DList as DList
 import qualified Data.Map as Map
@@ -108,6 +109,7 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     ( PreLaTeX (IRaw, ISequence, IText, MissingRef)
     , bold
     , cellcolor
+    , cline
     , enumerate
     , footnote
     , footref
@@ -125,6 +127,7 @@ import Language.Ltml.ToLaTeX.PreLaTeXType
     , setpdftitle
     , tabular
     )
+import Numeric (showFFloat)
 import Text.Megaparsec (errorBundlePretty)
 
 -- | class to convert AST objects into PreLaTeX. To be able to automatically generate
@@ -198,7 +201,7 @@ instance
     where
     toPreLaTeXM (Word t) = pure $ IText t
     toPreLaTeXM Space = pure $ IText " "
-    toPreLaTeXM NonBreakingSpace = pure $ IText "\xA0"
+    toPreLaTeXM NonBreakingSpace = pure $ IRaw "~"
     toPreLaTeXM (LineBreak lbrk) = toPreLaTeXM lbrk
     toPreLaTeXM (Special s) = toPreLaTeXM s
     toPreLaTeXM (Reference l) = pure $ MissingRef l
@@ -408,21 +411,29 @@ instance ToPreLaTeXM SimpleBlock where
 -------------------------------- Table ----------------------------------
 
 instance ToPreLaTeXM Table where
-    toPreLaTeXM (Table rows) = do
+    toPreLaTeXM (Table mProps rows) = do
         let Row c = head rows
             n = length c
-            option = T.replicate n "|L" <> "|"
+            props = take n $ case mProps of
+                Nothing -> repeat 1
+                Just xs -> xs ++ repeat 1
+            total = sum props
+            applyMargin x =
+                let margin = max ((fromIntegral x / fromIntegral total) - 0.02) 0.01
+                    marginS = showFFloat (Just 2) margin ""
+                 in "|p{" <> marginS <> "\\textwidth}"
+            option = T.pack (concatMap applyMargin props) <> "|"
         rows' <- mapM toPreLaTeXM rows
         pure $
             IRaw
                 "\\textcolor{orange}{Attention: Tables are currently not fully supported!}\n\n"
-                <> tabular option (ISequence $ [hline] <> rows')
+                <> tabular option (ISequence rows' <> hline)
 
 instance ToPreLaTeXM Row where
     toPreLaTeXM (Row cells) = do
         cells' <- mapM toPreLaTeXM (filter (/= HSpannedCell) cells)
         let rowContent = mconcat $ intersperse (IRaw " & ") cells'
-        pure $ rowContent <> linebreak <> hline <> IText " "
+        pure $ allcLines <> rowContent <> linebreak
       where
         intersperse _ [] = []
         intersperse sep (x : xs) = x : prependToAll sep xs
@@ -430,17 +441,38 @@ instance ToPreLaTeXM Row where
         prependToAll _ [] = []
         prependToAll sep (y : ys) = sep : y : prependToAll sep ys
 
+        allcLines :: PreLaTeX
+        allcLines =
+            let (res, _, _) = go mempty 1 1 cells
+             in res
+          where
+            go :: PreLaTeX -> Int -> Int -> [Cell] -> (PreLaTeX, Int, Int)
+            go latex _ _ [] = (latex, 0, 0)
+            go latex i j (VSpannedCell w : cs) = go latex (i + 1) (j + w) cs
+            go latex i j (_ : cs) =
+                if i == j
+                    then go (latex <> cline i i) (i + 1) (j + 1) cs
+                    else go latex (i + 1) j cs
+
 instance ToPreLaTeXM Cell where
     toPreLaTeXM (Cell (CellFormat bg (Typography _ fontsize _)) content w h) = do
-        content' <- mapM toPreLaTeXM content
+        content' <-
+            foldM
+                ( \acc x ->
+                    toPreLaTeXM x
+                        >>= \r ->
+                            if any findLineBreak x
+                                then pure (acc <> r)
+                                else pure $ acc <> applyTextStyle fontsize r
+                )
+                mempty
+                (surfaceLineBreaks content) -- TODO
         let lineBreakCase =
                 if any findLineBreak content
                     then makecell
                     else id
             stylizedContent =
-                lineBreakCase $
-                    applyTextStyle fontsize (mconcat content')
-                        <> getColor bg
+                lineBreakCase content' <> getColor bg
         pure $
             if w > 1 && h > 1
                 then multicolumn w "|l|" $ multirow h stylizedContent
@@ -454,8 +486,30 @@ instance ToPreLaTeXM Cell where
       where
         getColor White = mempty
         getColor Gray = cellcolor "gray!30"
+
         findLineBreak (LineBreak _) = True
+        findLineBreak (Styled _ tt) = any findLineBreak tt
         findLineBreak _ = False
+
+        surfaceLineBreaks
+            :: [TextTree lbrk fnref style enum special]
+            -> [[TextTree lbrk fnref style enum special]]
+        surfaceLineBreaks =
+            foldr
+                ( \tt acc ->
+                    case tt of
+                        LineBreak lb -> [LineBreak lb] : acc
+                        Styled style innerTTs ->
+                            let innerSplits = surfaceLineBreaks innerTTs
+                                wrappedSplits =
+                                    map (\zs -> if any findLineBreak zs then zs else [Styled style zs]) innerSplits
+                             in wrappedSplits ++ acc
+                        other -> case acc of
+                            [] -> [[other]]
+                            ([LineBreak lb] : xs) -> [other] : [LineBreak lb] : xs
+                            (x : xs) -> (other : x) : xs
+                )
+                []
     toPreLaTeXM (VSpannedCell w) = pure $ if w > 1 then multicolumn w "|l|" mempty else mempty
     toPreLaTeXM HSpannedCell = pure mempty
 

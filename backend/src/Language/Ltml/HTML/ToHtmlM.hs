@@ -418,7 +418,7 @@ instance ToHtmlM SimpleParagraph where
 -------------------------------------------------------------------------------
 
 instance ToHtmlM Table where
-    toHtmlM (Table rows) = do
+    toHtmlM (Table _ rows) = do
         rowsHtml <- mconcat <$> mapM row rows
         return $
             (div_ <#> Class.TableContainer)

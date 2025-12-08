@@ -55,7 +55,7 @@ moduleBlockP
             categoryType@(CategoryType _ _ moduleType)
         ) = do
         -- categorized has to be tried first (see below)!
-        Table <$> choice [try categorizedP, plainP]
+        Table Nothing <$> choice [try categorizedP, plainP]
       where
         -- If categorized failes (due to the 'some' requirement), we try plain.
         -- Thus, empty categorizeds are not allowed

@@ -40,7 +40,9 @@ module Language.Ltml.ToLaTeX.PreLaTeXType
     , flushright
     , minipage
     , document
+    {- tabular -}
     , tabular
+    , cline
     , cellcolor
     , multirow
     , multicolumn
@@ -199,11 +201,15 @@ document content = IEnvironment "document" [] [content]
 tabular :: T.Text -> PreLaTeX -> PreLaTeX
 tabular cols content =
     IEnvironment
-        "tabulary"
+        "longtable"
         []
-        [IBraced $ IRaw "\\textwidth", IBraced $ IRaw cols, content]
+        [IBraced $ IRaw cols, content]
 
 ------------------- tabular commands ------------------------
+
+cline :: Int -> Int -> PreLaTeX
+cline start end = ICommand "cline" [] [IRaw (T.pack (show start) <> "-" <> T.pack (show end))]
+
 cellcolor :: T.Text -> PreLaTeX
 cellcolor color = ICommand "cellcolor" [] [IText color]
 
