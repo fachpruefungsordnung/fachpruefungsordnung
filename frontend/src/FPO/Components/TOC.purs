@@ -56,8 +56,9 @@ import FPO.Dto.DocumentDto.TreeDto
   , findRootTree
   , getContent
   , getFullTitle
+  , getFullTitleForDisplay
   , getHeading
-  , getShortTitle
+  , getShortTitleForDisplay
   , modifyNodeRootTree
   , unspecifiedMeta
   )
@@ -66,6 +67,7 @@ import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
 import FPO.Types (TOCEntry, TOCTree, firstTOCEntry)
+import FPO.UI.HTML as HTMLP
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.Util (isPrefixOf, prependIf, singletonIf)
 import FPO.Util as Util
@@ -844,7 +846,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
         Just entry -> do
           let
             leafId = entry.id
-            mTitle = getFullTitle <$> findLeafMeta leafId state.tocEntries
+            mTitle = getFullTitleForDisplay <$> findLeafMeta leafId state.tocEntries
           H.modify_ \st ->
             st
               { mSelectedTocEntry = Just (SelLeaf leafId)
@@ -956,7 +958,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 , HH.span
                     ( [ HP.classes titleClasses
                       , HP.style "align-self: stretch; flex-basis: 0;"
-                      , HP.title $ getFullTitle meta
+                      , HP.title $ getFullTitleForDisplay meta
                       ] <>
                         ( if canBeRenamed then
                             [ HE.onClick \_ -> JumpToNodeSection path
@@ -967,7 +969,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                             []
                         )
                     )
-                    [ HH.text $ getFullTitle meta ]
+                    [ HH.text $ getFullTitleForDisplay meta ]
                 , addItemInterface
                 ]
             ]
@@ -1030,7 +1032,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
           else []
         containerProps =
           ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <> selectedClasses
-            , HP.title ("Jump to section " <> getShortTitle meta)
+            , HP.title ("Jump to section " <> getShortTitleForDisplay meta)
             ] <> dragProps
           )
         innerDivBaseClasses =
@@ -1058,7 +1060,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
                         [ HB.textTruncate, HB.flexGrow1, HB.fwNormal, HB.fs6 ]
                     , HP.style "align-self: stretch; flex-basis: 0;"
                     ]
-                    [ HH.text $ getFullTitle meta ]
+                    [ HH.text $ HTMLP.decodeHtmlEntity (getFullTitle meta) ]
                 , renderParagraphButtonInterface
                     historyPath
                     path

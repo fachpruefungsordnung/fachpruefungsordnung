@@ -91,6 +91,7 @@ import FPO.Types
   , TOCEntry
   , emptyTOCEntry
   )
+import FPO.UI.HTML (decodeHtmlEntity)
 import FPO.UI.Modals.DiscardModal (discardModal)
 import FPO.UI.Modals.InfoModal (infoModal)
 import FPO.Util (prependIf)
@@ -495,7 +496,7 @@ editor = connect selectTranslator $ H.mkComponent
               ]
               [ HH.text $
                   case state.mTitle of
-                    Just title -> title
+                    Just title -> decodeHtmlEntity title
                     Nothing -> translate (label :: _ "editor_no_title")
                       state.translator
               ]
