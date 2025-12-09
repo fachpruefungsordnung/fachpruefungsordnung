@@ -25,7 +25,6 @@
             "halogen-bootstrap5",
             "halogen-store",
             "halogen-subscriptions",
-            "html-parser-halogen",
             "http-methods",
             "integers",
             "lists",
@@ -61,7 +60,6 @@
           "build_plan": [
             "ace",
             "aff",
-            "aff-promise",
             "affjax",
             "argonaut",
             "argonaut-codecs",
@@ -103,12 +101,10 @@
             "halogen-store",
             "halogen-subscriptions",
             "halogen-vdom",
-            "html-parser-halogen",
             "http-methods",
             "identity",
             "integers",
             "invariant",
-            "jest",
             "js-date",
             "js-promise",
             "js-uri",
@@ -130,7 +126,6 @@
             "prelude",
             "profunctor",
             "profunctor-lenses",
-            "psci-support",
             "quickcheck",
             "random",
             "record",
@@ -836,15 +831,6 @@
         "unsafe-coerce"
       ]
     },
-    "aff-promise": {
-      "type": "registry",
-      "version": "4.0.0",
-      "integrity": "sha256-Kq5EupbUpXeUXx4JqGQE7/RTTz/H6idzWhsocwlEFhM=",
-      "dependencies": [
-        "aff",
-        "foreign"
-      ]
-    },
     "affjax": {
       "type": "registry",
       "version": "13.0.0",
@@ -1454,26 +1440,6 @@
         "web-html"
       ]
     },
-    "html-parser-halogen": {
-      "type": "local",
-      "path": "./dependencies/html-parser-halogen-1.1.0",
-      "dependencies": [
-        "arrays",
-        "bifunctors",
-        "control",
-        "dom-indexed",
-        "effect",
-        "either",
-        "foldable-traversable",
-        "halogen",
-        "jest",
-        "lists",
-        "prelude",
-        "psci-support",
-        "string-parsers",
-        "strings"
-      ]
-    },
     "http-methods": {
       "type": "registry",
       "version": "6.0.0",
@@ -1511,17 +1477,6 @@
       "integrity": "sha256-RGWWyYrz0Hs1KjPDA+87Kia67ZFBhfJ5lMGOMCEFoLo=",
       "dependencies": [
         "control",
-        "prelude"
-      ]
-    },
-    "jest": {
-      "type": "registry",
-      "version": "1.0.0",
-      "integrity": "sha256-xw1qzdzazYZVGUoRi6r0qUDC8rgmlhiiRpBCXu1qLrQ=",
-      "dependencies": [
-        "aff",
-        "aff-promise",
-        "effect",
         "prelude"
       ]
     },
@@ -1984,16 +1939,6 @@
         "record",
         "transformers",
         "tuples"
-      ]
-    },
-    "psci-support": {
-      "type": "registry",
-      "version": "6.0.0",
-      "integrity": "sha256-C6ql4P9TEP06hft/1Z5QumPA4yARR4VIxDdhmL1EO+Y=",
-      "dependencies": [
-        "console",
-        "effect",
-        "prelude"
       ]
     },
     "quickcheck": {

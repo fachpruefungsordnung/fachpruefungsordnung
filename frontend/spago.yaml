@@ -21,7 +21,6 @@ package:
     - halogen-bootstrap5
     - halogen-store
     - halogen-subscriptions
-    - html-parser-halogen
     - http-methods
     - integers
     - lists
