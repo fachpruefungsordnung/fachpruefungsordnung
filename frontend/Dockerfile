@@ -22,6 +22,7 @@ COPY package.json package.json
 COPY package-lock.json package-lock.json
 COPY spago.yaml spago.yaml
 COPY spago.lock spago.lock
+COPY dependencies dependencies
 
 RUN --mount=type=cache,target=/build/node_modules/ \
     --mount=type=cache,target=/build/output/ \

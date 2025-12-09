@@ -1,0 +1,31 @@
+{
+  "name": "purescript-html-parser-halogen",
+  "description": "A library to render HTML string into halogen views",
+  "keywords": [
+    "purescript",
+    "halogen",
+    "html"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/rnons/purescript-html-parser-halogen.git"
+  },
+  "license": "BSD-3-Clause",
+  "ignore": [
+    "**/.*",
+    "bower_components",
+    "docs",
+    "example",
+    "node_modules",
+    "output",
+    "yarn.lock"
+  ],
+  "dependencies": {
+    "purescript-string-parsers": "^6.0.0",
+    "purescript-halogen": "^6.1.0"
+  },
+  "devDependencies": {
+    "purescript-psci-support": "^5.0.0",
+    "purescript-debug": "^5.0.0"
+  }
+}

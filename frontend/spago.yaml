@@ -21,6 +21,7 @@ package:
     - halogen-bootstrap5
     - halogen-store
     - halogen-subscriptions
+    - html-parser-halogen
     - http-methods
     - integers
     - lists
@@ -38,6 +39,7 @@ package:
     - routing-duplex
     - safe-coerce
     - simple-i18n
+    - string-parsers
     - strings
     - stringutils
     - transformers
@@ -61,4 +63,6 @@ package:
 workspace:
   packageSet:
     registry: 64.6.0
-  extraPackages: {}
+  extraPackages:
+    html-parser-halogen:
+      path: ./dependencies/html-parser-halogen-1.1.0

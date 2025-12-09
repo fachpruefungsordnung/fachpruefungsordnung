@@ -25,6 +25,7 @@
             "halogen-bootstrap5",
             "halogen-store",
             "halogen-subscriptions",
+            "html-parser-halogen",
             "http-methods",
             "integers",
             "lists",
@@ -42,6 +43,7 @@
             "routing-duplex",
             "safe-coerce",
             "simple-i18n",
+            "string-parsers",
             "strings",
             "stringutils",
             "transformers",
@@ -59,6 +61,7 @@
           "build_plan": [
             "ace",
             "aff",
+            "aff-promise",
             "affjax",
             "argonaut",
             "argonaut-codecs",
@@ -100,10 +103,12 @@
             "halogen-store",
             "halogen-subscriptions",
             "halogen-vdom",
+            "html-parser-halogen",
             "http-methods",
             "identity",
             "integers",
             "invariant",
+            "jest",
             "js-date",
             "js-promise",
             "js-uri",
@@ -125,6 +130,7 @@
             "prelude",
             "profunctor",
             "profunctor-lenses",
+            "psci-support",
             "quickcheck",
             "random",
             "record",
@@ -136,6 +142,7 @@
             "semirings",
             "simple-i18n",
             "st",
+            "string-parsers",
             "strings",
             "stringutils",
             "tailrec",
@@ -785,7 +792,11 @@
         "zipperarray": "2.0.0"
       }
     },
-    "extra_packages": {}
+    "extra_packages": {
+      "html-parser-halogen": {
+        "path": "./dependencies/html-parser-halogen-1.1.0"
+      }
+    }
   },
   "packages": {
     "ace": {
@@ -823,6 +834,15 @@
         "tailrec",
         "transformers",
         "unsafe-coerce"
+      ]
+    },
+    "aff-promise": {
+      "type": "registry",
+      "version": "4.0.0",
+      "integrity": "sha256-Kq5EupbUpXeUXx4JqGQE7/RTTz/H6idzWhsocwlEFhM=",
+      "dependencies": [
+        "aff",
+        "foreign"
       ]
     },
     "affjax": {
@@ -1434,6 +1454,26 @@
         "web-html"
       ]
     },
+    "html-parser-halogen": {
+      "type": "local",
+      "path": "./dependencies/html-parser-halogen-1.1.0",
+      "dependencies": [
+        "arrays",
+        "bifunctors",
+        "control",
+        "dom-indexed",
+        "effect",
+        "either",
+        "foldable-traversable",
+        "halogen",
+        "jest",
+        "lists",
+        "prelude",
+        "psci-support",
+        "string-parsers",
+        "strings"
+      ]
+    },
     "http-methods": {
       "type": "registry",
       "version": "6.0.0",
@@ -1471,6 +1511,17 @@
       "integrity": "sha256-RGWWyYrz0Hs1KjPDA+87Kia67ZFBhfJ5lMGOMCEFoLo=",
       "dependencies": [
         "control",
+        "prelude"
+      ]
+    },
+    "jest": {
+      "type": "registry",
+      "version": "1.0.0",
+      "integrity": "sha256-xw1qzdzazYZVGUoRi6r0qUDC8rgmlhiiRpBCXu1qLrQ=",
+      "dependencies": [
+        "aff",
+        "aff-promise",
+        "effect",
         "prelude"
       ]
     },
@@ -1935,6 +1986,16 @@
         "tuples"
       ]
     },
+    "psci-support": {
+      "type": "registry",
+      "version": "6.0.0",
+      "integrity": "sha256-C6ql4P9TEP06hft/1Z5QumPA4yARR4VIxDdhmL1EO+Y=",
+      "dependencies": [
+        "console",
+        "effect",
+        "prelude"
+      ]
+    },
     "quickcheck": {
       "type": "registry",
       "version": "8.0.1",
@@ -2167,6 +2228,23 @@
         "prelude",
         "tailrec",
         "unsafe-coerce"
+      ]
+    },
+    "string-parsers": {
+      "type": "registry",
+      "version": "8.0.0",
+      "integrity": "sha256-9ATYh0S54ERoR+uhkCM59wBRvW/6zv6geHJ0TmcI644=",
+      "dependencies": [
+        "arrays",
+        "bifunctors",
+        "control",
+        "either",
+        "foldable-traversable",
+        "lists",
+        "maybe",
+        "prelude",
+        "strings",
+        "tailrec"
       ]
     },
     "strings": {
