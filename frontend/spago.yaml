@@ -38,7 +38,6 @@ package:
     - routing-duplex
     - safe-coerce
     - simple-i18n
-    - string-parsers
     - strings
     - stringutils
     - transformers

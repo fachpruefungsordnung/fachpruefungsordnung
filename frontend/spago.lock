@@ -42,7 +42,6 @@
             "routing-duplex",
             "safe-coerce",
             "simple-i18n",
-            "string-parsers",
             "strings",
             "stringutils",
             "transformers",
@@ -137,7 +136,6 @@
             "semirings",
             "simple-i18n",
             "st",
-            "string-parsers",
             "strings",
             "stringutils",
             "tailrec",
@@ -2173,23 +2171,6 @@
         "prelude",
         "tailrec",
         "unsafe-coerce"
-      ]
-    },
-    "string-parsers": {
-      "type": "registry",
-      "version": "8.0.0",
-      "integrity": "sha256-9ATYh0S54ERoR+uhkCM59wBRvW/6zv6geHJ0TmcI644=",
-      "dependencies": [
-        "arrays",
-        "bifunctors",
-        "control",
-        "either",
-        "foldable-traversable",
-        "lists",
-        "maybe",
-        "prelude",
-        "strings",
-        "tailrec"
       ]
     },
     "strings": {
