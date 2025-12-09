@@ -38,6 +38,7 @@ import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
+import Effect.Console (log)
 import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postText)
@@ -130,6 +131,8 @@ data Output
   | ModifyVersion Int (Maybe Int)
   | CompareTo Int (Maybe Int)
   | RenameNode { path :: Path, newName :: String }
+  -- | DEMONSTRATION ONLY: Action that changes the document structure
+  | UpdateDocumentType
 
 type Path = Array Int
 
@@ -181,6 +184,8 @@ data Action
   | SearchVersions Int
   | ModifyDateInput Boolean Int String
   | UpdateUpToDateVersion
+  -- | DEMONSTRATION ONLY: Action that changes the document structure
+  | UpdateDocumentStructure
 
 data EntityKind = Section | Paragraph
 
@@ -604,6 +609,13 @@ tocview = connect (selectEq identity) $ H.mkComponent
     ClearDropZones -> do
       H.modify_ _ { dragState = Nothing }
 
+    UpdateDocumentStructure -> do
+      -- DEMONSTRATION ONLY: Action that updates the document structure
+      -- to show that the TOC can handle such changes gracefully.
+      -- In a real application, this would be replaced by actual logic that
+      -- modifies the document structure based on user actions or other events.
+      H.raise UpdateDocumentType
+
     CompleteDrop targetId -> do
       state <- H.get
       case state.dragState of
@@ -780,6 +792,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
     ReceiveTOCs entries metaMap a -> do
       state <- H.get
       H.modify_ _ { tocEntries = entries, metaMap = metaMap }
+      -- DEMONSTRATION ONLY: Show the meta map in the console for debugging purposes.
+      liftEffect $ log $ MM.prettyPrintMetaMap metaMap
       let
         sData = map
           ( \elem ->
@@ -889,6 +903,18 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 [ HH.span
                     [ HP.classes [ HB.fwSemibold, HB.textTruncate, HB.fs4, HB.p2 ] ]
                     [ HH.text docName ]
+                ]
+            , -- DEMONSTRATION ONLY: button to change the document structure
+              HH.button
+                [ HP.classes
+                    [ HB.btn, HB.btnSm, HB.btnOutlineSecondary, HB.m2, HB.ms5 ]
+                , HE.onClick \_ -> UpdateDocumentStructure
+                , HP.title "Change doc structure"
+                ]
+                [ HH.i
+                    [ HP.classes [ HH.ClassName "bi bi-file-earmark-diff" ]
+                    ]
+                    []
                 ]
             ]
         , HH.div
@@ -1497,8 +1523,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
   renderSectionButtonInterface
     :: forall slots
      . Array (Tuple MM.FullTypeName MM.ProperTypeMeta)
-    -> Array Int
-    -> Array Int
+    -> Path
+    -> Path
     -> Boolean
     -> EntityKind
     -> String
