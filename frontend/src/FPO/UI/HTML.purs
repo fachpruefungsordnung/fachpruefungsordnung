@@ -18,6 +18,8 @@ import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
 import Web.UIEvent.MouseEvent (MouseEvent)
 
+foreign import decodeHtmlEntity :: String -> String
+
 -- Creates a new column with a optional label and an input field.
 addColumn
   :: forall w a
