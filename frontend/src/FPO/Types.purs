@@ -13,13 +13,17 @@ module FPO.Types
   , findTOCEntry
   , findTitleTOCEntry
   , firstTOCEntry
+  , getMCommentSection
+  , hasProblems
   , markerToAnnotation
   , nodeHeaderToTOCEntry
   , replaceTOCEntry
   , sectionDtoToCS
+  , setAllHadProblemTrue
   , tocEntryToNodeHeader
   , tocTreeToDocumentTree
-  ) where
+  )
+  where
 
 import Prelude
 
@@ -44,6 +48,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , replaceNodeRootTree
   )
 import Partial.Unsafe (unsafePartial)
+import Data.Foldable (any)
 
 -- TODO We can also store different markers, such as errors. But do we want to?
 type AnnotatedMarker =
@@ -62,6 +67,7 @@ type CommentSection =
   , first :: Maybe Comment
   , replies :: Array Comment
   , resolved :: Boolean
+  , hasProblem :: Boolean
   }
 
 type FirstComment =
@@ -122,6 +128,7 @@ emptyCommentSection =
   , first: Nothing
   , replies: []
   , resolved: false
+  , hasProblem: true
   }
 
 findTOCEntry :: Int -> TOCTree -> Maybe TOCEntry
@@ -178,7 +185,16 @@ sectionDtoToCS (Section { id, firstComment, replies, status }) =
     -- comments = cons fst rep
     resolved = status == "Resolved"
   in
-    { markerID: id, first: Just fst, replies: rep, resolved: resolved }
+    { markerID: id, first: Just fst, replies: rep, resolved: resolved, hasProblem: false }
 
 firstTOCEntry :: TOCTree -> Maybe TOCEntry
 firstTOCEntry = firstLeafRootTree
+
+getMCommentSection :: AnnotatedMarker -> Maybe CommentSection
+getMCommentSection = _.mCommentSection
+
+hasProblems :: Array CommentSection -> Boolean
+hasProblems = any _.hasProblem
+
+setAllHadProblemTrue :: Array CommentSection -> Array CommentSection
+setAllHadProblemTrue = map (\cs -> cs { hasProblem = true })

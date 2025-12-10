@@ -882,8 +882,8 @@ splitview = connect selectTranslator $ H.mkComponent
       Comment.CommentOverview tocID cs -> do
         H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID cs)
 
-      Comment.SendAbstractedComments abstractCSs -> do
-        H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs)
+      Comment.SendAbstractedComments abstractCSs hasProblem -> do
+        H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs hasProblem)
 
       Comment.ToDeleteComment -> do
         H.tell _editor 0 (Editor.ToDeleteComment)
@@ -1002,8 +1002,8 @@ splitview = connect selectTranslator $ H.mkComponent
                     H.liftEffect $ revokeObjectURL url
                   pure unit
 
-      Editor.RequestComments docID entryID -> do
-        H.tell _comment unit (Comment.RequestComments docID entryID)
+      Editor.RequestComments docID entryID markerIDs -> do
+        H.tell _comment unit (Comment.RequestComments docID entryID markerIDs)
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get

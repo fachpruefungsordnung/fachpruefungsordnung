@@ -21,7 +21,9 @@ import FPO.Types
   , FirstComment
   , cdCommentToComment
   , emptyComment
+  , hasProblems
   , sectionDtoToCS
+  , setAllHadProblemTrue
   )
 import FPO.UI.HTML (addModal)
 import Halogen as H
@@ -32,6 +34,7 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
+import Data.Foldable (any)
 
 type Input = Unit
 
@@ -39,7 +42,7 @@ data Output
   = CloseCommentSection
   | UpdateComment CommentSection
   | CommentOverview Int (Array FirstComment)
-  | SendAbstractedComments (Array FirstComment)
+  | SendAbstractedComments (Array FirstComment) Boolean
   | ToDeleteComment
 
 data Action
@@ -57,7 +60,7 @@ data Action
 data Query a
   = AddComment Int Int a
   | ReceiveTimeFormatter (Maybe Formatter) a
-  | RequestComments Int Int a
+  | RequestComments Int Int (Array Int) a
   | SelectedCommentSection Int Int Int a
   | Overview Int Int a
 
@@ -67,6 +70,7 @@ type State = FPOState
   , markerID :: Int
   , commentSections :: Array CommentSection
   , mCommentSection :: Maybe CommentSection
+  , hasProblem :: Boolean
   , newComment :: Boolean
   , commentDraft :: String
   , mTimeFormatter :: Maybe Formatter
@@ -91,6 +95,7 @@ commentview = connect selectTranslator $ H.mkComponent
       , markerID: -1
       , commentSections: []
       , mCommentSection: Nothing
+      , hasProblem: false
       , newComment: false
       , commentDraft: ""
       , mTimeFormatter: Nothing
@@ -509,19 +514,28 @@ commentview = connect selectTranslator $ H.mkComponent
       H.modify_ \state -> state { mTimeFormatter = mTimeFormatter }
       pure (Just a)
 
-    RequestComments docID tocID a -> do
+    RequestComments docID tocID markerIDs a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
-        commentSections <- fetchCommentSections docID tocID
+        fetchedCommentSections <- fetchCommentSections docID tocID
+        let
+          commentSections = map
+            (\cs -> cs 
+              { hasProblem =
+                not (any (\id -> cs.markerID == id) markerIDs)
+              }
+            )
+            fetchedCommentSections
+          hasProblem = hasProblems commentSections
         H.modify_ _
-          { docID = docID, tocID = tocID, commentSections = commentSections }
+          { docID = docID, tocID = tocID, commentSections = commentSections, hasProblem = hasProblem }
         let cs = map extractFirst commentSections
-        H.raise (SendAbstractedComments cs)
+        H.raise (SendAbstractedComments cs hasProblem)
       else do
         let
           css = state.commentSections
           cs = map extractFirst css
-        H.raise (SendAbstractedComments cs)
+        H.raise (SendAbstractedComments cs state.hasProblem)
       pure (Just a)
 
     SelectedCommentSection docID tocID markerID a -> do

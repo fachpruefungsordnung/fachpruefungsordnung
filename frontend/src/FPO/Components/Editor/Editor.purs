@@ -146,6 +146,7 @@ type CommentState =
   -- mostly going to use livemarkers. Markers are used for API requests
   , markers :: Array AnnotatedMarker
   , liveMarkers :: Array LiveMarker
+  , hasProblem :: Boolean
   }
 
 type SaveState =
@@ -212,7 +213,7 @@ data Output
   | ClickedQuery String
   | PostPDF String
   | RenamedNode String Path
-  | RequestComments Int Int
+  | RequestComments Int Int (Array Int)
   | SelectedCommentSection Int Int
   | ShowAllCommentsOutput Int Int
   | RaiseDiscard
@@ -226,7 +227,7 @@ data Action
   | DoNothing
   | Comment
   | ChangeToSection TOCEntry (Maybe Int) (Maybe String)
-  | ContinueChangeToSection (Array FirstComment) Boolean
+  | ContinueChangeToSection (Array FirstComment) Boolean Boolean
   | SelectComment
   | Font (Types.Editor -> Effect Unit)
   | FontSize (Int -> Int)
@@ -270,7 +271,7 @@ data Query a
   | SaveSection a
   -- | receive the selected TOC and put its content into the editor
   | ChangeSection TOCEntry (Maybe Int) (Maybe String) a
-  | ContinueChangeSection (Array FirstComment) a
+  | ContinueChangeSection (Array FirstComment) Boolean a
   -- | Open and edit a raw string outside the TOCEntry structure.
   --   This is used to make the editor available for editing
   --   the section names (headings) of non-leaf nodes.
@@ -1545,13 +1546,14 @@ editor = connect selectTranslator $ H.mkComponent
             -- Only secondary Editor has ElementData
             -- Only first Editor gets to load the comments
             if isJust state.compareToElement then do
-              handleAction $ ContinueChangeToSection [] false
+              handleAction $ ContinueChangeToSection [] false false
             else do
               -- Get comments
               let
                 comments = ContentDto.getWrapperComments wrapper
                 -- convert markers
                 markers = map ContentDto.convertToAnnotetedMarker comments
+                markerIDs = map (\m -> m.id) markers
               -- update the markers into state
               H.modify_ \st -> st
                 { commentState = st.commentState
@@ -1563,7 +1565,7 @@ editor = connect selectTranslator $ H.mkComponent
                 , isEditorOutdated = version /= "latest"
                 }
               -- Get comments information from Comment Child
-              H.raise (RequestComments state.docID entry.id)
+              H.raise (RequestComments state.docID entry.id markerIDs)
 
         --will be set to true right now, but should be set to false if didn't change to draft
         case loadedDraftContent of
@@ -1572,7 +1574,7 @@ editor = connect selectTranslator $ H.mkComponent
       pure unit
 
     -- After getting information from from Comment
-    ContinueChangeToSection fCs showHtml -> do
+    ContinueChangeToSection fCs showHtml hasProblem -> do
       state <- H.get
       case state.mListener of
         Nothing -> pure unit
@@ -1622,7 +1624,7 @@ editor = connect selectTranslator $ H.mkComponent
             mMax <- H.gets _.saveState.mPendingMaxWaitF
             traverse_ H.kill mMax
             H.modify_ \st -> st
-              { commentState = st.commentState { liveMarkers = newLiveMarkers }
+              { commentState = st.commentState { liveMarkers = newLiveMarkers, hasProblem = hasProblem }
               , saveState = st.saveState
                   { mPendingDebounceF = Nothing
                   , mPendingMaxWaitF = Nothing
@@ -1660,8 +1662,8 @@ editor = connect selectTranslator $ H.mkComponent
       handleAction (ChangeToSection entry rev mTitle)
       pure (Just a)
 
-    ContinueChangeSection fCs a -> do
-      handleAction (ContinueChangeToSection fCs true)
+    ContinueChangeSection fCs hasProblem a -> do
+      handleAction (ContinueChangeToSection fCs true hasProblem)
       pure (Just a)
 
     ChangeToNode heading path mTitle a -> do
@@ -1825,6 +1827,9 @@ editor = connect selectTranslator $ H.mkComponent
               }
           H.modify_ _
             { commentState = newCommentState }
+          for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
+          handleAction $ SetManualSavedFlag false
+          handleAction $ Save true
         _, _ -> pure unit
       pure (Just a)
 
@@ -1989,6 +1994,7 @@ initialCommentState =
   , selectedLiveMarker: Nothing
   , markers: []
   , liveMarkers: []
+  , hasProblem: false
   }
 
 initialSaveState :: SaveState
