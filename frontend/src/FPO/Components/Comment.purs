@@ -6,9 +6,11 @@ import Data.Argonaut.Core (jsonEmptyObject)
 import Data.Argonaut.Encode (encodeJson)
 import Data.Array (find, snoc)
 import Data.Either (Either(..))
-import Data.Formatter.DateTime (Formatter, format)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Foldable (any)
+import Data.Formatter.DateTime (Formatter)
+import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
+import FPO.Components.UI.RenderComment (renderComment, renderFirstComment)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request as Request
 import FPO.Data.Store as Store
@@ -16,14 +18,13 @@ import FPO.Dto.CommentDto as CD
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types
-  ( Comment
-  , CommentSection
+  ( CommentSection
   , FirstComment
   , cdCommentToComment
-  , emptyComment
+  , extractFirst
   , hasProblems
   , sectionDtoToCS
-  , setAllHadProblemTrue
+  , updateFirstCommentProblem
   )
 import FPO.UI.HTML (addModal)
 import Halogen as H
@@ -34,7 +35,6 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
-import Data.Foldable (any)
 
 type Input = Unit
 
@@ -135,104 +135,11 @@ commentview = connect selectTranslator $ H.mkComponent
      . Array (H.ComponentHTML Action slots m)
   renderComments state commentSection = case commentSection.first of
     Nothing -> [ HH.text "" ]
-    Just c ->
-      [ renderFirstComment state c commentSection.resolved ]
-        <> map (renderComment state) commentSection.replies
-
-  renderFirstComment
-    :: State
-    -> Comment
-    -> Boolean
-    -> forall slots
-     . H.ComponentHTML Action slots m
-  renderFirstComment state c resolved =
-    HH.div
-      [ HP.classes
-          [ HB.p2
-          , HB.mb2
-          , HB.border
-          , HB.rounded
-          , HB.shadowSm
-          , HB.dFlex
-          , HB.flexColumn
-          ]
-      , HP.style $ "background-color:"
-          <> (if resolved then "rgba(66, 250, 0, 0.9)" else "rgba(246, 250, 0, 0.9)")
-          <> ";"
+    Just first ->
+      [ renderFirstComment state.translator state.mTimeFormatter first false DoNothing
       ]
-      [ HH.div_
-          [ HH.div
-              [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
-              , HP.style "font-weight: 500; font-size: 1rem;"
-              ]
-              ( [ HH.span_ [ HH.text c.author ] ]
-                  <>
-                    if resolved then
-                      [ HH.i
-                          [ HP.classes
-                              [ HB.bi
-                              , H.ClassName "bi-check-circle-fill"
-                              , HB.msAuto
-                              , H.ClassName "fs-4"
-                              ]
-                          ]
-                          []
-                      ]
-                    else []
-              )
-          , HH.div
-              [ HP.classes [ HB.mt1 ]
-              , HP.style "font-size: 1rem;"
-              ]
-              [ HH.text c.content ]
-          ]
-      , HH.div
-          [ HP.classes [ HB.mt2 ]
-          , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;"
-          ]
-          [ HH.text $ maybe
-              (translate (label :: _ "comment_no_timestamp") state.translator)
-              (\formatter -> format formatter c.timestamp)
-              state.mTimeFormatter
-          ]
-      ]
-
-  renderComment
-    :: State -> Comment -> forall slots. H.ComponentHTML Action slots m
-  renderComment state c =
-    HH.div
-      [ HP.classes
-          [ HB.p1
-          , HB.mb1
-          , HB.mx2
-          , HB.border
-          , HB.rounded
-          , HB.shadowSm
-          , HB.dFlex
-          , HB.flexColumn
-          ]
-      , HP.style "background-color: #fff9c4;"
-      ]
-      [ HH.div_
-          [ HH.div
-              [ HP.style "font-weight: 500; font-size: 1rem;" ]
-              [ HH.text c.author ]
-          , HH.div
-              [ HP.classes [ HB.mt1 ]
-              , HP.style "font-size: 0.875rem;"
-              ]
-              [ HH.text c.content ]
-          ]
-      , HH.div
-          [ HP.classes [ HB.mt2 ]
-          , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;"
-          ]
-          [ HH.text $ maybe
-              (translate (label :: _ "comment_no_timestamp") state.translator)
-              (\formatter -> format formatter c.timestamp)
-              state.mTimeFormatter
-          ]
-      ]
+        <> map (renderComment state.translator state.mTimeFormatter)
+          commentSection.replies
 
   renderInput :: State -> forall slots. H.ComponentHTML Action slots m
   renderInput state =
@@ -520,17 +427,23 @@ commentview = connect selectTranslator $ H.mkComponent
         fetchedCommentSections <- fetchCommentSections docID tocID
         let
           commentSections = map
-            (\cs -> cs 
-              { hasProblem =
-                not (any (\id -> cs.markerID == id) markerIDs)
-              }
+            ( \cs -> cs
+                { hasProblem =
+                    not (any (\id -> cs.markerID == id) markerIDs)
+                }
             )
             fetchedCommentSections
           hasProblem = hasProblems commentSections
         H.modify_ _
-          { docID = docID, tocID = tocID, commentSections = commentSections, hasProblem = hasProblem }
-        let cs = map extractFirst commentSections
-        H.raise (SendAbstractedComments cs hasProblem)
+          { docID = docID
+          , tocID = tocID
+          , commentSections = commentSections
+          , hasProblem = hasProblem
+          }
+        let
+          cs = map updateFirstCommentProblem commentSections
+          fs = map extractFirst cs
+        H.raise (SendAbstractedComments fs hasProblem)
       else do
         let
           css = state.commentSections
@@ -582,9 +495,4 @@ commentview = connect selectTranslator $ H.mkComponent
     :: CommentSection -> Array CommentSection -> Array CommentSection
   updateCommentSection cs = map \c ->
     if c.markerID == cs.markerID then cs else c
-
-  extractFirst :: CommentSection -> FirstComment
-  extractFirst { markerID, resolved, first } = case first of
-    Nothing -> { markerID: -1, resolved: true, first: emptyComment }
-    Just c -> { markerID, resolved, first: c }
 

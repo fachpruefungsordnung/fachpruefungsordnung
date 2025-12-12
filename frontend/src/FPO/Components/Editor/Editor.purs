@@ -1624,7 +1624,8 @@ editor = connect selectTranslator $ H.mkComponent
             mMax <- H.gets _.saveState.mPendingMaxWaitF
             traverse_ H.kill mMax
             H.modify_ \st -> st
-              { commentState = st.commentState { liveMarkers = newLiveMarkers, hasProblem = hasProblem }
+              { commentState = st.commentState
+                  { liveMarkers = newLiveMarkers, hasProblem = hasProblem }
               , saveState = st.saveState
                   { mPendingDebounceF = Nothing
                   , mPendingMaxWaitF = Nothing
@@ -1740,7 +1741,7 @@ editor = connect selectTranslator $ H.mkComponent
               , startCol: Types.getColumn start
               , endRow: Types.getRow end
               , endCol: Types.getColumn end
-              , markerText: first.author
+              , markerText: first.comment.author
               , mCommentSection: Just newCommentSection
               }
             newMarkers = snoc state.commentState.markers newMarker

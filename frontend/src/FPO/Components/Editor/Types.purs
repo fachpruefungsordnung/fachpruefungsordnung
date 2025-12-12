@@ -217,7 +217,7 @@ updateMarkers firsts markers =
   mapMaybe
     ( \m ->
         case Array.find (\fs -> fs.markerID == m.id && not fs.resolved) firsts of
-          Just fs -> Just (m { markerText = fs.first.author })
+          Just fs -> Just (m { markerText = fs.comment.author })
           Nothing -> Nothing
     )
     markers
