@@ -40,10 +40,11 @@ type Input = Unit
 
 data Output
   = CloseCommentSection
-  | UpdateComment CommentSection
+  | ConfirmComment CommentSection
   | CommentOverview Int (Array FirstComment)
   | SendAbstractedComments (Array FirstComment) Boolean
-  | ToDeleteComment
+  | ToDeleteComment Boolean
+  | UpdatedComments Int (Array FirstComment) Boolean
 
 data Action
   = Init
@@ -63,6 +64,7 @@ data Query a
   | RequestComments Int Int (Array Int) a
   | SelectedCommentSection Int Int Int a
   | Overview Int Int a
+  | UpdateComment (Array Int) a
 
 type State = FPOState
   ( docID :: Int
@@ -304,7 +306,7 @@ commentview = connect selectTranslator $ H.mkComponent
                 , newComment = false
                 , commentDraft = ""
                 }
-              H.raise (UpdateComment cs)
+              H.raise (ConfirmComment cs)
         else do
           res <- Request.postJson CD.decodeComment
             ( "/docs/" <> show state.docID <> "/text/" <> show state.tocID
@@ -344,25 +346,30 @@ commentview = connect selectTranslator $ H.mkComponent
         Nothing -> pure unit
         Just cs -> do
           let
-            newCs = cs { resolved = true }
-            newCSs = updateCommentSection newCs state.commentSections
+            newCS = updateFirstCommentProblem $ cs { resolved = true, hasProblem = false }
+            newCSs = updateCommentSection newCS state.commentSections
+            hasProblem = hasProblems newCSs
           H.modify_ _
             { commentSections = newCSs
-            , mCommentSection = Just newCs
+            , mCommentSection = Just newCS
             , commentDraft = ""
             , requestModal = Nothing
+            , hasProblem = hasProblem
             }
           -- Delete it from Editor
-          H.raise (ToDeleteComment)
+          H.raise (ToDeleteComment hasProblem)
+          H.raise (CommentOverview state.tocID (map extractFirst newCSs))
 
     DeleteComment -> do
+      hasProblem <- H.gets _.hasProblem
       H.modify_ _
         { markerID = -1
         , newComment = false
         , commentDraft = ""
         , requestModal = Nothing
+        , hasProblem = hasProblem
         }
-      H.raise (ToDeleteComment)
+      H.raise (ToDeleteComment hasProblem)
 
     SelectingCommentSection markerID -> do
       if markerID == -360 then do
@@ -427,28 +434,31 @@ commentview = connect selectTranslator $ H.mkComponent
         fetchedCommentSections <- fetchCommentSections docID tocID
         let
           commentSections = map
-            ( \cs -> cs
-                { hasProblem =
-                    not (any (\id -> cs.markerID == id) markerIDs)
-                }
-            )
+            (checkForProblems markerIDs)
             fetchedCommentSections
           hasProblem = hasProblems commentSections
+          css = map updateFirstCommentProblem commentSections
+          fs = map extractFirst css
         H.modify_ _
           { docID = docID
           , tocID = tocID
-          , commentSections = commentSections
+          , commentSections = css
           , hasProblem = hasProblem
           }
-        let
-          cs = map updateFirstCommentProblem commentSections
-          fs = map extractFirst cs
         H.raise (SendAbstractedComments fs hasProblem)
       else do
         let
-          css = state.commentSections
-          cs = map extractFirst css
-        H.raise (SendAbstractedComments cs state.hasProblem)
+          commentSections = map
+            (checkForProblems markerIDs)
+            state.commentSections
+          hasProblem = hasProblems commentSections
+          css = map updateFirstCommentProblem commentSections
+          fs = map extractFirst css
+        H.modify_ _
+          { commentSections = css
+          , hasProblem = hasProblem
+          }
+        H.raise (SendAbstractedComments fs hasProblem)
       pure (Just a)
 
     SelectedCommentSection docID tocID markerID a -> do
@@ -468,13 +478,28 @@ commentview = connect selectTranslator $ H.mkComponent
         commentSections <- fetchCommentSections docID tocID
         H.modify_ _
           { docID = docID, tocID = tocID, commentSections = commentSections }
-        let cs = map extractFirst commentSections
-        H.raise (CommentOverview state.tocID cs)
+        let fs = map extractFirst commentSections
+        H.raise (CommentOverview state.tocID fs)
       else do
         let
           css = state.commentSections
-          cs = map extractFirst css
-        H.raise (CommentOverview state.tocID cs)
+          fs = map extractFirst css
+        H.raise (CommentOverview tocID fs)
+      pure (Just a)
+    
+    UpdateComment markerIDs a -> do
+      state <- H.get
+      let
+        commentSections = map (checkForProblems markerIDs) state.commentSections
+        hasProblem = hasProblems commentSections
+        css = map updateFirstCommentProblem commentSections
+        fs = map extractFirst css
+      H.modify_ _ 
+        { commentSections = css
+        , hasProblem = hasProblem
+        , mCommentSection = find (\sec -> sec.markerID == state.markerID) css
+        }
+      H.raise $ UpdatedComments state.tocID fs hasProblem
       pure (Just a)
 
   -- Retrieves the comment sections for a given document ID and TOC ID. If
@@ -495,4 +520,8 @@ commentview = connect selectTranslator $ H.mkComponent
     :: CommentSection -> Array CommentSection -> Array CommentSection
   updateCommentSection cs = map \c ->
     if c.markerID == cs.markerID then cs else c
+
+  checkForProblems :: Array Int -> CommentSection -> CommentSection
+  checkForProblems markerIDs cs =
+    cs { hasProblem = (not cs.resolved) && (not (any (\id -> cs.markerID == id) markerIDs)) }
 

@@ -220,7 +220,10 @@ updateFirstCommentProblem :: CommentSection -> CommentSection
 updateFirstCommentProblem cs =
   cs
     { first = cs.first <#> \fc ->
-        fc { hasProblem = cs.hasProblem }
+        fc 
+          { hasProblem = cs.hasProblem 
+          , resolved = cs.resolved
+          }
     }
 
 extractFirst :: CommentSection -> FirstComment

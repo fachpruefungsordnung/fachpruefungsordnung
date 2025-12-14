@@ -39,6 +39,7 @@ renderFirstComment translator mTimeFormatter firstComment clickable clickAction 
           ( "background-color:"
               <>
                 ( if firstComment.resolved then "rgba(66, 250, 0, 0.9)"
+                  else if firstComment.hasProblem then "rgb(253, 126, 20)"
                   else "rgba(246, 250, 0, 0.9)"
                 )
               <> ";"
@@ -60,6 +61,17 @@ renderFirstComment translator mTimeFormatter firstComment clickable clickAction 
                         [ HP.classes
                             [ HB.bi
                             , H.ClassName "bi-check-circle-fill"
+                            , HB.msAuto
+                            , H.ClassName "fs-4"
+                            ]
+                        ]
+                        []
+                    ]
+                  else if firstComment.hasProblem then
+                    [ HH.i
+                        [ HP.classes
+                            [ HB.bi
+                            , H.ClassName "bi-exclamation-circle-fill"
                             , HB.msAuto
                             , H.ClassName "fs-4"
                             ]
