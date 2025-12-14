@@ -1001,7 +1001,8 @@ editor = connect selectTranslator $ H.mkComponent
 
           pure unit
 
-      H.raise $ UpdateComment $ map ContentDto.getCommentAnchorID (ContentDto.getWrapperComments newWrapper)
+      H.raise $ UpdateComment $ map ContentDto.getCommentAnchorID
+        (ContentDto.getWrapperComments newWrapper)
       freeSaveFlagsAndMaybeRerun
 
     SetManualSavedFlag flag ->
@@ -1819,7 +1820,8 @@ editor = connect selectTranslator $ H.mkComponent
     ToDeleteComment commentProblem a -> do
       state <- H.get
       -- always update this
-      H.modify_ \st -> st { commentState = st.commentState { commentProblem = commentProblem } }
+      H.modify_ \st -> st
+        { commentState = st.commentState { commentProblem = commentProblem } }
       case state.mEditor, state.commentState.selectedLiveMarker of
         Just ed, Just lm -> do
           session <- H.liftEffect $ Editor.getSession ed
@@ -1870,7 +1872,8 @@ editor = connect selectTranslator $ H.mkComponent
       pure $ Just a
 
     UpdateCommentProblem commentProblem a -> do
-      H.modify_ \st -> st { commentState = st.commentState {commentProblem = commentProblem} }
+      H.modify_ \st -> st
+        { commentState = st.commentState { commentProblem = commentProblem } }
       pure (Just a)
 
   -- free up the save flags for the next save session

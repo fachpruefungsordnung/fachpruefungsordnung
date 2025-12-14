@@ -2,6 +2,7 @@ module FPO.Components.CommentOverview where
 
 import Prelude
 
+import Data.Array (partition)
 import Data.Formatter.DateTime (Formatter)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
@@ -66,15 +67,22 @@ commentOverviewview = connect selectTranslator $ H.mkComponent
       HH.div [ HP.style "padding: 1rem;" ]
         [ HH.text "No comments in this section." ]
     _ ->
-      HH.div [ HP.style "comment-section space-y-3" ]
-        ( map
-            ( \first ->
-                ( renderFirstComment state.translator state.mTimeFormatter first true
-                    (SelectCommentSection state.tocID first.markerID)
-                )
-            )
-            state.comments
-        )
+      let
+        shortendRenderFirstComment
+          :: FirstComment -> forall slots. H.ComponentHTML Action slots m
+        shortendRenderFirstComment first = renderFirstComment state.translator
+          state.mTimeFormatter
+          true
+          (SelectCommentSection state.tocID first.markerID)
+          first
+
+        parts = partition _.resolved state.comments
+        -- parts.no  = unresolved comments
+        -- parts.yes = resolved comments
+        sorted = parts.no <> parts.yes
+      in
+        HH.div [ HP.style "comment-section space-y-3" ]
+          (map shortendRenderFirstComment sorted)
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of

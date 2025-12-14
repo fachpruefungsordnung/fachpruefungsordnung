@@ -891,7 +891,6 @@ splitview = connect selectTranslator $ H.mkComponent
       Comment.UpdatedComments tocID fs commentProblem -> do
         H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID fs)
         H.tell _editor 0 (Editor.UpdateCommentProblem commentProblem)
-        
 
     HandleCommentOverview output -> case output of
 

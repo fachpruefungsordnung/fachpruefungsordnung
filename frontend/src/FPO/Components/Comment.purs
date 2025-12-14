@@ -138,7 +138,7 @@ commentview = connect selectTranslator $ H.mkComponent
   renderComments state commentSection = case commentSection.first of
     Nothing -> [ HH.text "" ]
     Just first ->
-      [ renderFirstComment state.translator state.mTimeFormatter first false DoNothing
+      [ renderFirstComment state.translator state.mTimeFormatter false DoNothing first
       ]
         <> map (renderComment state.translator state.mTimeFormatter)
           commentSection.replies
@@ -346,7 +346,8 @@ commentview = connect selectTranslator $ H.mkComponent
         Nothing -> pure unit
         Just cs -> do
           let
-            newCS = updateFirstCommentProblem $ cs { resolved = true, hasProblem = false }
+            newCS = updateFirstCommentProblem $ cs
+              { resolved = true, hasProblem = false }
             newCSs = updateCommentSection newCS state.commentSections
             hasProblem = hasProblems newCSs
           H.modify_ _
@@ -486,7 +487,7 @@ commentview = connect selectTranslator $ H.mkComponent
           fs = map extractFirst css
         H.raise (CommentOverview tocID fs)
       pure (Just a)
-    
+
     UpdateComment markerIDs a -> do
       state <- H.get
       let
@@ -494,7 +495,7 @@ commentview = connect selectTranslator $ H.mkComponent
         hasProblem = hasProblems commentSections
         css = map updateFirstCommentProblem commentSections
         fs = map extractFirst css
-      H.modify_ _ 
+      H.modify_ _
         { commentSections = css
         , hasProblem = hasProblem
         , mCommentSection = find (\sec -> sec.markerID == state.markerID) css
@@ -523,5 +524,8 @@ commentview = connect selectTranslator $ H.mkComponent
 
   checkForProblems :: Array Int -> CommentSection -> CommentSection
   checkForProblems markerIDs cs =
-    cs { hasProblem = (not cs.resolved) && (not (any (\id -> cs.markerID == id) markerIDs)) }
+    cs
+      { hasProblem = (not cs.resolved) &&
+          (not (any (\id -> cs.markerID == id) markerIDs))
+      }
 

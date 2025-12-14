@@ -20,11 +20,11 @@ renderFirstComment
   :: forall action slots m
    . Translator Labels
   -> Maybe Formatter
-  -> FirstComment
   -> Boolean
   -> action
+  -> FirstComment
   -> H.ComponentHTML action slots m
-renderFirstComment translator mTimeFormatter firstComment clickable clickAction =
+renderFirstComment translator mTimeFormatter clickable clickAction firstComment =
   HH.div
     ( [ HP.classes
           [ HB.p2
