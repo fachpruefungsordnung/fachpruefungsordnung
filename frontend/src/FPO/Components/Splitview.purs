@@ -742,7 +742,9 @@ splitview = connect selectTranslator $ H.mkComponent
             state.tocEntries
       H.modify_ _ { versionMapping = newVersionMapping }
 
-    ToggleComment -> H.modify_ _ { commentShown = false }
+    ToggleComment -> do
+      H.modify_ _ { commentShown = false }
+      H.tell _editor 0 (Editor.UnselectCommentSection)
 
     ToggleCommentOverview shown docID tocID -> do
       sidebarShown <- H.gets _.sidebarShown
@@ -891,6 +893,9 @@ splitview = connect selectTranslator $ H.mkComponent
       Comment.UpdatedComments tocID fs commentProblem -> do
         H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID fs)
         H.tell _editor 0 (Editor.UpdateCommentProblem commentProblem)
+
+      Comment.SetReAnchor reAnchor -> do
+        H.tell _editor 0 (Editor.SetReAnchor reAnchor)
 
     HandleCommentOverview output -> case output of
 
@@ -1136,6 +1141,9 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Editor.UpdateComment markerIDs -> do
         H.tell _comment unit (Comment.UpdateComment markerIDs)
+
+      Editor.ReaddedAnchor -> do
+        H.tell _comment unit (Comment.ReaddedAnchor)
 
     DeleteDraft -> do
       handleAction UpdateMSelectedTocEntry

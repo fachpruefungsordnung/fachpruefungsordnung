@@ -45,6 +45,7 @@ data Output
   | SendAbstractedComments (Array FirstComment) Boolean
   | ToDeleteComment Boolean
   | UpdatedComments Int (Array FirstComment) Boolean
+  | SetReAnchor (Maybe CommentSection)
 
 data Action
   = Init
@@ -65,6 +66,7 @@ data Query a
   | SelectedCommentSection Int Int Int a
   | Overview Int Int a
   | UpdateComment (Array Int) a
+  | ReaddedAnchor a
 
 type State = FPOState
   ( docID :: Int
@@ -379,10 +381,11 @@ commentview = connect selectTranslator $ H.mkComponent
           , mCommentSection = Nothing
           , newComment = true
           }
+        H.raise (SetReAnchor Nothing)
       else do
         state <- H.get
         let commentSections = state.commentSections
-        when (markerID /= state.markerID) do
+        if (markerID /= state.markerID) then do
           case (find (\cs -> cs.markerID == markerID) commentSections) of
             Nothing -> pure unit
             Just section -> do
@@ -390,6 +393,10 @@ commentview = connect selectTranslator $ H.mkComponent
                 { markerID = markerID
                 , mCommentSection = Just section
                 }
+              when section.hasProblem $
+                H.raise (SetReAnchor (Just section))
+        else
+          H.raise (SetReAnchor state.mCommentSection)
 
     RequestModal mode -> do
       H.modify_ _ { requestModal = Just mode }
@@ -501,6 +508,25 @@ commentview = connect selectTranslator $ H.mkComponent
         , mCommentSection = find (\sec -> sec.markerID == state.markerID) css
         }
       H.raise $ UpdatedComments state.tocID fs hasProblem
+      pure (Just a)
+    
+    ReaddedAnchor a -> do
+      state <- H.get
+      case state.mCommentSection of
+        -- should not happen
+        Nothing -> pure unit
+        Just cs -> do
+          let
+            newCS = updateFirstCommentProblem $ cs
+              { hasProblem = false }
+            newCSs = updateCommentSection newCS state.commentSections
+            hasProblem = hasProblems newCSs
+          H.modify_ _
+            { commentSections = newCSs
+            , mCommentSection = Just newCS
+            , hasProblem = hasProblem
+            }
+          H.raise (CommentOverview state.tocID (map extractFirst newCSs))
       pure (Just a)
 
   -- Retrieves the comment sections for a given document ID and TOC ID. If

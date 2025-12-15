@@ -118,3 +118,11 @@
   border-color: #e96b0c;
   color: #fff;
 }
+
+.icon-orange {
+  color: #fd7e14;
+}
+
+.icon-orange:hover {
+  color: #e96b0c;
+}
