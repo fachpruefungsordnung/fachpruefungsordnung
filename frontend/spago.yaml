@@ -61,4 +61,6 @@ package:
 workspace:
   packageSet:
     registry: 64.6.0
-  extraPackages: {}
+  extraPackages:
+    html-parser-halogen:
+      path: ./dependencies/html-parser-halogen-1.1.0
