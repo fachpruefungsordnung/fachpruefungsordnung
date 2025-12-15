@@ -19,7 +19,7 @@ jobs:
   job-spec:
     name: Decide which jobs to run
     permissions: write-all
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     outputs:
       backend: ${{ github.ref == 'refs/heads/main' || steps.filter.outputs.backend }}
       frontend: ${{ github.ref == 'refs/heads/main' || steps.filter.outputs.frontend }}
@@ -44,7 +44,7 @@ jobs:
 
   check-backend:
     name: Check Backend
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: job-spec
     if: ${{ needs.job-spec.outputs.backend == 'true' }}
     steps:
@@ -84,7 +84,7 @@ jobs:
 
   check-frontend:
     name: Check Frontend
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: job-spec
     if: ${{ needs.job-spec.outputs.frontend == 'true' }}
     steps:
@@ -112,7 +112,7 @@ jobs:
 
   test-backend:
     name: Run backend tests
-    runs-on: self-hosted #postgres
+    runs-on: ubuntu-latest
     needs:
       - job-spec
       - check-backend
@@ -130,7 +130,7 @@ jobs:
   lint-migrations:
     name: Check Postgres migrations
     permissions: write-all
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: job-spec
     if: ${{ needs.job-spec.outputs.migrations == 'true' }}
     steps:
@@ -166,7 +166,7 @@ jobs:
 
   tests-pass:
     name: Tests Pass
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs:
       - job-spec
       - check-backend
