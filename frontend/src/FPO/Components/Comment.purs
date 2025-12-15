@@ -140,7 +140,20 @@ commentview = connect selectTranslator $ H.mkComponent
   renderComments state commentSection = case commentSection.first of
     Nothing -> [ HH.text "" ]
     Just first ->
-      [ renderFirstComment state.translator state.mTimeFormatter false DoNothing first
+      [ HH.div
+          [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+          [ HH.text
+              ( case state.mCommentSection of
+                  Nothing ->
+                    ""
+                  Just cs ->
+                    if cs.hasProblem then
+                      translate (label :: _ "comment_reanchor") state.translator
+                    else
+                      ""
+              )
+          ]
+      , renderFirstComment state.translator state.mTimeFormatter false DoNothing first
       ]
         <> map (renderComment state.translator state.mTimeFormatter)
           commentSection.replies
@@ -393,10 +406,14 @@ commentview = connect selectTranslator $ H.mkComponent
                 { markerID = markerID
                 , mCommentSection = Just section
                 }
-              when section.hasProblem $
-                H.raise (SetReAnchor (Just section))
-        else
-          H.raise (SetReAnchor state.mCommentSection)
+              let reAnchor = if section.hasProblem then Just section else Nothing
+              H.raise (SetReAnchor reAnchor)
+        else do
+          let
+            reAnchor =
+              state.mCommentSection >>= \cs ->
+                if cs.hasProblem then Just cs else Nothing
+          H.raise (SetReAnchor reAnchor)
 
     RequestModal mode -> do
       H.modify_ _ { requestModal = Just mode }
@@ -509,7 +526,7 @@ commentview = connect selectTranslator $ H.mkComponent
         }
       H.raise $ UpdatedComments state.tocID fs hasProblem
       pure (Just a)
-    
+
     ReaddedAnchor a -> do
       state <- H.get
       case state.mCommentSection of

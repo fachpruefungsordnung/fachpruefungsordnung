@@ -116,6 +116,7 @@ type Labels =
       ::: "comment_modal_delete_titel"
       ::: "comment_modal_resolve_titel"
       ::: "comment_no_timestamp"
+      ::: "comment_reanchor"
       ::: "comment_resolve"
       ::: "comment_resolve_phrase"
       ::: "comment_send"

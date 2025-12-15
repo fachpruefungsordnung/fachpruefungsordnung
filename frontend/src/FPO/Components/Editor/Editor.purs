@@ -449,7 +449,8 @@ editor = connect selectTranslator $ H.mkComponent
                           else []
                         )
                         Comment
-                        ( if (isJust state.commentState.reAnchor) then "bi-chat-square-quote-fill"
+                        ( if (isJust state.commentState.reAnchor) then
+                            "bi-chat-square-quote-fill"
                           else "bi-chat-square-text"
                         )
 
@@ -833,6 +834,7 @@ editor = connect selectTranslator $ H.mkComponent
       H.raise $ ShowAllCommentsOutput state.docID tocID
       H.gets _.mEditor >>= traverse_ \ed ->
         H.liftEffect $ Editor.focus ed
+      H.modify_ \st -> st { commentState = st.commentState { reAnchor = Nothing } }
 
     Save isAutoSave -> do
       when (not isAutoSave) $
@@ -1127,88 +1129,93 @@ editor = connect selectTranslator $ H.mkComponent
             eRow = Types.getRow end
             eCol = Types.getColumn end
 
-          case state.commentState.reAnchor of
-            Just reAnchor -> do
-              for_ reAnchor.first \first -> do
+          if (sRow /= eRow || sCol /= eCol) then do
+            case state.commentState.reAnchor of
+              Just reAnchor -> do
+                for_ reAnchor.first \first -> do
+                  let
+                    newMarker =
+                      { id: first.markerID
+                      , type: "info"
+                      , startRow: sRow
+                      , startCol: sCol
+                      , endRow: eRow
+                      , endCol: eCol
+                      , markerText: first.comment.author
+                      , mCommentSection: Just reAnchor
+                      }
+                    newMarkers = snoc state.commentState.markers newMarker
+                  newLiveMarker <- H.liftEffect $ addAnchor newMarker session listener
+                    true
+                  let
+                    newLM = case newLiveMarker of
+                      Nothing -> failureLiveMarker
+                      Just lm' -> lm'
+                    newLiveMarkers = case newLiveMarker of
+                      Nothing -> state.commentState.liveMarkers
+                      Just lm' -> snoc state.commentState.liveMarkers lm'
+                    newCommentState =
+                      state.commentState
+                        { selectedLiveMarker = Just newLM
+                        , markers = newMarkers
+                        , liveMarkers = newLiveMarkers
+                        , reAnchor = Nothing
+                        }
+                  H.modify_ _ { commentState = newCommentState }
+                  H.raise (ReaddedAnchor)
+                  -- Save readded comment anchor
+                  -- set dirty to true to be able to save
+                  for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
+                  handleAction $ SetManualSavedFlag false
+                  handleAction $ Save true
+              _ -> do
+
+                -- delete temporary live marker, as the first comment has not been sent
+                case state.commentState.tmpLiveMarker of
+                  Just lm -> do
+                    H.liftEffect $ removeLiveMarker lm session
+                    handleAction $ DeleteAnnotation lm false false
+                  Nothing -> pure unit
+
                 let
+                  userName = getUserName user
                   newMarker =
-                    { id: first.markerID
+                    { id: -360
                     , type: "info"
                     , startRow: sRow
                     , startCol: sCol
                     , endRow: eRow
                     , endCol: eCol
-                    , markerText: first.comment.author
-                    , mCommentSection: Just reAnchor
+                    , markerText: userName
+                    , mCommentSection: Nothing
                     }
-                  newMarkers = snoc state.commentState.markers newMarker
-                newLiveMarker <- H.liftEffect $ addAnchor newMarker session listener true
-                let
-                  newLM = case newLiveMarker of
-                    Nothing -> failureLiveMarker
-                    Just lm' -> lm'
-                  newLiveMarkers = case newLiveMarker of
-                    Nothing -> state.commentState.liveMarkers
-                    Just lm' -> snoc state.commentState.liveMarkers lm'
-                  newCommentState =
-                    state.commentState
-                      { selectedLiveMarker = Just newLM
-                      , markers = newMarkers
-                      , liveMarkers = newLiveMarkers
-                      , reAnchor = Nothing
+
+                mLiveMarker <- H.liftEffect $ addAnchor newMarker session listener
+                  true
+
+                case state.mTocEntry of
+                  Just entry -> do
+                    H.modify_ \st -> st
+                      { commentState = st.commentState
+                          { tmpLiveMarker = mLiveMarker
+                          , selectedLiveMarker = mLiveMarker
+                          }
                       }
-                H.modify_ _ { commentState = newCommentState }
-                H.raise (ReaddedAnchor)
-                -- Save readded comment anchor
-                -- set dirty to true to be able to save
-                for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
-                handleAction $ SetManualSavedFlag false
-                handleAction $ Save true
-            _ -> do
-            
-              -- delete temporary live marker, as the first comment has not been sent
-              case state.commentState.tmpLiveMarker of
-                Just lm -> do
-                  H.liftEffect $ removeLiveMarker lm session
-                  handleAction $ DeleteAnnotation lm false false
-                Nothing -> pure unit
+                    H.raise (AddComment state.docID entry.id)
+                  Nothing -> pure unit
 
-              let
-                userName = getUserName user
-                newMarker =
-                  { id: -360
-                  , type: "info"
-                  , startRow: sRow
-                  , startCol: sCol
-                  , endRow: eRow
-                  , endCol: eCol
-                  , markerText: userName
-                  , mCommentSection: Nothing
-                  }
-
-              mLiveMarker <- H.liftEffect $ addAnchor newMarker session listener true
-
-              case state.mTocEntry of
-                Just entry -> do
-                  H.modify_ \st -> st
-                    { commentState = st.commentState
-                        { tmpLiveMarker = mLiveMarker
-                        , selectedLiveMarker = mLiveMarker
-                        }
-                    }
-                  H.raise (AddComment state.docID entry.id)
-                Nothing -> pure unit
-
-              -- show comment dragger handles
-              case mLiveMarker of
-                Nothing -> pure unit
-                Just lm -> do
-                  H.liftEffect $ highlightSelection ed
-                    (snoc state.commentState.liveMarkers lm)
-                    lm
-                  handleAction (ShowHandles lm)
-          -- remove the selection
-          H.liftEffect $ clearSelection ed
+                -- show comment dragger handles
+                case mLiveMarker of
+                  Nothing -> pure unit
+                  Just lm -> do
+                    H.liftEffect $ highlightSelection ed
+                      (snoc state.commentState.liveMarkers lm)
+                      lm
+                    handleAction (ShowHandles lm)
+            -- remove the selection
+            H.liftEffect $ clearSelection ed
+          else
+            H.liftEffect $ Editor.focus ed
 
         _, _, _ -> pure unit -- TODO error handling
 
@@ -1892,7 +1899,9 @@ editor = connect selectTranslator $ H.mkComponent
       state <- H.get
       -- always update this
       H.modify_ \st -> st
-        { commentState = st.commentState { commentProblem = commentProblem, reAnchor = Nothing } }
+        { commentState = st.commentState
+            { commentProblem = commentProblem, reAnchor = Nothing }
+        }
       case state.mEditor, state.commentState.selectedLiveMarker of
         Just ed, Just lm -> do
           session <- H.liftEffect $ Editor.getSession ed
@@ -1946,10 +1955,9 @@ editor = connect selectTranslator $ H.mkComponent
       H.modify_ \st -> st
         { commentState = st.commentState { commentProblem = commentProblem } }
       pure (Just a)
-    
+
     SetReAnchor reAnchor a -> do
-      H.liftEffect $ log $ show reAnchor
-      H.modify_ \st -> st { commentState = st.commentState {reAnchor = reAnchor} }
+      H.modify_ \st -> st { commentState = st.commentState { reAnchor = reAnchor } }
       pure (Just a)
 
   -- free up the save flags for the next save session
