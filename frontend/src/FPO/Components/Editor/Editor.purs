@@ -1148,27 +1148,29 @@ editor = connect selectTranslator $ H.mkComponent
                     newMarkers = snoc state.commentState.markers newMarker
                   newLiveMarker <- H.liftEffect $ addAnchor newMarker session listener
                     true
-                  let
-                    newLM = case newLiveMarker of
-                      Nothing -> failureLiveMarker
-                      Just lm' -> lm'
-                    newLiveMarkers = case newLiveMarker of
-                      Nothing -> state.commentState.liveMarkers
-                      Just lm' -> snoc state.commentState.liveMarkers lm'
-                    newCommentState =
-                      state.commentState
-                        { selectedLiveMarker = Just newLM
-                        , markers = newMarkers
-                        , liveMarkers = newLiveMarkers
-                        , reAnchor = Nothing
-                        }
-                  H.modify_ _ { commentState = newCommentState }
-                  H.raise (ReaddedAnchor)
-                  -- Save readded comment anchor
-                  -- set dirty to true to be able to save
-                  for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
-                  handleAction $ SetManualSavedFlag false
-                  handleAction $ Save true
+                  case newLiveMarker of
+                    Nothing -> do
+                      pure unit
+                    -- Optionally, show an error modal or log the error
+                    -- H.liftEffect $ infoModal "Failed to add anchor. Please try again."
+                    Just lm' -> do
+                      let
+                        newCommentState =
+                          state.commentState
+                            { selectedLiveMarker = Just lm'
+                            , markers = newMarkers
+                            , liveMarkers = snoc state.commentState.liveMarkers lm'
+                            , reAnchor = Nothing
+                            }
+                      H.modify_ _ { commentState = newCommentState }
+                      H.raise (ReaddedAnchor)
+                      -- Save readded comment anchor
+                      -- set dirty to true to be able to save
+                      for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write
+                        true
+                        r
+                      handleAction $ SetManualSavedFlag false
+                      handleAction $ Save true
               _ -> do
 
                 -- delete temporary live marker, as the first comment has not been sent
@@ -2190,9 +2192,9 @@ makeEditorToolbarButtonWithText enabled asText btnClasses action biName smallTex
   HH.button
     ( prependIf (not asText) (HP.title smallText)
         [ HP.classes
-            ( btnClasses <>
-                prependIf (not enabled) HB.opacity25
-                  [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
+            ( prependIf (not enabled) HB.opacity25
+                [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
+                <> btnClasses
             )
         , HP.style "white-space: nowrap;"
         , HE.onClick \_ -> action

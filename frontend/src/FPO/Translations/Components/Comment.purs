@@ -48,7 +48,7 @@ deComment = fromRecord
   , comment_modal_resolve_titel: "Auflösen bestätigen"
   , comment_no_timestamp: "Keinen timestamp gefunden."
   , comment_reanchor:
-      "Hinweis: Dieser Kommentar hat keinen Anker mehr. Makiere neuen Bereich und klicke auf „Kommentar“-Button, um ihn neu zu verankern."
+      "Hinweis: Dieser Kommentar hat keinen Anker mehr. Markiere neuen Bereich und klicke auf „Kommentar“-Button, um ihn neu zu verankern."
   , comment_resolve: "Auflösen"
   , comment_resolve_phrase:
       "Sind sie sicher, dass sie diesen Kommentar auflösen möchten?"

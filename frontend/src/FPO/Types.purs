@@ -34,7 +34,7 @@ import Data.Date.Component (Day, Month(..), Year)
 import Data.DateTime (DateTime(..))
 import Data.Enum (toEnum)
 import Data.Foldable (any)
-import Data.Maybe (Maybe(..), fromJust, maybe)
+import Data.Maybe (Maybe(..), fromJust, fromMaybe, maybe)
 import Data.Time (Time(..))
 import Data.Time.Component (Hour, Millisecond, Minute, Second)
 import FPO.Dto.CommentDto (CommentT(..), Section(..))
@@ -227,7 +227,6 @@ updateFirstCommentProblem cs =
     }
 
 extractFirst :: CommentSection -> FirstComment
-extractFirst cs = maybe
+extractFirst cs = fromMaybe
   { markerID: -1, resolved: true, comment: emptyComment, hasProblem: true }
-  (\f -> f)
   cs.first

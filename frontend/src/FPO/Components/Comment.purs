@@ -4,7 +4,7 @@ import Prelude
 
 import Data.Argonaut.Core (jsonEmptyObject)
 import Data.Argonaut.Encode (encodeJson)
-import Data.Array (find, snoc)
+import Data.Array (filter, find, snoc)
 import Data.Either (Either(..))
 import Data.Foldable (any)
 import Data.Formatter.DateTime (Formatter)
@@ -377,12 +377,20 @@ commentview = connect selectTranslator $ H.mkComponent
           H.raise (CommentOverview state.tocID (map extractFirst newCSs))
 
     DeleteComment -> do
-      hasProblem <- H.gets _.hasProblem
+      state <- H.get
+      let
+        -- Remove the current comment section from the list
+        updatedSections = case state.mCommentSection of
+          Nothing -> state.commentSections
+          Just cs -> filter (\s -> s.markerID /= cs.markerID) state.commentSections
+        hasProblem = hasProblems updatedSections
       H.modify_ _
         { markerID = -1
         , newComment = false
         , commentDraft = ""
         , requestModal = Nothing
+        , commentSections = updatedSections
+        , mCommentSection = Nothing
         , hasProblem = hasProblem
         }
       H.raise (ToDeleteComment hasProblem)
@@ -459,7 +467,7 @@ commentview = connect selectTranslator $ H.mkComponent
         fetchedCommentSections <- fetchCommentSections docID tocID
         let
           commentSections = map
-            (checkForProblems markerIDs)
+            (updateProblemStatus markerIDs)
             fetchedCommentSections
           hasProblem = hasProblems commentSections
           css = map updateFirstCommentProblem commentSections
@@ -474,7 +482,7 @@ commentview = connect selectTranslator $ H.mkComponent
       else do
         let
           commentSections = map
-            (checkForProblems markerIDs)
+            (updateProblemStatus markerIDs)
             state.commentSections
           hasProblem = hasProblems commentSections
           css = map updateFirstCommentProblem commentSections
@@ -504,7 +512,7 @@ commentview = connect selectTranslator $ H.mkComponent
         H.modify_ _
           { docID = docID, tocID = tocID, commentSections = commentSections }
         let fs = map extractFirst commentSections
-        H.raise (CommentOverview state.tocID fs)
+        H.raise (CommentOverview tocID fs)
       else do
         let
           css = state.commentSections
@@ -515,7 +523,7 @@ commentview = connect selectTranslator $ H.mkComponent
     UpdateComment markerIDs a -> do
       state <- H.get
       let
-        commentSections = map (checkForProblems markerIDs) state.commentSections
+        commentSections = map (updateProblemStatus markerIDs) state.commentSections
         hasProblem = hasProblems commentSections
         css = map updateFirstCommentProblem commentSections
         fs = map extractFirst css
@@ -565,8 +573,8 @@ commentview = connect selectTranslator $ H.mkComponent
   updateCommentSection cs = map \c ->
     if c.markerID == cs.markerID then cs else c
 
-  checkForProblems :: Array Int -> CommentSection -> CommentSection
-  checkForProblems markerIDs cs =
+  updateProblemStatus :: Array Int -> CommentSection -> CommentSection
+  updateProblemStatus markerIDs cs =
     cs
       { hasProblem = (not cs.resolved) &&
           (not (any (\id -> cs.markerID == id) markerIDs))
