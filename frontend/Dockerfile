@@ -6,7 +6,10 @@ FROM debian:bookworm-slim AS build
 
 # install dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends locales git npm nodejs python3
+    apt-get install -y --no-install-recommends curl
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends build-essential locales git npm nodejs python3
 RUN apt-get clean && rm -rf /var/lib/apt/lists/*
 RUN locale-gen de_DE.UTF-8 && update-locale
 
