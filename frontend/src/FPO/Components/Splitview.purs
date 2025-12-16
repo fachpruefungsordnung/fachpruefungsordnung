@@ -742,7 +742,9 @@ splitview = connect selectTranslator $ H.mkComponent
             state.tocEntries
       H.modify_ _ { versionMapping = newVersionMapping }
 
-    ToggleComment -> H.modify_ _ { commentShown = false }
+    ToggleComment -> do
+      H.modify_ _ { commentShown = false }
+      H.tell _editor 0 (Editor.UnselectCommentSection)
 
     ToggleCommentOverview shown docID tocID -> do
       sidebarShown <- H.gets _.sidebarShown
@@ -876,17 +878,24 @@ splitview = connect selectTranslator $ H.mkComponent
         H.modify_ _ { commentShown = false }
 
       -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
-      Comment.UpdateComment newCommentSection -> do
-        H.tell _editor 0 (Editor.UpdateComment newCommentSection)
+      Comment.ConfirmComment newCommentSection -> do
+        H.tell _editor 0 (Editor.ConfirmComment newCommentSection)
 
-      Comment.CommentOverview tocID cs -> do
-        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID cs)
+      Comment.CommentOverview tocID fs -> do
+        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID fs)
 
-      Comment.SendAbstractedComments abstractCSs -> do
-        H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs)
+      Comment.SendAbstractedComments abstractCSs hasProblem -> do
+        H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs hasProblem)
 
-      Comment.ToDeleteComment -> do
-        H.tell _editor 0 (Editor.ToDeleteComment)
+      Comment.ToDeleteComment commentProblem -> do
+        H.tell _editor 0 (Editor.ToDeleteComment commentProblem)
+
+      Comment.UpdatedComments tocID fs commentProblem -> do
+        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID fs)
+        H.tell _editor 0 (Editor.UpdateCommentProblem commentProblem)
+
+      Comment.SetReAnchor reAnchor -> do
+        H.tell _editor 0 (Editor.SetReAnchor reAnchor)
 
     HandleCommentOverview output -> case output of
 
@@ -1001,8 +1010,8 @@ splitview = connect selectTranslator $ H.mkComponent
                     H.liftEffect $ revokeObjectURL url
                   pure unit
 
-      Editor.RequestComments docID entryID -> do
-        H.tell _comment unit (Comment.RequestComments docID entryID)
+      Editor.RequestComments docID entryID markerIDs -> do
+        H.tell _comment unit (Comment.RequestComments docID entryID markerIDs)
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get
@@ -1128,6 +1137,12 @@ splitview = connect selectTranslator $ H.mkComponent
         handleAction GET
         mmTitle <- H.request _toc unit TOC.RequestFullTitle
         H.tell _editor 0 $ Editor.ReceiveFullTitle (join mmTitle)
+
+      Editor.UpdateComment markerIDs -> do
+        H.tell _comment unit (Comment.UpdateComment markerIDs)
+
+      Editor.ReaddedAnchor -> do
+        H.tell _comment unit (Comment.ReaddedAnchor)
 
     DeleteDraft -> do
       handleAction UpdateMSelectedTocEntry

@@ -10,15 +10,20 @@ module FPO.Types
   , emptyComment
   , emptyCommentSection
   , emptyTOCEntry
+  , extractFirst
   , findTOCEntry
   , findTitleTOCEntry
   , firstTOCEntry
+  , getMCommentSection
+  , hasProblems
   , markerToAnnotation
   , nodeHeaderToTOCEntry
   , replaceTOCEntry
   , sectionDtoToCS
+  , setAllHadProblemTrue
   , tocEntryToNodeHeader
   , tocTreeToDocumentTree
+  , updateFirstCommentProblem
   ) where
 
 import Prelude
@@ -28,7 +33,8 @@ import Data.Date (canonicalDate)
 import Data.Date.Component (Day, Month(..), Year)
 import Data.DateTime (DateTime(..))
 import Data.Enum (toEnum)
-import Data.Maybe (Maybe(..), fromJust)
+import Data.Foldable (any)
+import Data.Maybe (Maybe(..), fromJust, fromMaybe)
 import Data.Time (Time(..))
 import Data.Time.Component (Hour, Millisecond, Minute, Second)
 import FPO.Dto.CommentDto (CommentT(..), Section(..))
@@ -59,15 +65,17 @@ type AnnotatedMarker =
 
 type CommentSection =
   { markerID :: Int
-  , first :: Maybe Comment
+  , first :: Maybe FirstComment
   , replies :: Array Comment
   , resolved :: Boolean
+  , hasProblem :: Boolean
   }
 
 type FirstComment =
   { markerID :: Int
   , resolved :: Boolean
-  , first :: Comment
+  , comment :: Comment
+  , hasProblem :: Boolean
   }
 
 type Comment =
@@ -122,6 +130,7 @@ emptyCommentSection =
   , first: Nothing
   , replies: []
   , resolved: false
+  , hasProblem: true
   }
 
 findTOCEntry :: Int -> TOCTree -> Maybe TOCEntry
@@ -178,7 +187,46 @@ sectionDtoToCS (Section { id, firstComment, replies, status }) =
     -- comments = cons fst rep
     resolved = status == "Resolved"
   in
-    { markerID: id, first: Just fst, replies: rep, resolved: resolved }
+    { markerID: id
+    , first: Just
+        { markerID: id
+        , resolved
+        , comment: fst
+        , hasProblem: false
+        }
+    , replies: rep
+    , resolved: resolved
+    , hasProblem: false
+    }
 
 firstTOCEntry :: TOCTree -> Maybe TOCEntry
 firstTOCEntry = firstLeafRootTree
+
+getMCommentSection :: AnnotatedMarker -> Maybe CommentSection
+getMCommentSection = _.mCommentSection
+
+hasProblems :: Array CommentSection -> Boolean
+hasProblems = any _.hasProblem
+
+setAllHadProblemTrue :: Array CommentSection -> Array CommentSection
+setAllHadProblemTrue =
+  map \cs ->
+    cs
+      { hasProblem = true
+      , first = cs.first <#> \fc -> fc { hasProblem = true }
+      }
+
+updateFirstCommentProblem :: CommentSection -> CommentSection
+updateFirstCommentProblem cs =
+  cs
+    { first = cs.first <#> \fc ->
+        fc
+          { hasProblem = cs.hasProblem
+          , resolved = cs.resolved
+          }
+    }
+
+extractFirst :: CommentSection -> FirstComment
+extractFirst cs = fromMaybe
+  { markerID: -1, resolved: true, comment: emptyComment, hasProblem: true }
+  cs.first

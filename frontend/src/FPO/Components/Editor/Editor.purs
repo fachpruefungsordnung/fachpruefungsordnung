@@ -147,6 +147,8 @@ type CommentState =
   -- mostly going to use livemarkers. Markers are used for API requests
   , markers :: Array AnnotatedMarker
   , liveMarkers :: Array LiveMarker
+  , commentProblem :: Boolean
+  , reAnchor :: Maybe CommentSection
   }
 
 type SaveState =
@@ -213,7 +215,7 @@ data Output
   | ClickedQuery String
   | PostPDF String
   | RenamedNode String Path
-  | RequestComments Int Int
+  | RequestComments Int Int (Array Int)
   | SelectedCommentSection Int Int
   | ShowAllCommentsOutput Int Int
   | RaiseDiscard
@@ -221,13 +223,15 @@ data Output
   | Merged
   | RaiseUpdateVersion (Maybe Int)
   | UpdateFullTitle
+  | UpdateComment (Array Int)
+  | ReaddedAnchor
 
 data Action
   = Init
   | DoNothing
   | Comment
   | ChangeToSection TOCEntry (Maybe Int) (Maybe String)
-  | ContinueChangeToSection (Array FirstComment) Boolean
+  | ContinueChangeToSection (Array FirstComment) Boolean Boolean
   | SelectComment
   | Font (Types.Editor -> Effect Unit)
   | FontSize (Int -> Int)
@@ -271,21 +275,24 @@ data Query a
   | SaveSection a
   -- | receive the selected TOC and put its content into the editor
   | ChangeSection TOCEntry (Maybe Int) (Maybe String) a
-  | ContinueChangeSection (Array FirstComment) a
+  | ContinueChangeSection (Array FirstComment) Boolean a
   -- | Open and edit a raw string outside the TOCEntry structure.
   --   This is used to make the editor available for editing
   --   the section names (headings) of non-leaf nodes.
   | ChangeToNode String Path (Maybe String) a
   -- | Update the position of a node in the editor, if existing.
   | UpdateNodePosition Path a
-  | UpdateComment CommentSection a
+  | ConfirmComment CommentSection a
   | SelectCommentSection Int a
-  | ToDeleteComment a
+  | UnselectCommentSection a
+  | ToDeleteComment Boolean a
   | RequestDirtyVersion (Boolean -> a)
   | ResetDirtyVersion a
   | ReceiveUpToDateUpdate (Maybe Version) a
   | IsOnMerge (Boolean -> a)
   | PreventChangeSection a
+  | UpdateCommentProblem Boolean a
+  | SetReAnchor (Maybe CommentSection) a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -364,6 +371,7 @@ editor = connect selectTranslator $ H.mkComponent
                       makeEditorToolbarButton
                         true
                         (translate (label :: _ "editor_textBold") state.translator)
+                        []
                         (Font makeBold)
                         "bi-type-bold"
                 , case state.compareToElement of
@@ -372,6 +380,7 @@ editor = connect selectTranslator $ H.mkComponent
                       makeEditorToolbarButton
                         true
                         (translate (label :: _ "editor_textItalic") state.translator)
+                        []
                         (Font makeItalic)
                         "bi-type-italic"
                 , case state.compareToElement of
@@ -382,6 +391,7 @@ editor = connect selectTranslator $ H.mkComponent
                         ( translate (label :: _ "editor_textUnderline")
                             state.translator
                         )
+                        []
                         (Font underscore)
                         "bi-type-underline"
 
@@ -392,11 +402,13 @@ editor = connect selectTranslator $ H.mkComponent
                 , makeEditorToolbarButton
                     true
                     (translate (label :: _ "editor_fontSizeUp") state.translator)
+                    []
                     (FontSize (\x -> x + 2))
                     "bi-plus-square"
                 , makeEditorToolbarButton
                     true
                     (translate (label :: _ "editor_fontSizeDown") state.translator)
+                    []
                     (FontSize (\x -> x - 2))
                     "bi-dash-square"
 
@@ -410,6 +422,7 @@ editor = connect selectTranslator $ H.mkComponent
                       makeEditorToolbarButton
                         true
                         (translate (label :: _ "editor_undo") state.translator)
+                        []
                         (History HUndo)
                         "bi-arrow-counterclockwise"
                 , case state.compareToElement of
@@ -418,6 +431,7 @@ editor = connect selectTranslator $ H.mkComponent
                       makeEditorToolbarButton
                         true
                         (translate (label :: _ "editor_redo") state.translator)
+                        []
                         (History HRedo)
                         "bi-arrow-clockwise"
 
@@ -431,8 +445,15 @@ editor = connect selectTranslator $ H.mkComponent
                       makeEditorToolbarButton
                         fullFeatures
                         (translate (label :: _ "editor_comment") state.translator)
+                        ( if (isJust state.commentState.reAnchor) then
+                            [ H.ClassName "icon-orange" ]
+                          else []
+                        )
                         Comment
-                        "bi-chat-square-text"
+                        ( if (isJust state.commentState.reAnchor) then
+                            "bi-chat-square-quote-fill"
+                          else "bi-chat-square-text"
+                        )
 
                 , case state.compareToElement of
                     Just _ -> HH.text ""
@@ -445,6 +466,7 @@ editor = connect selectTranslator $ H.mkComponent
                       makeEditorToolbarButton
                         true
                         (translate (label :: _ "editor_wrapToggle") state.translator)
+                        []
                         WrapToggle
                         "bi-text-wrap"
                 ]
@@ -458,6 +480,7 @@ editor = connect selectTranslator $ H.mkComponent
                     [ makeEditorToolbarButtonWithText
                         true
                         state.showButtonText
+                        []
                         (Save false)
                         "bi-floppy"
                         case state.isOnMerge of
@@ -468,20 +491,29 @@ editor = connect selectTranslator $ H.mkComponent
                     , makeEditorToolbarButtonWithText
                         fullFeatures
                         state.showButtonText
+                        []
                         (Render RenderHTML)
                         "bi-file-richtext"
                         (translate (label :: _ "editor_preview") state.translator)
                     , makeEditorToolbarButtonWithText
                         fullFeatures
                         state.showButtonText
+                        []
                         (Render RenderPDF)
                         "bi-filetype-pdf"
                         (translate (label :: _ "editor_pdf") state.translator)
                     , makeEditorToolbarButtonWithText
                         fullFeatures
                         state.showButtonText
+                        ( if state.commentState.commentProblem then
+                            [ H.ClassName "btn-orange" ]
+                          else []
+                        )
                         ShowAllComments
-                        "bi-chat-square"
+                        ( if state.commentState.commentProblem then
+                            "bi-exclamation-circle-fill"
+                          else "bi-chat-square"
+                        )
                         (translate (label :: _ "editor_allComments") state.translator)
                     ]
             ]
@@ -537,11 +569,13 @@ editor = connect selectTranslator $ H.mkComponent
                       , makeEditorToolbarButton
                           true
                           ""
+                          []
                           ToggleOutdatedInfoPopup
                           "bi bi-info-circle"
                       , makeEditorToolbarButtonWithText
                           true
                           state.showButtonText
+                          []
                           Discard
                           "bi bi-trash"
                           (translate (label :: _ "editor_discard") state.translator)
@@ -801,6 +835,7 @@ editor = connect selectTranslator $ H.mkComponent
       H.raise $ ShowAllCommentsOutput state.docID tocID
       H.gets _.mEditor >>= traverse_ \ed ->
         H.liftEffect $ Editor.focus ed
+      H.modify_ \st -> st { commentState = st.commentState { reAnchor = Nothing } }
 
     Save isAutoSave -> do
       when (not isAutoSave) $
@@ -930,6 +965,7 @@ editor = connect selectTranslator $ H.mkComponent
         Left err -> Store.addError err
 
         -- extract and insert new parentID into newContent
+        -- not updating the received comment anchors, as we send those same anchors to backend
         Right { content: updatedContent, typ: typ, html } -> do
 
           H.modify_ _ { mContent = Just updatedContent, html = html }
@@ -987,6 +1023,8 @@ editor = connect selectTranslator $ H.mkComponent
 
           pure unit
 
+      H.raise $ UpdateComment $ map ContentDto.getCommentAnchorID
+        (ContentDto.getWrapperComments newWrapper)
       freeSaveFlagsAndMaybeRerun
 
     SetManualSavedFlag flag ->
@@ -1080,62 +1118,109 @@ editor = connect selectTranslator $ H.mkComponent
     Comment -> do
       state <- H.get
       userWithError <- getUser
-      case userWithError, state.mListener of
-        Right user, Just listener -> do
-          H.gets _.mEditor >>= traverse_ \ed -> do
-            session <- H.liftEffect $ Editor.getSession ed
-            range <- H.liftEffect $ Editor.getSelectionRange ed
-            start <- H.liftEffect $ Range.getStart range
-            end <- H.liftEffect $ Range.getEnd range
+      case userWithError, state.mEditor, state.mListener of
+        Right user, Just ed, Just listener -> do
+          session <- H.liftEffect $ Editor.getSession ed
+          range <- H.liftEffect $ Editor.getSelectionRange ed
+          start <- H.liftEffect $ Range.getStart range
+          end <- H.liftEffect $ Range.getEnd range
+          let
+            sRow = Types.getRow start
+            sCol = Types.getColumn start
+            eRow = Types.getRow end
+            eCol = Types.getColumn end
 
-            -- delete temporary live marker, as the first comment has not been sent
-            case state.commentState.tmpLiveMarker of
-              Just lm -> do
-                H.liftEffect $ removeLiveMarker lm session
-                handleAction $ DeleteAnnotation lm false false
-              Nothing -> pure unit
-
-            let
-              sRow = Types.getRow start
-              sCol = Types.getColumn start
-              eRow = Types.getRow end
-              eCol = Types.getColumn end
-              userName = getUserName user
-              newMarker =
-                { id: -360
-                , type: "info"
-                , startRow: sRow
-                , startCol: sCol
-                , endRow: eRow
-                , endCol: eCol
-                , markerText: userName
-                , mCommentSection: Nothing
-                }
-
-            mLiveMarker <- H.liftEffect $ addAnchor newMarker session listener true
-
-            case state.mTocEntry of
-              Just entry -> do
-                H.modify_ \st -> st
-                  { commentState = st.commentState
-                      { tmpLiveMarker = mLiveMarker
-                      , selectedLiveMarker = mLiveMarker
+          if (sRow /= eRow || sCol /= eCol) then do
+            case state.commentState.reAnchor of
+              Just reAnchor -> do
+                for_ reAnchor.first \first -> do
+                  let
+                    newMarker =
+                      { id: first.markerID
+                      , type: "info"
+                      , startRow: sRow
+                      , startCol: sCol
+                      , endRow: eRow
+                      , endCol: eCol
+                      , markerText: first.comment.author
+                      , mCommentSection: Just reAnchor
                       }
-                  }
-                H.raise (AddComment state.docID entry.id)
-              Nothing -> pure unit
-            -- show comment dragger handles
-            case mLiveMarker of
-              Nothing -> pure unit
-              Just lm -> do
-                H.liftEffect $ highlightSelection ed
-                  (snoc state.commentState.liveMarkers lm)
-                  lm
-                handleAction (ShowHandles lm)
+                    newMarkers = snoc state.commentState.markers newMarker
+                  newLiveMarker <- H.liftEffect $ addAnchor newMarker session listener
+                    true
+                  case newLiveMarker of
+                    Nothing -> do
+                      pure unit
+                    -- Optionally, show an error modal or log the error
+                    -- H.liftEffect $ infoModal "Failed to add anchor. Please try again."
+                    Just lm' -> do
+                      let
+                        newCommentState =
+                          state.commentState
+                            { selectedLiveMarker = Just lm'
+                            , markers = newMarkers
+                            , liveMarkers = snoc state.commentState.liveMarkers lm'
+                            , reAnchor = Nothing
+                            }
+                      H.modify_ _ { commentState = newCommentState }
+                      H.raise (ReaddedAnchor)
+                      -- Save readded comment anchor
+                      -- set dirty to true to be able to save
+                      for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write
+                        true
+                        r
+                      handleAction $ SetManualSavedFlag false
+                      handleAction $ Save true
+              _ -> do
+
+                -- delete temporary live marker, as the first comment has not been sent
+                case state.commentState.tmpLiveMarker of
+                  Just lm -> do
+                    H.liftEffect $ removeLiveMarker lm session
+                    handleAction $ DeleteAnnotation lm false false
+                  Nothing -> pure unit
+
+                let
+                  userName = getUserName user
+                  newMarker =
+                    { id: -360
+                    , type: "info"
+                    , startRow: sRow
+                    , startCol: sCol
+                    , endRow: eRow
+                    , endCol: eCol
+                    , markerText: userName
+                    , mCommentSection: Nothing
+                    }
+
+                mLiveMarker <- H.liftEffect $ addAnchor newMarker session listener
+                  true
+
+                case state.mTocEntry of
+                  Just entry -> do
+                    H.modify_ \st -> st
+                      { commentState = st.commentState
+                          { tmpLiveMarker = mLiveMarker
+                          , selectedLiveMarker = mLiveMarker
+                          }
+                      }
+                    H.raise (AddComment state.docID entry.id)
+                  Nothing -> pure unit
+
+                -- show comment dragger handles
+                case mLiveMarker of
+                  Nothing -> pure unit
+                  Just lm -> do
+                    H.liftEffect $ highlightSelection ed
+                      (snoc state.commentState.liveMarkers lm)
+                      lm
+                    handleAction (ShowHandles lm)
             -- remove the selection
             H.liftEffect $ clearSelection ed
+          else
+            H.liftEffect $ Editor.focus ed
 
-        _, _ -> pure unit -- TODO error handling
+        _, _, _ -> pure unit -- TODO error handling
 
     SelectComment -> do
       state <- H.get
@@ -1546,13 +1631,14 @@ editor = connect selectTranslator $ H.mkComponent
             -- Only secondary Editor has ElementData
             -- Only first Editor gets to load the comments
             if isJust state.compareToElement then do
-              handleAction $ ContinueChangeToSection [] false
+              handleAction $ ContinueChangeToSection [] false false
             else do
               -- Get comments
               let
                 comments = ContentDto.getWrapperComments wrapper
                 -- convert markers
                 markers = map ContentDto.convertToAnnotetedMarker comments
+                markerIDs = map (\m -> m.id) markers
               -- update the markers into state
               H.modify_ \st -> st
                 { commentState = st.commentState
@@ -1564,7 +1650,7 @@ editor = connect selectTranslator $ H.mkComponent
                 , isEditorOutdated = version /= "latest"
                 }
               -- Get comments information from Comment Child
-              H.raise (RequestComments state.docID entry.id)
+              H.raise (RequestComments state.docID entry.id markerIDs)
 
         --will be set to true right now, but should be set to false if didn't change to draft
         case loadedDraftContent of
@@ -1573,7 +1659,7 @@ editor = connect selectTranslator $ H.mkComponent
       pure unit
 
     -- After getting information from from Comment
-    ContinueChangeToSection fCs showHtml -> do
+    ContinueChangeToSection fCs showHtml commentProblem -> do
       state <- H.get
       case state.mListener of
         Nothing -> pure unit
@@ -1623,7 +1709,8 @@ editor = connect selectTranslator $ H.mkComponent
             mMax <- H.gets _.saveState.mPendingMaxWaitF
             traverse_ H.kill mMax
             H.modify_ \st -> st
-              { commentState = st.commentState { liveMarkers = newLiveMarkers }
+              { commentState = st.commentState
+                  { liveMarkers = newLiveMarkers, commentProblem = commentProblem }
               , saveState = st.saveState
                   { mPendingDebounceF = Nothing
                   , mPendingMaxWaitF = Nothing
@@ -1661,8 +1748,8 @@ editor = connect selectTranslator $ H.mkComponent
       handleAction (ChangeToSection entry rev mTitle)
       pure (Just a)
 
-    ContinueChangeSection fCs a -> do
-      handleAction (ContinueChangeToSection fCs true)
+    ContinueChangeSection fCs commentProblem a -> do
+      handleAction (ContinueChangeToSection fCs true commentProblem)
       pure (Just a)
 
     ChangeToNode heading path mTitle a -> do
@@ -1716,8 +1803,8 @@ editor = connect selectTranslator $ H.mkComponent
       handleAction $ Save true
       pure (Just a)
 
-    -- Repurpose it to confirm, that the first comment was sent
-    UpdateComment newCommentSection a -> do
+    -- Confirm the first comment was sent
+    ConfirmComment newCommentSection a -> do
       state <- H.get
       case
         state.commentState.tmpLiveMarker,
@@ -1739,7 +1826,7 @@ editor = connect selectTranslator $ H.mkComponent
               , startCol: Types.getColumn start
               , endRow: Types.getRow end
               , endCol: Types.getColumn end
-              , markerText: first.author
+              , markerText: first.comment.author
               , mCommentSection: Just newCommentSection
               }
             newMarkers = snoc state.commentState.markers newMarker
@@ -1777,10 +1864,9 @@ editor = connect selectTranslator $ H.mkComponent
     SelectCommentSection markerID a -> do
       lms <- H.gets _.commentState.liveMarkers
       editor_ <- H.gets _.mEditor
+      handleAction HideHandles
       case (find (\m -> m.annotedMarkerID == markerID) lms) of
-        -- Comment not found because it is resolved
         Nothing -> do
-          handleAction HideHandles
           selectedLiveMarker <- H.gets _.commentState.selectedLiveMarker
           case selectedLiveMarker, editor_ of
             Just lm, Just ed -> do
@@ -1799,8 +1885,26 @@ editor = connect selectTranslator $ H.mkComponent
           handleAction (ShowHandles lm)
       pure (Just a)
 
-    ToDeleteComment a -> do
+    UnselectCommentSection a -> do
+      handleAction HideHandles
+      editor_ <- H.gets _.mEditor
+      selectedLiveMarker <- H.gets _.commentState.selectedLiveMarker
+      case selectedLiveMarker, editor_ of
+        Just lm, Just ed -> do
+          session <- H.liftEffect $ Editor.getSession ed
+          H.liftEffect $ setMarkerSelectedClass session lm false
+        _, _ -> pure unit
+      H.modify_ \st -> st
+        { commentState { selectedLiveMarker = Nothing, reAnchor = Nothing } }
+      pure (Just a)
+
+    ToDeleteComment commentProblem a -> do
       state <- H.get
+      -- always update this
+      H.modify_ \st -> st
+        { commentState = st.commentState
+            { commentProblem = commentProblem, reAnchor = Nothing }
+        }
       case state.mEditor, state.commentState.selectedLiveMarker of
         Just ed, Just lm -> do
           session <- H.liftEffect $ Editor.getSession ed
@@ -1826,6 +1930,9 @@ editor = connect selectTranslator $ H.mkComponent
               }
           H.modify_ _
             { commentState = newCommentState }
+          for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
+          handleAction $ SetManualSavedFlag false
+          handleAction $ Save true
         _, _ -> pure unit
       pure (Just a)
 
@@ -1846,6 +1953,15 @@ editor = connect selectTranslator $ H.mkComponent
     PreventChangeSection a -> do
       H.modify_ _ { discardPopup = true }
       pure $ Just a
+
+    UpdateCommentProblem commentProblem a -> do
+      H.modify_ \st -> st
+        { commentState = st.commentState { commentProblem = commentProblem } }
+      pure (Just a)
+
+    SetReAnchor reAnchor a -> do
+      H.modify_ \st -> st { commentState = st.commentState { reAnchor = reAnchor } }
+      pure (Just a)
 
   -- free up the save flags for the next save session
   -- check if there are new requests for saving during saving
@@ -1990,6 +2106,8 @@ initialCommentState =
   , selectedLiveMarker: Nothing
   , markers: []
   , liveMarkers: []
+  , commentProblem: false
+  , reAnchor: Nothing
   }
 
 initialSaveState :: SaveState
@@ -2036,11 +2154,19 @@ initialState { context, input } =
   }
 
 makeEditorToolbarButton
-  :: forall m. Boolean -> String -> Action -> String -> H.ComponentHTML Action () m
-makeEditorToolbarButton enabled tooltip action biName = HH.button
+  :: forall m
+   . Boolean
+  -> String
+  -> Array H.ClassName
+  -> Action
+  -> String
+  -> H.ComponentHTML Action () m
+makeEditorToolbarButton enabled tooltip btnClasses action biName = HH.button
   [ HP.classes
       ( prependIf (not enabled) HB.opacity25
-          [ HB.btn, HB.p0, HB.m0, HB.border0 ]
+          ( [ HB.btn, HB.p0, HB.m0, HB.border0 ]
+              <> btnClasses
+          )
       )
   , HP.title tooltip
   , HE.onClick \_ -> action
@@ -2057,29 +2183,32 @@ makeEditorToolbarButtonWithText
   :: forall m
    . Boolean
   -> Boolean
+  -> Array H.ClassName
   -> Action
   -> String
   -> String
   -> H.ComponentHTML Action () m
-makeEditorToolbarButtonWithText enabled asText action biName smallText = HH.button
-  ( prependIf (not asText) (HP.title smallText)
-      [ HP.classes
-          ( prependIf (not enabled) HB.opacity25
-              [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
-          )
-      , HP.style "white-space: nowrap;"
-      , HE.onClick \_ -> action
-      , HP.enabled enabled
-      ]
-  )
-  ( prependIf asText
-      (HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text smallText ])
-      [ HH.i
-          [ HP.classes [ HB.bi, H.ClassName biName ]
-          ]
-          []
-      ]
-  )
+makeEditorToolbarButtonWithText enabled asText btnClasses action biName smallText =
+  HH.button
+    ( prependIf (not asText) (HP.title smallText)
+        [ HP.classes
+            ( prependIf (not enabled) HB.opacity25
+                [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
+                <> btnClasses
+            )
+        , HP.style "white-space: nowrap;"
+        , HE.onClick \_ -> action
+        , HP.enabled enabled
+        ]
+    )
+    ( prependIf asText
+        (HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text smallText ])
+        [ HH.i
+            [ HP.classes [ HB.bi, H.ClassName biName ]
+            ]
+            []
+        ]
+    )
 
 addMouseDragListeners :: HTMLElement -> HS.Listener Action -> Effect Unit
 addMouseDragListeners container listener = do

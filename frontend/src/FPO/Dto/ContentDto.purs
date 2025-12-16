@@ -204,6 +204,9 @@ failureContent = Content
 failureContentWrapper :: ContentWrapper
 failureContentWrapper = Wrapper { content: failureContent, comments: [], html: "" }
 
+getCommentAnchorID :: CommentAnchor -> Int
+getCommentAnchorID (CommentAnchor { id }) = id
+
 extractDraft
   :: Content
   -> Json

@@ -106,3 +106,23 @@
   z-index: 1;
   background: rgba(255, 255, 0, 0.15) !important; 
 }
+
+.btn-orange {
+  background-color: #fd7e14;   /* Bootstrap-Orange */
+  border-color: #fd7e14;
+  color: #fff;
+}
+
+.btn-orange:hover {
+  background-color: #e96b0c;
+  border-color: #e96b0c;
+  color: #fff;
+}
+
+.icon-orange {
+  color: #fd7e14;
+}
+
+.icon-orange:hover {
+  color: #e96b0c;
+}

@@ -2,15 +2,21 @@ module FPO.Components.CommentOverview where
 
 import Prelude
 
-import Data.Formatter.DateTime (Formatter, format)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Array (partition)
+import Data.Formatter.DateTime (Formatter)
+import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
+import FPO.Components.UI.RenderComment (renderFirstComment)
+import FPO.Data.Navigate (class Navigate)
+import FPO.Data.Store as Store
+import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
+import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.Types (FirstComment)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Themes.Bootstrap5 as HB
+import Halogen.Store.Connect (Connected, connect)
+import Halogen.Store.Monad (class MonadStore)
 
 type Input = Unit
 
@@ -19,26 +25,38 @@ data Output = JumpToCommentSection Int Int
 
 data Action
   = Init
+  | Receive (Connected FPOTranslator Input)
   | SelectCommentSection Int Int
 
 data Query a
   = ReceiveTimeFormatter (Maybe Formatter) a
   | ReceiveComments Int (Array FirstComment) a
 
-type State =
-  { tocID :: Int
+type State = FPOState
+  ( tocID :: Int
   , comments :: Array FirstComment
   , mTimeFormatter :: Maybe Formatter
-  }
+  )
 
-commentOverviewview :: forall m. MonadAff m => H.Component Query Input Output m
-commentOverviewview = H.mkComponent
-  { initialState: \_ -> { tocID: -1, comments: [], mTimeFormatter: Nothing }
+commentOverviewview
+  :: forall m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => H.Component Query Input Output m
+commentOverviewview = connect selectTranslator $ H.mkComponent
+  { initialState: \{ context } ->
+      { translator: fromFpoTranslator context
+      , tocID: -1
+      , comments: []
+      , mTimeFormatter: Nothing
+      }
   , render
   , eval: H.mkEval $ H.defaultEval
       { initialize = Just Init
       , handleAction = handleAction
       , handleQuery = handleQuery
+      , receive = Just <<< Receive
       }
   }
   where
@@ -49,19 +67,31 @@ commentOverviewview = H.mkComponent
       HH.div [ HP.style "padding: 1rem;" ]
         [ HH.text "No comments in this section." ]
     _ ->
-      HH.div [ HP.style "comment-section space-y-3" ]
-        ( map
-            ( \first ->
-                (renderFirstComment state.mTimeFormatter first state.tocID)
-            )
-            state.comments
-        )
+      let
+        shortendRenderFirstComment
+          :: FirstComment -> forall slots. H.ComponentHTML Action slots m
+        shortendRenderFirstComment first = renderFirstComment state.translator
+          state.mTimeFormatter
+          true
+          (SelectCommentSection state.tocID first.markerID)
+          first
+
+        parts = partition _.resolved state.comments
+        -- parts.no  = unresolved comments
+        -- parts.yes = resolved comments
+        sorted = parts.no <> parts.yes
+      in
+        HH.div [ HP.style "comment-section space-y-3" ]
+          (map shortendRenderFirstComment sorted)
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
 
     Init -> do
       pure unit
+
+    Receive { context } -> do
+      H.modify_ _ { translator = fromFpoTranslator context }
 
     SelectCommentSection tocID markerID -> do
       H.raise (JumpToCommentSection tocID markerID)
@@ -79,62 +109,3 @@ commentOverviewview = H.mkComponent
     ReceiveComments tocID cs a -> do
       H.modify_ \state -> state { tocID = tocID, comments = cs }
       pure (Just a)
-
-  renderFirstComment
-    :: Maybe Formatter
-    -> FirstComment
-    -> Int
-    -> forall slots
-     . H.ComponentHTML Action slots m
-  renderFirstComment mFormatter c tocID =
-    HH.div
-      [ HP.classes
-          [ HB.p2
-          , HB.mb2
-          , HB.border
-          , HB.rounded
-          , HB.shadowSm
-          , HB.dFlex
-          , HB.flexColumn
-          ]
-      , HP.style $ "background-color:"
-          <>
-            (if c.resolved then "rgba(66, 250, 0, 0.9)" else "rgba(246, 250, 0, 0.9)")
-          <> ";"
-      , HE.onClick \_ -> SelectCommentSection tocID c.markerID
-      ]
-      [ HH.div_
-          [ HH.div
-              [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
-              , HP.style "font-weight: 500; font-size: 1rem;"
-              ]
-              ( [ HH.span_ [ HH.text c.first.author ] ]
-                  <>
-                    if c.resolved then
-                      [ HH.i
-                          [ HP.classes
-                              [ HB.bi
-                              , H.ClassName "bi-check-circle-fill"
-                              , HB.msAuto
-                              , H.ClassName "fs-4"
-                              ]
-                          ]
-                          []
-                      ]
-                    else []
-              )
-          , HH.div
-              [ HP.classes [ HB.mt1 ]
-              , HP.style "font-size: 1rem;"
-              ]
-              [ HH.text c.first.content ]
-          ]
-      , HH.div
-          [ HP.classes [ HB.mt2 ]
-          , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;"
-          ]
-          [ HH.text $ maybe "No timestamp found."
-              (\formatter -> format formatter c.first.timestamp)
-              mFormatter
-          ]
-      ]
