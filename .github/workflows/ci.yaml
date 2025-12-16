@@ -51,8 +51,18 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Check if build dependencies are installed
+        id: check-deps
+        run: |
+          if dpkg -s build-essential pkg-config >/dev/null 2>&1; then
+            echo "installed=true" >> $GITHUB_OUTPUT
+          else
+            echo "installed=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Install Bullshit
-        run: apt-get install -y --no-install-recommends build-essential pkg-config
+        if: steps.check-deps.outputs.installed == 'false'
+        run: sudo apt-get install -y --no-install-recommends build-essential pkg-config
 
       - name: Check Formatting
         uses: haskell-actions/run-fourmolu@v9
