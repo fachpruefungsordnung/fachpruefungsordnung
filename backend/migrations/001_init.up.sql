@@ -1,3 +1,6 @@
+SET statement_timeout = '5s';
+SET lock_timeout = '5s';
+
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
@@ -16,7 +19,7 @@ VALUES
     ),
     (
         '7f59659a-9a46-4ba0-a911-09698107a5ea',
-        'Test User',
+        'Admin',
         'test@test.com',
         '$argon2id$v=19$m=65536,t=2,p=1$07P6YJS1ZkVWh7aA5nBB4A$nhMV4SKqiZp8KqMvKnU1kPwAApPLkrOHcDXUdNA+2eQ'
     );
@@ -33,8 +36,8 @@ INSERT INTO
     groups (name, description)
 VALUES
     (
-        'testgruppe',
-        'this is a group to test the user system.'
+        'Default Group',
+        'This is a group to test the user system.'
     );
 
 CREATE TABLE IF NOT EXISTS roles (
