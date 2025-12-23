@@ -443,7 +443,7 @@ editor = connect selectTranslator $ H.mkComponent
                     Just _ -> HH.text ""
                     Nothing ->
                       makeEditorToolbarButton
-                        fullFeatures
+                        (state.currentVersion == "latest")
                         (translate (label :: _ "editor_comment") state.translator)
                         ( if (isJust state.commentState.reAnchor) then
                             [ H.ClassName "icon-orange" ]
