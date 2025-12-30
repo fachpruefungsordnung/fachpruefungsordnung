@@ -204,7 +204,7 @@ type State = FPOState
   -- Determines whether the user is on the merge view.
   , isOnMerge :: Boolean
   -- previous isOnMerge flag for ContinueToChange
-  , loadedIsOnMerge :: Boolean
+  , wasLoadedInMergeMode :: Boolean
   -- obtained from TOC. Used when merging. Set to the version details of the Version loaded into the right editor.
   , upToDateVersion :: Maybe Version
   , isLoading :: Boolean
@@ -684,7 +684,7 @@ editor = connect selectTranslator $ H.mkComponent
         H.modify_ _ { mEditor = Just editor_ }
         fontSize <- H.gets _.fontSize
 
-        -- setting for both instances and later add more specif settings
+        -- setting for both instances and later add more specific settings
         H.liftEffect $ setupAce editor_ fontSize
 
         when (compareToElement == Nothing) do
@@ -982,7 +982,6 @@ editor = connect selectTranslator $ H.mkComponent
                 (translate (label :: _ "editor_save_success") state.translator)
               case typ of
                 "noConflict" -> do
-                  --setIsOnMerge false
                   case state.isOnMerge of
                     false -> pure unit
                     true -> H.raise Merged
@@ -990,7 +989,6 @@ editor = connect selectTranslator $ H.mkComponent
                 "draftCreated" -> --should not happen here. just copy autosave case in case
 
                   pure unit
-                --setIsOnMerge true
                 "conflict" -> do --raise something to update version
                   setIsOnMerge true
                   H.raise $ RaiseMergeMode $ ContentDto.getContentText $
@@ -1000,9 +998,8 @@ editor = connect selectTranslator $ H.mkComponent
             -- manuell saving, draft mode => publish
             false, true -> do
               case typ of
-                --happends if parent was updated due to merge view being present.
+                --happens if parent was updated due to merge view being present.
                 "noConflict" -> do
-                  --setIsOnMerge false
                   case state.isOnMerge of
                     false -> pure unit
                     true -> H.raise Merged
@@ -1010,7 +1007,6 @@ editor = connect selectTranslator $ H.mkComponent
                 "draftCreated" -> --should not happen here. just copy autosave case in case
 
                   pure unit
-                --setIsOnMerge true
                 "conflict" -> do --raise something to update version
                   setIsOnMerge true
                   H.raise $ RaiseMergeMode $ ContentDto.getContentText $
@@ -1572,7 +1568,7 @@ editor = connect selectTranslator $ H.mkComponent
       for_ state.saveState.mPendingDebounceF H.kill
       for_ state.saveState.mPendingMaxWaitF H.kill
 
-    ChangeToSection entry rev mTitle isOnMerge -> do
+    ChangeToSection entry rev mTitle loadInMergeMode -> do
       state <- H.get
       let
         version = case rev of
@@ -1581,7 +1577,7 @@ editor = connect selectTranslator $ H.mkComponent
       -- Prevent of loading the same Section from backend again
       when
         ( map _.id state.mTocEntry /= Just entry.id || version /= state.currentVersion
-            || state.loadedIsOnMerge /= isOnMerge
+            || state.wasLoadedInMergeMode /= loadInMergeMode
         )
         do
           -- Get the content from server here
@@ -1592,7 +1588,7 @@ editor = connect selectTranslator $ H.mkComponent
           H.modify_ _ { isLoading = true }
 
           --first we look whether a draft to load is present. The right editor does not load drafts
-          loadedDraftContent <- case state.compareToElement, isOnMerge of
+          loadedDraftContent <- case state.compareToElement, loadInMergeMode of
             Nothing, false ->
               preventErrorHandlingLocally $ Request.getJson
                 ContentDto.decodeContentWrapper
@@ -1601,20 +1597,11 @@ editor = connect selectTranslator $ H.mkComponent
                 )
             _, _ -> pure $ Left $ NotFoundError "No Draft Found"
 
-          let
-            draftLoaded = case loadedDraftContent of
-              Right _ -> true
-              Left _ -> false
-
           -- check, if draft is present. Otherwise get from version
           loadedContent <- case loadedDraftContent of
             Right res -> do
-              -- H.modify_ _
-              --   { isEditorOutdated = true
-              --   }
               pure (Right res)
             Left _ -> do
-              -- H.modify_ _ { isEditorOutdated = isOnMerge }
               Request.getJson
                 ContentDto.decodeContentWrapper
                 ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
@@ -1637,9 +1624,9 @@ editor = connect selectTranslator $ H.mkComponent
                 , mTitle = mTitle
                 , mContent = Just content
                 , html = html
-                , loadedIsOnMerge = isOnMerge
+                , wasLoadedInMergeMode = loadInMergeMode
                 }
-              setIsOnMerge isOnMerge
+              setIsOnMerge loadInMergeMode
 
               -- Only secondary Editor has ElementData
               -- Only first Editor gets to load the comments
@@ -1652,6 +1639,9 @@ editor = connect selectTranslator $ H.mkComponent
                   -- convert markers
                   markers = map ContentDto.convertToAnnotetedMarker comments
                   markerIDs = map (\m -> m.id) markers
+                  isDraftAvailable = case loadedDraftContent of
+                    Right _ -> true
+                    Left _ -> false
                 -- update the markers into state
                 H.modify_ \st -> st
                   { commentState = st.commentState
@@ -1660,7 +1650,8 @@ editor = connect selectTranslator $ H.mkComponent
                       , oldMarkerAnnoPos = empty
                       , markers = markers
                       }
-                  , isEditorOutdated = version /= "latest" || isOnMerge || draftLoaded
+                  , isEditorOutdated = version /= "latest" || loadInMergeMode ||
+                      isDraftAvailable
                   }
                 -- Get comments information from Comment Child
                 H.raise (RequestComments state.docID entry.id markerIDs)
@@ -1979,7 +1970,7 @@ editor = connect selectTranslator $ H.mkComponent
       H.modify_ \st -> st { commentState = st.commentState { reAnchor = reAnchor } }
       pure (Just a)
 
-    -- Only used to send draft from main to 2. Editor
+    -- Only used to send the draft from the main editor (primary/left) to the secondary editor
     SetContent draft a -> do
       state <- H.get
       H.gets _.mEditor >>= traverse_ \ed -> do
@@ -1989,8 +1980,8 @@ editor = connect selectTranslator $ H.mkComponent
           document <- Session.getDocument session
           Document.setValue draft document
           Editor.setReadOnly true ed
-          -- not sure if necessary. Just to be sure
-          for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
+          -- Reset dirty flag: content is loaded from a draft and should be treated as the current saved state
+          for_ state.saveState.mDirtyRef \r -> Ref.write false r
           -- Reset Undo history
           undoMgr <- Session.getUndoManager session
           UndoMgr.reset undoMgr
@@ -2023,6 +2014,13 @@ editor = connect selectTranslator $ H.mkComponent
     mRef <- H.gets _.saveState.mIsOnMergeRef
     for_ mRef \r -> H.liftEffect $ Ref.write flag r
 
+  -- | Configure a newly created Ace editor instance.
+  --   Sets the font size, enables line wrapping, hides the print margin,
+  --   applies the default theme and mode, and marks the editor as read-only
+  --   until a document entry is explicitly selected elsewhere.
+  --
+  --   * First argument: the Ace editor instance to configure.
+  --   * Second argument: desired font size in pixels (without the \"px\" suffix).
   setupAce :: Types.Editor -> Int -> Effect Unit
   setupAce editor_ fontSize = do
     Editor.setFontSize (show fontSize <> "px") editor_
@@ -2202,7 +2200,7 @@ initialState { context, input } =
   , discardPopup: false
   , mDirtyVersion: Nothing
   , isOnMerge: false
-  , loadedIsOnMerge: false
+  , wasLoadedInMergeMode: false
   , upToDateVersion: Nothing
   , isLoading: true
   }
