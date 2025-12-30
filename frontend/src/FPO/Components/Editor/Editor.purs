@@ -446,7 +446,7 @@ editor = connect selectTranslator $ H.mkComponent
                     Just _ -> HH.text ""
                     Nothing ->
                       makeEditorToolbarButton
-                        (state.currentVersion == "latest")
+                        (fullFeatures && state.currentVersion == "latest")
                         (translate (label :: _ "editor_comment") state.translator)
                         ( if (isJust state.commentState.reAnchor) then
                             [ H.ClassName "icon-orange" ]
@@ -988,11 +988,13 @@ editor = connect selectTranslator $ H.mkComponent
                     true -> H.raise Merged
                   pure unit
                 "draftCreated" -> --should not happen here. just copy autosave case in case
+
                   pure unit
-                  --setIsOnMerge true
+                --setIsOnMerge true
                 "conflict" -> do --raise something to update version
                   setIsOnMerge true
-                  H.raise $ RaiseMergeMode $ ContentDto.getContentText $ ContentDto.getWrapperContent newWrapper
+                  H.raise $ RaiseMergeMode $ ContentDto.getContentText $
+                    ContentDto.getWrapperContent newWrapper
                   handleAction $ ChangeToSection newEntry Nothing state.mTitle true
                 _ -> pure unit
             -- manuell saving, draft mode => publish
@@ -1006,21 +1008,24 @@ editor = connect selectTranslator $ H.mkComponent
                     true -> H.raise Merged
                   pure unit
                 "draftCreated" -> --should not happen here. just copy autosave case in case
+
                   pure unit
-                  --setIsOnMerge true
+                --setIsOnMerge true
                 "conflict" -> do --raise something to update version
                   setIsOnMerge true
-                  H.raise $ RaiseMergeMode $ ContentDto.getContentText $ ContentDto.getWrapperContent newWrapper
+                  H.raise $ RaiseMergeMode $ ContentDto.getContentText $
+                    ContentDto.getWrapperContent newWrapper
                   handleAction $ ChangeToSection newEntry Nothing state.mTitle true
                   pure unit
                 _ -> pure unit
 
-          when (typ /= "conflict" ) do
+          when (typ /= "conflict") do
             H.modify_ _ { mContent = Just updatedContent, html = html }
             H.raise UpdateFullTitle
             isOnMerge' <- H.gets _.isOnMerge
-            when (not isOnMerge') $
-              H.raise $ ClickedQuery html
+            when (not isOnMerge')
+              $ H.raise
+              $ ClickedQuery html
 
           pure unit
 
@@ -1574,92 +1579,96 @@ editor = connect selectTranslator $ H.mkComponent
           Nothing -> "latest"
           Just v -> show v
       -- Prevent of loading the same Section from backend again
-      when (map _.id state.mTocEntry /= Just entry.id || version /= state.currentVersion || state.loadedIsOnMerge /= isOnMerge) do
-        -- Get the content from server here
-        -- We need Aff for that and thus cannot go inside Eff
-        -- TODO: After creating a new Leaf, we get Nothing in loadedContent
-        -- See, why and fix it
+      when
+        ( map _.id state.mTocEntry /= Just entry.id || version /= state.currentVersion
+            || state.loadedIsOnMerge /= isOnMerge
+        )
+        do
+          -- Get the content from server here
+          -- We need Aff for that and thus cannot go inside Eff
+          -- TODO: After creating a new Leaf, we get Nothing in loadedContent
+          -- See, why and fix it
 
-        H.modify_ _ { isLoading = true }
+          H.modify_ _ { isLoading = true }
 
-        --first we look whether a draft to load is present. The right editor does not load drafts
-        loadedDraftContent <- case state.compareToElement, isOnMerge of
-          Nothing, false ->
-            preventErrorHandlingLocally $ Request.getJson
-              ContentDto.decodeContentWrapper
-              ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-                  <> "/draft"
-              )
-          _ , _ -> pure $ Left $ NotFoundError "No Draft Found"
-        
-        let 
-          draftLoaded = case loadedDraftContent of
-            Right _ -> true
-            Left _ -> false
+          --first we look whether a draft to load is present. The right editor does not load drafts
+          loadedDraftContent <- case state.compareToElement, isOnMerge of
+            Nothing, false ->
+              preventErrorHandlingLocally $ Request.getJson
+                ContentDto.decodeContentWrapper
+                ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+                    <> "/draft"
+                )
+            _, _ -> pure $ Left $ NotFoundError "No Draft Found"
 
-        -- check, if draft is present. Otherwise get from version
-        loadedContent <- case loadedDraftContent of
-          Right res -> do
-            -- H.modify_ _
-            --   { isEditorOutdated = true
-            --   }
-            pure (Right res)
-          Left _ -> do
-            -- H.modify_ _ { isEditorOutdated = isOnMerge }
-            Request.getJson
-              ContentDto.decodeContentWrapper
-              ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-                  <> "/rev/"
-                  <> version
-              )
+          let
+            draftLoaded = case loadedDraftContent of
+              Right _ -> true
+              Left _ -> false
 
-        case loadedContent of
-          Left err -> do
-            H.modify_ _ { isLoading = false }
-            Store.addError err
-          Right wrapper -> do
-            let
-              content = ContentDto.getWrapperContent wrapper
-              html = ContentDto.getWrapperHtml wrapper
+          -- check, if draft is present. Otherwise get from version
+          loadedContent <- case loadedDraftContent of
+            Right res -> do
+              -- H.modify_ _
+              --   { isEditorOutdated = true
+              --   }
+              pure (Right res)
+            Left _ -> do
+              -- H.modify_ _ { isEditorOutdated = isOnMerge }
+              Request.getJson
+                ContentDto.decodeContentWrapper
+                ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+                    <> "/rev/"
+                    <> version
+                )
 
-            H.modify_ _
-              { mTocEntry = Just entry
-              , currentVersion = version
-              , mTitle = mTitle
-              , mContent = Just content
-              , html = html
-              , loadedIsOnMerge = isOnMerge
-              }
-            setIsOnMerge isOnMerge
-
-            -- Only secondary Editor has ElementData
-            -- Only first Editor gets to load the comments
-            if isJust state.compareToElement then do
-              handleAction $ ContinueChangeToSection [] false false
-            else do
-              -- Get comments
+          case loadedContent of
+            Left err -> do
+              H.modify_ _ { isLoading = false }
+              Store.addError err
+            Right wrapper -> do
               let
-                comments = ContentDto.getWrapperComments wrapper
-                -- convert markers
-                markers = map ContentDto.convertToAnnotetedMarker comments
-                markerIDs = map (\m -> m.id) markers
-              -- update the markers into state
-              H.modify_ \st -> st
-                { commentState = st.commentState
-                    { selectedLiveMarker = Nothing
-                    , markerAnnoHS = empty
-                    , oldMarkerAnnoPos = empty
-                    , markers = markers
-                    }
-                , isEditorOutdated = version /= "latest" || isOnMerge || draftLoaded
-                }
-              -- Get comments information from Comment Child
-              H.raise (RequestComments state.docID entry.id markerIDs)
+                content = ContentDto.getWrapperContent wrapper
+                html = ContentDto.getWrapperHtml wrapper
 
-        --will be set to true right now, but should be set to false if didn't change to draft
-        case loadedDraftContent of
-          Right _ -> pure unit
-          Left _ -> for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+              H.modify_ _
+                { mTocEntry = Just entry
+                , currentVersion = version
+                , mTitle = mTitle
+                , mContent = Just content
+                , html = html
+                , loadedIsOnMerge = isOnMerge
+                }
+              setIsOnMerge isOnMerge
+
+              -- Only secondary Editor has ElementData
+              -- Only first Editor gets to load the comments
+              if isJust state.compareToElement then do
+                handleAction $ ContinueChangeToSection [] false false
+              else do
+                -- Get comments
+                let
+                  comments = ContentDto.getWrapperComments wrapper
+                  -- convert markers
+                  markers = map ContentDto.convertToAnnotetedMarker comments
+                  markerIDs = map (\m -> m.id) markers
+                -- update the markers into state
+                H.modify_ \st -> st
+                  { commentState = st.commentState
+                      { selectedLiveMarker = Nothing
+                      , markerAnnoHS = empty
+                      , oldMarkerAnnoPos = empty
+                      , markers = markers
+                      }
+                  , isEditorOutdated = version /= "latest" || isOnMerge || draftLoaded
+                  }
+                -- Get comments information from Comment Child
+                H.raise (RequestComments state.docID entry.id markerIDs)
+
+          --will be set to true right now, but should be set to false if didn't change to draft
+          case loadedDraftContent of
+            Right _ -> pure unit
+            Left _ -> for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure unit
 
     -- After getting information from from Comment
@@ -1900,7 +1909,9 @@ editor = connect selectTranslator $ H.mkComponent
           H.liftEffect $ setMarkerSelectedClass session lm false
         _, _ -> pure unit
       H.modify_ \st -> st
-        { commentState = st.commentState { selectedLiveMarker = Nothing, reAnchor = Nothing } }
+        { commentState = st.commentState
+            { selectedLiveMarker = Nothing, reAnchor = Nothing }
+        }
       pure (Just a)
 
     ToDeleteComment commentProblem a -> do
@@ -1967,7 +1978,7 @@ editor = connect selectTranslator $ H.mkComponent
     SetReAnchor reAnchor a -> do
       H.modify_ \st -> st { commentState = st.commentState { reAnchor = reAnchor } }
       pure (Just a)
-    
+
     -- Only used to send draft from main to 2. Editor
     SetContent draft a -> do
       state <- H.get
@@ -1983,7 +1994,7 @@ editor = connect selectTranslator $ H.mkComponent
           -- Reset Undo history
           undoMgr <- Session.getUndoManager session
           UndoMgr.reset undoMgr
-      H.modify_ _ {isLoading = false}
+      H.modify_ _ { isLoading = false }
       pure (Just a)
 
   -- free up the save flags for the next save session
