@@ -293,6 +293,7 @@ data Query a
   | PreventChangeSection a
   | UpdateCommentProblem Boolean a
   | SetReAnchor (Maybe CommentSection) a
+  | UpdateEditorSize Number a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -1962,6 +1963,10 @@ editor = connect selectTranslator $ H.mkComponent
 
     SetReAnchor reAnchor a -> do
       H.modify_ \st -> st { commentState = st.commentState { reAnchor = reAnchor } }
+      pure (Just a)
+
+    UpdateEditorSize width a -> do
+      handleAction $ HandleResize width
       pure (Just a)
 
   -- free up the save flags for the next save session

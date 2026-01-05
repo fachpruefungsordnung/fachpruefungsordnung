@@ -691,6 +691,9 @@ splitview = connect selectTranslator $ H.mkComponent
                 else st.lastExpandedSidebarRatio
             }
 
+          H.tell _editor 0
+            (Editor.UpdateEditorSize (newEditorRatio * (toNumber intWidth)))
+
         -- TODO what if comment section or so is shown?
         -- TODO last expandedRatio
         Just ResizeRight -> do
@@ -712,6 +715,9 @@ splitview = connect selectTranslator $ H.mkComponent
                 if newSidebarRatio > minRatio then newSidebarRatio
                 else st.lastExpandedSidebarRatio
             }
+
+          H.tell _editor 0
+            (Editor.UpdateEditorSize (newEditorRatio * (toNumber intWidth)))
 
         _ -> pure unit
 
