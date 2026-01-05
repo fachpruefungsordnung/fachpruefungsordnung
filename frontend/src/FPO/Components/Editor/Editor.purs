@@ -878,6 +878,7 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit -- Nothing to do
                 Just path -> do
                   H.raise $ RenamedNode contentLines path
+                  H.modify_ _ { mTitle = Just contentLines }
               freeSaveFlagsAndMaybeRerun
             Just entry ->
               case state.mContent of
@@ -966,7 +967,7 @@ editor = connect selectTranslator $ H.mkComponent
 
         -- extract and insert new parentID into newContent
         -- not updating the received comment anchors, as we send those same anchors to backend
-        Right { content: updatedContent, typ: typ, html } -> do
+        Right { content: updatedContent, typ, html } -> do
 
           H.modify_ _ { mContent = Just updatedContent, html = html }
           H.raise $ ClickedQuery html
