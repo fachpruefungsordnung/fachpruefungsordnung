@@ -1052,7 +1052,7 @@ splitview = connect selectTranslator $ H.mkComponent
           _ -> do
             pure unit
 
-      Editor.RaiseMergeMode -> do
+      Editor.RaiseMergeMode draft -> do
         handleAction UpdateMSelectedTocEntry
         state <- H.get
         upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
@@ -1080,15 +1080,8 @@ splitview = connect selectTranslator $ H.mkComponent
                           )
                       )
                   )
-                -- let
-                -- Nothing case should never occur
-                -- entry = case (findTOCEntry id state.tocEntries) of
-                --   Nothing -> emptyTOCEntry
-                --   Just e -> e
-                handleAction (SetComparison id Nothing)
-              -- mmTitle <- H.request _toc unit TOC.RequestFullTitle
-              -- H.tell _editor 1
-              --   (Editor.ChangeSection entry version.identifier (join mmTitle))
+                --handleAction (SetComparison id Nothing)
+                H.tell _editor 1 (Editor.SetContent draft)
               _ -> pure unit
           _ -> do
             pure unit
