@@ -948,9 +948,10 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.PostPDF _ -> do
         state <- H.get
         upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
+        currentTocEntry <- H.request _toc unit TOC.RequestCurrentTocEntry
         let
           textElementId :: Int
-          textElementId = case state.mSelectedTocEntry of
+          textElementId = case join currentTocEntry of
             Just (SelLeaf id) -> id
             _ -> -1
 
