@@ -446,7 +446,7 @@ evalDelayed :: GlobalState -> Delayed a -> a
 evalDelayed _ (Now a) = a
 evalDelayed s (Later fa) = fa s
 
-returnNow :: Html () -> HtmlReaderState
+returnNow :: a -> ReaderStateMonad (Delayed a)
 returnNow = return . Now
 
 instance (Monoid a) => Monoid (Delayed a) where
