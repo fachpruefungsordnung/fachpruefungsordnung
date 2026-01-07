@@ -679,6 +679,7 @@ splitview = connect selectTranslator $ H.mkComponent
             } = resizeFromLeft
               state
               mouseXRatio
+              width
 
           H.modify_ \st -> st
             { sidebarRatio = newSidebarRatio
@@ -703,7 +704,7 @@ splitview = connect selectTranslator $ H.mkComponent
             , newPreviewRatio
             , sidebarClosed
             , previewClosed
-            } = resizeFromRight state (1.0 - mouseXRatio)
+            } = resizeFromRight state (1.0 - mouseXRatio) width
 
           H.modify_ \st -> st
             { sidebarRatio = newSidebarRatio
@@ -1651,50 +1652,58 @@ type ResizeResult =
 resizeFromLeft
   :: State
   -> Number
+  -> Number
   -> ResizeResult
 resizeFromLeft
   { startSidebarRatio, startPreviewRatio, startEditorRatio }
-  mousePercentFromLeft =
+  mousePercentFromLeft
+  windowWidth =
   let
     sidebarAndEditor = startSidebarRatio + startEditorRatio
+    resizerSizePercentage = 16.0 / windowWidth
   in
-    if mousePercentFromLeft <= 0.05 then -- close enough to hide sidebar
+    -- close enough to hide sidebar
+    if mousePercentFromLeft <= 0.05 then
       { newSidebarRatio: 0.0
-      , newEditorRatio: sidebarAndEditor
-      , newPreviewRatio: startPreviewRatio
+      , newEditorRatio: sidebarAndEditor - (resizerSizePercentage / 2.0)
+      , newPreviewRatio: startPreviewRatio - (resizerSizePercentage / 2.0)
       , sidebarClosed: true
       , previewClosed: false
       }
-    else if mousePercentFromLeft <= startSidebarRatio then -- resizing to the left of initial sidebar size
+    else if mousePercentFromLeft <= startSidebarRatio then
       -- resizing to the left but not close enough to hide sidebar
-      { newSidebarRatio: mousePercentFromLeft
-      , newEditorRatio: sidebarAndEditor - mousePercentFromLeft
-      , newPreviewRatio: startPreviewRatio
+      { newSidebarRatio: mousePercentFromLeft - (resizerSizePercentage / 3.0)
+      , newEditorRatio: sidebarAndEditor - mousePercentFromLeft -
+          (resizerSizePercentage / 3.0)
+      , newPreviewRatio: startPreviewRatio - (resizerSizePercentage / 3.0)
       , sidebarClosed: false
       , previewClosed: false
       }
+    -- resizing to the right but editor still bigger than preview
     else if
-      startSidebarRatio + startEditorRatio - mousePercentFromLeft >= startPreviewRatio then -- resizing to the right but editor still bigger than preview
-      { newSidebarRatio: mousePercentFromLeft
-      , newEditorRatio: sidebarAndEditor - mousePercentFromLeft
-      , newPreviewRatio: startPreviewRatio
+      startSidebarRatio + startEditorRatio - mousePercentFromLeft >= startPreviewRatio then
+      { newSidebarRatio: mousePercentFromLeft - (resizerSizePercentage / 3.0)
+      , newEditorRatio: sidebarAndEditor - mousePercentFromLeft -
+          (resizerSizePercentage / 3.0)
+      , newPreviewRatio: startPreviewRatio - (resizerSizePercentage / 3.0)
       , sidebarClosed: false
       , previewClosed: false
       }
-    else -- resizing to the right and preview bigger than editor
+    -- resizing to the right and preview bigger than editor
+    else
       let
         newEditorAndPreview = (1.0 - mousePercentFromLeft) / 2.0
       in
         if newEditorAndPreview >= 0.1 then
-          { newSidebarRatio: mousePercentFromLeft
-          , newEditorRatio: newEditorAndPreview
-          , newPreviewRatio: newEditorAndPreview
+          { newSidebarRatio: mousePercentFromLeft - (resizerSizePercentage / 3.0)
+          , newEditorRatio: newEditorAndPreview - (resizerSizePercentage / 3.0)
+          , newPreviewRatio: newEditorAndPreview - (resizerSizePercentage / 3.0)
           , sidebarClosed: false
           , previewClosed: false
           }
         else
-          { newSidebarRatio: 0.8
-          , newEditorRatio: 0.2
+          { newSidebarRatio: 0.8 - (resizerSizePercentage / 2.0)
+          , newEditorRatio: 0.2 - (resizerSizePercentage / 2.0)
           , newPreviewRatio: 0.0
           , sidebarClosed: false
           , previewClosed: true
@@ -1703,8 +1712,9 @@ resizeFromLeft
 resizeFromRight
   :: State
   -> Number
+  -> Number
   -> ResizeResult
-resizeFromRight state mousePercentFromRight =
+resizeFromRight state mousePercentFromRight windowWidth =
   let
     { newSidebarRatio, newEditorRatio, newPreviewRatio, sidebarClosed, previewClosed } =
       resizeFromLeft
@@ -1714,6 +1724,7 @@ resizeFromRight state mousePercentFromRight =
             }
         )
         mousePercentFromRight
+        windowWidth
   in
     { newSidebarRatio: newPreviewRatio
     , newEditorRatio

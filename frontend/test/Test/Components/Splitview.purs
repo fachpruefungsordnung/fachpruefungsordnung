@@ -57,6 +57,7 @@ resizeFromLeftTest =
       let startEditorSize = 0.4
       let startPreviewSize = 0.4
       let mousePercentFromLeft = 0.12
+      let width = 100000.0
 
       let
         { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
@@ -66,6 +67,7 @@ resizeFromLeftTest =
             , startPreviewRatio = startPreviewSize
             }
           mousePercentFromLeft
+          width
 
       newSidebarRatio `shouldBeNear` 0.12
       newEditorRatio `shouldBeNear` 0.48
@@ -79,6 +81,7 @@ resizeFromLeftTest =
         let startEditorSize = 0.4
         let startPreviewSize = 0.4
         let mousePercentFromLeft = 0.04887
+        let width = 100000.0
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
@@ -88,6 +91,7 @@ resizeFromLeftTest =
               , startPreviewRatio = startPreviewSize
               }
             mousePercentFromLeft
+            width
 
         newSidebarRatio `shouldBeNear` 0.0
         newEditorRatio `shouldBeNear` 0.6
@@ -101,6 +105,7 @@ resizeFromLeftTest =
         let startEditorSize = 0.4
         let startPreviewSize = 0.4
         let mousePercentFromLeft = 0.04887
+        let width = 100000.0
 
         let
           { sidebarClosed } = resizeFromLeft
@@ -110,6 +115,7 @@ resizeFromLeftTest =
               , startPreviewRatio = startPreviewSize
               }
             mousePercentFromLeft
+            width
 
         sidebarClosed `shouldEqual` true
 
@@ -121,6 +127,7 @@ resizeFromLeftTest =
         let startEditorSize = 0.4
         let startPreviewSize = 0.2
         let mousePercentFromLeft = 0.45
+        let width = 100000.0
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
@@ -130,6 +137,7 @@ resizeFromLeftTest =
               , startPreviewRatio = startPreviewSize
               }
             mousePercentFromLeft
+            width
 
         newSidebarRatio `shouldBeNear` 0.45
         newEditorRatio `shouldBeNear` 0.35
@@ -143,6 +151,7 @@ resizeFromLeftTest =
         let startEditorSize = 0.4
         let startPreviewSize = 0.4
         let mousePercentFromLeft = 0.5
+        let width = 100000.0
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
@@ -152,6 +161,7 @@ resizeFromLeftTest =
               , startPreviewRatio = startPreviewSize
               }
             mousePercentFromLeft
+            width
 
         newSidebarRatio `shouldBeNear` 0.5
         newEditorRatio `shouldBeNear` 0.25
@@ -165,6 +175,7 @@ resizeFromLeftTest =
         let startEditorSize = 0.4
         let startPreviewSize = 0.4
         let mousePercentFromLeft = 0.85
+        let width = 100000.0
 
         let
           { previewClosed } = resizeFromLeft
@@ -174,6 +185,7 @@ resizeFromLeftTest =
               , startPreviewRatio = startPreviewSize
               }
             mousePercentFromLeft
+            width
 
         previewClosed `shouldEqual` true
 
@@ -186,6 +198,7 @@ resizeFromLeftTest =
           startEditorSize = 0.6
           startPreviewSize = 0.4 - startSidebarSize
           mousePercentFromLeft = 0.4
+          width = 100000.0
 
         let
           { sidebarClosed, newSidebarRatio } = resizeFromLeft
@@ -195,6 +208,7 @@ resizeFromLeftTest =
               , startPreviewRatio = startPreviewSize
               }
             mousePercentFromLeft
+            width
 
         sidebarClosed `shouldEqual` false
         newSidebarRatio `shouldBeNear` 0.4
@@ -209,6 +223,7 @@ resizeFromLeftTest =
           startPreviewSize = 0.4 - startSidebarSize
           mousePercentFromLeft = 0.04
           sidebarShown = false
+          width = 100000.0
 
         let
           { sidebarClosed, newSidebarRatio } = resizeFromLeft
@@ -219,9 +234,54 @@ resizeFromLeftTest =
               , sidebarShown = sidebarShown
               }
             mousePercentFromLeft
+            width
 
         sidebarClosed `shouldEqual` true
         newSidebarRatio `shouldBeNear` 0.0
+
+    it "when dragging so far to the right that preview is smaller than 0.05, close it"
+      do
+
+        let startSidebarSize = 0.2
+        let startEditorSize = 0.4
+        let startPreviewSize = 0.4
+        let mousePercentFromLeft = 0.91
+        let width = 100000.0
+
+        let
+          { previewClosed } = resizeFromLeft
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
+            mousePercentFromLeft
+            width
+
+        previewClosed `shouldEqual` true
+
+    it "consider resizer width for calculations"
+      do
+
+        let startSidebarSize = 0.2
+        let startEditorSize = 0.4
+        let startPreviewSize = 0.4
+        let mousePercentFromLeft = 0.5
+        let width = 160.0
+
+        let
+          { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromLeft
+            defaultState
+              { startSidebarRatio = startSidebarSize
+              , startEditorRatio = startEditorSize
+              , startPreviewRatio = startPreviewSize
+              }
+            (mousePercentFromLeft)
+            width
+
+        newSidebarRatio `shouldBeNear` 0.46666666
+        newEditorRatio `shouldBeNear` 0.216666666
+        newPreviewRatio `shouldBeNear` 0.21666666
 
 resizeFromRightTest :: Spec Unit
 resizeFromRightTest =
@@ -232,6 +292,7 @@ resizeFromRightTest =
       let startEditorSize = 0.4
       let startPreviewSize = 0.4
       let mousePercentFromRight = 0.12
+      let width = 100000.0
 
       let
         { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
@@ -241,6 +302,7 @@ resizeFromRightTest =
             , startPreviewRatio = startPreviewSize
             }
           mousePercentFromRight
+          width
 
       newSidebarRatio `shouldBeNear` 0.2
       newEditorRatio `shouldBeNear` 0.68
@@ -254,6 +316,7 @@ resizeFromRightTest =
         let startEditorSize = 0.4
         let startPreviewSize = 0.4
         let mousePercentFromRight = 0.04887
+        let width = 100000.0
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
@@ -263,6 +326,7 @@ resizeFromRightTest =
               , startPreviewRatio = startPreviewSize
               }
             mousePercentFromRight
+            width
 
         newSidebarRatio `shouldBeNear` 0.2
         newEditorRatio `shouldBeNear` 0.8
@@ -276,6 +340,7 @@ resizeFromRightTest =
         let startEditorSize = 0.4
         let startPreviewSize = 0.4
         let mousePercentFromRight = 0.04887
+        let width = 100000.0
 
         let
           { previewClosed } = resizeFromRight
@@ -285,6 +350,7 @@ resizeFromRightTest =
               , startPreviewRatio = startPreviewSize
               }
             mousePercentFromRight
+            width
 
         previewClosed `shouldEqual` true
 
@@ -296,6 +362,7 @@ resizeFromRightTest =
         let startEditorSize = 0.4
         let startPreviewSize = 0.4
         let mousePercentFromRight = 0.45
+        let width = 100000.0
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
@@ -305,6 +372,7 @@ resizeFromRightTest =
               , startPreviewRatio = startPreviewSize
               }
             mousePercentFromRight
+            width
 
         newSidebarRatio `shouldBeNear` 0.2
         newEditorRatio `shouldBeNear` 0.35
@@ -318,6 +386,7 @@ resizeFromRightTest =
         let startEditorSize = 0.4
         let startPreviewSize = 0.2
         let mousePercentFromRight = 0.5
+        let width = 100000.0
 
         let
           { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
@@ -327,6 +396,7 @@ resizeFromRightTest =
               , startPreviewRatio = startPreviewSize
               }
             mousePercentFromRight
+            width
 
         newSidebarRatio `shouldBeNear` 0.25
         newEditorRatio `shouldBeNear` 0.25
@@ -340,6 +410,7 @@ resizeFromRightTest =
         let startEditorSize = 0.4
         let startPreviewSize = 0.2
         let mousePercentFromRight = 0.85
+        let width = 100000.0
 
         let
           { sidebarClosed } = resizeFromRight
@@ -349,6 +420,7 @@ resizeFromRightTest =
               , startPreviewRatio = startPreviewSize
               }
             mousePercentFromRight
+            width
 
         sidebarClosed `shouldEqual` true
 
