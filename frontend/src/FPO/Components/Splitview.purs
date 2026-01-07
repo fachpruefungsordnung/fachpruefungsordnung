@@ -801,36 +801,13 @@ splitview = connect selectTranslator $ H.mkComponent
 
     -- Toggle the preview area
     TogglePreview -> do
-      previewShown <- H.gets _.previewShown
-      previewRatio <- H.gets _.previewRatio
-      -- close preview
-      if previewShown then do
-        -- all this, in order for not overlapping the left resizer (to not make it disappear)
-        win <- H.liftEffect Web.HTML.window
-        totalWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
-        let
-          w = toNumber totalWidth
-          -- resizer size is 8, but there are 2 resizers.
-          -- Also resizer size is not in sidebarRatio
-          resizerWidth = 16.0
-          resizerRatio = resizerWidth / w
-          oldPreviewRatio = previewRatio
-        H.modify_ _
-          { previewRatio = resizerRatio
-          , lastExpandedPreviewRatio = oldPreviewRatio
-          , previewShown = false
-          }
-      -- open preview
-      else do
-        -- restore the last expanded middle ratio, when toggling preview back on
-        H.modify_ \st -> st
-          { previewRatio = st.lastExpandedPreviewRatio
-          , previewShown = true
-          }
-        -- only resize second editor, when visible
-        H.tell _editor 1 (Editor.EditorResize)
-      -- always resize main editor for each call
-      H.tell _editor 0 (Editor.EditorResize)
+      state <- H.get
+      win <- H.liftEffect Web.HTML.window
+      width <- H.liftEffect $ Web.HTML.Window.innerWidth win
+      let
+        numberWidth = toNumber width
+        newState = togglePreview numberWidth state
+      H.modify_ \_ -> newState
 
     ModifyVersionMapping tocID vID cData -> do
       previewShown <- H.gets _.previewShown
@@ -1732,3 +1709,25 @@ resizeFromRight state mousePercentFromRight windowWidth =
     , sidebarClosed: previewClosed
     , previewClosed: sidebarClosed
     }
+
+togglePreview :: Number -> State -> State
+togglePreview windowWidth oldState =
+  -- all this, in order for not overlapping the left resizer (to not make it disappear)
+  -- resizer size is 8, but there are 2 resizers.
+  let
+    resizerRatio = 16.0 / windowWidth
+  -- close preview
+  in
+    if oldState.previewShown then
+      oldState
+        { previewRatio = 0.0
+        , editorRatio = 1.0 - oldState.sidebarRatio - resizerRatio
+        , lastExpandedPreviewRatio = oldState.previewRatio
+        , previewShown = false
+        }
+    -- open preview
+    else oldState
+      { previewRatio = oldState.lastExpandedPreviewRatio
+      , previewShown = true
+      , editorRatio = oldState.editorRatio - oldState.lastExpandedPreviewRatio
+      }
