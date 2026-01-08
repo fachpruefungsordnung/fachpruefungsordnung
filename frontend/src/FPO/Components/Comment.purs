@@ -74,7 +74,6 @@ type State = FPOState
   , markerID :: Int
   , commentSections :: Array CommentSection
   , mCommentSection :: Maybe CommentSection
-  , hasProblem :: Boolean
   , newComment :: Boolean
   , commentDraft :: String
   , mTimeFormatter :: Maybe Formatter
@@ -99,7 +98,6 @@ commentview = connect selectTranslator $ H.mkComponent
       , markerID: -1
       , commentSections: []
       , mCommentSection: Nothing
-      , hasProblem: false
       , newComment: false
       , commentDraft: ""
       , mTimeFormatter: Nothing
@@ -370,7 +368,6 @@ commentview = connect selectTranslator $ H.mkComponent
             , mCommentSection = Just newCS
             , commentDraft = ""
             , requestModal = Nothing
-            , hasProblem = hasProblem
             }
           -- Delete it from Editor
           H.raise (ToDeleteComment hasProblem)
@@ -391,7 +388,6 @@ commentview = connect selectTranslator $ H.mkComponent
         , requestModal = Nothing
         , commentSections = updatedSections
         , mCommentSection = Nothing
-        , hasProblem = hasProblem
         }
       H.raise (ToDeleteComment hasProblem)
 
@@ -476,7 +472,6 @@ commentview = connect selectTranslator $ H.mkComponent
           { docID = docID
           , tocID = tocID
           , commentSections = css
-          , hasProblem = hasProblem
           }
         H.raise (SendAbstractedComments fs hasProblem)
       else do
@@ -487,10 +482,7 @@ commentview = connect selectTranslator $ H.mkComponent
           hasProblem = hasProblems commentSections
           css = map updateFirstCommentProblem commentSections
           fs = map extractFirst css
-        H.modify_ _
-          { commentSections = css
-          , hasProblem = hasProblem
-          }
+        H.modify_ _ { commentSections = css }
         H.raise (SendAbstractedComments fs hasProblem)
       pure (Just a)
 
@@ -529,7 +521,6 @@ commentview = connect selectTranslator $ H.mkComponent
         fs = map extractFirst css
       H.modify_ _
         { commentSections = css
-        , hasProblem = hasProblem
         , mCommentSection = find (\sec -> sec.markerID == state.markerID) css
         }
       H.raise $ UpdatedComments state.tocID fs hasProblem
@@ -545,11 +536,9 @@ commentview = connect selectTranslator $ H.mkComponent
             newCS = updateFirstCommentProblem $ cs
               { hasProblem = false }
             newCSs = updateCommentSection newCS state.commentSections
-            hasProblem = hasProblems newCSs
           H.modify_ _
             { commentSections = newCSs
             , mCommentSection = Just newCS
-            , hasProblem = hasProblem
             }
           H.raise (CommentOverview state.tocID (map extractFirst newCSs))
       pure (Just a)
