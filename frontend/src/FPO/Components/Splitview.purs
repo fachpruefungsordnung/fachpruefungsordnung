@@ -184,6 +184,7 @@ type State = FPOState
   -- obtained from TOC
   , upToDateVersion :: Maybe Version
   , pendingUpdateElementID :: Maybe Int
+  , inLatest :: Boolean
   )
 
 type ElemVersion =
@@ -248,6 +249,7 @@ splitview = connect selectTranslator $ H.mkComponent
     , modalData: Nothing
     , upToDateVersion: Nothing
     , pendingUpdateElementID: Nothing
+    , inLatest: true
     }
 
   render :: State -> H.ComponentHTML Action Slots m
@@ -882,7 +884,8 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _editor 0 (Editor.ConfirmComment newCommentSection)
 
       Comment.CommentOverview tocID fs -> do
-        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID fs)
+        inLatest <- H.gets _.inLatest
+        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID inLatest fs)
 
       Comment.SendAbstractedComments abstractCSs hasProblem -> do
         H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs hasProblem)
@@ -891,7 +894,8 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _editor 0 (Editor.ToDeleteComment commentProblem)
 
       Comment.UpdatedComments tocID fs commentProblem -> do
-        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID fs)
+        inLatest <- H.gets _.inLatest
+        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID inLatest fs)
         H.tell _editor 0 (Editor.UpdateCommentProblem commentProblem)
 
       Comment.SetReAnchor reAnchor -> do
@@ -1011,8 +1015,9 @@ splitview = connect selectTranslator $ H.mkComponent
                     H.liftEffect $ revokeObjectURL url
                   pure unit
 
-      Editor.RequestComments docID entryID markerIDs -> do
-        H.tell _comment unit (Comment.RequestComments docID entryID markerIDs)
+      Editor.RequestComments docID entryID markerIDs inLatest -> do
+        H.modify_ _ { inLatest = inLatest }
+        H.tell _comment unit (Comment.RequestComments docID entryID markerIDs inLatest)
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get

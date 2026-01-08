@@ -24,7 +24,7 @@ import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
 import Data.HashMap (HashMap, delete, empty, insert, lookup, size)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, isNothing, maybe)
 import Data.Traversable (for, traverse)
 import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
@@ -120,6 +120,8 @@ import Web.HTML.Window as Win
 import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
+
+import Effect.Console (log)
 
 foreign import _resize :: Types.Editor -> Effect Unit
 
@@ -217,7 +219,7 @@ data Output
   | ClickedQuery String
   | PostPDF String
   | RenamedNode String Path
-  | RequestComments Int Int (Array Int)
+  | RequestComments Int Int (Array Int) Boolean
   | SelectedCommentSection Int Int
   | ShowAllCommentsOutput Int Int
   | RaiseDiscard
@@ -508,14 +510,22 @@ editor = connect selectTranslator $ H.mkComponent
                     , makeEditorToolbarButtonWithText
                         fullFeatures
                         state.showButtonText
-                        ( if state.commentState.commentProblem then
-                            [ H.ClassName "btn-orange" ]
-                          else []
+                        ( case state.commentState.commentProblem, state.isEditorOutdated of
+                            true, false -> [ H.ClassName "btn-orange" ]
+                            true, true -> [ H.ClassName "btn-blue" ]
+                            _, _ -> []
+                          -- if state.commentState.commentProblem then
+                          --   [ H.ClassName "btn-orange" ]
+                          -- else []
                         )
                         ShowAllComments
-                        ( if state.commentState.commentProblem then
-                            "bi-exclamation-circle-fill"
-                          else "bi-chat-square"
+                        ( case state.commentState.commentProblem, state.isEditorOutdated of
+                            true, false -> "bi-exclamation-circle-fill"
+                            true, true -> "bi bi-clock-history"
+                            _, _ -> "bi-chat-square"
+                          -- if state.commentState.commentProblem then
+                          --   "bi-exclamation-circle-fill"
+                          -- else "bi-chat-square"
                         )
                         (translate (label :: _ "editor_allComments") state.translator)
                     ]
@@ -1655,7 +1665,7 @@ editor = connect selectTranslator $ H.mkComponent
                       isDraftAvailable
                   }
                 -- Get comments information from Comment Child
-                H.raise (RequestComments state.docID entry.id markerIDs)
+                H.raise (RequestComments state.docID entry.id markerIDs (isNothing rev))
 
           --will be set to true right now, but should be set to false if didn't change to draft
           case loadedDraftContent of
@@ -1704,6 +1714,8 @@ editor = connect selectTranslator $ H.mkComponent
               -- Add annotations from marker
               tmp <- for filMarkers \marker -> do
                 addAnchor marker session listener true
+
+              log $ show filMarkers
 
               pure (catMaybes tmp)
 

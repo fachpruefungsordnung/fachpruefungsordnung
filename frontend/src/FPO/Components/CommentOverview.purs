@@ -30,12 +30,13 @@ data Action
 
 data Query a
   = ReceiveTimeFormatter (Maybe Formatter) a
-  | ReceiveComments Int (Array FirstComment) a
+  | ReceiveComments Int Boolean (Array FirstComment) a
 
 type State = FPOState
   ( tocID :: Int
   , comments :: Array FirstComment
   , mTimeFormatter :: Maybe Formatter
+  , inLatest :: Boolean
   )
 
 commentOverviewview
@@ -50,6 +51,7 @@ commentOverviewview = connect selectTranslator $ H.mkComponent
       , tocID: -1
       , comments: []
       , mTimeFormatter: Nothing
+      , inLatest: true
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -72,6 +74,7 @@ commentOverviewview = connect selectTranslator $ H.mkComponent
           :: FirstComment -> forall slots. H.ComponentHTML Action slots m
         shortendRenderFirstComment first = renderFirstComment state.translator
           state.mTimeFormatter
+          state.inLatest
           true
           (SelectCommentSection state.tocID first.markerID)
           first
@@ -106,6 +109,6 @@ commentOverviewview = connect selectTranslator $ H.mkComponent
       H.modify_ \state -> state { mTimeFormatter = mTimeFormatter }
       pure (Just a)
 
-    ReceiveComments tocID cs a -> do
-      H.modify_ \state -> state { tocID = tocID, comments = cs }
+    ReceiveComments tocID inLatest cs a -> do
+      H.modify_ \state -> state { tocID = tocID, comments = cs, inLatest = inLatest }
       pure (Just a)

@@ -62,7 +62,7 @@ data Action
 data Query a
   = AddComment Int Int a
   | ReceiveTimeFormatter (Maybe Formatter) a
-  | RequestComments Int Int (Array Int) a
+  | RequestComments Int Int (Array Int) Boolean a
   | SelectedCommentSection Int Int Int a
   | Overview Int Int a
   | UpdateComment (Array Int) a
@@ -78,6 +78,7 @@ type State = FPOState
   , commentDraft :: String
   , mTimeFormatter :: Maybe Formatter
   , requestModal :: Maybe Mode
+  , inLatest :: Boolean
   )
 
 data Mode = Delete | Resolve
@@ -102,6 +103,7 @@ commentview = connect selectTranslator $ H.mkComponent
       , commentDraft: ""
       , mTimeFormatter: Nothing
       , requestModal: Nothing
+      , inLatest: true
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -151,7 +153,7 @@ commentview = connect selectTranslator $ H.mkComponent
                       ""
               )
           ]
-      , renderFirstComment state.translator state.mTimeFormatter false DoNothing first
+      , renderFirstComment state.translator state.mTimeFormatter state.inLatest false DoNothing first
       ]
         <> map (renderComment state.translator state.mTimeFormatter)
           commentSection.replies
@@ -457,7 +459,7 @@ commentview = connect selectTranslator $ H.mkComponent
       H.modify_ \state -> state { mTimeFormatter = mTimeFormatter }
       pure (Just a)
 
-    RequestComments docID tocID markerIDs a -> do
+    RequestComments docID tocID markerIDs inLatest a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
         fetchedCommentSections <- fetchCommentSections docID tocID
@@ -472,6 +474,7 @@ commentview = connect selectTranslator $ H.mkComponent
           { docID = docID
           , tocID = tocID
           , commentSections = css
+          , inLatest = inLatest
           }
         H.raise (SendAbstractedComments fs hasProblem)
       else do
