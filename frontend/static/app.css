@@ -1,0 +1,14 @@
+/* app.css – zentrale CSS-Sammelstelle
+   WICHTIG: @import muss ganz oben stehen (vor allen anderen Regeln)! 
+   falls du CSS-Variablen nutzt, unbedingt zuerst */
+@import url("./editor-theme.css");
+@import url("./editor.css");
+@import url("./comment.css");
+@import url("./highlighting.css");
+@import url("./home.css");
+@import url("./profile.css");
+@import url("./responsive.css");
+@import url("./toasts.css");
+@import url("./toc.css");
+@import url("./tooltip.css");
+@import url("./user-dropdown.css");
