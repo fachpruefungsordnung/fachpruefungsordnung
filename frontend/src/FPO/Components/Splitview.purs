@@ -21,6 +21,7 @@ import Data.Array
   , (!!)
   )
 import Data.Either (Either(..))
+import Data.Foldable (traverse_)
 import Data.Formatter.DateTime (Formatter, parseFormatString)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
@@ -71,8 +72,10 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
+import Halogen.Subscription as HS
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
@@ -86,6 +89,7 @@ import Web.HTML.HTMLDocument as HTMLDocument
 import Web.HTML.HTMLElement as HTMLElement
 import Web.HTML.Window (document)
 import Web.HTML.Window as Web.HTML.Window
+import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 
 data DragTarget = ResizeLeft | ResizeRight
@@ -132,6 +136,8 @@ data Action
   | ModifyVersionFromModal Int (Maybe Int)
   | DeleteDraft
   | DoNothing
+  | HandleWindowResize Number
+  | Finalize
 
 type State = FPOState
   ( docID :: DocumentID
@@ -184,6 +190,9 @@ type State = FPOState
   -- obtained from TOC
   , upToDateVersion :: Maybe Version
   , pendingUpdateElementID :: Maybe Int
+  , mListener :: Maybe (HS.Listener Action)
+  , mResizeObserver :: Maybe ResizeObserver
+  , mResizeSubscriptionId :: Maybe SubscriptionId
   )
 
 type ElemVersion =
@@ -216,6 +225,7 @@ splitview = connect selectTranslator $ H.mkComponent
       { initialize = Just Init
       , handleAction = handleAction
       , receive = Just <<< Receive
+      , finalize = Just Finalize
       }
   }
   where
@@ -248,6 +258,9 @@ splitview = connect selectTranslator $ H.mkComponent
     , modalData: Nothing
     , upToDateVersion: Nothing
     , pendingUpdateElementID: Nothing
+    , mListener: Nothing
+    , mResizeObserver: Nothing
+    , mResizeSubscriptionId: Nothing
     }
 
   render :: State -> H.ComponentHTML Action Slots m
@@ -559,6 +572,27 @@ splitview = connect selectTranslator $ H.mkComponent
       handleAction UpdateMSelectedTocEntry
       H.tell _toc unit (TOC.SelectFirstEntry)
 
+      -- Subscribe to resize events and store subscription for cleanup
+      { emitter, listener } <- H.liftEffect HS.create
+      subscription <- H.subscribe emitter
+
+      H.modify_ _
+        { mListener = Just listener
+        , mResizeSubscriptionId = Just subscription
+        }
+
+      H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
+        -- Set up ResizeObserver to monitor size changes
+        let
+          callback _ _ = do
+            -- Get the current width directly from the element
+            width <- HTMLElement.offsetWidth el
+            HS.notify listener (HandleWindowResize width)
+
+        observer <- H.liftEffect $ resizeObserver callback
+        H.liftEffect $ observe (HTMLElement.toElement el) {} observer
+        H.modify_ _ { mResizeObserver = Just observer }
+
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
 
@@ -649,6 +683,18 @@ splitview = connect selectTranslator $ H.mkComponent
     -- Stop resizing, when mouse is released (is detected by browser)
     StopResize _ -> do
       H.modify_ _ { mDragTarget = Nothing }
+
+    HandleWindowResize width -> do
+      state <- H.get
+      let newState = handleWindowResize width state
+      H.modify_ \st -> st
+        { sidebarRatio = newState.sidebarRatio
+        , editorRatio = newState.editorRatio
+        , previewRatio = newState.previewRatio
+        , lastExpandedSidebarRatio = newState.lastExpandedSidebarRatio
+        , lastExpandedPreviewRatio = newState.lastExpandedPreviewRatio
+        }
+      H.tell _editor 0 (Editor.UpdateEditorSize (newState.editorRatio * width))
 
     -- While mouse is hold down, resizer move to position of mouse
     -- (with certain rules)
@@ -807,6 +853,7 @@ splitview = connect selectTranslator $ H.mkComponent
       let
         numberWidth = toNumber width
         newState = togglePreview numberWidth state
+      H.tell _editor 0 (Editor.UpdateEditorSize $ numberWidth * state.editorRatio)
       H.modify_ \_ -> newState
 
     ModifyVersionMapping tocID vID cData -> do
@@ -1235,6 +1282,13 @@ splitview = connect selectTranslator $ H.mkComponent
         -- s <- H.get
         -- updateTree $ changeNodeName path newName s.tocEntries
         pure unit
+
+    Finalize -> do
+      -- Clean up ResizeObserver
+      mObserver <- H.gets _.mResizeObserver
+      case mObserver of
+        Just observer -> H.liftEffect $ disconnect observer
+        Nothing -> pure unit
 
     where
     -- Communicates tree changes to the server and TOC component.
@@ -1730,4 +1784,39 @@ togglePreview windowWidth oldState =
       { previewRatio = oldState.lastExpandedPreviewRatio
       , previewShown = true
       , editorRatio = oldState.editorRatio - oldState.lastExpandedPreviewRatio
+      }
+
+handleWindowResize :: Number -> State -> State
+handleWindowResize newWindowWidth oldState =
+  let
+    -- Berechne alte und neue Resizer-Ratios
+    totalCurrentContentRatio = oldState.sidebarRatio + oldState.editorRatio +
+      oldState.previewRatio
+    oldResizerRatio = 1.0 - totalCurrentContentRatio
+    newResizerRatio = 16.0 / newWindowWidth
+
+    -- Berechne verfügbaren Content-Space
+    oldContentSpace = totalCurrentContentRatio
+    newContentSpace = 1.0 - newResizerRatio
+
+    -- Scale-Faktor für Content-Bereiche
+    scaleFactor =
+      if oldContentSpace > 0.0 then newContentSpace / oldContentSpace
+      else 1.0
+
+    -- Skaliere alle Content-Ratios
+    newSidebarRatio = oldState.sidebarRatio * scaleFactor
+    newEditorRatio = oldState.editorRatio * scaleFactor
+    newPreviewRatio = oldState.previewRatio * scaleFactor
+
+    -- Skaliere auch die lastExpanded-Ratios
+    newLastExpandedSidebarRatio = oldState.lastExpandedSidebarRatio * scaleFactor
+    newLastExpandedPreviewRatio = oldState.lastExpandedPreviewRatio * scaleFactor
+  in
+    oldState
+      { sidebarRatio = newSidebarRatio
+      , editorRatio = newEditorRatio
+      , previewRatio = newPreviewRatio
+      , lastExpandedSidebarRatio = newLastExpandedSidebarRatio
+      , lastExpandedPreviewRatio = newLastExpandedPreviewRatio
       }

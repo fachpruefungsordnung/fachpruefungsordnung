@@ -184,8 +184,6 @@ type State = FPOState
   , commentState :: CommentState
   , fontSize :: Int
   , mListener :: Maybe (HS.Listener Action)
-  , mResizeObserver :: Maybe ResizeObserver
-  , mResizeSubscriptionId :: Maybe SubscriptionId
   , showButtonText :: Boolean
   , showButtons :: Boolean
   -- for autosave
@@ -675,9 +673,7 @@ editor = connect selectTranslator $ H.mkComponent
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
     Init -> do
-      -- Subscribe to resize events and store subscription for cleanup
-      { emitter, listener } <- H.liftEffect HS.create
-      subscription <- H.subscribe emitter
+      { listener } <- H.liftEffect HS.create
 
       -- Setup editor functionality (keydown listeners, Ace editor stuff, etc.)
       let
@@ -689,7 +685,6 @@ editor = connect selectTranslator $ H.mkComponent
         H.modify_ _
           { mEditor = Just editor_
           , mListener = Just listener
-          , mResizeSubscriptionId = Just subscription
           }
         fontSize <- H.gets _.fontSize
 
@@ -714,17 +709,6 @@ editor = connect selectTranslator $ H.mkComponent
           Editor.setEnableLiveAutocompletion true editor_
           -- set read only at the start to prevent users to write in not selected entry
           Editor.setReadOnly true editor_
-
-        -- Setup ResizeObserver for the container element
-        let
-          callback _ _ = do
-            -- Get the current width directly from the element
-            width <- offsetWidth el
-            HS.notify listener (HandleResize width)
-
-        observer <- H.liftEffect $ resizeObserver callback
-        H.liftEffect $ observe (toElement el) {} observer
-        H.modify_ _ { mResizeObserver = Just observer }
 
       -- If a comparison element is loaded, also load the current content in the primary editor
       compareTo <- H.gets _.compareToElement
@@ -1555,13 +1539,6 @@ editor = connect selectTranslator $ H.mkComponent
       let
         tgt = Win.toEventTarget win
         beforeunload = EventType "beforeunload"
-      -- Cleanup observer and subscription
-      H.liftEffect $ case state.mResizeObserver of
-        Just obs -> disconnect obs
-        Nothing -> pure unit
-      case state.mResizeSubscriptionId of
-        Just subscription -> H.unsubscribe subscription
-        Nothing -> pure unit
       case state.saveState.mBeforeUnloadListener of
         Just l -> H.liftEffect $ removeEventListener beforeunload l false tgt
         _ -> pure unit
@@ -2144,8 +2121,6 @@ initialState { context, input } =
   , commentState: initialCommentState
   , fontSize: 12
   , mListener: Nothing
-  , mResizeObserver: Nothing
-  , mResizeSubscriptionId: Nothing
   , showButtonText: true
   , showButtons: true
   , saveState: initialSaveState
