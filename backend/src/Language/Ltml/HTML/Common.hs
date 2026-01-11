@@ -30,9 +30,8 @@ module Language.Ltml.HTML.Common
     , TocEntry
     , TocCategory (..)
     , addTocEntry
-    , addPhantomTocEntry
-    , PhantomTocEntry
-    , RenderedTocEntry
+    , addFrontendTocEntry
+    , FrontendTocEntry
     , Result (..)
     , result
 
@@ -58,7 +57,6 @@ module Language.Ltml.HTML.Common
 import Control.Monad.Reader (ReaderT, runReaderT)
 import Control.Monad.State (State, get, modify, runState)
 import Data.Aeson (FromJSON, ToJSON)
-import Data.ByteString.Lazy (ByteString)
 import Data.DList (DList, snoc)
 import qualified Data.DList as DList (empty)
 import Data.Map (Map)
@@ -127,10 +125,9 @@ data GlobalState = GlobalState
     -- ^ Holds all labels and the Html element that should be displayed when this label is referenced
     , tableOfContents :: ToC
     -- ^ Holds all entries for the table of contents as (Maybe key (e.g. § 1),
-    --   title, HTML id as anchor link, category). The title is wrapped into 'Result'.
-    --   In case of an parse error this title will be set to an Error title.
-    --   The 'Left' constructor holds metadata for the Frontend,
-    --   which is ignored when rendering the 'ToC'.
+    --   title, HTML id as anchor link, category).
+    , frontendToC :: FrontendToC
+    -- ^ Holds textual ToC titles which include error or success marks for the frontend.
     , mangledLabelName :: Text
     -- ^ Mangled prefix name for generating new label names that do not exist in source language
     , mangledLabelID :: Int
@@ -215,6 +212,7 @@ initGlobalState =
         , locallyUsedFootnotes = Set.empty
         , labels = []
         , tableOfContents = DList.empty
+        , frontendToC = DList.empty
         , mangledLabelName = "_TOC_ENTRY_"
         , mangledLabelID = 0
         , enumStyles = []
@@ -301,26 +299,35 @@ instance Ord NumLabel where
 
 -- | The ToC uses a difference list to get constant time appending at the end, which has no speed draw backs,
 --   since the list is evaluated only ones when building the ToC Html at the end of rendering.
-type ToC = DList (Either PhantomTocEntry TocEntry)
+type ToC = DList TocEntry
 
-type TocEntry = (Maybe (Html ()), Result (Delayed (Html ())), Text, TocCategory)
+type TocEntry = (Maybe (Html ()), Delayed (Html ()), Text, TocCategory)
 
 data TocCategory = SomeSection | Other
 
--- | Toc Entry that only exists to send info to the Frontend;
---   It is ignored when rendering a ToC
-type PhantomTocEntry = (Maybe (Html ()), Result (Html ()))
+-- | ToC type which holds only textual titles and error information,
+--   which get send to the frontend.
+type FrontendToC = DList FrontendTocEntry
+
+-- | Type of exported ToC Entries (especially for Frontend);
+--   @Result@ signals if the generated title was parsed successfully or not
+type FrontendTocEntry = (Maybe Text, Result Text)
+
 
 -- | Add entry to table of contents with: key Html (e.g. § 1), title Html and html anchor link id;
 --   If Label is present uses it as the anchor link id, otherwise it creates a new mangled label name;
 --   the used label name is returned;
+--   ALSO adds a frontend ToC entry using the given textual id and title.
 addTocEntry
-    :: Maybe (Html ())
-    -> Result (Delayed (Html ()))
+    :: Maybe Text
+    -> Result Text
+    -> Maybe (Html ())
+    -> Delayed (Html ())
     -> Maybe Label
     -> TocCategory
     -> ReaderStateMonad Text
-addTocEntry mKey title mLabel cat = do
+addTocEntry mIdText rTitleText mKey title mLabel cat = do
+    addFrontendTocEntry mIdText rTitleText
     globalState <- get
     htmlId <- case mLabel of
         -- \| Create new mangled name for non existing label
@@ -335,26 +342,16 @@ addTocEntry mKey title mLabel cat = do
     modify
         ( \s ->
             s
-                { tableOfContents = snoc (tableOfContents s) (Right (mKey, title, htmlId, cat))
+                { tableOfContents = snoc (tableOfContents s) (mKey, title, htmlId, cat)
                 }
         )
     return htmlId
 
--- | Adds a phantom entry into the table of contents, which is ignored when rendering.
---   Its only purpose is to tell the frontend if a parse error occured in this segment.
---   This is only meant to be used for segments that do not have a normal Toc entry,
---   like @SimpleSection@s.
-addPhantomTocEntry
-    :: Result (Html ()) -> ReaderStateMonad ()
-addPhantomTocEntry resHtml =
-    -- \| Phantom Entries do not have an ID and are not Delayed;
-    --    Nothing is still needed to fit into the (ID, Title) scheme
-    let tocEntry = (Nothing, resHtml)
-     in modify (\s -> s {tableOfContents = snoc (tableOfContents s) (Left tocEntry)})
-
--- | Type of exported ToC Entries (especially for Frontend);
---   @Result@ signals if the generated title was parsed successfully or not
-type RenderedTocEntry = (Maybe ByteString, Result ByteString)
+-- | Adds a ToC entry which is meant for the frontend.
+--   Thus, it consists of textual entries and error information only.
+addFrontendTocEntry
+    :: Maybe Text -> Result Text -> ReaderStateMonad ()
+addFrontendTocEntry mIdText rTitle = modify (\s -> s {frontendToC = snoc (frontendToC s) (mIdText, rTitle)})
 
 data Result a = Success a | Error a
     deriving (Show, Generic)
