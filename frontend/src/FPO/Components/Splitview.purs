@@ -885,7 +885,8 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Comment.CommentOverview tocID fs -> do
         inLatest <- H.gets _.inLatest
-        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID inLatest fs)
+        H.tell _commentOverview unit
+          (CommentOverview.ReceiveComments tocID inLatest fs)
 
       Comment.SendAbstractedComments abstractCSs hasProblem -> do
         H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs hasProblem)
@@ -895,7 +896,8 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Comment.UpdatedComments tocID fs commentProblem -> do
         inLatest <- H.gets _.inLatest
-        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID inLatest fs)
+        H.tell _commentOverview unit
+          (CommentOverview.ReceiveComments tocID inLatest fs)
         H.tell _editor 0 (Editor.UpdateCommentProblem commentProblem)
 
       Comment.SetReAnchor reAnchor -> do
@@ -1017,7 +1019,8 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Editor.RequestComments docID entryID markerIDs inLatest -> do
         H.modify_ _ { inLatest = inLatest }
-        H.tell _comment unit (Comment.RequestComments docID entryID markerIDs inLatest)
+        H.tell _comment unit
+          (Comment.RequestComments docID entryID markerIDs inLatest)
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get

@@ -25,7 +25,13 @@ renderFirstComment
   -> action
   -> FirstComment
   -> H.ComponentHTML action slots m
-renderFirstComment translator mTimeFormatter inLatest clickable clickAction firstComment =
+renderFirstComment
+  translator
+  mTimeFormatter
+  inLatest
+  clickable
+  clickAction
+  firstComment =
   HH.div
     ( [ HP.classes
           [ HB.p2
@@ -59,7 +65,7 @@ renderFirstComment translator mTimeFormatter inLatest clickable clickAction firs
             ( [ HH.span_ [ HH.text firstComment.comment.author ] ]
                 <>
                   case firstComment.resolved, firstComment.hasProblem, inLatest of
-                    true, _, _ -> 
+                    true, _, _ ->
                       [ HH.i
                           [ HP.classes
                               [ HB.bi
@@ -92,7 +98,7 @@ renderFirstComment translator mTimeFormatter inLatest clickable clickAction firs
                           ]
                           []
                       ]
-                    _, _, _ -> 
+                    _, _, _ ->
                       []
             )
         , HH.div
@@ -103,7 +109,8 @@ renderFirstComment translator mTimeFormatter inLatest clickable clickAction firs
         ]
     , HH.div
         [ HP.classes [ HB.mt2 ]
-        , HP.style "align-self: flex-end; font-size: 0.75rem; color: var(--comment-text);"
+        , HP.style
+            "align-self: flex-end; font-size: 0.75rem; color: var(--comment-text);"
         ]
         [ HH.text $ maybe
             (translate (label :: _ "comment_no_timestamp") translator)
@@ -144,7 +151,8 @@ renderComment translator mTimeFormatter c =
         ]
     , HH.div
         [ HP.classes [ HB.mt2 ]
-        , HP.style "align-self: flex-end; font-size: 0.75rem; color: var(--comment-text);"
+        , HP.style
+            "align-self: flex-end; font-size: 0.75rem; color: var(--comment-text);"
         ]
         [ HH.text $ maybe
             (translate (label :: _ "comment_no_timestamp") translator)

@@ -121,8 +121,6 @@ import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
 
-import Effect.Console (log)
-
 foreign import _resize :: Types.Editor -> Effect Unit
 
 type CommentState =
@@ -510,22 +508,28 @@ editor = connect selectTranslator $ H.mkComponent
                     , makeEditorToolbarButtonWithText
                         fullFeatures
                         state.showButtonText
-                        ( case state.commentState.commentProblem, state.isEditorOutdated of
+                        ( case
+                            state.commentState.commentProblem,
+                            state.isEditorOutdated
+                            of
                             true, false -> [ H.ClassName "btn-orange" ]
                             true, true -> [ H.ClassName "btn-blue" ]
                             _, _ -> []
-                          -- if state.commentState.commentProblem then
-                          --   [ H.ClassName "btn-orange" ]
-                          -- else []
+                        -- if state.commentState.commentProblem then
+                        --   [ H.ClassName "btn-orange" ]
+                        -- else []
                         )
                         ShowAllComments
-                        ( case state.commentState.commentProblem, state.isEditorOutdated of
+                        ( case
+                            state.commentState.commentProblem,
+                            state.isEditorOutdated
+                            of
                             true, false -> "bi-exclamation-circle-fill"
                             true, true -> "bi bi-clock-history"
                             _, _ -> "bi-chat-square"
-                          -- if state.commentState.commentProblem then
-                          --   "bi-exclamation-circle-fill"
-                          -- else "bi-chat-square"
+                        -- if state.commentState.commentProblem then
+                        --   "bi-exclamation-circle-fill"
+                        -- else "bi-chat-square"
                         )
                         (translate (label :: _ "editor_allComments") state.translator)
                     ]
@@ -1665,7 +1669,8 @@ editor = connect selectTranslator $ H.mkComponent
                       isDraftAvailable
                   }
                 -- Get comments information from Comment Child
-                H.raise (RequestComments state.docID entry.id markerIDs (isNothing rev))
+                H.raise
+                  (RequestComments state.docID entry.id markerIDs (isNothing rev))
 
           --will be set to true right now, but should be set to false if didn't change to draft
           case loadedDraftContent of
@@ -1714,8 +1719,6 @@ editor = connect selectTranslator $ H.mkComponent
               -- Add annotations from marker
               tmp <- for filMarkers \marker -> do
                 addAnchor marker session listener true
-
-              log $ show filMarkers
 
               pure (catMaybes tmp)
 

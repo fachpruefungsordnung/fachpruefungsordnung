@@ -153,7 +153,9 @@ commentview = connect selectTranslator $ H.mkComponent
                       ""
               )
           ]
-      , renderFirstComment state.translator state.mTimeFormatter state.inLatest false DoNothing first
+      , renderFirstComment state.translator state.mTimeFormatter state.inLatest false
+          DoNothing
+          first
       ]
         <> map (renderComment state.translator state.mTimeFormatter)
           commentSection.replies
