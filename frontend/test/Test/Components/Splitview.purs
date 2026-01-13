@@ -33,10 +33,6 @@ defaultState =
   { docID: 0
   , translator: fromFpoTranslator translator
   , mDragTarget: Nothing
-  , startMouseRatio: 0.0
-  , startSidebarRatio: 0.0
-  , startPreviewRatio: 0.0
-  , startEditorRatio: 0.0
   , sidebarRatio: 0.2
   , previewRatio: 0.4
   , editorRatio: 0.4

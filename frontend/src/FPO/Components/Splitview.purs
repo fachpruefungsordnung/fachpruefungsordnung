@@ -144,16 +144,6 @@ type State = FPOState
   ( docID :: DocumentID
   , mDragTarget :: Maybe DragTarget
 
-  -- Store the width values as ratios of the total width
-  -- TODO: Using the ratios to keep the ratio, when resizing the window
-
-  -- Instead of setting the width directly to mouse position, calculate a delta
-  -- for a smoother and correct resize experience with the start positions
-  , startMouseRatio :: Number
-  , startSidebarRatio :: Number
-  , startPreviewRatio :: Number
-  , startEditorRatio :: Number
-
   -- The current widths of the sidebar and middle content (as percentage ratios)
   , sidebarRatio :: Number
   , previewRatio :: Number
@@ -236,10 +226,6 @@ splitview = connect selectTranslator $ H.mkComponent
     { docID: input
     , translator: fromFpoTranslator context
     , mDragTarget: Nothing
-    , startMouseRatio: 0.0
-    , startSidebarRatio: 0.0
-    , startPreviewRatio: 0.0
-    , startEditorRatio: 0.0
     , sidebarRatio: 0.2
     , previewRatio: 0.4
     , editorRatio: 0.4
