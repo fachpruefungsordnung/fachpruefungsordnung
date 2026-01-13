@@ -93,7 +93,7 @@ import Web.HTML.Window as Web.HTML.Window
 import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 
-data DragTarget = ResizeLeft | ResizeRight
+data DragTarget = LeftResizer | RightResizer
 
 derive instance eqDragTarget :: Eq DragTarget
 
@@ -421,7 +421,7 @@ splitview = connect selectTranslator $ H.mkComponent
         ]
     -- Left Resizer
     , HH.div
-        [ HE.onMouseDown (StartResize ResizeLeft)
+        [ HE.onMouseDown (StartResize LeftResizer)
         , HP.style
             "width: 8px; \
             \cursor: col-resize; \
@@ -458,7 +458,7 @@ splitview = connect selectTranslator $ H.mkComponent
   rightResizer :: State -> H.ComponentHTML Action Slots m
   rightResizer state =
     HH.div
-      [ HE.onMouseDown (StartResize ResizeRight)
+      [ HE.onMouseDown (StartResize RightResizer)
       , HP.style
           "width: 8px; \
           \cursor: col-resize; \
@@ -676,8 +676,8 @@ splitview = connect selectTranslator $ H.mkComponent
     -- (Or until the browser detects the mouse is released)
     StartResize which mouse -> do
       case which of
-        ResizeLeft -> H.modify_ _ { sidebarShown = true }
-        ResizeRight -> H.modify_ _ { previewShown = true }
+        LeftResizer -> H.modify_ _ { sidebarShown = true }
+        RightResizer -> H.modify_ _ { previewShown = true }
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let
@@ -712,11 +712,11 @@ splitview = connect selectTranslator $ H.mkComponent
     -- While mouse is hold down, resizer move to position of mouse
     -- (with certain rules)
     -- Mouse here is a HTML MouseEvent
-    HandleMouseMove mouse -> do
+    HandleMouseMove mouseEvent -> do
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let
-        mouseXPos = toNumber $ clientX mouse
+        mouseXPos = toNumber $ clientX mouseEvent
         width = toNumber intWidth
 
       dragTargetAction <- H.gets _.mDragTarget
@@ -724,7 +724,7 @@ splitview = connect selectTranslator $ H.mkComponent
 
       case dragTargetAction of
         -- Resizing TOC or Comment Sidebar
-        Just ResizeLeft -> do
+        Just LeftResizer -> do
           let newResizeState = resizeFromLeft state.resizeState mouseXPos
 
           H.modify_ \st -> st { resizeState = newResizeState }
@@ -734,7 +734,7 @@ splitview = connect selectTranslator $ H.mkComponent
 
         -- TODO what if comment section or so is shown?
         -- TODO last expandedRatio
-        Just ResizeRight -> do
+        Just RightResizer -> do
           let
             mousePxFromRight = width - mouseXPos
             newResizeState = resizeFromRight state.resizeState mousePxFromRight
