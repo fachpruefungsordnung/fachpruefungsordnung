@@ -139,13 +139,25 @@ data Action
   | HandleWindowResize Number
   | Finalize
 
+type ResizeState =
+  { windowWidth :: Int
+  -- All the ratios here are ratios of the content width (i.e., total width minus resizers)
+  -- so all of the ratios should sum to 1.0
+  , sidebarRatio :: Number
+  , previewRatio :: Number
+  , editorRatio :: Number
+  , lastExpandedSidebarRatio :: Number
+  , lastExpandedPreviewRatio :: Number
+  , sidebarClosed :: Boolean
+  , previewClosed :: Boolean
+  }
+
 type State = FPOState
   ( docID :: DocumentID
   , mDragTarget :: Maybe DragTarget
 
   -- Store the width values as ratios of the total width
   -- TODO: Using the ratios to keep the ratio, when resizing the window
-  --      But how do we get the event of window resize?
 
   -- Instead of setting the width directly to mouse position, calculate a delta
   -- for a smoother and correct resize experience with the start positions
@@ -158,6 +170,8 @@ type State = FPOState
   , sidebarRatio :: Number
   , previewRatio :: Number
   , editorRatio :: Number
+  , resizeState :: ResizeState
+  , mStartResizeState :: Maybe ResizeState -- store the state at the start of resizing
 
   -- The last expanded sidebar width, used to restore the sidebar when toggling
   , lastExpandedSidebarRatio :: Number
@@ -243,6 +257,17 @@ splitview = connect selectTranslator $ H.mkComponent
     , editorRatio: 0.4
     , lastExpandedSidebarRatio: 0.2
     , lastExpandedPreviewRatio: 0.4
+    , resizeState:
+        { windowWidth: 0
+        , sidebarRatio: 0.2
+        , previewRatio: 0.4
+        , editorRatio: 0.4
+        , lastExpandedSidebarRatio: 0.2
+        , lastExpandedPreviewRatio: 0.4
+        , sidebarClosed: false
+        , previewClosed: false
+        }
+    , mStartResizeState: Nothing
     , renderedHtml: Nothing
     , testDownload: ""
     , tocEntries: Empty
@@ -716,30 +741,12 @@ splitview = connect selectTranslator $ H.mkComponent
       case dragTargetAction of
         -- Resizing TOC or Comment Sidebar
         Just ResizeLeft -> do
-          let
-            { newSidebarRatio
-            , newEditorRatio
-            , newPreviewRatio
-            , sidebarClosed
-            , previewClosed
-            } = resizeFromLeft
-              state
-              mouseXRatio
-              width
+          let newResizeState = resizeFromLeft state.resizeState mouseXPos
 
-          H.modify_ \st -> st
-            { sidebarRatio = newSidebarRatio
-            , editorRatio = newEditorRatio
-            , previewRatio = newPreviewRatio
-            , sidebarShown = not sidebarClosed
-            , previewShown = not previewClosed
-            , lastExpandedSidebarRatio =
-                if newSidebarRatio > minRatio then newSidebarRatio
-                else st.lastExpandedSidebarRatio
-            }
+          H.modify_ \st -> st { resizeState = newResizeState }
 
           H.tell _editor 0
-            (Editor.UpdateEditorSize (newEditorRatio * (toNumber intWidth)))
+            (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
 
         -- TODO what if comment section or so is shown?
         -- TODO last expandedRatio
@@ -1681,64 +1688,61 @@ type ResizeResult =
   }
 
 resizeFromLeft
-  :: State
+  :: ResizeState
   -> Number
-  -> Number
-  -> ResizeResult
+  -> ResizeState
 resizeFromLeft
-  { startSidebarRatio, startPreviewRatio, startEditorRatio }
-  mousePercentFromLeft
-  windowWidth =
+  resizeState
+  mousePxFromLeft =
   let
-    sidebarAndEditor = startSidebarRatio + startEditorRatio
-    resizerSizePercentage = 16.0 / windowWidth
+    widthNumber = toNumber resizeState.windowWidth
+    sidebarAndEditor = resizeState.sidebarRatio + resizeState.editorRatio
+    mousePercentFromLeft = mousePxFromLeft / widthNumber
+    contentWidth = widthNumber - 16.0
+    previewWidth = contentWidth * resizeState.previewRatio
+    editorWidth = contentWidth * resizeState.editorRatio
+    sidebarWidth = contentWidth * resizeState.sidebarRatio
   in
     -- close enough to hide sidebar
     if mousePercentFromLeft <= 0.05 then
-      { newSidebarRatio: 0.0
-      , newEditorRatio: sidebarAndEditor - (resizerSizePercentage / 2.0)
-      , newPreviewRatio: startPreviewRatio - (resizerSizePercentage / 2.0)
-      , sidebarClosed: true
-      , previewClosed: false
-      }
-    else if mousePercentFromLeft <= startSidebarRatio then
-      -- resizing to the left but not close enough to hide sidebar
-      { newSidebarRatio: mousePercentFromLeft - (resizerSizePercentage / 3.0)
-      , newEditorRatio: sidebarAndEditor - mousePercentFromLeft -
-          (resizerSizePercentage / 3.0)
-      , newPreviewRatio: startPreviewRatio - (resizerSizePercentage / 3.0)
-      , sidebarClosed: false
-      , previewClosed: false
-      }
-    -- resizing to the right but editor still bigger than preview
+      resizeState
+        { sidebarRatio = 0.0
+        , editorRatio = sidebarAndEditor
+        , sidebarClosed = true
+        }
     else if
-      startSidebarRatio + startEditorRatio - mousePercentFromLeft >= startPreviewRatio then
-      { newSidebarRatio: mousePercentFromLeft - (resizerSizePercentage / 3.0)
-      , newEditorRatio: sidebarAndEditor - mousePercentFromLeft -
-          (resizerSizePercentage / 3.0)
-      , newPreviewRatio: startPreviewRatio - (resizerSizePercentage / 3.0)
-      , sidebarClosed: false
-      , previewClosed: false
-      }
+      mousePxFromLeft <= sidebarWidth
+        -- resizing to the left but not close enough to hide sidebar
+        || (mousePxFromLeft >= sidebarWidth) &&
+          (editorWidth - (mousePxFromLeft - sidebarWidth - 8.0) >= previewWidth)
+    -- OR resizing to the left but preview still bigger than editor
+    then
+      let
+        sidebarRatio = mousePxFromLeft / contentWidth
+      in
+        resizeState
+          { sidebarRatio = sidebarRatio
+          , editorRatio = sidebarAndEditor - sidebarRatio
+          }
     -- resizing to the right and preview bigger than editor
     else
       let
-        newEditorAndPreview = (1.0 - mousePercentFromLeft) / 2.0
+        sidebarRatio = mousePxFromLeft / contentWidth
+        newEditorAndPreview = (1.0 - sidebarRatio) / 2.0
       in
         if newEditorAndPreview >= 0.1 then
-          { newSidebarRatio: mousePercentFromLeft - (resizerSizePercentage / 3.0)
-          , newEditorRatio: newEditorAndPreview - (resizerSizePercentage / 3.0)
-          , newPreviewRatio: newEditorAndPreview - (resizerSizePercentage / 3.0)
-          , sidebarClosed: false
-          , previewClosed: false
-          }
+          resizeState
+            { sidebarRatio = sidebarRatio
+            , editorRatio = newEditorAndPreview
+            , previewRatio = newEditorAndPreview
+            }
         else
-          { newSidebarRatio: 0.8 - (resizerSizePercentage / 2.0)
-          , newEditorRatio: 0.2 - (resizerSizePercentage / 2.0)
-          , newPreviewRatio: 0.0
-          , sidebarClosed: false
-          , previewClosed: true
-          }
+          resizeState
+            { sidebarRatio = sidebarRatio
+            , editorRatio = 1.0 - sidebarRatio
+            , previewRatio = 0.0
+            , previewClosed = true
+            }
 
 resizeFromRight
   :: State
@@ -1747,19 +1751,12 @@ resizeFromRight
   -> ResizeResult
 resizeFromRight state mousePercentFromRight windowWidth =
   let
-    { newSidebarRatio, newEditorRatio, newPreviewRatio, sidebarClosed, previewClosed } =
-      resizeFromLeft
-        ( state
-            { startSidebarRatio = state.startPreviewRatio
-            , startPreviewRatio = state.startSidebarRatio
-            }
-        )
-        mousePercentFromRight
-        windowWidth
+    { sidebarClosed, previewClosed } = resizeFromLeft state.resizeState
+      mousePercentFromRight
   in
-    { newSidebarRatio: newPreviewRatio
-    , newEditorRatio
-    , newPreviewRatio: newSidebarRatio
+    { newSidebarRatio: 0.2
+    , newEditorRatio: 0.4
+    , newPreviewRatio: 0.4
     , sidebarClosed: previewClosed
     , previewClosed: sidebarClosed
     }
@@ -1792,7 +1789,6 @@ handleWindowResize newWindowWidth oldState =
     -- Berechne alte und neue Resizer-Ratios
     totalCurrentContentRatio = oldState.sidebarRatio + oldState.editorRatio +
       oldState.previewRatio
-    oldResizerRatio = 1.0 - totalCurrentContentRatio
     newResizerRatio = 16.0 / newWindowWidth
 
     -- Berechne verfügbaren Content-Space
