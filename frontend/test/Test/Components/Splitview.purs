@@ -164,143 +164,93 @@ resizeFromLeftTest =
 resizeFromRightTest :: Spec Unit
 resizeFromRightTest =
   describe "resizeFromRight" do
-    it "when dragging to the right then make preview smaller and editor bigger" do
+    it "makes the preview smaller when dragging to the right" do
+      let mousePxFromRight = 12.0
+      let { previewRatio } = resizeFromRight defaultResizeState mousePxFromRight
 
-      let startSidebarSize = 0.2
-      let startEditorSize = 0.4
-      let startPreviewSize = 0.4
-      let mousePercentFromRight = 0.12
-      let width = 100000.0
+      previewRatio `shouldBeNear` 0.12
 
-      let
-        { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
-          defaultState
-            { startSidebarRatio = startSidebarSize
-            , startEditorRatio = startEditorSize
-            , startPreviewRatio = startPreviewSize
-            }
-          mousePercentFromRight
-          width
+    it "makes preview ratio 0 when dragging to the right closer than 10%" do
+      let mousePxFromRight = 9.887
 
-      newSidebarRatio `shouldBeNear` 0.2
-      newEditorRatio `shouldBeNear` 0.68
-      newPreviewRatio `shouldBeNear` 0.12
+      let { previewRatio } = resizeFromRight defaultResizeState mousePxFromRight
+      previewRatio `shouldBeNear` 0.0
 
-    it
-      "when dragging to the right more than 5% close to the left side, then set preview ratio to 0"
+    it "hides preview, when dragging to the right more than 10% close to the right side"
       do
-
-        let startSidebarSize = 0.2
-        let startEditorSize = 0.4
-        let startPreviewSize = 0.4
-        let mousePercentFromRight = 0.04887
-        let width = 100000.0
-
-        let
-          { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
-            defaultState
-              { startSidebarRatio = startSidebarSize
-              , startEditorRatio = startEditorSize
-              , startPreviewRatio = startPreviewSize
-              }
-            mousePercentFromRight
-            width
-
-        newSidebarRatio `shouldBeNear` 0.2
-        newEditorRatio `shouldBeNear` 0.8
-        newPreviewRatio `shouldBeNear` 0.0
-
-    it
-      "when dragging to the right more than 5% close to the left side, then hide preview"
-      do
-
-        let startSidebarSize = 0.2
-        let startEditorSize = 0.4
-        let startPreviewSize = 0.4
-        let mousePercentFromRight = 0.04887
-        let width = 100000.0
-
-        let
-          { previewClosed } = resizeFromRight
-            defaultState
-              { startSidebarRatio = startSidebarSize
-              , startEditorRatio = startEditorSize
-              , startPreviewRatio = startPreviewSize
-              }
-            mousePercentFromRight
-            width
+        let mousePxFromRight = 9.887
+        let { previewClosed } = resizeFromRight defaultResizeState mousePxFromRight
 
         previewClosed `shouldEqual` true
 
     it
-      "when dragging to the right so that the editor is still bigger than preview just resize editor"
+      "sets last expanded preview ratio, when dragging to the right more than 10% close to the right side"
       do
-
-        let startSidebarSize = 0.2
-        let startEditorSize = 0.4
-        let startPreviewSize = 0.4
-        let mousePercentFromRight = 0.45
-        let width = 100000.0
-
+        let mousePxFromRight = 9.887
         let
-          { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
-            defaultState
-              { startSidebarRatio = startSidebarSize
-              , startEditorRatio = startEditorSize
-              , startPreviewRatio = startPreviewSize
-              }
-            mousePercentFromRight
-            width
+          { lastExpandedPreviewRatio } = resizeFromRight defaultResizeState
+            mousePxFromRight
 
-        newSidebarRatio `shouldBeNear` 0.2
-        newEditorRatio `shouldBeNear` 0.35
-        newPreviewRatio `shouldBeNear` 0.45
+        lastExpandedPreviewRatio `shouldBeNear` 0.4
+
+    it "makes the editor bigger when dragging to the right" do
+      let mousePxFromRight = 12.0
+      let { editorRatio } = resizeFromRight defaultResizeState mousePxFromRight
+
+      editorRatio `shouldBeNear` 0.68
 
     it
-      "when dragging to the right so that the editor is smaller bigger than preview make both equally small"
+      "only makes the editor smaller when dragging to the left so that the editor is still bigger than sidebar"
       do
-
-        let startSidebarSize = 0.4
-        let startEditorSize = 0.4
-        let startPreviewSize = 0.2
-        let mousePercentFromRight = 0.5
-        let width = 100000.0
-
+        let mousePxFromRight = 35.0
         let
-          { newSidebarRatio, newEditorRatio, newPreviewRatio } = resizeFromRight
-            defaultState
-              { startSidebarRatio = startSidebarSize
-              , startEditorRatio = startEditorSize
-              , startPreviewRatio = startPreviewSize
-              }
-            mousePercentFromRight
-            width
+          { editorRatio } = resizeFromRight
+            ( defaultResizeState
+                { sidebarRatio = 0.3, editorRatio = 0.4, previewRatio = 0.3 }
+            )
+            mousePxFromRight
 
-        newSidebarRatio `shouldBeNear` 0.25
-        newEditorRatio `shouldBeNear` 0.25
-        newPreviewRatio `shouldBeNear` 0.5
+        editorRatio `shouldBeNear` 0.35
 
     it
-      "when dragging to the left so that the sidebar is smaller than 10%, hide it"
+      "makes sidebar and editor equally small when dragging to the left so that the editor is smaller than sidebar"
       do
-
-        let startSidebarSize = 0.4
-        let startEditorSize = 0.4
-        let startPreviewSize = 0.2
-        let mousePercentFromRight = 0.85
-        let width = 100000.0
-
+        let mousePxFromRight = 50.0
         let
-          { sidebarClosed } = resizeFromRight
-            defaultState
-              { startSidebarRatio = startSidebarSize
-              , startEditorRatio = startEditorSize
-              , startPreviewRatio = startPreviewSize
-              }
-            mousePercentFromRight
-            width
+          { editorRatio, sidebarRatio } = resizeFromRight
+            ( defaultResizeState
+                { sidebarRatio = 0.3, editorRatio = 0.4, previewRatio = 0.3 }
+            )
+            mousePxFromRight
+
+        editorRatio `shouldBeNear` 0.25
+        sidebarRatio `shouldBeNear` 0.25
+
+    it
+      "hides the sidebar, when dragging to the left more than 5% close to the left side"
+      do
+        let mousePxFromRight = 100.0
+        let { sidebarClosed } = resizeFromRight defaultResizeState mousePxFromRight
 
         sidebarClosed `shouldEqual` true
+
+    it
+      "sets the sidebar width to 0, when dragging to the left more than 5% close to the left side"
+      do
+        let mousePxFromRight = 100.0
+        let { sidebarRatio } = resizeFromRight defaultResizeState mousePxFromRight
+
+        sidebarRatio `shouldBeNear` 0.0
+
+    it
+      "sets the latest sidebar width to start sidebar width, when dragging to the left more than 5% close to the left side"
+      do
+        let mousePxFromRight = 100.0
+        let
+          { lastExpandedSidebarRatio } = resizeFromRight defaultResizeState
+            mousePxFromRight
+
+        lastExpandedSidebarRatio `shouldBeNear` 0.2
 
 togglePreviewTest :: Spec Unit
 togglePreviewTest =

@@ -752,26 +752,13 @@ splitview = connect selectTranslator $ H.mkComponent
         -- TODO last expandedRatio
         Just ResizeRight -> do
           let
-            { newSidebarRatio
-            , newEditorRatio
-            , newPreviewRatio
-            , sidebarClosed
-            , previewClosed
-            } = resizeFromRight state (1.0 - mouseXRatio) width
+            mousePxFromRight = width - mouseXPos
+            newResizeState = resizeFromRight state.resizeState mousePxFromRight
 
-          H.modify_ \st -> st
-            { sidebarRatio = newSidebarRatio
-            , editorRatio = newEditorRatio
-            , previewRatio = newPreviewRatio
-            , sidebarShown = not sidebarClosed
-            , previewShown = not previewClosed
-            , lastExpandedSidebarRatio =
-                if newSidebarRatio > minRatio then newSidebarRatio
-                else st.lastExpandedSidebarRatio
-            }
+          H.modify_ \st -> st { resizeState = newResizeState }
 
           H.tell _editor 0
-            (Editor.UpdateEditorSize (newEditorRatio * (toNumber intWidth)))
+            (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
 
         _ -> pure unit
 
@@ -1745,21 +1732,66 @@ resizeFromLeft
             }
 
 resizeFromRight
-  :: State
+  :: ResizeState
   -> Number
-  -> Number
-  -> ResizeResult
-resizeFromRight state mousePercentFromRight windowWidth =
+  -> ResizeState
+resizeFromRight
+  resizeState
+  mousePxFromRight =
   let
-    { sidebarClosed, previewClosed } = resizeFromLeft state.resizeState
-      mousePercentFromRight
+    widthNumber = toNumber resizeState.windowWidth
+    previewAndEditor = resizeState.previewRatio + resizeState.editorRatio
+    contentWidth = widthNumber - 16.0
+    sidebarWidth = contentWidth * resizeState.sidebarRatio
+    editorWidth = contentWidth * resizeState.editorRatio
+    previewWidth = contentWidth * resizeState.previewRatio
+    -- Calculate position from left for sidebar closing logic
+    mousePxFromLeft = widthNumber - mousePxFromRight
+    mousePercentFromLeft = mousePxFromLeft / widthNumber
+    mousePercentFromRight = mousePxFromRight / widthNumber
   in
-    { newSidebarRatio: 0.2
-    , newEditorRatio: 0.4
-    , newPreviewRatio: 0.4
-    , sidebarClosed: previewClosed
-    , previewClosed: sidebarClosed
-    }
+    -- Hide preview when dragging close to right edge (10%)
+    if mousePercentFromRight <= 0.10 then
+      resizeState
+        { previewRatio = 0.0
+        , editorRatio = previewAndEditor
+        , previewClosed = true
+        , lastExpandedPreviewRatio = resizeState.previewRatio
+        }
+    else if
+      mousePxFromRight <= previewWidth
+        -- resizing to the right but not close enough to hide preview
+        || (mousePxFromRight >= previewWidth) &&
+          (editorWidth - (mousePxFromRight - previewWidth - 8.0) >= sidebarWidth)
+    -- OR resizing to the right but sidebar still bigger than editor
+    then
+      let
+        previewRatio = mousePxFromRight / contentWidth
+      in
+        resizeState
+          { previewRatio = previewRatio
+          , editorRatio = previewAndEditor - previewRatio
+          }
+    -- Hide sidebar when dragging close to left edge (5%)
+    else
+      let
+        previewRatio = mousePxFromRight / contentWidth
+        newEditorAndSidebar = (1.0 - previewRatio) / 2.0
+      in
+        -- resizing to the left and sidebar bigger than editor - make them equal
+        if newEditorAndSidebar > 0.05 then
+          resizeState
+            { previewRatio = previewRatio
+            , editorRatio = newEditorAndSidebar
+            , sidebarRatio = newEditorAndSidebar
+            }
+        else
+          resizeState
+            { sidebarRatio = 0.0
+            , editorRatio = resizeState.sidebarRatio + resizeState.editorRatio
+            , sidebarClosed = true
+            , lastExpandedSidebarRatio = resizeState.sidebarRatio
+            }
 
 togglePreview :: Number -> State -> State
 togglePreview windowWidth oldState =
