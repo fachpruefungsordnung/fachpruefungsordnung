@@ -144,6 +144,7 @@ data Action
   | ModifyVersionFromModal Int (Maybe Int)
   | DeleteDraft
   | DoNothing
+  | HandleWindowResize Number
   | Finalize
 
 type State = FPOState
