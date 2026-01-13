@@ -1,0 +1,14 @@
+/* app.css – central CSS collection file
+   IMPORTANT: @import must be at the very top (before all other rules)! 
+   if you use CSS variables, it must come first */
+@import url("./editor-theme.css");
+@import url("./editor.css");
+@import url("./comment.css");
+@import url("./highlighting.css");
+@import url("./home.css");
+@import url("./profile.css");
+@import url("./responsive.css");
+@import url("./toasts.css");
+@import url("./toc.css");
+@import url("./tooltip.css");
+@import url("./user-dropdown.css");

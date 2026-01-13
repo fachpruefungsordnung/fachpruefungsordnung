@@ -21,10 +21,17 @@ renderFirstComment
    . Translator Labels
   -> Maybe Formatter
   -> Boolean
+  -> Boolean
   -> action
   -> FirstComment
   -> H.ComponentHTML action slots m
-renderFirstComment translator mTimeFormatter clickable clickAction firstComment =
+renderFirstComment
+  translator
+  mTimeFormatter
+  inLatest
+  clickable
+  clickAction
+  firstComment =
   HH.div
     ( [ HP.classes
           [ HB.p2
@@ -38,11 +45,12 @@ renderFirstComment translator mTimeFormatter clickable clickAction firstComment 
       , HP.style
           ( "background-color:"
               <>
-                ( if firstComment.resolved then "rgba(66, 250, 0, 0.9)"
-                  else if firstComment.hasProblem then "rgb(253, 126, 20)"
-                  else "rgba(246, 250, 0, 0.9)"
+                ( case firstComment.resolved, firstComment.hasProblem, inLatest of
+                    true, _, _ -> "var(--comment-bg-resolved);"
+                    _, true, true -> "var(--comment-bg-problem);"
+                    _, true, false -> "var(--comment-bg-outdated);"
+                    _, _, _ -> "var(--comment-bg-first);"
                 )
-              <> ";"
           )
       ]
         <>
@@ -56,29 +64,42 @@ renderFirstComment translator mTimeFormatter clickable clickAction firstComment 
             ]
             ( [ HH.span_ [ HH.text firstComment.comment.author ] ]
                 <>
-                  if firstComment.resolved then
-                    [ HH.i
-                        [ HP.classes
-                            [ HB.bi
-                            , H.ClassName "bi-check-circle-fill"
-                            , HB.msAuto
-                            , H.ClassName "fs-4"
-                            ]
-                        ]
-                        []
-                    ]
-                  else if firstComment.hasProblem then
-                    [ HH.i
-                        [ HP.classes
-                            [ HB.bi
-                            , H.ClassName "bi-exclamation-circle-fill"
-                            , HB.msAuto
-                            , H.ClassName "fs-4"
-                            ]
-                        ]
-                        []
-                    ]
-                  else []
+                  case firstComment.resolved, firstComment.hasProblem, inLatest of
+                    true, _, _ ->
+                      [ HH.i
+                          [ HP.classes
+                              [ HB.bi
+                              , H.ClassName "bi-check-circle-fill"
+                              , HB.msAuto
+                              , H.ClassName "fs-4"
+                              ]
+                          ]
+                          []
+                      ]
+                    _, true, true ->
+                      [ HH.i
+                          [ HP.classes
+                              [ HB.bi
+                              , H.ClassName "bi-exclamation-circle-fill"
+                              , HB.msAuto
+                              , H.ClassName "fs-4"
+                              ]
+                          ]
+                          []
+                      ]
+                    _, true, false ->
+                      [ HH.i
+                          [ HP.classes
+                              [ HB.bi
+                              , H.ClassName "bi-clock-history"
+                              , HB.msAuto
+                              , H.ClassName "fs-4"
+                              ]
+                          ]
+                          []
+                      ]
+                    _, _, _ ->
+                      []
             )
         , HH.div
             [ HP.classes [ HB.mt1 ]
@@ -88,7 +109,8 @@ renderFirstComment translator mTimeFormatter clickable clickAction firstComment 
         ]
     , HH.div
         [ HP.classes [ HB.mt2 ]
-        , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;"
+        , HP.style
+            "align-self: flex-end; font-size: 0.75rem; color: var(--comment-text);"
         ]
         [ HH.text $ maybe
             (translate (label :: _ "comment_no_timestamp") translator)
@@ -115,7 +137,7 @@ renderComment translator mTimeFormatter c =
         , HB.dFlex
         , HB.flexColumn
         ]
-    , HP.style "background-color: #fff9c4;"
+    , HP.style "background-color: var(--comment-bg-default);"
     ]
     [ HH.div_
         [ HH.div
@@ -129,7 +151,8 @@ renderComment translator mTimeFormatter c =
         ]
     , HH.div
         [ HP.classes [ HB.mt2 ]
-        , HP.style "align-self: flex-end; font-size: 0.75rem; color: #555;"
+        , HP.style
+            "align-self: flex-end; font-size: 0.75rem; color: var(--comment-text);"
         ]
         [ HH.text $ maybe
             (translate (label :: _ "comment_no_timestamp") translator)
