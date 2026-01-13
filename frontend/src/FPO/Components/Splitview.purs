@@ -674,28 +674,16 @@ splitview = connect selectTranslator $ H.mkComponent
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
-    StartResize which mouse -> do
-      case which of
-        LeftResizer -> H.modify_ _ { sidebarShown = true }
-        RightResizer -> H.modify_ _ { previewShown = true }
-      win <- H.liftEffect Web.HTML.window
-      intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
-      let
-        x = toNumber $ clientX mouse
-        width = toNumber intWidth
-        mouseXRatio = x / width
+    StartResize dragTarget mouseEvent -> do
       H.modify_ \st -> st
-        { mDragTarget = Just which
-        , startMouseRatio = mouseXRatio
-        , startSidebarRatio = st.sidebarRatio
-        , startEditorRatio = st.editorRatio
-        , startPreviewRatio = st.previewRatio
+        { mDragTarget = Just dragTarget
+        , mStartResizeState = Just st.resizeState
         }
-      handleAction $ HandleMouseMove mouse
+      handleAction $ HandleMouseMove mouseEvent
 
     -- Stop resizing, when mouse is released (is detected by browser)
     StopResize _ -> do
-      H.modify_ _ { mDragTarget = Nothing }
+      H.modify_ _ { mDragTarget = Nothing, mStartResizeState = Nothing }
 
     HandleWindowResize width -> do
       state <- H.get
@@ -713,44 +701,45 @@ splitview = connect selectTranslator $ H.mkComponent
     -- (with certain rules)
     -- Mouse here is a HTML MouseEvent
     HandleMouseMove mouseEvent -> do
+      state <- H.get
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let
         mouseXPos = toNumber $ clientX mouseEvent
         width = toNumber intWidth
 
-      dragTargetAction <- H.gets _.mDragTarget
-      state <- H.get
-
-      case dragTargetAction of
+      case state.mDragTarget, state.mStartResizeState of
         -- Resizing TOC or Comment Sidebar
-        Just LeftResizer -> do
-          let newResizeState = resizeFromLeft state.resizeState mouseXPos
+        Just LeftResizer, Just startResizeState -> do
+          let newResizeState = resizeFromLeft startResizeState mouseXPos
 
           H.modify_ \st -> st { resizeState = newResizeState }
 
           H.tell _editor 0
+            (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
+          H.tell _editor 1
             (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
 
         -- TODO what if comment section or so is shown?
         -- TODO last expandedRatio
-        Just RightResizer -> do
+        Just RightResizer, Just startResizeState -> do
           let
             mousePxFromRight = width - mouseXPos
-            newResizeState = resizeFromRight state.resizeState mousePxFromRight
+            newResizeState = resizeFromRight startResizeState mousePxFromRight
 
           H.modify_ \st -> st { resizeState = newResizeState }
 
           H.tell _editor 0
             (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
+          H.tell _editor 1
+            (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
 
-        _ -> pure unit
+        _, _ -> pure unit
 
-      when (isJust dragTargetAction) do
+      -- Update editor width for handling line breaks and stuff
+      when (isJust state.mDragTarget) do
         H.tell _editor 0 (Editor.EditorResize)
         H.tell _editor 1 (Editor.EditorResize)
-
-    -- Toggle actions
 
     UpdateMSelectedTocEntry -> do
       cToc <- H.request _toc unit TOC.RequestCurrentTocEntry
