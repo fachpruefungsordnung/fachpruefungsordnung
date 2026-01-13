@@ -9,6 +9,7 @@ import Test.UI.Resizing
   ( resizeFromLeftTest
   , resizeFromRightTest
   , togglePreviewTest
+  , toggleSidebarTest
   )
 
 main :: Effect Unit
@@ -16,3 +17,4 @@ main = do
   runSpecAndExitProcess [ consoleReporter ] resizeFromLeftTest
   runSpecAndExitProcess [ consoleReporter ] resizeFromRightTest
   runSpecAndExitProcess [ consoleReporter ] togglePreviewTest
+  runSpecAndExitProcess [ consoleReporter ] toggleSidebarTest

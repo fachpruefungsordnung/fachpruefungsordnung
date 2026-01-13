@@ -2,11 +2,18 @@ module Test.UI.Resizing
   ( resizeFromLeftTest
   , resizeFromRightTest
   , togglePreviewTest
+  , toggleSidebarTest
   ) where
 
 import Prelude
 
-import FPO.UI.Resizing (ResizeState, resizeFromLeft, resizeFromRight, togglePreview)
+import FPO.UI.Resizing
+  ( ResizeState
+  , resizeFromLeft
+  , resizeFromRight
+  , togglePreview
+  , toggleSidebar
+  )
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 import Test.Util (shouldBeNear)
@@ -230,3 +237,57 @@ togglePreviewTest =
               { previewClosed = true, lastExpandedPreviewRatio = 0.15 }
           )
       previewRatio `shouldEqual` 0.15
+
+    it "makes the editor bigger when closing the preview" do 
+      let { editorRatio } = togglePreview defaultResizeState
+      editorRatio `shouldBeNear` 0.8
+    
+    it "makes the editor smaller when opening the preview" do 
+      let 
+        { editorRatio } = togglePreview  
+          ( defaultResizeState
+              { previewClosed = true, lastExpandedPreviewRatio = 0.15, editorRatio = 0.6 }
+          )
+      editorRatio `shouldBeNear` 0.45
+
+
+toggleSidebarTest :: Spec Unit
+toggleSidebarTest =
+  describe "toggleSidebarTest" do
+    it "closes sidebar, when it was open" do
+      let { sidebarClosed } = toggleSidebar defaultResizeState
+      sidebarClosed `shouldEqual` true
+
+    it "sets sidebar width to 0.0, when it was open" do
+      let { sidebarRatio } = toggleSidebar defaultResizeState
+      sidebarRatio `shouldEqual` 0.0
+
+    it "sets lastExpandedSidebarRatio to previous sidebarRatio, when it was open" do
+      let { lastExpandedSidebarRatio } = toggleSidebar defaultResizeState
+      lastExpandedSidebarRatio `shouldEqual` defaultResizeState.sidebarRatio
+
+    it "opens sidebar, when it was closed" do
+      let
+        { sidebarClosed } = toggleSidebar
+          (defaultResizeState { sidebarClosed = true })
+      sidebarClosed `shouldEqual` false
+
+    it "sets sidebar width to lastExpnadedSidebarRatio, when it was closed" do
+      let
+        { sidebarRatio } = toggleSidebar
+          ( defaultResizeState
+              { sidebarClosed = true, lastExpandedSidebarRatio = 0.15 }
+          )
+      sidebarRatio `shouldEqual` 0.15
+
+    it "makes the editor bigger when closing the sidebar" do 
+      let { editorRatio } = toggleSidebar defaultResizeState
+      editorRatio `shouldBeNear` 0.6
+
+    it "makes the editor smaller when opening the sidebar" do 
+      let 
+        { editorRatio } = toggleSidebar  
+          ( defaultResizeState
+              { sidebarClosed = true, lastExpandedSidebarRatio = 0.15, editorRatio = 0.6 }
+          )
+      editorRatio `shouldBeNear` 0.45

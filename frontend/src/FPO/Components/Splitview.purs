@@ -68,7 +68,13 @@ import FPO.Types
   , tocTreeToDocumentTree
   )
 import FPO.UI.Modals.DirtyVersionModal (dirtyVersionModal)
-import FPO.UI.Resizing (ResizeState, resizeFromLeft, resizeFromRight, togglePreview)
+import FPO.UI.Resizing
+  ( ResizeState
+  , resizeFromLeft
+  , resizeFromRight
+  , togglePreview
+  , toggleSidebar
+  )
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -760,32 +766,15 @@ splitview = connect selectTranslator $ H.mkComponent
       else
         H.modify_ _ { commentOverviewShown = false }
 
-    -- Toggle the sidebar
-    -- Add logic in calculating the middle ratio
-    -- to restore the last expanded middle ratio, when toggling preview back on
     ToggleSidebar -> do
       state <- H.get
-      -- close sidebar
-      if state.sidebarShown then
-        H.modify_ \st -> st
-          { sidebarRatio = 0.0
-          , lastExpandedSidebarRatio = st.sidebarRatio
-          , sidebarShown = false
-          }
-      -- open sidebar
-      else do
-        H.modify_ \st -> st
-          { sidebarRatio = st.lastExpandedSidebarRatio
-          , sidebarShown = true
-          }
-      H.tell _editor 0
-        ( Editor.UpdateEditorSize
-            (state.resizeState.editorRatio * state.resizeState.windowWidth)
-        )
-      H.tell _editor 1
-        ( Editor.UpdateEditorSize
-            (state.resizeState.editorRatio * state.resizeState.windowWidth)
-        )
+      let newResizeState = toggleSidebar state.resizeState
+      H.modify_ \st -> st { resizeState = newResizeState }
+
+      H.tell _editor 0 $ Editor.UpdateEditorSize
+        (newResizeState.editorRatio * newResizeState.windowWidth)
+      H.tell _editor 1 $ Editor.UpdateEditorSize
+        (newResizeState.editorRatio * newResizeState.windowWidth)
 
     DoNothing -> do
       pure unit
