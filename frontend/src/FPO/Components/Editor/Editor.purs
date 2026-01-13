@@ -89,7 +89,6 @@ import FPO.Types
   , CommentSection
   , FirstComment
   , TOCEntry
-  , emptyTOCEntry
   )
 import FPO.UI.HTML (decodeHtmlEntity)
 import FPO.UI.Modals.DiscardModal (discardModal)
@@ -209,13 +208,13 @@ type State = FPOState
 type Input = { docID :: DocumentID, elementData :: ElementData }
 
 data Output
-  = AddComment Int Int
+  = AddComment
   | ClickedQuery String
   | PostPDF String
   | RenamedNode String Path
-  | RequestComments Int Int (Array Int)
-  | SelectedCommentSection Int Int
-  | ShowAllCommentsOutput Int Int
+  | RequestComments Int Int (Array Int) Boolean
+  | SelectedCommentSection Int
+  | ShowAllCommentsOutput
   | RaiseDiscard
   | RaiseMergeMode String
   | Merged
@@ -449,7 +448,9 @@ editor = connect selectTranslator $ H.mkComponent
                           else []
                         )
                         Comment
-                        ( if (isJust state.commentState.reAnchor) then
+                        ( if
+                            (not state.isEditorOutdated) &&
+                              (isJust state.commentState.reAnchor) then
                             "bi-chat-square-quote-fill"
                           else "bi-chat-square-text"
                         )
@@ -504,14 +505,22 @@ editor = connect selectTranslator $ H.mkComponent
                     , makeEditorToolbarButtonWithText
                         fullFeatures
                         state.showButtonText
-                        ( if state.commentState.commentProblem then
-                            [ H.ClassName "btn-orange" ]
-                          else []
+                        ( case
+                            state.commentState.commentProblem,
+                            state.isEditorOutdated
+                            of
+                            true, false -> [ H.ClassName "btn-orange" ]
+                            true, true -> [ H.ClassName "btn-blue" ]
+                            _, _ -> []
                         )
                         ShowAllComments
-                        ( if state.commentState.commentProblem then
-                            "bi-exclamation-circle-fill"
-                          else "bi-chat-square"
+                        ( case
+                            state.commentState.commentProblem,
+                            state.isEditorOutdated
+                            of
+                            true, false -> "bi-exclamation-circle-fill"
+                            true, true -> "bi-clock-history"
+                            _, _ -> "bi-chat-square"
                         )
                         (translate (label :: _ "editor_allComments") state.translator)
                     ]
@@ -807,9 +816,7 @@ editor = connect selectTranslator $ H.mkComponent
         H.liftEffect $ Editor.focus ed
 
     ShowAllComments -> do
-      state <- H.get
-      let tocID = maybe (-1) _.id state.mTocEntry
-      H.raise $ ShowAllCommentsOutput state.docID tocID
+      H.raise $ ShowAllCommentsOutput
       H.gets _.mEditor >>= traverse_ \ed ->
         H.liftEffect $ Editor.focus ed
       H.modify_ \st -> st { commentState = st.commentState { reAnchor = Nothing } }
@@ -1181,14 +1188,14 @@ editor = connect selectTranslator $ H.mkComponent
                   true
 
                 case state.mTocEntry of
-                  Just entry -> do
+                  Just _ -> do
                     H.modify_ \st -> st
                       { commentState = st.commentState
                           { tmpLiveMarker = mLiveMarker
                           , selectedLiveMarker = mLiveMarker
                           }
                       }
-                    H.raise (AddComment state.docID entry.id)
+                    H.raise AddComment
                   Nothing -> pure unit
 
                 -- show comment dragger handles
@@ -1241,15 +1248,10 @@ editor = connect selectTranslator $ H.mkComponent
             Nothing -> failureLiveMarker
             Just found -> found
           foundID = lm.annotedMarkerID
-
-          -- need it only for its ID
-          tocEntry = case state.mTocEntry of
-            Nothing -> emptyTOCEntry
-            Just e -> e
         H.modify_ \st -> st
           { commentState = st.commentState { selectedLiveMarker = Just lm } }
         when (foundID >= 0 || foundID == -360) $
-          H.raise (SelectedCommentSection tocEntry.id foundID)
+          H.raise (SelectedCommentSection foundID)
 
     -- Comment Section Dragger Actions
 
@@ -1621,6 +1623,8 @@ editor = connect selectTranslator $ H.mkComponent
                   isDraftAvailable = case loadedDraftContent of
                     Right _ -> true
                     Left _ -> false
+                  isEditorOutdated' = version /= "latest" || loadInMergeMode ||
+                    isDraftAvailable
                 -- update the markers into state
                 H.modify_ \st -> st
                   { commentState = st.commentState
@@ -1629,11 +1633,13 @@ editor = connect selectTranslator $ H.mkComponent
                       , oldMarkerAnnoPos = empty
                       , markers = markers
                       }
-                  , isEditorOutdated = version /= "latest" || loadInMergeMode ||
-                      isDraftAvailable
+                  , isEditorOutdated = isEditorOutdated'
                   }
                 -- Get comments information from Comment Child
-                H.raise (RequestComments state.docID entry.id markerIDs)
+                H.raise
+                  ( RequestComments state.docID entry.id markerIDs
+                      (not isEditorOutdated')
+                  )
 
           --will be set to true right now, but should be set to false if didn't change to draft
           case loadedDraftContent of

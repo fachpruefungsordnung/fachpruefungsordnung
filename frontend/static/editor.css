@@ -1,0 +1,66 @@
+/* --- Marker --- */
+
+.ace_marker-layer .my-marker {
+  position: absolute;
+  z-index: 2;
+  background-color: var(--marker-bg);
+  border: 1px solid black;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+/* base class for comment section dragger handle */
+.ace_marker-layer .fpo-handle-start,
+.ace_marker-layer .fpo-handle-end {
+  position: absolute;
+  background: transparent;   /* Text nicht überdecken */
+  cursor: grab !important;   /* Hand-Cursor */
+  pointer-events: auto;      /* Klickbar */
+  user-select: none;         /* keine Textauswahl */
+  z-index: 4;
+}
+
+/* comment section dragger handle */
+.ace_marker-layer .fpo-handle-start::after,
+.ace_marker-layer .fpo-handle-end::after {
+  content: "";
+  position: absolute;
+  top: -2px;               /* etwas höher als Text */
+  left: -2px;
+  width: 5px;              /* dünn = Linie */
+  height: 1.6em;           /* so hoch wie die Textzeile */
+  background: var(--marker-bg);
+  border: 1px solid rgb(0,0,0);
+  box-sizing: border-box;
+}
+
+
+
+/* selected comment section */
+.ace_marker-layer .my-marker.selected {
+  box-shadow: inset var(--comment-shadow);
+  outline: 1px dashed currentColor;
+  outline-offset: -1px;
+}
+
+.ace_editor.fpo-dragging {
+  cursor: grabbing;
+}
+
+/* To make not mark the text underneath the dragged comment section */ 
+.ace_editor.fpo-dragging .ace_selection,
+.ace_editor.fpo-dragging .ace_marker-layer .ace_selected-word {
+  background: transparent !important;
+}
+
+/* --- Annotation --- */
+
+.ace_gutter-cell.ace_info {
+  /* Found icon on https://icon-sets.iconify.design/picon/?keyword=c&category=UI+Other+%2F+Mixed+Grid */
+  background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDggOCI+PHBhdGggZmlsbD0iI2U4YTU1MiIgZD0iTTQgNkwxIDhWMWg2djciLz48L3N2Zz4=");
+}
+
+.ace_editor .ace_marker-layer .ace_active-line {
+  z-index: 1;
+  background: var(--active-line-bg) !important; 
+}
