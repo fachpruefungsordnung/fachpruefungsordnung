@@ -99,7 +99,6 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, enabled, ref, style, title) as HP
-import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
@@ -115,9 +114,8 @@ import Web.Event.EventTarget
   , removeEventListener
   )
 import Web.HTML (HTMLElement, window)
-import Web.HTML.HTMLElement (offsetWidth, toElement)
+import Web.HTML.HTMLElement (toElement)
 import Web.HTML.Window as Win
-import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
 
@@ -266,8 +264,7 @@ data Action
 
 -- We use a query to get the content of the editor
 data Query a
-  = EditorResize a
-  | ReceiveFullTitle (Maybe String) a
+  = ReceiveFullTitle (Maybe String) a
   | SetDirtyFlag a
   -- | save the current content and send it to splitview
   | SaveSection a
@@ -1518,15 +1515,19 @@ editor = connect selectTranslator $ H.mkComponent
     HandleResize width -> do
       -- Decides whether to show button text based on the width.
       -- Because german labels are longer, we need to adjust the cutoff
-      -- threshold dynamically. Pretty sure this is not the best solution,
-      -- but it works.
-
+      -- threshold dynamically.
       lang <- H.liftEffect $ Store.loadLanguage
       let cutoff = if lang == Just "de-DE" then 690.0 else 592.0
       let noButtonsCutoff = 350.0
 
       H.modify_ _
         { showButtonText = width >= cutoff, showButtons = width >= noButtonsCutoff }
+
+      -- Let the editor itself handle internal details like line breaks with resizing
+      editor_ <- H.gets _.mEditor
+      case editor_ of
+        Nothing -> pure unit
+        Just ed -> H.liftEffect $ Editor.resize (Just true) ed
 
     Finalize -> do
       -- Save in case, the user changes the page (via Navbar)
@@ -1714,13 +1715,6 @@ editor = connect selectTranslator $ H.mkComponent
       H.modify_ _ { upToDateVersion = mVersion }
       -- there is a new container above the editor. Resize editor to be able to scroll all the way down
       handleAction Resize
-      pure (Just a)
-
-    EditorResize a -> do
-      editor_ <- H.gets _.mEditor
-      case editor_ of
-        Nothing -> pure unit
-        Just ed -> H.liftEffect $ Editor.resize (Just true) ed
       pure (Just a)
 
     ChangeSection entry rev mTitle a -> do

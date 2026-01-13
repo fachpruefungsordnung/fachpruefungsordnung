@@ -24,7 +24,7 @@ import Data.Either (Either(..))
 import Data.Foldable (traverse_)
 import Data.Formatter.DateTime (Formatter, parseFormatString)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.Regex as Regex
 import Data.String.Regex.Flags as RegexFlags
 import Effect.Aff (Milliseconds(..), delay)
@@ -719,11 +719,6 @@ splitview = connect selectTranslator $ H.mkComponent
 
         _, _ -> pure unit
 
-      -- Update editor width for handling line breaks and stuff
-      when (isJust state.mDragTarget) do
-        H.tell _editor 0 (Editor.EditorResize)
-        H.tell _editor 1 (Editor.EditorResize)
-
     UpdateMSelectedTocEntry -> do
       cToc <- H.request _toc unit TOC.RequestCurrentTocEntry
       H.modify_ _ { mSelectedTocEntry = join cToc }
@@ -769,9 +764,9 @@ splitview = connect selectTranslator $ H.mkComponent
     -- Add logic in calculating the middle ratio
     -- to restore the last expanded middle ratio, when toggling preview back on
     ToggleSidebar -> do
-      sidebarShown <- H.gets _.sidebarShown
+      state <- H.get
       -- close sidebar
-      if sidebarShown then
+      if state.sidebarShown then
         H.modify_ \st -> st
           { sidebarRatio = 0.0
           , lastExpandedSidebarRatio = st.sidebarRatio
@@ -783,7 +778,14 @@ splitview = connect selectTranslator $ H.mkComponent
           { sidebarRatio = st.lastExpandedSidebarRatio
           , sidebarShown = true
           }
-      H.tell _editor 0 (Editor.EditorResize)
+      H.tell _editor 0
+        ( Editor.UpdateEditorSize
+            (state.resizeState.editorRatio * state.resizeState.windowWidth)
+        )
+      H.tell _editor 1
+        ( Editor.UpdateEditorSize
+            (state.resizeState.editorRatio * state.resizeState.windowWidth)
+        )
 
     DoNothing -> do
       pure unit
