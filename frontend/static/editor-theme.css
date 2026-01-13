@@ -1,20 +1,20 @@
 :root {
   /* --- Comment sticky note --- */
-  --comment-bg-default:  #fff9c4; /* Post-it gelb */
-  --comment-bg-hover:    #fff3a6; /* leicht dunkler */
-  --comment-border:      #ffe08a; /* Rand */
-  --comment-text:        #212529; /* lesbarer Standardtext */
+  --comment-bg-default:  #fff9c4; /* Post-it yellow */
+  --comment-bg-hover:    #fff3a6; /* a bit darker */
+  --comment-border:      #ffe08a; /* edge */
+  --comment-text:        #212529; /* standard text */
   --comment-shadow:      0 0 0 1.5px #000;
   --comment-radius:      10px;
 
-  /* --- Comment status backgrounds (wenn du sie als BG nutzt) --- */
+  /* --- Comment status backgrounds --- */
   --comment-bg-first:   #FFFF00E6;
   --comment-bg-resolved: #42fa00;
   --comment-bg-problem:  #fd7e14;
   --comment-bg-outdated: #0099ff;
 
-  /* --- Accent colors (für Icons/Badges/Left-border) --- */
-  --accent-resolved: #198754;  /* etwas “bootstrapiger” als neon-grün */
+  /* --- Accent colors (for Icons/Badges/Left-border) --- */
+  --accent-resolved: #198754;
   --accent-problem:  #fd7e14;
   --accent-outdated: #0099ff;
 

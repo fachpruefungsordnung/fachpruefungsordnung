@@ -1,6 +1,6 @@
-/* app.css – zentrale CSS-Sammelstelle
-   WICHTIG: @import muss ganz oben stehen (vor allen anderen Regeln)! 
-   falls du CSS-Variablen nutzt, unbedingt zuerst */
+/* app.css – central CSS collection file
+   IMPORTANT: @import must be at the very top (before all other rules)! 
+   if you use CSS variables, it must come first */
 @import url("./editor-theme.css");
 @import url("./editor.css");
 @import url("./comment.css");

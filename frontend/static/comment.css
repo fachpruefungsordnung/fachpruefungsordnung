@@ -20,7 +20,7 @@
   border-color: var(--btn-blue-hover); 
 }
 
-/* Icons: gleiche Farbpalette wie Buttons */
+/* Icons: same color palette as buttons */
 .icon-orange { color:var(--btn-orange); }
 .icon-orange:hover { color: var(--btn-orange-hover); }
 

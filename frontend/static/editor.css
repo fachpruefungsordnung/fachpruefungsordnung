@@ -60,7 +60,6 @@
   background-image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDggOCI+PHBhdGggZmlsbD0iI2U4YTU1MiIgZD0iTTQgNkwxIDhWMWg2djciLz48L3N2Zz4=");
 }
 
-/* Active-Line bewusst nach hinten */
 .ace_editor .ace_marker-layer .ace_active-line {
   z-index: 1;
   background: var(--active-line-bg) !important; 
