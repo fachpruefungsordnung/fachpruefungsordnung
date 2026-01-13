@@ -2,6 +2,7 @@ module FPO.UI.Resizing
   ( ResizeState
   , resizeFromLeft
   , resizeFromRight
+  , togglePreview
   ) where
 
 import Prelude
@@ -133,3 +134,17 @@ resizeFromRight
             , sidebarClosed = true
             , lastExpandedSidebarRatio = resizeState.sidebarRatio
             }
+
+togglePreview :: ResizeState -> ResizeState
+togglePreview resizeState =
+  if resizeState.previewClosed then
+    resizeState
+      { previewClosed = false
+      , previewRatio = resizeState.lastExpandedPreviewRatio
+      }
+  else
+    resizeState
+      { previewClosed = true
+      , previewRatio = 0.0
+      , lastExpandedPreviewRatio = resizeState.previewRatio
+      }

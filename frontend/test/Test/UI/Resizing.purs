@@ -1,11 +1,12 @@
 module Test.UI.Resizing
   ( resizeFromLeftTest
   , resizeFromRightTest
+  , togglePreviewTest
   ) where
 
 import Prelude
 
-import FPO.UI.Resizing (ResizeState, resizeFromLeft, resizeFromRight)
+import FPO.UI.Resizing (ResizeState, resizeFromLeft, resizeFromRight, togglePreview)
 import Test.Spec (Spec, describe, it)
 import Test.Spec.Assertions (shouldEqual)
 import Test.Util (shouldBeNear)
@@ -200,3 +201,32 @@ resizeFromRightTest =
             mousePxFromRight
 
         lastExpandedSidebarRatio `shouldBeNear` 0.2
+
+togglePreviewTest :: Spec Unit
+togglePreviewTest =
+  describe "togglePreviewTest" do
+    it "closes preview, when it was open" do
+      let { previewClosed } = togglePreview defaultResizeState
+      previewClosed `shouldEqual` true
+
+    it "sets preview width to 0.0, when it was open" do
+      let { previewRatio } = togglePreview defaultResizeState
+      previewRatio `shouldEqual` 0.0
+
+    it "sets lastExpandedPreviewRatio to previous previewRatio, when it was open" do
+      let { lastExpandedPreviewRatio } = togglePreview defaultResizeState
+      lastExpandedPreviewRatio `shouldEqual` defaultResizeState.previewRatio
+
+    it "opens preview, when it was closed" do
+      let
+        { previewClosed } = togglePreview
+          (defaultResizeState { previewClosed = true })
+      previewClosed `shouldEqual` false
+
+    it "sets preview width to lastExpnadedPreviewRatio, when it was closed" do
+      let
+        { previewRatio } = togglePreview
+          ( defaultResizeState
+              { previewClosed = true, lastExpandedPreviewRatio = 0.15 }
+          )
+      previewRatio `shouldEqual` 0.15

@@ -68,7 +68,7 @@ import FPO.Types
   , tocTreeToDocumentTree
   )
 import FPO.UI.Modals.DirtyVersionModal (dirtyVersionModal)
-import FPO.UI.Resizing (ResizeState, resizeFromLeft, resizeFromRight)
+import FPO.UI.Resizing (ResizeState, resizeFromLeft, resizeFromRight, togglePreview)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -804,9 +804,12 @@ splitview = connect selectTranslator $ H.mkComponent
       width <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let
         numberWidth = toNumber width
-        newState = togglePreview numberWidth state
-      H.tell _editor 0 (Editor.UpdateEditorSize $ numberWidth * state.editorRatio)
-      H.modify_ \_ -> newState
+        newResizeState = togglePreview state.resizeState
+      H.modify_ \st -> st { resizeState = newResizeState }
+      H.tell _editor 0
+        (Editor.UpdateEditorSize $ numberWidth * newResizeState.editorRatio)
+      H.tell _editor 1
+        (Editor.UpdateEditorSize $ numberWidth * newResizeState.previewRatio)
 
     ModifyVersionMapping tocID vID cData -> do
       previewShown <- H.gets _.previewShown
@@ -1623,33 +1626,3 @@ stripHtmlTags input =
   case Regex.regex "<[^>]*>" (RegexFlags.global <> RegexFlags.ignoreCase) of
     Left _ -> input -- If regex compilation fails, return original string
     Right htmlRegex -> Regex.replace htmlRegex "" input
-
-type ResizeResult =
-  { newSidebarRatio :: Number
-  , newEditorRatio :: Number
-  , newPreviewRatio :: Number
-  , sidebarClosed :: Boolean
-  , previewClosed :: Boolean
-  }
-
-togglePreview :: Number -> State -> State
-togglePreview windowWidth oldState =
-  -- all this, in order for not overlapping the left resizer (to not make it disappear)
-  -- resizer size is 8, but there are 2 resizers.
-  let
-    resizerRatio = 16.0 / windowWidth
-  -- close preview
-  in
-    if oldState.previewShown then
-      oldState
-        { previewRatio = 0.0
-        , editorRatio = 1.0 - oldState.sidebarRatio - resizerRatio
-        , lastExpandedPreviewRatio = oldState.previewRatio
-        , previewShown = false
-        }
-    -- open preview
-    else oldState
-      { previewRatio = oldState.lastExpandedPreviewRatio
-      , previewShown = true
-      , editorRatio = oldState.editorRatio - oldState.lastExpandedPreviewRatio
-      }
