@@ -4,8 +4,7 @@ import Prelude
 
 import Effect (Effect)
 import Test.Components.Splitview
-  ( handleWindowResizeTest
-  , togglePreviewTest
+  ( togglePreviewTest
   )
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner.Node (runSpecAndExitProcess)
@@ -19,4 +18,3 @@ main = do
   runSpecAndExitProcess [ consoleReporter ] resizeFromLeftTest
   runSpecAndExitProcess [ consoleReporter ] resizeFromRightTest
   runSpecAndExitProcess [ consoleReporter ] togglePreviewTest
-  runSpecAndExitProcess [ consoleReporter ] handleWindowResizeTest

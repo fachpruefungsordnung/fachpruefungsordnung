@@ -6,10 +6,8 @@ module FPO.UI.Resizing
 
 import Prelude
 
-import Data.Int (toNumber)
-
 type ResizeState =
-  { windowWidth :: Int
+  { windowWidth :: Number
   -- All the ratios here are ratios of the content width (i.e., total width minus resizers)
   -- so all of the ratios should sum to 1.0
   , sidebarRatio :: Number
@@ -29,10 +27,9 @@ resizeFromLeft
   resizeState
   mousePxFromLeft =
   let
-    widthNumber = toNumber resizeState.windowWidth
     sidebarAndEditor = resizeState.sidebarRatio + resizeState.editorRatio
-    mousePercentFromLeft = mousePxFromLeft / widthNumber
-    contentWidth = widthNumber - 16.0
+    mousePercentFromLeft = mousePxFromLeft / resizeState.windowWidth
+    contentWidth = resizeState.windowWidth - 16.0
     previewWidth = contentWidth * resizeState.previewRatio
     editorWidth = contentWidth * resizeState.editorRatio
     sidebarWidth = contentWidth * resizeState.sidebarRatio
@@ -86,14 +83,13 @@ resizeFromRight
   resizeState
   mousePxFromRight =
   let
-    widthNumber = toNumber resizeState.windowWidth
     previewAndEditor = resizeState.previewRatio + resizeState.editorRatio
-    contentWidth = widthNumber - 16.0
+    contentWidth = resizeState.windowWidth - 16.0
     sidebarWidth = contentWidth * resizeState.sidebarRatio
     editorWidth = contentWidth * resizeState.editorRatio
     previewWidth = contentWidth * resizeState.previewRatio
     -- Calculate position from left for sidebar closing logic
-    mousePercentFromRight = mousePxFromRight / widthNumber
+    mousePercentFromRight = mousePxFromRight / resizeState.windowWidth
   in
     -- Hide preview when dragging close to right edge (10%)
     if mousePercentFromRight <= 0.10 then

@@ -11,7 +11,7 @@ import Test.Spec.Assertions (shouldEqual)
 import Test.Util (shouldBeNear)
 
 defaultResizeState =
-  { windowWidth: 116 -- easy number for percent calculations, because content width - resizers is 100
+  { windowWidth: 116.0 -- easy number for percent calculations, because content width - resizers is 100
   , sidebarRatio: 0.2
   , editorRatio: 0.4
   , previewRatio: 0.4

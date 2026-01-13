@@ -109,6 +109,7 @@ data Action
   | StartResize DragTarget MouseEvent
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
+  | HandleWindowResize Number
   -- Toggle buttons
   | ToggleComment
   | ToggleCommentOverview Boolean Int Int
@@ -137,7 +138,6 @@ data Action
   | ModifyVersionFromModal Int (Maybe Int)
   | DeleteDraft
   | DoNothing
-  | HandleWindowResize Number
   | Finalize
 
 type State = FPOState
@@ -232,7 +232,7 @@ splitview = connect selectTranslator $ H.mkComponent
     , lastExpandedSidebarRatio: 0.2
     , lastExpandedPreviewRatio: 0.4
     , resizeState:
-        { windowWidth: 0
+        { windowWidth: 0.0
         , sidebarRatio: 0.2
         , previewRatio: 0.4
         , editorRatio: 0.4
@@ -668,20 +668,17 @@ splitview = connect selectTranslator $ H.mkComponent
       handleAction $ HandleMouseMove mouseEvent
 
     -- Stop resizing, when mouse is released (is detected by browser)
+    -- the parameter cannot be deleted here because there is always a MouseEvent present, we just don't need it here
     StopResize _ -> do
       H.modify_ _ { mDragTarget = Nothing, mStartResizeState = Nothing }
 
     HandleWindowResize width -> do
       state <- H.get
-      let newState = handleWindowResize width state
+      let newResizeState = state.resizeState { windowWidth = width }
       H.modify_ \st -> st
-        { sidebarRatio = newState.sidebarRatio
-        , editorRatio = newState.editorRatio
-        , previewRatio = newState.previewRatio
-        , lastExpandedSidebarRatio = newState.lastExpandedSidebarRatio
-        , lastExpandedPreviewRatio = newState.lastExpandedPreviewRatio
+        { resizeState = newResizeState
         }
-      H.tell _editor 0 (Editor.UpdateEditorSize (newState.editorRatio * width))
+      H.tell _editor 0 (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
 
     -- While mouse is hold down, resizer move to position of mouse
     -- (with certain rules)
@@ -1653,38 +1650,4 @@ togglePreview windowWidth oldState =
       { previewRatio = oldState.lastExpandedPreviewRatio
       , previewShown = true
       , editorRatio = oldState.editorRatio - oldState.lastExpandedPreviewRatio
-      }
-
-handleWindowResize :: Number -> State -> State
-handleWindowResize newWindowWidth oldState =
-  let
-    -- Berechne alte und neue Resizer-Ratios
-    totalCurrentContentRatio = oldState.sidebarRatio + oldState.editorRatio +
-      oldState.previewRatio
-    newResizerRatio = 16.0 / newWindowWidth
-
-    -- Berechne verfügbaren Content-Space
-    oldContentSpace = totalCurrentContentRatio
-    newContentSpace = 1.0 - newResizerRatio
-
-    -- Scale-Faktor für Content-Bereiche
-    scaleFactor =
-      if oldContentSpace > 0.0 then newContentSpace / oldContentSpace
-      else 1.0
-
-    -- Skaliere alle Content-Ratios
-    newSidebarRatio = oldState.sidebarRatio * scaleFactor
-    newEditorRatio = oldState.editorRatio * scaleFactor
-    newPreviewRatio = oldState.previewRatio * scaleFactor
-
-    -- Skaliere auch die lastExpanded-Ratios
-    newLastExpandedSidebarRatio = oldState.lastExpandedSidebarRatio * scaleFactor
-    newLastExpandedPreviewRatio = oldState.lastExpandedPreviewRatio * scaleFactor
-  in
-    oldState
-      { sidebarRatio = newSidebarRatio
-      , editorRatio = newEditorRatio
-      , previewRatio = newPreviewRatio
-      , lastExpandedSidebarRatio = newLastExpandedSidebarRatio
-      , lastExpandedPreviewRatio = newLastExpandedPreviewRatio
       }
