@@ -24,5 +24,5 @@
 .icon-orange { color:var(--btn-orange); }
 .icon-orange:hover { color: var(--btn-orange-hover); }
 
-.icon-blue { color: var(--btn-blue) }
-.icon-blue:hover { color: var(--btn-blue-hover) }
+.icon-blue { color: var(--btn-blue); }
+.icon-blue:hover { color: var(--btn-blue-hover); }

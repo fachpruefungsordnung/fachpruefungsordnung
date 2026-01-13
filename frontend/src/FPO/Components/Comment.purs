@@ -41,10 +41,10 @@ type Input = Unit
 data Output
   = CloseCommentSection
   | ConfirmComment CommentSection
-  | CommentOverview Int (Array FirstComment)
+  | CommentOverview (Array FirstComment)
   | SendAbstractedComments (Array FirstComment) Boolean
   | ToDeleteComment Boolean
-  | UpdatedComments Int (Array FirstComment) Boolean
+  | UpdatedComments (Array FirstComment) Boolean
   | SetReAnchor (Maybe CommentSection)
 
 data Action
@@ -60,11 +60,11 @@ data Action
   | CancelModal
 
 data Query a
-  = AddComment Int Int a
+  = AddComment a
   | ReceiveTimeFormatter (Maybe Formatter) a
   | RequestComments Int Int (Array Int) Boolean a
-  | SelectedCommentSection Int Int Int a
-  | Overview Int Int a
+  | SelectedCommentSection Int a
+  | Overview a
   | UpdateComment (Array Int) a
   | ReaddedAnchor a
 
@@ -148,7 +148,10 @@ commentview = connect selectTranslator $ H.mkComponent
                     ""
                   Just cs ->
                     if cs.hasProblem then
-                      translate (label :: _ "comment_reanchor") state.translator
+                      if state.inLatest then
+                        translate (label :: _ "comment_reanchor") state.translator
+                      else
+                        translate (label :: _ "comment_predated") state.translator
                     else
                       ""
               )
@@ -375,7 +378,7 @@ commentview = connect selectTranslator $ H.mkComponent
             }
           -- Delete it from Editor
           H.raise (ToDeleteComment hasProblem)
-          H.raise (CommentOverview state.tocID (map extractFirst newCSs))
+          H.raise (CommentOverview (map extractFirst newCSs))
 
     DeleteComment -> do
       state <- H.get
@@ -435,21 +438,8 @@ commentview = connect selectTranslator $ H.mkComponent
     -> H.HalogenM State Action slots Output m (Maybe a)
   handleQuery = case _ of
 
-    AddComment docID tocID a -> do
-      -- load comments, when section was changed
-      state <- H.get
-      when (state.docID /= docID || tocID /= state.tocID) do
-        recComs <- Request.getCommentSections docID tocID
-        let
-          commentSections = case recComs of
-            Left _ -> []
-            Right cms -> map sectionDtoToCS $ CD.getCommentSections cms
-        H.modify_ _
-          { docID = docID
-          , tocID = tocID
-          , commentSections = commentSections
-          }
-      -- Always set this
+    -- add temporary comment
+    AddComment a -> do
       H.modify_ _
         { markerID = -360
         , mCommentSection = Nothing
@@ -476,6 +466,8 @@ commentview = connect selectTranslator $ H.mkComponent
           { docID = docID
           , tocID = tocID
           , commentSections = css
+          , mCommentSection = Nothing
+          , markerID = -1
           , inLatest = inLatest
           }
         H.raise (SendAbstractedComments fs hasProblem)
@@ -487,34 +479,24 @@ commentview = connect selectTranslator $ H.mkComponent
           hasProblem = hasProblems commentSections
           css = map updateFirstCommentProblem commentSections
           fs = map extractFirst css
-        H.modify_ _ { commentSections = css }
+        H.modify_ _ 
+          { commentSections = css
+          , mCommentSection = Nothing
+          , markerID = -1
+          , inLatest = inLatest }
         H.raise (SendAbstractedComments fs hasProblem)
       pure (Just a)
 
-    SelectedCommentSection docID tocID markerID a -> do
-      state <- H.get
-      if (state.docID /= docID || tocID /= state.tocID) then do
-        commentSections <- fetchCommentSections docID tocID
-        H.modify_ _
-          { docID = docID, tocID = tocID, commentSections = commentSections }
-        handleAction $ SelectingCommentSection markerID
-      else do
-        handleAction $ SelectingCommentSection markerID
+    SelectedCommentSection markerID a -> do
+      handleAction $ SelectingCommentSection markerID
       pure (Just a)
 
-    Overview docID tocID a -> do
+    Overview a -> do
       state <- H.get
-      if (state.docID /= docID || tocID /= state.tocID) then do
-        commentSections <- fetchCommentSections docID tocID
-        H.modify_ _
-          { docID = docID, tocID = tocID, commentSections = commentSections }
-        let fs = map extractFirst commentSections
-        H.raise (CommentOverview tocID fs)
-      else do
-        let
-          css = state.commentSections
-          fs = map extractFirst css
-        H.raise (CommentOverview tocID fs)
+      let
+        css = state.commentSections
+        fs = map extractFirst css
+      H.raise (CommentOverview fs)
       pure (Just a)
 
     UpdateComment markerIDs a -> do
@@ -528,7 +510,7 @@ commentview = connect selectTranslator $ H.mkComponent
         { commentSections = css
         , mCommentSection = find (\sec -> sec.markerID == state.markerID) css
         }
-      H.raise $ UpdatedComments state.tocID fs hasProblem
+      H.raise $ UpdatedComments fs hasProblem
       pure (Just a)
 
     ReaddedAnchor a -> do
@@ -541,11 +523,12 @@ commentview = connect selectTranslator $ H.mkComponent
             newCS = updateFirstCommentProblem $ cs
               { hasProblem = false }
             newCSs = updateCommentSection newCS state.commentSections
+            hasProblem = hasProblems newCSs
           H.modify_ _
             { commentSections = newCSs
             , mCommentSection = Just newCS
             }
-          H.raise (CommentOverview state.tocID (map extractFirst newCSs))
+          H.raise (UpdatedComments (map extractFirst newCSs) hasProblem)
       pure (Just a)
 
   -- Retrieves the comment sections for a given document ID and TOC ID. If

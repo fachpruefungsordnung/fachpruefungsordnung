@@ -91,7 +91,7 @@ renderFirstComment
                       [ HH.i
                           [ HP.classes
                               [ HB.bi
-                              , H.ClassName "bi bi-clock-history"
+                              , H.ClassName "bi-clock-history"
                               , HB.msAuto
                               , H.ClassName "fs-4"
                               ]

@@ -21,20 +21,19 @@ import Halogen.Store.Monad (class MonadStore)
 type Input = Unit
 
 -- DeleteComment later
-data Output = JumpToCommentSection Int Int
+data Output = JumpToCommentSection Int
 
 data Action
   = Init
   | Receive (Connected FPOTranslator Input)
-  | SelectCommentSection Int Int
+  | SelectCommentSection Int
 
 data Query a
   = ReceiveTimeFormatter (Maybe Formatter) a
-  | ReceiveComments Int Boolean (Array FirstComment) a
+  | ReceiveComments Boolean (Array FirstComment) a
 
 type State = FPOState
-  ( tocID :: Int
-  , comments :: Array FirstComment
+  ( comments :: Array FirstComment
   , mTimeFormatter :: Maybe Formatter
   , inLatest :: Boolean
   )
@@ -48,7 +47,6 @@ commentOverviewview
 commentOverviewview = connect selectTranslator $ H.mkComponent
   { initialState: \{ context } ->
       { translator: fromFpoTranslator context
-      , tocID: -1
       , comments: []
       , mTimeFormatter: Nothing
       , inLatest: true
@@ -76,7 +74,7 @@ commentOverviewview = connect selectTranslator $ H.mkComponent
           state.mTimeFormatter
           state.inLatest
           true
-          (SelectCommentSection state.tocID first.markerID)
+          (SelectCommentSection first.markerID)
           first
 
         parts = partition _.resolved state.comments
@@ -96,8 +94,8 @@ commentOverviewview = connect selectTranslator $ H.mkComponent
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
 
-    SelectCommentSection tocID markerID -> do
-      H.raise (JumpToCommentSection tocID markerID)
+    SelectCommentSection markerID -> do
+      H.raise (JumpToCommentSection markerID)
 
   handleQuery
     :: forall slots a
@@ -109,6 +107,6 @@ commentOverviewview = connect selectTranslator $ H.mkComponent
       H.modify_ \state -> state { mTimeFormatter = mTimeFormatter }
       pure (Just a)
 
-    ReceiveComments tocID inLatest cs a -> do
-      H.modify_ \state -> state { tocID = tocID, comments = cs, inLatest = inLatest }
+    ReceiveComments inLatest cs a -> do
+      H.modify_ \state -> state { comments = cs, inLatest = inLatest }
       pure (Just a)
