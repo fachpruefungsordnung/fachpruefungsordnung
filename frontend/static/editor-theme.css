@@ -1,0 +1,32 @@
+:root {
+  /* --- Comment sticky note --- */
+  --comment-bg-default:  #fff9c4; /* Post-it yellow */
+  --comment-bg-hover:    #fff3a6; /* a bit darker */
+  --comment-border:      #ffe08a; /* edge */
+  --comment-text:        #212529; /* standard text */
+  --comment-shadow:      0 0 0 1.5px #000;
+  --comment-radius:      10px;
+
+  /* --- Comment status backgrounds --- */
+  --comment-bg-first:   #FFFF00E6;
+  --comment-bg-resolved: #42fa00;
+  --comment-bg-problem:  #fd7e14;
+  --comment-bg-outdated: #0099ff;
+
+  /* --- Accent colors (for Icons/Badges/Left-border) --- */
+  --accent-resolved: #198754;
+  --accent-problem:  #fd7e14;
+  --accent-outdated: #0099ff;
+
+  /* --- Ace editor marker --- */
+  --marker-bg:      var(--comment-bg-first);
+  --active-line-bg: #FFFF0026;
+  --handle-bg:      #FFBB00;
+
+  /* --- Buttons --- */
+  --btn-orange:       #fd7e14;
+  --btn-orange-hover: #e96b0c;
+
+  --btn-blue:         #0099ff;
+  --btn-blue-hover:   #0b5ed7;
+}

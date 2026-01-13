@@ -1,0 +1,28 @@
+/* Orange (Warning / Problem) */
+.btn-orange {
+  background-color: var(--btn-orange);
+  border-color: var(--btn-orange);
+}
+
+.btn-orange:hover {
+  background-color: var(--btn-orange-hover);
+  border-color: var(--btn-orange-hover);
+}
+
+/* Blue (Info / alte Revision) */
+.btn-blue {
+  background-color: var(--btn-blue);   /* Bootstrap primary */
+  border-color: var(--btn-blue); 
+}
+
+.btn-blue:hover {
+  background-color: var(--btn-blue-hover); 
+  border-color: var(--btn-blue-hover); 
+}
+
+/* Icons: same color palette as buttons */
+.icon-orange { color:var(--btn-orange); }
+.icon-orange:hover { color: var(--btn-orange-hover); }
+
+.icon-blue { color: var(--btn-blue); }
+.icon-blue:hover { color: var(--btn-blue-hover); }

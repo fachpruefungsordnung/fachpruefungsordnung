@@ -106,7 +106,7 @@ data Action
   | HandleMouseMove MouseEvent
   -- Toggle buttons
   | ToggleComment
-  | ToggleCommentOverview Boolean Int Int
+  | ToggleCommentOverview Boolean
   | ToggleSidebar
   | SwitchPreview
   | TogglePreview
@@ -184,6 +184,7 @@ type State = FPOState
   -- obtained from TOC
   , upToDateVersion :: Maybe Version
   , pendingUpdateElementID :: Maybe Int
+  , inLatest :: Boolean
   )
 
 type ElemVersion =
@@ -248,6 +249,7 @@ splitview = connect selectTranslator $ H.mkComponent
     , modalData: Nothing
     , upToDateVersion: Nothing
     , pendingUpdateElementID: Nothing
+    , inLatest: true
     }
 
   render :: State -> H.ComponentHTML Action Slots m
@@ -383,7 +385,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 else
                   "display: none;"
         ]
-        [ closeButton $ ToggleCommentOverview false (-1) (-1)
+        [ closeButton $ ToggleCommentOverview false
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -746,7 +748,7 @@ splitview = connect selectTranslator $ H.mkComponent
       H.modify_ _ { commentShown = false }
       H.tell _editor 0 (Editor.UnselectCommentSection)
 
-    ToggleCommentOverview shown docID tocID -> do
+    ToggleCommentOverview shown -> do
       sidebarShown <- H.gets _.sidebarShown
       if shown then do
         if sidebarShown then
@@ -758,7 +760,7 @@ splitview = connect selectTranslator $ H.mkComponent
             , commentShown = false
             , commentOverviewShown = true
             }
-        H.tell _comment unit (Comment.Overview docID tocID)
+        H.tell _comment unit (Comment.Overview)
       else
         H.modify_ _ { commentOverviewShown = false }
 
@@ -881,8 +883,10 @@ splitview = connect selectTranslator $ H.mkComponent
       Comment.ConfirmComment newCommentSection -> do
         H.tell _editor 0 (Editor.ConfirmComment newCommentSection)
 
-      Comment.CommentOverview tocID fs -> do
-        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID fs)
+      Comment.CommentOverview fs -> do
+        inLatest <- H.gets _.inLatest
+        H.tell _commentOverview unit
+          (CommentOverview.ReceiveComments inLatest fs)
 
       Comment.SendAbstractedComments abstractCSs hasProblem -> do
         H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs hasProblem)
@@ -890,8 +894,10 @@ splitview = connect selectTranslator $ H.mkComponent
       Comment.ToDeleteComment commentProblem -> do
         H.tell _editor 0 (Editor.ToDeleteComment commentProblem)
 
-      Comment.UpdatedComments tocID fs commentProblem -> do
-        H.tell _commentOverview unit (CommentOverview.ReceiveComments tocID fs)
+      Comment.UpdatedComments fs commentProblem -> do
+        inLatest <- H.gets _.inLatest
+        H.tell _commentOverview unit
+          (CommentOverview.ReceiveComments inLatest fs)
         H.tell _editor 0 (Editor.UpdateCommentProblem commentProblem)
 
       Comment.SetReAnchor reAnchor -> do
@@ -899,16 +905,15 @@ splitview = connect selectTranslator $ H.mkComponent
 
     HandleCommentOverview output -> case output of
 
-      CommentOverview.JumpToCommentSection tocID markerID -> do
-        docID <- H.gets _.docID
+      CommentOverview.JumpToCommentSection markerID -> do
         H.modify_ _ { commentShown = true }
         H.tell _comment unit
-          (Comment.SelectedCommentSection docID tocID markerID)
+          (Comment.SelectedCommentSection markerID)
         H.tell _editor 0 (Editor.SelectCommentSection markerID)
 
     HandleEditor output -> case output of
 
-      Editor.AddComment docID tocID -> do
+      Editor.AddComment -> do
         sidebarShown <- H.gets _.sidebarShown
         if sidebarShown then
           H.modify_ _ { commentShown = true }
@@ -918,7 +923,7 @@ splitview = connect selectTranslator $ H.mkComponent
             , sidebarShown = true
             , commentShown = true
             }
-        H.tell _comment unit (Comment.AddComment docID tocID)
+        H.tell _comment unit Comment.AddComment
 
       Editor.ClickedQuery html -> do
         state <- H.get
@@ -1011,10 +1016,12 @@ splitview = connect selectTranslator $ H.mkComponent
                     H.liftEffect $ revokeObjectURL url
                   pure unit
 
-      Editor.RequestComments docID entryID markerIDs -> do
-        H.tell _comment unit (Comment.RequestComments docID entryID markerIDs)
+      Editor.RequestComments docID entryID markerIDs inLatest -> do
+        H.modify_ _ { inLatest = inLatest }
+        H.tell _comment unit
+          (Comment.RequestComments docID entryID markerIDs inLatest)
 
-      Editor.SelectedCommentSection tocID markerID -> do
+      Editor.SelectedCommentSection markerID -> do
         state <- H.get
         if state.sidebarShown then
           H.modify_ _ { commentShown = true }
@@ -1025,14 +1032,14 @@ splitview = connect selectTranslator $ H.mkComponent
             , commentShown = true
             }
         H.tell _comment unit
-          (Comment.SelectedCommentSection state.docID tocID markerID)
+          (Comment.SelectedCommentSection markerID)
 
       Editor.RenamedNode newName path -> do
         s <- H.get
         updateTree $ changeNodeHeading path newName s.tocEntries
 
-      Editor.ShowAllCommentsOutput docID tocID -> do
-        handleAction $ ToggleCommentOverview true docID tocID
+      Editor.ShowAllCommentsOutput -> do
+        handleAction $ ToggleCommentOverview true
 
       Editor.RaiseDiscard -> do
         handleAction UpdateMSelectedTocEntry
