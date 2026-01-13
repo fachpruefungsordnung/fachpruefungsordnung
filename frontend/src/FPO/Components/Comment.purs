@@ -479,11 +479,12 @@ commentview = connect selectTranslator $ H.mkComponent
           hasProblem = hasProblems commentSections
           css = map updateFirstCommentProblem commentSections
           fs = map extractFirst css
-        H.modify_ _ 
+        H.modify_ _
           { commentSections = css
           , mCommentSection = Nothing
           , markerID = -1
-          , inLatest = inLatest }
+          , inLatest = inLatest
+          }
         H.raise (SendAbstractedComments fs hasProblem)
       pure (Just a)
 

@@ -452,7 +452,9 @@ editor = connect selectTranslator $ H.mkComponent
                           else []
                         )
                         Comment
-                        ( if (not state.isEditorOutdated) && (isJust state.commentState.reAnchor) then
+                        ( if
+                            (not state.isEditorOutdated) &&
+                              (isJust state.commentState.reAnchor) then
                             "bi-chat-square-quote-fill"
                           else "bi-chat-square-text"
                         )
