@@ -118,7 +118,7 @@ data Action
   | HandleWindowResize Number
   -- Toggle buttons
   | ToggleComment
-  | ToggleCommentOverview Boolean
+  | ToggleCommentOverview Boolean Int Int
   | ToggleSidebar
   | SwitchPreview
   | TogglePreview
@@ -144,7 +144,6 @@ data Action
   | ModifyVersionFromModal Int (Maybe Int)
   | DeleteDraft
   | DoNothing
-  | HandleWindowResize Number
   | Finalize
 
 type State = FPOState
@@ -770,22 +769,21 @@ splitview = connect selectTranslator $ H.mkComponent
       state <- H.get
       if shown then do
         if not state.resizeState.sidebarClosed then
-          if not state.resizeState.sidebarClosed then
-            H.modify_ \st -> st
-              { resizeState = st.resizeState
-                  { commentClosed = true, commentOverviewClosed = false }
-              }
-          else
-            H.modify_ \st -> st
-              { resizeState =
-                  st.resizeState
-                    { sidebarRatio = st.resizeState.lastExpandedSidebarRatio
-                    , sidebarClosed = false
-                    , commentClosed = true
-                    , commentOverviewClosed = false
-                    }
-              }
-        H.tell _comment unit (Comment.Overview docID tocID)
+          H.modify_ \st -> st
+            { resizeState = st.resizeState
+                { commentClosed = true, commentOverviewClosed = false }
+            }
+        else
+          H.modify_ \st -> st
+            { resizeState =
+                st.resizeState
+                  { sidebarRatio = st.resizeState.lastExpandedSidebarRatio
+                  , sidebarClosed = false
+                  , commentClosed = true
+                  , commentOverviewClosed = false
+                  }
+            }
+        H.tell _comment unit Comment.Overview
       else
         H.modify_ \st -> st
           { resizeState = st.resizeState { commentOverviewClosed = true } }
@@ -904,7 +902,7 @@ splitview = connect selectTranslator $ H.mkComponent
 
     HandleCommentOverview output -> case output of
 
-      CommentOverview.JumpToCommentSection tocID markerID -> do
+      CommentOverview.JumpToCommentSection markerID -> do
         docID <- H.gets _.docID
         H.modify_ \st -> st { resizeState = st.resizeState { commentClosed = false } }
         H.tell _comment unit
@@ -913,7 +911,7 @@ splitview = connect selectTranslator $ H.mkComponent
 
     HandleEditor output -> case output of
 
-      Editor.AddComment docID tocID -> do
+      Editor.AddComment -> do
         state <- H.get
         if not state.resizeState.sidebarClosed then
           H.modify_ \st -> st
@@ -1047,7 +1045,7 @@ splitview = connect selectTranslator $ H.mkComponent
         updateTree $ changeNodeHeading path newName s.tocEntries
 
       Editor.ShowAllCommentsOutput -> do
-        handleAction $ ToggleCommentOverview true
+        handleAction $ ToggleCommentOverview true (-1) (-1)
 
       Editor.RaiseDiscard -> do
         handleAction UpdateMSelectedTocEntry
@@ -1151,7 +1149,7 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _comment unit (Comment.UpdateComment markerIDs)
 
       Editor.ReaddedAnchor -> do
-        H.tell _comment unit (Comment.ReaddedAnchor)
+        H.tell _comment unit Comment.ReaddedAnchor
 
     DeleteDraft -> do
       handleAction UpdateMSelectedTocEntry
