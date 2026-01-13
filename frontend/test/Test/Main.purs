@@ -5,12 +5,14 @@ import Prelude
 import Effect (Effect)
 import Test.Components.Splitview
   ( handleWindowResizeTest
-  , resizeFromLeftTest
-  , resizeFromRightTest
   , togglePreviewTest
   )
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner.Node (runSpecAndExitProcess)
+import Test.UI.Resizing
+  ( resizeFromLeftTest
+  , resizeFromRightTest
+  )
 
 main :: Effect Unit
 main = do
