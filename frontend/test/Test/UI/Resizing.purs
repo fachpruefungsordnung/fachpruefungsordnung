@@ -238,18 +238,20 @@ togglePreviewTest =
           )
       previewRatio `shouldEqual` 0.15
 
-    it "makes the editor bigger when closing the preview" do 
+    it "makes the editor bigger when closing the preview" do
       let { editorRatio } = togglePreview defaultResizeState
       editorRatio `shouldBeNear` 0.8
-    
-    it "makes the editor smaller when opening the preview" do 
-      let 
-        { editorRatio } = togglePreview  
+
+    it "makes the editor smaller when opening the preview" do
+      let
+        { editorRatio } = togglePreview
           ( defaultResizeState
-              { previewClosed = true, lastExpandedPreviewRatio = 0.15, editorRatio = 0.6 }
+              { previewClosed = true
+              , lastExpandedPreviewRatio = 0.15
+              , editorRatio = 0.6
+              }
           )
       editorRatio `shouldBeNear` 0.45
-
 
 toggleSidebarTest :: Spec Unit
 toggleSidebarTest =
@@ -280,14 +282,17 @@ toggleSidebarTest =
           )
       sidebarRatio `shouldEqual` 0.15
 
-    it "makes the editor bigger when closing the sidebar" do 
+    it "makes the editor bigger when closing the sidebar" do
       let { editorRatio } = toggleSidebar defaultResizeState
       editorRatio `shouldBeNear` 0.6
 
-    it "makes the editor smaller when opening the sidebar" do 
-      let 
-        { editorRatio } = toggleSidebar  
+    it "makes the editor smaller when opening the sidebar" do
+      let
+        { editorRatio } = toggleSidebar
           ( defaultResizeState
-              { sidebarClosed = true, lastExpandedSidebarRatio = 0.15, editorRatio = 0.6 }
+              { sidebarClosed = true
+              , lastExpandedSidebarRatio = 0.15
+              , editorRatio = 0.6
+              }
           )
       editorRatio `shouldBeNear` 0.45

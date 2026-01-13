@@ -291,8 +291,10 @@ splitview = connect selectTranslator $ H.mkComponent
     -- We have to manually shrink the size of those elements, otherwise if they overflow the bottom
     -- of the elements wont be visible anymore
     let
-      navbarHeight :: Int
       navbarHeight = 56 -- px, height of the navbar
+      contentWidth = state.resizeState.windowWidth - 16.0
+      ratioScaleFactor = contentWidth / state.resizeState.windowWidth
+      absoluteEditorRatio = state.resizeState.editorRatio * ratioScaleFactor
     -- toolbarHeight :: Int
     -- toolbarHeight = 31 -- px, height of the toolbar
     in
@@ -312,7 +314,7 @@ splitview = connect selectTranslator $ H.mkComponent
               [ -- Editor
                 HH.div
                   [ HP.style $ "position: relative; flex: 0 0 "
-                      <> show (state.editorRatio * 100.0)
+                      <> show (absoluteEditorRatio * 100.0)
                       <> "%;"
                   ]
                   [ -- The actual editor area
@@ -346,106 +348,112 @@ splitview = connect selectTranslator $ H.mkComponent
   -- Always keep them load to not load them over and over again
   renderSidebar :: State -> Array (H.ComponentHTML Action Slots m)
   renderSidebar state =
-    [ -- TOC
-      HH.div
-        [ HP.classes [ HB.overflowAuto, HB.p1 ]
-        , HP.style $
-            "flex: 0 0 " <> show (state.sidebarRatio * 100.0)
-              <>
-                "%; box-sizing: border-box; min-width: 6ch; background:rgb(233, 233, 235); position: relative;"
-              <>
-                if
-                  state.sidebarShown
-                    && not state.commentOverviewShown
-                    && not state.commentShown
-                    && state.tocShown then
-                  ""
-                else
-                  "display: none;"
-        ]
-        [ HH.slot _toc unit TOC.tocview state.docID HandleTOC ]
-    -- Comment
-    , HH.div
-        [ HP.classes [ HB.overflowAuto, HB.p1 ]
-        , HP.style $
-            "flex: 0 0 " <> show (state.sidebarRatio * 100.0)
-              <>
-                "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
-              <>
-                if state.sidebarShown && state.commentShown then
-                  ""
-                else
-                  "display: none;"
-        ]
-        [ closeButton ToggleComment
-        , HH.h4
-            [ HP.style
-                "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
-            ]
-            [ HH.text (translate (label :: _ "comment_comment") state.translator) ]
-        , HH.slot _comment unit Comment.commentview unit HandleComment
-        ]
-    -- CommentOverview
-    , HH.div
-        [ HP.classes [ HB.overflowAuto, HB.p1 ]
-        , HP.style $
-            "flex: 0 0 " <> show (state.sidebarRatio * 100.0)
-              <>
-                "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
-              <>
-                if
-                  state.sidebarShown
-                    && not state.commentShown
-                    && state.commentOverviewShown then
-                  ""
-                else
-                  "display: none;"
-        ]
-        [ closeButton $ ToggleCommentOverview false (-1) (-1)
-        , HH.h4
-            [ HP.style
-                "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
-            ]
-            [ HH.text (translate (label :: _ "comment_allComments") state.translator)
-            ]
-        , HH.slot _commentOverview unit CommentOverview.commentOverviewview unit
-            HandleCommentOverview
-        ]
-    -- Left Resizer
-    , HH.div
-        [ HE.onMouseDown (StartResize LeftResizer)
-        , HP.style
-            "width: 8px; \
-            \cursor: col-resize; \
-            \background:rgba(0, 0, 0, 0.3); \
-            \display: flex; \
-            \align-items: center; \
-            \justify-content: center; \
-            \position: relative;"
-        ]
-        [ HH.button
-            [ HP.style
-                "background:rgba(255, 255, 255, 0.8); \
-                \border: 0.2px solid #aaa; \
-                \padding: 0.1rem 0.1rem; \
-                \font-size: 8px; \
-                \font-weight: bold; \
-                \line-height: 1; \
-                \color:rgba(0, 0, 0, 0.7); \
-                \border-radius: 3px; \
-                \cursor: pointer; \
-                \height: 40px; \
-                \width: 8px;"
-            -- To prevent the resizer event under the button
-            , HE.handler' (EventType "mousedown") \ev ->
-                unsafePerformEffect do
-                  stopPropagation ev
-                  pure Nothing -- Do not trigger the mouse down event under the button
-            , HE.onClick \_ -> ToggleSidebar
-            ]
-            [ HH.text if state.sidebarShown then "⟨" else "⟩" ]
-        ]
-    ]
+    let
+      contentWidth = state.resizeState.windowWidth - 16.0
+      ratioScaleFactor = contentWidth / state.resizeState.windowWidth
+      absoluteSidebarRatio = state.resizeState.sidebarRatio * ratioScaleFactor
+    in
+      [ -- TOC
+        HH.div
+          [ HP.classes [ HB.overflowAuto, HB.p1 ]
+          , HP.style $
+              "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
+                <>
+                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(233, 233, 235); position: relative;"
+                <>
+                  if
+                    state.sidebarShown
+                      && not state.commentOverviewShown
+                      && not state.commentShown
+                      && state.tocShown then
+                    ""
+                  else
+                    "display: none;"
+          ]
+          [ HH.slot _toc unit TOC.tocview state.docID HandleTOC ]
+      -- Comment
+      , HH.div
+          [ HP.classes [ HB.overflowAuto, HB.p1 ]
+          , HP.style $
+              "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
+                <>
+                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
+                <>
+                  if state.sidebarShown && state.commentShown then
+                    ""
+                  else
+                    "display: none;"
+          ]
+          [ closeButton ToggleComment
+          , HH.h4
+              [ HP.style
+                  "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
+              ]
+              [ HH.text (translate (label :: _ "comment_comment") state.translator) ]
+          , HH.slot _comment unit Comment.commentview unit HandleComment
+          ]
+      -- CommentOverview
+      , HH.div
+          [ HP.classes [ HB.overflowAuto, HB.p1 ]
+          , HP.style $
+              "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
+                <>
+                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
+                <>
+                  if
+                    state.sidebarShown
+                      && not state.commentShown
+                      && state.commentOverviewShown then
+                    ""
+                  else
+                    "display: none;"
+          ]
+          [ closeButton $ ToggleCommentOverview false (-1) (-1)
+          , HH.h4
+              [ HP.style
+                  "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
+              ]
+              [ HH.text
+                  (translate (label :: _ "comment_allComments") state.translator)
+              ]
+          , HH.slot _commentOverview unit CommentOverview.commentOverviewview unit
+              HandleCommentOverview
+          ]
+      -- Left Resizer
+      , HH.div
+          [ HE.onMouseDown (StartResize LeftResizer)
+          , HP.style
+              "width: 8px; \
+              \cursor: col-resize; \
+              \background:rgba(0, 0, 0, 0.3); \
+              \display: flex; \
+              \align-items: center; \
+              \justify-content: center; \
+              \position: relative;"
+          ]
+          [ HH.button
+              [ HP.style
+                  "background:rgba(255, 255, 255, 0.8); \
+                  \border: 0.2px solid #aaa; \
+                  \padding: 0.1rem 0.1rem; \
+                  \font-size: 8px; \
+                  \font-weight: bold; \
+                  \line-height: 1; \
+                  \color:rgba(0, 0, 0, 0.7); \
+                  \border-radius: 3px; \
+                  \cursor: pointer; \
+                  \height: 40px; \
+                  \width: 8px;"
+              -- To prevent the resizer event under the button
+              , HE.handler' (EventType "mousedown") \ev ->
+                  unsafePerformEffect do
+                    stopPropagation ev
+                    pure Nothing -- Do not trigger the mouse down event under the button
+              , HE.onClick \_ -> ToggleSidebar
+              ]
+              [ HH.text if state.sidebarShown then "⟨" else "⟩" ]
+          ]
+      ]
 
   rightResizer :: State -> H.ComponentHTML Action Slots m
   rightResizer state =
@@ -485,16 +493,55 @@ splitview = connect selectTranslator $ H.mkComponent
 
   renderPreview :: State -> Array (H.ComponentHTML Action Slots m)
   renderPreview state =
-    [ -- Right Resizer
-      rightResizer state
+    let
+      contentWidth = state.resizeState.windowWidth - 16.0
+      ratioScaleFactor = contentWidth / state.resizeState.windowWidth
+      absolutePreviewRatio = state.resizeState.previewRatio * ratioScaleFactor
+    in
+      [ -- Right Resizer
+        rightResizer state
 
-    -- Preview
-    , if state.previewShown then
+      -- Preview
+      , if state.previewShown then
+          HH.div
+            [ HP.classes [ HB.dFlex, HB.flexColumn ]
+            , HP.style $
+                "flex: 1 1 "
+                  <> show (absolutePreviewRatio * 100.0)
+                  <>
+                    "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
+            ]
+            [ HH.div
+                [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
+                , HP.style "padding-right: 0.5rem;"
+                ]
+                [ closeButton SwitchPreview ]
+            , HH.slot _preview unit Preview.preview
+                { renderedHtml: state.renderedHtml
+                , isDragging: state.mDragTarget /= Nothing
+                }
+                HandlePreview
+            ]
+        else
+          HH.text ""
+      ]
+
+  renderSecondEditor :: State -> ElementData -> Array (H.ComponentHTML Action Slots m)
+  renderSecondEditor state cData =
+    let
+      contentWidth = state.resizeState.windowWidth - 16.0
+      ratioScaleFactor = contentWidth / state.resizeState.windowWidth
+      absolutePreviewRatio = state.resizeState.previewRatio * ratioScaleFactor
+    in
+      [ -- Right Resizer
+        rightResizer state
+      ,
+        -- Preview
         HH.div
           [ HP.classes [ HB.dFlex, HB.flexColumn ]
           , HP.style $
               "flex: 1 1 "
-                <> show (state.previewRatio * 100.0)
+                <> show (absolutePreviewRatio * 100.0)
                 <>
                   "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
           ]
@@ -503,39 +550,10 @@ splitview = connect selectTranslator $ H.mkComponent
               , HP.style "padding-right: 0.5rem;"
               ]
               [ closeButton SwitchPreview ]
-          , HH.slot _preview unit Preview.preview
-              { renderedHtml: state.renderedHtml
-              , isDragging: state.mDragTarget /= Nothing
-              }
-              HandlePreview
+          , HH.slot_ _editor 1 Editor.editor
+              { docID: state.docID, elementData: cData }
           ]
-      else
-        HH.text ""
-    ]
-
-  renderSecondEditor :: State -> ElementData -> Array (H.ComponentHTML Action Slots m)
-  renderSecondEditor state cData =
-    [ -- Right Resizer
-      rightResizer state
-    ,
-      -- Preview
-      HH.div
-        [ HP.classes [ HB.dFlex, HB.flexColumn ]
-        , HP.style $
-            "flex: 1 1 "
-              <> show (state.previewRatio * 100.0)
-              <>
-                "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
-        ]
-        [ HH.div
-            [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
-            , HP.style "padding-right: 0.5rem;"
-            ]
-            [ closeButton SwitchPreview ]
-        , HH.slot_ _editor 1 Editor.editor
-            { docID: state.docID, elementData: cData }
-        ]
-    ]
+      ]
 
   closeButton :: Action -> H.ComponentHTML Action Slots m
   closeButton action =
