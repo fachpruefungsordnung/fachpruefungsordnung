@@ -146,6 +146,19 @@ data Action
   | DoNothing
   | Finalize
 
+type ResizeState =
+  { windowWidth :: Int
+  -- All the ratios here are ratios of the content width (i.e., total width minus resizers)
+  -- so all of the ratios should sum to 1.0
+  , sidebarRatio :: Number
+  , previewRatio :: Number
+  , editorRatio :: Number
+  , lastExpandedSidebarRatio :: Number
+  , lastExpandedPreviewRatio :: Number
+  , sidebarClosed :: Boolean
+  , previewClosed :: Boolean
+  }
+
 type State = FPOState
   ( docID :: DocumentID
   , mDragTarget :: Maybe DragTarget
