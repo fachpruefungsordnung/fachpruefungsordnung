@@ -98,7 +98,6 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, enabled, ref, style, title) as HP
-import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
@@ -114,9 +113,8 @@ import Web.Event.EventTarget
   , removeEventListener
   )
 import Web.HTML (HTMLElement, window)
-import Web.HTML.HTMLElement (offsetWidth, toElement)
+import Web.HTML.HTMLElement (toElement)
 import Web.HTML.Window as Win
-import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
 
@@ -183,8 +181,6 @@ type State = FPOState
   , commentState :: CommentState
   , fontSize :: Int
   , mListener :: Maybe (HS.Listener Action)
-  , mResizeObserver :: Maybe ResizeObserver
-  , mResizeSubscriptionId :: Maybe SubscriptionId
   , showButtonText :: Boolean
   , showButtons :: Boolean
   -- for autosave
@@ -269,8 +265,7 @@ data Action
 
 -- We use a query to get the content of the editor
 data Query a
-  = EditorResize a
-  | ReceiveFullTitle (Maybe String) a
+  = ReceiveFullTitle (Maybe String) a
   | SetDirtyFlag a
   -- | save the current content and send it to splitview
   | SaveSection a
@@ -295,6 +290,7 @@ data Query a
   | UpdateCommentProblem Boolean a
   | SetReAnchor (Maybe CommentSection) a
   | SetContent String a
+  | UpdateEditorSize Number a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -687,6 +683,7 @@ editor = connect selectTranslator $ H.mkComponent
   handleAction = case _ of
     Init -> do
       compareToElement <- H.gets _.compareToElement
+      { listener } <- H.liftEffect HS.create
 
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
@@ -696,68 +693,53 @@ editor = connect selectTranslator $ H.mkComponent
         -- setting for both instances and later add more specific settings
         H.liftEffect $ setupAce editor_ fontSize
 
-        when (compareToElement == Nothing) do
+        case compareToElement of
+          Nothing -> do
 
-          -- Subscribe to resize events and store subscription for cleanup
-          { emitter, listener } <- H.liftEffect HS.create
-          subscription <- H.subscribe emitter
+            -- Setup editor functionality (keydown listeners, Ace editor stuff, etc.)
+            let
+              onSave :: Effect Unit
+              onSave = HS.notify listener (Save false)
 
-          -- Setup editor functionality (keydown listeners, Ace editor stuff, etc.)
-          let
-            onSave :: Effect Unit
-            onSave = HS.notify listener (Save false)
+            H.modify_ _
+              { mEditor = Just editor_
+              , mListener = Just listener
+              }
 
-          H.modify_ _
-            { mListener = Just listener
-            , mResizeSubscriptionId = Just subscription
-            }
+            H.liftEffect $ do
+              eventListen <- eventListener (keyBinding onSave editor_)
+              container <- Editor.getContainer editor_
+              addEventListener keydown eventListen true
+                (toEventTarget $ toElement container)
 
-          H.liftEffect $ do
-            eventListen <- eventListener (keyBinding onSave editor_)
-            container <- Editor.getContainer editor_
-            addEventListener keydown eventListen true
-              (toEventTarget $ toElement container)
+              -- Set the editor's theme and mode
+              Editor.setEnableLiveAutocompletion true editor_
 
-            -- Set the editor's theme and mode
-            Editor.setEnableLiveAutocompletion true editor_
+          -- If a comparison element is loaded, also load the current content in the primary editor
+          Just { tocEntry: tocEntry, revID: revID } -> handleAction
+            (ChangeToSection tocEntry revID Nothing false)
 
-          -- Setup ResizeObserver for the container element
-          let
-            callback _ _ = do
-              -- Get the current width directly from the element
-              width <- offsetWidth el
-              HS.notify listener (HandleResize width)
+        -- New Ref for keeping track, if the content in editor has changed
+        -- 1. since last save
+        -- 2. since opening version
+        dirtyRef <- H.liftEffect $ Ref.new false
+        isOnMergeRef <- H.liftEffect $ Ref.new false
+        versionRef <- H.liftEffect $ Ref.new false
+        H.modify_ _ { mDirtyVersion = Just versionRef }
 
-          observer <- H.liftEffect $ resizeObserver callback
-          H.liftEffect $ observe (toElement el) {} observer
-          H.modify_ _ { mResizeObserver = Just observer }
+        -- create eventListener for preventing the tab from closing
+        -- when content has not been saved (Not changing through Navbar)
+        addBeforeUnloadListener dirtyRef isOnMergeRef listener
 
-          -- New Ref for keeping track, if the content in editor has changed
-          -- 1. since last save
-          -- 2. since opening version
-          dirtyRef <- H.liftEffect $ Ref.new false
-          isOnMergeRef <- H.liftEffect $ Ref.new false
-          versionRef <- H.liftEffect $ Ref.new false
-          H.modify_ _ { mDirtyVersion = Just versionRef }
-
-          -- create eventListener for preventing the tab from closing
-          -- when content has not been saved (Not changing through Navbar)
-          addBeforeUnloadListener dirtyRef isOnMergeRef listener
-
-          -- add and start Editor listeners
-          H.liftEffect $ addChangeListenerWithRef editor_ dirtyRef versionRef listener
-          container <- H.liftEffect $ Editor.getContainer editor_
-          H.liftEffect $ addMouseDragListeners container listener
-
-      -- If a comparison element is loaded, also load the current content in the primary editor
-      case compareToElement of
-        Nothing -> pure unit
-        Just { tocEntry: tocEntry, revID: revID } -> handleAction
-          (ChangeToSection tocEntry revID Nothing false)
+        -- add and start Editor listeners
+        H.liftEffect $ addChangeListenerWithRef editor_ dirtyRef versionRef listener
+        container <- H.liftEffect $ Editor.getContainer editor_
+        H.liftEffect $ addMouseDragListeners container listener
 
     DoNothing -> do
       pure unit
 
+    -- Resize the editor's rendering (called when content changes internally)
     Resize -> do
       state <- H.get
       H.liftEffect
@@ -1534,18 +1516,24 @@ editor = connect selectTranslator $ H.mkComponent
             $ handleAction
             $ DeleteAnnotation lm true true
 
+    -- Handle external resize from parent component (Splitview)
+    -- Updates UI elements based on width and triggers editor resize
     HandleResize width -> do
       -- Decides whether to show button text based on the width.
       -- Because german labels are longer, we need to adjust the cutoff
-      -- threshold dynamically. Pretty sure this is not the best solution,
-      -- but it works.
-
+      -- threshold dynamically.
       lang <- H.liftEffect $ Store.loadLanguage
       let cutoff = if lang == Just "de-DE" then 690.0 else 592.0
       let noButtonsCutoff = 350.0
 
       H.modify_ _
         { showButtonText = width >= cutoff, showButtons = width >= noButtonsCutoff }
+
+      -- Let the editor itself handle internal details like line breaks with resizing
+      editor_ <- H.gets _.mEditor
+      case editor_ of
+        Nothing -> pure unit
+        Just ed -> H.liftEffect $ Editor.resize (Just true) ed
 
     Finalize -> do
       -- Save in case, the user changes the page (via Navbar)
@@ -1558,13 +1546,6 @@ editor = connect selectTranslator $ H.mkComponent
       let
         tgt = Win.toEventTarget win
         beforeunload = EventType "beforeunload"
-      -- Cleanup observer and subscription
-      H.liftEffect $ case state.mResizeObserver of
-        Just obs -> disconnect obs
-        Nothing -> pure unit
-      case state.mResizeSubscriptionId of
-        Just subscription -> H.unsubscribe subscription
-        Nothing -> pure unit
       case state.saveState.mBeforeUnloadListener of
         Just l -> H.liftEffect $ removeEventListener beforeunload l false tgt
         _ -> pure unit
@@ -1747,13 +1728,6 @@ editor = connect selectTranslator $ H.mkComponent
       H.modify_ _ { upToDateVersion = mVersion }
       -- there is a new container above the editor. Resize editor to be able to scroll all the way down
       handleAction Resize
-      pure (Just a)
-
-    EditorResize a -> do
-      editor_ <- H.gets _.mEditor
-      case editor_ of
-        Nothing -> pure unit
-        Just ed -> H.liftEffect $ Editor.resize (Just true) ed
       pure (Just a)
 
     ChangeSection entry rev mTitle a -> do
@@ -1977,6 +1951,10 @@ editor = connect selectTranslator $ H.mkComponent
       H.modify_ \st -> st { commentState = st.commentState { reAnchor = reAnchor } }
       pure (Just a)
 
+    UpdateEditorSize width a -> do
+      handleAction $ HandleResize width
+      pure (Just a)
+
     -- Only used to send the draft from the main editor (primary/left) to the secondary editor
     SetContent draft a -> do
       state <- H.get
@@ -2196,8 +2174,6 @@ initialState { context, input } =
   , commentState: initialCommentState
   , fontSize: 12
   , mListener: Nothing
-  , mResizeObserver: Nothing
-  , mResizeSubscriptionId: Nothing
   , showButtonText: true
   , showButtons: true
   , saveState: initialSaveState
