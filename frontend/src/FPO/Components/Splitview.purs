@@ -287,6 +287,7 @@ splitview = connect selectTranslator $ H.mkComponent
             ( "height: calc(100vh - " <> show navbarHeight <>
                 "px); max-height: 100%; min-height: 0;"
             )
+        , HP.ref (H.RefLabel "splitview")
         ]
         ( -- TOC Sidebar
           renderSidebar state
@@ -594,7 +595,7 @@ splitview = connect selectTranslator $ H.mkComponent
         , mResizeSubscriptionId = Just subscription
         }
 
-      H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
+      H.getHTMLElementRef (H.RefLabel "splitview") >>= traverse_ \el -> do
         -- Set up ResizeObserver to monitor size changes
         let
           callback _ _ = do
@@ -690,8 +691,11 @@ splitview = connect selectTranslator $ H.mkComponent
       state <- H.get
       let newResizeState = state.resizeState { windowWidth = width }
       H.modify_ \st -> st
-        { resizeState = newResizeState
+        { resizeState = st.resizeState
+            { windowWidth = width
+            }
         }
+      newResizeState <- H.gets _.resizeState
       H.tell _editor 0 (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
       H.tell _editor 1 (Editor.UpdateEditorSize (newResizeState.previewRatio * width))
 
