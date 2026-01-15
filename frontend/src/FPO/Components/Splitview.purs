@@ -590,7 +590,7 @@ splitview = connect selectTranslator $ H.mkComponent
       H.modify_ \st -> st
         { resizeState = st.resizeState { windowWidth = width }
         }
-      H.tell _editor 0 (Editor.UpdateEditorSize (initialState.editorRatio * width))
+      H.tell _editor 0 (Editor.UpdateEditorSize (0.4 * width))
 
       H.modify_ \st -> do
         st { mTimeFormatter = timeFormatter }
@@ -617,8 +617,8 @@ splitview = connect selectTranslator $ H.mkComponent
         let
           callback _ _ = do
             -- Get the current width directly from the element
-            width <- HTMLElement.offsetWidth el
-            HS.notify listener (HandleWindowResize width)
+            width_ <- HTMLElement.offsetWidth el
+            HS.notify listener (HandleWindowResize width_)
 
         observer <- H.liftEffect $ resizeObserver callback
         H.liftEffect $ observe (HTMLElement.toElement el) {} observer

@@ -139,11 +139,35 @@ resizeFromRight
 togglePreview :: ResizeState -> ResizeState
 togglePreview resizeState =
   if resizeState.previewClosed then
-    resizeState
-      { previewClosed = false
-      , previewRatio = resizeState.lastExpandedPreviewRatio
-      , editorRatio = resizeState.editorRatio - resizeState.lastExpandedPreviewRatio
-      }
+    -- if there is enough space to shrink the editor, do it
+    if resizeState.lastExpandedPreviewRatio < (resizeState.editorRatio - 0.2) then
+      resizeState
+        { previewClosed = false
+        , previewRatio = resizeState.lastExpandedPreviewRatio
+        , editorRatio = resizeState.editorRatio - resizeState.lastExpandedPreviewRatio
+        }
+    -- if not, try to shrink the sidebar
+    else if resizeState.lastExpandedPreviewRatio < (resizeState.sidebarRatio - 0.1) then
+      resizeState
+        { previewClosed = false
+        , previewRatio = resizeState.lastExpandedPreviewRatio
+        , sidebarRatio = resizeState.sidebarRatio -
+            resizeState.lastExpandedPreviewRatio
+        }
+    else
+      -- if there is not space, evenly distribute the space 
+      -- from the sum of the not fitting windows (see test for real numbers)
+      let
+        sumOfAllRatios = resizeState.lastExpandedPreviewRatio
+          + resizeState.editorRatio
+          + resizeState.sidebarRatio
+      in
+        resizeState
+          { previewClosed = false
+          , sidebarRatio = resizeState.sidebarRatio / sumOfAllRatios
+          , editorRatio = resizeState.editorRatio / sumOfAllRatios
+          , previewRatio = resizeState.lastExpandedPreviewRatio / sumOfAllRatios
+          }
   else
     resizeState
       { previewClosed = true
@@ -155,11 +179,35 @@ togglePreview resizeState =
 toggleSidebar :: ResizeState -> ResizeState
 toggleSidebar resizeState =
   if resizeState.sidebarClosed then
-    resizeState
-      { sidebarClosed = false
-      , sidebarRatio = resizeState.lastExpandedSidebarRatio
-      , editorRatio = resizeState.editorRatio - resizeState.lastExpandedSidebarRatio
-      }
+    -- if there is enough space to shrink the editor, do it
+    if resizeState.lastExpandedSidebarRatio < (resizeState.editorRatio - 0.2) then
+      resizeState
+        { sidebarClosed = false
+        , sidebarRatio = resizeState.lastExpandedSidebarRatio
+        , editorRatio = resizeState.editorRatio - resizeState.lastExpandedSidebarRatio
+        }
+    -- if not, try to shrink the preview
+    else if resizeState.lastExpandedSidebarRatio < (resizeState.previewRatio - 0.15) then
+      resizeState
+        { sidebarClosed = false
+        , sidebarRatio = resizeState.lastExpandedSidebarRatio
+        , previewRatio = resizeState.previewRatio -
+            resizeState.lastExpandedSidebarRatio
+        }
+    else
+      -- if there is not space, evenly distribute the space 
+      -- from the sum of the not fitting windows (see test for real numbers)
+      let
+        sumOfAllRatios = resizeState.lastExpandedSidebarRatio
+          + resizeState.editorRatio
+          + resizeState.previewRatio
+      in
+        resizeState
+          { sidebarClosed = false
+          , previewRatio = resizeState.previewRatio / sumOfAllRatios
+          , editorRatio = resizeState.editorRatio / sumOfAllRatios
+          , sidebarRatio = resizeState.lastExpandedSidebarRatio / sumOfAllRatios
+          }
   else
     resizeState
       { sidebarClosed = true

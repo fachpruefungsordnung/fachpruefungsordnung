@@ -253,6 +253,35 @@ togglePreviewTest =
           )
       editorRatio `shouldBeNear` 0.45
 
+    it "makes sidebar smaller if there is not enough space to make editor smaller" do
+      let
+        { editorRatio, sidebarRatio } = togglePreview
+          ( defaultResizeState
+              { previewClosed = true
+              , lastExpandedPreviewRatio = 0.5
+              , sidebarRatio = 0.8
+              , editorRatio = 0.2
+              }
+          )
+      editorRatio `shouldEqual` 0.2
+      sidebarRatio `shouldBeNear` 0.3
+
+    it
+      "distributes space evenly based on the stored numbers when no fitting is possible"
+      do
+        let
+          { editorRatio, sidebarRatio, previewRatio } = togglePreview
+            ( defaultResizeState
+                { previewClosed = true
+                , lastExpandedPreviewRatio = 0.8 -- to big to either shorten sidebar or editor
+                , sidebarRatio = 0.5
+                , editorRatio = 0.5
+                }
+            )
+        editorRatio `shouldBeNear` (0.5 / 1.8)
+        sidebarRatio `shouldBeNear` (0.5 / 1.8)
+        previewRatio `shouldBeNear` (0.8 / 1.8)
+
 toggleSidebarTest :: Spec Unit
 toggleSidebarTest =
   describe "toggleSidebarTest" do
@@ -296,3 +325,32 @@ toggleSidebarTest =
               }
           )
       editorRatio `shouldBeNear` 0.45
+
+    it "makes sidebar smaller if there is not enough space to make editor smaller" do
+      let
+        { editorRatio, previewRatio } = toggleSidebar
+          ( defaultResizeState
+              { sidebarClosed = true
+              , lastExpandedSidebarRatio = 0.5
+              , previewRatio = 0.8
+              , editorRatio = 0.2
+              }
+          )
+      editorRatio `shouldEqual` 0.2
+      previewRatio `shouldBeNear` 0.3
+
+    it
+      "distributes space evenly based on the stored numbers when no fitting is possible"
+      do
+        let
+          { editorRatio, previewRatio, sidebarRatio } = toggleSidebar
+            ( defaultResizeState
+                { sidebarClosed = true
+                , lastExpandedSidebarRatio = 0.8 -- to big to either shorten sidebar or editor
+                , previewRatio = 0.5
+                , editorRatio = 0.5
+                }
+            )
+        editorRatio `shouldBeNear` (0.5 / 1.8)
+        previewRatio `shouldBeNear` (0.5 / 1.8)
+        sidebarRatio `shouldBeNear` (0.8 / 1.8)
