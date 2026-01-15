@@ -13,9 +13,9 @@ import Prelude
 resizerWidth :: Number
 resizerWidth = 8.0
 
--- The total width taken up by resizers (2 resizers × 8px each)
+-- The total width taken up by resizers (2 resizers × resizerWidth each)
 resizersTotalWidth :: Number
-resizersTotalWidth = 16.0
+resizersTotalWidth = 2.0 * resizerWidth
 
 -- Minimum space required when toggling panels
 minEditorSpaceForToggle :: Number
