@@ -4,9 +4,18 @@ module FPO.UI.Resizing
   , resizeFromRight
   , togglePreview
   , toggleSidebar
+  , resizersTotalWidth
   ) where
 
 import Prelude
+
+-- Width of a single resizer in pixels
+resizerWidth :: Number
+resizerWidth = 8.0
+
+-- The total width taken up by resizers (2 resizers × 8px each)
+resizersTotalWidth :: Number
+resizersTotalWidth = 16.0
 
 type ResizeState =
   { windowWidth :: Number
@@ -34,7 +43,7 @@ resizeFromLeft
   let
     sidebarAndEditor = resizeState.sidebarRatio + resizeState.editorRatio
     mousePercentFromLeft = mousePxFromLeft / resizeState.windowWidth
-    contentWidth = resizeState.windowWidth - 16.0
+    contentWidth = resizeState.windowWidth - resizersTotalWidth
     previewWidth = contentWidth * resizeState.previewRatio
     editorWidth = contentWidth * resizeState.editorRatio
     sidebarWidth = contentWidth * resizeState.sidebarRatio
@@ -45,12 +54,13 @@ resizeFromLeft
         { sidebarRatio = 0.0
         , editorRatio = sidebarAndEditor
         , sidebarClosed = true
+        , lastExpandedSidebarRatio = resizeState.sidebarRatio
         }
     else if
       mousePxFromLeft <= sidebarWidth
         -- resizing to the left but not close enough to hide sidebar
         || (mousePxFromLeft >= sidebarWidth) &&
-          (editorWidth - (mousePxFromLeft - sidebarWidth - 8.0) >= previewWidth)
+          (editorWidth - (mousePxFromLeft - sidebarWidth - resizerWidth) >= previewWidth)
     -- OR resizing to the left but preview still bigger than editor
     then
       let
@@ -89,11 +99,10 @@ resizeFromRight
   mousePxFromRight =
   let
     previewAndEditor = resizeState.previewRatio + resizeState.editorRatio
-    contentWidth = resizeState.windowWidth - 16.0
+    contentWidth = resizeState.windowWidth - resizersTotalWidth
     sidebarWidth = contentWidth * resizeState.sidebarRatio
     editorWidth = contentWidth * resizeState.editorRatio
     previewWidth = contentWidth * resizeState.previewRatio
-    -- Calculate position from left for sidebar closing logic
     mousePercentFromRight = mousePxFromRight / resizeState.windowWidth
   in
     -- Hide preview when dragging close to right edge (10%)
@@ -108,7 +117,7 @@ resizeFromRight
       mousePxFromRight <= previewWidth
         -- resizing to the right but not close enough to hide preview
         || (mousePxFromRight >= previewWidth) &&
-          (editorWidth - (mousePxFromRight - previewWidth - 8.0) >= sidebarWidth)
+          (editorWidth - (mousePxFromRight - previewWidth - resizerWidth) >= sidebarWidth)
     -- OR resizing to the right but sidebar still bigger than editor
     then
       let

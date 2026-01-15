@@ -739,6 +739,7 @@ editor = connect selectTranslator $ H.mkComponent
     DoNothing -> do
       pure unit
 
+    -- Resize the editor's rendering (called when content changes internally)
     Resize -> do
       state <- H.get
       H.liftEffect
@@ -1515,6 +1516,8 @@ editor = connect selectTranslator $ H.mkComponent
             $ handleAction
             $ DeleteAnnotation lm true true
 
+    -- Handle external resize from parent component (Splitview)
+    -- Updates UI elements based on width and triggers editor resize
     HandleResize width -> do
       -- Decides whether to show button text based on the width.
       -- Because german labels are longer, we need to adjust the cutoff

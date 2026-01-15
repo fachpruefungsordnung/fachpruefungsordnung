@@ -72,6 +72,7 @@ import FPO.UI.Resizing
   ( ResizeState
   , resizeFromLeft
   , resizeFromRight
+  , resizersTotalWidth
   , togglePreview
   , toggleSidebar
   )
@@ -274,7 +275,7 @@ splitview = connect selectTranslator $ H.mkComponent
     -- of the elements wont be visible anymore
     let
       navbarHeight = 56 -- px, height of the navbar
-      contentWidth = state.resizeState.windowWidth - 16.0
+      contentWidth = state.resizeState.windowWidth - resizersTotalWidth
       ratioScaleFactor = contentWidth / state.resizeState.windowWidth
       absoluteEditorRatio = state.resizeState.editorRatio * ratioScaleFactor
     -- toolbarHeight :: Int
@@ -327,12 +328,12 @@ splitview = connect selectTranslator $ H.mkComponent
                 _ -> renderPreview state
         )
 
-  -- Render both TOC and Comment but make them visable depending of the flags
-  -- Always keep them load to not load them over and over again
+  -- Render both TOC and Comment but make them visible depending on the flags
+  -- Always keep them loaded to not load them over and over again
   renderSidebar :: State -> Array (H.ComponentHTML Action Slots m)
   renderSidebar state =
     let
-      contentWidth = state.resizeState.windowWidth - 16.0
+      contentWidth = state.resizeState.windowWidth - resizersTotalWidth
       ratioScaleFactor = contentWidth / state.resizeState.windowWidth
       absoluteSidebarRatio = state.resizeState.sidebarRatio * ratioScaleFactor
     in
@@ -479,7 +480,7 @@ splitview = connect selectTranslator $ H.mkComponent
   renderPreview :: State -> Array (H.ComponentHTML Action Slots m)
   renderPreview state =
     let
-      contentWidth = state.resizeState.windowWidth - 16.0
+      contentWidth = state.resizeState.windowWidth - resizersTotalWidth
       ratioScaleFactor = contentWidth / state.resizeState.windowWidth
       absolutePreviewRatio = state.resizeState.previewRatio * ratioScaleFactor
     in
@@ -514,7 +515,7 @@ splitview = connect selectTranslator $ H.mkComponent
   renderSecondEditor :: State -> ElementData -> Array (H.ComponentHTML Action Slots m)
   renderSecondEditor state cData =
     let
-      contentWidth = state.resizeState.windowWidth - 16.0
+      contentWidth = state.resizeState.windowWidth - resizersTotalWidth
       ratioScaleFactor = contentWidth / state.resizeState.windowWidth
       absolutePreviewRatio = state.resizeState.previewRatio * ratioScaleFactor
     in
@@ -722,8 +723,6 @@ splitview = connect selectTranslator $ H.mkComponent
           H.tell _editor 1
             (Editor.UpdateEditorSize (newResizeState.previewRatio * width))
 
-        -- TODO what if comment section or so is shown?
-        -- TODO last expandedRatio
         Just RightResizer, Just startResizeState -> do
           let
             mousePxFromRight = width - mouseXPos
