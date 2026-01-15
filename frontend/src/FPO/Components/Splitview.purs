@@ -603,8 +603,8 @@ splitview = connect selectTranslator $ H.mkComponent
         let
           callback _ _ = do
             -- Get the current width directly from the element
-            width_ <- HTMLElement.offsetWidth el
-            HS.notify listener (HandleWindowResize width_)
+            width <- HTMLElement.offsetWidth el
+            HS.notify listener (HandleWindowResize width)
 
         observer <- H.liftEffect $ resizeObserver callback
         H.liftEffect $ observe (HTMLElement.toElement el) {} observer
