@@ -150,16 +150,8 @@ type State = FPOState
   ( docID :: DocumentID
   , mDragTarget :: Maybe DragTarget
 
-  -- The current widths of the sidebar and middle content (as percentage ratios)
-  , sidebarRatio :: Number
-  , previewRatio :: Number
-  , editorRatio :: Number
   , resizeState :: ResizeState
   , mStartResizeState :: Maybe ResizeState -- store the state at the start of resizing
-
-  -- The last expanded sidebar width, used to restore the sidebar when toggling
-  , lastExpandedSidebarRatio :: Number
-  , lastExpandedPreviewRatio :: Number
 
   , renderedHtml :: Maybe (LoadState String)
   , testDownload :: String
@@ -227,11 +219,6 @@ splitview = connect selectTranslator $ H.mkComponent
     { docID: input
     , translator: fromFpoTranslator context
     , mDragTarget: Nothing
-    , sidebarRatio: 0.2
-    , previewRatio: 0.4
-    , editorRatio: 0.4
-    , lastExpandedSidebarRatio: 0.2
-    , lastExpandedPreviewRatio: 0.4
     , resizeState:
         { windowWidth: 0.0
         , sidebarRatio: 0.2
@@ -706,6 +693,7 @@ splitview = connect selectTranslator $ H.mkComponent
         { resizeState = newResizeState
         }
       H.tell _editor 0 (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
+      H.tell _editor 1 (Editor.UpdateEditorSize (newResizeState.previewRatio * width))
 
     -- While mouse is hold down, resizer move to position of mouse
     -- (with certain rules)
@@ -728,7 +716,7 @@ splitview = connect selectTranslator $ H.mkComponent
           H.tell _editor 0
             (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
           H.tell _editor 1
-            (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
+            (Editor.UpdateEditorSize (newResizeState.previewRatio * width))
 
         -- TODO what if comment section or so is shown?
         -- TODO last expandedRatio
@@ -742,7 +730,7 @@ splitview = connect selectTranslator $ H.mkComponent
           H.tell _editor 0
             (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
           H.tell _editor 1
-            (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
+            (Editor.UpdateEditorSize (newResizeState.previewRatio * width))
 
         _, _ -> pure unit
 
@@ -802,7 +790,7 @@ splitview = connect selectTranslator $ H.mkComponent
       H.tell _editor 0 $ Editor.UpdateEditorSize
         (newResizeState.editorRatio * newResizeState.windowWidth)
       H.tell _editor 1 $ Editor.UpdateEditorSize
-        (newResizeState.editorRatio * newResizeState.windowWidth)
+        (newResizeState.previewRatio * newResizeState.windowWidth)
 
     DoNothing -> do
       pure unit
@@ -834,7 +822,7 @@ splitview = connect selectTranslator $ H.mkComponent
       when previewClosed $
         H.modify_ \st -> st
           { resizeState = st.resizeState
-              { previewRatio = st.lastExpandedPreviewRatio
+              { previewRatio = st.resizeState.lastExpandedPreviewRatio
               , previewClosed = false
               }
           }
@@ -921,7 +909,7 @@ splitview = connect selectTranslator $ H.mkComponent
         else
           H.modify_ \st -> st
             { resizeState = st.resizeState
-                { sidebarRatio = st.lastExpandedSidebarRatio
+                { sidebarRatio = st.resizeState.lastExpandedSidebarRatio
                 , sidebarClosed = false
                 , commentClosed = false
                 }
@@ -950,7 +938,7 @@ splitview = connect selectTranslator $ H.mkComponent
         when state.resizeState.previewClosed do
           H.modify_ \st -> st
             { resizeState = st.resizeState
-                { previewRatio = state.lastExpandedPreviewRatio
+                { previewRatio = state.resizeState.lastExpandedPreviewRatio
                 , previewClosed = false
                 }
             }
@@ -1031,7 +1019,7 @@ splitview = connect selectTranslator $ H.mkComponent
         else
           H.modify_ \st -> st
             { resizeState = st.resizeState
-                { sidebarRatio = st.lastExpandedSidebarRatio
+                { sidebarRatio = st.resizeState.lastExpandedSidebarRatio
                 , sidebarClosed = false
                 , commentClosed = false
                 }
