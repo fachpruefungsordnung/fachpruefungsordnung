@@ -4,9 +4,35 @@ module FPO.UI.Resizing
   , resizeFromRight
   , togglePreview
   , toggleSidebar
+  , resizersTotalWidth
   ) where
 
 import Prelude
+
+-- Width of a single resizer in pixels
+resizerWidth :: Number
+resizerWidth = 8.0
+
+-- The total width taken up by resizers (2 resizers × resizerWidth each)
+resizersTotalWidth :: Number
+resizersTotalWidth = 2.0 * resizerWidth
+
+-- Minimum space required when toggling panels
+minEditorSpaceForToggle :: Number
+minEditorSpaceForToggle = 0.2
+
+minSidebarSpaceForToggle :: Number
+minSidebarSpaceForToggle = 0.1
+
+minPreviewSpaceForToggle :: Number
+minPreviewSpaceForToggle = 0.15
+
+-- Minimum panel sizes to prevent closing during resize
+minPanelSize :: Number
+minPanelSize = 0.1
+
+minSidebarSizeBeforeClosing :: Number
+minSidebarSizeBeforeClosing = 0.05
 
 type ResizeState =
   { windowWidth :: Number
@@ -34,23 +60,27 @@ resizeFromLeft
   let
     sidebarAndEditor = resizeState.sidebarRatio + resizeState.editorRatio
     mousePercentFromLeft = mousePxFromLeft / resizeState.windowWidth
-    contentWidth = resizeState.windowWidth - 16.0
+    contentWidth = resizeState.windowWidth - resizersTotalWidth
     previewWidth = contentWidth * resizeState.previewRatio
     editorWidth = contentWidth * resizeState.editorRatio
     sidebarWidth = contentWidth * resizeState.sidebarRatio
   in
-    -- close enough to hide sidebar
+    -- Close sidebar when dragging close enough to left edge (< 5%)
     if mousePercentFromLeft <= 0.05 then
       resizeState
         { sidebarRatio = 0.0
         , editorRatio = sidebarAndEditor
         , sidebarClosed = true
+        -- Save current sidebar ratio before closing (for later restoration)
+        , lastExpandedSidebarRatio = resizeState.sidebarRatio
         }
     else if
       mousePxFromLeft <= sidebarWidth
         -- resizing to the left but not close enough to hide sidebar
         || (mousePxFromLeft >= sidebarWidth) &&
-          (editorWidth - (mousePxFromLeft - sidebarWidth - 8.0) >= previewWidth)
+          ( editorWidth - (mousePxFromLeft - sidebarWidth - resizerWidth) >=
+              previewWidth
+          )
     -- OR resizing to the left but preview still bigger than editor
     then
       let
@@ -66,7 +96,7 @@ resizeFromLeft
         sidebarRatio = mousePxFromLeft / contentWidth
         newEditorAndPreview = (1.0 - sidebarRatio) / 2.0
       in
-        if newEditorAndPreview >= 0.1 then
+        if newEditorAndPreview >= minPanelSize then
           resizeState
             { sidebarRatio = sidebarRatio
             , editorRatio = newEditorAndPreview
@@ -89,26 +119,28 @@ resizeFromRight
   mousePxFromRight =
   let
     previewAndEditor = resizeState.previewRatio + resizeState.editorRatio
-    contentWidth = resizeState.windowWidth - 16.0
+    contentWidth = resizeState.windowWidth - resizersTotalWidth
     sidebarWidth = contentWidth * resizeState.sidebarRatio
     editorWidth = contentWidth * resizeState.editorRatio
     previewWidth = contentWidth * resizeState.previewRatio
-    -- Calculate position from left for sidebar closing logic
     mousePercentFromRight = mousePxFromRight / resizeState.windowWidth
   in
-    -- Hide preview when dragging close to right edge (10%)
+    -- Hide preview when dragging close to right edge (< 10%)
     if mousePercentFromRight <= 0.10 then
       resizeState
         { previewRatio = 0.0
         , editorRatio = previewAndEditor
         , previewClosed = true
+        -- Save current preview ratio before closing (for later restoration)
         , lastExpandedPreviewRatio = resizeState.previewRatio
         }
     else if
       mousePxFromRight <= previewWidth
         -- resizing to the right but not close enough to hide preview
         || (mousePxFromRight >= previewWidth) &&
-          (editorWidth - (mousePxFromRight - previewWidth - 8.0) >= sidebarWidth)
+          ( editorWidth - (mousePxFromRight - previewWidth - resizerWidth) >=
+              sidebarWidth
+          )
     -- OR resizing to the right but sidebar still bigger than editor
     then
       let
@@ -125,7 +157,7 @@ resizeFromRight
         newEditorAndSidebar = (1.0 - previewRatio) / 2.0
       in
         -- resizing to the left and sidebar bigger than editor - make them equal
-        if newEditorAndSidebar > 0.05 then
+        if newEditorAndSidebar > minSidebarSizeBeforeClosing then
           resizeState
             { previewRatio = previewRatio
             , editorRatio = newEditorAndSidebar
@@ -136,6 +168,7 @@ resizeFromRight
             { sidebarRatio = 0.0
             , editorRatio = resizeState.sidebarRatio + resizeState.editorRatio
             , sidebarClosed = true
+            -- Save current sidebar ratio before closing (for later restoration)
             , lastExpandedSidebarRatio = resizeState.sidebarRatio
             }
 
@@ -143,14 +176,18 @@ togglePreview :: ResizeState -> ResizeState
 togglePreview resizeState =
   if resizeState.previewClosed then
     -- if there is enough space to shrink the editor, do it
-    if resizeState.lastExpandedPreviewRatio < (resizeState.editorRatio - 0.2) then
+    if
+      resizeState.lastExpandedPreviewRatio <
+        (resizeState.editorRatio - minEditorSpaceForToggle) then
       resizeState
         { previewClosed = false
         , previewRatio = resizeState.lastExpandedPreviewRatio
         , editorRatio = resizeState.editorRatio - resizeState.lastExpandedPreviewRatio
         }
     -- if not, try to shrink the sidebar
-    else if resizeState.lastExpandedPreviewRatio < (resizeState.sidebarRatio - 0.1) then
+    else if
+      resizeState.lastExpandedPreviewRatio <
+        (resizeState.sidebarRatio - minSidebarSpaceForToggle) then
       resizeState
         { previewClosed = false
         , previewRatio = resizeState.lastExpandedPreviewRatio
@@ -172,9 +209,11 @@ togglePreview resizeState =
           , previewRatio = resizeState.lastExpandedPreviewRatio / sumOfAllRatios
           }
   else
+    -- Close preview and expand editor
     resizeState
       { previewClosed = true
       , previewRatio = 0.0
+      -- Save current preview ratio before closing (for later restoration)
       , lastExpandedPreviewRatio = resizeState.previewRatio
       , editorRatio = resizeState.previewRatio + resizeState.editorRatio
       }
@@ -183,14 +222,18 @@ toggleSidebar :: ResizeState -> ResizeState
 toggleSidebar resizeState =
   if resizeState.sidebarClosed then
     -- if there is enough space to shrink the editor, do it
-    if resizeState.lastExpandedSidebarRatio < (resizeState.editorRatio - 0.2) then
+    if
+      resizeState.lastExpandedSidebarRatio <
+        (resizeState.editorRatio - minEditorSpaceForToggle) then
       resizeState
         { sidebarClosed = false
         , sidebarRatio = resizeState.lastExpandedSidebarRatio
         , editorRatio = resizeState.editorRatio - resizeState.lastExpandedSidebarRatio
         }
     -- if not, try to shrink the preview
-    else if resizeState.lastExpandedSidebarRatio < (resizeState.previewRatio - 0.15) then
+    else if
+      resizeState.lastExpandedSidebarRatio <
+        (resizeState.previewRatio - minPreviewSpaceForToggle) then
       resizeState
         { sidebarClosed = false
         , sidebarRatio = resizeState.lastExpandedSidebarRatio
@@ -212,9 +255,11 @@ toggleSidebar resizeState =
           , sidebarRatio = resizeState.lastExpandedSidebarRatio / sumOfAllRatios
           }
   else
+    -- Close sidebar and expand editor
     resizeState
       { sidebarClosed = true
       , sidebarRatio = 0.0
+      -- Save current sidebar ratio before closing (for later restoration)
       , lastExpandedSidebarRatio = resizeState.sidebarRatio
       , editorRatio = resizeState.sidebarRatio + resizeState.editorRatio
       }
