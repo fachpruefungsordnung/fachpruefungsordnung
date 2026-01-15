@@ -950,9 +950,10 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.PostPDF _ -> do
         state <- H.get
         upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
+        currentTocEntry <- H.request _toc unit TOC.RequestCurrentTocEntry
         let
           textElementId :: Int
-          textElementId = case state.mSelectedTocEntry of
+          textElementId = case join currentTocEntry of
             Just (SelLeaf id) -> id
             _ -> -1
 
@@ -1057,7 +1058,7 @@ splitview = connect selectTranslator $ H.mkComponent
           _ -> do
             pure unit
 
-      Editor.RaiseMergeMode -> do
+      Editor.RaiseMergeMode draft -> do
         handleAction UpdateMSelectedTocEntry
         state <- H.get
         upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
@@ -1085,15 +1086,8 @@ splitview = connect selectTranslator $ H.mkComponent
                           )
                       )
                   )
-                -- let
-                -- Nothing case should never occur
-                -- entry = case (findTOCEntry id state.tocEntries) of
-                --   Nothing -> emptyTOCEntry
-                --   Just e -> e
-                handleAction (SetComparison id Nothing)
-              -- mmTitle <- H.request _toc unit TOC.RequestFullTitle
-              -- H.tell _editor 1
-              --   (Editor.ChangeSection entry version.identifier (join mmTitle))
+                --handleAction (SetComparison id Nothing)
+                H.tell _editor 1 (Editor.SetContent draft)
               _ -> pure unit
           _ -> do
             pure unit
