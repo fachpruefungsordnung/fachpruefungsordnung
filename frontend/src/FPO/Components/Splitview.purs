@@ -362,7 +362,7 @@ splitview = connect selectTranslator $ H.mkComponent
                   "%; box-sizing: border-box; min-width: 6ch; background:rgb(233, 233, 235); position: relative;"
                 <>
                   if
-                    state.sidebarShown
+                    not state.resizeState.sidebarClosed
                       && not state.commentOverviewShown
                       && not state.commentShown
                       && state.tocShown then
@@ -379,7 +379,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 <>
                   "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
                 <>
-                  if state.sidebarShown && state.commentShown then
+                  if not state.resizeState.sidebarClosed && state.commentShown then
                     ""
                   else
                     "display: none;"
@@ -401,7 +401,7 @@ splitview = connect selectTranslator $ H.mkComponent
                   "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
                 <>
                   if
-                    state.sidebarShown
+                    not state.resizeState.sidebarClosed
                       && not state.commentShown
                       && state.commentOverviewShown then
                     ""
@@ -451,7 +451,7 @@ splitview = connect selectTranslator $ H.mkComponent
                     pure Nothing -- Do not trigger the mouse down event under the button
               , HE.onClick \_ -> ToggleSidebar
               ]
-              [ HH.text if state.sidebarShown then "⟨" else "⟩" ]
+              [ HH.text if not state.resizeState.sidebarClosed then "⟨" else "⟩" ]
           ]
       ]
 
@@ -488,7 +488,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 pure Nothing -- Do not trigger the mouse down event under the button
           , HE.onClick \_ -> TogglePreview
           ]
-          [ HH.text if state.previewShown then "⟩" else "⟨" ]
+          [ HH.text if not state.resizeState.previewClosed then "⟩" else "⟨" ]
       ]
 
   renderPreview :: State -> Array (H.ComponentHTML Action Slots m)
@@ -502,7 +502,7 @@ splitview = connect selectTranslator $ H.mkComponent
         rightResizer state
 
       -- Preview
-      , if state.previewShown then
+      , if not state.resizeState.previewClosed then
           HH.div
             [ HP.classes [ HB.dFlex, HB.flexColumn ]
             , HP.style $
@@ -583,6 +583,14 @@ splitview = connect selectTranslator $ H.mkComponent
         timeFormatter = Just $ case parseFormatString timeFormat of
           Left _ -> defaultFormatter
           Right formatter -> formatter
+
+      win <- H.liftEffect Web.HTML.window
+      intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
+      let width = toNumber intWidth
+      H.modify_ \st -> st
+        { resizeState = st.resizeState { windowWidth = width }
+        }
+      H.tell _editor 0 (Editor.UpdateEditorSize (initialState.editorRatio * width))
 
       H.modify_ \st -> do
         st { mTimeFormatter = timeFormatter }
