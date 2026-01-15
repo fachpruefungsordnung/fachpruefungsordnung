@@ -118,7 +118,7 @@ data Action
   | HandleWindowResize Number
   -- Toggle buttons
   | ToggleComment
-  | ToggleCommentOverview Boolean Int Int
+  | ToggleCommentOverview Boolean
   | ToggleSidebar
   | SwitchPreview
   | TogglePreview
@@ -393,7 +393,7 @@ splitview = connect selectTranslator $ H.mkComponent
                   else
                     "display: none;"
           ]
-          [ closeButton $ ToggleCommentOverview false (-1) (-1)
+          [ closeButton $ ToggleCommentOverview false
           , HH.h4
               [ HP.style
                   "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -765,7 +765,7 @@ splitview = connect selectTranslator $ H.mkComponent
       H.modify_ \st -> st { resizeState = st.resizeState { commentClosed = true } }
       H.tell _editor 0 (Editor.UnselectCommentSection)
 
-    ToggleCommentOverview shown docID tocID -> do
+    ToggleCommentOverview shown -> do
       state <- H.get
       if shown then do
         if not state.resizeState.sidebarClosed then
@@ -884,6 +884,10 @@ splitview = connect selectTranslator $ H.mkComponent
         inLatest <- H.gets _.inLatest
         H.tell _commentOverview unit
           (CommentOverview.ReceiveComments inLatest fs)
+      Comment.CommentOverview fs -> do
+        inLatest <- H.gets _.inLatest
+        H.tell _commentOverview unit
+          (CommentOverview.ReceiveComments inLatest fs)
 
       Comment.SendAbstractedComments abstractCSs hasProblem -> do
         H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs hasProblem)
@@ -891,6 +895,10 @@ splitview = connect selectTranslator $ H.mkComponent
       Comment.ToDeleteComment commentProblem -> do
         H.tell _editor 0 (Editor.ToDeleteComment commentProblem)
 
+      Comment.UpdatedComments fs commentProblem -> do
+        inLatest <- H.gets _.inLatest
+        H.tell _commentOverview unit
+          (CommentOverview.ReceiveComments inLatest fs)
       Comment.UpdatedComments fs commentProblem -> do
         inLatest <- H.gets _.inLatest
         H.tell _commentOverview unit
@@ -1023,6 +1031,10 @@ splitview = connect selectTranslator $ H.mkComponent
         H.modify_ _ { inLatest = inLatest }
         H.tell _comment unit
           (Comment.RequestComments docID entryID markerIDs inLatest)
+      Editor.RequestComments docID entryID markerIDs inLatest -> do
+        H.modify_ _ { inLatest = inLatest }
+        H.tell _comment unit
+          (Comment.RequestComments docID entryID markerIDs inLatest)
 
       Editor.SelectedCommentSection markerID -> do
         state <- H.get
@@ -1045,7 +1057,7 @@ splitview = connect selectTranslator $ H.mkComponent
         updateTree $ changeNodeHeading path newName s.tocEntries
 
       Editor.ShowAllCommentsOutput -> do
-        handleAction $ ToggleCommentOverview true (-1) (-1)
+        handleAction $ ToggleCommentOverview true
 
       Editor.RaiseDiscard -> do
         handleAction UpdateMSelectedTocEntry
