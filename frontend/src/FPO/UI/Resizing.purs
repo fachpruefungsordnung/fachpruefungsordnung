@@ -65,12 +65,13 @@ resizeFromLeft
     editorWidth = contentWidth * resizeState.editorRatio
     sidebarWidth = contentWidth * resizeState.sidebarRatio
   in
-    -- close enough to hide sidebar
+    -- Close sidebar when dragging close enough to left edge (< 5%)
     if mousePercentFromLeft <= 0.05 then
       resizeState
         { sidebarRatio = 0.0
         , editorRatio = sidebarAndEditor
         , sidebarClosed = true
+        -- Save current sidebar ratio before closing (for later restoration)
         , lastExpandedSidebarRatio = resizeState.sidebarRatio
         }
     else if
@@ -122,12 +123,13 @@ resizeFromRight
     previewWidth = contentWidth * resizeState.previewRatio
     mousePercentFromRight = mousePxFromRight / resizeState.windowWidth
   in
-    -- Hide preview when dragging close to right edge (10%)
+    -- Hide preview when dragging close to right edge (< 10%)
     if mousePercentFromRight <= 0.10 then
       resizeState
         { previewRatio = 0.0
         , editorRatio = previewAndEditor
         , previewClosed = true
+        -- Save current preview ratio before closing (for later restoration)
         , lastExpandedPreviewRatio = resizeState.previewRatio
         }
     else if
@@ -162,6 +164,7 @@ resizeFromRight
             { sidebarRatio = 0.0
             , editorRatio = resizeState.sidebarRatio + resizeState.editorRatio
             , sidebarClosed = true
+            -- Save current sidebar ratio before closing (for later restoration)
             , lastExpandedSidebarRatio = resizeState.sidebarRatio
             }
 
@@ -198,9 +201,11 @@ togglePreview resizeState =
           , previewRatio = resizeState.lastExpandedPreviewRatio / sumOfAllRatios
           }
   else
+    -- Close preview and expand editor
     resizeState
       { previewClosed = true
       , previewRatio = 0.0
+      -- Save current preview ratio before closing (for later restoration)
       , lastExpandedPreviewRatio = resizeState.previewRatio
       , editorRatio = resizeState.previewRatio + resizeState.editorRatio
       }
@@ -238,9 +243,11 @@ toggleSidebar resizeState =
           , sidebarRatio = resizeState.lastExpandedSidebarRatio / sumOfAllRatios
           }
   else
+    -- Close sidebar and expand editor
     resizeState
       { sidebarClosed = true
       , sidebarRatio = 0.0
+      -- Save current sidebar ratio before closing (for later restoration)
       , lastExpandedSidebarRatio = resizeState.sidebarRatio
       , editorRatio = resizeState.sidebarRatio + resizeState.editorRatio
       }
