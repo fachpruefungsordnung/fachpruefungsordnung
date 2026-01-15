@@ -27,6 +27,9 @@ defaultResizeState =
   , lastExpandedSidebarRatio: 0.2
   , sidebarClosed: false
   , previewClosed: false
+  , tocClosed: false
+  , commentClosed: true
+  , commentOverviewClosed: true
   } :: ResizeState
 
 resizeFromLeftTest :: Spec Unit

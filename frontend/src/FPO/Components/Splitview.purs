@@ -175,11 +175,6 @@ type State = FPOState
   , mTimeFormatter :: Maybe Formatter
 
   -- Boolean flags for UI state
-  , sidebarShown :: Boolean
-  , tocShown :: Boolean
-  , commentOverviewShown :: Boolean
-  , commentShown :: Boolean
-  , previewShown :: Boolean
   -- , compareToElement :: ElementData
   -- this value is updated from the same value in TOC
   , mSelectedTocEntry :: Maybe SelectedEntity
@@ -246,6 +241,9 @@ splitview = connect selectTranslator $ H.mkComponent
         , lastExpandedPreviewRatio: 0.4
         , sidebarClosed: false
         , previewClosed: false
+        , tocClosed: false
+        , commentClosed: true
+        , commentOverviewClosed: true
         }
     , mStartResizeState: Nothing
     , renderedHtml: Nothing
@@ -253,11 +251,6 @@ splitview = connect selectTranslator $ H.mkComponent
     , tocEntries: Empty
     , versionMapping: Empty
     , mTimeFormatter: Nothing
-    , sidebarShown: true
-    , tocShown: true
-    , commentOverviewShown: false
-    , commentShown: false
-    , previewShown: true
     , mSelectedTocEntry: Nothing
     , dirtyVersion: false
     , modalData: Nothing
@@ -363,9 +356,9 @@ splitview = connect selectTranslator $ H.mkComponent
                 <>
                   if
                     not state.resizeState.sidebarClosed
-                      && not state.commentOverviewShown
-                      && not state.commentShown
-                      && state.tocShown then
+                      && state.resizeState.commentOverviewClosed
+                      && state.resizeState.commentClosed
+                      && not state.resizeState.tocClosed then
                     ""
                   else
                     "display: none;"
@@ -379,7 +372,9 @@ splitview = connect selectTranslator $ H.mkComponent
                 <>
                   "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
                 <>
-                  if not state.resizeState.sidebarClosed && state.commentShown then
+                  if
+                    not state.resizeState.sidebarClosed && not
+                      state.resizeState.commentClosed then
                     ""
                   else
                     "display: none;"
@@ -402,8 +397,8 @@ splitview = connect selectTranslator $ H.mkComponent
                 <>
                   if
                     not state.resizeState.sidebarClosed
-                      && not state.commentShown
-                      && state.commentOverviewShown then
+                      && state.resizeState.commentClosed
+                      && not state.resizeState.commentOverviewClosed then
                     ""
                   else
                     "display: none;"
@@ -773,24 +768,31 @@ splitview = connect selectTranslator $ H.mkComponent
       H.modify_ _ { versionMapping = newVersionMapping }
 
     ToggleComment -> do
-      H.modify_ _ { commentShown = false }
+      H.modify_ \st -> st { resizeState = st.resizeState { commentClosed = true } }
       H.tell _editor 0 (Editor.UnselectCommentSection)
 
     ToggleCommentOverview shown docID tocID -> do
-      sidebarShown <- H.gets _.sidebarShown
+      state <- H.get
       if shown then do
-        if sidebarShown then
-          H.modify_ _ { commentShown = false, commentOverviewShown = true }
+        if not state.resizeState.sidebarClosed then
+          H.modify_ \st -> st
+            { resizeState = st.resizeState
+                { commentClosed = true, commentOverviewClosed = false }
+            }
         else
           H.modify_ \st -> st
-            { sidebarRatio = st.lastExpandedSidebarRatio
-            , sidebarShown = true
-            , commentShown = false
-            , commentOverviewShown = true
+            { resizeState =
+                st.resizeState
+                  { sidebarRatio = st.resizeState.lastExpandedSidebarRatio
+                  , sidebarClosed = false
+                  , commentClosed = true
+                  , commentOverviewClosed = false
+                  }
             }
         H.tell _comment unit (Comment.Overview docID tocID)
       else
-        H.modify_ _ { commentOverviewShown = false }
+        H.modify_ \st -> st
+          { resizeState = st.resizeState { commentOverviewClosed = true } }
 
     ToggleSidebar -> do
       state <- H.get
@@ -827,12 +829,14 @@ splitview = connect selectTranslator $ H.mkComponent
         (Editor.UpdateEditorSize $ numberWidth * newResizeState.previewRatio)
 
     ModifyVersionMapping tocID vID cData -> do
-      previewShown <- H.gets _.previewShown
+      previewClosed <- H.gets _.resizeState.previewClosed
       versionMapping <- H.gets _.versionMapping
-      when (not previewShown) $
+      when previewClosed $
         H.modify_ \st -> st
-          { previewRatio = st.lastExpandedPreviewRatio
-          , previewShown = true
+          { resizeState = st.resizeState
+              { previewRatio = st.lastExpandedPreviewRatio
+              , previewClosed = false
+              }
           }
       handleAction UpdateMSelectedTocEntry
       let
@@ -876,7 +880,7 @@ splitview = connect selectTranslator $ H.mkComponent
     HandleComment output -> case output of
 
       Comment.CloseCommentSection -> do
-        H.modify_ _ { commentShown = false }
+        H.modify_ \st -> st { resizeState = st.resizeState { commentClosed = true } }
 
       -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
       Comment.ConfirmComment newCommentSection -> do
@@ -902,7 +906,7 @@ splitview = connect selectTranslator $ H.mkComponent
 
       CommentOverview.JumpToCommentSection tocID markerID -> do
         docID <- H.gets _.docID
-        H.modify_ _ { commentShown = true }
+        H.modify_ \st -> st { resizeState = st.resizeState { commentClosed = false } }
         H.tell _comment unit
           (Comment.SelectedCommentSection docID tocID markerID)
         H.tell _editor 0 (Editor.SelectCommentSection markerID)
@@ -910,14 +914,17 @@ splitview = connect selectTranslator $ H.mkComponent
     HandleEditor output -> case output of
 
       Editor.AddComment docID tocID -> do
-        sidebarShown <- H.gets _.sidebarShown
-        if sidebarShown then
-          H.modify_ _ { commentShown = true }
+        state <- H.get
+        if not state.resizeState.sidebarClosed then
+          H.modify_ \st -> st
+            { resizeState = st.resizeState { commentClosed = false } }
         else
           H.modify_ \st -> st
-            { sidebarRatio = st.lastExpandedSidebarRatio
-            , sidebarShown = true
-            , commentShown = true
+            { resizeState = st.resizeState
+                { sidebarRatio = st.lastExpandedSidebarRatio
+                , sidebarClosed = false
+                , commentClosed = false
+                }
             }
         H.tell _comment unit (Comment.AddComment docID tocID)
 
@@ -939,11 +946,13 @@ splitview = connect selectTranslator $ H.mkComponent
         H.modify_ _
           { renderedHtml = Just (Loaded html)
           }
-        -- Only update previewRatio and previewShown if preview is not already shown
-        unless state.previewShown do
+        -- Only update previewRatio and previewClosed if preview is not already shown
+        when state.resizeState.previewClosed do
           H.modify_ \st -> st
-            { previewRatio = state.lastExpandedPreviewRatio
-            , previewShown = true
+            { resizeState = st.resizeState
+                { previewRatio = state.lastExpandedPreviewRatio
+                , previewClosed = false
+                }
             }
 
       Editor.PostPDF _ -> do
@@ -1016,13 +1025,16 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Editor.SelectedCommentSection tocID markerID -> do
         state <- H.get
-        if state.sidebarShown then
-          H.modify_ _ { commentShown = true }
+        if not state.resizeState.sidebarClosed then
+          H.modify_ \st -> st
+            { resizeState = st.resizeState { commentClosed = false } }
         else
-          H.modify_ _
-            { sidebarRatio = state.lastExpandedSidebarRatio
-            , sidebarShown = true
-            , commentShown = true
+          H.modify_ \st -> st
+            { resizeState = st.resizeState
+                { sidebarRatio = st.lastExpandedSidebarRatio
+                , sidebarClosed = false
+                , commentClosed = false
+                }
             }
         H.tell _comment unit
           (Comment.SelectedCommentSection state.docID tocID markerID)

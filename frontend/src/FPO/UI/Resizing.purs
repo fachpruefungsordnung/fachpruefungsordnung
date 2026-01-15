@@ -19,6 +19,9 @@ type ResizeState =
   , lastExpandedPreviewRatio :: Number
   , sidebarClosed :: Boolean
   , previewClosed :: Boolean
+  , commentClosed :: Boolean
+  , tocClosed :: Boolean
+  , commentOverviewClosed :: Boolean
   }
 
 resizeFromLeft
