@@ -602,8 +602,8 @@ splitview = connect selectTranslator $ H.mkComponent
         let
           callback _ _ = do
             -- Get the current width directly from the element
-            width <- HTMLElement.offsetWidth el
-            HS.notify listener (HandleWindowResize width)
+            width_ <- HTMLElement.offsetWidth el
+            HS.notify listener (HandleWindowResize width_)
 
         observer <- H.liftEffect $ resizeObserver callback
         H.liftEffect $ observe (HTMLElement.toElement el) {} observer
@@ -690,8 +690,6 @@ splitview = connect selectTranslator $ H.mkComponent
       H.modify_ _ { mDragTarget = Nothing, mStartResizeState = Nothing }
 
     HandleWindowResize width -> do
-      state <- H.get
-      let newResizeState = state.resizeState { windowWidth = width }
       H.modify_ \st -> st
         { resizeState = st.resizeState
             { windowWidth = width
@@ -884,10 +882,6 @@ splitview = connect selectTranslator $ H.mkComponent
         inLatest <- H.gets _.inLatest
         H.tell _commentOverview unit
           (CommentOverview.ReceiveComments inLatest fs)
-      Comment.CommentOverview fs -> do
-        inLatest <- H.gets _.inLatest
-        H.tell _commentOverview unit
-          (CommentOverview.ReceiveComments inLatest fs)
 
       Comment.SendAbstractedComments abstractCSs hasProblem -> do
         H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs hasProblem)
@@ -895,10 +889,6 @@ splitview = connect selectTranslator $ H.mkComponent
       Comment.ToDeleteComment commentProblem -> do
         H.tell _editor 0 (Editor.ToDeleteComment commentProblem)
 
-      Comment.UpdatedComments fs commentProblem -> do
-        inLatest <- H.gets _.inLatest
-        H.tell _commentOverview unit
-          (CommentOverview.ReceiveComments inLatest fs)
       Comment.UpdatedComments fs commentProblem -> do
         inLatest <- H.gets _.inLatest
         H.tell _commentOverview unit
@@ -911,7 +901,6 @@ splitview = connect selectTranslator $ H.mkComponent
     HandleCommentOverview output -> case output of
 
       CommentOverview.JumpToCommentSection markerID -> do
-        docID <- H.gets _.docID
         H.modify_ \st -> st { resizeState = st.resizeState { commentClosed = false } }
         H.tell _comment unit
           (Comment.SelectedCommentSection markerID)
@@ -1027,10 +1016,6 @@ splitview = connect selectTranslator $ H.mkComponent
                     H.liftEffect $ revokeObjectURL url
                   pure unit
 
-      Editor.RequestComments docID entryID markerIDs inLatest -> do
-        H.modify_ _ { inLatest = inLatest }
-        H.tell _comment unit
-          (Comment.RequestComments docID entryID markerIDs inLatest)
       Editor.RequestComments docID entryID markerIDs inLatest -> do
         H.modify_ _ { inLatest = inLatest }
         H.tell _comment unit
