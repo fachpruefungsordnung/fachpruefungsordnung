@@ -78,7 +78,9 @@ resizeFromLeft
       mousePxFromLeft <= sidebarWidth
         -- resizing to the left but not close enough to hide sidebar
         || (mousePxFromLeft >= sidebarWidth) &&
-          (editorWidth - (mousePxFromLeft - sidebarWidth - resizerWidth) >= previewWidth)
+          ( editorWidth - (mousePxFromLeft - sidebarWidth - resizerWidth) >=
+              previewWidth
+          )
     -- OR resizing to the left but preview still bigger than editor
     then
       let
@@ -136,7 +138,9 @@ resizeFromRight
       mousePxFromRight <= previewWidth
         -- resizing to the right but not close enough to hide preview
         || (mousePxFromRight >= previewWidth) &&
-          (editorWidth - (mousePxFromRight - previewWidth - resizerWidth) >= sidebarWidth)
+          ( editorWidth - (mousePxFromRight - previewWidth - resizerWidth) >=
+              sidebarWidth
+          )
     -- OR resizing to the right but sidebar still bigger than editor
     then
       let
@@ -172,14 +176,18 @@ togglePreview :: ResizeState -> ResizeState
 togglePreview resizeState =
   if resizeState.previewClosed then
     -- if there is enough space to shrink the editor, do it
-    if resizeState.lastExpandedPreviewRatio < (resizeState.editorRatio - minEditorSpaceForToggle) then
+    if
+      resizeState.lastExpandedPreviewRatio <
+        (resizeState.editorRatio - minEditorSpaceForToggle) then
       resizeState
         { previewClosed = false
         , previewRatio = resizeState.lastExpandedPreviewRatio
         , editorRatio = resizeState.editorRatio - resizeState.lastExpandedPreviewRatio
         }
     -- if not, try to shrink the sidebar
-    else if resizeState.lastExpandedPreviewRatio < (resizeState.sidebarRatio - minSidebarSpaceForToggle) then
+    else if
+      resizeState.lastExpandedPreviewRatio <
+        (resizeState.sidebarRatio - minSidebarSpaceForToggle) then
       resizeState
         { previewClosed = false
         , previewRatio = resizeState.lastExpandedPreviewRatio
@@ -214,14 +222,18 @@ toggleSidebar :: ResizeState -> ResizeState
 toggleSidebar resizeState =
   if resizeState.sidebarClosed then
     -- if there is enough space to shrink the editor, do it
-    if resizeState.lastExpandedSidebarRatio < (resizeState.editorRatio - minEditorSpaceForToggle) then
+    if
+      resizeState.lastExpandedSidebarRatio <
+        (resizeState.editorRatio - minEditorSpaceForToggle) then
       resizeState
         { sidebarClosed = false
         , sidebarRatio = resizeState.lastExpandedSidebarRatio
         , editorRatio = resizeState.editorRatio - resizeState.lastExpandedSidebarRatio
         }
     -- if not, try to shrink the preview
-    else if resizeState.lastExpandedSidebarRatio < (resizeState.previewRatio - minPreviewSpaceForToggle) then
+    else if
+      resizeState.lastExpandedSidebarRatio <
+        (resizeState.previewRatio - minPreviewSpaceForToggle) then
       resizeState
         { sidebarClosed = false
         , sidebarRatio = resizeState.lastExpandedSidebarRatio
