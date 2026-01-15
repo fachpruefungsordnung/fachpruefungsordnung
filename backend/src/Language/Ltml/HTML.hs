@@ -117,33 +117,14 @@ renderHtmlCssBS docCon =
 -------------------------------------------------------------------------------
 
 -- | Renders a global ToC (including appendices) as a list of
---   either (@Maybe@ idHtml, @Result@ titleHtml) or a phantom result type
---   for @SimpleSection@s which do not have a @Heading@.
---   The @Result@ type signals the Frontend if an error occured while
+--   (@Maybe@ idText, @Result@ titleText). 
+--   The @Result@ type signals if an error occured while
 --   parsing the segment.
 renderTocList
-    :: Flagged' DocumentContainer -> [RenderedTocEntry]
+    :: Flagged' DocumentContainer -> [FrontendTocEntry]
 renderTocList docContainer =
-    -- \| Create global ToC with Footnote context
-    let (_, finalState) =
-            runState
-                ( runReaderT
-                    (toHtmlM docContainer)
-                    (initReaderState {appendixHasGlobalToC = True})
-                )
-                initGlobalState
-        tocList = toList $ tableOfContents finalState
-        -- \| Produce (Just <span>id</span>, Success <span>title</span>);
-        --    This creates one homogeneous list without Either
-        htmlTitleList =
-            map
-                ( either
-                    (bimap (span_ <$>) (span_ <$>))
-                    ( \(mId, rDt, _, _) -> (span_ <$> mId, span_ . evalDelayed finalState <$> rDt)
-                    )
-                )
-                tocList
-     in -- \| Render Maybe Html and Result Html to ByteString
-        map (bimap (fmap renderBS) (fmap renderBS)) htmlTitleList
+    -- \| Create global ToC inlcuding appendices
+    let (_, finalState) = runReaderState (toHtmlM docContainer) initReaderState initGlobalState
+     in toList $ frontendToC finalState
 
 -------------------------------------------------------------------------------
