@@ -21,9 +21,10 @@ import Data.Array
   , (!!)
   )
 import Data.Either (Either(..))
+import Data.Foldable (traverse_)
 import Data.Formatter.DateTime (Formatter, parseFormatString)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..), fromMaybe, isJust)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String.Regex as Regex
 import Data.String.Regex.Flags as RegexFlags
 import Effect.Aff (Milliseconds(..), delay)
@@ -67,12 +68,22 @@ import FPO.Types
   , tocTreeToDocumentTree
   )
 import FPO.UI.Modals.DirtyVersionModal (dirtyVersionModal)
+import FPO.UI.Resizing
+  ( ResizeState
+  , resizeFromLeft
+  , resizeFromRight
+  , resizersTotalWidth
+  , togglePreview
+  , toggleSidebar
+  )
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
+import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
+import Halogen.Subscription as HS
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
@@ -86,9 +97,10 @@ import Web.HTML.HTMLDocument as HTMLDocument
 import Web.HTML.HTMLElement as HTMLElement
 import Web.HTML.Window (document)
 import Web.HTML.Window as Web.HTML.Window
+import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
 
-data DragTarget = ResizeLeft | ResizeRight
+data DragTarget = LeftResizer | RightResizer
 
 derive instance eqDragTarget :: Eq DragTarget
 
@@ -104,6 +116,7 @@ data Action
   | StartResize DragTarget MouseEvent
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
+  | HandleWindowResize Number
   -- Toggle buttons
   | CloseComment
   | ToggleCommentOverview Boolean
@@ -132,30 +145,14 @@ data Action
   | ModifyVersionFromModal Int (Maybe Int)
   | DeleteDraft
   | DoNothing
+  | Finalize
 
 type State = FPOState
   ( docID :: DocumentID
   , mDragTarget :: Maybe DragTarget
 
-  -- Store the width values as ratios of the total width
-  -- TODO: Using the ratios to keep the ratio, when resizing the window
-  --      But how do we get the event of window resize?
-
-  -- Instead of setting the width directly to mouse position, calculate a delta
-  -- for a smoother and correct resize experience with the start positions
-  , startMouseRatio :: Number
-  , startSidebarRatio :: Number
-  , startPreviewRatio :: Number
-  , startEditorRatio :: Number
-
-  -- The current widths of the sidebar and middle content (as percentage ratios)
-  , sidebarRatio :: Number
-  , previewRatio :: Number
-  , editorRatio :: Number
-
-  -- The last expanded sidebar width, used to restore the sidebar when toggling
-  , lastExpandedSidebarRatio :: Number
-  , lastExpandedPreviewRatio :: Number
+  , resizeState :: ResizeState
+  , mStartResizeState :: Maybe ResizeState -- store the state at the start of resizing
 
   , renderedHtml :: Maybe (LoadState String)
   , testDownload :: String
@@ -171,11 +168,6 @@ type State = FPOState
   , mTimeFormatter :: Maybe Formatter
 
   -- Boolean flags for UI state
-  , sidebarShown :: Boolean
-  , tocShown :: Boolean
-  , commentOverviewShown :: Boolean
-  , commentShown :: Boolean
-  , previewShown :: Boolean
   -- , compareToElement :: ElementData
   -- this value is updated from the same value in TOC
   , mSelectedTocEntry :: Maybe SelectedEntity
@@ -185,6 +177,9 @@ type State = FPOState
   , upToDateVersion :: Maybe Version
   , pendingUpdateElementID :: Maybe Int
   , inLatest :: Boolean
+  , mListener :: Maybe (HS.Listener Action)
+  , mResizeObserver :: Maybe ResizeObserver
+  , mResizeSubscriptionId :: Maybe SubscriptionId
   )
 
 type ElemVersion =
@@ -217,6 +212,7 @@ splitview = connect selectTranslator $ H.mkComponent
       { initialize = Just Init
       , handleAction = handleAction
       , receive = Just <<< Receive
+      , finalize = Just Finalize
       }
   }
   where
@@ -225,31 +221,34 @@ splitview = connect selectTranslator $ H.mkComponent
     { docID: input
     , translator: fromFpoTranslator context
     , mDragTarget: Nothing
-    , startMouseRatio: 0.0
-    , startSidebarRatio: 0.0
-    , startPreviewRatio: 0.0
-    , startEditorRatio: 0.0
-    , sidebarRatio: 0.2
-    , previewRatio: 0.4
-    , editorRatio: 0.4
-    , lastExpandedSidebarRatio: 0.2
-    , lastExpandedPreviewRatio: 0.4
+    , resizeState:
+        { windowWidth: 0.0
+        , sidebarRatio: 0.2
+        , previewRatio: 0.4
+        , editorRatio: 0.4
+        , lastExpandedSidebarRatio: 0.2
+        , lastExpandedPreviewRatio: 0.4
+        , sidebarClosed: false
+        , previewClosed: false
+        , tocClosed: false
+        , commentClosed: true
+        , commentOverviewClosed: true
+        }
+    , mStartResizeState: Nothing
     , renderedHtml: Nothing
     , testDownload: ""
     , tocEntries: Empty
     , versionMapping: Empty
     , mTimeFormatter: Nothing
-    , sidebarShown: true
-    , tocShown: true
-    , commentOverviewShown: false
-    , commentShown: false
-    , previewShown: true
     , mSelectedTocEntry: Nothing
     , dirtyVersion: false
     , modalData: Nothing
     , upToDateVersion: Nothing
     , pendingUpdateElementID: Nothing
     , inLatest: true
+    , mListener: Nothing
+    , mResizeObserver: Nothing
+    , mResizeSubscriptionId: Nothing
     }
 
   render :: State -> H.ComponentHTML Action Slots m
@@ -275,8 +274,10 @@ splitview = connect selectTranslator $ H.mkComponent
     -- We have to manually shrink the size of those elements, otherwise if they overflow the bottom
     -- of the elements wont be visible anymore
     let
-      navbarHeight :: Int
       navbarHeight = 56 -- px, height of the navbar
+      contentWidth = state.resizeState.windowWidth - resizersTotalWidth
+      ratioScaleFactor = contentWidth / state.resizeState.windowWidth
+      absoluteEditorRatio = state.resizeState.editorRatio * ratioScaleFactor
     -- toolbarHeight :: Int
     -- toolbarHeight = 31 -- px, height of the toolbar
     in
@@ -289,6 +290,7 @@ splitview = connect selectTranslator $ H.mkComponent
             ( "height: calc(100vh - " <> show navbarHeight <>
                 "px); max-height: 100%; min-height: 0;"
             )
+        , HP.ref (H.RefLabel "splitview")
         ]
         ( -- TOC Sidebar
           renderSidebar state
@@ -296,7 +298,7 @@ splitview = connect selectTranslator $ H.mkComponent
               [ -- Editor
                 HH.div
                   [ HP.style $ "position: relative; flex: 0 0 "
-                      <> show (state.editorRatio * 100.0)
+                      <> show (absoluteEditorRatio * 100.0)
                       <> "%;"
                   ]
                   [ -- The actual editor area
@@ -326,115 +328,123 @@ splitview = connect selectTranslator $ H.mkComponent
                 _ -> renderPreview state
         )
 
-  -- Render both TOC and Comment but make them visable depending of the flags
-  -- Always keep them load to not load them over and over again
+  -- Render both TOC and Comment but make them visible depending on the flags
+  -- Always keep them loaded to not load them over and over again
   renderSidebar :: State -> Array (H.ComponentHTML Action Slots m)
   renderSidebar state =
-    [ -- TOC
-      HH.div
-        [ HP.classes [ HB.overflowAuto, HB.p1 ]
-        , HP.style $
-            "flex: 0 0 " <> show (state.sidebarRatio * 100.0)
-              <>
-                "%; box-sizing: border-box; min-width: 6ch; background:rgb(233, 233, 235); position: relative;"
-              <>
-                if
-                  state.sidebarShown
-                    && not state.commentOverviewShown
-                    && not state.commentShown
-                    && state.tocShown then
-                  ""
-                else
-                  "display: none;"
-        ]
-        [ HH.slot _toc unit TOC.tocview state.docID HandleTOC ]
-    -- Comment
-    , HH.div
-        [ HP.classes [ HB.overflowAuto, HB.p1 ]
-        , HP.style $
-            "flex: 0 0 " <> show (state.sidebarRatio * 100.0)
-              <>
-                "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
-              <>
-                if state.sidebarShown && state.commentShown then
-                  ""
-                else
-                  "display: none;"
-        ]
-        [ closeButton CloseComment
-        , HH.h4
-            [ HP.style
-                "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
-            ]
-            [ HH.text (translate (label :: _ "comment_comment") state.translator) ]
-        , HH.slot _comment unit Comment.commentview unit HandleComment
-        ]
-    -- CommentOverview
-    , HH.div
-        [ HP.classes [ HB.overflowAuto, HB.p1 ]
-        , HP.style $
-            "flex: 0 0 " <> show (state.sidebarRatio * 100.0)
-              <>
-                "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
-              <>
-                if
-                  state.sidebarShown
-                    && not state.commentShown
-                    && state.commentOverviewShown then
-                  ""
-                else
-                  "display: none;"
-        ]
-        [ closeButton $ ToggleCommentOverview false
-        , HH.h4
-            [ HP.style
-                "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
-            ]
-            [ HH.text (translate (label :: _ "comment_allComments") state.translator)
-            ]
-        , HH.slot _commentOverview unit CommentOverview.commentOverviewview unit
-            HandleCommentOverview
-        ]
-    -- Left Resizer
-    , HH.div
-        [ HE.onMouseDown (StartResize ResizeLeft)
-        , HP.style
-            "width: 8px; \
-            \cursor: col-resize; \
-            \background:rgba(0, 0, 0, 0.3); \
-            \display: flex; \
-            \align-items: center; \
-            \justify-content: center; \
-            \position: relative;"
-        ]
-        [ HH.button
-            [ HP.style
-                "background:rgba(255, 255, 255, 0.8); \
-                \border: 0.2px solid #aaa; \
-                \padding: 0.1rem 0.1rem; \
-                \font-size: 8px; \
-                \font-weight: bold; \
-                \line-height: 1; \
-                \color:rgba(0, 0, 0, 0.7); \
-                \border-radius: 3px; \
-                \cursor: pointer; \
-                \height: 40px; \
-                \width: 8px;"
-            -- To prevent the resizer event under the button
-            , HE.handler' (EventType "mousedown") \ev ->
-                unsafePerformEffect do
-                  stopPropagation ev
-                  pure Nothing -- Do not trigger the mouse down event under the button
-            , HE.onClick \_ -> ToggleSidebar
-            ]
-            [ HH.text if state.sidebarShown then "⟨" else "⟩" ]
-        ]
-    ]
+    let
+      contentWidth = state.resizeState.windowWidth - resizersTotalWidth
+      ratioScaleFactor = contentWidth / state.resizeState.windowWidth
+      absoluteSidebarRatio = state.resizeState.sidebarRatio * ratioScaleFactor
+    in
+      [ -- TOC
+        HH.div
+          [ HP.classes [ HB.overflowAuto, HB.p1 ]
+          , HP.style $
+              "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
+                <>
+                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(233, 233, 235); position: relative;"
+                <>
+                  if
+                    not state.resizeState.sidebarClosed
+                      && state.resizeState.commentOverviewClosed
+                      && state.resizeState.commentClosed
+                      && not state.resizeState.tocClosed then
+                    ""
+                  else
+                    "display: none;"
+          ]
+          [ HH.slot _toc unit TOC.tocview state.docID HandleTOC ]
+      -- Comment
+      , HH.div
+          [ HP.classes [ HB.overflowAuto, HB.p1 ]
+          , HP.style $
+              "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
+                <>
+                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
+                <>
+                  if
+                    not state.resizeState.sidebarClosed && not
+                      state.resizeState.commentClosed then
+                    ""
+                  else
+                    "display: none;"
+          ]
+          [ closeButton CloseComment
+          , HH.h4
+              [ HP.style
+                  "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
+              ]
+              [ HH.text (translate (label :: _ "comment_comment") state.translator) ]
+          , HH.slot _comment unit Comment.commentview unit HandleComment
+          ]
+      -- CommentOverview
+      , HH.div
+          [ HP.classes [ HB.overflowAuto, HB.p1 ]
+          , HP.style $
+              "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
+                <>
+                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
+                <>
+                  if
+                    not state.resizeState.sidebarClosed
+                      && state.resizeState.commentClosed
+                      && not state.resizeState.commentOverviewClosed then
+                    ""
+                  else
+                    "display: none;"
+          ]
+          [ closeButton $ ToggleCommentOverview false
+          , HH.h4
+              [ HP.style
+                  "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
+              ]
+              [ HH.text
+                  (translate (label :: _ "comment_allComments") state.translator)
+              ]
+          , HH.slot _commentOverview unit CommentOverview.commentOverviewview unit
+              HandleCommentOverview
+          ]
+      -- Left Resizer
+      , HH.div
+          [ HE.onMouseDown (StartResize LeftResizer)
+          , HP.style
+              "width: 8px; \
+              \cursor: col-resize; \
+              \background:rgba(0, 0, 0, 0.3); \
+              \display: flex; \
+              \align-items: center; \
+              \justify-content: center; \
+              \position: relative;"
+          ]
+          [ HH.button
+              [ HP.style
+                  "background:rgba(255, 255, 255, 0.8); \
+                  \border: 0.2px solid #aaa; \
+                  \padding: 0.1rem 0.1rem; \
+                  \font-size: 8px; \
+                  \font-weight: bold; \
+                  \line-height: 1; \
+                  \color:rgba(0, 0, 0, 0.7); \
+                  \border-radius: 3px; \
+                  \cursor: pointer; \
+                  \height: 40px; \
+                  \width: 8px;"
+              -- To prevent the resizer event under the button
+              , HE.handler' (EventType "mousedown") \ev ->
+                  unsafePerformEffect do
+                    stopPropagation ev
+                    pure Nothing -- Do not trigger the mouse down event under the button
+              , HE.onClick \_ -> ToggleSidebar
+              ]
+              [ HH.text if not state.resizeState.sidebarClosed then "⟨" else "⟩" ]
+          ]
+      ]
 
   rightResizer :: State -> H.ComponentHTML Action Slots m
   rightResizer state =
     HH.div
-      [ HE.onMouseDown (StartResize ResizeRight)
+      [ HE.onMouseDown (StartResize RightResizer)
       , HP.style
           "width: 8px; \
           \cursor: col-resize; \
@@ -464,21 +474,60 @@ splitview = connect selectTranslator $ H.mkComponent
                 pure Nothing -- Do not trigger the mouse down event under the button
           , HE.onClick \_ -> TogglePreview
           ]
-          [ HH.text if state.previewShown then "⟩" else "⟨" ]
+          [ HH.text if not state.resizeState.previewClosed then "⟩" else "⟨" ]
       ]
 
   renderPreview :: State -> Array (H.ComponentHTML Action Slots m)
   renderPreview state =
-    [ -- Right Resizer
-      rightResizer state
+    let
+      contentWidth = state.resizeState.windowWidth - resizersTotalWidth
+      ratioScaleFactor = contentWidth / state.resizeState.windowWidth
+      absolutePreviewRatio = state.resizeState.previewRatio * ratioScaleFactor
+    in
+      [ -- Right Resizer
+        rightResizer state
 
-    -- Preview
-    , if state.previewShown then
+      -- Preview
+      , if not state.resizeState.previewClosed then
+          HH.div
+            [ HP.classes [ HB.dFlex, HB.flexColumn ]
+            , HP.style $
+                "flex: 1 1 "
+                  <> show (absolutePreviewRatio * 100.0)
+                  <>
+                    "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
+            ]
+            [ HH.div
+                [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
+                , HP.style "padding-right: 0.5rem;"
+                ]
+                [ closeButton SwitchPreview ]
+            , HH.slot _preview unit Preview.preview
+                { renderedHtml: state.renderedHtml
+                , isDragging: state.mDragTarget /= Nothing
+                }
+                HandlePreview
+            ]
+        else
+          HH.text ""
+      ]
+
+  renderSecondEditor :: State -> ElementData -> Array (H.ComponentHTML Action Slots m)
+  renderSecondEditor state cData =
+    let
+      contentWidth = state.resizeState.windowWidth - resizersTotalWidth
+      ratioScaleFactor = contentWidth / state.resizeState.windowWidth
+      absolutePreviewRatio = state.resizeState.previewRatio * ratioScaleFactor
+    in
+      [ -- Right Resizer
+        rightResizer state
+      ,
+        -- Preview
         HH.div
           [ HP.classes [ HB.dFlex, HB.flexColumn ]
           , HP.style $
               "flex: 1 1 "
-                <> show (state.previewRatio * 100.0)
+                <> show (absolutePreviewRatio * 100.0)
                 <>
                   "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
           ]
@@ -487,39 +536,10 @@ splitview = connect selectTranslator $ H.mkComponent
               , HP.style "padding-right: 0.5rem;"
               ]
               [ closeButton SwitchPreview ]
-          , HH.slot _preview unit Preview.preview
-              { renderedHtml: state.renderedHtml
-              , isDragging: state.mDragTarget /= Nothing
-              }
-              HandlePreview
+          , HH.slot_ _editor 1 Editor.editor
+              { docID: state.docID, elementData: cData }
           ]
-      else
-        HH.text ""
-    ]
-
-  renderSecondEditor :: State -> ElementData -> Array (H.ComponentHTML Action Slots m)
-  renderSecondEditor state cData =
-    [ -- Right Resizer
-      rightResizer state
-    ,
-      -- Preview
-      HH.div
-        [ HP.classes [ HB.dFlex, HB.flexColumn ]
-        , HP.style $
-            "flex: 1 1 "
-              <> show (state.previewRatio * 100.0)
-              <>
-                "%; box-sizing: border-box; min-height: 0; overflow: auto; min-width: 6ch; position: relative;"
-        ]
-        [ HH.div
-            [ HP.classes [ HB.dFlex, HB.alignItemsCenter ]
-            , HP.style "padding-right: 0.5rem;"
-            ]
-            [ closeButton SwitchPreview ]
-        , HH.slot_ _editor 1 Editor.editor
-            { docID: state.docID, elementData: cData }
-        ]
-    ]
+      ]
 
   closeButton :: Action -> H.ComponentHTML Action Slots m
   closeButton action =
@@ -550,6 +570,14 @@ splitview = connect selectTranslator $ H.mkComponent
           Left _ -> defaultFormatter
           Right formatter -> formatter
 
+      win <- H.liftEffect Web.HTML.window
+      intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
+      let width = toNumber intWidth
+      H.modify_ \st -> st
+        { resizeState = st.resizeState { windowWidth = width }
+        }
+      H.tell _editor 0 (Editor.UpdateEditorSize (0.4 * width))
+
       H.modify_ \st -> do
         st { mTimeFormatter = timeFormatter }
       H.tell _comment unit (Comment.ReceiveTimeFormatter timeFormatter)
@@ -560,6 +588,27 @@ splitview = connect selectTranslator $ H.mkComponent
       handleAction GET
       handleAction UpdateMSelectedTocEntry
       H.tell _toc unit (TOC.SelectFirstEntry)
+
+      -- Subscribe to resize events and store subscription for cleanup
+      { emitter, listener } <- H.liftEffect HS.create
+      subscription <- H.subscribe emitter
+
+      H.modify_ _
+        { mListener = Just listener
+        , mResizeSubscriptionId = Just subscription
+        }
+
+      H.getHTMLElementRef (H.RefLabel "splitview") >>= traverse_ \el -> do
+        -- Set up ResizeObserver to monitor size changes
+        let
+          callback _ _ = do
+            -- Get the current width directly from the element
+            width_ <- HTMLElement.offsetWidth el
+            HS.notify listener (HandleWindowResize width_)
+
+        observer <- H.liftEffect $ resizeObserver callback
+        H.liftEffect $ observe (HTMLElement.toElement el) {} observer
+        H.modify_ _ { mResizeObserver = Just observer }
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
@@ -629,99 +678,64 @@ splitview = connect selectTranslator $ H.mkComponent
 
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
-    StartResize which mouse -> do
-      case which of
-        ResizeLeft -> H.modify_ _ { sidebarShown = true }
-        ResizeRight -> H.modify_ _ { previewShown = true }
-      win <- H.liftEffect Web.HTML.window
-      intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
-      let
-        x = toNumber $ clientX mouse
-        width = toNumber intWidth
-        mouseXRatio = x / width
+    StartResize dragTarget mouseEvent -> do
       H.modify_ \st -> st
-        { mDragTarget = Just which
-        , startMouseRatio = mouseXRatio
-        , startSidebarRatio = st.sidebarRatio
-        , startEditorRatio = st.editorRatio
-        , startPreviewRatio = st.previewRatio
+        { mDragTarget = Just dragTarget
+        , mStartResizeState = Just st.resizeState
         }
-      handleAction $ HandleMouseMove mouse
+      handleAction $ HandleMouseMove mouseEvent
 
     -- Stop resizing, when mouse is released (is detected by browser)
+    -- the parameter cannot be deleted here because there is always a MouseEvent present, we just don't need it here
     StopResize _ -> do
-      H.modify_ _ { mDragTarget = Nothing }
+      H.modify_ _ { mDragTarget = Nothing, mStartResizeState = Nothing }
+
+    HandleWindowResize width -> do
+      H.modify_ \st -> st
+        { resizeState = st.resizeState
+            { windowWidth = width
+            }
+        }
+      newResizeState <- H.gets _.resizeState
+      H.tell _editor 0 (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
+      H.tell _editor 1 (Editor.UpdateEditorSize (newResizeState.previewRatio * width))
 
     -- While mouse is hold down, resizer move to position of mouse
     -- (with certain rules)
     -- Mouse here is a HTML MouseEvent
-    HandleMouseMove mouse -> do
+    HandleMouseMove mouseEvent -> do
+      state <- H.get
       win <- H.liftEffect Web.HTML.window
       intWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
       let
-        mouseXPos = toNumber $ clientX mouse
+        mouseXPos = toNumber $ clientX mouseEvent
         width = toNumber intWidth
-        mouseXRatio = mouseXPos / width
 
-        -- A window should always have at least 5% width for each section
-        minRatio = 0.05 -- 5%
-
-      dragTargetAction <- H.gets _.mDragTarget
-      state <- H.get
-
-      case dragTargetAction of
+      case state.mDragTarget, state.mStartResizeState of
         -- Resizing TOC or Comment Sidebar
-        Just ResizeLeft -> do
+        Just LeftResizer, Just startResizeState -> do
+          let newResizeState = resizeFromLeft startResizeState mouseXPos
+
+          H.modify_ \st -> st { resizeState = newResizeState }
+
+          H.tell _editor 0
+            (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
+          H.tell _editor 1
+            (Editor.UpdateEditorSize (newResizeState.previewRatio * width))
+
+        Just RightResizer, Just startResizeState -> do
           let
-            { newSidebarRatio
-            , newEditorRatio
-            , newPreviewRatio
-            , sidebarClosed
-            , previewClosed
-            } = resizeFromLeft
-              state
-              mouseXRatio
+            mousePxFromRight = width - mouseXPos
+            newResizeState = resizeFromRight startResizeState mousePxFromRight
 
-          H.modify_ \st -> st
-            { sidebarRatio = newSidebarRatio
-            , editorRatio = newEditorRatio
-            , previewRatio = newPreviewRatio
-            , sidebarShown = not sidebarClosed
-            , previewShown = not previewClosed
-            , lastExpandedSidebarRatio =
-                if newSidebarRatio > minRatio then newSidebarRatio
-                else st.lastExpandedSidebarRatio
-            }
+          H.modify_ \st -> st { resizeState = newResizeState }
 
-        -- TODO what if comment section or so is shown?
-        -- TODO last expandedRatio
-        Just ResizeRight -> do
-          let
-            { newSidebarRatio
-            , newEditorRatio
-            , newPreviewRatio
-            , sidebarClosed
-            , previewClosed
-            } = resizeFromRight state (1.0 - mouseXRatio)
+          H.tell _editor 0
+            (Editor.UpdateEditorSize (newResizeState.editorRatio * width))
+          H.tell _editor 1
+            (Editor.UpdateEditorSize (newResizeState.previewRatio * width))
 
-          H.modify_ \st -> st
-            { sidebarRatio = newSidebarRatio
-            , editorRatio = newEditorRatio
-            , previewRatio = newPreviewRatio
-            , sidebarShown = not sidebarClosed
-            , previewShown = not previewClosed
-            , lastExpandedSidebarRatio =
-                if newSidebarRatio > minRatio then newSidebarRatio
-                else st.lastExpandedSidebarRatio
-            }
-
-        _ -> pure unit
-
-      when (isJust dragTargetAction) do
-        H.tell _editor 0 (Editor.EditorResize)
-        H.tell _editor 1 (Editor.EditorResize)
-
-    -- Toggle actions
+        _, _ -> pure unit
 
     UpdateMSelectedTocEntry -> do
       cToc <- H.request _toc unit TOC.RequestCurrentTocEntry
@@ -745,44 +759,41 @@ splitview = connect selectTranslator $ H.mkComponent
       H.modify_ _ { versionMapping = newVersionMapping }
 
     CloseComment -> do
-      H.modify_ _ { commentShown = false }
+      H.modify_ \st -> st { resizeState = st.resizeState { commentClosed = true } }
       H.tell _editor 0 (Editor.UnselectCommentSection)
 
     ToggleCommentOverview shown -> do
-      sidebarShown <- H.gets _.sidebarShown
+      state <- H.get
       if shown then do
-        if sidebarShown then
-          H.modify_ _ { commentShown = false, commentOverviewShown = true }
+        if not state.resizeState.sidebarClosed then
+          H.modify_ \st -> st
+            { resizeState = st.resizeState
+                { commentClosed = true, commentOverviewClosed = false }
+            }
         else
           H.modify_ \st -> st
-            { sidebarRatio = st.lastExpandedSidebarRatio
-            , sidebarShown = true
-            , commentShown = false
-            , commentOverviewShown = true
+            { resizeState =
+                st.resizeState
+                  { sidebarRatio = st.resizeState.lastExpandedSidebarRatio
+                  , sidebarClosed = false
+                  , commentClosed = true
+                  , commentOverviewClosed = false
+                  }
             }
-        H.tell _comment unit (Comment.Overview)
+        H.tell _comment unit Comment.Overview
       else
-        H.modify_ _ { commentOverviewShown = false }
+        H.modify_ \st -> st
+          { resizeState = st.resizeState { commentOverviewClosed = true } }
 
-    -- Toggle the sidebar
-    -- Add logic in calculating the middle ratio
-    -- to restore the last expanded middle ratio, when toggling preview back on
     ToggleSidebar -> do
-      sidebarShown <- H.gets _.sidebarShown
-      -- close sidebar
-      if sidebarShown then
-        H.modify_ \st -> st
-          { sidebarRatio = 0.0
-          , lastExpandedSidebarRatio = st.sidebarRatio
-          , sidebarShown = false
-          }
-      -- open sidebar
-      else do
-        H.modify_ \st -> st
-          { sidebarRatio = st.lastExpandedSidebarRatio
-          , sidebarShown = true
-          }
-      H.tell _editor 0 (Editor.EditorResize)
+      state <- H.get
+      let newResizeState = toggleSidebar state.resizeState
+      H.modify_ \st -> st { resizeState = newResizeState }
+
+      H.tell _editor 0 $ Editor.UpdateEditorSize
+        (newResizeState.editorRatio * newResizeState.windowWidth)
+      H.tell _editor 1 $ Editor.UpdateEditorSize
+        (newResizeState.previewRatio * newResizeState.windowWidth)
 
     DoNothing -> do
       pure unit
@@ -796,44 +807,27 @@ splitview = connect selectTranslator $ H.mkComponent
 
     -- Toggle the preview area
     TogglePreview -> do
-      previewShown <- H.gets _.previewShown
-      previewRatio <- H.gets _.previewRatio
-      -- close preview
-      if previewShown then do
-        -- all this, in order for not overlapping the left resizer (to not make it disappear)
-        win <- H.liftEffect Web.HTML.window
-        totalWidth <- H.liftEffect $ Web.HTML.Window.innerWidth win
-        let
-          w = toNumber totalWidth
-          -- resizer size is 8, but there are 2 resizers.
-          -- Also resizer size is not in sidebarRatio
-          resizerWidth = 16.0
-          resizerRatio = resizerWidth / w
-          oldPreviewRatio = previewRatio
-        H.modify_ _
-          { previewRatio = resizerRatio
-          , lastExpandedPreviewRatio = oldPreviewRatio
-          , previewShown = false
-          }
-      -- open preview
-      else do
-        -- restore the last expanded middle ratio, when toggling preview back on
-        H.modify_ \st -> st
-          { previewRatio = st.lastExpandedPreviewRatio
-          , previewShown = true
-          }
-        -- only resize second editor, when visible
-        H.tell _editor 1 (Editor.EditorResize)
-      -- always resize main editor for each call
-      H.tell _editor 0 (Editor.EditorResize)
+      state <- H.get
+      win <- H.liftEffect Web.HTML.window
+      width <- H.liftEffect $ Web.HTML.Window.innerWidth win
+      let
+        numberWidth = toNumber width
+        newResizeState = togglePreview state.resizeState
+      H.modify_ \st -> st { resizeState = newResizeState }
+      H.tell _editor 0
+        (Editor.UpdateEditorSize $ numberWidth * newResizeState.editorRatio)
+      H.tell _editor 1
+        (Editor.UpdateEditorSize $ numberWidth * newResizeState.previewRatio)
 
     ModifyVersionMapping tocID vID cData -> do
-      previewShown <- H.gets _.previewShown
+      previewClosed <- H.gets _.resizeState.previewClosed
       versionMapping <- H.gets _.versionMapping
-      when (not previewShown) $
+      when previewClosed $
         H.modify_ \st -> st
-          { previewRatio = st.lastExpandedPreviewRatio
-          , previewShown = true
+          { resizeState = st.resizeState
+              { previewRatio = st.resizeState.lastExpandedPreviewRatio
+              , previewClosed = false
+              }
           }
       handleAction UpdateMSelectedTocEntry
       let
@@ -877,7 +871,7 @@ splitview = connect selectTranslator $ H.mkComponent
     HandleComment output -> case output of
 
       Comment.CloseCommentSection -> do
-        H.modify_ _ { commentShown = false }
+        H.modify_ \st -> st { resizeState = st.resizeState { commentClosed = true } }
 
       -- behaviour for old versions still to discuss. for now will simply fail if old element version selected.
       Comment.ConfirmComment newCommentSection -> do
@@ -906,7 +900,7 @@ splitview = connect selectTranslator $ H.mkComponent
     HandleCommentOverview output -> case output of
 
       CommentOverview.JumpToCommentSection markerID -> do
-        H.modify_ _ { commentShown = true }
+        H.modify_ \st -> st { resizeState = st.resizeState { commentClosed = false } }
         H.tell _comment unit
           (Comment.SelectedCommentSection markerID)
         H.tell _editor 0 (Editor.SelectCommentSection markerID)
@@ -914,14 +908,17 @@ splitview = connect selectTranslator $ H.mkComponent
     HandleEditor output -> case output of
 
       Editor.AddComment -> do
-        sidebarShown <- H.gets _.sidebarShown
-        if sidebarShown then
-          H.modify_ _ { commentShown = true }
+        state <- H.get
+        if not state.resizeState.sidebarClosed then
+          H.modify_ \st -> st
+            { resizeState = st.resizeState { commentClosed = false } }
         else
           H.modify_ \st -> st
-            { sidebarRatio = st.lastExpandedSidebarRatio
-            , sidebarShown = true
-            , commentShown = true
+            { resizeState = st.resizeState
+                { sidebarRatio = st.resizeState.lastExpandedSidebarRatio
+                , sidebarClosed = false
+                , commentClosed = false
+                }
             }
         H.tell _comment unit Comment.AddComment
 
@@ -943,11 +940,13 @@ splitview = connect selectTranslator $ H.mkComponent
         H.modify_ _
           { renderedHtml = Just (Loaded html)
           }
-        -- Only update previewRatio and previewShown if preview is not already shown
-        unless state.previewShown do
+        -- Only update previewRatio and previewClosed if preview is not already shown
+        when state.resizeState.previewClosed do
           H.modify_ \st -> st
-            { previewRatio = state.lastExpandedPreviewRatio
-            , previewShown = true
+            { resizeState = st.resizeState
+                { previewRatio = state.resizeState.lastExpandedPreviewRatio
+                , previewClosed = false
+                }
             }
 
       Editor.PostPDF _ -> do
@@ -1023,13 +1022,16 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Editor.SelectedCommentSection markerID -> do
         state <- H.get
-        if state.sidebarShown then
-          H.modify_ _ { commentShown = true }
+        if not state.resizeState.sidebarClosed then
+          H.modify_ \st -> st
+            { resizeState = st.resizeState { commentClosed = false } }
         else
-          H.modify_ _
-            { sidebarRatio = state.lastExpandedSidebarRatio
-            , sidebarShown = true
-            , commentShown = true
+          H.modify_ \st -> st
+            { resizeState = st.resizeState
+                { sidebarRatio = st.resizeState.lastExpandedSidebarRatio
+                , sidebarClosed = false
+                , commentClosed = false
+                }
             }
         H.tell _comment unit
           (Comment.SelectedCommentSection markerID)
@@ -1143,7 +1145,7 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _comment unit (Comment.UpdateComment markerIDs)
 
       Editor.ReaddedAnchor -> do
-        H.tell _comment unit (Comment.ReaddedAnchor)
+        H.tell _comment unit Comment.ReaddedAnchor
 
       Editor.UpdateCommentProlem markerID -> do
         H.tell _comment unit (Comment.UpdateCommentProblem markerID)
@@ -1255,6 +1257,13 @@ splitview = connect selectTranslator $ H.mkComponent
         -- s <- H.get
         -- updateTree $ changeNodeName path newName s.tocEntries
         pure unit
+
+    Finalize -> do
+      -- Clean up ResizeObserver
+      mObserver <- H.gets _.mResizeObserver
+      case mObserver of
+        Just observer -> H.liftEffect $ disconnect observer
+        Nothing -> pure unit
 
     where
     -- Communicates tree changes to the server and TOC component.
@@ -1637,85 +1646,3 @@ stripHtmlTags input =
   case Regex.regex "<[^>]*>" (RegexFlags.global <> RegexFlags.ignoreCase) of
     Left _ -> input -- If regex compilation fails, return original string
     Right htmlRegex -> Regex.replace htmlRegex "" input
-
-type ResizeResult =
-  { newSidebarRatio :: Number
-  , newEditorRatio :: Number
-  , newPreviewRatio :: Number
-  , sidebarClosed :: Boolean
-  , previewClosed :: Boolean
-  }
-
-resizeFromLeft
-  :: State
-  -> Number
-  -> ResizeResult
-resizeFromLeft
-  { startSidebarRatio, startPreviewRatio, startEditorRatio }
-  mousePercentFromLeft =
-  let
-    sidebarAndEditor = startSidebarRatio + startEditorRatio
-  in
-    if mousePercentFromLeft <= 0.05 then -- close enough to hide sidebar
-      { newSidebarRatio: 0.0
-      , newEditorRatio: sidebarAndEditor
-      , newPreviewRatio: startPreviewRatio
-      , sidebarClosed: true
-      , previewClosed: false
-      }
-    else if mousePercentFromLeft <= startSidebarRatio then -- resizing to the left of initial sidebar size
-      -- resizing to the left but not close enough to hide sidebar
-      { newSidebarRatio: mousePercentFromLeft
-      , newEditorRatio: sidebarAndEditor - mousePercentFromLeft
-      , newPreviewRatio: startPreviewRatio
-      , sidebarClosed: false
-      , previewClosed: false
-      }
-    else if
-      startSidebarRatio + startEditorRatio - mousePercentFromLeft >= startPreviewRatio then -- resizing to the right but editor still bigger than preview
-      { newSidebarRatio: mousePercentFromLeft
-      , newEditorRatio: sidebarAndEditor - mousePercentFromLeft
-      , newPreviewRatio: startPreviewRatio
-      , sidebarClosed: false
-      , previewClosed: false
-      }
-    else -- resizing to the right and preview bigger than editor
-      let
-        newEditorAndPreview = (1.0 - mousePercentFromLeft) / 2.0
-      in
-        if newEditorAndPreview >= 0.1 then
-          { newSidebarRatio: mousePercentFromLeft
-          , newEditorRatio: newEditorAndPreview
-          , newPreviewRatio: newEditorAndPreview
-          , sidebarClosed: false
-          , previewClosed: false
-          }
-        else
-          { newSidebarRatio: 0.8
-          , newEditorRatio: 0.2
-          , newPreviewRatio: 0.0
-          , sidebarClosed: false
-          , previewClosed: true
-          }
-
-resizeFromRight
-  :: State
-  -> Number
-  -> ResizeResult
-resizeFromRight state mousePercentFromRight =
-  let
-    { newSidebarRatio, newEditorRatio, newPreviewRatio, sidebarClosed, previewClosed } =
-      resizeFromLeft
-        ( state
-            { startSidebarRatio = state.startPreviewRatio
-            , startPreviewRatio = state.startSidebarRatio
-            }
-        )
-        mousePercentFromRight
-  in
-    { newSidebarRatio: newPreviewRatio
-    , newEditorRatio
-    , newPreviewRatio: newSidebarRatio
-    , sidebarClosed: previewClosed
-    , previewClosed: sidebarClosed
-    }
