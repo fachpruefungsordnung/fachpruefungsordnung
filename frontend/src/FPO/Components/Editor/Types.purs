@@ -163,11 +163,11 @@ near a b =
 
 removeLiveMarker :: LiveMarker -> Types.EditSession -> Effect Unit
 removeLiveMarker lm session = do
-  -- Marker entfernen
+  -- Remove marker
   markerId <- Ref.read lm.ref
   Session.removeMarker markerId session
 
-  -- Anchors vom Dokument lösen
+  -- Detach anchors from document
   Anchor.detach lm.startAnchor
   Anchor.detach lm.endAnchor
 

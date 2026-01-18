@@ -632,7 +632,7 @@ editor = connect selectTranslator $ H.mkComponent
           [ HP.ref (H.RefLabel "container")
           , HP.style "flex:1 1 0; min-height:0; position:relative;"
           ]
-          [ -- Loading-Overlay nur, wenn isLoading
+          [ -- Loading overlay only when isLoading
             if state.isLoading then
               HH.div
                 [ HP.classes
@@ -991,7 +991,7 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit --raise something to update version
                 "conflict" -> pure unit --should not happen here also raise something just in case
                 _ -> pure unit
-            -- manuell saving and working in latest version
+            -- manual save while working in latest version
             false, false -> do
               updateStore $ Store.AddSuccess
                 (translate (label :: _ "editor_save_success") state.translator)
@@ -1010,7 +1010,7 @@ editor = connect selectTranslator $ H.mkComponent
                     ContentDto.getWrapperContent newWrapper
                   handleAction $ ChangeToSection newEntry Nothing state.mTitle true
                 _ -> pure unit
-            -- manuell saving, draft mode => publish
+            -- manual save, draft mode => publish
             false, true -> do
               case typ of
                 --happens if parent was updated due to merge view being present.
@@ -1301,7 +1301,7 @@ editor = connect selectTranslator $ H.mkComponent
       selectedLiveMarker <- H.gets _.commentState.selectedLiveMarker
       case mEditor, selectedLiveMarker of
         Just ed, Just lm -> do
-          -- Mauspos -> Textpos
+          -- mouse position -> text position
           pos <- H.liftEffect $ screenToText ed clientX clientY
           sPos <- H.liftEffect $ Anchor.getPosition lm.startAnchor
           ePos <- H.liftEffect $ Anchor.getPosition lm.endAnchor
@@ -1614,7 +1614,7 @@ editor = connect selectTranslator $ H.mkComponent
           H.modify_ \st ->
             st { commentState = st.commentState { annoMaps = a } }
 
-      -- speichern wie vorher
+      -- save as before
       for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
       handleAction $ SetManualSavedFlag false
       handleAction $ Save true

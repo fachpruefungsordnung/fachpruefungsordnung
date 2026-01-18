@@ -185,7 +185,7 @@ commentview = connect selectTranslator $ H.mkComponent
               [ HP.classes [ HB.dFlex, HB.alignItemsCenter, HB.w100 ]
               , HP.style "gap: .5rem; padding-left: 0.5rem; padding-right: 0.5rem;"
               ]
-              [ -- Senden (links)
+              [ -- Send (left)
                 HH.button
                   [ HP.classes [ HB.btn, HB.btnPrimary, HB.px3, HB.py1, HB.m0 ]
                   , HP.style "white-space: nowrap;"
@@ -198,7 +198,7 @@ commentview = connect selectTranslator $ H.mkComponent
                   , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-send" ] ] []
                   ]
 
-              -- Resolve (rechts)
+              -- Resolve (right)
               , if state.newComment then
                   HH.button
                     [ HP.classes
