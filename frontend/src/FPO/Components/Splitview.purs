@@ -105,7 +105,7 @@ data Action
   | StopResize MouseEvent
   | HandleMouseMove MouseEvent
   -- Toggle buttons
-  | ToggleComment
+  | CloseComment
   | ToggleCommentOverview Boolean
   | ToggleSidebar
   | SwitchPreview
@@ -361,7 +361,7 @@ splitview = connect selectTranslator $ H.mkComponent
                 else
                   "display: none;"
         ]
-        [ closeButton ToggleComment
+        [ closeButton CloseComment
         , HH.h4
             [ HP.style
                 "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
@@ -744,7 +744,7 @@ splitview = connect selectTranslator $ H.mkComponent
             state.tocEntries
       H.modify_ _ { versionMapping = newVersionMapping }
 
-    ToggleComment -> do
+    CloseComment -> do
       H.modify_ _ { commentShown = false }
       H.tell _editor 0 (Editor.UnselectCommentSection)
 
@@ -891,8 +891,8 @@ splitview = connect selectTranslator $ H.mkComponent
       Comment.SendAbstractedComments abstractCSs hasProblem -> do
         H.tell _editor 0 (Editor.ContinueChangeSection abstractCSs hasProblem)
 
-      Comment.ToDeleteComment commentProblem -> do
-        H.tell _editor 0 (Editor.ToDeleteComment commentProblem)
+      Comment.ToDeleteComment markerID commentProblem -> do
+        H.tell _editor 0 (Editor.ToDeleteComment markerID commentProblem)
 
       Comment.UpdatedComments fs commentProblem -> do
         inLatest <- H.gets _.inLatest
@@ -1144,6 +1144,9 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Editor.ReaddedAnchor -> do
         H.tell _comment unit (Comment.ReaddedAnchor)
+
+      Editor.UpdateCommentProlem markerID -> do
+        H.tell _comment unit (Comment.UpdateCommentProblem markerID)
 
     DeleteDraft -> do
       handleAction UpdateMSelectedTocEntry
