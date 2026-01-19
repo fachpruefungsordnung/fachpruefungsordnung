@@ -1147,7 +1147,7 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.ReaddedAnchor -> do
         H.tell _comment unit Comment.ReaddedAnchor
 
-      Editor.UpdateCommentProlem markerID -> do
+      Editor.UpdateCommentProblem markerID -> do
         H.tell _comment unit (Comment.UpdateCommentProblem markerID)
 
     DeleteDraft -> do
