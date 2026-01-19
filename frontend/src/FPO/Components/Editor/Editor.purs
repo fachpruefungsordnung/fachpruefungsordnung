@@ -226,7 +226,7 @@ data Output
   | UpdateFullTitle
   | UpdateComment (Array Int)
   | ReaddedAnchor
-  | UpdateCommentProblem Int
+  | ToUpdateCommentProblem Int
 
 data Action
   = Init
@@ -1534,7 +1534,7 @@ editor = connect selectTranslator $ H.mkComponent
             }
         }
 
-      H.raise $ UpdateCommentProblem markerID
+      H.raise $ ToUpdateCommentProblem markerID
 
     DeleteComment markerID commentProblem -> do
       state <- H.get
