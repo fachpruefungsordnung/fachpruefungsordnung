@@ -19,13 +19,15 @@ import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
-import Data.Array (catMaybes, deleteBy, intercalate, snoc)
+import Control.Alt ((<|>))
+import Data.Array (catMaybes, filter, intercalate, snoc, uncons)
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
-import Data.HashMap (HashMap, delete, empty, insert, lookup, size)
+import Data.HashMap (delete, insert, lookup)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.Traversable (for, traverse)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
@@ -45,19 +47,24 @@ import FPO.Components.Editor.Keybindings
   , underscore
   )
 import FPO.Components.Editor.Types
-  ( DragHandle(..)
+  ( AnnotationMaps
+  , DragHandle(..)
   , ElementData
   , HandleBorder
   , HistoryOp(..)
   , LiveMarker
   , Path
   , RenderKind(..)
+  , addAnnotationMaps
   , createMarkerRange
   , cursorInRange
+  , deleteAnnotationMaps
+  , emptyAnnotationMaps
   , failureLiveMarker
   , hideHandlesFrom
   , highlightSelection
   , near
+  , rebuildAnnotations
   , removeLiveMarker
   , setAnnotations
   , setMarkerSelectedClass
@@ -123,10 +130,7 @@ foreign import _resize :: Types.Editor -> Effect Unit
 type CommentState =
   {
     -- Hashmaps for Annotations
-    -- Row line -> Hashmap of Username -> how many times the use has comments in the line
-    markerAnnoHS :: HashMap Int (HashMap String Int)
-  -- markerID -> old row position in Annotation
-  , oldMarkerAnnoPos :: HashMap Int Int
+    annoMaps :: AnnotationMaps
   -- to move comment anchors
   , dragState :: Maybe { which :: DragHandle, lm :: LiveMarker }
   , startHandleMarkerId :: Maybe Int
@@ -222,6 +226,7 @@ data Output
   | UpdateFullTitle
   | UpdateComment (Array Int)
   | ReaddedAnchor
+  | ToUpdateCommentProblem Int
 
 data Action
   = Init
@@ -252,6 +257,8 @@ data Action
   | AddAnnotation LiveMarker Boolean
   | DeleteAnnotation LiveMarker Boolean Boolean
   | UpdateAnnotation LiveMarker
+  | NotifyCommentProblem Int
+  | DeleteComment Int Boolean
   | Render RenderKind
   | ShowAllComments
   | Receive (Connected FPOTranslator Input)
@@ -281,7 +288,7 @@ data Query a
   | ConfirmComment CommentSection a
   | SelectCommentSection Int a
   | UnselectCommentSection a
-  | ToDeleteComment Boolean a
+  | ToDeleteComment Int Boolean a
   | RequestDirtyVersion (Boolean -> a)
   | ResetDirtyVersion a
   | ReceiveUpToDateUpdate (Maybe Version) a
@@ -621,7 +628,7 @@ editor = connect selectTranslator $ H.mkComponent
           [ HP.ref (H.RefLabel "container")
           , HP.style "flex:1 1 0; min-height:0; position:relative;"
           ]
-          [ -- Loading-Overlay nur, wenn isLoading
+          [ -- Loading overlay only when isLoading
             if state.isLoading then
               HH.div
                 [ HP.classes
@@ -683,7 +690,8 @@ editor = connect selectTranslator $ H.mkComponent
   handleAction = case _ of
     Init -> do
       compareToElement <- H.gets _.compareToElement
-      { listener } <- H.liftEffect HS.create
+      { emitter, listener } <- H.liftEffect HS.create
+      _ <- H.subscribe emitter
 
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
@@ -966,7 +974,7 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit --raise something to update version
                 "conflict" -> pure unit --should not happen here also raise something just in case
                 _ -> pure unit
-            -- manuell saving and working in latest version
+            -- manual save while working in latest version
             false, false -> do
               updateStore $ Store.AddSuccess
                 (translate (label :: _ "editor_save_success") state.translator)
@@ -985,7 +993,7 @@ editor = connect selectTranslator $ H.mkComponent
                     ContentDto.getWrapperContent newWrapper
                   handleAction $ ChangeToSection newEntry Nothing state.mTitle true
                 _ -> pure unit
-            -- manuell saving, draft mode => publish
+            -- manual save, draft mode => publish
             false, true -> do
               case typ of
                 --happens if parent was updated due to merge view being present.
@@ -1156,6 +1164,11 @@ editor = connect selectTranslator $ H.mkComponent
                             }
                       H.modify_ _ { commentState = newCommentState }
                       H.raise (ReaddedAnchor)
+                      -- show comment dragger handles
+                      H.liftEffect $ highlightSelection ed
+                        (snoc state.commentState.liveMarkers lm')
+                        lm'
+                      handleAction (ShowHandles lm')
                       -- Save readded comment anchor
                       -- set dirty to true to be able to save
                       for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write
@@ -1217,42 +1230,51 @@ editor = connect selectTranslator $ H.mkComponent
     SelectComment -> do
       state <- H.get
       H.gets _.mEditor >>= traverse_ \ed -> do
+        range <- H.liftEffect $ Editor.getSelectionRange ed
+        start <- H.liftEffect $ Range.getStart range
+        end <- H.liftEffect $ Range.getEnd range
         let
-          liveMarkers = case state.commentState.tmpLiveMarker of
-            Nothing -> state.commentState.liveMarkers
-            Just lm -> snoc state.commentState.liveMarkers lm
-        cursor <- H.liftEffect $ Editor.getCursorPosition ed
-        session <- H.liftEffect $ Editor.getSession ed
-        foundLM <- H.liftEffect $ cursorInRange liveMarkers cursor
-        -- comment section dragger handles
-        case foundLM of
-          Nothing -> do
-            -- remove selection and remove handles
-            H.modify_ \st -> st
-              { commentState = st.commentState
-                  { selectedLiveMarker = Nothing
-                  , dragState = Nothing
-                  }
-              }
-            case state.commentState.selectedLiveMarker of
-              Nothing -> pure unit
-              Just lm -> H.liftEffect $ setMarkerSelectedClass session lm false
-            handleAction HideHandles
-          Just lm -> do
-            -- set selection and highlight it
-            H.modify_ \st -> st
-              { commentState = st.commentState { selectedLiveMarker = Just lm } }
-            H.liftEffect $ highlightSelection ed liveMarkers lm
-            handleAction (ShowHandles lm)
-        let
-          lm = case foundLM of
-            Nothing -> failureLiveMarker
-            Just found -> found
-          foundID = lm.annotedMarkerID
-        H.modify_ \st -> st
-          { commentState = st.commentState { selectedLiveMarker = Just lm } }
-        when (foundID >= 0 || foundID == -360) $
-          H.raise (SelectedCommentSection foundID)
+          sRow = Types.getRow start
+          sCol = Types.getColumn start
+          eRow = Types.getRow end
+          eCol = Types.getColumn end
+
+        if (sRow /= eRow || sCol /= eCol) then
+          pure unit
+        else do
+          let
+            liveMarkers = case state.commentState.tmpLiveMarker of
+              Nothing -> state.commentState.liveMarkers
+              Just lm -> snoc state.commentState.liveMarkers lm
+          cursor <- H.liftEffect $ Editor.getCursorPosition ed
+          session <- H.liftEffect $ Editor.getSession ed
+          foundLM <- H.liftEffect $ cursorInRange liveMarkers cursor
+          -- comment section dragger handles
+          case foundLM of
+            Nothing -> do
+              -- remove selection and remove handles
+              H.modify_ \st -> st
+                { commentState = st.commentState
+                    { selectedLiveMarker = Nothing
+                    , dragState = Nothing
+                    }
+                }
+              case state.commentState.selectedLiveMarker of
+                Nothing -> pure unit
+                Just lm -> H.liftEffect $ setMarkerSelectedClass session lm false
+              handleAction HideHandles
+            Just lm -> do
+              case state.commentState.selectedLiveMarker of
+                Just old | old.annotedMarkerID /= lm.annotedMarkerID ->
+                  H.liftEffect $ setMarkerSelectedClass session old false
+                _ -> pure unit
+              -- set selection and highlight it
+              H.modify_ \st -> st
+                { commentState = st.commentState { selectedLiveMarker = Just lm } }
+              H.liftEffect $ highlightSelection ed liveMarkers lm
+              handleAction (ShowHandles lm)
+              when (lm.annotedMarkerID >= 0 || lm.annotedMarkerID == -360) $
+                H.raise (SelectedCommentSection lm.annotedMarkerID)
 
     -- Comment Section Dragger Actions
 
@@ -1262,7 +1284,7 @@ editor = connect selectTranslator $ H.mkComponent
       selectedLiveMarker <- H.gets _.commentState.selectedLiveMarker
       case mEditor, selectedLiveMarker of
         Just ed, Just lm -> do
-          -- Mauspos -> Textpos
+          -- mouse position -> text position
           pos <- H.liftEffect $ screenToText ed clientX clientY
           sPos <- H.liftEffect $ Anchor.getPosition lm.startAnchor
           ePos <- H.liftEffect $ Anchor.getPosition lm.endAnchor
@@ -1345,14 +1367,31 @@ editor = connect selectTranslator $ H.mkComponent
               col' =
                 if row' == row then
                   case side of
-                    DragStart -> if c0 > column then column - 1 else c0
-                    DragEnd -> if c0 < column then column + 1 else c0
+                    DragStart -> if c0 >= column then max 0 (column - 1) else c0
+                    DragEnd -> if c0 <= column then column + 1 else c0
                 else c0
+
+              wouldOverlapSameRow =
+                row' == row &&
+                  case side of
+                    DragStart -> col' >= column
+                    DragEnd -> col' <= column
+
+            Tuple rowFinal colFinal <-
+              if wouldOverlapSameRow then do
+                cur <- H.liftEffect case which of
+                  DragStart -> Anchor.getPosition lm.startAnchor
+                  DragEnd -> Anchor.getPosition lm.endAnchor
+                pure $ Tuple (Types.getRow cur) (Types.getColumn cur)
+              else
+                pure $ Tuple row' col'
 
             -- set drag anchor
             case which of
-              DragStart -> H.liftEffect $ setAnchorPosition lm.startAnchor row' col'
-              DragEnd -> H.liftEffect $ setAnchorPosition lm.endAnchor row' col'
+              DragStart -> H.liftEffect $ setAnchorPosition lm.startAnchor rowFinal
+                colFinal
+              DragEnd -> H.liftEffect $ setAnchorPosition lm.endAnchor rowFinal
+                colFinal
 
             -- draw new Handles (current position)
             session <- H.liftEffect $ Editor.getSession ed
@@ -1363,8 +1402,8 @@ editor = connect selectTranslator $ H.mkComponent
               { commentState = st.commentState
                   { startHandleMarkerId = ids.startId
                   , endHandleMarkerId = ids.endId
-                  , dragRowAS = row'
-                  , dragColAS = col'
+                  , dragRowAS = rowFinal
+                  , dragColAS = colFinal
                   }
               }
         _, _, _ -> pure unit
@@ -1440,70 +1479,30 @@ editor = connect selectTranslator $ H.mkComponent
 
     AddAnnotation lm setAnn -> do
       commentState <- H.gets _.commentState
-      pos <- H.liftEffect $ Anchor.getPosition lm.startAnchor
-      let
-        startRow = Types.getRow pos
-        newOldMarkerAnnoPos = insert lm.annotedMarkerID startRow
-          commentState.oldMarkerAnnoPos
-        newMarkerAnnoHS = case lookup startRow commentState.markerAnnoHS of
-          Nothing ->
-            let
-              newEntry = insert lm.markerText 1 empty
-            in
-              insert startRow newEntry commentState.markerAnnoHS
-          Just entry ->
-            let
-              oldValue = fromMaybe 0 (lookup lm.markerText entry)
-              newEntry = insert lm.markerText (oldValue + 1) entry
-            in
-              insert startRow newEntry commentState.markerAnnoHS
+      maps <- H.liftEffect $ addAnnotationMaps lm commentState.annoMaps
       H.modify_ \st -> st
-        { commentState = st.commentState
-            { markerAnnoHS = newMarkerAnnoHS
-            , oldMarkerAnnoPos = newOldMarkerAnnoPos
-            }
-        }
+        { commentState = st.commentState { annoMaps = maps } }
       when setAnn do
         mEditor <- H.gets _.mEditor
-        H.liftEffect $ setAnnotations newMarkerAnnoHS mEditor
+        H.liftEffect $ setAnnotations maps.markerAnnoHS mEditor
 
     DeleteAnnotation lm reAdd setAnn -> do
       commentState <- H.gets _.commentState
       let
-        -- get old row number for this marker
-        oldRow = fromMaybe 0 (lookup lm.annotedMarkerID commentState.oldMarkerAnnoPos)
-        -- update Annotation HashMap
-        newMarkerAnnoHS = case lookup oldRow commentState.markerAnnoHS of
-          -- should not happen
-          Nothing -> commentState.markerAnnoHS
-          -- update this HashMap entry
-          Just entry -> do
-            let
-              -- if 1 then delete it, bigger just decreament the value
-              oldValue = fromMaybe 0 (lookup lm.markerText entry)
-              newEntry =
-                if oldValue <= 1 then
-                  delete lm.markerText entry
-                else
-                  insert lm.markerText (oldValue - 1) entry
-            -- delete entry if empty
-            if ((size newEntry) == 0) then
-              delete oldRow commentState.markerAnnoHS
-            else
-              insert oldRow newEntry commentState.markerAnnoHS
+        maps = deleteAnnotationMaps lm commentState.annoMaps
       H.modify_ \st -> st
-        { commentState = st.commentState { markerAnnoHS = newMarkerAnnoHS } }
+        { commentState = st.commentState { annoMaps = maps } }
       -- if we want to update the live marker annotation
       if reAdd then
         handleAction $ AddAnnotation lm setAnn
       else
         when setAnn do
           mEditor <- H.gets _.mEditor
-          H.liftEffect $ setAnnotations newMarkerAnnoHS mEditor
+          H.liftEffect $ setAnnotations maps.markerAnnoHS mEditor
 
     -- delete and readd Annotation if the startRow of live marker has changed
     UpdateAnnotation lm -> do
-      oldMarkerAnnoPos <- H.gets _.commentState.oldMarkerAnnoPos
+      oldMarkerAnnoPos <- H.gets _.commentState.annoMaps.oldMarkerAnnoPos
       -- get startRow from live marker
       pos <- H.liftEffect $ Anchor.getPosition lm.startAnchor
       let startRow = Types.getRow pos
@@ -1515,6 +1514,93 @@ editor = connect selectTranslator $ H.mkComponent
           when (startRow /= oldRow)
             $ handleAction
             $ DeleteAnnotation lm true true
+
+    NotifyCommentProblem markerID -> do
+      state <- H.get
+
+      let
+        markers' = state.commentState.markers <#> \m ->
+          if m.id == markerID then
+            m
+              { startRow = m.endRow
+              , startCol = m.endCol
+              }
+          else m
+
+      H.modify_ \st -> st
+        { commentState = st.commentState
+            { commentProblem = true
+            , markers = markers'
+            }
+        }
+
+      H.raise $ ToUpdateCommentProblem markerID
+
+    DeleteComment markerID commentProblem -> do
+      state <- H.get
+      mLm <- H.liftEffect $ resolveDeleteLiveMarker markerID state.commentState
+      let
+        cs = state.commentState
+        targetId = maybe markerID _.annotedMarkerID mLm
+        isTarget lm = lm.annotedMarkerID == targetId
+
+        dropIfTarget mlm =
+          mlm >>= \lm -> if isTarget lm then Nothing else Just lm
+
+        newTmp = dropIfTarget cs.tmpLiveMarker
+        newLiveMarkers = filter (not <<< isTarget) cs.liveMarkers
+        liveMarkersForAnno =
+          case newTmp of
+            Nothing -> newLiveMarkers
+            Just lm -> snoc newLiveMarkers lm
+        wasSelected = maybe false isTarget cs.selectedLiveMarker
+        isTargetMarker m = m.id == markerID || m.id == targetId
+        newOldMarkerAnnoPos =
+          delete targetId (delete markerID cs.annoMaps.oldMarkerAnnoPos)
+
+      didDelete <- case state.mEditor, mLm of
+        Just ed, Just lm -> do
+          session <- H.liftEffect $ Editor.getSession ed
+          H.liftEffect $ removeLiveMarker lm session
+          handleAction $ DeleteAnnotation lm false true
+          when wasSelected (handleAction HideHandles)
+          pure true
+        _, _ -> pure false
+
+      mAnno <-
+        if didDelete then
+          pure Nothing
+        else do
+          Just <$> H.liftEffect
+            (rebuildAnnotations liveMarkersForAnno state.mEditor)
+
+      H.modify_ \st ->
+        st
+          { commentState = st.commentState
+              { commentProblem = commentProblem
+              , reAnchor = case st.commentState.reAnchor of
+                  Just r | r.markerID == markerID -> Nothing
+                  other -> other
+              , selectedLiveMarker =
+                  dropIfTarget st.commentState.selectedLiveMarker
+              , tmpLiveMarker = newTmp
+              , liveMarkers = newLiveMarkers
+              , markers = filter (not <<< isTargetMarker)
+                  st.commentState.markers
+              , annoMaps =
+                  st.commentState.annoMaps { oldMarkerAnnoPos = newOldMarkerAnnoPos }
+              }
+          }
+      case mAnno of
+        Nothing -> pure unit
+        Just a ->
+          H.modify_ \st ->
+            st { commentState = st.commentState { annoMaps = a } }
+
+      -- save as before
+      for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
+      handleAction $ SetManualSavedFlag false
+      handleAction $ Save true
 
     -- Handle external resize from parent component (Splitview)
     -- Updates UI elements based on width and triggers editor resize
@@ -1622,7 +1708,11 @@ editor = connect selectTranslator $ H.mkComponent
                   comments = ContentDto.getWrapperComments wrapper
                   -- convert markers
                   markers = map ContentDto.convertToAnnotetedMarker comments
-                  markerIDs = map (\m -> m.id) markers
+                  validMarker m =
+                    m.startRow < m.endRow ||
+                      (m.startRow == m.endRow && m.startCol < m.endCol)
+                  validMarkers = filter validMarker markers
+                  markerIDs = map (\m -> m.id) validMarkers
                   isDraftAvailable = case loadedDraftContent of
                     Right _ -> true
                     Left _ -> false
@@ -1632,9 +1722,8 @@ editor = connect selectTranslator $ H.mkComponent
                 H.modify_ \st -> st
                   { commentState = st.commentState
                       { selectedLiveMarker = Nothing
-                      , markerAnnoHS = empty
-                      , oldMarkerAnnoPos = empty
-                      , markers = markers
+                      , annoMaps = emptyAnnotationMaps
+                      , markers = validMarkers
                       }
                   , isEditorOutdated = isEditorOutdated'
                   }
@@ -1716,7 +1805,7 @@ editor = connect selectTranslator $ H.mkComponent
           H.raise $ ClickedQuery html'
 
   -- convert Hashmap to Annotations and show them
-  -- H.liftEffect $ setAnnotations commentState.markerAnnoHS state.mEditor
+  -- H.liftEffect $ setAnnotations commentState.annoMaps.markerAnnoHS state.mEditor
 
   handleQuery
     :: forall slots a
@@ -1817,10 +1906,14 @@ editor = connect selectTranslator $ H.mkComponent
               }
             newMarkers = snoc state.commentState.markers newMarker
             -- delete temp id from hash map
-            newOldMarkerAnnoPos = delete (-360) state.commentState.oldMarkerAnnoPos
+            newOldMarkerAnnoPos = delete (-360)
+              state.commentState.annoMaps.oldMarkerAnnoPos
             -- add the real id instead
             newOldMarkerAnnoPos' = insert newMarker.id newMarker.startRow
               newOldMarkerAnnoPos
+            newAnnoMaps =
+              state.commentState.annoMaps
+                { oldMarkerAnnoPos = newOldMarkerAnnoPos' }
           newLiveMarker <- H.liftEffect $ addAnchor newMarker session listener true
           let
             newLM = case newLiveMarker of
@@ -1831,8 +1924,8 @@ editor = connect selectTranslator $ H.mkComponent
               Just lm' -> snoc state.commentState.liveMarkers lm'
             newCommentState =
               state.commentState
-                { oldMarkerAnnoPos = newOldMarkerAnnoPos'
-                , tmpLiveMarker = Nothing
+                { tmpLiveMarker = Nothing
+                , annoMaps = newAnnoMaps
                 , selectedLiveMarker = Just newLM
                 , markers = newMarkers
                 , liveMarkers = newLiveMarkers
@@ -1886,42 +1979,8 @@ editor = connect selectTranslator $ H.mkComponent
         }
       pure (Just a)
 
-    ToDeleteComment commentProblem a -> do
-      state <- H.get
-      -- always update this
-      H.modify_ \st -> st
-        { commentState = st.commentState
-            { commentProblem = commentProblem, reAnchor = Nothing }
-        }
-      case state.mEditor, state.commentState.selectedLiveMarker of
-        Just ed, Just lm -> do
-          session <- H.liftEffect $ Editor.getSession ed
-          H.liftEffect $ removeLiveMarker lm session
-          handleAction $ DeleteAnnotation lm false true
-          handleAction $ HideHandles
-
-          let
-            newCommentState = state.commentState
-              { selectedLiveMarker = Nothing
-              , tmpLiveMarker = case state.commentState.tmpLiveMarker of
-                  Just tmpLM ->
-                    if (tmpLM.annotedMarkerID == lm.annotedMarkerID) then
-                      Nothing
-                    else
-                      Just tmpLM
-                  Nothing -> Nothing
-              -- delete this marker from state. Otherwise, it can be still selected
-              , liveMarkers = deleteBy
-                  (\b c -> b.annotedMarkerID == c.annotedMarkerID)
-                  lm
-                  state.commentState.liveMarkers
-              }
-          H.modify_ _
-            { commentState = newCommentState }
-          for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
-          handleAction $ SetManualSavedFlag false
-          handleAction $ Save true
-        _, _ -> pure unit
+    ToDeleteComment markerID commentProblem a -> do
+      handleAction $ DeleteComment markerID commentProblem
       pure (Just a)
 
     RequestDirtyVersion reply -> do
@@ -2063,6 +2122,68 @@ addChangeListenerWithRef editor_ dirtyRef versionRef listener = do
             Session.replace range "  " session
             Ref.write false guardRef
 
+resolveDeleteLiveMarker
+  :: Int
+  -> CommentState
+  -> Effect (Maybe LiveMarker)
+resolveDeleteLiveMarker markerID commentState = do
+  let
+    isTargetById lm = lm.annotedMarkerID == markerID
+
+    keepIf p x = if p x then Just x else Nothing
+
+    mLmById =
+      (commentState.tmpLiveMarker >>= keepIf isTargetById)
+        <|> (commentState.selectedLiveMarker >>= keepIf isTargetById)
+        <|> find isTargetById commentState.liveMarkers
+
+    mTargetMarker = find (\m -> m.id == markerID) commentState.markers
+
+    candidateLms =
+      catMaybes
+        [ commentState.tmpLiveMarker
+        , commentState.selectedLiveMarker
+        ] <> commentState.liveMarkers
+
+    oneItem xs =
+      case uncons xs of
+        Nothing -> Nothing
+        Just { head: x, tail: rest } ->
+          case uncons rest of
+            Nothing -> Just x
+            Just _ -> Nothing
+
+    findUnique target matchText lms =
+      let
+        matches lm = do
+          start <- Anchor.getPosition lm.startAnchor
+          end <- Anchor.getPosition lm.endAnchor
+          let
+            sameRange =
+              Types.getRow start == target.startRow
+                && Types.getColumn start == target.startCol
+                && Types.getRow end == target.endRow
+                &&
+                  Types.getColumn end == target.endCol
+            ok =
+              if matchText then
+                sameRange && lm.markerText == target.markerText
+              else
+                sameRange
+          pure $ if ok then Just lm else Nothing
+      in
+        oneItem <$> (catMaybes <$> for lms matches)
+
+  case mLmById, mTargetMarker of
+    Just lm, _ -> pure (Just lm)
+    Nothing, Just target -> do
+      mByText <- findUnique target true candidateLms
+      if isJust mByText then
+        pure mByText
+      else
+        findUnique target false candidateLms
+    Nothing, Nothing -> pure Nothing
+
 addAnchor
   :: AnnotatedMarker
   -> Types.EditSession
@@ -2081,6 +2202,7 @@ addAnchor marker session listener action =
     range <- createMarkerRange marker
     id <- Session.addMarker range "my-marker" "text" false session
     markerRef <- Ref.new id
+    deletedRef <- Ref.new false
 
     let
       lm =
@@ -2095,26 +2217,36 @@ addAnchor marker session listener action =
         :: { old :: Types.Position, value :: Types.Position }
         -> Effect Unit
       rerenderMarker _ = do
-        Ref.read markerRef >>= flip Session.removeMarker session
-        Types.Position { row: startRow, column: startColumn } <- Anchor.getPosition
-          startAnchor
-        Types.Position { row: endRow, column: endColumn } <- Anchor.getPosition
-          endAnchor
-        markRange <- Range.create
-          startRow
-          startColumn
-          endRow
-          endColumn
-        newId <- Session.addMarker
-          markRange
-          "my-marker"
-          "text"
-          false
-          session
+        wasDeleted <- Ref.read deletedRef
+        when (not wasDeleted) do
+          Ref.read markerRef >>= flip Session.removeMarker session
+          Types.Position { row: startRow, column: startColumn } <- Anchor.getPosition
+            startAnchor
+          Types.Position { row: endRow, column: endColumn } <- Anchor.getPosition
+            endAnchor
+          -- TODO: check if anchors are the same => anchors got deleted by user
+          if startRow > endRow || (startRow == endRow && startColumn >= endColumn) then
+            do
+              Ref.write true deletedRef
+              HS.notify listener (DeleteComment marker.id true)
+              HS.notify listener (NotifyCommentProblem marker.id)
+              pure unit
+          else do
+            markRange <- Range.create
+              startRow
+              startColumn
+              endRow
+              endColumn
+            newId <- Session.addMarker
+              markRange
+              "my-marker"
+              "text"
+              false
+              session
 
-        Ref.write newId markerRef
-        HS.notify listener (UpdateAnnotation lm)
-        pure unit
+            Ref.write newId markerRef
+            HS.notify listener (UpdateAnnotation lm)
+            pure unit
 
     Anchor.onChange startAnchor rerenderMarker
     Anchor.onChange endAnchor rerenderMarker
@@ -2129,8 +2261,7 @@ buttonDivisor = HH.div
 
 initialCommentState :: CommentState
 initialCommentState =
-  { markerAnnoHS: empty
-  , oldMarkerAnnoPos: empty
+  { annoMaps: emptyAnnotationMaps
   , dragState: Nothing
   , startHandleMarkerId: Nothing
   , endHandleMarkerId: Nothing
