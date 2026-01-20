@@ -119,6 +119,12 @@ navbar = connect (selectEq identity) $ H.mkComponent
 
             -- Right side of the navbar
             , HH.ul [ HP.classes [ HB.navbarNav, HB.msAuto ] ]
+                [ HH.li [ HP.classes [ HB.navItem ] ]
+                    [ 
+                      helpButton (label :: _ "navbar_help") Login
+                        
+                    ]
+            , HH.ul [ HP.classes [ HB.navbarNav, HB.msAuto ] ]
                 [ languageDropdown state.language
                 , HH.li [ HP.classes [ HB.navItem ] ]
                     [ case state.user of
