@@ -19,9 +19,11 @@ module FPO.Data.Request
   , getGroup
   , getGroups
   , getIgnore
+  , getDocumentHistory
   , getJson
   , getString
   , getTextElemHistory
+  , getTreeHistory
   , getUser
   , getUserDocuments
   , getUserGroups
@@ -74,6 +76,7 @@ import FPO.Dto.DocumentDto.FullDocument (decodeFullDocument)
 import FPO.Dto.DocumentDto.FullDocument as FD
 import FPO.Dto.DocumentDto.Query as DQ
 import FPO.Dto.DocumentDto.TextElement as TE
+import FPO.Dto.DocumentDto.DocumentHistory as DHist
 import FPO.Dto.GroupDto
   ( GroupCreate
   , GroupDto
@@ -592,6 +595,80 @@ getTextElemHistory dID tID before after limit =
     getJson
       decodeJson
       ( "/docs/" <> show dID <> "/text/" <> show tID <> "/history" <> queryData
+      )
+
+-- | Fetches document-wide history from /docs/{documentID}/history endpoint.
+-- | This includes both tree revisions (structure changes) and text revisions (content changes).
+-- | Parameters:
+-- |   - dID: The document ID
+-- |   - before: Optional date to filter history items before this date
+-- |   - limit: Optional maximum number of items to return
+getDocumentHistory
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => DH.DocumentID
+  -> Maybe DD.DocDate
+  -> Maybe Int
+  -> H.HalogenM st act slots msg m (Either AppError DHist.DocumentHistory)
+getDocumentHistory dID before limit =
+  let
+    beforeString =
+      case before of
+        Nothing -> ""
+        Just dVal -> "&before=" <> DD.toStringFormat dVal
+    limitString =
+      case limit of
+        Nothing -> ""
+        Just l -> "&limit=" <> show l
+    conc = beforeString <> limitString
+    queryData =
+      if null conc then
+        ""
+      else
+        "?" <> (drop 1 conc)
+  in
+    getJson
+      decodeJson
+      ( "/docs/" <> show dID <> "/history" <> queryData
+      )
+
+-- | Fetches tree revision history from /docs/{documentID}/tree/history endpoint.
+-- | This includes only tree revisions (document structure changes).
+-- | Parameters:
+-- |   - dID: The document ID
+-- |   - before: Optional date to filter history items before this date
+-- |   - limit: Optional maximum number of items to return
+getTreeHistory
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => DH.DocumentID
+  -> Maybe DD.DocDate
+  -> Maybe Int
+  -> H.HalogenM st act slots msg m (Either AppError DHist.TreeRevisionHistory)
+getTreeHistory dID before limit =
+  let
+    beforeString =
+      case before of
+        Nothing -> ""
+        Just dVal -> "&before=" <> DD.toStringFormat dVal
+    limitString =
+      case limit of
+        Nothing -> ""
+        Just l -> "&limit=" <> show l
+    conc = beforeString <> limitString
+    queryData =
+      if null conc then
+        ""
+      else
+        "?" <> (drop 1 conc)
+  in
+    getJson
+      decodeJson
+      ( "/docs/" <> show dID <> "/tree/history" <> queryData
       )
 
 getUserDocuments

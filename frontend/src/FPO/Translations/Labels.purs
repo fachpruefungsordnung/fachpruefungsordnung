@@ -125,6 +125,8 @@ type Labels =
       -- | Common Phrases
       ::: "common_by"
       ::: "common_cancel"
+      ::: "common_clear"
+      ::: "common_close"
       ::: "common_confirmDelete"
       ::: "common_confirmDiscard"
       ::: "common_create"
@@ -188,7 +190,7 @@ type Labels =
       ::: "editor_viewVersion"
       ::: "editor_wrapToggle"
 
-      -- | Errors 
+      -- | Errors
       ::: "error_accessDeniedError"
       ::: "error_authError"
       ::: "error_conflictError"
@@ -250,6 +252,20 @@ type Labels =
 
       -- | Login Page
       ::: "login_passwordForgotten"
+
+      -- | Modal labels
+      ::: "modal_changesFound"
+      ::: "modal_content"
+      ::: "modal_currentVersion"
+      ::: "modal_documentHistory_title"
+      ::: "modal_historyBefore"
+      ::: "modal_noHistory"
+      ::: "modal_paragraph"
+      ::: "modal_paragraphHistory_title"
+      ::: "modal_structure"
+      ::: "modal_textRevision"
+      ::: "modal_treeRevision"
+      ::: "modal_versionsFound"
 
       -- | Navar
       ::: "navbar_documents"

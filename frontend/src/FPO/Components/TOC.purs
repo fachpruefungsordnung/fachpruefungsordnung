@@ -42,6 +42,9 @@ import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postText)
 import FPO.Data.Store as Store
+import FPO.UI.Modals.ParagraphHistoryModal as PHM
+import FPO.UI.Modals.DocumentHistoryModal as DHM
+import Type.Proxy (Proxy(..))
 import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
@@ -183,6 +186,13 @@ data Action
   | SearchVersions Int
   | ModifyDateInput Boolean Int String
   | UpdateUpToDateVersion
+  -- | Modal actions
+  | OpenParagraphHistoryModal Int String -- elementID, title
+  | OpenDocumentHistoryModal
+  | CloseParagraphHistoryModal
+  | CloseDocumentHistoryModal
+  | HandleParagraphHistoryOutput PHM.Output
+  | HandleDocumentHistoryOutput DHM.Output
 
 data EntityKind = Section | Paragraph
 
@@ -229,7 +239,22 @@ type State = FPOState
   , timezoneOffset :: Maybe Minutes
   -- temporarily used, might be outdated at times and thus to be updated when needed.
   , upToDateVersion :: Maybe Version
+  -- | Modal state
+  , showParagraphHistoryModal :: Maybe { elementID :: Int, title :: String }
+  , showDocumentHistoryModal :: Boolean
   )
+
+-- | Slot types for child components
+type Slots =
+  ( paragraphHistoryModal :: H.Slot PHM.Query PHM.Output Unit
+  , documentHistoryModal :: H.Slot DHM.Query DHM.Output Unit
+  )
+
+_paragraphHistoryModal :: Proxy "paragraphHistoryModal"
+_paragraphHistoryModal = Proxy
+
+_documentHistoryModal :: Proxy "documentHistoryModal"
+_documentHistoryModal = Proxy
 
 tocview
   :: forall m
@@ -256,6 +281,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
       , searchData: Empty
       , timezoneOffset: Nothing
       , upToDateVersion: Nothing
+      , showParagraphHistoryModal: Nothing
+      , showDocumentHistoryModal: false
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -270,12 +297,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
   modalDeleteRef :: H.RefLabel
   modalDeleteRef = H.RefLabel "modal-delete"
 
-  render :: State -> forall slots. H.ComponentHTML Action slots m
+  render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
       [ HP.classes [ HH.ClassName "leftscrollbar" ] ]
       [ HH.div_ $
           renderDeleteModal
+            <> renderParagraphHistoryModal
+            <> renderDocumentHistoryModal
             <>
               ( rootTreeToHTML
                   state
@@ -289,6 +318,28 @@ tocview = connect (selectEq identity) $ H.mkComponent
               )
       ]
     where
+    renderParagraphHistoryModal = case state.showParagraphHistoryModal of
+      Nothing -> []
+      Just { elementID, title } ->
+        [ HH.slot _paragraphHistoryModal unit PHM.paragraphHistoryModal
+            { documentID: state.docID
+            , textElementID: elementID
+            , paragraphTitle: title
+            }
+            HandleParagraphHistoryOutput
+        ]
+
+    renderDocumentHistoryModal =
+      if state.showDocumentHistoryModal then
+        [ HH.slot _documentHistoryModal unit DHM.documentHistoryModal
+            { documentID: state.docID
+            , documentName: state.documentName
+            }
+            HandleDocumentHistoryOutput
+        ]
+      else
+        []
+
     renderDeleteModal = case state.requestDelete of
       Nothing -> []
       Just { path, kind, title } ->
@@ -308,7 +359,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       Section -> translate (label :: _ "toc_section") state.translator
       Paragraph -> translate (label :: _ "toc_paragraph") state.translator
 
-  handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
     Init -> do
       s <- H.get
@@ -492,6 +543,41 @@ tocview = connect (selectEq identity) $ H.mkComponent
               state.searchData
       H.modify_ _ { searchData = newSearchTree }
       pure unit
+
+    -- Modal actions
+    OpenParagraphHistoryModal elementID title -> do
+      H.modify_ _ { showParagraphHistoryModal = Just { elementID, title } }
+
+    OpenDocumentHistoryModal -> do
+      H.modify_ _ { showDocumentHistoryModal = true }
+
+    CloseParagraphHistoryModal -> do
+      H.modify_ _ { showParagraphHistoryModal = Nothing }
+
+    CloseDocumentHistoryModal -> do
+      H.modify_ _ { showDocumentHistoryModal = false }
+
+    HandleParagraphHistoryOutput output -> do
+      case output of
+        PHM.ViewVersion elementID versionID -> do
+          H.modify_ _ { showParagraphHistoryModal = Nothing }
+          H.raise (ModifyVersion elementID versionID)
+        PHM.CompareVersion elementID versionID -> do
+          H.modify_ _ { showParagraphHistoryModal = Nothing }
+          H.raise (CompareTo elementID versionID)
+        PHM.Closed -> do
+          H.modify_ _ { showParagraphHistoryModal = Nothing }
+
+    HandleDocumentHistoryOutput output -> do
+      case output of
+        DHM.ViewTreeRevision _revisionID -> do
+          -- For now, just close the modal - tree revision viewing can be added later
+          H.modify_ _ { showDocumentHistoryModal = false }
+        DHM.ViewTextRevision textElementID revisionID -> do
+          H.modify_ _ { showDocumentHistoryModal = false }
+          H.raise (ModifyVersion textElementID (Just revisionID))
+        DHM.Closed -> do
+          H.modify_ _ { showDocumentHistoryModal = false }
 
     OpenVersion elementID vID -> do
       H.raise (ModifyVersion elementID vID)
@@ -714,11 +800,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
   --       the meta map usually just represents a tree and we're coolio, but this
   --       is by no means guaranteed.
   createNode
-    :: forall slots
-     . MM.FullTypeName
+    :: MM.FullTypeName
     -> MM.ProperTypeMeta
     -> MM.MetaMap
-    -> H.HalogenM State Action slots Output m (Maybe (Tree TOCEntry))
+    -> H.HalogenM State Action Slots Output m (Maybe (Tree TOCEntry))
   createNode fullTypeName meta metaMap = do
     let
       header = TreeHeader
@@ -745,15 +830,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
     createNodeFromTuple
       :: Tuple MM.FullTypeName MM.ProperTypeMeta
       -> MM.MetaMap
-      -> H.HalogenM State Action slots Output m (Maybe (Tree TOCEntry))
+      -> H.HalogenM State Action Slots Output m (Maybe (Tree TOCEntry))
     createNodeFromTuple (Tuple ftm m) = createNode ftm m
 
   -- Creates a new text element and returns its TOC leaf representation,
   -- not added to the TOC yet.
   createLeaf
-    :: forall slots
-     . MM.FullTypeName
-    -> H.HalogenM State Action slots Output m (Maybe (Tree TOCEntry))
+    :: MM.FullTypeName
+    -> H.HalogenM State Action Slots Output m (Maybe (Tree TOCEntry))
   createLeaf fullTypeName = do
     s <- H.get
     let
@@ -775,9 +859,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
         }
 
   handleQuery
-    :: forall slots a
+    :: forall a
      . Query a
-    -> H.HalogenM State Action slots Output m (Maybe a)
+    -> H.HalogenM State Action Slots Output m (Maybe a)
   handleQuery = case _ of
     ReceiveTOCs entries metaMap a -> do
       state <- H.get
@@ -860,8 +944,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       pure (Just a)
 
   rootTreeToHTML
-    :: forall slots
-     . State
+    :: State
     -> String
     -> Array Int
     -> Array Int
@@ -869,7 +952,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Maybe DateTime
     -> RootTree SearchData
     -> RootTree TOCEntry
-    -> Array (H.ComponentHTML Action slots m)
+    -> Array (H.ComponentHTML Action Slots m)
   rootTreeToHTML _ _ _ _ _ _ _ Empty = []
   rootTreeToHTML
     state
@@ -891,6 +974,19 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 [ HH.span
                     [ HP.classes [ HB.fwSemibold, HB.textTruncate, HB.fs4, HB.p2 ] ]
                     [ HH.text docName ]
+                , HH.button
+                    [ HP.classes
+                        [ HB.btn
+                        , HB.btnOutlinePrimary
+                        , HB.btnSm
+                        , HB.me2
+                        ]
+                    , HP.title $ translate (label :: _ "modal_documentHistory_title") state.translator
+                    , HE.onClick $ const OpenDocumentHistoryModal
+                    ]
+                    [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-clock-history", HB.me1 ] ] []
+                    , HH.text $ translate (label :: _ "modal_documentHistory_title") state.translator
+                    ]
                 ]
             ]
         , HH.div
@@ -909,8 +1005,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     ]
 
   treeToHTML
-    :: forall slots
-     . TreeHeader
+    :: TreeHeader
     -> State
     -> Path
     -> Path
@@ -920,7 +1015,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Maybe DateTime
     -> RootTree SearchData
     -> Tree TOCEntry
-    -> Array (H.ComponentHTML Action slots m)
+    -> Array (H.ComponentHTML Action Slots m)
   treeToHTML
     parentHeader
     state
@@ -1168,7 +1263,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
   -- Creates a drop zone for the current path.
   addDropZone
-    :: forall slots. State -> Array Int -> H.ComponentHTML Action slots m
+    :: State -> Array Int -> H.ComponentHTML Action Slots m
   addDropZone state path = HH.div
     [ HP.classes
         $ prependIf (activeDropzone state path) (H.ClassName "active")
@@ -1183,15 +1278,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
   --       but it could be used to adjust the styling or behavior of the drop zone based on
   --       the section level / depth (for example, to add padding or margin).
   addEndDropZone
-    :: forall slots
-     . State
+    :: State
     -> Path
     -- ^ The path where the drop zone is located.
     -> Int
     -- ^ The level of the section where the drop zone is located.
     -> MM.Disjunction MM.FullTypeName
     -- ^ The general type of acceptable children for this drop zone.
-    -> H.ComponentHTML Action slots m
+    -> H.ComponentHTML Action Slots m
   addEndDropZone state path _ pd =
     HH.div
       ( [ HP.classes
@@ -1216,11 +1310,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
   -- Creates a delete button for the section.
   deleteSectionButton
-    :: forall slots
-     . Array Int
+    :: Array Int
     -> EntityKind
     -> String
-    -> H.ComponentHTML Action slots m
+    -> H.ComponentHTML Action Slots m
   deleteSectionButton path kind title =
     HH.button
       [ HP.classes
@@ -1235,10 +1328,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
   -- Creates a history button for a paragraph.
   historyButton
-    :: forall slots
-     . Path
+    :: Path
     -> Int
-    -> H.ComponentHTML Action slots m
+    -> H.ComponentHTML Action Slots m
   historyButton path elementID = HH.button
     [ HP.classes
         [ HB.btn
@@ -1252,8 +1344,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     []
 
   renderParagraphButtonInterface
-    :: forall slots
-     . Path
+    :: Path
     -> Path
     -> Boolean
     -> Array Version
@@ -1262,7 +1353,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Int
     -> RootTree SearchData
     -> State
-    -> H.ComponentHTML Action slots m
+    -> H.ComponentHTML Action Slots m
   renderParagraphButtonInterface
     historyPath
     path
@@ -1497,14 +1588,13 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
   -- Helper to render add button with dropdown, and optional delete button.
   renderSectionButtonInterface
-    :: forall slots
-     . Array (Tuple MM.FullTypeName MM.ProperTypeMeta)
+    :: Array (Tuple MM.FullTypeName MM.ProperTypeMeta)
     -> Array Int
     -> Array Int
     -> Boolean
     -> EntityKind
     -> String
-    -> H.ComponentHTML Action slots m
+    -> H.ComponentHTML Action Slots m
   renderSectionButtonInterface
     items
     menuPath
