@@ -118,14 +118,21 @@ navbar = connect (selectEq identity) $ H.mkComponent
                 )
 
             -- Right side of the navbar
+            
+                
             , HH.ul [ HP.classes [ HB.navbarNav, HB.msAuto ] ]
-                [ HH.li [ HP.classes [ HB.navItem ] ]
+                
+                [  HH.li [ HP.classes [ HB.navItem ] ]
                     [ 
-                      helpButton (label :: _ "navbar_help") Login
+                      HH.button
+                        [ HP.classes [ HB.btn, HB.btnLink ]
+                        , HE.onClick (const $ Logout)
+                        , HP.title (translate (label :: _ "navbar_help") state.translator)
+                        ]
+                        [ HH.i [HP.classes [ HB.bi, H.ClassName "bi bi-question-circle", HB.me1 ]] []]
                         
                     ]
-            , HH.ul [ HP.classes [ HB.navbarNav, HB.msAuto ] ]
-                [ languageDropdown state.language
+                , languageDropdown state.language
                 , HH.li [ HP.classes [ HB.navItem ] ]
                     [ case state.user of
                         Nothing -> navButton "Login" Login
@@ -256,3 +263,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
           , HH.text label
           ]
       ]
+
+
+
+ 
