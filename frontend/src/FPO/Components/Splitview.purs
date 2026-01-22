@@ -686,12 +686,20 @@ splitview = connect selectTranslator $ H.mkComponent
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
     StartResize dragTarget mouseEvent -> do
-      H.liftEffect $ preventDefault (MouseEvent.toEvent mouseEvent)
-      H.modify_ \st -> st
-        { mDragTarget = Just dragTarget
-        , mStartResizeState = Just st.resizeState
-        }
-      handleAction $ HandleMouseMove mouseEvent
+      startResizing <- case dragTarget of
+        LeftResizer -> do
+          sidebarClosed <- H.gets _.resizeState.sidebarClosed
+          pure $ not sidebarClosed
+        RightResizer -> do
+          previewClosed <- H.gets _.resizeState.previewClosed
+          pure $ not previewClosed
+      when startResizing $ do
+        H.liftEffect $ preventDefault (MouseEvent.toEvent mouseEvent)
+        H.modify_ \st -> st
+          { mDragTarget = Just dragTarget
+          , mStartResizeState = Just st.resizeState
+          }
+        handleAction $ HandleMouseMove mouseEvent
 
     -- Stop resizing, when mouse is released (is detected by browser)
     -- the parameter cannot be deleted here because there is always a MouseEvent present, we just don't need it here
