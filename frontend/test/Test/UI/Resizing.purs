@@ -41,6 +41,31 @@ resizeFromLeftTest =
 
       sidebarRatio `shouldBeNear` 0.12
 
+    it "keeps sidebar closed when dragging less than 5% while closed" do
+      let
+        mousePxFromLeft = 4.0
+        { sidebarClosed, sidebarRatio } = resizeFromLeft
+          ( defaultResizeState
+              { sidebarClosed = true, sidebarRatio = 0.0, editorRatio = 0.6 }
+          )
+          mousePxFromLeft
+
+      sidebarClosed `shouldEqual` true
+      sidebarRatio `shouldBeNear` 0.0
+
+    it "opens sidebar when dragging past 5% while closed" do
+      let
+        mousePxFromLeft = 6.0
+        { sidebarClosed, sidebarRatio, editorRatio } = resizeFromLeft
+          ( defaultResizeState
+              { sidebarClosed = true, sidebarRatio = 0.0, editorRatio = 0.6 }
+          )
+          mousePxFromLeft
+
+      sidebarClosed `shouldEqual` false
+      sidebarRatio `shouldBeNear` 0.06
+      editorRatio `shouldBeNear` 0.54
+
     it "makes sidebar ratio 0 when dragging to the left closer than 5%" do
       let mousePxFromLeft = 4.887
 
@@ -128,6 +153,31 @@ resizeFromRightTest =
       let { previewRatio } = resizeFromRight defaultResizeState mousePxFromRight
 
       previewRatio `shouldBeNear` 0.12
+
+    it "keeps preview closed when dragging less than 5% while closed" do
+      let
+        mousePxFromRight = 4.0
+        { previewClosed, previewRatio } = resizeFromRight
+          ( defaultResizeState
+              { previewClosed = true, previewRatio = 0.0, editorRatio = 0.6 }
+          )
+          mousePxFromRight
+
+      previewClosed `shouldEqual` true
+      previewRatio `shouldBeNear` 0.0
+
+    it "opens preview to 10% when dragging past 5% while closed" do
+      let
+        mousePxFromRight = 6.0
+        { previewClosed, previewRatio, editorRatio } = resizeFromRight
+          ( defaultResizeState
+              { previewClosed = true, previewRatio = 0.0, editorRatio = 0.6 }
+          )
+          mousePxFromRight
+
+      previewClosed `shouldEqual` false
+      previewRatio `shouldBeNear` 0.10
+      editorRatio `shouldBeNear` 0.50
 
     it "makes preview ratio 0 when dragging to the right closer than 10%" do
       let mousePxFromRight = 9.887
