@@ -89,7 +89,7 @@ import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
 import Web.DOM.Document as Document
 import Web.DOM.Element as Element
-import Web.Event.Event (EventType(..), stopPropagation)
+import Web.Event.Event (EventType(..), preventDefault, stopPropagation)
 import Web.File.Url (createObjectURL, revokeObjectURL)
 import Web.HTML (window)
 import Web.HTML as Web.HTML
@@ -99,6 +99,7 @@ import Web.HTML.Window (document)
 import Web.HTML.Window as Web.HTML.Window
 import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
+import Web.UIEvent.MouseEvent as MouseEvent
 
 data DragTarget = LeftResizer | RightResizer
 
@@ -278,6 +279,12 @@ splitview = connect selectTranslator $ H.mkComponent
       contentWidth = state.resizeState.windowWidth - resizersTotalWidth
       ratioScaleFactor = contentWidth / state.resizeState.windowWidth
       absoluteEditorRatio = state.resizeState.editorRatio * ratioScaleFactor
+      isDragging = state.mDragTarget /= Nothing
+      dragStyle =
+        if isDragging then
+          "user-select: none; -webkit-user-select: none;"
+        else
+          ""
     -- toolbarHeight :: Int
     -- toolbarHeight = 31 -- px, height of the toolbar
     in
@@ -287,8 +294,9 @@ splitview = connect selectTranslator $ H.mkComponent
         , HE.onMouseLeave StopResize
         , HP.classes [ HB.dFlex, HB.overflowHidden ]
         , HP.style
-            ( "height: calc(100vh - " <> show navbarHeight <>
-                "px); max-height: 100%; min-height: 0;"
+            ( "height: calc(100vh - " <> show navbarHeight
+                <> "px); max-height: 100%; min-height: 0;"
+                <> dragStyle
             )
         , HP.ref (H.RefLabel "splitview")
         ]
@@ -679,6 +687,7 @@ splitview = connect selectTranslator $ H.mkComponent
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
     StartResize dragTarget mouseEvent -> do
+      H.liftEffect $ preventDefault (MouseEvent.toEvent mouseEvent)
       H.modify_ \st -> st
         { mDragTarget = Just dragTarget
         , mStartResizeState = Just st.resizeState
