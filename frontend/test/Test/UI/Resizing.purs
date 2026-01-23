@@ -179,6 +179,22 @@ resizeFromRightTest =
       previewRatio `shouldBeNear` 0.10
       editorRatio `shouldBeNear` 0.50
 
+    it "closes sidebar and opens preview when dragging far left while closed" do
+      let
+        mousePxFromRight = 90.0
+        { sidebarClosed, sidebarRatio, previewClosed, previewRatio, editorRatio } =
+          resizeFromRight
+            ( defaultResizeState
+                { previewClosed = true, previewRatio = 0.0, editorRatio = 0.6 }
+            )
+            mousePxFromRight
+
+      sidebarClosed `shouldEqual` true
+      previewClosed `shouldEqual` false
+      sidebarRatio `shouldBeNear` 0.0
+      previewRatio `shouldBeNear` 0.9
+      editorRatio `shouldBeNear` 0.1
+
     it "makes preview ratio 0 when dragging to the right closer than 10%" do
       let mousePxFromRight = 9.887
 

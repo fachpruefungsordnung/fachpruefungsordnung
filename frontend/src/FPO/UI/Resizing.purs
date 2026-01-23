@@ -198,7 +198,8 @@ resizeFromRight
           else
             resizeState
               { sidebarRatio = 0.0
-              , editorRatio = resizeState.sidebarRatio + resizeState.editorRatio
+              , previewRatio = previewRatio
+              , editorRatio = 1.0 - previewRatio
               , sidebarClosed = true
               -- Save current sidebar ratio before closing (for later restoration)
               , lastExpandedSidebarRatio = resizeState.sidebarRatio
@@ -241,7 +242,8 @@ resizeFromRight
         else
           resizeState
             { sidebarRatio = 0.0
-            , editorRatio = resizeState.sidebarRatio + resizeState.editorRatio
+            , previewRatio = previewRatio
+            , editorRatio = 1.0 - previewRatio
             , sidebarClosed = true
             -- Save current sidebar ratio before closing (for later restoration)
             , lastExpandedSidebarRatio = resizeState.sidebarRatio
