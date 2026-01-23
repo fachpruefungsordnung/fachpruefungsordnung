@@ -89,7 +89,7 @@ getGroupHandler
     :: AuthResult Auth.Token -> Group.GroupID -> Handler Group.Group
 getGroupHandler (Authenticated token) groupID = do
     conn <- tryGetDBConnection
-    ifSuperOrAdminDo conn token groupID (getGroup conn)
+    ifSuperOrGroupMemberDo conn token groupID (getGroup conn)
   where
     getGroup :: Connection -> Handler Group.Group
     getGroup conn = do
