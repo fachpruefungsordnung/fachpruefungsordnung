@@ -52,8 +52,7 @@ data Output
   | Closed
 
 -- | Query interface for parent components
-data Query a
-  = Close a
+data Query a = Close a
 
 -- | Internal actions
 data Action
@@ -158,7 +157,8 @@ renderHeader state =
         , HP.id "documentHistoryModalLabel"
         ]
         [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-clock-history", HB.me2 ] ] []
-        , HH.text $ translate (label :: _ "modal_documentHistory_title") state.translator
+        , HH.text $ translate (label :: _ "modal_documentHistory_title")
+            state.translator
         , HH.small [ HP.classes [ HB.textMuted, HB.ms2 ] ]
             [ HH.text $ " - " <> state.documentName ]
         ]
@@ -177,16 +177,16 @@ renderBody state =
     [ HP.classes [ HH.ClassName "modal-body" ] ]
     [ -- Date filter section
       renderDateFilter state
-      -- Legend
+    -- Legend
     , renderLegend state
-      -- Error message
+    -- Error message
     , case state.error of
         Just err ->
           HH.div
             [ HP.classes [ HB.alert, HB.alertDanger, HB.mt3 ] ]
             [ HH.text err ]
         Nothing -> HH.text ""
-      -- Loading spinner
+    -- Loading spinner
     , if state.loading then
         HH.div [ HP.classes [ HB.textCenter, HB.my4 ] ]
           [ HH.span [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
@@ -208,7 +208,9 @@ renderDateFilter state =
                 [ HP.classes [ HB.colMd6 ] ]
                 [ HH.label
                     [ HP.classes [ HB.formLabel, HB.small, HB.mb1 ] ]
-                    [ HH.text $ translate (label :: _ "modal_historyBefore") state.translator ]
+                    [ HH.text $ translate (label :: _ "modal_historyBefore")
+                        state.translator
+                    ]
                 , HH.input
                     [ HP.type_ HP.InputDate
                     , HP.classes [ HB.formControl, HB.formControlSm ]
@@ -216,7 +218,7 @@ renderDateFilter state =
                     , HE.onValueInput UpdateBeforeDate
                     ]
                 ]
-              -- Buttons
+            -- Buttons
             , HH.div
                 [ HP.classes [ HB.colMd6 ] ]
                 [ HH.div
@@ -226,16 +228,23 @@ renderDateFilter state =
                         , HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
                         , HE.onClick $ const ApplyDateFilter
                         ]
-                        [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-search", HB.me1 ] ] []
-                        , HH.text $ translate (label :: _ "common_search") state.translator
+                        [ HH.i
+                            [ HP.classes [ HB.bi, HH.ClassName "bi-search", HB.me1 ] ]
+                            []
+                        , HH.text $ translate (label :: _ "common_search")
+                            state.translator
                         ]
                     , HH.button
                         [ HP.type_ HP.ButtonButton
                         , HP.classes [ HB.btn, HB.btnOutlineSecondary, HB.btnSm ]
                         , HE.onClick $ const ClearFilters
                         ]
-                        [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-x-circle", HB.me1 ] ] []
-                        , HH.text $ translate (label :: _ "common_clear") state.translator
+                        [ HH.i
+                            [ HP.classes [ HB.bi, HH.ClassName "bi-x-circle", HB.me1 ]
+                            ]
+                            []
+                        , HH.text $ translate (label :: _ "common_clear")
+                            state.translator
                         ]
                     ]
                 ]
@@ -249,12 +258,18 @@ renderLegend state =
     [ HP.classes [ HB.dFlex, HB.gap3, HB.mb3, HB.small ] ]
     [ HH.div
         [ HP.classes [ HB.dFlex, HB.alignItemsCenter ] ]
-        [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-diagram-3", HB.me1, HB.textInfo ] ] []
+        [ HH.i
+            [ HP.classes [ HB.bi, HH.ClassName "bi-diagram-3", HB.me1, HB.textInfo ] ]
+            []
         , HH.text $ translate (label :: _ "modal_treeRevision") state.translator
         ]
     , HH.div
         [ HP.classes [ HB.dFlex, HB.alignItemsCenter ] ]
-        [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-file-text", HB.me1, HB.textSuccess ] ] []
+        [ HH.i
+            [ HP.classes
+                [ HB.bi, HH.ClassName "bi-file-text", HB.me1, HB.textSuccess ]
+            ]
+            []
         , HH.text $ translate (label :: _ "modal_textRevision") state.translator
         ]
     ]
@@ -264,7 +279,9 @@ renderHistoryList state =
   if null state.historyItems then
     HH.div
       [ HP.classes [ HB.textCenter, HB.textMuted, HB.py4 ] ]
-      [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-inbox", HB.fs1, HB.mb3, HB.dBlock ] ] []
+      [ HH.i
+          [ HP.classes [ HB.bi, HH.ClassName "bi-inbox", HB.fs1, HB.mb3, HB.dBlock ] ]
+          []
       , HH.text $ translate (label :: _ "modal_noHistory") state.translator
       ]
   else
@@ -287,7 +304,12 @@ renderHistoryList state =
     else
       []
 
-renderHistoryItem :: forall slots m. State -> Int -> DHist.DocumentHistoryItem -> H.ComponentHTML Action slots m
+renderHistoryItem
+  :: forall slots m
+   . State
+  -> Int
+  -> DHist.DocumentHistoryItem
+  -> H.ComponentHTML Action slots m
 renderHistoryItem state index item =
   let
     header = DHist.getItemHeader item
@@ -329,9 +351,11 @@ renderHistoryItem state index item =
                         HH.span_
                           [ HH.text $ " | "
                           , HH.span [ HP.classes [ HB.fwMedium ] ]
-                              [ HH.text $ translate (label :: _ "modal_paragraph") state.translator
-                                  <> " #"
-                                  <> show textId
+                              [ HH.text $
+                                  translate (label :: _ "modal_paragraph")
+                                    state.translator
+                                    <> " #"
+                                    <> show textId
                               ]
                           ]
                       Nothing -> HH.text ""
@@ -360,11 +384,13 @@ renderHistoryItem state index item =
                 , HE.onClick $ const $ selectAction item header
                 ]
                 [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-eye", HB.me1 ] ] []
-                , HH.text $ translate (label :: _ "editor_viewVersion") state.translator
+                , HH.text $ translate (label :: _ "editor_viewVersion")
+                    state.translator
                 ]
             else
               HH.i
-                [ HP.classes [ HB.bi, HH.ClassName "bi-chevron-right", HB.textMuted ] ]
+                [ HP.classes [ HB.bi, HH.ClassName "bi-chevron-right", HB.textMuted ]
+                ]
                 []
           ]
       ]

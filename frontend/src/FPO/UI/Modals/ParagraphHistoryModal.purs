@@ -11,6 +11,7 @@ module FPO.UI.Modals.ParagraphHistoryModal
 import Prelude
 
 import Data.Array (head, length, null)
+import Data.Array (tail) as Array
 import Data.DateTime (Date, adjust)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe)
@@ -27,7 +28,6 @@ import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
 import FPO.Translations.Labels (Labels)
 import FPO.Translations.Translator (fromFpoTranslator)
-import Data.Array (tail) as Array
 import FPO.Util (handleKeyDownEscape)
 import Halogen as H
 import Halogen.HTML as HH
@@ -61,8 +61,7 @@ data Output
   | Closed
 
 -- | Query interface for parent components
-data Query a
-  = Close a
+data Query a = Close a
 
 -- | Internal actions
 data Action
@@ -176,7 +175,8 @@ renderHeader state =
         , HP.id "paragraphHistoryModalLabel"
         ]
         [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-clock-history", HB.me2 ] ] []
-        , HH.text $ translate (label :: _ "modal_paragraphHistory_title") state.translator
+        , HH.text $ translate (label :: _ "modal_paragraphHistory_title")
+            state.translator
         , HH.small [ HP.classes [ HB.textMuted, HB.ms2 ] ]
             [ HH.text $ " - " <> state.paragraphTitle ]
         ]
@@ -195,14 +195,14 @@ renderBody state =
     [ HP.classes [ HH.ClassName "modal-body" ] ]
     [ -- Date filter section
       renderDateFilters state
-      -- Error message
+    -- Error message
     , case state.error of
         Just err ->
           HH.div
             [ HP.classes [ HB.alert, HB.alertDanger, HB.mt3 ] ]
             [ HH.text err ]
         Nothing -> HH.text ""
-      -- Loading spinner
+    -- Loading spinner
     , if state.loading then
         HH.div [ HP.classes [ HB.textCenter, HB.my4 ] ]
           [ HH.span [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
@@ -224,7 +224,8 @@ renderDateFilters state =
                 [ HP.classes [ HB.colMd4 ] ]
                 [ HH.label
                     [ HP.classes [ HB.formLabel, HB.small, HB.mb1 ] ]
-                    [ HH.text $ translate (label :: _ "common_from") state.translator ]
+                    [ HH.text $ translate (label :: _ "common_from") state.translator
+                    ]
                 , HH.input
                     [ HP.type_ HP.InputDate
                     , HP.classes [ HB.formControl, HB.formControlSm ]
@@ -232,7 +233,7 @@ renderDateFilters state =
                     , HE.onValueInput UpdateFromDate
                     ]
                 ]
-              -- To date
+            -- To date
             , HH.div
                 [ HP.classes [ HB.colMd4 ] ]
                 [ HH.label
@@ -245,7 +246,7 @@ renderDateFilters state =
                     , HE.onValueInput UpdateToDate
                     ]
                 ]
-              -- Buttons
+            -- Buttons
             , HH.div
                 [ HP.classes [ HB.colMd4 ] ]
                 [ HH.div
@@ -255,16 +256,23 @@ renderDateFilters state =
                         , HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
                         , HE.onClick $ const ApplyDateFilter
                         ]
-                        [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-search", HB.me1 ] ] []
-                        , HH.text $ translate (label :: _ "common_search") state.translator
+                        [ HH.i
+                            [ HP.classes [ HB.bi, HH.ClassName "bi-search", HB.me1 ] ]
+                            []
+                        , HH.text $ translate (label :: _ "common_search")
+                            state.translator
                         ]
                     , HH.button
                         [ HP.type_ HP.ButtonButton
                         , HP.classes [ HB.btn, HB.btnOutlineSecondary, HB.btnSm ]
                         , HE.onClick $ const ClearFilters
                         ]
-                        [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-x-circle", HB.me1 ] ] []
-                        , HH.text $ translate (label :: _ "common_clear") state.translator
+                        [ HH.i
+                            [ HP.classes [ HB.bi, HH.ClassName "bi-x-circle", HB.me1 ]
+                            ]
+                            []
+                        , HH.text $ translate (label :: _ "common_clear")
+                            state.translator
                         ]
                     ]
                 ]
@@ -277,7 +285,9 @@ renderVersionList state =
   if null state.versions then
     HH.div
       [ HP.classes [ HB.textCenter, HB.textMuted, HB.py4 ] ]
-      [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-inbox", HB.fs1, HB.mb3, HB.dBlock ] ] []
+      [ HH.i
+          [ HP.classes [ HB.bi, HH.ClassName "bi-inbox", HB.fs1, HB.mb3, HB.dBlock ] ]
+          []
       , HH.text $ translate (label :: _ "modal_noHistory") state.translator
       ]
   else
@@ -300,7 +310,8 @@ renderVersionList state =
     else
       []
 
-renderVersionItem :: forall slots m. State -> Version -> H.ComponentHTML Action slots m
+renderVersionItem
+  :: forall slots m. State -> Version -> H.ComponentHTML Action slots m
 renderVersionItem state version =
   let
     isCurrentVersion = version.identifier == Nothing
@@ -324,7 +335,9 @@ renderVersionItem state version =
           [ HH.i
               [ HP.classes
                   [ HB.bi
-                  , HH.ClassName $ if isCurrentVersion then "bi-check-circle-fill" else "bi-clock-history"
+                  , HH.ClassName $
+                      if isCurrentVersion then "bi-check-circle-fill"
+                      else "bi-clock-history"
                   , HB.me2
                   , if isCurrentVersion then HB.textSuccess else HB.textSecondary
                   ]
@@ -349,7 +362,9 @@ renderVersionItem state version =
           [ if isCurrentVersion then
               HH.span
                 [ HP.classes [ HB.badge, HB.bgSuccess, HB.me2 ] ]
-                [ HH.text $ translate (label :: _ "modal_currentVersion") state.translator ]
+                [ HH.text $ translate (label :: _ "modal_currentVersion")
+                    state.translator
+                ]
             else
               HH.text ""
           , if isSelected then
@@ -361,20 +376,25 @@ renderVersionItem state version =
                     , HE.onClick $ const $ SelectView version
                     ]
                     [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-eye", HB.me1 ] ] []
-                    , HH.text $ translate (label :: _ "editor_viewVersion") state.translator
+                    , HH.text $ translate (label :: _ "editor_viewVersion")
+                        state.translator
                     ]
                 , HH.button
                     [ HP.type_ HP.ButtonButton
                     , HP.classes [ HB.btn, HB.btnOutlineSecondary ]
                     , HE.onClick $ const $ SelectCompare version
                     ]
-                    [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-file-diff", HB.me1 ] ] []
-                    , HH.text $ translate (label :: _ "editor_compareVersion") state.translator
+                    [ HH.i
+                        [ HP.classes [ HB.bi, HH.ClassName "bi-file-diff", HB.me1 ] ]
+                        []
+                    , HH.text $ translate (label :: _ "editor_compareVersion")
+                        state.translator
                     ]
                 ]
             else
               HH.i
-                [ HP.classes [ HB.bi, HH.ClassName "bi-chevron-right", HB.textMuted ] ]
+                [ HP.classes [ HB.bi, HH.ClassName "bi-chevron-right", HB.textMuted ]
+                ]
                 []
           ]
       ]
@@ -437,7 +457,8 @@ handleAction = case _ of
                 (dateToDatetime val)
             )
 
-    history <- getTextElemHistory state.documentID state.textElementID before after Nothing
+    history <- getTextElemHistory state.documentID state.textElementID before after
+      Nothing
 
     case history of
       Left _ -> do
@@ -460,7 +481,9 @@ handleAction = case _ of
         -- Determine up-to-date version
         upToDate <- case before of
           Just _ -> do
-            temp <- getTextElemHistory state.documentID state.textElementID Nothing Nothing (Just 1)
+            temp <- getTextElemHistory state.documentID state.textElementID Nothing
+              Nothing
+              (Just 1)
             case temp of
               Left _ ->
                 pure

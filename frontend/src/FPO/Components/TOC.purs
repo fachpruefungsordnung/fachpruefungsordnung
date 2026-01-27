@@ -12,7 +12,23 @@ module FPO.Components.TOC
   , tocview
   ) where
 
-import Data.Array (catMaybes, concat, cons, drop, head, index, last, length, mapWithIndex, null, snoc, tail, take, uncons, unsnoc)
+import Data.Array
+  ( catMaybes
+  , concat
+  , cons
+  , drop
+  , head
+  , index
+  , last
+  , length
+  , mapWithIndex
+  , null
+  , snoc
+  , tail
+  , take
+  , uncons
+  , unsnoc
+  )
 import Data.DateTime (Date, DateTime, adjust)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
@@ -23,6 +39,7 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Now (getTimezoneOffset, nowDateTime)
+import Effect.Unsafe (unsafePerformEffect)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postText)
 import FPO.Data.Store as Store
@@ -31,7 +48,21 @@ import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.MetaTree as MM
 import FPO.Dto.DocumentDto.TextElement as TE
-import FPO.Dto.DocumentDto.TreeDto (Edge(..), Meta(..), RootTree(..), Tree(..), TreeHeader(..), findRootTree, getContent, getFullTitle, getFullTitleForDisplay, getHeading, getShortTitleForDisplay, modifyNodeRootTree, unspecifiedMeta)
+import FPO.Dto.DocumentDto.TreeDto
+  ( Edge(..)
+  , Meta(..)
+  , RootTree(..)
+  , Tree(..)
+  , TreeHeader(..)
+  , findRootTree
+  , getContent
+  , getFullTitle
+  , getFullTitleForDisplay
+  , getHeading
+  , getShortTitleForDisplay
+  , modifyNodeRootTree
+  , unspecifiedMeta
+  )
 import FPO.Dto.PostTextDto (createPostTextDto)
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
@@ -52,10 +83,36 @@ import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
 import Parsing (runParserT)
-import Prelude (class Eq, Unit, bind, const, discard, flip, identity, map, negate, not, pure, show, unit, when, ($), (&&), (+), (-), (/=), (<), (<$>), (<<<), (<>), (==), (>), (||))
+import Prelude
+  ( class Eq
+  , Unit
+  , bind
+  , const
+  , discard
+  , flip
+  , identity
+  , map
+  , negate
+  , not
+  , pure
+  , show
+  , unit
+  , when
+  , ($)
+  , (&&)
+  , (+)
+  , (-)
+  , (/=)
+  , (<)
+  , (<$>)
+  , (<<<)
+  , (<>)
+  , (==)
+  , (>)
+  , (||)
+  )
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
-import Effect.Unsafe (unsafePerformEffect)
 import Web.Event.Event (preventDefault, stopPropagation)
 import Web.HTML.Event.DragEvent (DragEvent, toEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
@@ -925,11 +982,17 @@ tocview = connect (selectEq identity) $ H.mkComponent
                         , HB.btnSm
                         , HB.me2
                         ]
-                    , HP.title $ translate (label :: _ "modal_documentHistory_title") state.translator
+                    , HP.title $ translate (label :: _ "modal_documentHistory_title")
+                        state.translator
                     , HE.onClick $ const OpenDocumentHistoryModal
                     ]
-                    [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-clock-history", HB.me1 ] ] []
-                    , HH.text $ translate (label :: _ "modal_documentHistory_title") state.translator
+                    [ HH.i
+                        [ HP.classes
+                            [ HB.bi, HH.ClassName "bi-clock-history", HB.me1 ]
+                        ]
+                        []
+                    , HH.text $ translate (label :: _ "modal_documentHistory_title")
+                        state.translator
                     ]
                 ]
             ]

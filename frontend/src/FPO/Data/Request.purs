@@ -72,11 +72,11 @@ import FPO.Dto.CommentDto (CommentSections)
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
+import FPO.Dto.DocumentDto.DocumentHistory as DHist
 import FPO.Dto.DocumentDto.FullDocument (decodeFullDocument)
 import FPO.Dto.DocumentDto.FullDocument as FD
 import FPO.Dto.DocumentDto.Query as DQ
 import FPO.Dto.DocumentDto.TextElement as TE
-import FPO.Dto.DocumentDto.DocumentHistory as DHist
 import FPO.Dto.GroupDto
   ( GroupCreate
   , GroupDto
