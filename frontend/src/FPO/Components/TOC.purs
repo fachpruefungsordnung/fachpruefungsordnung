@@ -45,7 +45,7 @@ import FPO.Data.Store as Store
 import FPO.UI.Modals.ParagraphHistoryModal as PHM
 import FPO.UI.Modals.DocumentHistoryModal as DHM
 import Type.Proxy (Proxy(..))
-import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed)
+import FPO.Data.Time (dateToDatetime)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.MetaTree as MM
@@ -109,7 +109,6 @@ import Prelude
   , (<>)
   , (==)
   , (>)
-  , (>=)
   , (||)
   )
 import Simple.I18n.Translator (label, translate)
@@ -1157,15 +1156,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     ]
                     [ HH.text $ HTMLP.decodeHtmlEntity (getFullTitle meta) ]
                 , renderParagraphButtonInterface
-                    historyPath
                     path
                     isDeletable
-                    state.versions
-                    state.showHistorySubmenu
                     (getFullTitle meta)
                     id
-                    searchData
-                    state
                 ]
             ]
         ]
@@ -1326,12 +1320,12 @@ tocview = connect (selectEq identity) $ H.mkComponent
       ]
       [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-dash" ] ] [] ]
 
-  -- Creates a history button for a paragraph.
+  -- Creates a history button for a paragraph that opens the history modal.
   historyButton
-    :: Path
-    -> Int
+    :: Int
+    -> String
     -> H.ComponentHTML Action Slots m
-  historyButton path elementID = HH.button
+  historyButton elementID title = HH.button
     [ HP.classes
         [ HB.btn
         , HB.btnSecondary
@@ -1339,252 +1333,27 @@ tocview = connect (selectEq identity) $ H.mkComponent
         , HH.ClassName "toc-add-wrapper"
         , H.ClassName "bi bi-clock-history"
         ]
-    , HE.onClick $ const $ ToggleHistoryMenu path elementID
+    , HE.onClick $ const $ OpenParagraphHistoryModal elementID title
     ]
     []
 
   renderParagraphButtonInterface
     :: Path
-    -> Path
     -> Boolean
-    -> Array Version
-    -> Maybe (Maybe Int)
     -> String
     -> Int
-    -> RootTree SearchData
-    -> State
     -> H.ComponentHTML Action Slots m
   renderParagraphButtonInterface
-    historyPath
     path
     renderDeleteBtn
-    versions
-    showHistorySubmenu
     title
-    elementID
-    searchData
-    state =
+    elementID =
     HH.div
       [ HP.classes [ HB.positionRelative, HB.dInlineFlex ] ] $
-      [ historyButton path elementID
+      [ historyButton elementID title
       ]
         <>
           singletonIf renderDeleteBtn (deleteSectionButton path Paragraph title)
-        <>
-          [ if historyPath == path then
-              HH.div
-                [ HP.classes
-                    [ HB.positionAbsolute
-                    , HB.bgWhite
-                    , HB.border
-                    , HB.borderSecondary
-                    , HB.rounded
-                    , HB.shadowSm
-                    , HB.py1
-                    , HB.px1
-                    ]
-                , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
-                ]
-                versionHistoryMenu
-            else
-              HH.text ""
-          ]
-    where
-    -- this is a placeholder that only allows to look at the 5 last versions
-
-    vHM =
-      ( map
-          (\v -> addVersionButton v)
-          versions
-      )
-
-    versionHistoryMenu =
-      searchBarSegment
-        <>
-          [ HH.div
-              [ HP.style "overflow: auto; max-height: 19.3rem;" ] $
-              vHM
-                <>
-                  if length vHM >= 200 then
-                    [ HH.div
-                        [ HP.classes $
-                            [ HB.btn
-                            , HB.btnInfo
-                            , HB.textStart
-                            , HB.textDecorationNone
-                            , HB.w100
-                            , HB.textBody
-                            , HB.dFlex
-                            , HB.alignItemsCenter
-                            , HH.ClassName "toc-item"
-                            ]
-                        , HP.style
-                            "border: none; border-top-style: solid; border-color: grey; border-width: 1px; border-radius: 0;"
-                        ] $
-                        [ HH.text (translate (label :: _ "toc_full") state.translator)
-                        ]
-                    ]
-                  else
-                    []
-          ]
-
-    searchBarSegment =
-      let
-        fromDate =
-          case (findRootTree (\e -> e.elementID == elementID) searchData) of
-            Nothing -> ""
-            Just sd -> sd.fromStringDate
-        toDate =
-          case (findRootTree (\e -> e.elementID == elementID) searchData) of
-            Nothing -> ""
-            Just sd -> sd.toStringDate
-      in
-        [ HH.div
-            [ HP.classes [ HB.dFlex, HB.flexColumn ]
-            ]
-            [ HH.div
-                [ HP.classes
-                    [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
-                ]
-                [ punctuation $
-                    (translate (label :: _ "common_from") state.translator) <> ": "
-                , HH.input
-                    [ HP.type_ HP.InputDate
-                    , HP.value fromDate
-                    , HE.onValueInput (ModifyDateInput true elementID)
-                    ]
-                ]
-            , HH.div
-                [ HP.classes
-                    [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
-                ]
-                [ punctuation $ (translate (label :: _ "common_to") state.translator)
-                    <> ": "
-                , HH.input
-                    [ HP.type_ HP.InputDate
-                    , HP.value toDate
-                    , HE.onValueInput (ModifyDateInput false elementID)
-                    ]
-                ]
-            , HH.div
-                [ HP.classes
-                    [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb2 ]
-                ]
-                [ searchBarButton
-                    (SearchVersions elementID)
-                    "bi bi-search"
-                    (translate (label :: _ "common_search") state.translator)
-                ]
-            ]
-        ]
-
-    searchBarButton action biName smallText = HH.button
-      [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.w100, HB.px1, HB.py0, HB.m0 ]
-      , HP.style "white-space: nowrap;"
-      , HE.onClick \_ -> action
-      , HP.enabled true
-      ]
-      [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text smallText ]
-      , HH.i [ HP.classes [ HB.bi, H.ClassName biName ] ] []
-      ]
-
-    punctuation str =
-      HH.div
-        [ HP.classes
-            [ HB.dFlex, HB.alignItemsCenter, HB.textBody, HH.ClassName "mx05" ]
-        ]
-        [ HH.text str ]
-
-    addVersionButton version =
-      let
-        buttonStyle =
-          if showHistorySubmenu == (Just version.identifier) then
-            [ HH.ClassName "active" ]
-          else
-            []
-      in
-        HH.button
-          [ HP.classes $
-              [ HB.btn
-              , HB.btnInfo
-              , HB.textStart
-              , HB.textDecorationNone
-              , HB.w100
-              , HB.textBody
-              , HB.dFlex
-              , HB.alignItemsCenter
-              , HH.ClassName "toc-item"
-              -- , HH.ClassName "active"
-              ]
-                <>
-                  buttonStyle
-          , HP.style
-              "border: none; border-top-style: solid; border-color: grey; border-width: 1px; border-radius: 0;"
-
-          , HE.onClick \_ -> ToggleHistorySubmenu version.identifier
-          ] $
-          [ HH.div
-              [ HP.classes [ H.ClassName "bi bi-clock-history", HB.fs5, HB.me1 ] ]
-              []
-          , HH.div [ HP.classes [ HB.fs6 ] ]
-              [ HH.text
-                  ( formatAbsoluteTimeDetailed state.timezoneOffset
-                      (DD.docDateToDateTime version.timestamp)
-                      <> " "
-                      <> (translate (label :: _ "common_by") state.translator)
-                      <> " "
-                      <> (DH.getUserName version.author)
-                  )
-              ]
-          ]
-            <>
-              [ if showHistorySubmenu == (Just version.identifier) then
-                  HH.div
-                    [ HP.classes
-                        [ HB.positionAbsolute
-                        , HB.bgWhite
-                        , HB.border
-                        , HB.borderSecondary
-                        , HB.rounded
-                        , HB.shadowSm
-                        , HB.py1
-                        ]
-                    , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
-                    ]
-                    [ versionHistorySubmenuButton
-                        (translate (label :: _ "editor_viewVersion") state.translator)
-                        OpenVersion
-                        version
-                    , versionHistorySubmenuButton
-                        ( translate (label :: _ "editor_compareVersion")
-                            state.translator
-                        )
-                        CompareVersion
-                        version
-                    ]
-                else
-                  HH.text ""
-              ]
-
-    versionHistorySubmenuButton t act version =
-      HH.button
-        [ HP.classes
-            [ HB.btn
-            , HB.btnLink
-            , HB.textStart
-            , HB.textDecorationNone
-            , HB.w100
-            , HB.border0
-            , HB.textBody
-            , HB.dFlex
-            , HB.alignItemsCenter
-            ]
-        , HE.onClick \_ -> Both (act elementID version.identifier)
-            (ToggleHistoryMenu path elementID)
-        ]
-        [ HH.div [ HP.classes [ HB.fs6 ] ]
-            [ HH.text t ]
-        ]
 
   -- Helper to render add button with dropdown, and optional delete button.
   renderSectionButtonInterface
