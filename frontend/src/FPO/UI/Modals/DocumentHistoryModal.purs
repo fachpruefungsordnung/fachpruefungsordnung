@@ -9,7 +9,6 @@ module FPO.UI.Modals.DocumentHistoryModal
   ) where
 
 import Prelude
-import Data.Function (identity)
 
 import Data.Array (length, mapWithIndex, null)
 import Data.DateTime (Date, adjust)
