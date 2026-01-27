@@ -9,7 +9,6 @@ module FPO.UI.Modals.ParagraphHistoryModal
   ) where
 
 import Prelude
-import Data.Function (identity)
 
 import Data.Array (head, length, null)
 import Data.DateTime (Date, adjust)
@@ -18,7 +17,7 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Time.Duration (Days(..), Minutes)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
-import Effect.Now (getTimezoneOffset, nowDateTime)
+import Effect.Now (getTimezoneOffset)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getTextElemHistory)
 import FPO.Data.Store as Store

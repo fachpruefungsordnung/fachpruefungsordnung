@@ -12,23 +12,7 @@ module FPO.Components.TOC
   , tocview
   ) where
 
-import Data.Array
-  ( catMaybes
-  , concat
-  , cons
-  , drop
-  , head
-  , index
-  , last
-  , length
-  , mapWithIndex
-  , null
-  , snoc
-  , tail
-  , take
-  , uncons
-  , unsnoc
-  )
+import Data.Array (catMaybes, concat, cons, drop, head, index, last, length, mapWithIndex, null, snoc, tail, take, uncons, unsnoc)
 import Data.DateTime (Date, DateTime, adjust)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
@@ -42,29 +26,12 @@ import Effect.Now (getTimezoneOffset, nowDateTime)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postText)
 import FPO.Data.Store as Store
-import FPO.UI.Modals.ParagraphHistoryModal as PHM
-import FPO.UI.Modals.DocumentHistoryModal as DHM
-import Type.Proxy (Proxy(..))
 import FPO.Data.Time (dateToDatetime)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.MetaTree as MM
 import FPO.Dto.DocumentDto.TextElement as TE
-import FPO.Dto.DocumentDto.TreeDto
-  ( Edge(..)
-  , Meta(..)
-  , RootTree(..)
-  , Tree(..)
-  , TreeHeader(..)
-  , findRootTree
-  , getContent
-  , getFullTitle
-  , getFullTitleForDisplay
-  , getHeading
-  , getShortTitleForDisplay
-  , modifyNodeRootTree
-  , unspecifiedMeta
-  )
+import FPO.Dto.DocumentDto.TreeDto (Edge(..), Meta(..), RootTree(..), Tree(..), TreeHeader(..), findRootTree, getContent, getFullTitle, getFullTitleForDisplay, getHeading, getShortTitleForDisplay, modifyNodeRootTree, unspecifiedMeta)
 import FPO.Dto.PostTextDto (createPostTextDto)
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
@@ -72,6 +39,8 @@ import FPO.Translations.Util (FPOState)
 import FPO.Types (TOCEntry, TOCTree, firstTOCEntry)
 import FPO.UI.HTML as HTMLP
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
+import FPO.UI.Modals.DocumentHistoryModal as DHM
+import FPO.UI.Modals.ParagraphHistoryModal as PHM
 import FPO.Util (isPrefixOf, prependIf, singletonIf)
 import FPO.Util as Util
 import Halogen as H
@@ -83,37 +52,13 @@ import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
 import Parsing (runParserT)
-import Prelude
-  ( class Eq
-  , Unit
-  , bind
-  , const
-  , discard
-  , flip
-  , identity
-  , map
-  , negate
-  , not
-  , pure
-  , show
-  , unit
-  , when
-  , ($)
-  , (&&)
-  , (+)
-  , (-)
-  , (/=)
-  , (<)
-  , (<$>)
-  , (<<<)
-  , (<>)
-  , (==)
-  , (>)
-  , (||)
-  )
+import Prelude (class Eq, Unit, bind, const, discard, flip, identity, map, negate, not, pure, show, unit, when, ($), (&&), (+), (-), (/=), (<), (<$>), (<<<), (<>), (==), (>), (||))
 import Simple.I18n.Translator (label, translate)
-import Web.Event.Event (preventDefault)
+import Type.Proxy (Proxy(..))
+import Effect.Unsafe (unsafePerformEffect)
+import Web.Event.Event (preventDefault, stopPropagation)
 import Web.HTML.Event.DragEvent (DragEvent, toEvent)
+import Web.UIEvent.MouseEvent as MouseEvent
 
 type Input = DH.DocumentID
 
@@ -1333,7 +1278,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
         , HH.ClassName "toc-add-wrapper"
         , H.ClassName "bi bi-clock-history"
         ]
-    , HE.onClick $ const $ OpenParagraphHistoryModal elementID title
+    , HE.onClick \e -> unsafePerformEffect do
+        stopPropagation (MouseEvent.toEvent e)
+        pure $ OpenParagraphHistoryModal elementID title
     ]
     []
 
