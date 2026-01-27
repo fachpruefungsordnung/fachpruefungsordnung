@@ -65,9 +65,9 @@ formatAbsoluteTimeDetailed offset dateTime =
 defaultFormatter :: Formatter
 defaultFormatter =
   ( FDT.DayOfMonthTwoDigits
-      : FDT.Placeholder " "
+      : FDT.Placeholder ". "
       : FDT.MonthShort
-      : FDT.Placeholder "."
+      : FDT.Placeholder ". "
       : FDT.YearFull
       : FDT.Placeholder " "
       : FDT.Hours24
@@ -90,9 +90,7 @@ formatRelativeTime (Just current) updated =
     totalDays = floor (seconds / 86400.0)
   in
     if totalDays > 7 then
-      case formatDateTime "DD.MMM.YYYY" updated of
-        Right time -> time
-        Left _ -> format formatAbsoluteDate updated
+      format formatAbsoluteDate updated
     else if totalDays >= 1 then
       show totalDays <> if totalDays == 1 then " day ago" else " days ago"
     else if totalHours >= 1 then
@@ -107,9 +105,9 @@ formatRelativeTime (Just current) updated =
   formatAbsoluteDate :: Formatter
   formatAbsoluteDate =
     ( FDT.DayOfMonthTwoDigits
-        : FDT.Placeholder "."
+        : FDT.Placeholder ". "
         : FDT.MonthShort
-        : FDT.Placeholder "."
+        : FDT.Placeholder ". "
         : FDT.YearFull
         : Nil
     )
