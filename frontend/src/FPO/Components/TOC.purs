@@ -39,10 +39,11 @@ import Data.Tuple (Tuple(..))
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Now (getTimezoneOffset, nowDateTime)
+import Effect.Unsafe (unsafePerformEffect)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getDocumentHeader, getTextElemHistory, postText)
 import FPO.Data.Store as Store
-import FPO.Data.Time (dateToDatetime, formatAbsoluteTimeDetailed)
+import FPO.Data.Time (dateToDatetime)
 import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.MetaTree as MM
@@ -69,6 +70,8 @@ import FPO.Translations.Util (FPOState)
 import FPO.Types (TOCEntry, TOCTree, firstTOCEntry)
 import FPO.UI.HTML as HTMLP
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
+import FPO.UI.Modals.DocumentHistoryModal as DHM
+import FPO.UI.Modals.ParagraphHistoryModal as PHM
 import FPO.Util (isPrefixOf, prependIf, singletonIf)
 import FPO.Util as Util
 import Halogen as H
@@ -106,12 +109,13 @@ import Prelude
   , (<>)
   , (==)
   , (>)
-  , (>=)
   , (||)
   )
 import Simple.I18n.Translator (label, translate)
-import Web.Event.Event (preventDefault)
+import Type.Proxy (Proxy(..))
+import Web.Event.Event (preventDefault, stopPropagation)
 import Web.HTML.Event.DragEvent (DragEvent, toEvent)
+import Web.UIEvent.MouseEvent as MouseEvent
 
 type Input = DH.DocumentID
 
@@ -183,6 +187,13 @@ data Action
   | SearchVersions Int
   | ModifyDateInput Boolean Int String
   | UpdateUpToDateVersion
+  -- | Modal actions
+  | OpenParagraphHistoryModal Int String -- elementID, title
+  | OpenDocumentHistoryModal
+  | CloseParagraphHistoryModal
+  | CloseDocumentHistoryModal
+  | HandleParagraphHistoryOutput PHM.Output
+  | HandleDocumentHistoryOutput DHM.Output
 
 data EntityKind = Section | Paragraph
 
@@ -229,7 +240,22 @@ type State = FPOState
   , timezoneOffset :: Maybe Minutes
   -- temporarily used, might be outdated at times and thus to be updated when needed.
   , upToDateVersion :: Maybe Version
+  -- | Modal state
+  , showParagraphHistoryModal :: Maybe { elementID :: Int, title :: String }
+  , showDocumentHistoryModal :: Boolean
   )
+
+-- | Slot types for child components
+type Slots =
+  ( paragraphHistoryModal :: H.Slot PHM.Query PHM.Output Unit
+  , documentHistoryModal :: H.Slot DHM.Query DHM.Output Unit
+  )
+
+_paragraphHistoryModal :: Proxy "paragraphHistoryModal"
+_paragraphHistoryModal = Proxy
+
+_documentHistoryModal :: Proxy "documentHistoryModal"
+_documentHistoryModal = Proxy
 
 tocview
   :: forall m
@@ -256,6 +282,8 @@ tocview = connect (selectEq identity) $ H.mkComponent
       , searchData: Empty
       , timezoneOffset: Nothing
       , upToDateVersion: Nothing
+      , showParagraphHistoryModal: Nothing
+      , showDocumentHistoryModal: false
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -270,12 +298,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
   modalDeleteRef :: H.RefLabel
   modalDeleteRef = H.RefLabel "modal-delete"
 
-  render :: State -> forall slots. H.ComponentHTML Action slots m
+  render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div
       [ HP.classes [ HH.ClassName "leftscrollbar" ] ]
       [ HH.div_ $
           renderDeleteModal
+            <> renderParagraphHistoryModal
+            <> renderDocumentHistoryModal
             <>
               ( rootTreeToHTML
                   state
@@ -289,6 +319,28 @@ tocview = connect (selectEq identity) $ H.mkComponent
               )
       ]
     where
+    renderParagraphHistoryModal = case state.showParagraphHistoryModal of
+      Nothing -> []
+      Just { elementID, title } ->
+        [ HH.slot _paragraphHistoryModal unit PHM.paragraphHistoryModal
+            { documentID: state.docID
+            , textElementID: elementID
+            , paragraphTitle: title
+            }
+            HandleParagraphHistoryOutput
+        ]
+
+    renderDocumentHistoryModal =
+      if state.showDocumentHistoryModal then
+        [ HH.slot _documentHistoryModal unit DHM.documentHistoryModal
+            { documentID: state.docID
+            , documentName: state.documentName
+            }
+            HandleDocumentHistoryOutput
+        ]
+      else
+        []
+
     renderDeleteModal = case state.requestDelete of
       Nothing -> []
       Just { path, kind, title } ->
@@ -308,7 +360,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       Section -> translate (label :: _ "toc_section") state.translator
       Paragraph -> translate (label :: _ "toc_paragraph") state.translator
 
-  handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
+  handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
     Init -> do
       s <- H.get
@@ -492,6 +544,41 @@ tocview = connect (selectEq identity) $ H.mkComponent
               state.searchData
       H.modify_ _ { searchData = newSearchTree }
       pure unit
+
+    -- Modal actions
+    OpenParagraphHistoryModal elementID title -> do
+      H.modify_ _ { showParagraphHistoryModal = Just { elementID, title } }
+
+    OpenDocumentHistoryModal -> do
+      H.modify_ _ { showDocumentHistoryModal = true }
+
+    CloseParagraphHistoryModal -> do
+      H.modify_ _ { showParagraphHistoryModal = Nothing }
+
+    CloseDocumentHistoryModal -> do
+      H.modify_ _ { showDocumentHistoryModal = false }
+
+    HandleParagraphHistoryOutput output -> do
+      case output of
+        PHM.ViewVersion elementID versionID -> do
+          H.modify_ _ { showParagraphHistoryModal = Nothing }
+          H.raise (ModifyVersion elementID versionID)
+        PHM.CompareVersion elementID versionID -> do
+          H.modify_ _ { showParagraphHistoryModal = Nothing }
+          H.raise (CompareTo elementID versionID)
+        PHM.Closed -> do
+          H.modify_ _ { showParagraphHistoryModal = Nothing }
+
+    HandleDocumentHistoryOutput output -> do
+      case output of
+        DHM.ViewTreeRevision _revisionID -> do
+          -- For now, just close the modal - tree revision viewing can be added later
+          H.modify_ _ { showDocumentHistoryModal = false }
+        DHM.ViewTextRevision textElementID revisionID -> do
+          H.modify_ _ { showDocumentHistoryModal = false }
+          H.raise (ModifyVersion textElementID (Just revisionID))
+        DHM.Closed -> do
+          H.modify_ _ { showDocumentHistoryModal = false }
 
     OpenVersion elementID vID -> do
       H.raise (ModifyVersion elementID vID)
@@ -714,11 +801,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
   --       the meta map usually just represents a tree and we're coolio, but this
   --       is by no means guaranteed.
   createNode
-    :: forall slots
-     . MM.FullTypeName
+    :: MM.FullTypeName
     -> MM.ProperTypeMeta
     -> MM.MetaMap
-    -> H.HalogenM State Action slots Output m (Maybe (Tree TOCEntry))
+    -> H.HalogenM State Action Slots Output m (Maybe (Tree TOCEntry))
   createNode fullTypeName meta metaMap = do
     let
       header = TreeHeader
@@ -745,15 +831,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
     createNodeFromTuple
       :: Tuple MM.FullTypeName MM.ProperTypeMeta
       -> MM.MetaMap
-      -> H.HalogenM State Action slots Output m (Maybe (Tree TOCEntry))
+      -> H.HalogenM State Action Slots Output m (Maybe (Tree TOCEntry))
     createNodeFromTuple (Tuple ftm m) = createNode ftm m
 
   -- Creates a new text element and returns its TOC leaf representation,
   -- not added to the TOC yet.
   createLeaf
-    :: forall slots
-     . MM.FullTypeName
-    -> H.HalogenM State Action slots Output m (Maybe (Tree TOCEntry))
+    :: MM.FullTypeName
+    -> H.HalogenM State Action Slots Output m (Maybe (Tree TOCEntry))
   createLeaf fullTypeName = do
     s <- H.get
     let
@@ -775,9 +860,9 @@ tocview = connect (selectEq identity) $ H.mkComponent
         }
 
   handleQuery
-    :: forall slots a
+    :: forall a
      . Query a
-    -> H.HalogenM State Action slots Output m (Maybe a)
+    -> H.HalogenM State Action Slots Output m (Maybe a)
   handleQuery = case _ of
     ReceiveTOCs entries metaMap a -> do
       state <- H.get
@@ -860,8 +945,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
       pure (Just a)
 
   rootTreeToHTML
-    :: forall slots
-     . State
+    :: State
     -> String
     -> Array Int
     -> Array Int
@@ -869,7 +953,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Maybe DateTime
     -> RootTree SearchData
     -> RootTree TOCEntry
-    -> Array (H.ComponentHTML Action slots m)
+    -> Array (H.ComponentHTML Action Slots m)
   rootTreeToHTML _ _ _ _ _ _ _ Empty = []
   rootTreeToHTML
     state
@@ -891,6 +975,25 @@ tocview = connect (selectEq identity) $ H.mkComponent
                 [ HH.span
                     [ HP.classes [ HB.fwSemibold, HB.textTruncate, HB.fs4, HB.p2 ] ]
                     [ HH.text docName ]
+                , HH.button
+                    [ HP.classes
+                        [ HB.btn
+                        , HB.btnOutlinePrimary
+                        , HB.btnSm
+                        , HB.me2
+                        ]
+                    , HP.title $ translate (label :: _ "modal_documentHistory_title")
+                        state.translator
+                    , HE.onClick $ const OpenDocumentHistoryModal
+                    ]
+                    [ HH.i
+                        [ HP.classes
+                            [ HB.bi, HH.ClassName "bi-clock-history", HB.me1 ]
+                        ]
+                        []
+                    , HH.text $ translate (label :: _ "modal_documentHistory_title")
+                        state.translator
+                    ]
                 ]
             ]
         , HH.div
@@ -909,8 +1012,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     ]
 
   treeToHTML
-    :: forall slots
-     . TreeHeader
+    :: TreeHeader
     -> State
     -> Path
     -> Path
@@ -920,7 +1022,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     -> Maybe DateTime
     -> RootTree SearchData
     -> Tree TOCEntry
-    -> Array (H.ComponentHTML Action slots m)
+    -> Array (H.ComponentHTML Action Slots m)
   treeToHTML
     parentHeader
     state
@@ -1062,15 +1164,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
                     ]
                     [ HH.text $ HTMLP.decodeHtmlEntity (getFullTitle meta) ]
                 , renderParagraphButtonInterface
-                    historyPath
                     path
                     isDeletable
-                    state.versions
-                    state.showHistorySubmenu
                     (getFullTitle meta)
                     id
-                    searchData
-                    state
                 ]
             ]
         ]
@@ -1168,7 +1265,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
   -- Creates a drop zone for the current path.
   addDropZone
-    :: forall slots. State -> Array Int -> H.ComponentHTML Action slots m
+    :: State -> Array Int -> H.ComponentHTML Action Slots m
   addDropZone state path = HH.div
     [ HP.classes
         $ prependIf (activeDropzone state path) (H.ClassName "active")
@@ -1183,15 +1280,14 @@ tocview = connect (selectEq identity) $ H.mkComponent
   --       but it could be used to adjust the styling or behavior of the drop zone based on
   --       the section level / depth (for example, to add padding or margin).
   addEndDropZone
-    :: forall slots
-     . State
+    :: State
     -> Path
     -- ^ The path where the drop zone is located.
     -> Int
     -- ^ The level of the section where the drop zone is located.
     -> MM.Disjunction MM.FullTypeName
     -- ^ The general type of acceptable children for this drop zone.
-    -> H.ComponentHTML Action slots m
+    -> H.ComponentHTML Action Slots m
   addEndDropZone state path _ pd =
     HH.div
       ( [ HP.classes
@@ -1216,11 +1312,10 @@ tocview = connect (selectEq identity) $ H.mkComponent
 
   -- Creates a delete button for the section.
   deleteSectionButton
-    :: forall slots
-     . Array Int
+    :: Array Int
     -> EntityKind
     -> String
-    -> H.ComponentHTML Action slots m
+    -> H.ComponentHTML Action Slots m
   deleteSectionButton path kind title =
     HH.button
       [ HP.classes
@@ -1233,13 +1328,12 @@ tocview = connect (selectEq identity) $ H.mkComponent
       ]
       [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-dash" ] ] [] ]
 
-  -- Creates a history button for a paragraph.
+  -- Creates a history button for a paragraph that opens the history modal.
   historyButton
-    :: forall slots
-     . Path
-    -> Int
-    -> H.ComponentHTML Action slots m
-  historyButton path elementID = HH.button
+    :: Int
+    -> String
+    -> H.ComponentHTML Action Slots m
+  historyButton elementID title = HH.button
     [ HP.classes
         [ HB.btn
         , HB.btnSecondary
@@ -1247,264 +1341,39 @@ tocview = connect (selectEq identity) $ H.mkComponent
         , HH.ClassName "toc-add-wrapper"
         , H.ClassName "bi bi-clock-history"
         ]
-    , HE.onClick $ const $ ToggleHistoryMenu path elementID
+    , HE.onClick \e -> unsafePerformEffect do
+        stopPropagation (MouseEvent.toEvent e)
+        pure $ OpenParagraphHistoryModal elementID title
     ]
     []
 
   renderParagraphButtonInterface
-    :: forall slots
-     . Path
-    -> Path
+    :: Path
     -> Boolean
-    -> Array Version
-    -> Maybe (Maybe Int)
     -> String
     -> Int
-    -> RootTree SearchData
-    -> State
-    -> H.ComponentHTML Action slots m
+    -> H.ComponentHTML Action Slots m
   renderParagraphButtonInterface
-    historyPath
     path
     renderDeleteBtn
-    versions
-    showHistorySubmenu
     title
-    elementID
-    searchData
-    state =
+    elementID =
     HH.div
       [ HP.classes [ HB.positionRelative, HB.dInlineFlex ] ] $
-      [ historyButton path elementID
+      [ historyButton elementID title
       ]
         <>
           singletonIf renderDeleteBtn (deleteSectionButton path Paragraph title)
-        <>
-          [ if historyPath == path then
-              HH.div
-                [ HP.classes
-                    [ HB.positionAbsolute
-                    , HB.bgWhite
-                    , HB.border
-                    , HB.borderSecondary
-                    , HB.rounded
-                    , HB.shadowSm
-                    , HB.py1
-                    , HB.px1
-                    ]
-                , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
-                ]
-                versionHistoryMenu
-            else
-              HH.text ""
-          ]
-    where
-    -- this is a placeholder that only allows to look at the 5 last versions
-
-    vHM =
-      ( map
-          (\v -> addVersionButton v)
-          versions
-      )
-
-    versionHistoryMenu =
-      searchBarSegment
-        <>
-          [ HH.div
-              [ HP.style "overflow: auto; max-height: 19.3rem;" ] $
-              vHM
-                <>
-                  if length vHM >= 200 then
-                    [ HH.div
-                        [ HP.classes $
-                            [ HB.btn
-                            , HB.btnInfo
-                            , HB.textStart
-                            , HB.textDecorationNone
-                            , HB.w100
-                            , HB.textBody
-                            , HB.dFlex
-                            , HB.alignItemsCenter
-                            , HH.ClassName "toc-item"
-                            ]
-                        , HP.style
-                            "border: none; border-top-style: solid; border-color: grey; border-width: 1px; border-radius: 0;"
-                        ] $
-                        [ HH.text (translate (label :: _ "toc_full") state.translator)
-                        ]
-                    ]
-                  else
-                    []
-          ]
-
-    searchBarSegment =
-      let
-        fromDate =
-          case (findRootTree (\e -> e.elementID == elementID) searchData) of
-            Nothing -> ""
-            Just sd -> sd.fromStringDate
-        toDate =
-          case (findRootTree (\e -> e.elementID == elementID) searchData) of
-            Nothing -> ""
-            Just sd -> sd.toStringDate
-      in
-        [ HH.div
-            [ HP.classes [ HB.dFlex, HB.flexColumn ]
-            ]
-            [ HH.div
-                [ HP.classes
-                    [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
-                ]
-                [ punctuation $
-                    (translate (label :: _ "common_from") state.translator) <> ": "
-                , HH.input
-                    [ HP.type_ HP.InputDate
-                    , HP.value fromDate
-                    , HE.onValueInput (ModifyDateInput true elementID)
-                    ]
-                ]
-            , HH.div
-                [ HP.classes
-                    [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb1 ]
-                ]
-                [ punctuation $ (translate (label :: _ "common_to") state.translator)
-                    <> ": "
-                , HH.input
-                    [ HP.type_ HP.InputDate
-                    , HP.value toDate
-                    , HE.onValueInput (ModifyDateInput false elementID)
-                    ]
-                ]
-            , HH.div
-                [ HP.classes
-                    [ HB.dFlex, HB.flexRow, HB.justifyContentBetween, HB.mb2 ]
-                ]
-                [ searchBarButton
-                    (SearchVersions elementID)
-                    "bi bi-search"
-                    (translate (label :: _ "common_search") state.translator)
-                ]
-            ]
-        ]
-
-    searchBarButton action biName smallText = HH.button
-      [ HP.classes [ HB.btn, HB.btnOutlineDark, HB.w100, HB.px1, HB.py0, HB.m0 ]
-      , HP.style "white-space: nowrap;"
-      , HE.onClick \_ -> action
-      , HP.enabled true
-      ]
-      [ HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text smallText ]
-      , HH.i [ HP.classes [ HB.bi, H.ClassName biName ] ] []
-      ]
-
-    punctuation str =
-      HH.div
-        [ HP.classes
-            [ HB.dFlex, HB.alignItemsCenter, HB.textBody, HH.ClassName "mx05" ]
-        ]
-        [ HH.text str ]
-
-    addVersionButton version =
-      let
-        buttonStyle =
-          if showHistorySubmenu == (Just version.identifier) then
-            [ HH.ClassName "active" ]
-          else
-            []
-      in
-        HH.button
-          [ HP.classes $
-              [ HB.btn
-              , HB.btnInfo
-              , HB.textStart
-              , HB.textDecorationNone
-              , HB.w100
-              , HB.textBody
-              , HB.dFlex
-              , HB.alignItemsCenter
-              , HH.ClassName "toc-item"
-              -- , HH.ClassName "active"
-              ]
-                <>
-                  buttonStyle
-          , HP.style
-              "border: none; border-top-style: solid; border-color: grey; border-width: 1px; border-radius: 0;"
-
-          , HE.onClick \_ -> ToggleHistorySubmenu version.identifier
-          ] $
-          [ HH.div
-              [ HP.classes [ H.ClassName "bi bi-clock-history", HB.fs5, HB.me1 ] ]
-              []
-          , HH.div [ HP.classes [ HB.fs6 ] ]
-              [ HH.text
-                  ( formatAbsoluteTimeDetailed state.timezoneOffset
-                      (DD.docDateToDateTime version.timestamp)
-                      <> " "
-                      <> (translate (label :: _ "common_by") state.translator)
-                      <> " "
-                      <> (DH.getUserName version.author)
-                  )
-              ]
-          ]
-            <>
-              [ if showHistorySubmenu == (Just version.identifier) then
-                  HH.div
-                    [ HP.classes
-                        [ HB.positionAbsolute
-                        , HB.bgWhite
-                        , HB.border
-                        , HB.borderSecondary
-                        , HB.rounded
-                        , HB.shadowSm
-                        , HB.py1
-                        ]
-                    , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
-                    ]
-                    [ versionHistorySubmenuButton
-                        (translate (label :: _ "editor_viewVersion") state.translator)
-                        OpenVersion
-                        version
-                    , versionHistorySubmenuButton
-                        ( translate (label :: _ "editor_compareVersion")
-                            state.translator
-                        )
-                        CompareVersion
-                        version
-                    ]
-                else
-                  HH.text ""
-              ]
-
-    versionHistorySubmenuButton t act version =
-      HH.button
-        [ HP.classes
-            [ HB.btn
-            , HB.btnLink
-            , HB.textStart
-            , HB.textDecorationNone
-            , HB.w100
-            , HB.border0
-            , HB.textBody
-            , HB.dFlex
-            , HB.alignItemsCenter
-            ]
-        , HE.onClick \_ -> Both (act elementID version.identifier)
-            (ToggleHistoryMenu path elementID)
-        ]
-        [ HH.div [ HP.classes [ HB.fs6 ] ]
-            [ HH.text t ]
-        ]
 
   -- Helper to render add button with dropdown, and optional delete button.
   renderSectionButtonInterface
-    :: forall slots
-     . Array (Tuple MM.FullTypeName MM.ProperTypeMeta)
+    :: Array (Tuple MM.FullTypeName MM.ProperTypeMeta)
     -> Array Int
     -> Array Int
     -> Boolean
     -> EntityKind
     -> String
-    -> H.ComponentHTML Action slots m
+    -> H.ComponentHTML Action Slots m
   renderSectionButtonInterface
     items
     menuPath

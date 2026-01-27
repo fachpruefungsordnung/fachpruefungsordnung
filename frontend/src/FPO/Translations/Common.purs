@@ -7,6 +7,8 @@ import Simple.I18n.Translation (Translation, fromRecord)
 type CommonLabels =
   ( "common_by"
       ::: "common_cancel"
+      ::: "common_clear"
+      ::: "common_close"
       ::: "common_confirmDelete"
       ::: "common_confirmDiscard"
       ::: "common_create"
@@ -38,6 +40,18 @@ type CommonLabels =
       ::: "common_to"
       ::: "common_user"
       ::: "common_userName"
+      ::: "modal_changesFound"
+      ::: "modal_content"
+      ::: "modal_currentVersion"
+      ::: "modal_documentHistory_title"
+      ::: "modal_historyBefore"
+      ::: "modal_noHistory"
+      ::: "modal_paragraph"
+      ::: "modal_paragraphHistory_title"
+      ::: "modal_structure"
+      ::: "modal_textRevision"
+      ::: "modal_treeRevision"
+      ::: "modal_versionsFound"
       ::: SNil
   )
 
@@ -45,6 +59,8 @@ enCommon :: Translation CommonLabels
 enCommon = fromRecord
   { common_by: "by"
   , common_cancel: "Cancel"
+  , common_clear: "Clear"
+  , common_close: "Close"
   , common_confirmDelete: "Confirm Delete"
   , common_confirmDiscard: "Confirm Discard"
   , common_create: "Create"
@@ -80,12 +96,26 @@ enCommon = fromRecord
   --       german in certain phrase constructions.
   , common_theGroup: "group"
   , common_submit: "Submit"
+  , modal_changesFound: "changes found"
+  , modal_content: "Content"
+  , modal_currentVersion: "Current"
+  , modal_documentHistory_title: "Document History"
+  , modal_historyBefore: "Show changes before"
+  , modal_noHistory: "No revision history available"
+  , modal_paragraph: "Paragraph"
+  , modal_paragraphHistory_title: "Paragraph History"
+  , modal_structure: "Structure"
+  , modal_textRevision: "Text Revision"
+  , modal_treeRevision: "Structure Revision"
+  , modal_versionsFound: "versions found"
   }
 
 deCommon :: Translation CommonLabels
 deCommon = fromRecord
   { common_by: "von"
   , common_cancel: "Abbrechen"
+  , common_clear: "Leeren"
+  , common_close: "Schließen"
   , common_confirmDelete: "Löschen bestätigen"
   , common_confirmDiscard: "Verwerfen bestätigen"
   , common_create: "Erstellen"
@@ -118,5 +148,16 @@ deCommon = fromRecord
   , common_userName: "Benutzername"
   , common_theGroup: "die Gruppe"
   , common_submit: "Absenden"
+  , modal_changesFound: "Änderungen gefunden"
+  , modal_content: "Inhalt"
+  , modal_currentVersion: "Aktuell"
+  , modal_documentHistory_title: "Dokumentverlauf"
+  , modal_historyBefore: "Änderungen vor"
+  , modal_noHistory: "Keine Versionshistorie verfügbar"
+  , modal_paragraph: "Absatz"
+  , modal_paragraphHistory_title: "Absatzverlauf"
+  , modal_structure: "Struktur"
+  , modal_textRevision: "Textänderung"
+  , modal_treeRevision: "Strukturänderung"
+  , modal_versionsFound: "Versionen gefunden"
   }
-
