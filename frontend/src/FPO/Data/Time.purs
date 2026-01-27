@@ -19,8 +19,7 @@ import Data.DateTime
   , canonicalDate
   , diff
   )
-import Data.Either (Either(..))
-import Data.Formatter.DateTime (Formatter, format, formatDateTime)
+import Data.Formatter.DateTime (Formatter, format)
 import Data.Formatter.DateTime as FDT
 import Data.Int (floor)
 import Data.List (List(..), (:))
