@@ -36,6 +36,8 @@ import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Store.Select (selectEq)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
+import Web.HTML (window)
+import Web.HTML.Window (open)
 
 type State = FPOState (user :: Maybe FullUserDto, language :: String)
 
@@ -45,6 +47,7 @@ data Action
   | Logout
   | SetLanguage String
   | ReloadUser
+  | Help
 
 data Query a
   -- | Request a reload from outside - usually, the main routing component
@@ -126,7 +129,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                     [ 
                       HH.button
                         [ HP.classes [ HB.btn, HB.btnLink ]
-                        , HE.onClick (const $ Logout)
+                        , HE.onClick (const $ Help)
                         , HP.title (translate (label :: _ "navbar_help") state.translator)
                         ]
                         [ HH.i [HP.classes [ HB.bi, H.ClassName "bi bi-question-circle", HB.me1 ]] []]
@@ -171,6 +174,10 @@ navbar = connect (selectEq identity) $ H.mkComponent
     case userWithError of
       Left _ -> H.modify_ _ { user = Nothing } -- TODO error handling
       Right user -> H.modify_ _ { user = Just user }
+  handleAction Help = do
+    win <- H.liftEffect window
+    _ <- H.liftEffect $ open "https://fpo.bahn.sh/docs/user-docs/" "_blank" "" win
+    pure unit
 
   handleQuery :: forall a. Query a -> H.HalogenM State Action () output m (Maybe a)
   handleQuery (RequestReloadUser a) = do
