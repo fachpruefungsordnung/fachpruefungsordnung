@@ -31,7 +31,7 @@ import Data.Time.Duration (class Duration, Seconds(..), negateDuration, toDurati
 {- import FPO.Dto.DocumentDto.DocumentHeader (DocumentHeader)
 import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader -}
 
--- for cases that need to be handled even though one case cannot happen. This Data is a placeholder that can be used in 
+-- for cases that need to be handled even though one case cannot happen. This Data is a placeholder that can be used in
 -- such places
 genericDatetime :: DateTime
 genericDatetime = DateTime genericDate genericTime
@@ -60,23 +60,19 @@ formatAbsoluteTimeDetailed offset dateTime =
       Just oSet -> adjust (negateDuration oSet) dateTime
       Nothing -> Just dateTime
   in
-    case formatDateTime "YYYY.MMM.DD HH:mm:ss" dTime of
-      Right time -> time
-      Left _ -> format defaultFormatter dTime
+    format defaultFormatter dTime
 
 defaultFormatter :: Formatter
 defaultFormatter =
-  ( FDT.YearFull
-      : FDT.Placeholder "."
+  ( FDT.DayOfMonthTwoDigits
+      : FDT.Placeholder " "
       : FDT.MonthShort
       : FDT.Placeholder "."
-      : FDT.DayOfMonthTwoDigits
+      : FDT.YearFull
       : FDT.Placeholder " "
       : FDT.Hours24
       : FDT.Placeholder ":"
       : FDT.MinutesTwoDigits
-      : FDT.Placeholder ":"
-      : FDT.SecondsTwoDigits
       : Nil
   )
 
