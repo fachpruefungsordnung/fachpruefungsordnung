@@ -193,24 +193,24 @@ instance ToHtmlM (Parsed DocumentHeading) where
     toHtmlM eErrDocumentHeading = do
         -- \| Title which is used if a parse error occurs
         fallbackTitle <- gets documentFallbackTitle
-        (resType, titleHtml) <- case eErrDocumentHeading of
+        (resType, tocTitleHtml, titleHtml) <- case eErrDocumentHeading of
             Left _ -> do
                 setHasErrors
                 failedHeadingTextHtml <- toHtmlM fallbackTitle
-                return (Error, failedHeadingTextHtml)
+                return (Error, failedHeadingTextHtml, failedHeadingTextHtml)
             Right (DocumentHeading headingTextTree) -> do
-                headingTextHtml <- toHtmlM headingTextTree
+                (tocHeadingTextHtml, headingTextHtml) <- tocHeadingHtml headingTextTree
                 -- \| Used for setting HTML title
                 modify (\s -> s {mainDocumentTitle = headingText headingTextTree})
-                return (Success, headingTextHtml)
+                return (Success, tocHeadingTextHtml, headingTextHtml)
         -- \| Get HeadingFormat from DocumentContainer or AppendixSection
         headingFormatS <- asks documentHeadingFormat
         -- \| Here we check if we are inside an appendix, since
         --   the appendix heading format has an id and the main documents has not
-        (mIdHtml, formattedTitle, mLabel) <- case headingFormatS of
+        (mIdText, mIdHtml, formattedTitle, mLabel) <- case headingFormatS of
             Left headFormat -> buildMainHeading titleHtml headFormat
             Right headFormatId -> buildAppendixHeading titleHtml headFormatId
-        htmlId <- addTocEntry mIdHtml (resType titleHtml) mLabel Other
+        htmlId <- addTocEntry mIdText (resType tocTitleText) mIdHtml tocTitleHtml mLabel Other
         -- \| In case of a parse error, output an error box
         return $
             either
@@ -226,18 +226,18 @@ instance ToHtmlM (Parsed DocumentHeading) where
         buildMainHeading
             :: Delayed (Html ())
             -> HeadingFormat False
-            -> ReaderStateMonad (Maybe (Html ()), Delayed (Html ()), Maybe Label)
+            -> ReaderStateMonad (Maybe Text, Maybe (Html ()), Delayed (Html ()), Maybe Label)
         buildMainHeading dTitleHtml headFormat = do
             let formattedTitle = headingFormat headFormat <$> dTitleHtml
             -- \| Used for adding title to exported sections
             modify (\s -> s {mainDocumentTitleHtml = formattedTitle})
-            return (Nothing, formattedTitle, Nothing)
+            return (Nothing, Nothing, formattedTitle, Nothing)
 
         -- \| Appendix Docuemnt Heading with Id and Label
         buildAppendixHeading
             :: Delayed (Html ())
             -> HeadingFormat True
-            -> ReaderStateMonad (Maybe (Html ()), Delayed (Html ()), Maybe Label)
+            -> ReaderStateMonad (Maybe Text, Maybe (Html ()), Delayed (Html ()), Maybe Label)
         buildAppendixHeading dTitleHtml headFormatId = do
             -- \| Heading for Appendix Element (with id and toc key)
             docId <- asks currentAppendixElementID
@@ -317,12 +317,9 @@ instance ToHtmlM (Node Section) where
                             createTocEntryH Nothing (Error $ Now tocKeyHtml)
                         return (Now $ parseErrorHtml (Just htmlId) parseErr, htmlId, mempty)
                     Right (Heading headingFormatS title) -> do
-                        titleHtml <- toHtmlM title
+                        (tocTitleHtml, titleHtml) <- tocHeadingHtml title
                         let rawTitleText = headingText title
-                        -- TODO: Maybe: Toc entry for section has no footnotes (headingText skips them),
-                        --       since the could contain @<a>@. When the Toc entry is wrapped in another
-                        --       @<a>@ it creates invalid HTML
-                        htmlId <- createTocEntryH (Just tocKeyHtml) (Success $ toHtml <$> rawTitleText)
+                        htmlId <- createTocEntryH (Just tocKeyHtml) (Success tocTitleHtml)
                         return
                             ( h2_ [cssClass_ Class.Heading, cssClass_ Class.Anchor, id_ htmlId]
                                 . headingFormatId headingFormatS sectionIDHtml
@@ -828,6 +825,21 @@ renderGroupedTextTree textF_ enumF_ tts =
             followingHtml <- renderGroupedTextTree textF_ enumF_ tts'
             -- \| Wrap raw text without enums into textF_
             return $ (textF_ <$> rawTextHtml) <> followingHtml
+
+-------------------------------------------------------------------------------
+
+-- | Render 'HeadingTextTree' with and without 'FootnoteRef's for normal and ToC usage
+tocHeadingHtml
+    :: [HeadingTextTree] -> ReaderStateMonad (Delayed (Html ()), Delayed (Html ()))
+tocHeadingHtml [] = return (mempty, mempty)
+tocHeadingHtml (h : hs) = do
+    normalHtml <- toHtmlM h
+    let tocHtml = case h of
+            FootnoteRef _ -> mempty
+            _ -> normalHtml
+    (tocRest, normalRest) <- tocHeadingHtml hs
+
+    return (tocHtml <> tocRest, normalHtml <> normalRest)
 
 -------------------------------------------------------------------------------
 
