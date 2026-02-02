@@ -2316,7 +2316,7 @@ initialState { context, input } =
   , mListener: Nothing
   , showButtonText: true
   , showButtons: true
-  , wrapEnabled: false
+  , wrapEnabled: true
   , saveState: initialSaveState
   , compareToElement: input.elementData
   , isEditorOutdated: false

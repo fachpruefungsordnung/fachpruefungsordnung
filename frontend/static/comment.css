@@ -53,5 +53,5 @@
 }
 
 /* Icons: same color palette as buttons */
-.icon-orange { color:var(--btn-orange); }
+.icon-orange { color: var(--btn-orange); }
 .icon-orange:hover { color: var(--btn-orange-hover); }
