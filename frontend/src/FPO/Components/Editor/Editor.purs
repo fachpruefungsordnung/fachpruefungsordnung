@@ -474,7 +474,10 @@ editor = connect selectTranslator $ H.mkComponent
                       makeEditorToolbarButton
                         true
                         (translate (label :: _ "editor_wrapToggle") state.translator)
-                        (if state.wrapEnabled then [ H.ClassName "toolbar-btn--active" ] else [])
+                        ( if state.wrapEnabled then
+                            [ H.ClassName "toolbar-btn--active" ]
+                          else []
+                        )
                         WrapToggle
                         "bi-text-wrap"
                 ]
@@ -2350,7 +2353,7 @@ makeEditorToolbarButton enabled tooltip btnClasses action biName =
     HH.button
       [ HP.classes
           ( prependIf (not enabled) HB.opacity25
-              ( baseClasses <> toolbarDefaultClasses <> btnClasses )
+              (baseClasses <> toolbarDefaultClasses <> btnClasses)
           )
       , HP.title tooltip
       , HE.onClick \_ -> action
@@ -2390,7 +2393,7 @@ makeEditorToolbarButtonWithText enabled asText btnClasses action biName smallTex
       ( prependIf (not asText) (HP.title smallText)
           [ HP.classes
               ( prependIf (not enabled) HB.opacity25
-                  ( baseClasses <> toolbarDefaultClasses <> btnClasses )
+                  (baseClasses <> toolbarDefaultClasses <> btnClasses)
               )
           , HP.style "white-space: nowrap;"
           , HE.onClick \_ -> action
