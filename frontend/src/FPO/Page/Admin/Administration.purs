@@ -317,7 +317,7 @@ component =
                   (if state.currentTab == UsersTab then [ HB.active ] else [])
               , HE.onClick $ const $ SwitchTab UsersTab
               ]
-              [ HH.i [ HP.classes [ H.ClassName "bi-people-fill", HB.me2 ] ] []
+              [ HH.i [ HP.classes [ H.ClassName "bi-person-fill", HB.me2 ] ] []
               , HH.text $ translate (label :: _ "admin_users") state.translator
               ]
           ]
@@ -327,7 +327,7 @@ component =
                   (if state.currentTab == GroupsTab then [ HB.active ] else [])
               , HE.onClick $ const $ SwitchTab GroupsTab
               ]
-              [ HH.i [ HP.classes [ H.ClassName "bi-folder-fill", HB.me2 ] ] []
+              [ HH.i [ HP.classes [ H.ClassName "bi-people-fill", HB.me2 ] ] []
               , HH.text $ translate (label :: _ "admin_groups") state.translator
               ]
           ]
