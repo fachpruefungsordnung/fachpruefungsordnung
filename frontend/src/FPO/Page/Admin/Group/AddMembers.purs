@@ -16,7 +16,7 @@ import FPO.Data.Request
   , getGroup
   , removeUser
   )
-import FPO.Data.Route (Route(..))
+import FPO.Data.Route (Route(Page404), groupOverview)
 import FPO.Data.Store as Store
 import FPO.Dto.GroupDto (GroupDto, GroupID, getGroupName, isUserInGroup)
 import FPO.Dto.UserOverviewDto (getID)
@@ -25,6 +25,7 @@ import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import Halogen as H
 import Halogen.HTML as HH
+import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
@@ -50,6 +51,7 @@ data Action
   | HandleFilter Filter.Output
   | HandleUserList (UserList.Output ButtonEvent)
   | ReloadGroup
+  | NavigateBack
 
 type State = FPOState
   ( group :: Maybe GroupDto
@@ -147,11 +149,23 @@ component =
             { group = Just group
             }
         Left _ -> pure unit
+    NavigateBack -> do
+      s <- H.get
+      navigate $ groupOverview s.groupID (Just "members")
 
   renderMemberManagement :: State -> GroupDto -> H.ComponentHTML Action Slots m
   renderMemberManagement state group =
     HH.div_ $
-      [ HH.h2 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+      [ HH.div [ HP.classes [ HB.mb3 ] ]
+          [ HH.button
+              [ HP.classes [ HB.btn, HB.btnOutlineSecondary ]
+              , HE.onClick $ const NavigateBack
+              ]
+              [ HH.i [ HP.classes [ H.ClassName "bi-arrow-left", HB.me2 ] ] []
+              , HH.text $ translate (label :: _ "common_cancel") state.translator
+              ]
+          ]
+      , HH.h2 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
           [ HH.text $
               translate (label :: _ "gmam_assignMembers")
                 state.translator <> " "

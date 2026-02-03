@@ -18,15 +18,14 @@ import FPO.AppM (runAppM)
 import FPO.Components.AppToasts as AppToasts
 import FPO.Components.Navbar as Navbar
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Route (Route(..), routeCodec)
+import FPO.Data.Route (Route(..), GroupSubRoute(..), routeCodec)
 import FPO.Data.Store (loadLanguage)
 import FPO.Data.Store as Store
 import FPO.Page.Admin.Administration as Administration
 import FPO.Page.Admin.CreateGroup as CreateGroup
 import FPO.Page.Admin.CreateUser as CreateUser
-import FPO.Page.Admin.Group.AddMembers as GroupAddMembers
-import FPO.Page.Admin.Group.DocOverview as ViewGroupDocuments
-import FPO.Page.Admin.Group.MemberOverview as ViewGroupMembers
+import FPO.Page.Admin.Group.AddMembers as AddGroupMember
+import FPO.Page.Admin.GroupOverview as GroupOverview
 import FPO.Page.EditorPage as EditorPage
 import FPO.Page.Home as Home
 import FPO.Page.Login as Login
@@ -86,9 +85,8 @@ _resetPassword = Proxy :: Proxy "resetPassword"
 _administration = Proxy :: Proxy "administration"
 _createUser = Proxy :: Proxy "createUser"
 _createGroup = Proxy :: Proxy "createGroup"
-_viewGroupDocuments = Proxy :: Proxy "viewGroupDocuments"
-_viewGroupMembers = Proxy :: Proxy "viewGroupMembers"
-_groupAddMembers = Proxy :: Proxy "groupAddMembers"
+_groupOverview = Proxy :: Proxy "groupOverview"
+_addGroupMember = Proxy :: Proxy "addGroupMember"
 _page404 = Proxy :: Proxy "page404"
 _profile = Proxy :: Proxy "profile"
 _appToasts = Proxy :: Proxy "appToasts"
@@ -102,9 +100,8 @@ type Slots =
   , administration :: forall q. H.Slot q Void Unit
   , createUser :: forall q. H.Slot q Void Unit
   , createGroup :: forall q. H.Slot q Void Unit
-  , viewGroupDocuments :: forall q. H.Slot q Void Unit
-  , viewGroupMembers :: forall q. H.Slot q Void Unit
-  , groupAddMembers :: forall q. H.Slot q Void Unit
+  , groupOverview :: forall q. H.Slot q Void Unit
+  , addGroupMember :: forall q. H.Slot q Void Unit
   , page404 :: forall q. H.Slot q Void Unit
   , profile :: forall q. H.Slot q Profile.Output Unit
   , appToasts :: forall q. H.Slot q Void Unit
@@ -155,15 +152,13 @@ component =
             { tab }
           CreateUser -> HH.slot_ _createUser unit CreateUser.component unit
           CreateGroup -> HH.slot_ _createGroup unit CreateGroup.component unit
-          ViewGroupDocuments { groupID } -> HH.slot_ _viewGroupDocuments unit
-            ViewGroupDocuments.component
-            groupID
-          ViewGroupMembers { groupID } -> HH.slot_ _viewGroupMembers unit
-            ViewGroupMembers.component
-            groupID
-          GroupAddMembers { groupID } -> HH.slot_ _groupAddMembers unit
-            GroupAddMembers.component
-            groupID
+          GroupRoute groupID subRoute -> case subRoute of
+            GroupOverview { tab } -> HH.slot_ _groupOverview unit
+              GroupOverview.component
+              { groupID, tab }
+            AddMember -> HH.slot_ _addGroupMember unit
+              AddGroupMember.component
+              groupID
           Page404 -> HH.slot_ _page404 unit Page404.component unit
           Profile { loginSuccessful, userId } -> HH.slot _profile unit
             Profile.component

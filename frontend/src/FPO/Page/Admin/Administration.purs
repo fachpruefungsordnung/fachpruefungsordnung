@@ -23,7 +23,7 @@ import FPO.Data.Request
   , getUserGroups
   , getUsers
   )
-import FPO.Data.Route (Route(..))
+import FPO.Data.Route (Route(Page404, Administration, CreateUser, CreateGroup, Profile), groupOverview)
 import FPO.Data.Store as Store
 import FPO.Dto.GroupDto
   ( GroupID
@@ -250,7 +250,7 @@ component =
 
     CancelDeleteGroup -> H.modify_ _ { requestDeleteGroup = Nothing }
 
-    NavigateToGroupDocuments gID -> navigate $ ViewGroupDocuments { groupID: gID }
+    NavigateToGroupDocuments gID -> navigate $ groupOverview gID Nothing
 
     NavigateToCreateGroup -> navigate CreateGroup
 
