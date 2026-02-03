@@ -79,8 +79,12 @@ component =
               [ HH.div [ HP.classes [ HB.card ] ]
                   [ HH.div [ HP.classes [ HB.cardHeader ] ]
                       [ HH.h5 [ HP.classes [ HB.mb0 ] ]
-                          [ HH.i [ HP.classes [ H.ClassName "bi-folder-plus", HB.me2 ] ] []
-                          , HH.text $ translate (label :: _ "admin_groups_createNewGroup") state.translator
+                          [ HH.i
+                              [ HP.classes [ H.ClassName "bi-folder-plus", HB.me2 ] ]
+                              []
+                          , HH.text $ translate
+                              (label :: _ "admin_groups_createNewGroup")
+                              state.translator
                           ]
                       ]
                   , HH.div [ HP.classes [ HB.cardBody ] ]
@@ -103,13 +107,16 @@ component =
           ChangeGroupName
       , HH.div [ HP.classes [ HB.mb4 ] ]
           [ HH.label [ HP.classes [ HB.formLabel ] ]
-              [ HH.text $ translate (label :: _ "admin_groups_desc") state.translator ]
+              [ HH.text $ translate (label :: _ "admin_groups_desc") state.translator
+              ]
           , HH.div [ HP.classes [ HB.inputGroup ] ]
               [ HH.span [ HP.classes [ HB.inputGroupText ] ]
                   [ HH.i [ HP.classes [ H.ClassName "bi-card-text" ] ] [] ]
               , HH.textarea
                   [ HP.classes [ HB.formControl ]
-                  , HP.placeholder $ translate (label :: _ "admin_groups_enterGroupDesc") state.translator
+                  , HP.placeholder $ translate
+                      (label :: _ "admin_groups_enterGroupDesc")
+                      state.translator
                   , HP.value state.groupDescription
                   , HP.rows 3
                   , HE.onValueInput ChangeGroupDescription
@@ -131,9 +138,10 @@ component =
               , HP.classes [ HB.btn, HB.btnPrimary ]
               , HP.disabled $ null state.groupName || state.waiting
               ]
-              [ if state.waiting
-                  then HH.span [ HP.classes [ HB.spinnerBorderSm, HB.me2 ] ] []
-                  else HH.i [ HP.classes [ H.ClassName "bi-plus-circle", HB.me2 ] ] []
+              [ if state.waiting then HH.span
+                  [ HP.classes [ HB.spinnerBorderSm, HB.me2 ] ]
+                  []
+                else HH.i [ HP.classes [ H.ClassName "bi-plus-circle", HB.me2 ] ] []
               , HH.text $ translate (label :: _ "common_create") state.translator
               ]
           ]
@@ -175,7 +183,9 @@ component =
             H.modify_ _ { waiting = false }
           Right _ -> do
             updateStore $ Store.AddSuccess
-              (translate (label :: _ "admin_groups_successfullyCreatedGroup") state.translator)
+              ( translate (label :: _ "admin_groups_successfullyCreatedGroup")
+                  state.translator
+              )
             navigate $ Administration { tab: Just "groups" }
 
     Cancel -> navigate $ Administration { tab: Just "groups" }

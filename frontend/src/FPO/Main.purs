@@ -18,13 +18,12 @@ import FPO.AppM (runAppM)
 import FPO.Components.AppToasts as AppToasts
 import FPO.Components.Navbar as Navbar
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Route (Route(..), GroupSubRoute(..), routeCodec)
+import FPO.Data.Route (GroupSubRoute(..), Route(..), routeCodec)
 import FPO.Data.Store (loadLanguage)
 import FPO.Data.Store as Store
 import FPO.Page.Admin.Administration as Administration
 import FPO.Page.Admin.CreateGroup as CreateGroup
 import FPO.Page.Admin.CreateUser as CreateUser
-import FPO.Page.Admin.Group.AddMembers as AddGroupMember
 import FPO.Page.Admin.GroupOverview as GroupOverview
 import FPO.Page.EditorPage as EditorPage
 import FPO.Page.Home as Home
@@ -86,7 +85,6 @@ _administration = Proxy :: Proxy "administration"
 _createUser = Proxy :: Proxy "createUser"
 _createGroup = Proxy :: Proxy "createGroup"
 _groupOverview = Proxy :: Proxy "groupOverview"
-_addGroupMember = Proxy :: Proxy "addGroupMember"
 _page404 = Proxy :: Proxy "page404"
 _profile = Proxy :: Proxy "profile"
 _appToasts = Proxy :: Proxy "appToasts"
@@ -101,7 +99,6 @@ type Slots =
   , createUser :: forall q. H.Slot q Void Unit
   , createGroup :: forall q. H.Slot q Void Unit
   , groupOverview :: forall q. H.Slot q Void Unit
-  , addGroupMember :: forall q. H.Slot q Void Unit
   , page404 :: forall q. H.Slot q Void Unit
   , profile :: forall q. H.Slot q Profile.Output Unit
   , appToasts :: forall q. H.Slot q Void Unit
@@ -152,13 +149,9 @@ component =
             { tab }
           CreateUser -> HH.slot_ _createUser unit CreateUser.component unit
           CreateGroup -> HH.slot_ _createGroup unit CreateGroup.component unit
-          GroupRoute groupID subRoute -> case subRoute of
-            GroupOverview { tab } -> HH.slot_ _groupOverview unit
-              GroupOverview.component
-              { groupID, tab }
-            AddMember -> HH.slot_ _addGroupMember unit
-              AddGroupMember.component
-              groupID
+          GroupRoute groupID (GroupOverview { tab }) -> HH.slot_ _groupOverview unit
+            GroupOverview.component
+            { groupID, tab }
           Page404 -> HH.slot_ _page404 unit Page404.component unit
           Profile { loginSuccessful, userId } -> HH.slot _profile unit
             Profile.component

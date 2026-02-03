@@ -90,8 +90,14 @@ component =
               [ HH.div [ HP.classes [ HB.card ] ]
                   [ HH.div [ HP.classes [ HB.cardHeader ] ]
                       [ HH.h5 [ HP.classes [ HB.mb0 ] ]
-                          [ HH.i [ HP.classes [ H.ClassName "bi-person-plus-fill", HB.me2 ] ] []
-                          , HH.text $ translate (label :: _ "admin_users_createNewUser") state.translator
+                          [ HH.i
+                              [ HP.classes
+                                  [ H.ClassName "bi-person-plus-fill", HB.me2 ]
+                              ]
+                              []
+                          , HH.text $ translate
+                              (label :: _ "admin_users_createNewUser")
+                              state.translator
                           ]
                       ]
                   , HH.div [ HP.classes [ HB.cardBody ] ]
@@ -141,9 +147,10 @@ component =
               , HP.classes [ HB.btn, HB.btnPrimary ]
               , HP.disabled $ not (isFormValid state.createUserDto) || state.waiting
               ]
-              [ if state.waiting
-                  then HH.span [ HP.classes [ HB.spinnerBorderSm, HB.me2 ] ] []
-                  else HH.i [ HP.classes [ H.ClassName "bi-plus-circle", HB.me2 ] ] []
+              [ if state.waiting then HH.span
+                  [ HP.classes [ HB.spinnerBorderSm, HB.me2 ] ]
+                  []
+                else HH.i [ HP.classes [ H.ClassName "bi-plus-circle", HB.me2 ] ] []
               , HH.text $ translate (label :: _ "admin_users_create") state.translator
               ]
           ]
@@ -181,13 +188,18 @@ component =
       case response of
         Left err -> do
           Store.addError $ ServerError
-            ( (translate (label :: _ "admin_users_failedToCreateUser") state.translator)
-                <> ": " <> show err
+            ( ( translate (label :: _ "admin_users_failedToCreateUser")
+                  state.translator
+              )
+                <> ": "
+                <> show err
             )
           H.modify_ _ { waiting = false }
         Right _ -> do
           updateStore $ Store.AddSuccess
-            (translate (label :: _ "admin_users_successfullyCreatedUser") state.translator)
+            ( translate (label :: _ "admin_users_successfullyCreatedUser")
+                state.translator
+            )
           navigate $ Administration { tab: Nothing }
 
     Cancel -> navigate $ Administration { tab: Nothing }

@@ -217,6 +217,7 @@ type Labels =
       ::: "gm_addMember"
       ::: "gm_memberManagement"
       ::: "gm_membersOfGroup"
+      ::: "gm_noUsersFound"
       ::: "gm_removeMember"
       ::: "gm_role"
       ::: "gm_searchMembers"

@@ -9,18 +9,28 @@ module FPO.Page.Admin.GroupOverview
 
 import Prelude
 
-import Data.Array (filter, head, length, replicate, slice, (:))
+import Data.Array (elem, filter, head, length, notElem, null, replicate, slice, (:))
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
 import Data.String (Pattern(..), contains, toLower)
+import Data.Traversable (traverse)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
 import FPO.Data.AppError (AppError(..))
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (changeRole, createNewDocument, deleteIgnore, getAuthorizedUser, getDocumentsQueryFromURL, getGroup, getUser)
-import FPO.Data.Route (Route(..), groupOverview, addGroupMember)
+import FPO.Data.Request
+  ( changeRole
+  , createNewDocument
+  , deleteIgnore
+  , getAuthorizedUser
+  , getDocumentsQueryFromURL
+  , getGroup
+  , getUser
+  , getUsers
+  )
+import FPO.Data.Route (Route(..), groupOverview)
 import FPO.Data.Store as Store
 import FPO.Data.Time (formatRelativeTime)
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto(..))
@@ -28,8 +38,20 @@ import FPO.Dto.DocumentDto.DocDate as DD
 import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.FullDocument as FD
 import FPO.Dto.DocumentDto.Query as DQ
-import FPO.Dto.GroupDto (GroupDto, GroupID, GroupMemberDto, getGroupMembers, getGroupName, getUserInfoID, getUserInfoName, getUserInfoRole, lookupUser)
+import FPO.Dto.GroupDto
+  ( GroupDto
+  , GroupID
+  , GroupMemberDto
+  , getGroupMembers
+  , getGroupName
+  , getUserInfoID
+  , getUserInfoName
+  , getUserInfoRole
+  , lookupUser
+  )
 import FPO.Dto.UserDto (UserID, isAdminOf, isUserSuperadmin)
+import FPO.Dto.UserOverviewDto (UserOverviewDto)
+import FPO.Dto.UserOverviewDto as UOD
 import FPO.Dto.UserRoleDto (Role(..))
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
@@ -43,7 +65,6 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import Halogen.Themes.Bootstrap5 as HB
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
@@ -83,10 +104,16 @@ data Action
   | RequestRemoveMember UserID
   | ConfirmRemoveMember UserID
   | SetUserRole GroupMemberDto Role
-  | NavigateToAddMember
   | NavigateToUserProfile UserID
   -- Modal actions
   | CancelModal
+  -- Add member popover actions
+  | OpenAddMemberPopover
+  | CloseAddMemberPopover
+  | FilterAvailableUsers String
+  | ToggleUserSelection UserID
+  | ConfirmAddMembers
+  | CancelAddMembers
 
 -- | Simple "state machine" for the modal system.
 data ModalState
@@ -114,6 +141,14 @@ type State = FPOState
   , memberPage :: Int
   -- Modal state
   , modalState :: ModalState
+  -- Add member popover state
+  , showAddMemberPopover :: Boolean
+  , loadingUsers :: Boolean
+  , availableUsers :: Array UserOverviewDto
+  , filteredAvailableUsers :: Array UserOverviewDto
+  , selectedUsersToAdd :: Array UserID
+  , userSearchFilter :: String
+  , addingMembers :: Boolean
   )
 
 component
@@ -154,6 +189,14 @@ component =
     , memberPage: 0
     -- Modal state
     , modalState: NoModal
+    -- Add member popover state
+    , showAddMemberPopover: false
+    , loadingUsers: false
+    , availableUsers: []
+    , filteredAvailableUsers: []
+    , selectedUsersToAdd: []
+    , userSearchFilter: ""
+    , addingMembers: false
     }
 
   tabFromString :: Maybe String -> Tab
@@ -227,7 +270,9 @@ component =
                   (if state.currentTab == DocumentsTab then [ HB.active ] else [])
               , HE.onClick $ const $ SwitchTab DocumentsTab
               ]
-              [ HH.i [ HP.classes [ H.ClassName "bi-file-earmark-text-fill", HB.me2 ] ] []
+              [ HH.i
+                  [ HP.classes [ H.ClassName "bi-file-earmark-text-fill", HB.me2 ] ]
+                  []
               , HH.text $ translate (label :: _ "common_projects") state.translator
               ]
           ]
@@ -256,13 +301,23 @@ component =
     HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
       [ HH.div [ HP.classes [ HB.col12, HB.colLg10 ] ]
           [ HH.div [ HP.classes [ HB.card ] ]
-              [ HH.div [ HP.classes [ HB.cardHeader, HB.dFlex, HB.justifyContentBetween, HB.alignItemsCenter ] ]
+              [ HH.div
+                  [ HP.classes
+                      [ HB.cardHeader
+                      , HB.dFlex
+                      , HB.justifyContentBetween
+                      , HB.alignItemsCenter
+                      ]
+                  ]
                   [ HH.h5 [ HP.classes [ HB.mb0 ] ]
-                      [ HH.text $ translate (label :: _ "gp_groupProjects") state.translator ]
+                      [ HH.text $ translate (label :: _ "gp_groupProjects")
+                          state.translator
+                      ]
                   , HH.button
                       [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
                       , HE.onClick $ const RequestCreateDocument
-                      , Style.popover $ translate (label :: _ "gp_createNewProject") state.translator
+                      , Style.popover $ translate (label :: _ "gp_createNewProject")
+                          state.translator
                       ]
                       [ HH.i [ HP.classes [ H.ClassName "bi-plus-lg", HB.me1 ] ] []
                       , HH.text $ translate (label :: _ "common_add") state.translator
@@ -277,7 +332,8 @@ component =
                       $ map (renderDocumentEntry state) docs
                           <> replicate (itemsPerPage - length docs)
                             (emptyEntryGen [ emptyDocButtons ])
-                  , HH.slot _docPagination unit P.component docPaginationProps SetDocPage
+                  , HH.slot _docPagination unit P.component docPaginationProps
+                      SetDocPage
                   ]
               ]
           ]
@@ -293,7 +349,14 @@ component =
 
   renderDocumentEntry :: State -> DH.DocumentHeader -> H.ComponentHTML Action Slots m
   renderDocumentEntry state doc =
-    HH.li [ HP.classes [ HB.listGroupItem, HB.dFlex, HB.justifyContentBetween, HB.alignItemsCenter ] ]
+    HH.li
+      [ HP.classes
+          [ HB.listGroupItem
+          , HB.dFlex
+          , HB.justifyContentBetween
+          , HB.alignItemsCenter
+          ]
+      ]
       [ HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
           [ HH.span [ HP.classes [ HB.fwBold ] ]
               [ HH.text $ DH.getName doc ]
@@ -312,7 +375,8 @@ component =
           , HH.button
               [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm ]
               , HE.onClick $ const $ RequestDeleteDocument (DH.getID doc)
-              , Style.popover $ translate (label :: _ "gp_removeProject") state.translator
+              , Style.popover $ translate (label :: _ "gp_removeProject")
+                  state.translator
               ]
               [ HH.i [ HP.classes [ H.ClassName "bi-trash-fill" ] ] [] ]
           ]
@@ -321,9 +385,11 @@ component =
   emptyDocButtons :: forall w. HH.HTML w Action
   emptyDocButtons =
     HH.div [ HP.classes [ HB.dFlex, HB.gap2 ] ]
-      [ HH.button [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm, HB.invisible ] ]
+      [ HH.button
+          [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm, HB.invisible ] ]
           [ HH.i [ HP.classes [ H.ClassName "bi-pencil-fill" ] ] [] ]
-      , HH.button [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm, HB.invisible ] ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm, HB.invisible ] ]
           [ HH.i [ HP.classes [ H.ClassName "bi-trash-fill" ] ] [] ]
       ]
 
@@ -340,16 +406,33 @@ component =
     HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
       [ HH.div [ HP.classes [ HB.col12, HB.colLg10 ] ]
           [ HH.div [ HP.classes [ HB.card ] ]
-              [ HH.div [ HP.classes [ HB.cardHeader, HB.dFlex, HB.justifyContentBetween, HB.alignItemsCenter ] ]
-                  [ HH.h5 [ HP.classes [ HB.mb0 ] ]
-                      [ HH.text $ translate (label :: _ "common_members") state.translator ]
-                  , HH.button
-                      [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
-                      , HE.onClick $ const NavigateToAddMember
-                      , Style.popover $ translate (label :: _ "gm_addMember") state.translator
+              [ HH.div
+                  [ HP.classes
+                      [ HB.cardHeader
+                      , HB.dFlex
+                      , HB.justifyContentBetween
+                      , HB.alignItemsCenter
                       ]
-                      [ HH.i [ HP.classes [ H.ClassName "bi-plus-lg", HB.me1 ] ] []
-                      , HH.text $ translate (label :: _ "common_add") state.translator
+                  ]
+                  [ HH.h5 [ HP.classes [ HB.mb0 ] ]
+                      [ HH.text $ translate (label :: _ "common_members")
+                          state.translator
+                      ]
+                  , HH.div [ HP.style "position: relative;" ]
+                      [ HH.button
+                          [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
+                          , HE.onClick $ const OpenAddMemberPopover
+                          , Style.popover $ translate (label :: _ "gm_addMember")
+                              state.translator
+                          ]
+                          [ HH.i [ HP.classes [ H.ClassName "bi-plus-lg", HB.me1 ] ]
+                              []
+                          , HH.text $ translate (label :: _ "common_add")
+                              state.translator
+                          ]
+                      , if state.showAddMemberPopover then renderAddMemberPopover
+                          state
+                        else HH.text ""
                       ]
                   ]
               , HH.div [ HP.classes [ HB.cardBody ] ]
@@ -361,13 +444,15 @@ component =
                       $ map (renderMemberEntry state) members
                           <> replicate (itemsPerPage - length members)
                             (emptyEntryGen [ emptyMemberButtons state ])
-                  , HH.slot _memberPagination unit P.component memberPaginationProps SetMemberPage
+                  , HH.slot _memberPagination unit P.component memberPaginationProps
+                      SetMemberPage
                   ]
               ]
           ]
       ]
     where
-    members = slice (state.memberPage * itemsPerPage) ((state.memberPage + 1) * itemsPerPage)
+    members = slice (state.memberPage * itemsPerPage)
+      ((state.memberPage + 1) * itemsPerPage)
       state.filteredMembers
     memberPaginationProps =
       { pages: P.calculatePageCount (length state.filteredMembers) itemsPerPage
@@ -377,7 +462,14 @@ component =
 
   renderMemberEntry :: State -> GroupMemberDto -> H.ComponentHTML Action Slots m
   renderMemberEntry state member =
-    HH.li [ HP.classes [ HB.listGroupItem, HB.dFlex, HB.justifyContentBetween, HB.alignItemsCenter ] ]
+    HH.li
+      [ HP.classes
+          [ HB.listGroupItem
+          , HB.dFlex
+          , HB.justifyContentBetween
+          , HB.alignItemsCenter
+          ]
+      ]
       [ HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
           [ HH.span [ HP.classes [ HB.fwBold ] ]
               [ HH.text $ getUserInfoName member ]
@@ -394,7 +486,8 @@ component =
               HH.button
                 [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
                 , HE.onClick $ const $ NavigateToUserProfile (getUserInfoID member)
-                , Style.popover $ translate (label :: _ "admin_users_goToProfilePage") state.translator
+                , Style.popover $ translate (label :: _ "admin_users_goToProfilePage")
+                    state.translator
                 ]
                 [ HH.i [ HP.classes [ H.ClassName "bi-person-fill" ] ] [] ]
             else
@@ -403,7 +496,8 @@ component =
             HH.button
               [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm ]
               , HE.onClick $ const $ RequestRemoveMember (getUserInfoID member)
-              , Style.popover $ translate (label :: _ "gm_removeMember") state.translator
+              , Style.popover $ translate (label :: _ "gm_removeMember")
+                  state.translator
               ]
               [ HH.i [ HP.classes [ H.ClassName "bi-box-arrow-right" ] ] [] ]
           ]
@@ -414,14 +508,20 @@ component =
     HH.div [ HP.classes [ HB.btnGroup, HB.btnGroupSm ] ]
       [ HH.button
           [ HP.classes $ [ HB.btn ] <>
-              if currentRole == Admin then [ HB.btnPrimary ] else [ HB.btnOutlineSecondary ]
-          , HE.onClick $ if currentRole /= Admin then const $ SetUserRole member Admin else const DoNothing
+              if currentRole == Admin then [ HB.btnPrimary ]
+              else [ HB.btnOutlineSecondary ]
+          , HE.onClick $
+              if currentRole /= Admin then const $ SetUserRole member Admin
+              else const DoNothing
           ]
           [ HH.text "Admin" ]
       , HH.button
           [ HP.classes $ [ HB.btn ] <>
-              if currentRole == Member then [ HB.btnPrimary ] else [ HB.btnOutlineSecondary ]
-              , HE.onClick $ if currentRole /= Member then const $ SetUserRole member Member else const DoNothing
+              if currentRole == Member then [ HB.btnPrimary ]
+              else [ HB.btnOutlineSecondary ]
+          , HE.onClick $
+              if currentRole /= Member then const $ SetUserRole member Member
+              else const DoNothing
           ]
           [ HH.text $ translate (label :: _ "common_member") state.translator ]
       ]
@@ -432,13 +532,16 @@ component =
   emptyMemberButtons state =
     HH.div [ HP.classes [ HB.dFlex, HB.gap2, HB.alignItemsCenter ] ]
       [ HH.div [ HP.classes [ HB.btnGroup, HB.btnGroupSm, HB.invisible ] ]
-          [ HH.button [ HP.classes [ HB.btn, HB.btnOutlineSecondary ] ] [ HH.text "Admin" ]
+          [ HH.button [ HP.classes [ HB.btn, HB.btnOutlineSecondary ] ]
+              [ HH.text "Admin" ]
           , HH.button [ HP.classes [ HB.btn, HB.btnPrimary ] ]
               [ HH.text $ translate (label :: _ "common_member") state.translator ]
           ]
-      , HH.button [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm, HB.invisible ] ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm, HB.invisible ] ]
           [ HH.i [ HP.classes [ H.ClassName "bi-person-fill" ] ] [] ]
-      , HH.button [ HP.classes [ HB.btn, HB.btnOutlineWarning, HB.btnSm, HB.invisible ] ]
+      , HH.button
+          [ HP.classes [ HB.btn, HB.btnOutlineWarning, HB.btnSm, HB.invisible ] ]
           [ HH.i [ HP.classes [ H.ClassName "bi-box-arrow-right" ] ] [] ]
       ]
 
@@ -446,6 +549,122 @@ component =
   roleToString state = case _ of
     Admin -> "Admin"
     Member -> translate (label :: _ "common_member") state.translator
+
+  -- ============== ADD MEMBER POPOVER ==============
+
+  renderAddMemberPopover :: State -> H.ComponentHTML Action Slots m
+  renderAddMemberPopover state =
+    let
+      hasSelection = not $ null state.selectedUsersToAdd
+    in
+      HH.div
+        [ HP.classes [ HB.card, HB.shadow ]
+        , HP.style
+            "position: absolute; top: 100%; right: 0; z-index: 1050; width: 350px; margin-top: 0.25rem;"
+        ]
+        [ -- Header
+          HH.div
+            [ HP.classes
+                [ HB.cardHeader
+                , HB.dFlex
+                , HB.justifyContentBetween
+                , HB.alignItemsCenter
+                , HB.py2
+                ]
+            ]
+            [ HH.span [ HP.classes [ HB.fwBold ] ]
+                [ HH.i [ HP.classes [ H.ClassName "bi-person-plus-fill", HB.me2 ] ] []
+                , HH.text $ translate (label :: _ "gm_addMember") state.translator
+                ]
+            , if hasSelection then HH.span [ HP.classes [ HB.badge, HB.bgPrimary ] ]
+                [ HH.text $ show (length state.selectedUsersToAdd) ]
+              else HH.text ""
+            ]
+        , -- Body
+          HH.div [ HP.classes [ HB.cardBody, HB.p2 ] ]
+            [ -- Search input
+              HH.div [ HP.classes [ HB.inputGroup, HB.inputGroupSm, HB.mb2 ] ]
+                [ HH.span [ HP.classes [ HB.inputGroupText ] ]
+                    [ HH.i [ HP.classes [ H.ClassName "bi-search" ] ] [] ]
+                , HH.input
+                    [ HP.type_ HP.InputText
+                    , HP.classes [ HB.formControl ]
+                    , HP.placeholder $ translate
+                        (label :: _ "admin_users_searchUsers")
+                        state.translator
+                    , HP.value state.userSearchFilter
+                    , HE.onValueInput FilterAvailableUsers
+                    ]
+                ]
+            , -- User list or loading
+              if state.loadingUsers then HH.div
+                [ HP.classes [ HB.textCenter, HB.py3 ] ]
+                [ HH.div
+                    [ HP.classes
+                        [ HB.spinnerBorder, HB.spinnerBorderSm, HB.textPrimary ]
+                    ]
+                    []
+                ]
+              else if null state.filteredAvailableUsers then HH.div
+                [ HP.classes [ HB.textCenter, HB.py3, HB.textMuted, HB.small ] ]
+                [ HH.text $ translate (label :: _ "gm_noUsersFound") state.translator
+                ]
+              else
+                HH.div
+                  [ HP.classes [ HB.listGroup, HB.listGroupFlush ]
+                  , HP.style "max-height: 200px; overflow-y: auto;"
+                  ]
+                  $ map (renderUserCheckboxEntry state) state.filteredAvailableUsers
+            ]
+        , -- Footer
+          HH.div
+            [ HP.classes
+                [ HB.cardFooter, HB.dFlex, HB.justifyContentEnd, HB.gap2, HB.py2 ]
+            ]
+            [ HH.button
+                [ HP.classes [ HB.btn, HB.btnOutlineSecondary, HB.btnSm ]
+                , HE.onClick $ const CancelAddMembers
+                , HP.disabled state.addingMembers
+                ]
+                [ HH.text $ translate (label :: _ "common_cancel") state.translator ]
+            , HH.button
+                [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
+                , HE.onClick $ const ConfirmAddMembers
+                , HP.disabled $ not hasSelection || state.addingMembers
+                ]
+                [ if state.addingMembers then HH.span
+                    [ HP.classes [ HB.spinnerBorderSm, HB.me1 ] ]
+                    []
+                  else HH.i [ HP.classes [ H.ClassName "bi-person-plus", HB.me1 ] ] []
+                , HH.text $ translate (label :: _ "common_add") state.translator
+                ]
+            ]
+        ]
+
+  renderUserCheckboxEntry
+    :: State -> UserOverviewDto -> H.ComponentHTML Action Slots m
+  renderUserCheckboxEntry state user =
+    let
+      userId = UOD.getID user
+      isSelected = userId `elem` state.selectedUsersToAdd
+    in
+      HH.label
+        [ HP.classes [ HB.listGroupItem, HB.dFlex, HB.alignItemsCenter, HB.gap3 ]
+        , HP.style "cursor: pointer;"
+        ]
+        [ HH.input
+            [ HP.type_ HP.InputCheckbox
+            , HP.classes [ HB.formCheckInput, HB.mt0 ]
+            , HP.checked isSelected
+            , HE.onChecked $ const $ ToggleUserSelection userId
+            ]
+        , HH.div [ HP.classes [ HB.dFlex, HB.flexColumn ] ]
+            [ HH.span [ HP.classes [ HB.fwBold ] ]
+                [ HH.text $ UOD.getName user ]
+            , HH.small [ HP.classes [ HB.textMuted ] ]
+                [ HH.text $ UOD.getEmail user ]
+            ]
+        ]
 
   -- ============== COMMON RENDERING ==============
 
@@ -473,7 +692,8 @@ component =
           ]
       ]
 
-  createDocumentModal :: { waiting :: Boolean } -> State -> H.ComponentHTML Action Slots m
+  createDocumentModal
+    :: { waiting :: Boolean } -> State -> H.ComponentHTML Action Slots m
   createDocumentModal ms state =
     addModal (translate (label :: _ "gp_createNewProject") state.translator)
       CancelModal
@@ -491,13 +711,16 @@ component =
                   [ HP.for "docName"
                   , HP.classes [ HH.ClassName "form-label" ]
                   ]
-                  [ HH.text $ translate (label :: _ "gp_documentName") state.translator ]
+                  [ HH.text $ translate (label :: _ "gp_documentName")
+                      state.translator
+                  ]
               , HH.input
                   [ HP.type_ HP.InputText
                   , HP.classes [ HH.ClassName "form-control" ]
                   , HP.id "docName"
                   , HP.ref modalInputRef
-                  , HP.placeholder $ translate (label :: _ "gp_enterDocumentName") state.translator
+                  , HP.placeholder $ translate (label :: _ "gp_enterDocumentName")
+                      state.translator
                   , HP.required true
                   , HE.onValueInput ChangeCreateDocumentName
                   ]
@@ -505,7 +728,7 @@ component =
           ]
       , HH.div [ HP.classes [ HB.modalFooter ] ]
           ( singletonIf ms.waiting
-              ( HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary, HB.me5 ] ] [] )
+              (HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary, HB.me5 ] ] [])
               <>
                 [ HH.button
                     [ HP.type_ HP.ButtonButton
@@ -513,14 +736,18 @@ component =
                     , HE.onClick (const CancelModal)
                     , HP.disabled ms.waiting
                     ]
-                    [ HH.text $ translate (label :: _ "common_cancel") state.translator ]
+                    [ HH.text $ translate (label :: _ "common_cancel")
+                        state.translator
+                    ]
                 , HH.button
                     [ HP.type_ HP.ButtonButton
                     , HP.classes [ HB.btn, HB.btnPrimary ]
                     , HE.onClick (const ConfirmCreateDocument)
                     , HP.disabled (state.newDocumentName == "" || ms.waiting)
                     ]
-                    [ HH.text $ translate (label :: _ "common_create") state.translator ]
+                    [ HH.text $ translate (label :: _ "common_create")
+                        state.translator
+                    ]
                 ]
           )
       ]
@@ -567,9 +794,10 @@ component =
     -- Tab actions
     SwitchTab tab -> do
       state <- H.get
-      let tabStr = case tab of
-            DocumentsTab -> Nothing
-            MembersTab -> Just "members"
+      let
+        tabStr = case tab of
+          DocumentsTab -> Nothing
+          MembersTab -> Just "members"
       navigate $ groupOverview state.groupID tabStr
 
     -- Document actions
@@ -617,10 +845,11 @@ component =
         updateStore $ Store.AddWarning "Document name cannot be empty."
       else do
         setModalWaiting true
-        let dto = NewDocumentCreateDto
-              { groupID: state.groupID
-              , title: newDocName
-              }
+        let
+          dto = NewDocumentCreateDto
+            { groupID: state.groupID
+            , title: newDocName
+            }
         createResponse <- createNewDocument dto
         case createResponse of
           Left err -> do
@@ -655,7 +884,8 @@ component =
 
     ConfirmRemoveMember userID -> do
       state <- H.get
-      deleteResponse <- deleteIgnore ("/roles/" <> show state.groupID <> "/" <> userID)
+      deleteResponse <- deleteIgnore
+        ("/roles/" <> show state.groupID <> "/" <> userID)
       case deleteResponse of
         Left _ -> H.modify_ _ { modalState = NoModal }
         Right _ -> H.modify_ _ { modalState = NoModal }
@@ -669,15 +899,97 @@ component =
         Left _ -> pure unit
         Right _ -> reloadGroupMembers
 
-    NavigateToAddMember -> do
-      state <- H.get
-      navigate $ addGroupMember state.groupID
-
     NavigateToUserProfile userID -> do
       navigate $ Profile { loginSuccessful: Nothing, userId: Just userID }
 
     CancelModal -> do
       H.modify_ _ { modalState = NoModal }
+
+    -- Add member popover actions
+    OpenAddMemberPopover -> do
+      state <- H.get
+      if state.showAddMemberPopover
+      -- Toggle off if already open and no selection
+      then when (null state.selectedUsersToAdd) $
+        H.modify_ _ { showAddMemberPopover = false }
+      else do
+        H.modify_ _
+          { showAddMemberPopover = true
+          , loadingUsers = true
+          , availableUsers = []
+          , filteredAvailableUsers = []
+          , selectedUsersToAdd = []
+          , userSearchFilter = ""
+          , addingMembers = false
+          }
+        -- Fetch all users
+        usersResult <- getUsers
+        case usersResult of
+          Left _ -> H.modify_ _ { loadingUsers = false }
+          Right users -> do
+            s <- H.get
+            let
+              memberIds = fromMaybe [] $ map getUserInfoID <<< getGroupMembers <$>
+                s.group
+              available = filter (\u -> UOD.getID u `notElem` memberIds) users
+            H.modify_ _
+              { availableUsers = available
+              , filteredAvailableUsers = available
+              , loadingUsers = false
+              }
+
+    CloseAddMemberPopover -> do
+      state <- H.get
+      -- Only close if no users selected
+      when (null state.selectedUsersToAdd) $
+        H.modify_ _ { showAddMemberPopover = false }
+
+    FilterAvailableUsers searchText -> do
+      H.modify_ _ { userSearchFilter = searchText }
+      state <- H.get
+      let
+        filtered =
+          if searchText == "" then state.availableUsers
+          else filter
+            ( \u ->
+                contains (Pattern $ toLower searchText) (toLower $ UOD.getName u)
+                  || contains (Pattern $ toLower searchText)
+                    (toLower $ UOD.getEmail u)
+            )
+            state.availableUsers
+      H.modify_ _ { filteredAvailableUsers = filtered }
+
+    ToggleUserSelection userId -> do
+      state <- H.get
+      let
+        newSelection =
+          if userId `elem` state.selectedUsersToAdd then filter (_ /= userId)
+            state.selectedUsersToAdd
+          else userId : state.selectedUsersToAdd
+      H.modify_ _ { selectedUsersToAdd = newSelection }
+
+    ConfirmAddMembers -> do
+      state <- H.get
+      when (not $ null state.selectedUsersToAdd) $ do
+        H.modify_ _ { addingMembers = true }
+        -- Add each selected user as a Member
+        _ <- traverse (\userId -> changeRole state.groupID userId Member)
+          state.selectedUsersToAdd
+        H.modify_ _
+          { showAddMemberPopover = false
+          , selectedUsersToAdd = []
+          , addingMembers = false
+          }
+        -- Reload group members
+        reloadGroupMembers
+        updateStore $ Store.AddSuccess "Members added successfully"
+
+    CancelAddMembers -> do
+      H.modify_ _
+        { showAddMemberPopover = false
+        , selectedUsersToAdd = []
+        , userSearchFilter = ""
+        }
 
   -- ============== HELPER FUNCTIONS ==============
 
@@ -712,7 +1024,9 @@ component =
     state <- H.get
     let
       filtered = filter
-        (\d -> contains (Pattern $ toLower state.documentFilter) (toLower $ DH.getName d))
+        ( \d -> contains (Pattern $ toLower state.documentFilter)
+            (toLower $ DH.getName d)
+        )
         state.documents
     H.modify_ _ { filteredDocuments = filtered }
 
@@ -722,7 +1036,9 @@ component =
     let allMembers = fromMaybe [] $ getGroupMembers <$> state.group
     let
       filtered = filter
-        (contains (Pattern $ toLower state.memberFilter) <<< toLower <<< getUserInfoName)
+        ( contains (Pattern $ toLower state.memberFilter) <<< toLower <<<
+            getUserInfoName
+        )
         allMembers
     H.modify_ _ { filteredMembers = filtered, memberPage = 0 }
     H.tell _memberPagination unit $ P.SetPageQ 0
@@ -735,8 +1051,9 @@ component =
       Left _ -> pure unit
       Right grp -> do
         let members = getGroupMembers grp
-        let newPage = min state.memberPage
-              (P.calculatePageCount (length members) itemsPerPage - 1)
+        let
+          newPage = min state.memberPage
+            (P.calculatePageCount (length members) itemsPerPage - 1)
         H.tell _memberPagination unit $ P.SetPageQ newPage
         H.modify_ _
           { group = Just grp

@@ -9,14 +9,22 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromMaybe)
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
 import FPO.Dto.GroupDto (GroupID)
-import Routing.Duplex (RouteDuplex', boolean, int, optional, params, parse, root, segment, string)
+import Routing.Duplex
+  ( RouteDuplex'
+  , boolean
+  , int
+  , optional
+  , params
+  , parse
+  , root
+  , segment
+  , string
+  )
 import Routing.Duplex.Generic (noArgs, sum)
 import Routing.Duplex.Generic.Syntax ((/), (?))
 
 -- | Sub-routes for group management under /administration/groups/:groupID
-data GroupSubRoute
-  = GroupOverview { tab :: Maybe String }
-  | AddMember
+data GroupSubRoute = GroupOverview { tab :: Maybe String }
 
 derive instance genericGroupSubRoute :: Generic GroupSubRoute _
 derive instance eqGroupSubRoute :: Eq GroupSubRoute
@@ -45,7 +53,6 @@ instance showRoute :: Show Route where
 groupSubRouteCodec :: RouteDuplex' GroupSubRoute
 groupSubRouteCodec = sum
   { "GroupOverview": params { tab: optional <<< string }
-  , "AddMember": "members" / "add" / noArgs
   }
 
 -- | The codec for the routes. It defines how to parse and serialize the routes.
@@ -74,7 +81,8 @@ routeToString = case _ of
   Administration { tab } -> "Administration:" <> show tab
   CreateUser -> "CreateUser"
   CreateGroup -> "CreateGroup"
-  GroupRoute groupID subRoute -> "GroupRoute:" <> show groupID <> " " <> showSubRoute subRoute
+  GroupRoute groupID subRoute -> "GroupRoute:" <> show groupID <> " " <> showSubRoute
+    subRoute
   Page404 -> "Page404"
   Profile { loginSuccessful } -> "Profile" <>
     ( if loginSuccessful == Nothing then ""
@@ -84,7 +92,6 @@ routeToString = case _ of
 showSubRoute :: GroupSubRoute -> String
 showSubRoute = case _ of
   GroupOverview { tab } -> "GroupOverview tab:" <> show tab
-  AddMember -> "AddMember"
 
 urlToRoute :: String -> Maybe Route
 urlToRoute url = case parse routeCodec url of
@@ -94,7 +101,3 @@ urlToRoute url = case parse routeCodec url of
 -- | Helper to create a GroupOverview route
 groupOverview :: GroupID -> Maybe String -> Route
 groupOverview gid tab = GroupRoute gid (GroupOverview { tab })
-
--- | Helper to create an AddMember route
-addGroupMember :: GroupID -> Route
-addGroupMember gid = GroupRoute gid AddMember
