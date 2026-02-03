@@ -19,13 +19,15 @@ import Ace.Editor as Editor
 import Ace.Range as Range
 import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
-import Data.Array (catMaybes, deleteBy, intercalate, snoc)
+import Control.Alt ((<|>))
+import Data.Array (catMaybes, filter, intercalate, snoc, uncons)
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
-import Data.HashMap (HashMap, delete, empty, insert, lookup, size)
+import Data.HashMap (delete, insert, lookup)
 import Data.Int (toNumber)
 import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.Traversable (for, traverse)
+import Data.Tuple (Tuple(..))
 import Effect (Effect)
 import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
@@ -45,19 +47,24 @@ import FPO.Components.Editor.Keybindings
   , underscore
   )
 import FPO.Components.Editor.Types
-  ( DragHandle(..)
+  ( AnnotationMaps
+  , DragHandle(..)
   , ElementData
   , HandleBorder
   , HistoryOp(..)
   , LiveMarker
   , Path
   , RenderKind(..)
+  , addAnnotationMaps
   , createMarkerRange
   , cursorInRange
+  , deleteAnnotationMaps
+  , emptyAnnotationMaps
   , failureLiveMarker
   , hideHandlesFrom
   , highlightSelection
   , near
+  , rebuildAnnotations
   , removeLiveMarker
   , setAnnotations
   , setMarkerSelectedClass
@@ -89,7 +96,6 @@ import FPO.Types
   , CommentSection
   , FirstComment
   , TOCEntry
-  , emptyTOCEntry
   )
 import FPO.UI.HTML (decodeHtmlEntity)
 import FPO.UI.Modals.DiscardModal (discardModal)
@@ -99,7 +105,6 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events (onClick) as HE
 import Halogen.HTML.Properties (classes, enabled, ref, style, title) as HP
-import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
@@ -115,9 +120,8 @@ import Web.Event.EventTarget
   , removeEventListener
   )
 import Web.HTML (HTMLElement, window)
-import Web.HTML.HTMLElement (offsetWidth, toElement)
+import Web.HTML.HTMLElement (toElement)
 import Web.HTML.Window as Win
-import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.KeyboardEvent.EventTypes (keydown)
 import Web.UIEvent.MouseEvent as ME
 
@@ -126,10 +130,7 @@ foreign import _resize :: Types.Editor -> Effect Unit
 type CommentState =
   {
     -- Hashmaps for Annotations
-    -- Row line -> Hashmap of Username -> how many times the use has comments in the line
-    markerAnnoHS :: HashMap Int (HashMap String Int)
-  -- markerID -> old row position in Annotation
-  , oldMarkerAnnoPos :: HashMap Int Int
+    annoMaps :: AnnotationMaps
   -- to move comment anchors
   , dragState :: Maybe { which :: DragHandle, lm :: LiveMarker }
   , startHandleMarkerId :: Maybe Int
@@ -184,8 +185,6 @@ type State = FPOState
   , commentState :: CommentState
   , fontSize :: Int
   , mListener :: Maybe (HS.Listener Action)
-  , mResizeObserver :: Maybe ResizeObserver
-  , mResizeSubscriptionId :: Maybe SubscriptionId
   , showButtonText :: Boolean
   , showButtons :: Boolean
   -- for autosave
@@ -203,6 +202,8 @@ type State = FPOState
   , mDirtyVersion :: Maybe (Ref Boolean)
   -- Determines whether the user is on the merge view.
   , isOnMerge :: Boolean
+  -- previous isOnMerge flag for ContinueToChange
+  , wasLoadedInMergeMode :: Boolean
   -- obtained from TOC. Used when merging. Set to the version details of the Version loaded into the right editor.
   , upToDateVersion :: Maybe Version
   , isLoading :: Boolean
@@ -211,26 +212,27 @@ type State = FPOState
 type Input = { docID :: DocumentID, elementData :: ElementData }
 
 data Output
-  = AddComment Int Int
+  = AddComment
   | ClickedQuery String
   | PostPDF String
   | RenamedNode String Path
-  | RequestComments Int Int (Array Int)
-  | SelectedCommentSection Int Int
-  | ShowAllCommentsOutput Int Int
+  | RequestComments Int Int (Array Int) Boolean
+  | SelectedCommentSection Int
+  | ShowAllCommentsOutput
   | RaiseDiscard
-  | RaiseMergeMode
+  | RaiseMergeMode String
   | Merged
   | RaiseUpdateVersion (Maybe Int)
   | UpdateFullTitle
   | UpdateComment (Array Int)
   | ReaddedAnchor
+  | ToUpdateCommentProblem Int
 
 data Action
   = Init
   | DoNothing
   | Comment
-  | ChangeToSection TOCEntry (Maybe Int) (Maybe String)
+  | ChangeToSection TOCEntry (Maybe Int) (Maybe String) Boolean
   | ContinueChangeToSection (Array FirstComment) Boolean Boolean
   | SelectComment
   | Font (Types.Editor -> Effect Unit)
@@ -255,6 +257,8 @@ data Action
   | AddAnnotation LiveMarker Boolean
   | DeleteAnnotation LiveMarker Boolean Boolean
   | UpdateAnnotation LiveMarker
+  | NotifyCommentProblem Int
+  | DeleteComment Int Boolean
   | Render RenderKind
   | ShowAllComments
   | Receive (Connected FPOTranslator Input)
@@ -268,8 +272,7 @@ data Action
 
 -- We use a query to get the content of the editor
 data Query a
-  = EditorResize a
-  | ReceiveFullTitle (Maybe String) a
+  = ReceiveFullTitle (Maybe String) a
   | SetDirtyFlag a
   -- | save the current content and send it to splitview
   | SaveSection a
@@ -285,7 +288,7 @@ data Query a
   | ConfirmComment CommentSection a
   | SelectCommentSection Int a
   | UnselectCommentSection a
-  | ToDeleteComment Boolean a
+  | ToDeleteComment Int Boolean a
   | RequestDirtyVersion (Boolean -> a)
   | ResetDirtyVersion a
   | ReceiveUpToDateUpdate (Maybe Version) a
@@ -293,6 +296,8 @@ data Query a
   | PreventChangeSection a
   | UpdateCommentProblem Boolean a
   | SetReAnchor (Maybe CommentSection) a
+  | SetContent String a
+  | UpdateEditorSize Number a
 
 -- | UpdateCompareToElement ElementData a
 
@@ -443,14 +448,16 @@ editor = connect selectTranslator $ H.mkComponent
                     Just _ -> HH.text ""
                     Nothing ->
                       makeEditorToolbarButton
-                        fullFeatures
+                        (fullFeatures && state.currentVersion == "latest")
                         (translate (label :: _ "editor_comment") state.translator)
                         ( if (isJust state.commentState.reAnchor) then
                             [ H.ClassName "icon-orange" ]
                           else []
                         )
                         Comment
-                        ( if (isJust state.commentState.reAnchor) then
+                        ( if
+                            (not state.isEditorOutdated) &&
+                              (isJust state.commentState.reAnchor) then
                             "bi-chat-square-quote-fill"
                           else "bi-chat-square-text"
                         )
@@ -505,14 +512,22 @@ editor = connect selectTranslator $ H.mkComponent
                     , makeEditorToolbarButtonWithText
                         fullFeatures
                         state.showButtonText
-                        ( if state.commentState.commentProblem then
-                            [ H.ClassName "btn-orange" ]
-                          else []
+                        ( case
+                            state.commentState.commentProblem,
+                            state.isEditorOutdated
+                            of
+                            true, false -> [ H.ClassName "btn-orange" ]
+                            true, true -> [ H.ClassName "btn-blue" ]
+                            _, _ -> []
                         )
                         ShowAllComments
-                        ( if state.commentState.commentProblem then
-                            "bi-exclamation-circle-fill"
-                          else "bi-chat-square"
+                        ( case
+                            state.commentState.commentProblem,
+                            state.isEditorOutdated
+                            of
+                            true, false -> "bi-exclamation-circle-fill"
+                            true, true -> "bi-clock-history"
+                            _, _ -> "bi-chat-square"
                         )
                         (translate (label :: _ "editor_allComments") state.translator)
                     ]
@@ -613,7 +628,7 @@ editor = connect selectTranslator $ H.mkComponent
           [ HP.ref (H.RefLabel "container")
           , HP.style "flex:1 1 0; min-height:0; position:relative;"
           ]
-          [ -- Loading-Overlay nur, wenn isLoading
+          [ -- Loading overlay only when isLoading
             if state.isLoading then
               HH.div
                 [ HP.classes
@@ -674,85 +689,65 @@ editor = connect selectTranslator $ H.mkComponent
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
     Init -> do
-      -- Subscribe to resize events and store subscription for cleanup
+      compareToElement <- H.gets _.compareToElement
       { emitter, listener } <- H.liftEffect HS.create
-      subscription <- H.subscribe emitter
+      _ <- H.subscribe emitter
 
-      -- Setup editor functionality (keydown listeners, Ace editor stuff, etc.)
-      let
-        onSave :: Effect Unit
-        onSave = HS.notify listener (Save false)
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
-
-        H.modify_ _
-          { mEditor = Just editor_
-          , mListener = Just listener
-          , mResizeSubscriptionId = Just subscription
-          }
+        H.modify_ _ { mEditor = Just editor_ }
         fontSize <- H.gets _.fontSize
 
-        H.liftEffect $ do
-          Editor.setFontSize (show fontSize <> "px") editor_
-          eventListen <- eventListener (keyBinding onSave editor_)
-          container <- Editor.getContainer editor_
-          addEventListener keydown eventListen true
-            (toEventTarget $ toElement container)
-          session <- Editor.getSession editor_
+        -- setting for both instances and later add more specific settings
+        H.liftEffect $ setupAce editor_ fontSize
 
-          -- Set line break
-          Editor.resize (Just true) editor_
-          Session.setUseWrapMode true session
+        case compareToElement of
+          Nothing -> do
 
-          -- remove the gray margin line
-          Editor.setShowPrintMargin false editor_
+            -- Setup editor functionality (keydown listeners, Ace editor stuff, etc.)
+            let
+              onSave :: Effect Unit
+              onSave = HS.notify listener (Save false)
 
-          -- Set the editor's theme and mode
-          Editor.setTheme "ace/theme/github" editor_
-          Session.setMode "ace/mode/custom_mode" session
-          Editor.setEnableLiveAutocompletion true editor_
-          -- set read only at the start to prevent users to write in not selected entry
-          Editor.setReadOnly true editor_
+            H.modify_ _
+              { mEditor = Just editor_
+              , mListener = Just listener
+              }
 
-        -- Setup ResizeObserver for the container element
-        let
-          callback _ _ = do
-            -- Get the current width directly from the element
-            width <- offsetWidth el
-            HS.notify listener (HandleResize width)
+            H.liftEffect $ do
+              eventListen <- eventListener (keyBinding onSave editor_)
+              container <- Editor.getContainer editor_
+              addEventListener keydown eventListen true
+                (toEventTarget $ toElement container)
 
-        observer <- H.liftEffect $ resizeObserver callback
-        H.liftEffect $ observe (toElement el) {} observer
-        H.modify_ _ { mResizeObserver = Just observer }
+              -- Set the editor's theme and mode
+              Editor.setEnableLiveAutocompletion true editor_
 
-      -- If a comparison element is loaded, also load the current content in the primary editor
-      compareTo <- H.gets _.compareToElement
-      case compareTo of
-        Nothing -> pure unit
-        Just { tocEntry: tocEntry, revID: revID } -> handleAction
-          (ChangeToSection tocEntry revID Nothing)
+          -- If a comparison element is loaded, also load the current content in the primary editor
+          Just { tocEntry: tocEntry, revID: revID } -> handleAction
+            (ChangeToSection tocEntry revID Nothing false)
 
-      -- New Ref for keeping track, if the content in editor has changed
-      -- 1. since last save
-      -- 2. since opening version
-      dirtyRef <- H.liftEffect $ Ref.new false
-      isOnMergeRef <- H.liftEffect $ Ref.new false
-      versionRef <- H.liftEffect $ Ref.new false
-      H.modify_ _ { mDirtyVersion = Just versionRef }
+        -- New Ref for keeping track, if the content in editor has changed
+        -- 1. since last save
+        -- 2. since opening version
+        dirtyRef <- H.liftEffect $ Ref.new false
+        isOnMergeRef <- H.liftEffect $ Ref.new false
+        versionRef <- H.liftEffect $ Ref.new false
+        H.modify_ _ { mDirtyVersion = Just versionRef }
 
-      -- create eventListener for preventing the tab from closing
-      -- when content has not been saved (Not changing through Navbar)
-      addBeforeUnloadListener dirtyRef isOnMergeRef listener
+        -- create eventListener for preventing the tab from closing
+        -- when content has not been saved (Not changing through Navbar)
+        addBeforeUnloadListener dirtyRef isOnMergeRef listener
 
-      -- add and start Editor listeners
-      H.gets _.mEditor >>= traverse_ \ed -> do
-        H.liftEffect $ addChangeListenerWithRef ed dirtyRef versionRef listener
-        container <- H.liftEffect $ Editor.getContainer ed
+        -- add and start Editor listeners
+        H.liftEffect $ addChangeListenerWithRef editor_ dirtyRef versionRef listener
+        container <- H.liftEffect $ Editor.getContainer editor_
         H.liftEffect $ addMouseDragListeners container listener
 
     DoNothing -> do
       pure unit
 
+    -- Resize the editor's rendering (called when content changes internally)
     Resize -> do
       state <- H.get
       H.liftEffect
@@ -830,9 +825,7 @@ editor = connect selectTranslator $ H.mkComponent
         H.liftEffect $ Editor.focus ed
 
     ShowAllComments -> do
-      state <- H.get
-      let tocID = maybe (-1) _.id state.mTocEntry
-      H.raise $ ShowAllCommentsOutput state.docID tocID
+      H.raise $ ShowAllCommentsOutput
       H.gets _.mEditor >>= traverse_ \ed ->
         H.liftEffect $ Editor.focus ed
       H.modify_ \st -> st { commentState = st.commentState { reAnchor = Nothing } }
@@ -878,6 +871,7 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit -- Nothing to do
                 Just path -> do
                   H.raise $ RenamedNode contentLines path
+                  H.modify_ _ { mTitle = Just contentLines }
               freeSaveFlagsAndMaybeRerun
             Just entry ->
               case state.mContent of
@@ -966,11 +960,7 @@ editor = connect selectTranslator $ H.mkComponent
 
         -- extract and insert new parentID into newContent
         -- not updating the received comment anchors, as we send those same anchors to backend
-        Right { content: updatedContent, typ: typ, html } -> do
-
-          H.modify_ _ { mContent = Just updatedContent, html = html }
-          H.raise $ ClickedQuery html
-          H.raise UpdateFullTitle
+        Right { content: updatedContent, typ, html } -> do
 
           -- Show saved icon or toast
           case isAutoSave, state.isEditorOutdated of
@@ -984,42 +974,52 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit --raise something to update version
                 "conflict" -> pure unit --should not happen here also raise something just in case
                 _ -> pure unit
-            -- manuell saving and working in latest version
+            -- manual save while working in latest version
             false, false -> do
               updateStore $ Store.AddSuccess
                 (translate (label :: _ "editor_save_success") state.translator)
               case typ of
                 "noConflict" -> do
-                  setIsOnMerge false
                   case state.isOnMerge of
                     false -> pure unit
                     true -> H.raise Merged
                   pure unit
                 "draftCreated" -> --should not happen here. just copy autosave case in case
 
-                  setIsOnMerge true
+                  pure unit
                 "conflict" -> do --raise something to update version
                   setIsOnMerge true
-                  H.raise RaiseMergeMode
+                  H.raise $ RaiseMergeMode $ ContentDto.getContentText $
+                    ContentDto.getWrapperContent newWrapper
+                  handleAction $ ChangeToSection newEntry Nothing state.mTitle true
                 _ -> pure unit
-            -- manuell saving, draft mode => publish
+            -- manual save, draft mode => publish
             false, true -> do
               case typ of
-                --happends if parent was updated due to merge view being present.
+                --happens if parent was updated due to merge view being present.
                 "noConflict" -> do
-                  setIsOnMerge false
                   case state.isOnMerge of
                     false -> pure unit
                     true -> H.raise Merged
                   pure unit
                 "draftCreated" -> --should not happen here. just copy autosave case in case
 
-                  setIsOnMerge true
+                  pure unit
                 "conflict" -> do --raise something to update version
                   setIsOnMerge true
-                  H.raise RaiseMergeMode
+                  H.raise $ RaiseMergeMode $ ContentDto.getContentText $
+                    ContentDto.getWrapperContent newWrapper
+                  handleAction $ ChangeToSection newEntry Nothing state.mTitle true
                   pure unit
                 _ -> pure unit
+
+          when (typ /= "conflict") do
+            H.modify_ _ { mContent = Just updatedContent, html = html }
+            H.raise UpdateFullTitle
+            isOnMerge' <- H.gets _.isOnMerge
+            when (not isOnMerge')
+              $ H.raise
+              $ ClickedQuery html
 
           pure unit
 
@@ -1164,6 +1164,11 @@ editor = connect selectTranslator $ H.mkComponent
                             }
                       H.modify_ _ { commentState = newCommentState }
                       H.raise (ReaddedAnchor)
+                      -- show comment dragger handles
+                      H.liftEffect $ highlightSelection ed
+                        (snoc state.commentState.liveMarkers lm')
+                        lm'
+                      handleAction (ShowHandles lm')
                       -- Save readded comment anchor
                       -- set dirty to true to be able to save
                       for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write
@@ -1197,14 +1202,14 @@ editor = connect selectTranslator $ H.mkComponent
                   true
 
                 case state.mTocEntry of
-                  Just entry -> do
+                  Just _ -> do
                     H.modify_ \st -> st
                       { commentState = st.commentState
                           { tmpLiveMarker = mLiveMarker
                           , selectedLiveMarker = mLiveMarker
                           }
                       }
-                    H.raise (AddComment state.docID entry.id)
+                    H.raise AddComment
                   Nothing -> pure unit
 
                 -- show comment dragger handles
@@ -1225,47 +1230,51 @@ editor = connect selectTranslator $ H.mkComponent
     SelectComment -> do
       state <- H.get
       H.gets _.mEditor >>= traverse_ \ed -> do
+        range <- H.liftEffect $ Editor.getSelectionRange ed
+        start <- H.liftEffect $ Range.getStart range
+        end <- H.liftEffect $ Range.getEnd range
         let
-          liveMarkers = case state.commentState.tmpLiveMarker of
-            Nothing -> state.commentState.liveMarkers
-            Just lm -> snoc state.commentState.liveMarkers lm
-        cursor <- H.liftEffect $ Editor.getCursorPosition ed
-        session <- H.liftEffect $ Editor.getSession ed
-        foundLM <- H.liftEffect $ cursorInRange liveMarkers cursor
-        -- comment section dragger handles
-        case foundLM of
-          Nothing -> do
-            -- remove selection and remove handles
-            H.modify_ \st -> st
-              { commentState = st.commentState
-                  { selectedLiveMarker = Nothing
-                  , dragState = Nothing
-                  }
-              }
-            case state.commentState.selectedLiveMarker of
-              Nothing -> pure unit
-              Just lm -> H.liftEffect $ setMarkerSelectedClass session lm false
-            handleAction HideHandles
-          Just lm -> do
-            -- set selection and highlight it
-            H.modify_ \st -> st
-              { commentState = st.commentState { selectedLiveMarker = Just lm } }
-            H.liftEffect $ highlightSelection ed liveMarkers lm
-            handleAction (ShowHandles lm)
-        let
-          lm = case foundLM of
-            Nothing -> failureLiveMarker
-            Just found -> found
-          foundID = lm.annotedMarkerID
+          sRow = Types.getRow start
+          sCol = Types.getColumn start
+          eRow = Types.getRow end
+          eCol = Types.getColumn end
 
-          -- need it only for its ID
-          tocEntry = case state.mTocEntry of
-            Nothing -> emptyTOCEntry
-            Just e -> e
-        H.modify_ \st -> st
-          { commentState = st.commentState { selectedLiveMarker = Just lm } }
-        when (foundID >= 0 || foundID == -360) $
-          H.raise (SelectedCommentSection tocEntry.id foundID)
+        if (sRow /= eRow || sCol /= eCol) then
+          pure unit
+        else do
+          let
+            liveMarkers = case state.commentState.tmpLiveMarker of
+              Nothing -> state.commentState.liveMarkers
+              Just lm -> snoc state.commentState.liveMarkers lm
+          cursor <- H.liftEffect $ Editor.getCursorPosition ed
+          session <- H.liftEffect $ Editor.getSession ed
+          foundLM <- H.liftEffect $ cursorInRange liveMarkers cursor
+          -- comment section dragger handles
+          case foundLM of
+            Nothing -> do
+              -- remove selection and remove handles
+              H.modify_ \st -> st
+                { commentState = st.commentState
+                    { selectedLiveMarker = Nothing
+                    , dragState = Nothing
+                    }
+                }
+              case state.commentState.selectedLiveMarker of
+                Nothing -> pure unit
+                Just lm -> H.liftEffect $ setMarkerSelectedClass session lm false
+              handleAction HideHandles
+            Just lm -> do
+              case state.commentState.selectedLiveMarker of
+                Just old | old.annotedMarkerID /= lm.annotedMarkerID ->
+                  H.liftEffect $ setMarkerSelectedClass session old false
+                _ -> pure unit
+              -- set selection and highlight it
+              H.modify_ \st -> st
+                { commentState = st.commentState { selectedLiveMarker = Just lm } }
+              H.liftEffect $ highlightSelection ed liveMarkers lm
+              handleAction (ShowHandles lm)
+              when (lm.annotedMarkerID >= 0 || lm.annotedMarkerID == -360) $
+                H.raise (SelectedCommentSection lm.annotedMarkerID)
 
     -- Comment Section Dragger Actions
 
@@ -1275,7 +1284,7 @@ editor = connect selectTranslator $ H.mkComponent
       selectedLiveMarker <- H.gets _.commentState.selectedLiveMarker
       case mEditor, selectedLiveMarker of
         Just ed, Just lm -> do
-          -- Mauspos -> Textpos
+          -- mouse position -> text position
           pos <- H.liftEffect $ screenToText ed clientX clientY
           sPos <- H.liftEffect $ Anchor.getPosition lm.startAnchor
           ePos <- H.liftEffect $ Anchor.getPosition lm.endAnchor
@@ -1358,14 +1367,31 @@ editor = connect selectTranslator $ H.mkComponent
               col' =
                 if row' == row then
                   case side of
-                    DragStart -> if c0 > column then column - 1 else c0
-                    DragEnd -> if c0 < column then column + 1 else c0
+                    DragStart -> if c0 >= column then max 0 (column - 1) else c0
+                    DragEnd -> if c0 <= column then column + 1 else c0
                 else c0
+
+              wouldOverlapSameRow =
+                row' == row &&
+                  case side of
+                    DragStart -> col' >= column
+                    DragEnd -> col' <= column
+
+            Tuple rowFinal colFinal <-
+              if wouldOverlapSameRow then do
+                cur <- H.liftEffect case which of
+                  DragStart -> Anchor.getPosition lm.startAnchor
+                  DragEnd -> Anchor.getPosition lm.endAnchor
+                pure $ Tuple (Types.getRow cur) (Types.getColumn cur)
+              else
+                pure $ Tuple row' col'
 
             -- set drag anchor
             case which of
-              DragStart -> H.liftEffect $ setAnchorPosition lm.startAnchor row' col'
-              DragEnd -> H.liftEffect $ setAnchorPosition lm.endAnchor row' col'
+              DragStart -> H.liftEffect $ setAnchorPosition lm.startAnchor rowFinal
+                colFinal
+              DragEnd -> H.liftEffect $ setAnchorPosition lm.endAnchor rowFinal
+                colFinal
 
             -- draw new Handles (current position)
             session <- H.liftEffect $ Editor.getSession ed
@@ -1376,8 +1402,8 @@ editor = connect selectTranslator $ H.mkComponent
               { commentState = st.commentState
                   { startHandleMarkerId = ids.startId
                   , endHandleMarkerId = ids.endId
-                  , dragRowAS = row'
-                  , dragColAS = col'
+                  , dragRowAS = rowFinal
+                  , dragColAS = colFinal
                   }
               }
         _, _, _ -> pure unit
@@ -1453,70 +1479,30 @@ editor = connect selectTranslator $ H.mkComponent
 
     AddAnnotation lm setAnn -> do
       commentState <- H.gets _.commentState
-      pos <- H.liftEffect $ Anchor.getPosition lm.startAnchor
-      let
-        startRow = Types.getRow pos
-        newOldMarkerAnnoPos = insert lm.annotedMarkerID startRow
-          commentState.oldMarkerAnnoPos
-        newMarkerAnnoHS = case lookup startRow commentState.markerAnnoHS of
-          Nothing ->
-            let
-              newEntry = insert lm.markerText 1 empty
-            in
-              insert startRow newEntry commentState.markerAnnoHS
-          Just entry ->
-            let
-              oldValue = fromMaybe 0 (lookup lm.markerText entry)
-              newEntry = insert lm.markerText (oldValue + 1) entry
-            in
-              insert startRow newEntry commentState.markerAnnoHS
+      maps <- H.liftEffect $ addAnnotationMaps lm commentState.annoMaps
       H.modify_ \st -> st
-        { commentState = st.commentState
-            { markerAnnoHS = newMarkerAnnoHS
-            , oldMarkerAnnoPos = newOldMarkerAnnoPos
-            }
-        }
+        { commentState = st.commentState { annoMaps = maps } }
       when setAnn do
         mEditor <- H.gets _.mEditor
-        H.liftEffect $ setAnnotations newMarkerAnnoHS mEditor
+        H.liftEffect $ setAnnotations maps.markerAnnoHS mEditor
 
     DeleteAnnotation lm reAdd setAnn -> do
       commentState <- H.gets _.commentState
       let
-        -- get old row number for this marker
-        oldRow = fromMaybe 0 (lookup lm.annotedMarkerID commentState.oldMarkerAnnoPos)
-        -- update Annotation HashMap
-        newMarkerAnnoHS = case lookup oldRow commentState.markerAnnoHS of
-          -- should not happen
-          Nothing -> commentState.markerAnnoHS
-          -- update this HashMap entry
-          Just entry -> do
-            let
-              -- if 1 then delete it, bigger just decreament the value
-              oldValue = fromMaybe 0 (lookup lm.markerText entry)
-              newEntry =
-                if oldValue <= 1 then
-                  delete lm.markerText entry
-                else
-                  insert lm.markerText (oldValue - 1) entry
-            -- delete entry if empty
-            if ((size newEntry) == 0) then
-              delete oldRow commentState.markerAnnoHS
-            else
-              insert oldRow newEntry commentState.markerAnnoHS
+        maps = deleteAnnotationMaps lm commentState.annoMaps
       H.modify_ \st -> st
-        { commentState = st.commentState { markerAnnoHS = newMarkerAnnoHS } }
+        { commentState = st.commentState { annoMaps = maps } }
       -- if we want to update the live marker annotation
       if reAdd then
         handleAction $ AddAnnotation lm setAnn
       else
         when setAnn do
           mEditor <- H.gets _.mEditor
-          H.liftEffect $ setAnnotations newMarkerAnnoHS mEditor
+          H.liftEffect $ setAnnotations maps.markerAnnoHS mEditor
 
     -- delete and readd Annotation if the startRow of live marker has changed
     UpdateAnnotation lm -> do
-      oldMarkerAnnoPos <- H.gets _.commentState.oldMarkerAnnoPos
+      oldMarkerAnnoPos <- H.gets _.commentState.annoMaps.oldMarkerAnnoPos
       -- get startRow from live marker
       pos <- H.liftEffect $ Anchor.getPosition lm.startAnchor
       let startRow = Types.getRow pos
@@ -1529,18 +1515,111 @@ editor = connect selectTranslator $ H.mkComponent
             $ handleAction
             $ DeleteAnnotation lm true true
 
+    NotifyCommentProblem markerID -> do
+      state <- H.get
+
+      let
+        markers' = state.commentState.markers <#> \m ->
+          if m.id == markerID then
+            m
+              { startRow = m.endRow
+              , startCol = m.endCol
+              }
+          else m
+
+      H.modify_ \st -> st
+        { commentState = st.commentState
+            { commentProblem = true
+            , markers = markers'
+            }
+        }
+
+      H.raise $ ToUpdateCommentProblem markerID
+
+    DeleteComment markerID commentProblem -> do
+      state <- H.get
+      mLm <- H.liftEffect $ resolveDeleteLiveMarker markerID state.commentState
+      let
+        cs = state.commentState
+        targetId = maybe markerID _.annotedMarkerID mLm
+        isTarget lm = lm.annotedMarkerID == targetId
+
+        dropIfTarget mlm =
+          mlm >>= \lm -> if isTarget lm then Nothing else Just lm
+
+        newTmp = dropIfTarget cs.tmpLiveMarker
+        newLiveMarkers = filter (not <<< isTarget) cs.liveMarkers
+        liveMarkersForAnno =
+          case newTmp of
+            Nothing -> newLiveMarkers
+            Just lm -> snoc newLiveMarkers lm
+        wasSelected = maybe false isTarget cs.selectedLiveMarker
+        isTargetMarker m = m.id == markerID || m.id == targetId
+        newOldMarkerAnnoPos =
+          delete targetId (delete markerID cs.annoMaps.oldMarkerAnnoPos)
+
+      didDelete <- case state.mEditor, mLm of
+        Just ed, Just lm -> do
+          session <- H.liftEffect $ Editor.getSession ed
+          H.liftEffect $ removeLiveMarker lm session
+          handleAction $ DeleteAnnotation lm false true
+          when wasSelected (handleAction HideHandles)
+          pure true
+        _, _ -> pure false
+
+      mAnno <-
+        if didDelete then
+          pure Nothing
+        else do
+          Just <$> H.liftEffect
+            (rebuildAnnotations liveMarkersForAnno state.mEditor)
+
+      H.modify_ \st ->
+        st
+          { commentState = st.commentState
+              { commentProblem = commentProblem
+              , reAnchor = case st.commentState.reAnchor of
+                  Just r | r.markerID == markerID -> Nothing
+                  other -> other
+              , selectedLiveMarker =
+                  dropIfTarget st.commentState.selectedLiveMarker
+              , tmpLiveMarker = newTmp
+              , liveMarkers = newLiveMarkers
+              , markers = filter (not <<< isTargetMarker)
+                  st.commentState.markers
+              , annoMaps =
+                  st.commentState.annoMaps { oldMarkerAnnoPos = newOldMarkerAnnoPos }
+              }
+          }
+      case mAnno of
+        Nothing -> pure unit
+        Just a ->
+          H.modify_ \st ->
+            st { commentState = st.commentState { annoMaps = a } }
+
+      -- save as before
+      for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
+      handleAction $ SetManualSavedFlag false
+      handleAction $ Save true
+
+    -- Handle external resize from parent component (Splitview)
+    -- Updates UI elements based on width and triggers editor resize
     HandleResize width -> do
       -- Decides whether to show button text based on the width.
       -- Because german labels are longer, we need to adjust the cutoff
-      -- threshold dynamically. Pretty sure this is not the best solution,
-      -- but it works.
-
+      -- threshold dynamically.
       lang <- H.liftEffect $ Store.loadLanguage
       let cutoff = if lang == Just "de-DE" then 690.0 else 592.0
       let noButtonsCutoff = 350.0
 
       H.modify_ _
         { showButtonText = width >= cutoff, showButtons = width >= noButtonsCutoff }
+
+      -- Let the editor itself handle internal details like line breaks with resizing
+      editor_ <- H.gets _.mEditor
+      case editor_ of
+        Nothing -> pure unit
+        Just ed -> H.liftEffect $ Editor.resize (Just true) ed
 
     Finalize -> do
       -- Save in case, the user changes the page (via Navbar)
@@ -1553,143 +1632,144 @@ editor = connect selectTranslator $ H.mkComponent
       let
         tgt = Win.toEventTarget win
         beforeunload = EventType "beforeunload"
-      -- Cleanup observer and subscription
-      H.liftEffect $ case state.mResizeObserver of
-        Just obs -> disconnect obs
-        Nothing -> pure unit
-      case state.mResizeSubscriptionId of
-        Just subscription -> H.unsubscribe subscription
-        Nothing -> pure unit
       case state.saveState.mBeforeUnloadListener of
         Just l -> H.liftEffect $ removeEventListener beforeunload l false tgt
         _ -> pure unit
       for_ state.saveState.mPendingDebounceF H.kill
       for_ state.saveState.mPendingMaxWaitF H.kill
 
-    ChangeToSection entry rev mTitle -> do
+    ChangeToSection entry rev mTitle loadInMergeMode -> do
       state <- H.get
       let
         version = case rev of
           Nothing -> "latest"
           Just v -> show v
       -- Prevent of loading the same Section from backend again
-      when (Just entry /= state.mTocEntry || version /= state.currentVersion) do
-        -- Get the content from server here
-        -- We need Aff for that and thus cannot go inside Eff
-        -- TODO: After creating a new Leaf, we get Nothing in loadedContent
-        -- See, why and fix it
+      when
+        ( map _.id state.mTocEntry /= Just entry.id || version /= state.currentVersion
+            || state.wasLoadedInMergeMode /= loadInMergeMode
+        )
+        do
+          -- Get the content from server here
+          -- We need Aff for that and thus cannot go inside Eff
+          -- TODO: After creating a new Leaf, we get Nothing in loadedContent
+          -- See, why and fix it
 
-        H.modify_ _ { isLoading = true }
+          H.modify_ _ { isLoading = true }
 
-        --first we look whether a draft to load is present. The right editor does not load drafts
-        loadedDraftContent <- case state.compareToElement of
-          Nothing ->
-            preventErrorHandlingLocally $ Request.getJson
-              ContentDto.decodeContentWrapper
-              ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-                  <> "/draft"
-              )
-          Just _ -> pure $ Left $ NotFoundError "No Draft Found"
+          --first we look whether a draft to load is present. The right editor does not load drafts
+          loadedDraftContent <- case state.compareToElement, loadInMergeMode of
+            Nothing, false ->
+              preventErrorHandlingLocally $ Request.getJson
+                ContentDto.decodeContentWrapper
+                ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+                    <> "/draft"
+                )
+            _, _ -> pure $ Left $ NotFoundError "No Draft Found"
 
-        -- check, if draft is present. Otherwise get from version
-        loadedContent <- case loadedDraftContent of
-          Right res -> do
-            H.modify_ _
-              { isEditorOutdated = true
-              }
-            pure (Right res)
-          Left _ -> do
-            H.modify_ _
-              { isEditorOutdated = false
-              }
-            Request.getJson
-              ContentDto.decodeContentWrapper
-              ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
-                  <> "/rev/"
-                  <> version
-              )
+          -- check, if draft is present. Otherwise get from version
+          loadedContent <- case loadedDraftContent of
+            Right res -> do
+              pure (Right res)
+            Left _ -> do
+              Request.getJson
+                ContentDto.decodeContentWrapper
+                ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
+                    <> "/rev/"
+                    <> version
+                )
 
-        case loadedContent of
-          Left err -> do
-            H.modify_ _ { isLoading = false }
-            Store.addError err
-          Right wrapper -> do
-            let
-              content = ContentDto.getWrapperContent wrapper
-              html = ContentDto.getWrapperHtml wrapper
-
-            H.modify_ _
-              { mTocEntry = Just entry
-              , currentVersion = version
-              , mTitle = mTitle
-              , mContent = Just content
-              , html = html
-              , isOnMerge = false
-              }
-            for_ state.saveState.mIsOnMergeRef \r -> H.liftEffect $ Ref.write false r
-
-            -- Only secondary Editor has ElementData
-            -- Only first Editor gets to load the comments
-            if isJust state.compareToElement then do
-              handleAction $ ContinueChangeToSection [] false false
-            else do
-              -- Get comments
+          case loadedContent of
+            Left err -> do
+              H.modify_ _ { isLoading = false }
+              Store.addError err
+            Right wrapper -> do
               let
-                comments = ContentDto.getWrapperComments wrapper
-                -- convert markers
-                markers = map ContentDto.convertToAnnotetedMarker comments
-                markerIDs = map (\m -> m.id) markers
-              -- update the markers into state
-              H.modify_ \st -> st
-                { commentState = st.commentState
-                    { selectedLiveMarker = Nothing
-                    , markerAnnoHS = empty
-                    , oldMarkerAnnoPos = empty
-                    , markers = markers
-                    }
-                , isEditorOutdated = version /= "latest"
-                }
-              -- Get comments information from Comment Child
-              H.raise (RequestComments state.docID entry.id markerIDs)
+                content = ContentDto.getWrapperContent wrapper
+                html = ContentDto.getWrapperHtml wrapper
 
-        --will be set to true right now, but should be set to false if didn't change to draft
-        case loadedDraftContent of
-          Right _ -> pure unit
-          Left _ -> for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
+              H.modify_ _
+                { mTocEntry = Just entry
+                , currentVersion = version
+                , mTitle = mTitle
+                , mContent = Just content
+                , html = html
+                , wasLoadedInMergeMode = loadInMergeMode
+                }
+              setIsOnMerge loadInMergeMode
+
+              -- Only secondary Editor has ElementData
+              -- Only first Editor gets to load the comments
+              if isJust state.compareToElement then do
+                handleAction $ ContinueChangeToSection [] false false
+              else do
+                -- Get comments
+                let
+                  comments = ContentDto.getWrapperComments wrapper
+                  -- convert markers
+                  markers = map ContentDto.convertToAnnotetedMarker comments
+                  validMarker m =
+                    m.startRow < m.endRow ||
+                      (m.startRow == m.endRow && m.startCol < m.endCol)
+                  validMarkers = filter validMarker markers
+                  markerIDs = map (\m -> m.id) validMarkers
+                  isDraftAvailable = case loadedDraftContent of
+                    Right _ -> true
+                    Left _ -> false
+                  isEditorOutdated' = version /= "latest" || loadInMergeMode ||
+                    isDraftAvailable
+                -- update the markers into state
+                H.modify_ \st -> st
+                  { commentState = st.commentState
+                      { selectedLiveMarker = Nothing
+                      , annoMaps = emptyAnnotationMaps
+                      , markers = validMarkers
+                      }
+                  , isEditorOutdated = isEditorOutdated'
+                  }
+                -- Get comments information from Comment Child
+                H.raise
+                  ( RequestComments state.docID entry.id markerIDs
+                      (not isEditorOutdated')
+                  )
+
+          --will be set to true right now, but should be set to false if didn't change to draft
+          case loadedDraftContent of
+            Right _ -> pure unit
+            Left _ -> for_ state.mDirtyVersion \r -> H.liftEffect $ Ref.write false r
       pure unit
 
     -- After getting information from from Comment
     ContinueChangeToSection fCs showHtml commentProblem -> do
       state <- H.get
-      case state.mListener of
-        Nothing -> pure unit
-        Just listener -> do
-          -- Put the content of the section into the editor and update markers
-          H.gets _.mEditor >>= traverse_ \ed -> do
-            let
-              commentState = state.commentState
-              filMarkers = updateMarkers fCs commentState.markers
-              content = case state.mContent of
-                Nothing -> ""
-                Just c -> ContentDto.getContentText c
-            handleAction Resize
-            newLiveMarkers <- H.liftEffect do
-              session <- Editor.getSession ed
-              document <- Session.getDocument session
+      -- Put the content of the section into the editor and update markers
+      H.gets _.mEditor >>= traverse_ \ed -> do
+        let
+          commentState = state.commentState
+          filMarkers = updateMarkers fCs commentState.markers
+          content = case state.mContent of
+            Nothing -> ""
+            Just c -> ContentDto.getContentText c
+        handleAction Resize
+        newLiveMarkers <- H.liftEffect do
+          session <- Editor.getSession ed
+          document <- Session.getDocument session
 
-              -- Set the content of the editor
-              Document.setValue content
-                document
-              Editor.setReadOnly (state.compareToElement /= Nothing) ed
+          -- Set the content of the editor
+          Document.setValue content document
+          Editor.setReadOnly (state.compareToElement /= Nothing) ed
 
-              -- reset Ref, because loading new content is considered
-              -- changing the existing content, which would set the flag
-              for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write false r
+          -- reset Ref, because loading new content is considered
+          -- changing the existing content, which would set the flag
+          for_ state.saveState.mDirtyRef \r -> Ref.write false r
 
-              -- Reset Undo history
-              undoMgr <- Session.getUndoManager session
-              UndoMgr.reset undoMgr
+          -- Reset Undo history
+          undoMgr <- Session.getUndoManager session
+          UndoMgr.reset undoMgr
 
+          case state.mListener of
+            Nothing -> pure []
+            Just listener -> do
               -- Remove existing markers
               for_ commentState.liveMarkers \lm -> do
                 removeLiveMarker lm session
@@ -1703,27 +1783,29 @@ editor = connect selectTranslator $ H.mkComponent
 
               pure (catMaybes tmp)
 
-            -- Update state with new marker IDs
-            mDeb <- H.gets _.saveState.mPendingDebounceF
-            traverse_ H.kill mDeb
-            mMax <- H.gets _.saveState.mPendingMaxWaitF
-            traverse_ H.kill mMax
-            H.modify_ \st -> st
-              { commentState = st.commentState
-                  { liveMarkers = newLiveMarkers, commentProblem = commentProblem }
-              , saveState = st.saveState
-                  { mPendingDebounceF = Nothing
-                  , mPendingMaxWaitF = Nothing
-                  , isManualSaved = true
-                  }
-              , isLoading = false
+        -- Update state with new marker IDs
+        when (state.compareToElement == Nothing) do
+          mDeb <- H.gets _.saveState.mPendingDebounceF
+          traverse_ H.kill mDeb
+          mMax <- H.gets _.saveState.mPendingMaxWaitF
+          traverse_ H.kill mMax
+        H.modify_ \st -> st
+          { commentState = st.commentState
+              { liveMarkers = newLiveMarkers, commentProblem = commentProblem }
+          , saveState = st.saveState
+              { mPendingDebounceF = Nothing
+              , mPendingMaxWaitF = Nothing
+              , isManualSaved = true
               }
-            -- lastly show html in preview
-            when showHtml $ do
-              H.raise $ ClickedQuery state.html
+          , isLoading = false
+          }
+        -- lastly show html in preview
+        when (showHtml && not state.isOnMerge) $ do
+          html' <- H.gets _.html
+          H.raise $ ClickedQuery html'
 
   -- convert Hashmap to Annotations and show them
-  -- H.liftEffect $ setAnnotations commentState.markerAnnoHS state.mEditor
+  -- H.liftEffect $ setAnnotations commentState.annoMaps.markerAnnoHS state.mEditor
 
   handleQuery
     :: forall slots a
@@ -1737,15 +1819,8 @@ editor = connect selectTranslator $ H.mkComponent
       handleAction Resize
       pure (Just a)
 
-    EditorResize a -> do
-      editor_ <- H.gets _.mEditor
-      case editor_ of
-        Nothing -> pure unit
-        Just ed -> H.liftEffect $ Editor.resize (Just true) ed
-      pure (Just a)
-
     ChangeSection entry rev mTitle a -> do
-      handleAction (ChangeToSection entry rev mTitle)
+      handleAction (ChangeToSection entry rev mTitle false)
       pure (Just a)
 
     ContinueChangeSection fCs commentProblem a -> do
@@ -1831,10 +1906,14 @@ editor = connect selectTranslator $ H.mkComponent
               }
             newMarkers = snoc state.commentState.markers newMarker
             -- delete temp id from hash map
-            newOldMarkerAnnoPos = delete (-360) state.commentState.oldMarkerAnnoPos
+            newOldMarkerAnnoPos = delete (-360)
+              state.commentState.annoMaps.oldMarkerAnnoPos
             -- add the real id instead
             newOldMarkerAnnoPos' = insert newMarker.id newMarker.startRow
               newOldMarkerAnnoPos
+            newAnnoMaps =
+              state.commentState.annoMaps
+                { oldMarkerAnnoPos = newOldMarkerAnnoPos' }
           newLiveMarker <- H.liftEffect $ addAnchor newMarker session listener true
           let
             newLM = case newLiveMarker of
@@ -1845,8 +1924,8 @@ editor = connect selectTranslator $ H.mkComponent
               Just lm' -> snoc state.commentState.liveMarkers lm'
             newCommentState =
               state.commentState
-                { oldMarkerAnnoPos = newOldMarkerAnnoPos'
-                , tmpLiveMarker = Nothing
+                { tmpLiveMarker = Nothing
+                , annoMaps = newAnnoMaps
                 , selectedLiveMarker = Just newLM
                 , markers = newMarkers
                 , liveMarkers = newLiveMarkers
@@ -1895,45 +1974,13 @@ editor = connect selectTranslator $ H.mkComponent
           H.liftEffect $ setMarkerSelectedClass session lm false
         _, _ -> pure unit
       H.modify_ \st -> st
-        { commentState { selectedLiveMarker = Nothing, reAnchor = Nothing } }
+        { commentState = st.commentState
+            { selectedLiveMarker = Nothing, reAnchor = Nothing }
+        }
       pure (Just a)
 
-    ToDeleteComment commentProblem a -> do
-      state <- H.get
-      -- always update this
-      H.modify_ \st -> st
-        { commentState = st.commentState
-            { commentProblem = commentProblem, reAnchor = Nothing }
-        }
-      case state.mEditor, state.commentState.selectedLiveMarker of
-        Just ed, Just lm -> do
-          session <- H.liftEffect $ Editor.getSession ed
-          H.liftEffect $ removeLiveMarker lm session
-          handleAction $ DeleteAnnotation lm false true
-          handleAction $ HideHandles
-
-          let
-            newCommentState = state.commentState
-              { selectedLiveMarker = Nothing
-              , tmpLiveMarker = case state.commentState.tmpLiveMarker of
-                  Just tmpLM ->
-                    if (tmpLM.annotedMarkerID == lm.annotedMarkerID) then
-                      Nothing
-                    else
-                      Just tmpLM
-                  Nothing -> Nothing
-              -- delete this marker from state. Otherwise, it can be still selected
-              , liveMarkers = deleteBy
-                  (\b c -> b.annotedMarkerID == c.annotedMarkerID)
-                  lm
-                  state.commentState.liveMarkers
-              }
-          H.modify_ _
-            { commentState = newCommentState }
-          for_ state.saveState.mDirtyRef \r -> H.liftEffect $ Ref.write true r
-          handleAction $ SetManualSavedFlag false
-          handleAction $ Save true
-        _, _ -> pure unit
+    ToDeleteComment markerID commentProblem a -> do
+      handleAction $ DeleteComment markerID commentProblem
       pure (Just a)
 
     RequestDirtyVersion reply -> do
@@ -1963,6 +2010,28 @@ editor = connect selectTranslator $ H.mkComponent
       H.modify_ \st -> st { commentState = st.commentState { reAnchor = reAnchor } }
       pure (Just a)
 
+    UpdateEditorSize width a -> do
+      handleAction $ HandleResize width
+      pure (Just a)
+
+    -- Only used to send the draft from the main editor (primary/left) to the secondary editor
+    SetContent draft a -> do
+      state <- H.get
+      H.gets _.mEditor >>= traverse_ \ed -> do
+        handleAction Resize
+        H.liftEffect do
+          session <- Editor.getSession ed
+          document <- Session.getDocument session
+          Document.setValue draft document
+          Editor.setReadOnly true ed
+          -- Reset dirty flag: content is loaded from a draft and should be treated as the current saved state
+          for_ state.saveState.mDirtyRef \r -> Ref.write false r
+          -- Reset Undo history
+          undoMgr <- Session.getUndoManager session
+          UndoMgr.reset undoMgr
+      H.modify_ _ { isLoading = false }
+      pure (Just a)
+
   -- free up the save flags for the next save session
   -- check if there are new requests for saving during saving
   freeSaveFlagsAndMaybeRerun
@@ -1988,6 +2057,32 @@ editor = connect selectTranslator $ H.mkComponent
     H.modify_ _ { isOnMerge = flag }
     mRef <- H.gets _.saveState.mIsOnMergeRef
     for_ mRef \r -> H.liftEffect $ Ref.write flag r
+
+  -- | Configure a newly created Ace editor instance.
+  --   Sets the font size, enables line wrapping, hides the print margin,
+  --   applies the default theme and mode, and marks the editor as read-only
+  --   until a document entry is explicitly selected elsewhere.
+  --
+  --   * First argument: the Ace editor instance to configure.
+  --   * Second argument: desired font size in pixels (without the \"px\" suffix).
+  setupAce :: Types.Editor -> Int -> Effect Unit
+  setupAce editor_ fontSize = do
+    Editor.setFontSize (show fontSize <> "px") editor_
+    session <- Editor.getSession editor_
+
+    -- Set line break
+    Editor.resize (Just true) editor_
+    Session.setUseWrapMode true session
+
+    -- remove the gray margin line
+    Editor.setShowPrintMargin false editor_
+
+    -- Set the editor's theme and mode
+    Editor.setTheme "ace/theme/github" editor_
+    Session.setMode "ace/mode/custom_mode" session
+
+    -- set read only at the start to prevent users to write in not selected entry
+    Editor.setReadOnly true editor_
 
 -- | Change listener for the editor.
 --
@@ -2027,6 +2122,68 @@ addChangeListenerWithRef editor_ dirtyRef versionRef listener = do
             Session.replace range "  " session
             Ref.write false guardRef
 
+resolveDeleteLiveMarker
+  :: Int
+  -> CommentState
+  -> Effect (Maybe LiveMarker)
+resolveDeleteLiveMarker markerID commentState = do
+  let
+    isTargetById lm = lm.annotedMarkerID == markerID
+
+    keepIf p x = if p x then Just x else Nothing
+
+    mLmById =
+      (commentState.tmpLiveMarker >>= keepIf isTargetById)
+        <|> (commentState.selectedLiveMarker >>= keepIf isTargetById)
+        <|> find isTargetById commentState.liveMarkers
+
+    mTargetMarker = find (\m -> m.id == markerID) commentState.markers
+
+    candidateLms =
+      catMaybes
+        [ commentState.tmpLiveMarker
+        , commentState.selectedLiveMarker
+        ] <> commentState.liveMarkers
+
+    oneItem xs =
+      case uncons xs of
+        Nothing -> Nothing
+        Just { head: x, tail: rest } ->
+          case uncons rest of
+            Nothing -> Just x
+            Just _ -> Nothing
+
+    findUnique target matchText lms =
+      let
+        matches lm = do
+          start <- Anchor.getPosition lm.startAnchor
+          end <- Anchor.getPosition lm.endAnchor
+          let
+            sameRange =
+              Types.getRow start == target.startRow
+                && Types.getColumn start == target.startCol
+                && Types.getRow end == target.endRow
+                &&
+                  Types.getColumn end == target.endCol
+            ok =
+              if matchText then
+                sameRange && lm.markerText == target.markerText
+              else
+                sameRange
+          pure $ if ok then Just lm else Nothing
+      in
+        oneItem <$> (catMaybes <$> for lms matches)
+
+  case mLmById, mTargetMarker of
+    Just lm, _ -> pure (Just lm)
+    Nothing, Just target -> do
+      mByText <- findUnique target true candidateLms
+      if isJust mByText then
+        pure mByText
+      else
+        findUnique target false candidateLms
+    Nothing, Nothing -> pure Nothing
+
 addAnchor
   :: AnnotatedMarker
   -> Types.EditSession
@@ -2045,6 +2202,7 @@ addAnchor marker session listener action =
     range <- createMarkerRange marker
     id <- Session.addMarker range "my-marker" "text" false session
     markerRef <- Ref.new id
+    deletedRef <- Ref.new false
 
     let
       lm =
@@ -2059,26 +2217,36 @@ addAnchor marker session listener action =
         :: { old :: Types.Position, value :: Types.Position }
         -> Effect Unit
       rerenderMarker _ = do
-        Ref.read markerRef >>= flip Session.removeMarker session
-        Types.Position { row: startRow, column: startColumn } <- Anchor.getPosition
-          startAnchor
-        Types.Position { row: endRow, column: endColumn } <- Anchor.getPosition
-          endAnchor
-        markRange <- Range.create
-          startRow
-          startColumn
-          endRow
-          endColumn
-        newId <- Session.addMarker
-          markRange
-          "my-marker"
-          "text"
-          false
-          session
+        wasDeleted <- Ref.read deletedRef
+        when (not wasDeleted) do
+          Ref.read markerRef >>= flip Session.removeMarker session
+          Types.Position { row: startRow, column: startColumn } <- Anchor.getPosition
+            startAnchor
+          Types.Position { row: endRow, column: endColumn } <- Anchor.getPosition
+            endAnchor
+          -- TODO: check if anchors are the same => anchors got deleted by user
+          if startRow > endRow || (startRow == endRow && startColumn >= endColumn) then
+            do
+              Ref.write true deletedRef
+              HS.notify listener (DeleteComment marker.id true)
+              HS.notify listener (NotifyCommentProblem marker.id)
+              pure unit
+          else do
+            markRange <- Range.create
+              startRow
+              startColumn
+              endRow
+              endColumn
+            newId <- Session.addMarker
+              markRange
+              "my-marker"
+              "text"
+              false
+              session
 
-        Ref.write newId markerRef
-        HS.notify listener (UpdateAnnotation lm)
-        pure unit
+            Ref.write newId markerRef
+            HS.notify listener (UpdateAnnotation lm)
+            pure unit
 
     Anchor.onChange startAnchor rerenderMarker
     Anchor.onChange endAnchor rerenderMarker
@@ -2093,8 +2261,7 @@ buttonDivisor = HH.div
 
 initialCommentState :: CommentState
 initialCommentState =
-  { markerAnnoHS: empty
-  , oldMarkerAnnoPos: empty
+  { annoMaps: emptyAnnotationMaps
   , dragState: Nothing
   , startHandleMarkerId: Nothing
   , endHandleMarkerId: Nothing
@@ -2138,8 +2305,6 @@ initialState { context, input } =
   , commentState: initialCommentState
   , fontSize: 12
   , mListener: Nothing
-  , mResizeObserver: Nothing
-  , mResizeSubscriptionId: Nothing
   , showButtonText: true
   , showButtons: true
   , saveState: initialSaveState
@@ -2149,6 +2314,7 @@ initialState { context, input } =
   , discardPopup: false
   , mDirtyVersion: Nothing
   , isOnMerge: false
+  , wasLoadedInMergeMode: false
   , upToDateVersion: Nothing
   , isLoading: true
   }

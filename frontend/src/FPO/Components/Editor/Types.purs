@@ -4,14 +4,21 @@ module FPO.Components.Editor.Types
   , HandleBorder
   , HistoryOp(..)
   , LiveMarker
+  , MarkerAnnoHS
+  , OldMarkerAnnoPos
+  , AnnotationMaps
+  , emptyAnnotationMaps
   , Path
   , RenderKind(..)
+  , addAnnotationMaps
   , createMarkerRange
   , cursorInRange
+  , deleteAnnotationMaps
   , failureLiveMarker
   , hideHandlesFrom
   , highlightSelection
   , near
+  , rebuildAnnotations
   , removeLiveMarker
   , setAnnotations
   , setMarkerSelectedClass
@@ -28,10 +35,11 @@ import Ace.Range as Range
 import Ace.Types as Types
 import Data.Array (mapMaybe, uncons)
 import Data.Array as Array
-import Data.Foldable (for_)
-import Data.HashMap (HashMap, toArrayBy)
-import Data.Maybe (Maybe(..))
+import Data.Foldable (foldl, for_)
+import Data.HashMap (HashMap, delete, empty, insert, lookup, size, toArrayBy)
+import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (joinWith)
+import Data.Traversable (for)
 import Effect (Effect)
 import Effect.Ref (Ref)
 import Effect.Ref as Ref
@@ -68,6 +76,21 @@ type LiveMarker =
   , ref :: Ref Int
   }
 
+type MarkerAnnoHS = HashMap Int (HashMap String Int)
+
+type OldMarkerAnnoPos = HashMap Int Int
+
+type AnnotationMaps =
+  { markerAnnoHS :: MarkerAnnoHS
+  , oldMarkerAnnoPos :: OldMarkerAnnoPos
+  }
+
+emptyAnnotationMaps :: AnnotationMaps
+emptyAnnotationMaps =
+  { markerAnnoHS: empty
+  , oldMarkerAnnoPos: empty
+  }
+
 type Path = Array Int
 
 -- Help function for markerAnnoHS
@@ -95,7 +118,7 @@ cursorInRange lms cursor =
         (Types.getRow cursor)
         (Types.getColumn cursor)
         range
-      if found then
+      if found || near cursor start || near cursor end then
         pure (Just l)
       else
         cursorInRange ls cursor
@@ -140,11 +163,11 @@ near a b =
 
 removeLiveMarker :: LiveMarker -> Types.EditSession -> Effect Unit
 removeLiveMarker lm session = do
-  -- Marker entfernen
+  -- Remove marker
   markerId <- Ref.read lm.ref
   Session.removeMarker markerId session
 
-  -- Anchors vom Dokument lösen
+  -- Detach anchors from document
   Anchor.detach lm.startAnchor
   Anchor.detach lm.endAnchor
 
@@ -166,6 +189,87 @@ setAnnotations markerAnnoHS mEditor = do
           (\{ line, text } -> { row: line, column: 1, text: text, type: "info" })
           tmp
     Session.setAnnotations anns session
+
+addAnnotationMaps :: LiveMarker -> AnnotationMaps -> Effect AnnotationMaps
+addAnnotationMaps lm maps = do
+  pos <- Anchor.getPosition lm.startAnchor
+  let
+    startRow = Types.getRow pos
+    newOldMarkerAnnoPos =
+      insert lm.annotedMarkerID startRow maps.oldMarkerAnnoPos
+    newMarkerAnnoHS = case lookup startRow maps.markerAnnoHS of
+      Nothing ->
+        let
+          newEntry = insert lm.markerText 1 empty
+        in
+          insert startRow newEntry maps.markerAnnoHS
+      Just entry ->
+        let
+          oldValue = fromMaybe 0 (lookup lm.markerText entry)
+          newEntry = insert lm.markerText (oldValue + 1) entry
+        in
+          insert startRow newEntry maps.markerAnnoHS
+  pure
+    { markerAnnoHS: newMarkerAnnoHS
+    , oldMarkerAnnoPos: newOldMarkerAnnoPos
+    }
+
+deleteAnnotationMaps :: LiveMarker -> AnnotationMaps -> AnnotationMaps
+deleteAnnotationMaps lm maps =
+  let
+    oldRow = fromMaybe 0 (lookup lm.annotedMarkerID maps.oldMarkerAnnoPos)
+    newMarkerAnnoHS = case lookup oldRow maps.markerAnnoHS of
+      Nothing -> maps.markerAnnoHS
+      Just entry -> do
+        let
+          oldValue = fromMaybe 0 (lookup lm.markerText entry)
+          newEntry =
+            if oldValue <= 1 then
+              delete lm.markerText entry
+            else
+              insert lm.markerText (oldValue - 1) entry
+        if size newEntry == 0 then
+          delete oldRow maps.markerAnnoHS
+        else
+          insert oldRow newEntry maps.markerAnnoHS
+  in
+    maps { markerAnnoHS = newMarkerAnnoHS }
+
+rebuildAnnotations
+  :: Array LiveMarker
+  -> Maybe Types.Editor
+  -> Effect AnnotationMaps
+rebuildAnnotations lms mEditor = do
+  annos <- for lms \lm -> do
+    pos <- Anchor.getPosition lm.startAnchor
+    pure
+      { id: lm.annotedMarkerID
+      , row: Types.getRow pos
+      , name: lm.markerText
+      }
+  let
+    newOldMarkerAnnoPos =
+      foldl (\acc a -> insert a.id a.row acc) empty annos
+    newMarkerAnnoHS =
+      foldl
+        ( \acc a ->
+            case lookup a.row acc of
+              Nothing ->
+                insert a.row (insert a.name 1 empty) acc
+              Just entry ->
+                let
+                  count = fromMaybe 0 (lookup a.name entry)
+                  newEntry = insert a.name (count + 1) entry
+                in
+                  insert a.row newEntry acc
+        )
+        empty
+        annos
+  setAnnotations newMarkerAnnoHS mEditor
+  pure
+    { markerAnnoHS: newMarkerAnnoHS
+    , oldMarkerAnnoPos: newOldMarkerAnnoPos
+    }
 
 -- Give the marker the correct class depending on isSelected
 setMarkerSelectedClass

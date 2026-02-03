@@ -1274,7 +1274,7 @@ tocview = connect (selectEq identity) $ H.mkComponent
     searchData
     state =
     HH.div
-      [ HP.classes [ HB.positionRelative ] ] $
+      [ HP.classes [ HB.positionRelative, HB.dInlineFlex ] ] $
       [ historyButton path elementID
       ]
         <>
