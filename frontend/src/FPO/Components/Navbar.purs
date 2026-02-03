@@ -38,8 +38,12 @@ import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Web.HTML (window)
 import Web.HTML.Window (open)
+import Effect.Class (class MonadEffect, liftEffect)
 
-type State = FPOState (user :: Maybe FullUserDto, language :: String)
+
+type State = FPOState (user :: Maybe FullUserDto, language :: String, currentRoute :: Maybe Route)
+
+
 
 data Action
   = Navigate Route
@@ -66,6 +70,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
       { user: Nothing
       , language: store.language
       , translator: fromFpoTranslator store.translator
+      , currentRoute: store.currentRoute
       }
   , render
   , eval: H.mkEval H.defaultEval
@@ -128,7 +133,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                 [  HH.li [ HP.classes [ HB.navItem ] ]
                     [ 
                       HH.button
-                        [ HP.classes [ HB.btn, HB.btnLink ]
+                        [ HP.classes [ HB.btn]
                         , HE.onClick (const $ Help)
                         , HP.title (translate (label :: _ "navbar_help") state.translator)
                         ]
@@ -156,6 +161,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
     H.modify_ _
       { language = store.language
       , translator = fromFpoTranslator store.translator
+      , currentRoute = store.currentRoute
       }
   handleAction Logout = do
     -- Reset the cookies and reset the user state
@@ -175,9 +181,13 @@ navbar = connect (selectEq identity) $ H.mkComponent
       Left _ -> H.modify_ _ { user = Nothing } -- TODO error handling
       Right user -> H.modify_ _ { user = Just user }
   handleAction Help = do
-    win <- H.liftEffect window
-    _ <- H.liftEffect $ open "https://fpo.bahn.sh/docs/user-docs/" "_blank" "" win
-    pure unit
+    state <- H.get
+    case state.currentRoute of
+      Just AdminViewGroups -> openInNewTab "https://fpo.bahn.sh/docs/user-docs/group-management/"
+      Just AdminViewUsers -> openInNewTab "https://fpo.bahn.sh/docs/user-docs/user-management/"
+      Just (Editor _) -> openInNewTab "https://fpo.bahn.sh/docs/user-docs/working-on-a-project/"
+      Just _ -> openInNewTab "https://fpo.bahn.sh/docs/user-docs/"
+      Nothing -> openInNewTab "https://fpo.bahn.sh/docs"
 
   handleQuery :: forall a. Query a -> H.HalogenM State Action () output m (Maybe a)
   handleQuery (RequestReloadUser a) = do
@@ -272,5 +282,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
       ]
 
 
-
- 
+openInNewTab :: forall m. MonadEffect m => String -> m Unit
+openInNewTab url = liftEffect do
+  win <- window
+  void $ open url "_blank" "" win
