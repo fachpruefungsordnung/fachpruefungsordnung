@@ -26,7 +26,17 @@
   /* --- Buttons --- */
   --btn-orange:       #fd7e14;
   --btn-orange-hover: #e96b0c;
+  --btn-orange-rgb: 253, 126, 20;
 
   --btn-blue:         #0099ff;
   --btn-blue-hover:   #0b5ed7;
+  --btn-blue-rgb: 0, 153, 255;
+  --toolbar-btn-bg: #f8f9fa;
+  --toolbar-btn-border: #dee2e6;
+  --toolbar-btn-color: #212529;
+  --toolbar-btn-hover-bg: #e9ecef;
+  --toolbar-btn-hover-border: #ced4da;
+  --toolbar-btn-hover-color: #212529;
+  --toolbar-btn-active-bg: #dee2e6;
+  --toolbar-btn-active-border: #adb5bd;
 }
