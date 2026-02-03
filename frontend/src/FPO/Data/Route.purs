@@ -22,8 +22,6 @@ data Route
   | Administration { tab :: Maybe String }
   | CreateUser
   | CreateGroup
-  | AdminViewUsers
-  | AdminViewGroups
   | ViewGroupDocuments { groupID :: GroupID }
   | ViewGroupMembers { groupID :: GroupID }
   | GroupAddMembers { groupID :: GroupID }
@@ -46,8 +44,6 @@ routeCodec = root $ sum
   , "Administration": "administration" ? { tab: optional <<< string }
   , "CreateUser": "administration" / "create-user" / noArgs
   , "CreateGroup": "administration" / "create-group" / noArgs
-  , "AdminViewUsers": "admin-users" / noArgs
-  , "AdminViewGroups": "admin-groups" / noArgs
   , "ViewGroupDocuments": "view-group-documents" ? { groupID: int }
   , "ViewGroupMembers": "view-group-members" ? { groupID: int }
   , "GroupAddMembers": "group-add-members" ? { groupID: int }
@@ -67,8 +63,6 @@ routeToString = case _ of
   Administration { tab } -> "Administration:" <> show tab
   CreateUser -> "CreateUser"
   CreateGroup -> "CreateGroup"
-  AdminViewUsers -> "AdminViewUsers"
-  AdminViewGroups -> "AdminViewGroups"
   ViewGroupDocuments groupID -> "ViewGroupDocuments:" <> show groupID
   ViewGroupMembers groupID -> "ViewGroupMembers:" <> show groupID
   GroupAddMembers groupID -> "GroupAddMembers:" <> show groupID

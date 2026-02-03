@@ -27,8 +27,6 @@ import FPO.Page.Admin.CreateUser as CreateUser
 import FPO.Page.Admin.Group.AddMembers as GroupAddMembers
 import FPO.Page.Admin.Group.DocOverview as ViewGroupDocuments
 import FPO.Page.Admin.Group.MemberOverview as ViewGroupMembers
-import FPO.Page.Admin.Groups as AdminViewGroups
-import FPO.Page.Admin.Users as AdminViewUsers
 import FPO.Page.EditorPage as EditorPage
 import FPO.Page.Home as Home
 import FPO.Page.Login as Login
@@ -88,8 +86,6 @@ _resetPassword = Proxy :: Proxy "resetPassword"
 _administration = Proxy :: Proxy "administration"
 _createUser = Proxy :: Proxy "createUser"
 _createGroup = Proxy :: Proxy "createGroup"
-_adminUsers = Proxy :: Proxy "adminPanelUsers"
-_adminGroups = Proxy :: Proxy "adminPanelGroups"
 _viewGroupDocuments = Proxy :: Proxy "viewGroupDocuments"
 _viewGroupMembers = Proxy :: Proxy "viewGroupMembers"
 _groupAddMembers = Proxy :: Proxy "groupAddMembers"
@@ -106,8 +102,6 @@ type Slots =
   , administration :: forall q. H.Slot q Void Unit
   , createUser :: forall q. H.Slot q Void Unit
   , createGroup :: forall q. H.Slot q Void Unit
-  , adminPanelUsers :: forall q. H.Slot q Void Unit
-  , adminPanelGroups :: forall q. H.Slot q Void Unit
   , viewGroupDocuments :: forall q. H.Slot q Void Unit
   , viewGroupMembers :: forall q. H.Slot q Void Unit
   , groupAddMembers :: forall q. H.Slot q Void Unit
@@ -161,8 +155,6 @@ component =
             { tab }
           CreateUser -> HH.slot_ _createUser unit CreateUser.component unit
           CreateGroup -> HH.slot_ _createGroup unit CreateGroup.component unit
-          AdminViewUsers -> HH.slot_ _adminUsers unit AdminViewUsers.component unit
-          AdminViewGroups -> HH.slot_ _adminGroups unit AdminViewGroups.component unit
           ViewGroupDocuments { groupID } -> HH.slot_ _viewGroupDocuments unit
             ViewGroupDocuments.component
             groupID
