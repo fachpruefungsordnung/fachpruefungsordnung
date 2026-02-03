@@ -12,6 +12,7 @@ import Prelude
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class (class MonadEffect, liftEffect)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getIgnore, getUser)
 import FPO.Data.Route (Route(..))
@@ -38,12 +39,9 @@ import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Web.HTML (window)
 import Web.HTML.Window (open)
-import Effect.Class (class MonadEffect, liftEffect)
 
-
-type State = FPOState (user :: Maybe FullUserDto, language :: String, currentRoute :: Maybe Route)
-
-
+type State = FPOState
+  (user :: Maybe FullUserDto, language :: String, currentRoute :: Maybe Route)
 
 data Action
   = Navigate Route
@@ -126,19 +124,23 @@ navbar = connect (selectEq identity) $ H.mkComponent
                 )
 
             -- Right side of the navbar
-            
-                
+
             , HH.ul [ HP.classes [ HB.navbarNav, HB.msAuto ] ]
-                
-                [  HH.li [ HP.classes [ HB.navItem ] ]
-                    [ 
-                      HH.button
-                        [ HP.classes [ HB.btn]
+
+                [ HH.li [ HP.classes [ HB.navItem ] ]
+                    [ HH.button
+                        [ HP.classes [ HB.btn ]
                         , HE.onClick (const $ Help)
-                        , HP.title (translate (label :: _ "navbar_help") state.translator)
+                        , HP.title
+                            (translate (label :: _ "navbar_help") state.translator)
                         ]
-                        [ HH.i [HP.classes [ HB.bi, H.ClassName "bi bi-question-circle", HB.me1 ]] []]
-                        
+                        [ HH.i
+                            [ HP.classes
+                                [ HB.bi, H.ClassName "bi bi-question-circle", HB.me1 ]
+                            ]
+                            []
+                        ]
+
                     ]
                 , languageDropdown state.language
                 , HH.li [ HP.classes [ HB.navItem ] ]
@@ -183,9 +185,12 @@ navbar = connect (selectEq identity) $ H.mkComponent
   handleAction Help = do
     state <- H.get
     case state.currentRoute of
-      Just AdminViewGroups -> openInNewTab "https://fpo.bahn.sh/docs/user-docs/group-management/"
-      Just AdminViewUsers -> openInNewTab "https://fpo.bahn.sh/docs/user-docs/user-management/"
-      Just (Editor _) -> openInNewTab "https://fpo.bahn.sh/docs/user-docs/working-on-a-project/"
+      Just AdminViewGroups -> openInNewTab
+        "https://fpo.bahn.sh/docs/user-docs/group-management/"
+      Just AdminViewUsers -> openInNewTab
+        "https://fpo.bahn.sh/docs/user-docs/user-management/"
+      Just (Editor _) -> openInNewTab
+        "https://fpo.bahn.sh/docs/user-docs/working-on-a-project/"
       Just _ -> openInNewTab "https://fpo.bahn.sh/docs/user-docs/"
       Nothing -> openInNewTab "https://fpo.bahn.sh/docs"
 
@@ -280,7 +285,6 @@ navbar = connect (selectEq identity) $ H.mkComponent
           , HH.text label
           ]
       ]
-
 
 openInNewTab :: forall m. MonadEffect m => String -> m Unit
 openInNewTab url = liftEffect do
