@@ -14,7 +14,8 @@ import FPO.Components.UI.UserList as UserList
 import FPO.Data.AppError (AppError(..))
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (deleteIgnore, getUser, postString)
-import FPO.Data.Route (Route(..))
+import FPO.Data.Route (Route(..)) as Route
+import FPO.Data.Route (Route(Page404, Profile))
 import FPO.Data.Store as Store
 import FPO.Dto.CreateUserDto
   ( CreateUserDto

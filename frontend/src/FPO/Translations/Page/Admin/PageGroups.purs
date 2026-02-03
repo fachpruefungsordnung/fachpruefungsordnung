@@ -6,6 +6,7 @@ import Simple.I18n.Translation (Translation, fromRecord)
 type AdminGroupPageLabels =
   ( "admin_groups_createGroup"
       ::: "admin_groups_createNewGroup"
+      ::: "admin_groups_deleteGroup"
       ::: "admin_groups_desc"
       ::: "admin_groups_enterGroupDesc"
       ::: "admin_groups_enterGroupName"
@@ -19,6 +20,7 @@ type AdminGroupPageLabels =
       ::: "admin_groups_notEmpty"
       ::: "admin_groups_searchForGroups"
       ::: "admin_groups_stillLoading"
+      ::: "admin_groups_successfullyCreatedGroup"
       ::: "admin_groups_viewDocumentsPage"
       ::: SNil
   )
@@ -27,6 +29,7 @@ enAdminGroupPage :: Translation AdminGroupPageLabels
 enAdminGroupPage = fromRecord
   { admin_groups_createGroup: "Create Group"
   , admin_groups_createNewGroup: "Create New Group"
+  , admin_groups_deleteGroup: "Delete Group"
   , admin_groups_desc: "Group description"
   , admin_groups_enterGroupDesc: "Enter group description (optional)"
   , admin_groups_enterGroupName: "Enter group name"
@@ -40,6 +43,7 @@ enAdminGroupPage = fromRecord
   , admin_groups_notEmpty: "Group name cannot be empty."
   , admin_groups_searchForGroups: "Search for Groups"
   , admin_groups_stillLoading: "Groups are still loading."
+  , admin_groups_successfullyCreatedGroup: "Successfully created group"
   , admin_groups_viewDocumentsPage: "View Documents Page of Group"
   }
 
@@ -47,6 +51,7 @@ deAdminGroupPage :: Translation AdminGroupPageLabels
 deAdminGroupPage = fromRecord
   { admin_groups_createGroup: "Gruppe erstellen"
   , admin_groups_createNewGroup: "Neue Gruppe erstellen"
+  , admin_groups_deleteGroup: "Gruppe löschen"
   , admin_groups_desc: "Gruppenbeschreibung"
   , admin_groups_enterGroupDesc: "Gruppenbeschreibung eingeben (optional)"
   , admin_groups_enterGroupName: "Gruppennamen eingeben"
@@ -60,6 +65,6 @@ deAdminGroupPage = fromRecord
   , admin_groups_notEmpty: "Der Gruppenname darf nicht leer sein."
   , admin_groups_searchForGroups: "Nach Gruppen suchen"
   , admin_groups_stillLoading: "Gruppen werden noch geladen."
+  , admin_groups_successfullyCreatedGroup: "Gruppe erfolgreich erstellt"
   , admin_groups_viewDocumentsPage: "Dokumente der Gruppe anzeigen"
   }
-

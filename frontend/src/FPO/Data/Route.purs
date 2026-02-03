@@ -19,6 +19,9 @@ data Route
   | Editor { docID :: DocumentID }
   | Login
   | PasswordReset { token :: Maybe String }
+  | Administration { tab :: Maybe String }
+  | CreateUser
+  | CreateGroup
   | AdminViewUsers
   | AdminViewGroups
   | ViewGroupDocuments { groupID :: GroupID }
@@ -40,6 +43,9 @@ routeCodec = root $ sum
   , "Editor": "editor" ? { docID: int }
   , "Login": "login" / noArgs
   , "PasswordReset": "reset-password" ? { token: optional <<< string }
+  , "Administration": "administration" ? { tab: optional <<< string }
+  , "CreateUser": "administration" / "create-user" / noArgs
+  , "CreateGroup": "administration" / "create-group" / noArgs
   , "AdminViewUsers": "admin-users" / noArgs
   , "AdminViewGroups": "admin-groups" / noArgs
   , "ViewGroupDocuments": "view-group-documents" ? { groupID: int }
@@ -58,6 +64,9 @@ routeToString = case _ of
   Editor docID -> "Editor:" <> show docID
   Login -> "Login"
   PasswordReset { token } -> "PasswordReset:" <> (show token)
+  Administration { tab } -> "Administration:" <> show tab
+  CreateUser -> "CreateUser"
+  CreateGroup -> "CreateGroup"
   AdminViewUsers -> "AdminViewUsers"
   AdminViewGroups -> "AdminViewGroups"
   ViewGroupDocuments groupID -> "ViewGroupDocuments:" <> show groupID

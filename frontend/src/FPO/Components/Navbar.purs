@@ -17,7 +17,7 @@ import FPO.Data.Request (getIgnore, getUser)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store (saveLanguage)
 import FPO.Data.Store as Store
-import FPO.Dto.UserDto (FullUserDto, getUserName, isAdmin, isUserSuperadmin)
+import FPO.Dto.UserDto (FullUserDto, getUserName, isAdmin)
 import FPO.Translations.Translator
   ( FPOTranslator(..)
   , fromFpoTranslator
@@ -92,25 +92,13 @@ navbar = connect (selectEq identity) $ H.mkComponent
                       ]
                   ]
                     <>
-                      ( if (maybe false isUserSuperadmin state.user) then
-                          [ HH.li [ HP.classes [ HB.navItem ] ]
-                              [ navButton
-                                  ( translate (label :: _ "navbar_users")
-                                      state.translator
-                                  )
-                                  AdminViewUsers
-                              ]
-                          ]
-                        else []
-                      )
-                    <>
                       ( if (maybe false isAdmin state.user) then
                           [ HH.li [ HP.classes [ HB.navItem ] ]
                               [ navButton
-                                  ( translate (label :: _ "navbar_groups")
+                                  ( translate (label :: _ "navbar_administration")
                                       state.translator
                                   )
-                                  AdminViewGroups
+                                  (Administration { tab: Nothing })
                               ]
                           ]
                         else []

@@ -21,6 +21,9 @@ import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Route (Route(..), routeCodec)
 import FPO.Data.Store (loadLanguage)
 import FPO.Data.Store as Store
+import FPO.Page.Admin.Administration as Administration
+import FPO.Page.Admin.CreateGroup as CreateGroup
+import FPO.Page.Admin.CreateUser as CreateUser
 import FPO.Page.Admin.Group.AddMembers as GroupAddMembers
 import FPO.Page.Admin.Group.DocOverview as ViewGroupDocuments
 import FPO.Page.Admin.Group.MemberOverview as ViewGroupMembers
@@ -82,6 +85,9 @@ _home = Proxy :: Proxy "home"
 _editor = Proxy :: Proxy "editor"
 _login = Proxy :: Proxy "login"
 _resetPassword = Proxy :: Proxy "resetPassword"
+_administration = Proxy :: Proxy "administration"
+_createUser = Proxy :: Proxy "createUser"
+_createGroup = Proxy :: Proxy "createGroup"
 _adminUsers = Proxy :: Proxy "adminPanelUsers"
 _adminGroups = Proxy :: Proxy "adminPanelGroups"
 _viewGroupDocuments = Proxy :: Proxy "viewGroupDocuments"
@@ -97,6 +103,9 @@ type Slots =
   , login :: forall q. H.Slot q Void Unit
   , navbar :: H.Slot Navbar.Query Void Unit
   , resetPassword :: forall q. H.Slot q Void Unit
+  , administration :: forall q. H.Slot q Void Unit
+  , createUser :: forall q. H.Slot q Void Unit
+  , createGroup :: forall q. H.Slot q Void Unit
   , adminPanelUsers :: forall q. H.Slot q Void Unit
   , adminPanelGroups :: forall q. H.Slot q Void Unit
   , viewGroupDocuments :: forall q. H.Slot q Void Unit
@@ -147,6 +156,11 @@ component =
           PasswordReset { token } -> HH.slot_ _resetPassword unit
             PasswordReset.component
             { token }
+          Administration { tab } -> HH.slot_ _administration unit
+            Administration.component
+            { tab }
+          CreateUser -> HH.slot_ _createUser unit CreateUser.component unit
+          CreateGroup -> HH.slot_ _createGroup unit CreateGroup.component unit
           AdminViewUsers -> HH.slot_ _adminUsers unit AdminViewUsers.component unit
           AdminViewGroups -> HH.slot_ _adminGroups unit AdminViewGroups.component unit
           ViewGroupDocuments { groupID } -> HH.slot_ _viewGroupDocuments unit
