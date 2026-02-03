@@ -270,6 +270,7 @@ type Labels =
       -- | Navar
       ::: "navbar_documents"
       ::: "navbar_groups"
+      ::: "navbar_help"
       ::: "navbar_users"
 
       -- | 404 Page
