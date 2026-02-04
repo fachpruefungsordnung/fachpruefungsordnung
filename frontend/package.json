@@ -1,5 +1,8 @@
 {
   "dependencies": {
-    "ace-builds": "^1.41.0"
+    "ace-builds": "^1.41.0",
+    "purescript-language-server": "^0.18.5",
+    "purs-tidy": "^0.11.1",
+    "spago": "^0.93.45"
   }
 }

@@ -5,7 +5,8 @@ import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord)
 
 type CommonLabels =
-  ( "common_by"
+  ( "common_add"
+      ::: "common_by"
       ::: "common_cancel"
       ::: "common_clear"
       ::: "common_close"
@@ -57,7 +58,8 @@ type CommonLabels =
 
 enCommon :: Translation CommonLabels
 enCommon = fromRecord
-  { common_by: "by"
+  { common_add: "Add"
+  , common_by: "by"
   , common_cancel: "Cancel"
   , common_clear: "Clear"
   , common_close: "Close"
@@ -112,7 +114,8 @@ enCommon = fromRecord
 
 deCommon :: Translation CommonLabels
 deCommon = fromRecord
-  { common_by: "von"
+  { common_add: "Hinzufügen"
+  , common_by: "von"
   , common_cancel: "Abbrechen"
   , common_clear: "Leeren"
   , common_close: "Schließen"
