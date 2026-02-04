@@ -115,7 +115,6 @@ data Action
   | ConfirmAddMembers
   | CancelAddMembers
 
--- | Simple "state machine" for the modal system.
 data ModalState
   = NoModal
   | DeleteDocumentModal Int
@@ -288,8 +287,6 @@ component =
           ]
       ]
 
-  -- ============== DOCUMENTS TAB ==============
-
   renderDocumentsTab :: State -> H.ComponentHTML Action Slots m
   renderDocumentsTab state =
     case state.group of
@@ -393,8 +390,6 @@ component =
           [ HH.i [ HP.classes [ H.ClassName "bi-trash-fill" ] ] [] ]
       ]
 
-  -- ============== MEMBERS TAB ==============
-
   renderMembersTab :: State -> H.ComponentHTML Action Slots m
   renderMembersTab state =
     case state.group of
@@ -475,13 +470,13 @@ component =
               [ HH.text $ getUserInfoName member ]
           ]
       , HH.div [ HP.classes [ HB.dFlex, HB.gap2, HB.alignItemsCenter ] ]
-          [ -- Role toggle button group (only for group admins)
+      [
             if state.isGroupAdmin then
               renderRoleToggle state member
             else
               HH.span [ HP.classes [ HB.badge, HB.bgSecondary ] ]
                 [ HH.text $ roleToString state (getUserInfoRole member) ]
-          , -- Edit user button (only for superadmins)
+          ,
             if state.isSuperAdmin then
               HH.button
                 [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
@@ -492,7 +487,7 @@ component =
                 [ HH.i [ HP.classes [ H.ClassName "bi-person-fill" ] ] [] ]
             else
               HH.text ""
-          , -- Leave/Remove button
+          ,
             HH.button
               [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm ]
               , HE.onClick $ const $ RequestRemoveMember (getUserInfoID member)
@@ -549,8 +544,6 @@ component =
   roleToString state = case _ of
     Admin -> "Admin"
     Member -> translate (label :: _ "common_member") state.translator
-
-  -- ============== ADD MEMBER POPOVER ==============
 
   renderAddMemberPopover :: State -> H.ComponentHTML Action Slots m
   renderAddMemberPopover state =
@@ -666,8 +659,6 @@ component =
             ]
         ]
 
-  -- ============== COMMON RENDERING ==============
-
   renderLoading :: H.ComponentHTML Action Slots m
   renderLoading =
     HH.div [ HP.classes [ HB.textCenter, HB.mt5 ] ]
@@ -752,21 +743,17 @@ component =
           )
       ]
 
-  -- ============== ACTION HANDLING ==============
-
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
       state <- H.get
 
-      -- Check authorization
       userAuth <- getAuthorizedUser state.groupID
       case userAuth of
         Left _ -> pure unit
         Right maybeUser ->
           when (isNothing maybeUser) $ navigate Page404
 
-      -- Get current user info for permission checks
       userResult <- getUser
       case userResult of
         Left _ -> H.modify_ _ { isGroupAdmin = false, isSuperAdmin = false }
@@ -905,11 +892,10 @@ component =
     CancelModal -> do
       H.modify_ _ { modalState = NoModal }
 
-    -- Add member popover actions
     OpenAddMemberPopover -> do
       state <- H.get
       if state.showAddMemberPopover
-      -- Toggle off if already open and no selection
+
       then when (null state.selectedUsersToAdd) $
         H.modify_ _ { showAddMemberPopover = false }
       else do
@@ -922,7 +908,7 @@ component =
           , userSearchFilter = ""
           , addingMembers = false
           }
-        -- Fetch all users
+
         usersResult <- getUsers
         case usersResult of
           Left _ -> H.modify_ _ { loadingUsers = false }
@@ -980,7 +966,7 @@ component =
           , selectedUsersToAdd = []
           , addingMembers = false
           }
-        -- Reload group members
+
         reloadGroupMembers
         updateStore $ Store.AddSuccess "Members added successfully"
 
@@ -991,13 +977,10 @@ component =
         , userSearchFilter = ""
         }
 
-  -- ============== HELPER FUNCTIONS ==============
-
   loadGroupData :: H.HalogenM State Action Slots output m Unit
   loadGroupData = do
     state <- H.get
 
-    -- Load group
     groupResult <- getGroup state.groupID
     case groupResult of
       Left _ -> pure unit
@@ -1007,7 +990,6 @@ component =
           , filteredMembers = getGroupMembers grp
           }
 
-    -- Load documents
     documents <- getDocumentsQueryFromURL ("/docs?group=" <> show state.groupID)
     case documents of
       Right docs -> do
