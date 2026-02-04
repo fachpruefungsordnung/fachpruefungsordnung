@@ -200,9 +200,9 @@ component =
             ( translate (label :: _ "admin_users_successfullyCreatedUser")
                 state.translator
             )
-          navigate $ Administration { tab: Nothing }
+          navigate AdminUsers
 
-    Cancel -> navigate $ Administration { tab: Nothing }
+    Cancel -> navigate AdminUsers
 
 isFormValid :: CreateUserDto -> Boolean
 isFormValid dto =

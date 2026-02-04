@@ -30,7 +30,7 @@ import FPO.Data.Request
   , getUser
   , getUsers
   )
-import FPO.Data.Route (Route(..), groupOverview)
+import FPO.Data.Route (GroupSubRoute(..), Route(..))
 import FPO.Data.Store as Store
 import FPO.Data.Time (formatRelativeTime)
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto(..))
@@ -781,11 +781,9 @@ component =
     -- Tab actions
     SwitchTab tab -> do
       state <- H.get
-      let
-        tabStr = case tab of
-          DocumentsTab -> Nothing
-          MembersTab -> Just "members"
-      navigate $ groupOverview state.groupID tabStr
+      navigate $ GroupRoute state.groupID $ case tab of
+        DocumentsTab -> GroupDocuments
+        MembersTab -> GroupMembers
 
     -- Document actions
     SetDocPage (P.Clicked p) -> H.modify_ _ { docPage = p }
@@ -797,7 +795,7 @@ component =
     ViewDocument docID -> do
       state <- H.get
       case state.modalState of
-        NoModal -> navigate (Editor { docID })
+        NoModal -> navigate (Editor docID)
         _ -> pure unit
 
     RequestDeleteDocument docID -> do
@@ -887,7 +885,7 @@ component =
         Right _ -> reloadGroupMembers
 
     NavigateToUserProfile userID -> do
-      navigate $ Profile { loginSuccessful: Nothing, userId: Just userID }
+      navigate $ UserProfile userID
 
     CancelModal -> do
       H.modify_ _ { modalState = NoModal }

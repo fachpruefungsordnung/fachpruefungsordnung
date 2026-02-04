@@ -186,6 +186,6 @@ component =
               ( translate (label :: _ "admin_groups_successfullyCreatedGroup")
                   state.translator
               )
-            navigate $ Administration { tab: Just "groups" }
+            navigate AdminGroups
 
-    Cancel -> navigate $ Administration { tab: Just "groups" }
+    Cancel -> navigate AdminGroups

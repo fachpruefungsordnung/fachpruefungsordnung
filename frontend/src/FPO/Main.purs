@@ -139,23 +139,36 @@ component =
         Nothing -> HH.slot_ _page404 unit Page404.component unit
         Just p -> case p of
           Home -> HH.slot_ _home unit Home.component unit
-          Editor { docID } -> HH.slot_ _editor unit EditorPage.component docID
+          Editor docID -> HH.slot_ _editor unit EditorPage.component docID
           Login -> HH.slot_ _login unit Login.component unit
           PasswordReset { token } -> HH.slot_ _resetPassword unit
             PasswordReset.component
             { token }
-          Administration { tab } -> HH.slot_ _administration unit
+          Administration -> HH.slot_ _administration unit
             Administration.component
-            { tab }
+            { tab: Nothing }
+          AdminUsers -> HH.slot_ _administration unit
+            Administration.component
+            { tab: Nothing }
           CreateUser -> HH.slot_ _createUser unit CreateUser.component unit
+          AdminGroups -> HH.slot_ _administration unit
+            Administration.component
+            { tab: Just "groups" }
           CreateGroup -> HH.slot_ _createGroup unit CreateGroup.component unit
-          GroupRoute groupID (GroupOverview { tab }) -> HH.slot_ _groupOverview unit
+          GroupRoute groupID GroupDocuments -> HH.slot_ _groupOverview unit
             GroupOverview.component
-            { groupID, tab }
+            { groupID, tab: Nothing }
+          GroupRoute groupID GroupMembers -> HH.slot_ _groupOverview unit
+            GroupOverview.component
+            { groupID, tab: Just "members" }
           Page404 -> HH.slot_ _page404 unit Page404.component unit
-          Profile { loginSuccessful, userId } -> HH.slot _profile unit
+          Profile -> HH.slot _profile unit
             Profile.component
-            { loginSuccessfulBanner: loginSuccessful, userId: userId }
+            { userId: Nothing }
+            HandleProfile
+          UserProfile userId -> HH.slot _profile unit
+            Profile.component
+            { userId: Just userId }
             HandleProfile
     ]
 
@@ -173,6 +186,10 @@ component =
   handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Void m (Maybe a)
   handleQuery = case _ of
     NavigateQ dest a -> do
+      let actualDest = case dest of
+            Administration -> AdminUsers
+            _ -> dest
+
       -- Here, we do not check for user credentials before navigating.
       -- Each page (e.g., profile or admin panel) should handle its own access control.
       -- If the user is not logged in, they will be redirected to the login page or
@@ -188,8 +205,8 @@ component =
       when (route == Just Login) $ do
         H.tell _navbar unit Navbar.RequestReloadUser
 
-      H.modify_ _ { route = Just dest }
-      updateStore $ Store.SetCurrentRoute (Just dest)
+      H.modify_ _ { route = Just actualDest }
+      updateStore $ Store.SetCurrentRoute (Just actualDest)
 
       pure $ Just a
 

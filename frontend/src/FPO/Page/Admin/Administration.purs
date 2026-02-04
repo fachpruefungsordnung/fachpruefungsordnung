@@ -24,8 +24,8 @@ import FPO.Data.Request
   , getUsers
   )
 import FPO.Data.Route
-  ( Route(Page404, Administration, CreateUser, CreateGroup, Profile)
-  , groupOverview
+  ( GroupSubRoute(..)
+  , Route(..)
   )
 import FPO.Data.Store as Store
 import FPO.Dto.GroupDto
@@ -198,11 +198,9 @@ component =
 
     -- Tab actions
     SwitchTab tab -> do
-      let
-        tabStr = case tab of
-          UsersTab -> Nothing
-          GroupsTab -> Just "groups"
-      navigate $ Administration { tab: tabStr }
+      navigate $ case tab of
+        UsersTab -> AdminUsers
+        GroupsTab -> AdminGroups
 
     -- User actions
     SetUserPage (P.Clicked p) -> H.modify_ _ { userPage = p }
@@ -226,10 +224,9 @@ component =
 
     NavigateToProfile userId -> do
       state <- H.get
-      navigate $ Profile
-        { loginSuccessful: Nothing
-        , userId: if state.currentUserID == Just userId then Nothing else Just userId
-        }
+      navigate $
+        if state.currentUserID == Just userId then Profile
+        else UserProfile userId
 
     NavigateToCreateUser -> navigate CreateUser
 
@@ -254,7 +251,7 @@ component =
 
     CancelDeleteGroup -> H.modify_ _ { requestDeleteGroup = Nothing }
 
-    NavigateToGroupDocuments gID -> navigate $ groupOverview gID Nothing
+    NavigateToGroupDocuments gID -> navigate $ GroupRoute gID GroupDocuments
 
     NavigateToCreateGroup -> navigate CreateGroup
 
