@@ -173,7 +173,7 @@ component =
                 }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
-      navigate (Editor { docID: DocumentHeader.getID project })
+      navigate (Editor (DocumentHeader.getID project))
     NavLogin -> do
       updateStore $ Store.SetLoginRedirect (Just Home)
       navigate Login

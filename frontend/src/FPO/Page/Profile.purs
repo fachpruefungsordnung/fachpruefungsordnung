@@ -80,7 +80,7 @@ type State = FPOState
   , isYourProfile :: Boolean
   )
 
-type Input = { loginSuccessfulBanner :: Maybe Boolean, userId :: Maybe String }
+type Input = { userId :: Maybe String }
 
 -- | User profile page component.
 component
