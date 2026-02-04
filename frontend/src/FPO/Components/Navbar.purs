@@ -152,7 +152,6 @@ navbar = connect (selectEq identity) $ H.mkComponent
     handleAction ReloadUser
     pure $ Just a
 
-  -- Creates a navigation button.
   navButton :: String -> Route -> H.ComponentHTML Action () m
   navButton label route =
     HH.button
