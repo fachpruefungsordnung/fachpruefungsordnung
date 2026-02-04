@@ -73,7 +73,7 @@ routeCodec = root $ sum
   , "Login": "login" / noArgs
   , "Page404": "404" / noArgs
   , "PasswordReset": "reset-password" ? { token: optional <<< string }
-  , "Profile": "profile" / noArgs
+  , "Profile": "me" / noArgs
   , "UserProfile": "profile" / string segment
   }
 

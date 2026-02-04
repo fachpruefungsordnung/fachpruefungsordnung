@@ -110,6 +110,7 @@ data Action
   -- Add member popover actions
   | OpenAddMemberPopover
   | CloseAddMemberPopover
+  | ForceCloseAddMemberPopover
   | FilterAvailableUsers String
   | ToggleUserSelection UserID
   | ConfirmAddMembers
@@ -220,6 +221,15 @@ component =
     HH.div
       [ HP.classes [ HB.container, HB.my5 ] ]
       [ renderModals state
+      , -- Transparent overlay to dismiss the Add Member popover on outside click
+        if state.showAddMemberPopover then
+          HH.div
+            [ HP.style
+                "position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1040; background: transparent;"
+            , HE.onClick $ const ForceCloseAddMemberPopover
+            ]
+            []
+        else HH.text ""
       , renderHeader state
       , renderTabs state
       , case state.currentTab of
@@ -331,6 +341,8 @@ component =
                             (emptyEntryGen [ emptyDocButtons ])
                   , HH.slot _docPagination unit P.component docPaginationProps
                       SetDocPage
+                  , renderEntryCount state.docPage itemsPerPage
+                      (length state.filteredDocuments)
                   ]
               ]
           ]
@@ -441,6 +453,8 @@ component =
                             (emptyEntryGen [ emptyMemberButtons state ])
                   , HH.slot _memberPagination unit P.component memberPaginationProps
                       SetMemberPage
+                  , renderEntryCount state.memberPage itemsPerPage
+                      (length state.filteredMembers)
                   ]
               ]
           ]
@@ -660,6 +674,21 @@ component =
   renderLoading =
     HH.div [ HP.classes [ HB.textCenter, HB.mt5 ] ]
       [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
+
+  -- | Renders a subtle "Showing X–Y of Z" indicator below the pagination.
+  renderEntryCount
+    :: forall w. Int -> Int -> Int -> HH.HTML w Action
+  renderEntryCount currentPage perPage totalItems =
+    if totalItems == 0 then HH.text ""
+    else
+      let
+        startItem = currentPage * perPage + 1
+        endItem = min ((currentPage + 1) * perPage) totalItems
+      in
+        HH.div [ HP.classes [ HB.textCenter, HB.textMuted, HB.small ] ]
+          [ HH.text $
+              show startItem <> "–" <> show endItem <> " / " <> show totalItems
+          ]
 
   renderFilterInput
     :: forall w
@@ -922,6 +951,13 @@ component =
       -- Only close if no users selected
       when (null state.selectedUsersToAdd) $
         H.modify_ _ { showAddMemberPopover = false }
+
+    ForceCloseAddMemberPopover -> do
+      H.modify_ _
+        { showAddMemberPopover = false
+        , selectedUsersToAdd = []
+        , userSearchFilter = ""
+        }
 
     FilterAvailableUsers searchText -> do
       H.modify_ _ { userSearchFilter = searchText }
