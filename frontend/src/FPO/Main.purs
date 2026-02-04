@@ -121,6 +121,7 @@ component =
         }
     }
   where
+
   render :: State -> H.ComponentHTML Action Slots m
   render state = HH.div
     [ HP.classes
@@ -136,7 +137,7 @@ component =
     [ HH.slot_ _navbar unit Navbar.navbar unit
     , HH.slot_ _appToasts unit AppToasts.component unit
     , case state.route of
-        Nothing -> HH.slot_ _page404 unit Page404.component unit
+        Nothing -> HH.div_ [] -- Loading: route not yet resolved
         Just p -> case p of
           Home -> HH.slot_ _home unit Home.component unit
           Editor docID -> HH.slot_ _editor unit EditorPage.component docID

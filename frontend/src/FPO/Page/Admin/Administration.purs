@@ -384,6 +384,8 @@ component =
                             (emptyEntryGen [ emptyUserButtons ])
                   , HH.slot _userPagination unit P.component userPaginationProps
                       SetUserPage
+                  , renderEntryCount state.userPage usersPerPage
+                      (length state.filteredUsers)
                   ]
               ]
           ]
@@ -492,6 +494,8 @@ component =
                             (emptyEntryGen [ emptyGroupButtons ])
                   , HH.slot _groupPagination unit P.component groupPaginationProps
                       SetGroupPage
+                  , renderEntryCount state.groupPage groupsPerPage
+                      (length state.filteredGroups)
                   ]
               ]
           ]
@@ -517,8 +521,12 @@ component =
           , HB.alignItemsCenter
           ]
       ]
-      [ HH.span [ HP.classes [ HB.fwBold ] ]
-          [ HH.text g.groupOverviewName ]
+      [ HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
+          [ HH.span [ HP.classes [ HB.fwBold ] ]
+              [ HH.text g.groupOverviewName ]
+          , HH.small [ HP.classes [ HB.textMuted ] ]
+              [ HH.text g.groupOverviewDescription ]
+          ]
       , HH.div [ HP.classes [ HB.dFlex, HB.gap2 ] ]
           [ HH.button
               [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
@@ -555,6 +563,21 @@ component =
   renderLoading =
     HH.div [ HP.classes [ HB.textCenter, HB.mt5 ] ]
       [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
+
+  -- | Renders a subtle "Showing X–Y of Z" indicator below the pagination.
+  renderEntryCount
+    :: forall w. Int -> Int -> Int -> HH.HTML w Action
+  renderEntryCount currentPage perPage totalItems =
+    if totalItems == 0 then HH.text ""
+    else
+      let
+        startItem = currentPage * perPage + 1
+        endItem = min ((currentPage + 1) * perPage) totalItems
+      in
+        HH.div [ HP.classes [ HB.textStart, HB.textMuted, HB.small ] ]
+          [ HH.text $
+              show startItem <> "–" <> show endItem <> " / " <> show totalItems
+          ]
 
   renderFilterInput
     :: forall w
