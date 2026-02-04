@@ -148,7 +148,7 @@ component =
       Just el -> H.liftEffect $ selectElement el
 
   -- After successful login, redirect to either a previously set redirect route
-  -- or to the profile page with a login success banner.
+  -- or to the project overview page (home).
   handleLoginRedirect :: H.HalogenM State Action () output m Unit
   handleLoginRedirect = do
     redirect <- _.loginRedirect <$> getStore
@@ -157,7 +157,7 @@ component =
         updateStore $ Store.SetLoginRedirect Nothing
         navigate r
       Nothing -> do
-        navigate Profile
+        navigate Home
 
   renderLoginForm :: forall w. State -> HH.HTML w Action
   renderLoginForm state =
@@ -176,6 +176,9 @@ component =
       eyeIcon =
         if state.showPassword then "bi-eye-slash-fill"
         else "bi-eye-fill"
+      loginFailedVisibility = HP.style
+        if state.loginFailed then ""
+        else "visibility: hidden;"
     in
       HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
         [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
@@ -183,8 +186,7 @@ component =
                 [ HH.text "Login" ]
             , HH.form
                 [ HE.onSubmit \e -> DoLogin (toLoginDto state) e ]
-                [ -- Email input
-                  HH.div [ HP.classes [ HB.mb4 ] ]
+                [ HH.div [ HP.classes [ HB.mb2 ] ]
                     [ HH.label [ HP.classes [ HB.formLabel ] ]
                         [ HH.text $
                             ( translate (label :: _ "common_emailAddress")
@@ -206,16 +208,14 @@ component =
                             , HE.onValueInput UpdateEmail
                             ]
                         ]
-                    , if state.loginFailed then
-                        HH.div
-                          [ HP.classes
-                              [ HH.ClassName "invalid-feedback", HB.dBlock ]
-                          ]
-                          [ HH.text errorMsg ]
-                      else HH.text ""
+                    , HH.div
+                        [ HP.classes
+                            [ HH.ClassName "invalid-feedback", HB.dBlock ]
+                        , loginFailedVisibility
+                        ]
+                        [ HH.text errorMsg ]
                     ]
-                -- Password input with eye toggle
-                , HH.div [ HP.classes [ HB.mb4 ] ]
+                , HH.div [ HP.classes [ HB.mb2 ] ]
                     [ HH.label [ HP.classes [ HB.formLabel ] ]
                         [ HH.text $
                             ( translate (label :: _ "common_password")
@@ -244,13 +244,12 @@ component =
                             ]
                             [ HH.i [ HP.class_ (HH.ClassName eyeIcon) ] [] ]
                         ]
-                    , if state.loginFailed then
-                        HH.div
-                          [ HP.classes
-                              [ HH.ClassName "invalid-feedback", HB.dBlock ]
-                          ]
-                          [ HH.text errorMsg ]
-                      else HH.text ""
+                    , HH.div
+                        [ HP.classes
+                            [ HH.ClassName "invalid-feedback", HB.dBlock ]
+                        , loginFailedVisibility
+                        ]
+                        [ HH.text errorMsg ]
                     ]
                 , HH.div [ HP.classes [ HB.mb4, HB.textCenter ] ]
                     [ HH.button
