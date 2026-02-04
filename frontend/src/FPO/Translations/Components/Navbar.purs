@@ -7,6 +7,7 @@ type NavbarLabels =
   ( "navbar_administration"
       ::: "navbar_documents"
       ::: "navbar_groups"
+      ::: "navbar_help"
       ::: "navbar_users"
       ::: SNil
   )
@@ -16,6 +17,7 @@ enNavbar = fromRecord
   { navbar_administration: "Administration"
   , navbar_documents: "Documents"
   , navbar_groups: "Groups"
+  , navbar_help: "Help"
   , navbar_users: "Users"
   }
 
@@ -24,5 +26,6 @@ deNavbar = fromRecord
   { navbar_administration: "Verwaltung"
   , navbar_documents: "Dokumente"
   , navbar_groups: "Gruppen"
+  , navbar_help: "Hilfe"
   , navbar_users: "Benutzer"
   }
