@@ -470,14 +470,12 @@ component =
               [ HH.text $ getUserInfoName member ]
           ]
       , HH.div [ HP.classes [ HB.dFlex, HB.gap2, HB.alignItemsCenter ] ]
-      [
-            if state.isGroupAdmin then
+          [ if state.isGroupAdmin then
               renderRoleToggle state member
             else
               HH.span [ HP.classes [ HB.badge, HB.bgSecondary ] ]
                 [ HH.text $ roleToString state (getUserInfoRole member) ]
-          ,
-            if state.isSuperAdmin then
+          , if state.isSuperAdmin then
               HH.button
                 [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
                 , HE.onClick $ const $ NavigateToUserProfile (getUserInfoID member)
@@ -487,8 +485,7 @@ component =
                 [ HH.i [ HP.classes [ H.ClassName "bi-person-fill" ] ] [] ]
             else
               HH.text ""
-          ,
-            HH.button
+          , HH.button
               [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm ]
               , HE.onClick $ const $ RequestRemoveMember (getUserInfoID member)
               , Style.popover $ translate (label :: _ "gm_removeMember")
@@ -892,9 +889,7 @@ component =
 
     OpenAddMemberPopover -> do
       state <- H.get
-      if state.showAddMemberPopover
-
-      then when (null state.selectedUsersToAdd) $
+      if state.showAddMemberPopover then when (null state.selectedUsersToAdd) $
         H.modify_ _ { showAddMemberPopover = false }
       else do
         H.modify_ _

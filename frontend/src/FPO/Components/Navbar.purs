@@ -19,7 +19,11 @@ import FPO.Data.Route (Route(..), isAdminRoute)
 import FPO.Data.Store (saveLanguage)
 import FPO.Data.Store as Store
 import FPO.Dto.UserDto (FullUserDto, getUserName, isAdmin)
-import FPO.Translations.Translator (FPOTranslator(..), fromFpoTranslator, getTranslatorForLanguage)
+import FPO.Translations.Translator
+  ( FPOTranslator(..)
+  , fromFpoTranslator
+  , getTranslatorForLanguage
+  )
 import FPO.Translations.Util (FPOState)
 import Halogen (AttrName(..), ClassName(..))
 import Halogen as H

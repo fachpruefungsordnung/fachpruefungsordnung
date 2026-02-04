@@ -186,9 +186,10 @@ component =
   handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Void m (Maybe a)
   handleQuery = case _ of
     NavigateQ dest a -> do
-      let actualDest = case dest of
-            Administration -> AdminUsers
-            _ -> dest
+      let
+        actualDest = case dest of
+          Administration -> AdminUsers
+          _ -> dest
 
       -- Here, we do not check for user credentials before navigating.
       -- Each page (e.g., profile or admin panel) should handle its own access control.
