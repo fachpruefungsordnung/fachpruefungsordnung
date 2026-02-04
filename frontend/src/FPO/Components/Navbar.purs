@@ -95,6 +95,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                       [ navButton
                           (translate (label :: _ "common_home") state.translator)
                           Home
+                          (state.currentRoute == Just Home)
                       ]
                   ]
                     <>
@@ -105,6 +106,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                                       state.translator
                                   )
                                   AdminUsers
+                                  (maybe false isAdminRoute state.currentRoute)
                               ]
                           ]
                         else []
@@ -134,6 +136,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                 , HH.li [ HP.classes [ HB.navItem ] ]
                     [ case state.user of
                         Nothing -> navButton "Login" Login
+                          (state.currentRoute == Just Login)
                         Just user -> userDropdown state user
                     ]
                 ]
@@ -174,23 +177,24 @@ navbar = connect (selectEq identity) $ H.mkComponent
     state <- H.get
     case state.currentRoute of
       Just (GroupRoute _ _) -> openInNewTab
-        "https://fpo.bahn.sh/docs/user-docs/group-management/"
+        "/docs/user-docs/group-management/"
       Just (Editor _) -> openInNewTab
-        "https://fpo.bahn.sh/docs/user-docs/working-on-a-project/"
+        "/docs/user-docs/working-on-a-project/"
       Just route | isAdminRoute route -> openInNewTab
-        "https://fpo.bahn.sh/docs/user-docs/user-management/"
-      Just _ -> openInNewTab "https://fpo.bahn.sh/docs/user-docs/"
-      Nothing -> openInNewTab "https://fpo.bahn.sh/docs"
+        "/docs/user-docs/user-management/"
+      Just _ -> openInNewTab "/docs/user-docs/"
+      Nothing -> openInNewTab "/docs/"
 
   handleQuery :: forall a. Query a -> H.HalogenM State Action () output m (Maybe a)
   handleQuery (RequestReloadUser a) = do
     handleAction ReloadUser
     pure $ Just a
 
-  navButton :: String -> Route -> H.ComponentHTML Action () m
-  navButton label route =
+  navButton :: String -> Route -> Boolean -> H.ComponentHTML Action () m
+  navButton label route isActive =
     HH.button
-      [ HP.classes [ HB.navLink, HB.btn, HB.btnLink ]
+      [ HP.classes $ [ HB.navLink, HB.btn, HB.btnLink ]
+          <> if isActive then [ HB.active ] else []
       , HE.onClick (const $ Navigate route)
       ]
       [ HH.text label ]

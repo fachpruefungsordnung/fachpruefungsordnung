@@ -384,6 +384,8 @@ component =
                             (emptyEntryGen [ emptyUserButtons ])
                   , HH.slot _userPagination unit P.component userPaginationProps
                       SetUserPage
+                  , renderEntryCount state.userPage usersPerPage
+                      (length state.filteredUsers)
                   ]
               ]
           ]
@@ -492,6 +494,8 @@ component =
                             (emptyEntryGen [ emptyGroupButtons ])
                   , HH.slot _groupPagination unit P.component groupPaginationProps
                       SetGroupPage
+                  , renderEntryCount state.groupPage groupsPerPage
+                      (length state.filteredGroups)
                   ]
               ]
           ]
@@ -555,6 +559,21 @@ component =
   renderLoading =
     HH.div [ HP.classes [ HB.textCenter, HB.mt5 ] ]
       [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
+
+  -- | Renders a subtle "Showing X–Y of Z" indicator below the pagination.
+  renderEntryCount
+    :: forall w. Int -> Int -> Int -> HH.HTML w Action
+  renderEntryCount currentPage perPage totalItems =
+    if totalItems == 0 then HH.text ""
+    else
+      let
+        startItem = currentPage * perPage + 1
+        endItem = min ((currentPage + 1) * perPage) totalItems
+      in
+        HH.div [ HP.classes [ HB.textCenter, HB.textMuted, HB.small ] ]
+          [ HH.text $
+              show startItem <> "–" <> show endItem <> " / " <> show totalItems
+          ]
 
   renderFilterInput
     :: forall w
