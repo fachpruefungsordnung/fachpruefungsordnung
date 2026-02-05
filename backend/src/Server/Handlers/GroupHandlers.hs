@@ -24,6 +24,7 @@ import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 
+import Data.Containers.ListUtils (nubOrd)
 import Prelude hiding (readFile)
 
 type GroupAPI =
@@ -72,7 +73,10 @@ createGroupHandler (Authenticated token@Auth.Token {..}) (Group.GroupCreate {..}
                     Right groupID -> do
                         addRoleInGroup conn subject groupID User.Admin
                         mapM_
-                            (mapM_ (\user -> addRoleInGroup conn user groupID User.Member))
+                            ( mapM_ (\user -> addRoleInGroup conn user groupID User.Member)
+                                . nubOrd -- deduplicate
+                                . filter (== subject) -- filter admin
+                            )
                             groupCreateUsers
                         return groupID
 createGroupHandler _ _ = throwError errNotLoggedIn
