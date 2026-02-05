@@ -20,7 +20,7 @@ import Ace.Range as Range
 import Ace.Types as Types
 import Ace.UndoManager as UndoMgr
 import Control.Alt ((<|>))
-import Data.Array (catMaybes, filter, intercalate, snoc, uncons)
+import Data.Array (catMaybes, filter, intercalate, null, snoc, uncons)
 import Data.Either (Either(..))
 import Data.Foldable (find, for_, traverse_)
 import Data.HashMap (delete, insert, lookup)
@@ -185,6 +185,7 @@ type State = FPOState
   , commentState :: CommentState
   , fontSize :: Int
   , mListener :: Maybe (HS.Listener Action)
+  , wrapEnabled :: Boolean
   , showButtonText :: Boolean
   , showButtons :: Boolean
   -- for autosave
@@ -359,7 +360,7 @@ editor = connect selectTranslator $ H.mkComponent
           if (not state.showButtons) then
             -- keep the toolbar even though there is not space, so that the screen doesnt pop higher
             [ HH.div
-                [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+                [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter ] ]
                 [ HH.div
                     [ HP.style
                         "visibility: hidden; height: 1.5rem; min-height: 1.5rem;"
@@ -369,7 +370,7 @@ editor = connect selectTranslator $ H.mkComponent
             ]
           else
             [ HH.div
-                [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ] ]
+                [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter ] ]
                 [ case state.compareToElement of
                     Just _ -> HH.text ""
                     Nothing ->
@@ -473,7 +474,10 @@ editor = connect selectTranslator $ H.mkComponent
                       makeEditorToolbarButton
                         true
                         (translate (label :: _ "editor_wrapToggle") state.translator)
-                        []
+                        ( if state.wrapEnabled then
+                            [ H.ClassName "toolbar-btn--active" ]
+                          else []
+                        )
                         WrapToggle
                         "bi-text-wrap"
                 ]
@@ -481,7 +485,10 @@ editor = connect selectTranslator $ H.mkComponent
                 Just _ -> HH.text ""
                 Nothing ->
                   HH.div
-                    [ HP.classes [ HB.m1, HB.dFlex, HB.alignItemsCenter, HB.gap1 ]
+                    [ HP.classes
+                        ( [ HB.m1, HB.dFlex, HB.alignItemsCenter ]
+                            <> if state.showButtonText then [ HB.gap1 ] else []
+                        )
                     , HP.style "min-width: 0;"
                     ]
                     [ makeEditorToolbarButtonWithText
@@ -695,7 +702,6 @@ editor = connect selectTranslator $ H.mkComponent
 
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
-        H.modify_ _ { mEditor = Just editor_ }
         fontSize <- H.gets _.fontSize
 
         -- setting for both instances and later add more specific settings
@@ -710,7 +716,8 @@ editor = connect selectTranslator $ H.mkComponent
               onSave = HS.notify listener (Save false)
 
             H.modify_ _
-              { mEditor = Just editor_
+              { wrapEnabled = true
+              , mEditor = Just editor_
               , mListener = Just listener
               }
 
@@ -801,13 +808,15 @@ editor = connect selectTranslator $ H.mkComponent
 
     WrapToggle -> do
       editor_ <- H.gets _.mEditor
-      H.liftEffect
-        case editor_ of
-          Nothing -> pure unit
-          Just e -> do
+      wrapEnabled <- H.gets _.wrapEnabled
+      case editor_ of
+        Nothing -> pure unit
+        Just e -> do
+          let newWrapEnabled = not wrapEnabled
+          H.liftEffect $ do
             session <- Editor.getSession e
-            wrapState <- H.liftEffect (Session.getUseWrapMode session)
-            Session.setUseWrapMode (not wrapState) session
+            Session.setUseWrapMode newWrapEnabled session
+          H.modify_ _ { wrapEnabled = newWrapEnabled }
 
     Discard ->
       H.modify_ _ { discardPopup = true }
@@ -2307,6 +2316,7 @@ initialState { context, input } =
   , mListener: Nothing
   , showButtonText: true
   , showButtons: true
+  , wrapEnabled: true
   , saveState: initialSaveState
   , compareToElement: input.elementData
   , isEditorOutdated: false
@@ -2327,22 +2337,33 @@ makeEditorToolbarButton
   -> Action
   -> String
   -> H.ComponentHTML Action () m
-makeEditorToolbarButton enabled tooltip btnClasses action biName = HH.button
-  [ HP.classes
-      ( prependIf (not enabled) HB.opacity25
-          ( [ HB.btn, HB.p0, HB.m0, HB.border0 ]
-              <> btnClasses
-          )
-      )
-  , HP.title tooltip
-  , HE.onClick \_ -> action
-  , HP.enabled enabled
-  ]
-  [ HH.i
-      [ HP.classes [ HB.bi, H.ClassName biName ]
+makeEditorToolbarButton enabled tooltip btnClasses action biName =
+  let
+    toolbarDefaultClasses =
+      if null btnClasses then [ H.ClassName "editor-toolbar-btn--default" ] else []
+    baseClasses =
+      [ HB.btn
+      , HB.p0
+      , HB.m0
+      , HB.border0
+      , H.ClassName "editor-toolbar-btn"
+      , H.ClassName "editor-toolbar-btn--icon"
       ]
-      []
-  ]
+  in
+    HH.button
+      [ HP.classes
+          ( prependIf (not enabled) HB.opacity25
+              (baseClasses <> toolbarDefaultClasses <> btnClasses)
+          )
+      , HP.title tooltip
+      , HE.onClick \_ -> action
+      , HP.enabled enabled
+      ]
+      [ HH.i
+          [ HP.classes [ HB.bi, H.ClassName biName ]
+          ]
+          []
+      ]
 
 -- Here, no tooltip is needed as the text is shown in the button
 makeEditorToolbarButtonWithText
@@ -2355,26 +2376,38 @@ makeEditorToolbarButtonWithText
   -> String
   -> H.ComponentHTML Action () m
 makeEditorToolbarButtonWithText enabled asText btnClasses action biName smallText =
-  HH.button
-    ( prependIf (not asText) (HP.title smallText)
-        [ HP.classes
-            ( prependIf (not enabled) HB.opacity25
-                [ HB.btn, HB.btnOutlineDark, HB.px1, HB.py0, HB.m0 ]
-                <> btnClasses
-            )
-        , HP.style "white-space: nowrap;"
-        , HE.onClick \_ -> action
-        , HP.enabled enabled
-        ]
-    )
-    ( prependIf asText
-        (HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text smallText ])
-        [ HH.i
-            [ HP.classes [ HB.bi, H.ClassName biName ]
-            ]
-            []
-        ]
-    )
+  let
+    toolbarDefaultClasses =
+      if null btnClasses then [ H.ClassName "editor-toolbar-btn--default" ] else []
+    baseClasses =
+      [ HB.btn
+      , HB.px1
+      , HB.py0
+      , HB.m0
+      , HB.border0
+      , H.ClassName "editor-toolbar-btn"
+      , H.ClassName "editor-toolbar-btn--text"
+      ]
+  in
+    HH.button
+      ( prependIf (not asText) (HP.title smallText)
+          [ HP.classes
+              ( prependIf (not enabled) HB.opacity25
+                  (baseClasses <> toolbarDefaultClasses <> btnClasses)
+              )
+          , HP.style "white-space: nowrap;"
+          , HE.onClick \_ -> action
+          , HP.enabled enabled
+          ]
+      )
+      ( prependIf asText
+          (HH.small [ HP.style "margin-right: 0.25rem;" ] [ HH.text smallText ])
+          [ HH.i
+              [ HP.classes [ HB.bi, H.ClassName biName ]
+              ]
+              []
+          ]
+      )
 
 addMouseDragListeners :: HTMLElement -> HS.Listener Action -> Effect Unit
 addMouseDragListeners container listener = do

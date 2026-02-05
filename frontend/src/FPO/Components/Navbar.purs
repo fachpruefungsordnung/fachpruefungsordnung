@@ -15,10 +15,10 @@ import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (getIgnore, getUser)
-import FPO.Data.Route (Route(..))
+import FPO.Data.Route (Route(..), isAdminRoute)
 import FPO.Data.Store (saveLanguage)
 import FPO.Data.Store as Store
-import FPO.Dto.UserDto (FullUserDto, getUserName, isAdmin, isUserSuperadmin)
+import FPO.Dto.UserDto (FullUserDto, getUserName, isAdmin)
 import FPO.Translations.Translator
   ( FPOTranslator(..)
   , fromFpoTranslator
@@ -95,28 +95,18 @@ navbar = connect (selectEq identity) $ H.mkComponent
                       [ navButton
                           (translate (label :: _ "common_home") state.translator)
                           Home
+                          (state.currentRoute == Just Home)
                       ]
                   ]
-                    <>
-                      ( if (maybe false isUserSuperadmin state.user) then
-                          [ HH.li [ HP.classes [ HB.navItem ] ]
-                              [ navButton
-                                  ( translate (label :: _ "navbar_users")
-                                      state.translator
-                                  )
-                                  AdminViewUsers
-                              ]
-                          ]
-                        else []
-                      )
                     <>
                       ( if (maybe false isAdmin state.user) then
                           [ HH.li [ HP.classes [ HB.navItem ] ]
                               [ navButton
-                                  ( translate (label :: _ "navbar_groups")
+                                  ( translate (label :: _ "navbar_administration")
                                       state.translator
                                   )
-                                  AdminViewGroups
+                                  AdminUsers
+                                  (maybe false isAdminRoute state.currentRoute)
                               ]
                           ]
                         else []
@@ -146,6 +136,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
                 , HH.li [ HP.classes [ HB.navItem ] ]
                     [ case state.user of
                         Nothing -> navButton "Login" Login
+                          (state.currentRoute == Just Login)
                         Just user -> userDropdown state user
                     ]
                 ]
@@ -185,25 +176,25 @@ navbar = connect (selectEq identity) $ H.mkComponent
   handleAction Help = do
     state <- H.get
     case state.currentRoute of
-      Just AdminViewGroups -> openInNewTab
-        "https://fpo.bahn.sh/docs/user-docs/group-management/"
-      Just AdminViewUsers -> openInNewTab
-        "https://fpo.bahn.sh/docs/user-docs/user-management/"
+      Just (GroupRoute _ _) -> openInNewTab
+        "/docs/user-docs/group-management/"
       Just (Editor _) -> openInNewTab
-        "https://fpo.bahn.sh/docs/user-docs/working-on-a-project/"
-      Just _ -> openInNewTab "https://fpo.bahn.sh/docs/user-docs/"
-      Nothing -> openInNewTab "https://fpo.bahn.sh/docs"
+        "/docs/user-docs/working-on-a-project/"
+      Just route | isAdminRoute route -> openInNewTab
+        "/docs/user-docs/user-management/"
+      Just _ -> openInNewTab "/docs/user-docs/"
+      Nothing -> openInNewTab "/docs/"
 
   handleQuery :: forall a. Query a -> H.HalogenM State Action () output m (Maybe a)
   handleQuery (RequestReloadUser a) = do
     handleAction ReloadUser
     pure $ Just a
 
-  -- Creates a navigation button.
-  navButton :: String -> Route -> H.ComponentHTML Action () m
-  navButton label route =
+  navButton :: String -> Route -> Boolean -> H.ComponentHTML Action () m
+  navButton label route isActive =
     HH.button
-      [ HP.classes [ HB.navLink, HB.btn, HB.btnLink ]
+      [ HP.classes $ [ HB.navLink, HB.btn, HB.btnLink ]
+          <> if isActive then [ HB.active ] else []
       , HE.onClick (const $ Navigate route)
       ]
       [ HH.text label ]
@@ -218,8 +209,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
           , HPA.role "button"
           , HP.id "userDropdown"
           , HP.attr (AttrName "aria-expanded") "false"
-          , HE.onClick $ const $ Navigate
-              (Profile { loginSuccessful: Nothing, userId: Nothing })
+          , HE.onClick $ const $ Navigate Profile
           , HP.title (translate (label :: _ "prof_profile") state.translator)
           ]
           [ HH.i [ HP.classes [ ClassName "bi-person", HB.me1 ] ] []

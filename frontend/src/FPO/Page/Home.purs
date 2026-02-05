@@ -173,7 +173,7 @@ component =
                 }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
-      navigate (Editor { docID: DocumentHeader.getID project })
+      navigate (Editor (DocumentHeader.getID project))
     NavLogin -> do
       updateStore $ Store.SetLoginRedirect (Just Home)
       navigate Login
@@ -565,6 +565,17 @@ component =
           , if state.projects == Loading then loadingSpinner
             else HH.div [ HP.classes [ HB.col12 ] ] [ renderProjectTable ps state ]
           , HH.slot _pagination unit P.component paginationSettings SetPage
+          , if length fps == 0 then HH.text ""
+            else
+              let
+                startItem = state.page * 5 + 1
+                endItem = min ((state.page + 1) * 5) (length fps)
+              in
+                HH.div [ HP.classes [ HB.textCenter, HB.textMuted, HB.small ] ]
+                  [ HH.text $
+                      show startItem <> "–" <> show endItem <> " / " <> show
+                        (length fps)
+                  ]
           ]
       ]
     where

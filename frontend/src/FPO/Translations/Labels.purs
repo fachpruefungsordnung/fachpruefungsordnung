@@ -74,9 +74,14 @@ de = fromRecord
 -- | Because of this constraint, it's sensible to use
 -- | appropriate prefixes for strongly related labels.
 type Labels =
-  ( -- | Admin Groups Page
-    "admin_groups_createGroup"
+  ( -- | Admin Panel / Administration Page
+    "admin_administration"
+      ::: "admin_groups"
+
+      -- | Admin Groups Page
+      ::: "admin_groups_createGroup"
       ::: "admin_groups_createNewGroup"
+      ::: "admin_groups_deleteGroup"
       ::: "admin_groups_desc"
       ::: "admin_groups_enterGroupDesc"
       ::: "admin_groups_enterGroupName"
@@ -90,9 +95,11 @@ type Labels =
       ::: "admin_groups_notEmpty"
       ::: "admin_groups_searchForGroups"
       ::: "admin_groups_stillLoading"
+      ::: "admin_groups_successfullyCreatedGroup"
       ::: "admin_groups_viewDocumentsPage"
 
-      -- | Admin Users Page
+      -- | Admin Users Page (admin_users comes before admin_users_*)
+      ::: "admin_users"
       ::: "admin_users_create"
       ::: "admin_users_createNewUser"
       ::: "admin_users_deleteUser"
@@ -101,6 +108,7 @@ type Labels =
       ::: "admin_users_failedToLoadUsers"
       ::: "admin_users_goToProfilePage"
       ::: "admin_users_listOfUsers"
+      ::: "admin_users_searchUsers"
       ::: "admin_users_successfullyCreatedUser"
       ::: "admin_users_theUser"
 
@@ -123,6 +131,7 @@ type Labels =
       ::: "comment_send"
 
       -- | Common Phrases
+      ::: "common_add"
       ::: "common_by"
       ::: "common_cancel"
       ::: "common_clear"
@@ -208,6 +217,7 @@ type Labels =
       ::: "gm_addMember"
       ::: "gm_memberManagement"
       ::: "gm_membersOfGroup"
+      ::: "gm_noUsersFound"
       ::: "gm_removeMember"
       ::: "gm_role"
       ::: "gm_searchMembers"
@@ -267,7 +277,8 @@ type Labels =
       ::: "modal_treeRevision"
       ::: "modal_versionsFound"
 
-      -- | Navar
+      -- | Navbar
+      ::: "navbar_administration"
       ::: "navbar_documents"
       ::: "navbar_groups"
       ::: "navbar_help"

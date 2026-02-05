@@ -18,14 +18,13 @@ import FPO.AppM (runAppM)
 import FPO.Components.AppToasts as AppToasts
 import FPO.Components.Navbar as Navbar
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Route (Route(..), routeCodec)
+import FPO.Data.Route (GroupSubRoute(..), Route(..), routeCodec)
 import FPO.Data.Store (loadLanguage)
 import FPO.Data.Store as Store
-import FPO.Page.Admin.Group.AddMembers as GroupAddMembers
-import FPO.Page.Admin.Group.DocOverview as ViewGroupDocuments
-import FPO.Page.Admin.Group.MemberOverview as ViewGroupMembers
-import FPO.Page.Admin.Groups as AdminViewGroups
-import FPO.Page.Admin.Users as AdminViewUsers
+import FPO.Page.Admin.Administration as Administration
+import FPO.Page.Admin.CreateGroup as CreateGroup
+import FPO.Page.Admin.CreateUser as CreateUser
+import FPO.Page.Admin.GroupOverview as GroupOverview
 import FPO.Page.EditorPage as EditorPage
 import FPO.Page.Home as Home
 import FPO.Page.Login as Login
@@ -82,11 +81,10 @@ _home = Proxy :: Proxy "home"
 _editor = Proxy :: Proxy "editor"
 _login = Proxy :: Proxy "login"
 _resetPassword = Proxy :: Proxy "resetPassword"
-_adminUsers = Proxy :: Proxy "adminPanelUsers"
-_adminGroups = Proxy :: Proxy "adminPanelGroups"
-_viewGroupDocuments = Proxy :: Proxy "viewGroupDocuments"
-_viewGroupMembers = Proxy :: Proxy "viewGroupMembers"
-_groupAddMembers = Proxy :: Proxy "groupAddMembers"
+_administration = Proxy :: Proxy "administration"
+_createUser = Proxy :: Proxy "createUser"
+_createGroup = Proxy :: Proxy "createGroup"
+_groupOverview = Proxy :: Proxy "groupOverview"
 _page404 = Proxy :: Proxy "page404"
 _profile = Proxy :: Proxy "profile"
 _appToasts = Proxy :: Proxy "appToasts"
@@ -97,11 +95,10 @@ type Slots =
   , login :: forall q. H.Slot q Void Unit
   , navbar :: H.Slot Navbar.Query Void Unit
   , resetPassword :: forall q. H.Slot q Void Unit
-  , adminPanelUsers :: forall q. H.Slot q Void Unit
-  , adminPanelGroups :: forall q. H.Slot q Void Unit
-  , viewGroupDocuments :: forall q. H.Slot q Void Unit
-  , viewGroupMembers :: forall q. H.Slot q Void Unit
-  , groupAddMembers :: forall q. H.Slot q Void Unit
+  , administration :: forall q. H.Slot q Void Unit
+  , createUser :: forall q. H.Slot q Void Unit
+  , createGroup :: forall q. H.Slot q Void Unit
+  , groupOverview :: forall q. H.Slot q Void Unit
   , page404 :: forall q. H.Slot q Void Unit
   , profile :: forall q. H.Slot q Profile.Output Unit
   , appToasts :: forall q. H.Slot q Void Unit
@@ -124,6 +121,7 @@ component =
         }
     }
   where
+
   render :: State -> H.ComponentHTML Action Slots m
   render state = HH.div
     [ HP.classes
@@ -139,29 +137,39 @@ component =
     [ HH.slot_ _navbar unit Navbar.navbar unit
     , HH.slot_ _appToasts unit AppToasts.component unit
     , case state.route of
-        Nothing -> HH.slot_ _page404 unit Page404.component unit
+        Nothing -> HH.div_ [] -- Loading: route not yet resolved
         Just p -> case p of
           Home -> HH.slot_ _home unit Home.component unit
-          Editor { docID } -> HH.slot_ _editor unit EditorPage.component docID
+          Editor docID -> HH.slot_ _editor unit EditorPage.component docID
           Login -> HH.slot_ _login unit Login.component unit
           PasswordReset { token } -> HH.slot_ _resetPassword unit
             PasswordReset.component
             { token }
-          AdminViewUsers -> HH.slot_ _adminUsers unit AdminViewUsers.component unit
-          AdminViewGroups -> HH.slot_ _adminGroups unit AdminViewGroups.component unit
-          ViewGroupDocuments { groupID } -> HH.slot_ _viewGroupDocuments unit
-            ViewGroupDocuments.component
-            groupID
-          ViewGroupMembers { groupID } -> HH.slot_ _viewGroupMembers unit
-            ViewGroupMembers.component
-            groupID
-          GroupAddMembers { groupID } -> HH.slot_ _groupAddMembers unit
-            GroupAddMembers.component
-            groupID
+          Administration -> HH.slot_ _administration unit
+            Administration.component
+            { tab: Nothing }
+          AdminUsers -> HH.slot_ _administration unit
+            Administration.component
+            { tab: Nothing }
+          CreateUser -> HH.slot_ _createUser unit CreateUser.component unit
+          AdminGroups -> HH.slot_ _administration unit
+            Administration.component
+            { tab: Just "groups" }
+          CreateGroup -> HH.slot_ _createGroup unit CreateGroup.component unit
+          GroupRoute groupID GroupDocuments -> HH.slot_ _groupOverview unit
+            GroupOverview.component
+            { groupID, tab: Nothing }
+          GroupRoute groupID GroupMembers -> HH.slot_ _groupOverview unit
+            GroupOverview.component
+            { groupID, tab: Just "members" }
           Page404 -> HH.slot_ _page404 unit Page404.component unit
-          Profile { loginSuccessful, userId } -> HH.slot _profile unit
+          Profile -> HH.slot _profile unit
             Profile.component
-            { loginSuccessfulBanner: loginSuccessful, userId: userId }
+            { userId: Nothing }
+            HandleProfile
+          UserProfile userId -> HH.slot _profile unit
+            Profile.component
+            { userId: Just userId }
             HandleProfile
     ]
 
@@ -179,6 +187,11 @@ component =
   handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Void m (Maybe a)
   handleQuery = case _ of
     NavigateQ dest a -> do
+      let
+        actualDest = case dest of
+          Administration -> AdminUsers
+          _ -> dest
+
       -- Here, we do not check for user credentials before navigating.
       -- Each page (e.g., profile or admin panel) should handle its own access control.
       -- If the user is not logged in, they will be redirected to the login page or
@@ -194,8 +207,8 @@ component =
       when (route == Just Login) $ do
         H.tell _navbar unit Navbar.RequestReloadUser
 
-      H.modify_ _ { route = Just dest }
-      updateStore $ Store.SetCurrentRoute (Just dest)
+      H.modify_ _ { route = Just actualDest }
+      updateStore $ Store.SetCurrentRoute (Just actualDest)
 
       pure $ Just a
 

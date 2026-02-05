@@ -16,7 +16,10 @@ type GroupID = Int
 
 -- | Represents a group overview entity, as returned by the `GET /groups` endpoint.
 newtype GroupOverview = GroupOverview
-  { groupOverviewName :: String, groupOverviewID :: GroupID }
+  { groupOverviewName :: String
+  , groupOverviewID :: GroupID
+  , groupOverviewDescription :: String
+  }
 
 getGroupOverviewID :: GroupOverview -> Int
 getGroupOverviewID (GroupOverview g) = g.groupOverviewID
@@ -49,6 +52,9 @@ newtype GroupDto = GroupDto
 
 getGroupName :: GroupDto -> String
 getGroupName (GroupDto g) = g.groupName
+
+getGroupDescription :: GroupDto -> String
+getGroupDescription (GroupDto g) = g.groupDescription
 
 getGroupMembers :: GroupDto -> Array GroupMemberDto
 getGroupMembers (GroupDto g) = g.groupMembers
@@ -98,10 +104,12 @@ instance toGroupOverviewGroupDto :: ToGroupOverview GroupDto where
   toGroupOverview (GroupDto g) = GroupOverview
     { groupOverviewName: g.groupName
     , groupOverviewID: g.groupID
+    , groupOverviewDescription: g.groupDescription
     }
 
 instance toGroupOverviewGroupOverview :: ToGroupOverview UR.FullUserRoleDto where
   toGroupOverview r = GroupOverview
     { groupOverviewName: UR.getGroupName r
     , groupOverviewID: UR.getGroupID r
+    , groupOverviewDescription: ""
     }

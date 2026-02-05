@@ -80,7 +80,7 @@ type State = FPOState
   , isYourProfile :: Boolean
   )
 
-type Input = { loginSuccessfulBanner :: Maybe Boolean, userId :: Maybe String }
+type Input = { userId :: Maybe String }
 
 -- | User profile page component.
 component
@@ -399,8 +399,31 @@ component =
             , userId = getUserID user
             , groupMemberships = getFullUserRoles user
             }
-    Receive { context } -> do
-      H.modify_ _ { translator = fromFpoTranslator context }
+    Receive { context, input } -> do
+      let newTranslator = fromFpoTranslator context
+      state <- H.get
+      let oldUserId = if state.isYourProfile then Nothing else Just state.userId
+      let newUserId = input.userId
+      H.modify_ _ { translator = newTranslator }
+      when (oldUserId /= newUserId) $ do
+        H.modify_ _
+          { userId = fromMaybe "" newUserId
+          , isYourProfile = newUserId == Nothing
+          , username = ""
+          , originalUsername = ""
+          , emailAddress = ""
+          , unsaved = false
+          , newPw = ""
+          , newPw2 = ""
+          , groupMemberships = []
+          , showSavedToast = Nothing
+          , showLinkToast = false
+          , showPwToast = false
+          , showNotYetImplementedToast = false
+          , loginSuccessfulBanner = false
+          , loadSaveUsername = false
+          }
+        handleAction Initialize
     UsernameInput value -> do
       state <- H.get
       H.modify_ _
