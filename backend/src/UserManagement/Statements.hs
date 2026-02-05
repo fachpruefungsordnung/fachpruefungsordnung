@@ -216,11 +216,13 @@ getGroupInfo =
 
 getAllGroupsOverview :: Statement () [Group.GroupOverview]
 getAllGroupsOverview =
-    fmap (\(id, name) -> Group.GroupOverview (id :: Group.GroupID) name)
+    fmap
+        ( \(id, name, description) -> Group.GroupOverview (id :: Group.GroupID) name description
+        )
         <$> rmap
             toList
             [vectorStatement|
-        select id :: int8, name :: text
+        select id :: int8, name :: text, description :: text
         from groups
     |]
 
