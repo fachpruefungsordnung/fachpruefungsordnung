@@ -25,7 +25,7 @@ instance ToSchema Group
 data GroupOverview = GroupOverview
     { groupOverviewID :: GroupID
     , groupOverviewName :: Text
-    , groupOverviewDesc :: Maybe Text
+    , groupOverviewDescription :: Maybe Text
     }
     deriving (Generic)
 
