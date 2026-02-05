@@ -205,10 +205,9 @@ addGroup =
       returning id :: int8
     |]
 
-getGroupInfo :: Statement Group.GroupID Group.GroupCreate
+getGroupInfo :: Statement Group.GroupID (Text, Maybe Text)
 getGroupInfo =
-    uncurry Group.GroupCreate
-        <$> [singletonStatement|
+    [singletonStatement|
         select name :: text, description :: text?
         from groups
         where id = $1 :: int8
@@ -216,11 +215,12 @@ getGroupInfo =
 
 getAllGroupsOverview :: Statement () [Group.GroupOverview]
 getAllGroupsOverview =
-    fmap (\(id, name) -> Group.GroupOverview (id :: Group.GroupID) name)
+    fmap
+        (\(id, name, mDesc) -> Group.GroupOverview (id :: Group.GroupID) name mDesc)
         <$> rmap
             toList
             [vectorStatement|
-        select id :: int8, name :: text
+        select id :: int8, name :: text, description :: text?
         from groups
     |]
 
