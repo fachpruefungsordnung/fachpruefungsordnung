@@ -35,8 +35,13 @@ instance showGroupOverview :: Show GroupOverview where
   show = genericShow
 
 -- | A group creation request DTO, as sent to the `POST /groups` endpoint.
+-- | The `groupCreateUsers` field is an optional array of user UUIDs to add
+-- | as members when the group is created.
 newtype GroupCreate = GroupCreate
-  { groupCreateName :: String, groupCreateDescription :: String }
+  { groupCreateName :: String
+  , groupCreateDescription :: String
+  , groupCreateUsers :: Array UserID
+  }
 
 derive instance newtypeGroupCreate :: Newtype GroupCreate _
 derive newtype instance encodeJsonGroupCreate :: EncodeJson GroupCreate
