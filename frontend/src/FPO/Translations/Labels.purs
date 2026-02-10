@@ -79,8 +79,10 @@ type Labels =
       ::: "admin_groups"
 
       -- | Admin Groups Page
+      ::: "admin_groups_addMembers"
       ::: "admin_groups_createGroup"
       ::: "admin_groups_createNewGroup"
+      ::: "admin_groups_creatorAdmin"
       ::: "admin_groups_deleteGroup"
       ::: "admin_groups_desc"
       ::: "admin_groups_enterGroupDesc"
@@ -92,8 +94,10 @@ type Labels =
       ::: "admin_groups_failedDeletingGroup"
       ::: "admin_groups_groupName"
       ::: "admin_groups_listOfGroups"
+      ::: "admin_groups_noUsersFound"
       ::: "admin_groups_notEmpty"
       ::: "admin_groups_searchForGroups"
+      ::: "admin_groups_searchUsersToAdd"
       ::: "admin_groups_stillLoading"
       ::: "admin_groups_successfullyCreatedGroup"
       ::: "admin_groups_viewDocumentsPage"
