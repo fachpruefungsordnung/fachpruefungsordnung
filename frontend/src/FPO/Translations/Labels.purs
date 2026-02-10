@@ -82,7 +82,6 @@ type Labels =
       ::: "admin_groups_addMembers"
       ::: "admin_groups_createGroup"
       ::: "admin_groups_createNewGroup"
-      ::: "admin_groups_creatorAdmin"
       ::: "admin_groups_deleteGroup"
       ::: "admin_groups_desc"
       ::: "admin_groups_enterGroupDesc"

@@ -31,7 +31,14 @@ import FPO.Data.Request (addGroup, changeRole, getUser, getUsers)
 import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.GroupDto (GroupCreate(..))
-import FPO.Dto.UserDto (FullUserDto, UserID, getUserEmail, getUserID, getUserName, isAdmin)
+import FPO.Dto.UserDto
+  ( FullUserDto
+  , UserID
+  , getUserEmail
+  , getUserID
+  , getUserName
+  , isAdmin
+  )
 import FPO.Dto.UserOverviewDto (UserOverviewDto)
 import FPO.Dto.UserOverviewDto as UOD
 import FPO.Dto.UserRoleDto (Role(..))
@@ -43,11 +50,11 @@ import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Web.UIEvent.KeyboardEvent as KE
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
+import Web.UIEvent.KeyboardEvent as KE
 
 -- | A member added to the group during creation.
 type AddedMember =
@@ -242,7 +249,7 @@ component =
         , HH.div [ HP.classes [ HB.cardBody ] ]
             [ -- Search bar with anchored dropdown popover
               renderUserSearch state
-              -- Added members list
+            -- Added members list
             , HH.ul [ HP.classes [ HB.listGroup, HB.listGroupFlush, HB.mt3 ] ]
                 $ map (renderMemberEntry state) state.addedMembers
             ]
@@ -252,24 +259,29 @@ component =
   -- | The dropdown is only visible when the search input has focus.
   renderUserSearch :: State -> H.ComponentHTML Action () m
   renderUserSearch state =
-    HH.div [ HP.style "position: relative; z-index: 1050;" ]
+    HH.div [ HP.style "z-index: 1050;" ]
       [ HH.div [ HP.classes [ HB.inputGroup ] ]
           [ HH.span [ HP.classes [ HB.inputGroupText ] ]
               [ HH.i [ HP.classes [ H.ClassName "bi-search" ] ] [] ]
-          , HH.input
-              [ HP.type_ HP.InputText
-              , HP.classes [ HB.formControl ]
-              , HP.placeholder $ translate
-                  (label :: _ "admin_groups_searchUsersToAdd")
-                  state.translator
-              , HP.value state.userSearchFilter
-              , HE.onValueInput SearchUsers
-              , HE.onFocus $ const FocusUserSearch
-              , HE.onKeyDown SearchKeyDown
+          , HH.div
+              [ HP.style "position: relative; flex: 1 1 auto; min-width: 0;" ]
+              [ HH.input
+                  [ HP.type_ HP.InputText
+                  , HP.classes [ HB.formControl ]
+                  , HP.style
+                      "border-top-left-radius: 0; border-bottom-left-radius: 0;"
+                  , HP.placeholder $ translate
+                      (label :: _ "admin_groups_searchUsersToAdd")
+                      state.translator
+                  , HP.value state.userSearchFilter
+                  , HE.onValueInput SearchUsers
+                  , HE.onFocus $ const FocusUserSearch
+                  , HE.onKeyDown SearchKeyDown
+                  ]
+              , if state.searchFocused then renderUserDropdown state
+                else HH.text ""
               ]
           ]
-      , if state.searchFocused then renderUserDropdown state
-        else HH.text ""
       ]
 
   -- | The dropdown popover anchored below the search bar.
@@ -481,7 +493,11 @@ component =
       | KE.key event == "Enter" -> do
           state <- H.get
           when state.searchFocused $ do
-            H.modify_ _ { searchSubmitGuard = true, searchFocused = false, userSearchFilter = "" }
+            H.modify_ _
+              { searchSubmitGuard = true
+              , searchFocused = false
+              , userSearchFilter = ""
+              }
             case head (availableUsers state) of
               Just user -> do
                 let
