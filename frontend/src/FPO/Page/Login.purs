@@ -16,9 +16,8 @@ import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (postString) as Request
-import FPO.Data.Route (Route(..))
-import FPO.Data.Store (preventErrorHandlingLocally)
+import FPO.Data.Request (postStringSilent) as Request
+import FPO.Data.Route (Route(..), urlToRoute)
 import FPO.Data.Store as Store
 import FPO.Dto.Login (LoginDto)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
@@ -36,7 +35,11 @@ import Web.Event.Internal.Types (Event)
 
 foreign import selectElement :: forall a. a -> Effect Unit
 
-type Input = Unit
+-- | The login page now receives an optional redirect URI from the route's
+-- | query parameters so that the user can be returned to the page they were
+-- | on before being logged out.  This survives page reloads (unlike the old
+-- | Store-based `loginRedirect`).
+type Input = { redirect :: Maybe String }
 
 data Action
   = Initialize
@@ -55,6 +58,7 @@ type State = FPOState
   , password :: String
   , loginFailed :: Boolean
   , showPassword :: Boolean
+  , redirect :: Maybe String -- ^ URI to navigate to after successful login
   )
 
 passwordRef :: H.RefLabel
@@ -72,11 +76,12 @@ component
   => H.Component query Input output m
 component =
   connect selectTranslator $ H.mkComponent
-    { initialState: \{ context } ->
+    { initialState: \{ context, input } ->
         { email: ""
         , password: ""
         , loginFailed: false
         , showPassword: false
+        , redirect: input.redirect
         , translator: fromFpoTranslator context
         }
     , render
@@ -101,12 +106,14 @@ component =
       -- address from the store, provided that it exists (was
       -- previously set).
       store <- getStore
+      currentRedirect <- H.gets _.redirect
       let
         initialState =
           { email: store.inputMail
           , password: ""
           , loginFailed: false
           , showPassword: false
+          , redirect: currentRedirect
           , translator: fromFpoTranslator store.translator
           }
       H.put initialState
@@ -128,15 +135,16 @@ component =
       H.liftEffect $ preventDefault event
       -- trying to do a login by calling the api at /api/login
       -- we show the error response that comes back from the backend
-      loginResponse <- preventErrorHandlingLocally $
-        Request.postString "/login" (encodeJson loginDto)
+      loginResponse <-
+        Request.postStringSilent "/login" (encodeJson loginDto)
       case loginResponse of
         Left _ -> do
           H.modify_ _ { loginFailed = true }
           selectPasswordField
         Right _ -> handleLoginRedirect
       pure unit
-    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
+    Receive { context, input } -> H.modify_ _
+      { translator = fromFpoTranslator context, redirect = input.redirect }
     ToggleShowPassword -> do
       H.modify_ \state -> state { showPassword = not state.showPassword }
 
@@ -147,17 +155,14 @@ component =
       Nothing -> pure unit
       Just el -> H.liftEffect $ selectElement el
 
-  -- After successful login, redirect to either a previously set redirect route
-  -- or to the project overview page (home).
+  -- After successful login, redirect to the route encoded in the URL's
+  -- ?redirect= query parameter, or fall back to Home.
   handleLoginRedirect :: H.HalogenM State Action () output m Unit
   handleLoginRedirect = do
-    redirect <- _.loginRedirect <$> getStore
-    case redirect of
-      Just r -> do
-        updateStore $ Store.SetLoginRedirect Nothing
-        navigate r
-      Nothing -> do
-        navigate Home
+    mRedirectUri <- H.gets _.redirect
+    case mRedirectUri >>= urlToRoute of
+      Just r -> navigate r
+      Nothing -> navigate Home
 
   renderLoginForm :: forall w. State -> HH.HTML w Action
   renderLoginForm state =

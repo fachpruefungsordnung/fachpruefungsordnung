@@ -34,7 +34,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import Halogen.Store.Select (selectEq)
+import Halogen.Store.Select (selectAll)
 import Halogen.Themes.Bootstrap5 as HB
 import Parsing (runParserT)
 import Simple.I18n.Translator (Translator, label, translate)
@@ -91,7 +91,7 @@ documentHistoryModal
   => Navigate m
   => MonadStore Store.Action Store.Store m
   => H.Component Query Input Output m
-documentHistoryModal = connect (selectEq identity) $ H.mkComponent
+documentHistoryModal = connect selectAll $ H.mkComponent
   { initialState
   , render
   , eval: H.mkEval $ H.defaultEval
