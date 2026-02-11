@@ -143,7 +143,6 @@ data Action
   -- inner maybe for how. Nothing for left Version means newest version, nothing
   -- for right version means no comparison
   | ModifyVersionMapping Int (Maybe (Maybe Int)) (Maybe (ElementData))
-  | UpdateMSelectedTocEntry
   | SetComparison Int (Maybe Int)
   | UpdateVersionMapping
   | UpdateDirtyVersion
@@ -600,7 +599,6 @@ splitview = connect selectTranslator $ H.mkComponent
       H.tell _toc unit (TOC.ReceiveTOCs Empty emptyMetaMap)
       -- Load the initial TOC entries into the editor
       handleAction GET
-      handleAction UpdateMSelectedTocEntry
 
       -- Read the URL params directly from the path so we don't depend on a
       -- variable that is only available in initialState/Receive.
@@ -651,6 +649,10 @@ splitview = connect selectTranslator $ H.mkComponent
     -- This is called after paragraph / version / splitview changes so
     -- that the address bar always reflects the current state.
     -- We compare against the current path to avoid re-entrant navigation.
+    --
+    -- Reads `mSelectedTocEntry` from Splitview's own state, which is the
+    -- single source of truth.  That field is only ever written by
+    -- `syncSelectedEntry` (and `initialState`), so it is always correct.
     SyncUrlParams -> do
       state <- H.get
       let
@@ -802,10 +804,6 @@ splitview = connect selectTranslator $ H.mkComponent
 
         _, _ -> pure unit
 
-    UpdateMSelectedTocEntry -> do
-      cToc <- H.request _toc unit TOC.RequestCurrentTocEntry
-      H.modify_ _ { mSelectedTocEntry = join cToc }
-
     -- for when the tree updates.
     UpdateVersionMapping -> do
       state <- H.get
@@ -867,7 +865,7 @@ splitview = connect selectTranslator $ H.mkComponent
     SwitchPreview -> do
       state <- H.get
       case state.mSelectedTocEntry of
-        Just _ -> H.modify_ _ { mSelectedTocEntry = Nothing }
+        Just _ -> clearSelectedEntry
         Nothing -> handleAction TogglePreview
 
     -- Toggle the preview area
@@ -894,7 +892,6 @@ splitview = connect selectTranslator $ H.mkComponent
               , previewClosed = false
               }
           }
-      handleAction UpdateMSelectedTocEntry
       -- After the version mapping is updated below, sync URL so the
       -- revision / splitview params stay current.
       let
@@ -1020,10 +1017,9 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.PostPDF _ -> do
         state <- H.get
         upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
-        currentTocEntry <- H.request _toc unit TOC.RequestCurrentTocEntry
         let
           textElementId :: Int
-          textElementId = case join currentTocEntry of
+          textElementId = case state.mSelectedTocEntry of
             Just (SelLeaf id) -> id
             _ -> -1
 
@@ -1112,7 +1108,6 @@ splitview = connect selectTranslator $ H.mkComponent
         handleAction $ ToggleCommentOverview true
 
       Editor.RaiseDiscard -> do
-        handleAction UpdateMSelectedTocEntry
         state <- H.get
         -- Only the SelLeaf case should ever occur
         case state.mSelectedTocEntry of
@@ -1131,7 +1126,6 @@ splitview = connect selectTranslator $ H.mkComponent
             pure unit
 
       Editor.RaiseMergeMode draft -> do
-        handleAction UpdateMSelectedTocEntry
         state <- H.get
         upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
         case upToDateVersion of
@@ -1189,7 +1183,6 @@ splitview = connect selectTranslator $ H.mkComponent
           _ -> pure unit
 
       Editor.Merged -> do
-        handleAction UpdateMSelectedTocEntry
         state <- H.get
         case state.mSelectedTocEntry of
           Just (SelLeaf elementID) -> do
@@ -1219,7 +1212,6 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _comment unit (Comment.UpdateCommentProblem markerID)
 
     DeleteDraft -> do
-      handleAction UpdateMSelectedTocEntry
       state <- H.get
       -- Only the SelLeaf case should ever occur
       case state.mSelectedTocEntry of
@@ -1271,10 +1263,14 @@ splitview = connect selectTranslator $ H.mkComponent
         else do
           H.modify_ _ { pendingUpdateElementID = currentElementID }
           H.tell _editor 0 Editor.SaveSection
-          -- Set mSelectedTocEntry directly from the known selectedId instead of
-          -- querying the TOC (whose own state may not be updated yet when it
-          -- raises ChangeToLeaf from JumpToLeafSection).
-          H.modify_ _ { mSelectedTocEntry = Just (SelLeaf selectedId) }
+          -- Atomically update Splitview state, notify the TOC, and sync the
+          -- URL.  This must happen before telling the editor to load the new
+          -- section, because the editor's save (triggered by SaveSection
+          -- above) may raise RaiseUpdateVersion whose handler eventually
+          -- calls ModifyVersionMapping → SyncUrlParams.  If
+          -- mSelectedTocEntry were still stale at that point the URL would
+          -- regress to the old paragraph.
+          syncSelectedEntry (SelLeaf selectedId) mTitle
           state <- H.get
           let
             entry = case (findTOCEntry selectedId state.tocEntries) of
@@ -1288,15 +1284,12 @@ splitview = connect selectTranslator $ H.mkComponent
                   { elementID: -1, versionID: Nothing, comparisonData: Nothing }
                 Just elem -> elem
           H.tell _editor 0 (Editor.ChangeSection entry ev.versionID mTitle)
-          H.tell _toc unit $ TOC.UpdateMSelectedTocEntry (SelLeaf selectedId) mTitle
           case ev.comparisonData of
             Nothing -> do
               -- this case should be covered by mSelectedTocEntry being set to Nothing
               pure unit
             Just d ->
               H.tell _editor 1 (Editor.ChangeSection d.tocEntry d.revID mTitle)
-          -- Keep the URL in sync with the newly selected paragraph
-          handleAction SyncUrlParams
 
       TOC.UpdateNodePosition path -> do
         H.tell _editor 0 (Editor.UpdateNodePosition path)
@@ -1307,8 +1300,7 @@ splitview = connect selectTranslator $ H.mkComponent
           H.tell _editor 0 Editor.PreventChangeSection
         else do
           H.tell _editor 0 (Editor.ChangeToNode heading path mTitle)
-          H.tell _toc unit $ TOC.UpdateMSelectedTocEntry (SelNode path heading)
-            (Just heading)
+          syncSelectedEntry (SelNode path heading) (Just heading)
 
       TOC.AddNode path node -> do
         s <- H.get
@@ -1339,6 +1331,24 @@ splitview = connect selectTranslator $ H.mkComponent
         Nothing -> pure unit
 
     where
+    -- | Atomically update the selected entry in Splitview, notify the TOC
+    -- | child component, and push the change into the browser URL.
+    -- |
+    -- | Together with `clearSelectedEntry`, these are the **only**
+    -- | functions that write `mSelectedTocEntry`.  By funnelling every
+    -- | mutation through these two helpers we guarantee that Splitview
+    -- | state, TOC state, and the browser URL can never drift apart.
+    syncSelectedEntry entry mTitle = do
+      H.modify_ _ { mSelectedTocEntry = Just entry }
+      H.tell _toc unit $ TOC.UpdateMSelectedTocEntry entry mTitle
+      handleAction SyncUrlParams
+
+    -- | Clear the selected entry (e.g. when leaving comparison mode).
+    -- | Counterpart to `syncSelectedEntry` — keeps the same invariant
+    -- | that `mSelectedTocEntry` is only written through controlled helpers.
+    clearSelectedEntry = do
+      H.modify_ _ { mSelectedTocEntry = Nothing }
+
     -- Communicates tree changes to the server and TOC component.
     updateTree newTree = do
       state <- H.get
