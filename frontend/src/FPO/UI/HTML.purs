@@ -194,8 +194,8 @@ loadingSpinner =
 -- | Used by the administration and group-overview pages.
 filterInput
   :: forall w i
-   . String        -- ^ current filter value
-  -> String        -- ^ placeholder text
+   . String -- ^ current filter value
+  -> String -- ^ placeholder text
   -> (String -> i) -- ^ action on input
   -> HH.HTML w i
 filterInput value placeholder action =

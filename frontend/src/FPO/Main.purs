@@ -17,8 +17,13 @@ import FPO.AppM (runAppM)
 import FPO.Components.AppToasts as AppToasts
 import FPO.Components.Navbar as Navbar
 import FPO.Data.Navigate (class Navigate)
-import FPO.Data.Route (GroupSubRoute(..), Route(..), currentPath, isLoginRoute, parseRoute)
-import FPO.Page.Unauthorized as Unauthorized
+import FPO.Data.Route
+  ( GroupSubRoute(..)
+  , Route(..)
+  , currentPath
+  , isLoginRoute
+  , parseRoute
+  )
 import FPO.Data.Store (loadLanguage)
 import FPO.Data.Store as Store
 import FPO.Page.Admin.Administration as Administration
@@ -31,6 +36,7 @@ import FPO.Page.Login as Login
 import FPO.Page.Page404 as Page404
 import FPO.Page.Profile as Profile
 import FPO.Page.ResetPassword as PasswordReset
+import FPO.Page.Unauthorized as Unauthorized
 import FPO.Translations.Translator
   ( FPOTranslator(..)
   , detectBrowserLanguage
@@ -56,9 +62,9 @@ import Prelude
   , void
   , when
   , ($)
-  , (==)
   , (/=)
   , (<<<)
+  , (==)
   )
 import Routing.PushState as PushState
 import Type.Proxy (Proxy(..))
@@ -255,9 +261,12 @@ main = HA.runHalogenAff do
   -- would never invoke the callback — meaning unknown URLs left the page
   -- unchanged.  Wrapping in `Maybe` (always `Just`) guarantees the
   -- callback fires for every path change.
-  void $ liftEffect $ PushState.matchesWith (Just <<< parseRoute) (\old new ->
-    when (old /= Just new) $ launchAff_ do
-      _response <- halogenIO.query $ H.mkTell $ NavigateQ new
-      pure unit) pushStateInterface
+  void $ liftEffect $ PushState.matchesWith (Just <<< parseRoute)
+    ( \old new ->
+        when (old /= Just new) $ launchAff_ do
+          _response <- halogenIO.query $ H.mkTell $ NavigateQ new
+          pure unit
+    )
+    pushStateInterface
 
   void $ liftEffect setupTruncationListener

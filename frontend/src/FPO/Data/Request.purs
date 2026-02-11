@@ -71,7 +71,14 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (liftEffect)
 import FPO.Data.AppError (AppError(..), printAjaxError)
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Route (Route(..), currentPath, isLoginRoute, loginRoute, loginRouteWithRedirect, urlToRoute)
+import FPO.Data.Route
+  ( Route(..)
+  , currentPath
+  , isLoginRoute
+  , loginRoute
+  , loginRouteWithRedirect
+  , urlToRoute
+  )
 import FPO.Data.Store as Store
 import FPO.Dto.CommentDto (CommentSections)
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto)
@@ -255,18 +262,20 @@ handleAppError err = do
       Store.addError err
       -- Check the browser URL to see if we're already redirecting to login
       path <- liftEffect currentPath
-      let alreadyOnLogin = case urlToRoute path of
-            Just r | isLoginRoute r -> true
-            _ -> false
+      let
+        alreadyOnLogin = case urlToRoute path of
+          Just r | isLoginRoute r -> true
+          _ -> false
       when (not alreadyOnLogin) $
         navigate Unauthorized
 
     NotFoundError _ -> do
       Store.addError err
       path <- liftEffect currentPath
-      let alreadyOnLogin = case urlToRoute path of
-            Just r | isLoginRoute r -> true
-            _ -> false
+      let
+        alreadyOnLogin = case urlToRoute path of
+          Just r | isLoginRoute r -> true
+          _ -> false
       when (not alreadyOnLogin) $
         navigate Page404
 

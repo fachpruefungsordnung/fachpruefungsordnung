@@ -143,7 +143,8 @@ component =
           selectPasswordField
         Right _ -> handleLoginRedirect
       pure unit
-    Receive { context, input } -> H.modify_ _ { translator = fromFpoTranslator context, redirect = input.redirect }
+    Receive { context, input } -> H.modify_ _
+      { translator = fromFpoTranslator context, redirect = input.redirect }
     ToggleShowPassword -> do
       H.modify_ \state -> state { showPassword = not state.showPassword }
 

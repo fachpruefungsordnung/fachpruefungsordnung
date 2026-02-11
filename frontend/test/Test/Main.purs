@@ -3,9 +3,9 @@ module Test.Main where
 import Prelude
 
 import Effect (Effect)
+import Test.Routing (routeCodecTests)
 import Test.Spec.Reporter.Console (consoleReporter)
 import Test.Spec.Runner.Node (runSpecAndExitProcess)
-import Test.Routing (routeCodecTests)
 import Test.UI.Resizing
   ( resizeFromLeftTest
   , resizeFromRightTest

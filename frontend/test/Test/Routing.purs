@@ -81,15 +81,21 @@ routeCodecTests = do
         roundTrip route `shouldEqual` Right route
 
       it "round-trips Editor with paragraph only" do
-        let route = Editor 1 { revision: Nothing, paragraph: Just 7, splitview: Nothing }
+        let
+          route = Editor 1
+            { revision: Nothing, paragraph: Just 7, splitview: Nothing }
         roundTrip route `shouldEqual` Right route
 
       it "round-trips Editor with revision only" do
-        let route = Editor 1 { revision: Just 3, paragraph: Nothing, splitview: Nothing }
+        let
+          route = Editor 1
+            { revision: Just 3, paragraph: Nothing, splitview: Nothing }
         roundTrip route `shouldEqual` Right route
 
       it "round-trips Editor with splitview only" do
-        let route = Editor 1 { revision: Nothing, paragraph: Nothing, splitview: Just "comparison" }
+        let
+          route = Editor 1
+            { revision: Nothing, paragraph: Nothing, splitview: Just "comparison" }
         roundTrip route `shouldEqual` Right route
 
       it "round-trips Editor with all params" do
@@ -109,21 +115,24 @@ routeCodecTests = do
 
       it "parses /documents/1?paragraph=3 correctly" do
         parse routeCodec "/documents/1?paragraph=3"
-          `shouldEqual` Right (Editor 1 { revision: Nothing, paragraph: Just 3, splitview: Nothing })
+          `shouldEqual` Right
+            (Editor 1 { revision: Nothing, paragraph: Just 3, splitview: Nothing })
 
       it "parses /documents/1?revision=5&paragraph=3 correctly" do
         parse routeCodec "/documents/1?revision=5&paragraph=3"
-          `shouldEqual` Right (Editor 1 { revision: Just 5, paragraph: Just 3, splitview: Nothing })
-
-      it "parses /documents/1?revision=5&paragraph=3&splitview=comparison correctly" do
-        parse routeCodec "/documents/1?revision=5&paragraph=3&splitview=comparison"
           `shouldEqual` Right
-            ( Editor 1
-                { revision: Just 5
-                , paragraph: Just 3
-                , splitview: Just "comparison"
-                }
-            )
+            (Editor 1 { revision: Just 5, paragraph: Just 3, splitview: Nothing })
+
+      it "parses /documents/1?revision=5&paragraph=3&splitview=comparison correctly"
+        do
+          parse routeCodec "/documents/1?revision=5&paragraph=3&splitview=comparison"
+            `shouldEqual` Right
+              ( Editor 1
+                  { revision: Just 5
+                  , paragraph: Just 3
+                  , splitview: Just "comparison"
+                  }
+              )
 
       it "prints Editor with all params to expected URI" do
         let
@@ -296,7 +305,8 @@ routeCodecTests = do
 
       it "returns correct Editor route with params" do
         parseRoute "/documents/1?paragraph=3"
-          `shouldEqual` Editor 1 { revision: Nothing, paragraph: Just 3, splitview: Nothing }
+          `shouldEqual` Editor 1
+            { revision: Nothing, paragraph: Just 3, splitview: Nothing }
 
       it "returns correct GroupRoute" do
         parseRoute "/administration/groups/5/members"

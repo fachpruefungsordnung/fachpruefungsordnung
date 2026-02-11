@@ -56,7 +56,8 @@ component =
               [ HH.text $ translate (label :: _ "unauthorized_title") state.translator
               ]
           , HH.p [ HP.classes [ HB.mb4 ] ]
-              [ HH.text $ translate (label :: _ "unauthorized_message") state.translator
+              [ HH.text $ translate (label :: _ "unauthorized_message")
+                  state.translator
               ]
           , HH.button
               [ HP.classes [ HB.btn, HB.btnPrimary ]

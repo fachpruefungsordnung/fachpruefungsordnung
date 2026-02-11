@@ -141,9 +141,9 @@ showEditorParams :: EditorParams -> String
 showEditorParams p =
   let
     parts =
-      (case p.paragraph of
-        Nothing -> ""
-        Just para -> " paragraph=" <> show para
+      ( case p.paragraph of
+          Nothing -> ""
+          Just para -> " paragraph=" <> show para
       )
         <>
           ( case p.revision of

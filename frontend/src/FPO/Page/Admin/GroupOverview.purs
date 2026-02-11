@@ -670,8 +670,6 @@ component =
             ]
         ]
 
-
-
   createDocumentModal
     :: { waiting :: Boolean } -> State -> H.ComponentHTML Action Slots m
   createDocumentModal ms state =
@@ -754,7 +752,8 @@ component =
               Right user -> do
                 let isSuperAdmin = isUserSuperadmin user
                 let isGroupAdmin = user `isAdminOf` state.groupID || isSuperAdmin
-                H.modify_ _ { isGroupAdmin = isGroupAdmin, isSuperAdmin = isSuperAdmin }
+                H.modify_ _
+                  { isGroupAdmin = isGroupAdmin, isSuperAdmin = isSuperAdmin }
 
             -- Load group data
             loadGroupData
@@ -844,7 +843,9 @@ component =
               , currentTime = Just now
               }
             updateStore $ Store.AddSuccess
-              (translate (label :: _ "gp_successfullyCreatedDocument") state.translator)
+              ( translate (label :: _ "gp_successfullyCreatedDocument")
+                  state.translator
+              )
             H.modify_ _ { documentFilter = "" }
             H.tell _docPagination unit $ P.SetPageQ 0
         setModalWaiting false
