@@ -21,6 +21,7 @@ import FPO.Translations.Page.Login (deLogin, enLogin)
 import FPO.Translations.Page.Page404 (dePage404, enPage404)
 import FPO.Translations.Page.Profile (deProfile, enProfile)
 import FPO.Translations.Page.ResetPassword (dePasswordReset, enPasswordReset)
+import FPO.Translations.Page.Unauthorized (deUnauthorized, enUnauthorized)
 import Record (merge)
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord, toRecord)
@@ -43,6 +44,7 @@ en = fromRecord
   $ merge (toRecord enPasswordReset)
   $ merge (toRecord enProfile)
   $ merge (toRecord enGroupProjectsPage)
+  $ merge (toRecord enUnauthorized)
   $
     toRecord enGroupMemberPage
 
@@ -64,6 +66,7 @@ de = fromRecord
   $ merge (toRecord dePasswordReset)
   $ merge (toRecord deProfile)
   $ merge (toRecord deGroupProjectsPage)
+  $ merge (toRecord deUnauthorized)
   $
     toRecord deGroupMemberPage
 
@@ -219,6 +222,7 @@ type Labels =
       -- | Group Members Page
       ::: "gm_addMember"
       ::: "gm_memberManagement"
+      ::: "gm_membersAddedSuccessfully"
       ::: "gm_membersOfGroup"
       ::: "gm_noUsersFound"
       ::: "gm_removeMember"
@@ -236,6 +240,7 @@ type Labels =
 
       -- | Group Projects Page
       ::: "gp_createNewProject"
+      ::: "gp_docNameNotEmpty"
       ::: "gp_documentName"
       ::: "gp_enterDocumentName"
       ::: "gp_groupProjects"
@@ -243,6 +248,7 @@ type Labels =
       ::: "gp_projectManagement"
       ::: "gp_removeProject"
       ::: "gp_searchProjects"
+      ::: "gp_successfullyCreatedDocument"
 
       -- | Home Page
       ::: "home_basicDescription"
@@ -337,6 +343,10 @@ type Labels =
       ::: "toc_full"
       ::: "toc_paragraph"
       ::: "toc_section"
+
+      -- | Unauthorized Page
+      ::: "unauthorized_message"
+      ::: "unauthorized_title"
 
       ::: SNil
   )

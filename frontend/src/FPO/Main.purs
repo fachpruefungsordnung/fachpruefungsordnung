@@ -7,18 +7,23 @@
 
 module Main where
 
-import Data.Either (hush)
 import Data.Function (const)
 import Data.Map as Map
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, maybe)
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Aff.Class (class MonadAff)
 import FPO.AppM (runAppM)
 import FPO.Components.AppToasts as AppToasts
 import FPO.Components.Navbar as Navbar
-import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Route (GroupSubRoute(..), Route(..), routeCodec)
+import FPO.Data.Navigate (class Navigate)
+import FPO.Data.Route
+  ( GroupSubRoute(..)
+  , Route(..)
+  , currentPath
+  , isLoginRoute
+  , parseRoute
+  )
 import FPO.Data.Store (loadLanguage)
 import FPO.Data.Store as Store
 import FPO.Page.Admin.Administration as Administration
@@ -31,6 +36,7 @@ import FPO.Page.Login as Login
 import FPO.Page.Page404 as Page404
 import FPO.Page.Profile as Profile
 import FPO.Page.ResetPassword as PasswordReset
+import FPO.Page.Unauthorized as Unauthorized
 import FPO.Translations.Translator
   ( FPOTranslator(..)
   , detectBrowserLanguage
@@ -57,12 +63,10 @@ import Prelude
   , when
   , ($)
   , (/=)
-  , (<$>)
   , (<<<)
   , (==)
   )
-import Routing.Duplex as RD
-import Routing.Hash (getHash, matchesWith)
+import Routing.PushState as PushState
 import Type.Proxy (Proxy(..))
 
 --------------------------------------------------------------------------------
@@ -86,6 +90,7 @@ _createUser = Proxy :: Proxy "createUser"
 _createGroup = Proxy :: Proxy "createGroup"
 _groupOverview = Proxy :: Proxy "groupOverview"
 _page404 = Proxy :: Proxy "page404"
+_unauthorized = Proxy :: Proxy "unauthorized"
 _profile = Proxy :: Proxy "profile"
 _appToasts = Proxy :: Proxy "appToasts"
 
@@ -100,6 +105,7 @@ type Slots =
   , createGroup :: forall q. H.Slot q Void Unit
   , groupOverview :: forall q. H.Slot q Void Unit
   , page404 :: forall q. H.Slot q Void Unit
+  , unauthorized :: forall q. H.Slot q Void Unit
   , profile :: forall q. H.Slot q Profile.Output Unit
   , appToasts :: forall q. H.Slot q Void Unit
   )
@@ -140,14 +146,13 @@ component =
         Nothing -> HH.div_ [] -- Loading: route not yet resolved
         Just p -> case p of
           Home -> HH.slot_ _home unit Home.component unit
-          Editor docID -> HH.slot_ _editor unit EditorPage.component docID
-          Login -> HH.slot_ _login unit Login.component unit
+          Editor docID params -> HH.slot_ _editor unit EditorPage.component
+            { docID, params }
+          Login { redirect } -> HH.slot_ _login unit Login.component
+            { redirect }
           PasswordReset { token } -> HH.slot_ _resetPassword unit
             PasswordReset.component
             { token }
-          Administration -> HH.slot_ _administration unit
-            Administration.component
-            { tab: Nothing }
           AdminUsers -> HH.slot_ _administration unit
             Administration.component
             { tab: Nothing }
@@ -163,6 +168,7 @@ component =
             GroupOverview.component
             { groupID, tab: Just "members" }
           Page404 -> HH.slot_ _page404 unit Page404.component unit
+          Unauthorized -> HH.slot_ _unauthorized unit Unauthorized.component unit
           Profile -> HH.slot _profile unit
             Profile.component
             { userId: Nothing }
@@ -176,8 +182,19 @@ component =
   handleAction :: Action -> H.HalogenM State Action Slots Void m Unit
   handleAction = case _ of
     Initialize -> do
-      initialRoute <- hush <<< (RD.parse routeCodec) <$> liftEffect getHash
-      navigate $ fromMaybe Home initialRoute
+      path <- liftEffect currentPath
+      let
+        parsedRoute = parseRoute path
+      -- Set route and currentRoute immediately so that handleAppError (called
+      -- from child-component API failures) can see the correct "from" route.
+      -- We intentionally do NOT call `navigate` here — the browser URL is
+      -- already at `parsedRoute`, so pushing the same URL would only create
+      -- a redundant history entry and, more importantly, trigger the
+      -- `matchesWith` listener which would queue a `NavigateQ` that races
+      -- with any auth-error redirect produced by child components during
+      -- initialisation.
+      H.modify_ _ { route = Just parsedRoute }
+      updateStore $ Store.SetCurrentRoute (Just parsedRoute)
     HandleProfile profileOutput -> case profileOutput of
       Profile.ChangedUsername -> do
         -- If the username was changed, we want to reload the user data
@@ -187,28 +204,23 @@ component =
   handleQuery :: forall a. Query a -> H.HalogenM State Action Slots Void m (Maybe a)
   handleQuery = case _ of
     NavigateQ dest a -> do
-      let
-        actualDest = case dest of
-          Administration -> AdminUsers
-          _ -> dest
+      -- Validate against the live browser URL.  The `matchesWith` listener
+      -- can deliver NavigateQ messages out of order (e.g. an initial-load
+      -- NavigateQ for the protected page arriving *after* handleAppError
+      -- already pushed /login?redirect=…).  By checking the browser URL we
+      -- discard any stale NavigateQ whose route no longer matches reality,
+      -- keeping the view and address bar in sync at all times.
+      browserPath <- liftEffect currentPath
+      let browserRoute = parseRoute browserPath
+      when (dest == browserRoute) $ do
+        route <- H.gets _.route
+        -- If the user came from the login page, we want to reload the user data
+        -- to ensure that the navbar displays the correct user information.
+        when (maybe false isLoginRoute route) $ do
+          H.tell _navbar unit Navbar.RequestReloadUser
 
-      -- Here, we do not check for user credentials before navigating.
-      -- Each page (e.g., profile or admin panel) should handle its own access control.
-      -- If the user is not logged in, they will be redirected to the login page or
-      -- some other sensible page (e.g., home or 404 page).
-      -- This is reasonable because each specific backend API call will check
-      -- whether the user is logged in or not (and has sufficient access rights), and
-      -- the frontend should then handle the response accordingly - for each possible
-      -- page and action.
-
-      route <- H.gets _.route
-      -- If the user came from the login page, we want to reload the user data
-      -- to ensure that the navbar displays the correct user information.
-      when (route == Just Login) $ do
-        H.tell _navbar unit Navbar.RequestReloadUser
-
-      H.modify_ _ { route = Just actualDest }
-      updateStore $ Store.SetCurrentRoute (Just actualDest)
+        H.modify_ _ { route = Just dest }
+        updateStore $ Store.SetCurrentRoute (Just dest)
 
       pure $ Just a
 
@@ -222,25 +234,39 @@ main = HA.runHalogenAff do
   browserLang <- H.liftEffect detectBrowserLanguage
   let defaultLang = fromMaybe browserLang savedLang :: String
   let translator = getTranslatorForLanguage defaultLang
+  pushStateInterface <- H.liftEffect PushState.makeInterface
   let
     initialStore =
       { inputMail: ""
-      , loginRedirect: Nothing
       , currentRoute: Nothing
       , translator: FPOTranslator translator
       , language: defaultLang
       , toasts: []
       , errorCooldowns: Map.empty
       , totalToasts: 0
-      , handleRequestError: true
+      , pushStateInterface: pushStateInterface
       } :: Store.Store
   rootComponent <- runAppM initialStore component
   halogenIO <- runUI rootComponent unit body
 
-  -- Set up a listener for hash changes and update the route accordingly.
-  void $ liftEffect $ matchesWith (RD.parse routeCodec) \old new ->
-    when (old /= Just new) $ launchAff_ do
-      _response <- halogenIO.query $ H.mkTell $ NavigateQ new
-      pure unit
+  -- Set up a listener for path changes and update the route accordingly.
+  -- The initial callback (old == Nothing) is allowed through so that the
+  -- matchesWith state is primed, but handleQuery validates every
+  -- NavigateQ against the live browser URL, so a stale initial
+  -- NavigateQ that arrives after an auth redirect is harmlessly
+  -- discarded.
+  -- Use `Just <<< parseRoute` so unknown paths produce `Page404` instead of
+  -- being silently dropped.  `RD.parse routeCodec` returns `Either`, and
+  -- `Foldable (Either e)` only folds `Right` values, so a parse failure
+  -- would never invoke the callback — meaning unknown URLs left the page
+  -- unchanged.  Wrapping in `Maybe` (always `Just`) guarantees the
+  -- callback fires for every path change.
+  void $ liftEffect $ PushState.matchesWith (Just <<< parseRoute)
+    ( \old new ->
+        when (old /= Just new) $ launchAff_ do
+          _response <- halogenIO.query $ H.mkTell $ NavigateQ new
+          pure unit
+    )
+    pushStateInterface
 
   void $ liftEffect setupTruncationListener

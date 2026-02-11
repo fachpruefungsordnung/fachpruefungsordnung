@@ -7,6 +7,7 @@ module FPO.Page.EditorPage (component) where
 
 import Prelude
 
+import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.Splitview as Splitview
 import FPO.Data.Navigate (class Navigate)
@@ -19,11 +20,30 @@ import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(..))
 
-type Input = DocumentID
+-- | The input now carries both the document ID and optional query parameters
+-- | parsed from the URL so that the editor can restore paragraph, revision,
+-- | and split-view state from a shared link.
+type Input =
+  { docID :: DocumentID
+  , params ::
+      { revision :: Maybe Int
+      , paragraph :: Maybe Int
+      , splitview :: Maybe String
+      }
+  }
 
-data Action = HandleSplitview Splitview.Output
+data Action
+  = HandleSplitview Splitview.Output
+  | Receive Input
 
-type State = { docID :: DocumentID }
+type State =
+  { docID :: DocumentID
+  , params ::
+      { revision :: Maybe Int
+      , paragraph :: Maybe Int
+      , splitview :: Maybe String
+      }
+  }
 
 type Slots =
   ( splitview :: H.Slot Splitview.Query Splitview.Output Unit
@@ -39,17 +59,24 @@ component
   => H.Component query Input output m
 component =
   H.mkComponent
-    { initialState: \docId -> { docID: docId }
+    { initialState: \input -> { docID: input.docID, params: input.params }
     , render
-    , eval: H.mkEval H.defaultEval { handleAction = handleAction }
+    , eval: H.mkEval H.defaultEval
+        { handleAction = handleAction
+        , receive = Just <<< Receive
+        }
     }
   where
   render :: State -> H.ComponentHTML Action Slots m
   render state =
     HH.div [ HP.classes [ HB.flexGrow1, HB.p0, HB.overflowHidden ] ]
-      [ HH.slot _splitview unit Splitview.splitview state.docID HandleSplitview
+      [ HH.slot _splitview unit Splitview.splitview
+          { docID: state.docID, params: state.params }
+          HandleSplitview
       ]
 
   handleAction :: MonadAff m => Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     HandleSplitview _ -> pure unit
+    Receive input -> do
+      H.modify_ _ { docID = input.docID, params = input.params }

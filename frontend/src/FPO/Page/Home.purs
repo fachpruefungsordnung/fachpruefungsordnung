@@ -28,10 +28,10 @@ import FPO.Data.Request
   ( LoadState(..)
   , fromLoading
   , getBlobOrError
-  , getUser
   , getUserDocuments
+  , getUserSilent
   )
-import FPO.Data.Route (Route(..))
+import FPO.Data.Route (Route(..), editorRoute, loginRouteWithRedirect)
 import FPO.Data.Store as Store
 import FPO.Data.Time (formatRelativeTime)
 import FPO.Dto.DocumentDto.DocDate as DocDate
@@ -52,7 +52,7 @@ import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
-import Halogen.Store.Monad (class MonadStore, updateStore)
+import Halogen.Store.Monad (class MonadStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
@@ -145,7 +145,7 @@ component =
     -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
-      userWithError <- Store.preventErrorHandlingLocally getUser
+      userWithError <- getUserSilent
       now <- liftEffect nowDateTime
       -- If the user is logged in, fetch their documents and convert them to projects.
       case userWithError of
@@ -173,10 +173,9 @@ component =
                 }
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
-      navigate (Editor (DocumentHeader.getID project))
+      navigate (editorRoute (DocumentHeader.getID project))
     NavLogin -> do
-      updateStore $ Store.SetLoginRedirect (Just Home)
-      navigate Login
+      navigate (loginRouteWithRedirect Home)
     ScrollToFeatures -> do
       H.liftEffect $ smoothScrollToElement "features"
     DoNothing ->

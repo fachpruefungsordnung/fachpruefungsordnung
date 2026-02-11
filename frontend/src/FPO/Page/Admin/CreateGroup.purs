@@ -444,9 +444,12 @@ component =
     Initialize -> do
       userResult <- getUser
       case userResult of
-        Left _ -> navigate Page404
+        -- Don't navigate to Page404 here – handleAppError already redirects
+        -- to the login page for auth errors (401).  Navigating unconditionally
+        -- would race with the auth redirect and corrupt the ?redirect= param.
+        Left _ -> pure unit
         Right user -> do
-          when (not $ isAdmin user) $ navigate Page404
+          when (not $ isAdmin user) $ navigate Unauthorized
           let
             creatorMember =
               { userId: getUserID user

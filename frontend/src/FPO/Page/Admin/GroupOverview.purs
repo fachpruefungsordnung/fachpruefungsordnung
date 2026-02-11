@@ -30,7 +30,7 @@ import FPO.Data.Request
   , getUser
   , getUsers
   )
-import FPO.Data.Route (GroupSubRoute(..), Route(..))
+import FPO.Data.Route (GroupSubRoute(..), Route(..), editorRoute)
 import FPO.Data.Store as Store
 import FPO.Data.Time (formatRelativeTime)
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto(..))
@@ -55,7 +55,7 @@ import FPO.Dto.UserOverviewDto as UOD
 import FPO.Dto.UserRoleDto (Role(..))
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addModal, emptyEntryGen)
+import FPO.UI.HTML (addModal, emptyEntryGen, entryCount, filterInput, loadingSpinner)
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.UI.Style as Style
 import FPO.Util (focusRef, handleKeyDown, singletonIf)
@@ -300,7 +300,7 @@ component =
   renderDocumentsTab :: State -> H.ComponentHTML Action Slots m
   renderDocumentsTab state =
     case state.group of
-      Nothing -> renderLoading
+      Nothing -> loadingSpinner
       Just _ -> renderDocumentsList state
 
   renderDocumentsList :: State -> H.ComponentHTML Action Slots m
@@ -331,7 +331,7 @@ component =
                       ]
                   ]
               , HH.div [ HP.classes [ HB.cardBody ] ]
-                  [ renderFilterInput
+                  [ filterInput
                       state.documentFilter
                       (translate (label :: _ "gp_searchProjects") state.translator)
                       FilterDocuments
@@ -341,7 +341,7 @@ component =
                             (emptyEntryGen [ emptyDocButtons ])
                   , HH.slot _docPagination unit P.component docPaginationProps
                       SetDocPage
-                  , renderEntryCount state.docPage itemsPerPage
+                  , entryCount state.docPage itemsPerPage
                       (length state.filteredDocuments)
                   ]
               ]
@@ -405,7 +405,7 @@ component =
   renderMembersTab :: State -> H.ComponentHTML Action Slots m
   renderMembersTab state =
     case state.group of
-      Nothing -> renderLoading
+      Nothing -> loadingSpinner
       Just _ -> renderMembersList state
 
   renderMembersList :: State -> H.ComponentHTML Action Slots m
@@ -443,7 +443,7 @@ component =
                       ]
                   ]
               , HH.div [ HP.classes [ HB.cardBody ] ]
-                  [ renderFilterInput
+                  [ filterInput
                       state.memberFilter
                       (translate (label :: _ "gm_searchMembers") state.translator)
                       FilterMembers
@@ -453,7 +453,7 @@ component =
                             (emptyEntryGen [ emptyMemberButtons state ])
                   , HH.slot _memberPagination unit P.component memberPaginationProps
                       SetMemberPage
-                  , renderEntryCount state.memberPage itemsPerPage
+                  , entryCount state.memberPage itemsPerPage
                       (length state.filteredMembers)
                   ]
               ]
@@ -670,45 +670,6 @@ component =
             ]
         ]
 
-  renderLoading :: H.ComponentHTML Action Slots m
-  renderLoading =
-    HH.div [ HP.classes [ HB.textCenter, HB.mt5 ] ]
-      [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
-
-  -- | Renders a subtle "Showing X–Y of Z" indicator below the pagination.
-  renderEntryCount
-    :: forall w. Int -> Int -> Int -> HH.HTML w Action
-  renderEntryCount currentPage perPage totalItems =
-    if totalItems == 0 then HH.text ""
-    else
-      let
-        startItem = currentPage * perPage + 1
-        endItem = min ((currentPage + 1) * perPage) totalItems
-      in
-        HH.div [ HP.classes [ HB.textCenter, HB.textMuted, HB.small ] ]
-          [ HH.text $
-              show startItem <> "–" <> show endItem <> " / " <> show totalItems
-          ]
-
-  renderFilterInput
-    :: forall w
-     . String
-    -> String
-    -> (String -> Action)
-    -> HH.HTML w Action
-  renderFilterInput value placeholder action =
-    HH.div [ HP.classes [ HB.inputGroup, HB.mb3 ] ]
-      [ HH.span [ HP.classes [ HB.inputGroupText ] ]
-          [ HH.i [ HP.classes [ H.ClassName "bi-search" ] ] [] ]
-      , HH.input
-          [ HP.type_ HP.InputText
-          , HP.classes [ HB.formControl ]
-          , HP.placeholder placeholder
-          , HP.value value
-          , HE.onValueInput action
-          ]
-      ]
-
   createDocumentModal
     :: { waiting :: Boolean } -> State -> H.ComponentHTML Action Slots m
   createDocumentModal ms state =
@@ -776,20 +737,26 @@ component =
 
       userAuth <- getAuthorizedUser state.groupID
       case userAuth of
+        -- handleAppError already redirects to login for auth errors (401)
+        -- and to Page404 for not-found errors (404).  Short-circuit here to
+        -- avoid firing further API calls that would cascade-fail and race
+        -- with the auth redirect, corrupting the ?redirect= query parameter.
         Left _ -> pure unit
         Right maybeUser ->
-          when (isNothing maybeUser) $ navigate Page404
+          if isNothing maybeUser then
+            navigate Unauthorized
+          else do
+            userResult <- getUser
+            case userResult of
+              Left _ -> H.modify_ _ { isGroupAdmin = false, isSuperAdmin = false }
+              Right user -> do
+                let isSuperAdmin = isUserSuperadmin user
+                let isGroupAdmin = user `isAdminOf` state.groupID || isSuperAdmin
+                H.modify_ _
+                  { isGroupAdmin = isGroupAdmin, isSuperAdmin = isSuperAdmin }
 
-      userResult <- getUser
-      case userResult of
-        Left _ -> H.modify_ _ { isGroupAdmin = false, isSuperAdmin = false }
-        Right user -> do
-          let isSuperAdmin = isUserSuperadmin user
-          let isGroupAdmin = user `isAdminOf` state.groupID || isSuperAdmin
-          H.modify_ _ { isGroupAdmin = isGroupAdmin, isSuperAdmin = isSuperAdmin }
-
-      -- Load group data
-      loadGroupData
+            -- Load group data
+            loadGroupData
 
     Receive { context, input } -> do
       H.modify_ _
@@ -821,7 +788,7 @@ component =
     ViewDocument docID -> do
       state <- H.get
       case state.modalState of
-        NoModal -> navigate (Editor docID)
+        NoModal -> navigate (editorRoute docID)
         _ -> pure unit
 
     RequestDeleteDocument docID -> do
@@ -853,7 +820,8 @@ component =
       state <- H.get
       let newDocName = state.newDocumentName
       if newDocName == "" then
-        updateStore $ Store.AddWarning "Document name cannot be empty."
+        updateStore $ Store.AddWarning
+          (translate (label :: _ "gp_docNameNotEmpty") state.translator)
       else do
         setModalWaiting true
         let
@@ -874,7 +842,10 @@ component =
               , filteredDocuments = header : s.filteredDocuments
               , currentTime = Just now
               }
-            updateStore $ Store.AddSuccess "Successfully created document"
+            updateStore $ Store.AddSuccess
+              ( translate (label :: _ "gp_successfullyCreatedDocument")
+                  state.translator
+              )
             H.modify_ _ { documentFilter = "" }
             H.tell _docPagination unit $ P.SetPageQ 0
         setModalWaiting false
@@ -997,7 +968,8 @@ component =
           }
 
         reloadGroupMembers
-        updateStore $ Store.AddSuccess "Members added successfully"
+        updateStore $ Store.AddSuccess
+          (translate (label :: _ "gm_membersAddedSuccessfully") state.translator)
 
     CancelAddMembers -> do
       H.modify_ _
