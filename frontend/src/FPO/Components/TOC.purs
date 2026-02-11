@@ -67,7 +67,7 @@ import FPO.Dto.PostTextDto (createPostTextDto)
 import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
-import FPO.Types (TOCEntry, TOCTree, firstTOCEntry)
+import FPO.Types (TOCEntry, TOCTree, findTOCEntry, firstTOCEntry)
 import FPO.UI.HTML as HTMLP
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.UI.Modals.DocumentHistoryModal as DHM
@@ -80,7 +80,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import Halogen.Store.Select (selectEq)
+import Halogen.Store.Select (selectAll)
 import Halogen.Themes.Bootstrap5 as HB
 import Parsing (runParserT)
 import Prelude
@@ -90,7 +90,6 @@ import Prelude
   , const
   , discard
   , flip
-  , identity
   , map
   , negate
   , not
@@ -204,6 +203,7 @@ data Query a
   | RequestUpToDateVersion (Maybe Version -> a)
   | RequestFullTitle (Maybe String -> a)
   | SelectFirstEntry a
+  | SelectEntry Int a -- ^ Select a specific leaf entry by its ID
   | UpdateMSelectedTocEntry SelectedEntity (Maybe String) a
 
 type SearchData =
@@ -263,7 +263,7 @@ tocview
   => Navigate m
   => MonadStore Store.Action Store.Store m
   => H.Component Query Input Output m
-tocview = connect (selectEq identity) $ H.mkComponent
+tocview = connect selectAll $ H.mkComponent
   { initialState: \{ context: store, input } ->
       { documentName: ""
       , tocEntries: Empty
@@ -938,6 +938,23 @@ tocview = connect (selectEq identity) $ H.mkComponent
               , mTitle = mTitle
               }
           H.raise (ChangeToLeaf leafId mTitle)
+          pure (Just a)
+
+    SelectEntry targetId a -> do
+      state <- H.get
+      case findTOCEntry targetId state.tocEntries of
+        Nothing ->
+          -- If the requested entry doesn't exist, fall back to first entry
+          handleQuery (SelectFirstEntry a)
+        Just _entry -> do
+          let
+            mTitle = getFullTitleForDisplay <$> findLeafMeta targetId state.tocEntries
+          H.modify_ \st ->
+            st
+              { mSelectedTocEntry = Just (SelLeaf targetId)
+              , mTitle = mTitle
+              }
+          H.raise (ChangeToLeaf targetId mTitle)
           pure (Just a)
 
     UpdateMSelectedTocEntry entry mTitle a -> do

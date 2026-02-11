@@ -14,8 +14,8 @@ import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (class MonadEffect, liftEffect)
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (getIgnore, getUser)
-import FPO.Data.Route (Route(..), isAdminRoute)
+import FPO.Data.Request (getIgnoreSilent, getUserSilent)
+import FPO.Data.Route (Route(..), isAdminRoute, isLoginRoute, loginRoute)
 import FPO.Data.Store (saveLanguage)
 import FPO.Data.Store as Store
 import FPO.Dto.UserDto (FullUserDto, getUserName, isAdmin)
@@ -34,7 +34,7 @@ import Halogen.HTML.Properties.ARIA (role)
 import Halogen.HTML.Properties.ARIA as HPA
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import Halogen.Store.Select (selectEq)
+import Halogen.Store.Select (selectAll)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Web.HTML (window)
@@ -63,7 +63,7 @@ navbar
   => MonadStore Store.Action Store.Store m
   => Navigate m
   => H.Component Query Unit output m
-navbar = connect (selectEq identity) $ H.mkComponent
+navbar = connect selectAll $ H.mkComponent
   { initialState: \{ context: store } ->
       { user: Nothing
       , language: store.language
@@ -135,8 +135,8 @@ navbar = connect (selectEq identity) $ H.mkComponent
                 , languageDropdown state.language
                 , HH.li [ HP.classes [ HB.navItem ] ]
                     [ case state.user of
-                        Nothing -> navButton "Login" Login
-                          (state.currentRoute == Just Login)
+                        Nothing -> navButton "Login" loginRoute
+                          (maybe false isLoginRoute state.currentRoute)
                         Just user -> userDropdown state user
                     ]
                 ]
@@ -158,10 +158,10 @@ navbar = connect (selectEq identity) $ H.mkComponent
       }
   handleAction Logout = do
     -- Reset the cookies and reset the user state
-    _ <- getIgnore "/logout"
+    _ <- getIgnoreSilent "/logout"
     H.modify_ _ { user = Nothing }
     -- Simply navigate to the Login page indiscriminately
-    navigate Login
+    navigate loginRoute
   handleAction (SetLanguage lang) = do
     H.liftEffect $ saveLanguage lang
     updateStore $ Store.SetLanguage lang
@@ -169,7 +169,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
     let translator = FPOTranslator $ getTranslatorForLanguage lang
     updateStore $ Store.SetTranslator translator
   handleAction ReloadUser = do
-    userWithError <- Store.preventErrorHandlingLocally getUser
+    userWithError <- getUserSilent
     case userWithError of
       Left _ -> H.modify_ _ { user = Nothing } -- TODO error handling
       Right user -> H.modify_ _ { user = Just user }
@@ -178,7 +178,7 @@ navbar = connect (selectEq identity) $ H.mkComponent
     case state.currentRoute of
       Just (GroupRoute _ _) -> openInNewTab
         "/docs/user-docs/group-management/"
-      Just (Editor _) -> openInNewTab
+      Just (Editor _ _) -> openInNewTab
         "/docs/user-docs/working-on-a-project/"
       Just route | isAdminRoute route -> openInNewTab
         "/docs/user-docs/user-management/"

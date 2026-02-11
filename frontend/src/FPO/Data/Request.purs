@@ -19,16 +19,20 @@ module FPO.Data.Request
   , getGroup
   , getGroups
   , getIgnore
+  , getIgnoreSilent
   , getDocumentHistory
   , getJson
+  , getJsonSilent
   , getString
   , getTextElemHistory
   , getTreeHistory
   , getUser
+  , getUserSilent
   , getUserDocuments
   , getUserGroups
   , getUserWithId
   , getUsers
+  , handleAppError
   , patchJson
   , patchString
   , postBlob
@@ -39,6 +43,7 @@ module FPO.Data.Request
   , postJson
   , postRenderHtml
   , postString
+  , postStringSilent
   , postText
   , putIgnore
   , putJson
@@ -66,7 +71,7 @@ import Effect.Aff.Class (class MonadAff, liftAff)
 import Effect.Class (liftEffect)
 import FPO.Data.AppError (AppError(..), printAjaxError)
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Route (Route(..))
+import FPO.Data.Route (Route(..), currentPath, isLoginRoute, loginRoute, loginRouteWithRedirect, urlToRoute)
 import FPO.Data.Store as Store
 import FPO.Dto.CommentDto (CommentSections)
 import FPO.Dto.CreateDocumentDto (NewDocumentCreateDto)
@@ -137,8 +142,49 @@ derive instance eqLoadState :: Eq a => Eq (LoadState a)
 
 -- | Generic Error Handling Functions ----------------------------------------
 
--- | Generic wrapper for any Aff request that returns Either Error (Response a)
--- | Converts Ajax errors and HTTP status codes to AppError
+-- | Shared helper: classify an HTTP response into Either AppError a.
+-- | Both `handleRequest'` and `handleRequestSilent'` delegate to this
+-- | function to avoid duplicating the status-code-to-error mapping.
+classifyResponse
+  :: forall a
+   . Store.Store
+  -> String -- URL for error context
+  -> Either Error (Response a)
+  -> Either AppError a
+classifyResponse store url = case _ of
+  Left err ->
+    Left $ NetworkError $ printAjaxError
+      ( translate (label :: _ "error_connectionFailed")
+          (fromFpoTranslator store.translator)
+      )
+      err
+  Right { body, status } -> case status of
+    StatusCode 401 ->
+      let
+        errorMessage =
+          if url == "/login" then
+            translate (label :: _ "error_invalidCredentials")
+              (fromFpoTranslator store.translator)
+          else
+            translate (label :: _ "error_sessionExpired")
+              (fromFpoTranslator store.translator)
+      in
+        Left $ AuthError errorMessage
+    StatusCode 403 -> Left AccessDeniedError
+    StatusCode 404 -> Left $ NotFoundError url
+    StatusCode 405 -> Left $ MethodNotAllowedError url "Unknown"
+    StatusCode 409 -> Left $ ConflictError url
+    StatusCode code | code >= 500 && code < 600 ->
+      Left $ ServerError $ "Server error (status: " <> show code <> ")"
+    StatusCode 200 -> Right body
+    StatusCode 201 -> Right body
+    StatusCode 204 -> Right body
+    StatusCode code ->
+      Left $ ServerError $ "Unexpected status code: " <> show code
+
+-- | Generic wrapper for any Aff request that returns Either Error (Response a).
+-- | Converts Ajax errors and HTTP status codes to AppError, and calls
+-- | `handleAppError` for automatic toasts / redirects on failure.
 handleRequest'
   :: forall a st act slots msg m
    . MonadAff m
@@ -150,56 +196,26 @@ handleRequest'
 handleRequest' url requestAction = do
   store <- getStore
   response <- H.liftAff requestAction
-  case response of
-    Left err -> do
-      pure $ Left $ NetworkError $ printAjaxError
-        ( translate (label :: _ "error_connectionFailed")
-            (fromFpoTranslator store.translator)
-        )
-        err
-    Right { body, status } -> do
-      case status of
-        StatusCode 401 -> do
-          let
-            errorMessage =
-              if url == "/login" then
-                ( translate (label :: _ "error_invalidCredentials")
-                    (fromFpoTranslator store.translator)
-                )
-              else
-                ( translate (label :: _ "error_sessionExpired")
-                    (fromFpoTranslator store.translator)
-                )
-            appError = AuthError errorMessage
-          updateStore $ Store.SetLoginRedirect store.currentRoute
-          handleAppError appError
-          pure $ Left appError
-        StatusCode 403 -> do
-          handleAppError AccessDeniedError
-          pure $ Left AccessDeniedError
-        StatusCode 404 -> do
-          handleAppError (NotFoundError url)
-          pure $ Left $ NotFoundError url
-        StatusCode 405 -> do
-          handleAppError (MethodNotAllowedError url "Unknown")
-          pure $ Left $ MethodNotAllowedError url "Unknown"
-        StatusCode 409 -> do
-          handleAppError (ConflictError url)
-          pure $ Left $ ConflictError url
-        StatusCode code | code >= 500 && code < 600 -> do
-          handleAppError (ServerError $ "Server error (status: " <> show code <> ")")
-          pure $ Left $ ServerError $ "Server error (status: " <> show code <> ")"
-        StatusCode 200 ->
-          pure $ Right body
-        StatusCode 201 ->
-          pure $ Right body
-        StatusCode 204 ->
-          pure $ Right body
-        StatusCode code -> do
-          handleAppError (ServerError $ "Unexpected status code: " <> show code)
-          pure $ Left $ ServerError $ "Unexpected status code: " <> show code
+  let result = classifyResponse store url response
+  case result of
+    Left appError -> do
+      handleAppError appError
+      pure $ Left appError
+    Right body ->
+      pure $ Right body
 
 -- | Helper function to handle app errors.
+-- |
+-- | For AuthError (401), we always read the current browser URL via
+-- | `currentPath` instead of relying on the store's `currentRoute`.
+-- | This avoids two classes of bugs:
+-- |   1. The store's `currentRoute` may be stale when the user just
+-- |      navigated (pushState updated the URL, but the async NavigateQ
+-- |      hasn't updated the store yet).  Using the browser URL ensures
+-- |      the redirect target is the page the user intended to visit.
+-- |   2. No dependency on a global flag — the old `handleRequestError`
+-- |      flag caused race conditions when the Navbar's silent user-check
+-- |      overlapped with other components' API calls.
 handleAppError
   :: forall st act slots msg m
    . MonadAff m
@@ -208,24 +224,100 @@ handleAppError
   => AppError
   -> H.HalogenM st act slots msg m Unit
 handleAppError err = do
-  s <- getStore
-  when s.handleRequestError $ do
-    Store.addError err
-    case err of
-      NetworkError _ -> pure unit -- Let component handle this
-      AuthError _ -> navigate Login
-      NotFoundError _ -> navigate Page404
-      ServerError _ -> pure unit -- Let component handle this
-      DataError _ -> pure unit -- Let component handle this
-      AccessDeniedError -> pure unit -- Let component handle this
-      MethodNotAllowedError _ _ -> pure unit -- Let component handle this
-      ConflictError _ -> pure unit -- Let component handle this
+  case err of
+    AuthError _ -> do
+      Store.addError err
+      -- Always read the live browser URL so that we capture the page the
+      -- user is on (or navigating to) right now, not a potentially stale
+      -- store value.
+      path <- liftEffect currentPath
+      let fromRoute = urlToRoute path
+      case fromRoute of
+        -- Already on the login page — do nothing so we don't overwrite the
+        -- existing ?redirect= param with a self-referencing login URI.
+        Just r | isLoginRoute r -> pure unit
+        -- Normal case: redirect to login, preserving where the user was.
+        -- We immediately update currentRoute in the store so that any
+        -- concurrent 401 responses (from other in-flight API calls) will
+        -- see the login route in the store and the browser URL, preventing
+        -- them from racing to overwrite the redirect parameter.
+        Just r -> do
+          let dest = loginRouteWithRedirect r
+          navigate dest
+          updateStore $ Store.SetCurrentRoute (Just dest)
+        -- Could not parse the current URL (should not happen in practice).
+        -- Fall back to a plain login redirect without a ?redirect= param.
+        Nothing -> do
+          navigate loginRoute
+          updateStore $ Store.SetCurrentRoute (Just loginRoute)
+
+    AccessDeniedError -> do
+      Store.addError err
+      -- Check the browser URL to see if we're already redirecting to login
+      path <- liftEffect currentPath
+      let alreadyOnLogin = case urlToRoute path of
+            Just r | isLoginRoute r -> true
+            _ -> false
+      when (not alreadyOnLogin) $
+        navigate Unauthorized
+
+    NotFoundError _ -> do
+      Store.addError err
+      path <- liftEffect currentPath
+      let alreadyOnLogin = case urlToRoute path of
+            Just r | isLoginRoute r -> true
+            _ -> false
+      when (not alreadyOnLogin) $
+        navigate Page404
+
+    -- For all remaining error types (NetworkError, ServerError, DataError,
+    -- MethodNotAllowedError, ConflictError) we only emit a toast and let
+    -- the originating component decide what to do.
+    _ -> Store.addError err
+
+-- | Silent variant of `handleRequest'` that never calls `handleAppError`.
+-- | Errors are still returned as `Left` values so the caller can inspect
+-- | them, but no toasts are shown and no automatic redirects occur.
+-- |
+-- | Use this for "optimistic" or "probe" requests where a failure is an
+-- | expected outcome (e.g. checking whether the user is logged in from
+-- | the Navbar, or probing for a draft in the Editor).
+handleRequestSilent'
+  :: forall a st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => String
+  -> Aff (Either Error (Response a))
+  -> H.HalogenM st act slots msg m (Either AppError a)
+handleRequestSilent' url requestAction = do
+  store <- getStore
+  response <- H.liftAff requestAction
+  pure $ classifyResponse store url response
+
+-- | Silent variant of `handleJsonRequest'`.
+handleJsonRequestSilent'
+  :: forall a st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => (Json -> Either JsonDecodeError a)
+  -> String
+  -> Aff (Either Error (Response Json))
+  -> H.HalogenM st act slots msg m (Either AppError a)
+handleJsonRequestSilent' decode url requestAction = do
+  result <- handleRequestSilent' url requestAction
+  case result of
+    Left appError -> pure $ Left appError
+    Right json -> do
+      case decode json of
+        Left err -> do
+          pure $ Left $ DataError $ "Invalid data format: " <> show err
+        Right val ->
+          pure $ Right val
 
 -- | Wrapper specifically for JSON responses with decode step
 handleJsonRequest'
   :: forall a st act slots msg m
    . MonadAff m
-  => MonadStore Store.Action Store.Store m
   => MonadStore Store.Action Store.Store m
   => Navigate m
   => (Json -> Either JsonDecodeError a)
@@ -247,7 +339,6 @@ handleJsonRequest' decode url requestAction = do
 handleUnitRequest
   :: forall st act slots msg m
    . MonadAff m
-  => MonadStore Store.Action Store.Store m
   => MonadStore Store.Action Store.Store m
   => Navigate m
   => String
@@ -277,6 +368,16 @@ getJson
   -> H.HalogenM st act slots msg m (Either AppError a)
 getJson decode url = handleJsonRequest' decode url (getJson' url)
 
+-- | Silent variant of `getJson` — no toasts, no redirects on error.
+getJsonSilent
+  :: forall a st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => (Json -> Either JsonDecodeError a)
+  -> String
+  -> H.HalogenM st act slots msg m (Either AppError a)
+getJsonSilent decode url = handleJsonRequestSilent' decode url (getJson' url)
+
 getBlob
   :: forall st act slots msg m
    . MonadAff m
@@ -303,6 +404,15 @@ getIgnore
   => String
   -> H.HalogenM st act slots msg m (Either AppError Unit)
 getIgnore url = handleUnitRequest url (getIgnore' url)
+
+-- | Silent variant of `getIgnore` — no toasts, no redirects on error.
+getIgnoreSilent
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => String
+  -> H.HalogenM st act slots msg m (Either AppError Unit)
+getIgnoreSilent url = handleRequestSilent' url (getIgnore' url)
 
 postIgnore
   :: forall st act slots msg m
@@ -335,6 +445,16 @@ postString
   -> Json
   -> H.HalogenM st act slots msg m (Either AppError String)
 postString url body = handleRequest' url (postString' url body)
+
+-- | Silent variant of `postString` — no toasts, no redirects on error.
+postStringSilent
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => String
+  -> Json
+  -> H.HalogenM st act slots msg m (Either AppError String)
+postStringSilent url body = handleRequestSilent' url (postString' url body)
 
 postBlob
   :: forall st act slots msg m
@@ -467,6 +587,16 @@ getUser
   => Navigate m
   => H.HalogenM st act slots msg m (Either AppError FullUserDto)
 getUser = getJson decodeJson "/me"
+
+-- | Silent variant of `getUser` — no toasts, no redirects on error.
+-- | Use this when a 401 is an expected / normal outcome (e.g. Navbar
+-- | checking whether the user is logged in, Home page probe).
+getUserSilent
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => H.HalogenM st act slots msg m (Either AppError FullUserDto)
+getUserSilent = getJsonSilent decodeJson "/me"
 
 getUsers
   :: forall st act slots msg m

@@ -34,12 +34,12 @@ import FPO.Dto.GroupDto
   , getGroupOverviewID
   , getGroupOverviewName
   )
-import FPO.Dto.UserDto (UserID, getUserID, isAdmin, isUserSuperadmin)
+import FPO.Dto.UserDto (UserID, getUserID, isAdmin)
 import FPO.Dto.UserOverviewDto (UserOverviewDto)
 import FPO.Dto.UserOverviewDto as UOD
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (emptyEntryGen)
+import FPO.UI.HTML (emptyEntryGen, entryCount, filterInput, loadingSpinner)
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.UI.Style as Style
 import FPO.Util as Util
@@ -178,15 +178,23 @@ component =
     Initialize -> do
       userResult <- getUser
       case userResult of
-        Left _ -> navigate Page404
+        -- Don't navigate to Page404 here – handleAppError already redirects
+        -- to the login page for auth errors (401) and to Page404 for
+        -- not-found errors (404).  Navigating to Page404 unconditionally
+        -- would race with the auth redirect and overwrite the ?redirect=
+        -- query parameter, causing the user to land on the 404 page after
+        -- logging back in.  We also short-circuit to avoid firing further
+        -- API calls (loadUsers / loadGroups) that would cascade-fail.
+        Left _ -> pure unit
         Right user -> do
-          when (not $ isAdmin user && not (isUserSuperadmin user)) $ pure unit
-          when (not $ isAdmin user) $ navigate Page404
-          H.modify_ _ { currentUserID = Just $ getUserID user }
+          if not (isAdmin user) then
+            navigate Unauthorized
+          else do
+            H.modify_ _ { currentUserID = Just $ getUserID user }
 
-      -- Load both users and groups
-      loadUsers
-      loadGroups
+            -- Load both users and groups
+            loadUsers
+            loadGroups
 
     Receive { context, input } -> do
       H.modify_ _
@@ -340,7 +348,7 @@ component =
   renderUsersTab :: State -> H.ComponentHTML Action Slots m
   renderUsersTab state =
     case state.users of
-      Loading -> renderLoading
+      Loading -> loadingSpinner
       Loaded _ -> renderUsersList state
 
   renderUsersList :: State -> H.ComponentHTML Action Slots m
@@ -372,7 +380,7 @@ component =
                       ]
                   ]
               , HH.div [ HP.classes [ HB.cardBody ] ]
-                  [ renderFilterInput
+                  [ filterInput
                       state.userFilter
                       ( translate (label :: _ "admin_users_searchUsers")
                           state.translator
@@ -384,7 +392,7 @@ component =
                             (emptyEntryGen [ emptyUserButtons ])
                   , HH.slot _userPagination unit P.component userPaginationProps
                       SetUserPage
-                  , renderEntryCount state.userPage usersPerPage
+                  , entryCount state.userPage usersPerPage
                       (length state.filteredUsers)
                   ]
               ]
@@ -450,7 +458,7 @@ component =
   renderGroupsTab :: State -> H.ComponentHTML Action Slots m
   renderGroupsTab state =
     case state.groups of
-      Loading -> renderLoading
+      Loading -> loadingSpinner
       Loaded _ -> renderGroupsList state
 
   renderGroupsList :: State -> H.ComponentHTML Action Slots m
@@ -482,7 +490,7 @@ component =
                       ]
                   ]
               , HH.div [ HP.classes [ HB.cardBody ] ]
-                  [ renderFilterInput
+                  [ filterInput
                       state.groupFilter
                       ( translate (label :: _ "admin_groups_searchForGroups")
                           state.translator
@@ -494,7 +502,7 @@ component =
                             (emptyEntryGen [ emptyGroupButtons ])
                   , HH.slot _groupPagination unit P.component groupPaginationProps
                       SetGroupPage
-                  , renderEntryCount state.groupPage groupsPerPage
+                  , entryCount state.groupPage groupsPerPage
                       (length state.filteredGroups)
                   ]
               ]
@@ -556,46 +564,6 @@ component =
       , HH.button
           [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm, HB.invisible ] ]
           [ HH.i [ HP.classes [ H.ClassName "bi-trash-fill" ] ] [] ]
-      ]
-
-  -- Common rendering helpers
-  renderLoading :: H.ComponentHTML Action Slots m
-  renderLoading =
-    HH.div [ HP.classes [ HB.textCenter, HB.mt5 ] ]
-      [ HH.div [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] [] ]
-
-  -- | Renders a subtle "Showing X–Y of Z" indicator below the pagination.
-  renderEntryCount
-    :: forall w. Int -> Int -> Int -> HH.HTML w Action
-  renderEntryCount currentPage perPage totalItems =
-    if totalItems == 0 then HH.text ""
-    else
-      let
-        startItem = currentPage * perPage + 1
-        endItem = min ((currentPage + 1) * perPage) totalItems
-      in
-        HH.div [ HP.classes [ HB.textStart, HB.textMuted, HB.small ] ]
-          [ HH.text $
-              show startItem <> "–" <> show endItem <> " / " <> show totalItems
-          ]
-
-  renderFilterInput
-    :: forall w
-     . String
-    -> String
-    -> (String -> Action)
-    -> HH.HTML w Action
-  renderFilterInput value placeholder action =
-    HH.div [ HP.classes [ HB.inputGroup, HB.mb3 ] ]
-      [ HH.span [ HP.classes [ HB.inputGroupText ] ]
-          [ HH.i [ HP.classes [ H.ClassName "bi-search" ] ] [] ]
-      , HH.input
-          [ HP.type_ HP.InputText
-          , HP.classes [ HB.formControl ]
-          , HP.placeholder placeholder
-          , HP.value value
-          , HE.onValueInput action
-          ]
       ]
 
   -- Delete modals

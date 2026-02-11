@@ -11,11 +11,11 @@ type Page404Labels =
 enPage404 :: Translation Page404Labels
 enPage404 = fromRecord
   { p404_notFound:
-      "This page does not exist, has been moved, or requires privileges you do not have."
+      "The page you are looking for does not exist or has been moved."
   }
 
 dePage404 :: Translation Page404Labels
 dePage404 = fromRecord
   { p404_notFound:
-      "Diese Seite existiert nicht, wurde verschoben oder erfordert Rechte, die Sie nicht haben."
+      "Die Seite, die Sie suchen, existiert nicht oder wurde verschoben."
   }

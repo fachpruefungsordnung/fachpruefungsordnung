@@ -16,11 +16,11 @@ import Effect.Class (class MonadEffect)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Route as Route
 import FPO.Data.Store as Store
+import Foreign (unsafeToForeign)
 import Halogen (liftEffect)
 import Halogen as H
-import Halogen.Store.Monad (class MonadStore, StoreT, runStoreT)
+import Halogen.Store.Monad (class MonadStore, StoreT, getStore, runStoreT)
 import Routing.Duplex as RD
-import Routing.Hash (setHash)
 import Safe.Coerce (coerce)
 
 newtype AppM a = AppM (StoreT Store.Action Store.Store Aff a)
@@ -42,5 +42,7 @@ derive newtype instance monadAffAppM :: MonadAff AppM
 derive newtype instance monadStoreAppM :: MonadStore Store.Action Store.Store AppM
 
 instance navigateAppM :: Navigate AppM where
-  navigate =
-    liftEffect <<< setHash <<< RD.print Route.routeCodec
+  navigate route = do
+    store <- getStore
+    let path = RD.print Route.routeCodec route
+    liftEffect $ store.pushStateInterface.pushState (unsafeToForeign {}) path

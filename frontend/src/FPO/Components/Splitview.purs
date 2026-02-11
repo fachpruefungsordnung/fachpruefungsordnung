@@ -24,7 +24,7 @@ import Data.Either (Either(..))
 import Data.Foldable (traverse_)
 import Data.Formatter.DateTime (Formatter, parseFormatString)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String.Regex as Regex
 import Data.String.Regex.Flags as RegexFlags
 import Effect.Aff (Milliseconds(..), delay)
@@ -37,9 +37,10 @@ import FPO.Components.Editor.Types (ElementData)
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC (Path, SelectedEntity(..), Version)
 import FPO.Components.TOC as TOC
-import FPO.Data.Navigate (class Navigate)
+import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (LoadState(..))
 import FPO.Data.Request as Request
+import FPO.Data.Route (EditorParams, Route(..), currentPath, routeCodec)
 import FPO.Data.Store as Store
 import FPO.Data.Time (defaultFormatter, timeStampsVersions)
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
@@ -84,6 +85,8 @@ import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
+import Routing.Duplex as RD
+
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
@@ -106,13 +109,17 @@ data DragTarget = LeftResizer | RightResizer
 derive instance eqDragTarget :: Eq DragTarget
 
 type Output = Unit
-type Input = DocumentID
+type Input =
+  { docID :: DocumentID
+  , params :: EditorParams
+  }
 
 data Query a = UnitQuery a
 
 data Action
   = Init
   | Receive (Connected FPOTranslator Input)
+  | SyncUrlParams
   -- Resizing Actions
   | StartResize DragTarget MouseEvent
   | StopResize MouseEvent
@@ -219,7 +226,7 @@ splitview = connect selectTranslator $ H.mkComponent
   where
   initialState :: Connected FPOTranslator Input -> State
   initialState { context, input } =
-    { docID: input
+    { docID: input.docID
     , translator: fromFpoTranslator context
     , mDragTarget: Nothing
     , resizeState:
@@ -595,7 +602,27 @@ splitview = connect selectTranslator $ H.mkComponent
       -- Load the initial TOC entries into the editor
       handleAction GET
       handleAction UpdateMSelectedTocEntry
-      H.tell _toc unit (TOC.SelectFirstEntry)
+
+      -- Read the URL params directly from the path so we don't depend on a
+      -- variable that is only available in initialState/Receive.
+      path <- H.liftEffect currentPath
+      let
+        mRoute = case RD.parse routeCodec path of
+          Left _ -> Nothing
+          Right r -> Just r
+        params = case mRoute of
+          Just (Editor _ p) -> p
+          _ -> { revision: Nothing, paragraph: Nothing, splitview: Nothing }
+      case params.paragraph of
+        Just paraId -> do
+          H.tell _toc unit (TOC.SelectEntry paraId)
+          -- If a specific revision is also requested, apply it
+          case params.revision of
+            Just revId ->
+              handleAction (ModifyVersionMapping paraId (Just (Just revId)) Nothing)
+            Nothing -> pure unit
+        Nothing ->
+          H.tell _toc unit (TOC.SelectFirstEntry)
 
       -- Subscribe to resize events and store subscription for cleanup
       { emitter, listener } <- H.liftEffect HS.create
@@ -620,6 +647,36 @@ splitview = connect selectTranslator $ H.mkComponent
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
+
+    -- Compute the current editor state and push it into the URL.
+    -- This is called after paragraph / version / splitview changes so
+    -- that the address bar always reflects the current state.
+    -- We compare against the current path to avoid re-entrant navigation.
+    SyncUrlParams -> do
+      state <- H.get
+      let
+        paraId = case state.mSelectedTocEntry of
+          Just (SelLeaf id) -> Just id
+          _ -> Nothing
+        revId = case paraId of
+          Nothing -> Nothing
+          Just pid ->
+            case findRootTree (\e -> e.elementID == pid) state.versionMapping of
+              Just entry -> entry.versionID
+              Nothing -> Nothing
+        svParam = case paraId of
+          Nothing -> Nothing
+          Just pid ->
+            case findRootTree (\e -> e.elementID == pid) state.versionMapping of
+              Just entry | isJust entry.comparisonData -> Just "comparison"
+              _ -> Nothing
+        newParams = { revision: revId, paragraph: paraId, splitview: svParam }
+        desiredPath = RD.print routeCodec (Editor state.docID newParams)
+      -- Only navigate when the path would actually change — this breaks
+      -- the navigate → popstate → Receive → SyncUrlParams feedback loop.
+      path <- H.liftEffect currentPath
+      when (path /= desiredPath) do
+        navigate (Editor state.docID newParams)
 
     UpdateDirtyVersion -> do
       isDirty <- H.request _editor 0 Editor.RequestDirtyVersion
@@ -839,6 +896,8 @@ splitview = connect selectTranslator $ H.mkComponent
               }
           }
       handleAction UpdateMSelectedTocEntry
+      -- After the version mapping is updated below, sync URL so the
+      -- revision / splitview params stay current.
       let
         newVersionID = case vID of
           Just id -> const id
@@ -857,6 +916,7 @@ splitview = connect selectTranslator $ H.mkComponent
             )
             versionMapping
       H.modify_ _ { versionMapping = newVersionMapping }
+      handleAction SyncUrlParams
 
     SetComparison elementID mVID -> do
       state <- H.get
@@ -1212,7 +1272,10 @@ splitview = connect selectTranslator $ H.mkComponent
         else do
           H.modify_ _ { pendingUpdateElementID = currentElementID }
           H.tell _editor 0 Editor.SaveSection
-          handleAction UpdateMSelectedTocEntry
+          -- Set mSelectedTocEntry directly from the known selectedId instead of
+          -- querying the TOC (whose own state may not be updated yet when it
+          -- raises ChangeToLeaf from JumpToLeafSection).
+          H.modify_ _ { mSelectedTocEntry = Just (SelLeaf selectedId) }
           state <- H.get
           let
             entry = case (findTOCEntry selectedId state.tocEntries) of
@@ -1233,6 +1296,8 @@ splitview = connect selectTranslator $ H.mkComponent
               pure unit
             Just d ->
               H.tell _editor 1 (Editor.ChangeSection d.tocEntry d.revID mTitle)
+          -- Keep the URL in sync with the newly selected paragraph
+          handleAction SyncUrlParams
 
       TOC.UpdateNodePosition path -> do
         H.tell _editor 0 (Editor.UpdateNodePosition path)

@@ -76,7 +76,6 @@ import FPO.Data.AppError (AppError(..))
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Request (getUser)
 import FPO.Data.Request as Request
-import FPO.Data.Store (preventErrorHandlingLocally)
 import FPO.Data.Store as Store
 import FPO.Dto.ContentDto
   ( Content
@@ -1669,7 +1668,7 @@ editor = connect selectTranslator $ H.mkComponent
           --first we look whether a draft to load is present. The right editor does not load drafts
           loadedDraftContent <- case state.compareToElement, loadInMergeMode of
             Nothing, false ->
-              preventErrorHandlingLocally $ Request.getJson
+              Request.getJsonSilent
                 ContentDto.decodeContentWrapper
                 ( "/docs/" <> show state.docID <> "/text/" <> show entry.id
                     <> "/draft"

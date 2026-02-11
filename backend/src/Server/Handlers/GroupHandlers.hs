@@ -24,6 +24,7 @@ import qualified UserManagement.Group as Group
 import qualified UserManagement.Sessions as Sessions
 import qualified UserManagement.User as User
 
+import Data.Containers.ListUtils (nubOrd)
 import Prelude hiding (readFile)
 
 type GroupAPI =
@@ -48,6 +49,8 @@ groupServer =
         :<|> getGroupHandler
         :<|> deleteGroupHandler
 
+-- | Creates 'Group', adds sender as 'Admin' and all users listed as 'Member';
+--   If adding any user fails, the group is still created
 createGroupHandler
     :: AuthResult Auth.Token -> Group.GroupCreate -> Handler Group.GroupID
 createGroupHandler (Authenticated token@Auth.Token {..}) (Group.GroupCreate {..}) = do
@@ -67,8 +70,15 @@ createGroupHandler (Authenticated token@Auth.Token {..}) (Group.GroupCreate {..}
                         Session.run (Sessions.addGroup groupCreateName groupCreateDescription) conn
                 case eGroupID of
                     Left _ -> throwError errDatabaseAccessFailed
-                    Right groupID ->
-                        addRoleInGroup conn subject groupID User.Admin >> return groupID
+                    Right groupID -> do
+                        addRoleInGroup conn subject groupID User.Admin
+                        mapM_
+                            ( mapM_ (\user -> addRoleInGroup conn user groupID User.Member)
+                                . nubOrd -- deduplicate
+                                . filter (== subject) -- filter admin
+                            )
+                            groupCreateUsers
+                        return groupID
 createGroupHandler _ _ = throwError errNotLoggedIn
 
 -- | If the logged in user is SuperAdmin returns list of all existing groups as
@@ -96,7 +106,7 @@ getGroupHandler (Authenticated token) groupID = do
         eGroupInfo <- liftIO $ Session.run (Sessions.getGroupInfo groupID) conn
         case eGroupInfo of
             Left _ -> throwError errDatabaseAccessFailed
-            Right (Group.GroupCreate name mDesc) -> do
+            Right (Group.GroupOverview _ name mDesc) -> do
                 members <- getMembers conn
                 return $ Group.Group groupID name mDesc members
 
