@@ -29,6 +29,7 @@ import FPO.Data.Request
   , getGroup
   , getUser
   , getUsers
+  , patchGroup
   )
 import FPO.Data.Route (GroupSubRoute(..), Route(..), editorRoute)
 import FPO.Data.Store as Store
@@ -42,6 +43,8 @@ import FPO.Dto.GroupDto
   ( GroupDto
   , GroupID
   , GroupMemberDto
+  , GroupPatch(..)
+  , getGroupDescription
   , getGroupMembers
   , getGroupName
   , getUserInfoID
@@ -77,7 +80,7 @@ type Slots =
   , memberPagination :: H.Slot P.Query P.Output Unit
   )
 
-data Tab = DocumentsTab | MembersTab
+data Tab = DocumentsTab | MembersTab | SettingsTab
 
 derive instance eqTab :: Eq Tab
 
@@ -115,6 +118,10 @@ data Action
   | ToggleUserSelection UserID
   | ConfirmAddMembers
   | CancelAddMembers
+  -- Settings actions
+  | ChangeGroupName String
+  | ChangeGroupDescription String
+  | SaveGroupSettings
 
 data ModalState
   = NoModal
@@ -149,6 +156,10 @@ type State = FPOState
   , selectedUsersToAdd :: Array UserID
   , userSearchFilter :: String
   , addingMembers :: Boolean
+  -- Settings state
+  , editedGroupName :: String
+  , editedGroupDescription :: String
+  , settingsSaving :: Boolean
   )
 
 component
@@ -197,11 +208,16 @@ component =
     , selectedUsersToAdd: []
     , userSearchFilter: ""
     , addingMembers: false
+    -- Settings state
+    , editedGroupName: ""
+    , editedGroupDescription: ""
+    , settingsSaving: false
     }
 
   tabFromString :: Maybe String -> Tab
   tabFromString = case _ of
     Just "members" -> MembersTab
+    Just "settings" -> SettingsTab
     _ -> DocumentsTab
 
   modalInputRef :: H.RefLabel
@@ -235,6 +251,7 @@ component =
       , case state.currentTab of
           DocumentsTab -> renderDocumentsTab state
           MembersTab -> renderMembersTab state
+          SettingsTab -> renderSettingsTab state
       ]
 
   renderModals :: State -> H.ComponentHTML Action Slots m
@@ -293,6 +310,16 @@ component =
               ]
               [ HH.i [ HP.classes [ H.ClassName "bi-people-fill", HB.me2 ] ] []
               , HH.text $ translate (label :: _ "common_members") state.translator
+              ]
+          ]
+      , HH.li [ HP.classes [ HB.navItem ] ]
+          [ HH.button
+              [ HP.classes $ [ HB.navLink ] <>
+                  (if state.currentTab == SettingsTab then [ HB.active ] else [])
+              , HE.onClick $ const $ SwitchTab SettingsTab
+              ]
+              [ HH.i [ HP.classes [ H.ClassName "bi-gear-fill", HB.me2 ] ] []
+              , HH.text $ translate (label :: _ "gs_settings") state.translator
               ]
           ]
       ]
@@ -730,6 +757,107 @@ component =
           )
       ]
 
+  renderSettingsTab :: State -> H.ComponentHTML Action Slots m
+  renderSettingsTab state =
+    case state.group of
+      Nothing -> loadingSpinner
+      Just _ -> renderSettingsForm state
+
+  renderSettingsForm :: State -> H.ComponentHTML Action Slots m
+  renderSettingsForm state =
+    HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
+      [ HH.div [ HP.classes [ HB.col12, HB.colLg10 ] ]
+          [ HH.div [ HP.classes [ HB.card ] ]
+              [ HH.div
+                  [ HP.classes
+                      [ HB.cardHeader
+                      , HB.dFlex
+                      , HB.justifyContentBetween
+                      , HB.alignItemsCenter
+                      ]
+                  ]
+                  [ HH.h5 [ HP.classes [ HB.mb0 ] ]
+                      [ HH.text $ translate (label :: _ "gs_settings")
+                          state.translator
+                      ]
+                  ]
+              , HH.div [ HP.classes [ HB.cardBody ] ]
+                  [ -- Group Name field
+                    HH.div [ HP.classes [ HB.mb3 ] ]
+                      [ HH.label
+                          [ HP.for "groupName"
+                          , HP.classes [ HB.formLabel ]
+                          ]
+                          [ HH.text $ translate (label :: _ "gs_groupName")
+                              state.translator
+                          ]
+                      , HH.input
+                          [ HP.type_ HP.InputText
+                          , HP.classes [ HB.formControl ]
+                          , HP.id "groupName"
+                          , HP.placeholder $ translate
+                              (label :: _ "gs_groupNamePlaceholder")
+                              state.translator
+                          , HP.value state.editedGroupName
+                          , HP.required true
+                          , HE.onValueInput ChangeGroupName
+                          , HP.disabled state.settingsSaving
+                          ]
+                      ]
+                  , -- Group Description field
+                    HH.div [ HP.classes [ HB.mb3 ] ]
+                      [ HH.label
+                          [ HP.for "groupDescription"
+                          , HP.classes [ HB.formLabel ]
+                          ]
+                          [ HH.text $ translate (label :: _ "gs_description")
+                              state.translator
+                          ]
+                      , HH.textarea
+                          [ HP.classes [ HB.formControl ]
+                          , HP.id "groupDescription"
+                          , HP.placeholder $ translate
+                              (label :: _ "gs_descriptionPlaceholder")
+                              state.translator
+                          , HP.value state.editedGroupDescription
+                          , HP.rows 3
+                          , HE.onValueInput ChangeGroupDescription
+                          , HP.disabled state.settingsSaving
+                          ]
+                      ]
+                  , -- Save button
+                    HH.div [ HP.classes [ HB.dFlex, HB.justifyContentEnd ] ]
+                      [ HH.button
+                          [ HP.classes [ HB.btn, HB.btnPrimary ]
+                          , HE.onClick $ const SaveGroupSettings
+                          , HP.disabled
+                              ( state.settingsSaving
+                                  || state.editedGroupName == ""
+                              )
+                          ]
+                          [ if state.settingsSaving then
+                              HH.span
+                                [ HP.classes
+                                    [ HB.spinnerBorder
+                                    , HB.spinnerBorderSm
+                                    , HB.me2
+                                    ]
+                                ]
+                                []
+                            else
+                              HH.i
+                                [ HP.classes [ H.ClassName "bi-check-lg", HB.me2 ]
+                                ]
+                                []
+                          , HH.text $ translate (label :: _ "gs_saveSettings")
+                              state.translator
+                          ]
+                      ]
+                  ]
+              ]
+          ]
+      ]
+
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
   handleAction = case _ of
     Initialize -> do
@@ -777,6 +905,7 @@ component =
       navigate $ GroupRoute state.groupID $ case tab of
         DocumentsTab -> GroupDocuments
         MembersTab -> GroupMembers
+        SettingsTab -> GroupSettings
 
     -- Document actions
     SetDocPage (P.Clicked p) -> H.modify_ _ { docPage = p }
@@ -978,6 +1107,50 @@ component =
         , userSearchFilter = ""
         }
 
+    -- Settings actions
+    ChangeGroupName name -> do
+      H.modify_ _ { editedGroupName = name }
+
+    ChangeGroupDescription desc -> do
+      H.modify_ _ { editedGroupDescription = desc }
+
+    SaveGroupSettings -> do
+      state <- H.get
+      when (state.editedGroupName /= "") $ do
+        H.modify_ _ { settingsSaving = true }
+        let
+          -- Determine if description changed (compare to current group description)
+          currentDesc = fromMaybe "" $ state.group >>= \g -> pure
+            (getGroupDescription g)
+          newDesc = state.editedGroupDescription
+          -- Only include description in patch if it changed
+          descPatch =
+            if newDesc /= currentDesc then Just
+              (if newDesc == "" then Nothing else Just newDesc)
+            else Nothing
+          -- Only include name in patch if it changed
+          currentName = fromMaybe "" $ getGroupName <$> state.group
+          namePatch =
+            if state.editedGroupName /= currentName then Just state.editedGroupName
+            else Nothing
+          patch = GroupPatch
+            { patchName: namePatch
+            , patchDescription: descPatch
+            }
+        -- Only call API if something changed
+        if namePatch == Nothing && descPatch == Nothing then
+          H.modify_ _ { settingsSaving = false }
+        else do
+          result <- patchGroup state.groupID patch
+          case result of
+            Left _ -> H.modify_ _ { settingsSaving = false }
+            Right _ -> do
+              H.modify_ _ { settingsSaving = false }
+              -- Reload group data to get updated info
+              reloadGroupData
+              updateStore $ Store.AddSuccess
+                (translate (label :: _ "gs_settingsUpdated") state.translator)
+
   loadGroupData :: H.HalogenM State Action Slots output m Unit
   loadGroupData = do
     state <- H.get
@@ -989,6 +1162,8 @@ component =
         H.modify_ _
           { group = Just grp
           , filteredMembers = getGroupMembers grp
+          , editedGroupName = getGroupName grp
+          , editedGroupDescription = getGroupDescription grp
           }
 
     documents <- getDocumentsQueryFromURL ("/docs?group=" <> show state.groupID)
@@ -1025,6 +1200,20 @@ component =
         allMembers
     H.modify_ _ { filteredMembers = filtered, memberPage = 0 }
     H.tell _memberPagination unit $ P.SetPageQ 0
+
+  reloadGroupData :: H.HalogenM State Action Slots output m Unit
+  reloadGroupData = do
+    state <- H.get
+    groupResult <- getGroup state.groupID
+    case groupResult of
+      Left _ -> pure unit
+      Right grp -> do
+        H.modify_ _
+          { group = Just grp
+          , filteredMembers = getGroupMembers grp
+          , editedGroupName = getGroupName grp
+          , editedGroupDescription = getGroupDescription grp
+          }
 
   reloadGroupMembers :: H.HalogenM State Action Slots output m Unit
   reloadGroupMembers = do

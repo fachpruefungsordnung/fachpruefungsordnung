@@ -1,5 +1,24 @@
 -- | All DTOs and data representations related to groups.
-module FPO.Dto.GroupDto where
+module FPO.Dto.GroupDto
+  ( GroupID
+  , GroupOverview(..)
+  , getGroupOverviewID
+  , getGroupOverviewName
+  , GroupCreate(..)
+  , GroupDto(..)
+  , getGroupName
+  , getGroupDescription
+  , getGroupMembers
+  , lookupUser
+  , isUserInGroup
+  , GroupMemberDto(..)
+  , getUserInfoName
+  , getUserInfoRole
+  , getUserInfoID
+  , GroupPatch(..)
+  , class ToGroupOverview
+  , toGroupOverview
+  ) where
 
 import Prelude
 
@@ -118,3 +137,18 @@ instance toGroupOverviewGroupOverview :: ToGroupOverview UR.FullUserRoleDto wher
     , groupOverviewID: UR.getGroupID r
     , groupOverviewDescription: ""
     }
+
+-- | A group patch request DTO, as sent to the `PATCH /groups/{groupID}` endpoint.
+-- | Both fields are optional, but at least one must be provided.
+-- | `patchDescription` is a Maybe (Maybe String) to allow:
+-- |   - Nothing: don't change description
+-- |   - Just Nothing: set description to null
+-- |   - Just (Just "...") : set description to new value
+newtype GroupPatch = GroupPatch
+  { patchName :: Maybe String
+  , patchDescription :: Maybe (Maybe String)
+  }
+
+derive instance newtypeGroupPatch :: Newtype GroupPatch _
+derive newtype instance encodeJsonGroupPatch :: EncodeJson GroupPatch
+derive newtype instance decodeJsonGroupPatch :: DecodeJson GroupPatch

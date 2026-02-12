@@ -167,6 +167,9 @@ component =
           GroupRoute groupID GroupMembers -> HH.slot_ _groupOverview unit
             GroupOverview.component
             { groupID, tab: Just "members" }
+          GroupRoute groupID GroupSettings -> HH.slot_ _groupOverview unit
+            GroupOverview.component
+            { groupID, tab: Just "settings" }
           Page404 -> HH.slot_ _page404 unit Page404.component unit
           Unauthorized -> HH.slot_ _unauthorized unit Unauthorized.component unit
           Profile -> HH.slot _profile unit

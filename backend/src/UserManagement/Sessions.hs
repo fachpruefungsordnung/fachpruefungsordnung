@@ -16,6 +16,8 @@ module UserManagement.Sessions
     , getGroupInfo
     , getAllGroupsOverview
     , deleteGroup
+    , updateGroupName
+    , updateGroupDescription
     , addRole
     , updateUserRoleInGroup
     , removeUserFromGroup
@@ -107,6 +109,12 @@ getAllGroupsOverview = statement () Statements.getAllGroupsOverview
 
 deleteGroup :: Group.GroupID -> Session ()
 deleteGroup groupID = statement groupID Statements.deleteGroup
+
+updateGroupName :: Group.GroupID -> Text -> Session ()
+updateGroupName groupID name = statement (name, groupID) Statements.updateGroupName
+
+updateGroupDescription :: Group.GroupID -> Maybe Text -> Session ()
+updateGroupDescription groupID desc = statement (desc, groupID) Statements.updateGroupDescription
 
 addRole :: User.UserID -> Group.GroupID -> User.Role -> Session ()
 addRole uid gid role =
