@@ -223,4 +223,5 @@ loginRoute = Login { redirect: Nothing }
 
 -- | Convenience constructor for the Login route with a redirect to the given route.
 loginRouteWithRedirect :: Route -> Route
-loginRouteWithRedirect from = Login { redirect: Just (routeToUri from) }
+loginRouteWithRedirect from = Login
+  { redirect: if from /= Home then Just $ routeToUri from else Nothing }

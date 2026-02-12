@@ -54,6 +54,7 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
+import Web.Event.Event (Event, preventDefault)
 import Web.UIEvent.KeyboardEvent as KE
 
 -- | A member added to the group during creation.
@@ -71,7 +72,7 @@ data Action
   | DoNothing
   | ChangeGroupName String
   | ChangeGroupDescription String
-  | SubmitCreateGroup
+  | SubmitCreateGroup Event
   | Cancel
   -- User search actions
   | SearchUsers String
@@ -168,7 +169,7 @@ component =
   renderForm :: State -> H.ComponentHTML Action () m
   renderForm state =
     HH.form
-      [ HE.onSubmit $ const SubmitCreateGroup ]
+      [ HE.onSubmit SubmitCreateGroup ]
       [ addColumn
           state.groupName
           (translate (label :: _ "admin_groups_groupName") state.translator)
@@ -555,7 +556,8 @@ component =
 
     -- Form submission --
 
-    SubmitCreateGroup -> do
+    SubmitCreateGroup event -> do
+      H.liftEffect $ preventDefault event
       state <- H.get
       -- If Enter was pressed inside the search popover, SearchKeyDown already
       -- handled it. Consume the guard and skip form submission.

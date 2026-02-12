@@ -1120,11 +1120,13 @@ component =
         H.modify_ _ { settingsSaving = true }
         let
           -- Determine if description changed (compare to current group description)
-          currentDesc = fromMaybe "" $ state.group >>= \g -> pure (getGroupDescription g)
+          currentDesc = fromMaybe "" $ state.group >>= \g -> pure
+            (getGroupDescription g)
           newDesc = state.editedGroupDescription
           -- Only include description in patch if it changed
           descPatch =
-            if newDesc /= currentDesc then Just (if newDesc == "" then Nothing else Just newDesc)
+            if newDesc /= currentDesc then Just
+              (if newDesc == "" then Nothing else Just newDesc)
             else Nothing
           -- Only include name in patch if it changed
           currentName = fromMaybe "" $ getGroupName <$> state.group
