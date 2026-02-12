@@ -40,6 +40,10 @@ type GroupAPI =
                 :<|> Auth AuthMethod Auth.Token
                     :> Capture "groupID" Group.GroupID
                     :> Delete '[JSON] NoContent
+                :<|> Auth AuthMethod Auth.Token
+                    :> Capture "groupID" Group.GroupID
+                    :> ReqBody '[JSON] Group.GroupPatch
+                    :> Patch '[JSON] Group.GroupOverview
            )
 
 groupServer :: Server GroupAPI
@@ -48,6 +52,7 @@ groupServer =
         :<|> getAllGroupsHandler
         :<|> getGroupHandler
         :<|> deleteGroupHandler
+        :<|> patchGroupHandler
 
 -- | Creates 'Group', adds sender as 'Admin' and all users listed as 'Member';
 --   If adding any user fails, the group is still created
@@ -131,3 +136,68 @@ deleteGroupHandler (Authenticated token) groupID = do
             Left _ -> throwError errDatabaseAccessFailed
             Right () -> return NoContent
 deleteGroupHandler _ _ = throwError errNotLoggedIn
+
+-- | Updates a group's name and/or description via PATCH
+--   Requires SuperAdmin or Admin of the specific group
+patchGroupHandler
+    :: AuthResult Auth.Token
+    -> Group.GroupID
+    -> Group.GroupPatch
+    -> Handler Group.GroupOverview
+patchGroupHandler (Authenticated token) groupID (Group.GroupPatch {..}) = do
+    conn <- tryGetDBConnection
+    ifSuperOrAdminDo conn token groupID (patchGroup conn)
+  where
+    patchGroup :: Connection -> Handler Group.GroupOverview
+    patchGroup conn = do
+        -- Validate that at least one field is provided
+        case (patchName, patchDescription) of
+            (Nothing, Nothing) ->
+                throwError $
+                    err400
+                        { errBody =
+                            "\"At least one of 'patchName' or 'patchDescription' must be provided.\""
+                        }
+            _ -> pure ()
+
+        -- If name is being changed, check for uniqueness
+        case patchName of
+            Just newName -> do
+                eBool <- liftIO $ Session.run (Sessions.checkGroupNameExistence newName) conn
+                case eBool of
+                    Left _ -> throwError errDatabaseAccessFailed
+                    Right True -> do
+                        -- Check if it's the same group (allow keeping same name)
+                        eCurrentInfo <- liftIO $ Session.run (Sessions.getGroupInfo groupID) conn
+                        case eCurrentInfo of
+                            Left _ -> throwError errDatabaseAccessFailed
+                            Right (Group.GroupOverview _ currentName _) ->
+                                if currentName == newName
+                                    then pure ()
+                                    else
+                                        throwError $ err409 {errBody = "\"A group with that name exists already.\""}
+                    Right False -> pure ()
+                -- Update name
+                eNameResult <-
+                    liftIO $ Session.run (Sessions.updateGroupName groupID newName) conn
+                case eNameResult of
+                    Left _ -> throwError errDatabaseAccessFailed
+                    Right () -> pure ()
+            Nothing -> pure ()
+
+        -- Update description if provided
+        case patchDescription of
+            Just newDesc -> do
+                eDescResult <-
+                    liftIO $ Session.run (Sessions.updateGroupDescription groupID newDesc) conn
+                case eDescResult of
+                    Left _ -> throwError errDatabaseAccessFailed
+                    Right () -> pure ()
+            Nothing -> pure ()
+
+        -- Return updated group info
+        eGroupInfo <- liftIO $ Session.run (Sessions.getGroupInfo groupID) conn
+        case eGroupInfo of
+            Left _ -> throwError errDatabaseAccessFailed
+            Right groupOverview -> return groupOverview
+patchGroupHandler _ _ _ = throwError errNotLoggedIn
