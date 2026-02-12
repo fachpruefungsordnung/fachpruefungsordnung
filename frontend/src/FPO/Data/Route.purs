@@ -30,6 +30,7 @@ import Web.HTML.Window as Window
 data GroupSubRoute
   = GroupDocuments
   | GroupMembers
+  | GroupSettings
 
 derive instance genericGroupSubRoute :: Generic GroupSubRoute _
 derive instance eqGroupSubRoute :: Eq GroupSubRoute
@@ -85,6 +86,7 @@ groupSubRouteCodec :: RouteDuplex' GroupSubRoute
 groupSubRouteCodec = sum
   { "GroupDocuments": noArgs
   , "GroupMembers": "members" / noArgs
+  , "GroupSettings": "settings" / noArgs
   }
 
 -- | The codec for the routes. It defines how to parse and serialize the routes.
@@ -162,6 +164,7 @@ showSubRoute :: GroupSubRoute -> String
 showSubRoute = case _ of
   GroupDocuments -> "GroupDocuments"
   GroupMembers -> "GroupMembers"
+  GroupSettings -> "GroupSettings"
 
 urlToRoute :: String -> Maybe Route
 urlToRoute url = case parse routeCodec url of
@@ -220,4 +223,5 @@ loginRoute = Login { redirect: Nothing }
 
 -- | Convenience constructor for the Login route with a redirect to the given route.
 loginRouteWithRedirect :: Route -> Route
-loginRouteWithRedirect from = Login { redirect: Just (routeToUri from) }
+loginRouteWithRedirect from = Login
+  { redirect: if from /= Home then Just $ routeToUri from else Nothing }

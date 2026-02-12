@@ -33,6 +33,7 @@ module FPO.Data.Request
   , getUserWithId
   , getUsers
   , handleAppError
+  , patchGroup
   , patchJson
   , patchString
   , postBlob
@@ -94,6 +95,7 @@ import FPO.Dto.GroupDto
   , GroupDto
   , GroupID
   , GroupOverview
+  , GroupPatch
   , toGroupOverview
   )
 import FPO.Dto.PostTextDto as PT
@@ -843,6 +845,19 @@ addGroup
   => GroupCreate
   -> H.HalogenM st act slots msg m (Either AppError GroupID)
 addGroup group = postJson decodeJson "/groups" (encodeJson group)
+
+-- | Updates a group's name and/or description via PATCH
+patchGroup
+  :: forall st act slots msg m
+   . MonadAff m
+  => MonadStore Store.Action Store.Store m
+  => Navigate m
+  => GroupID
+  -> GroupPatch
+  -> H.HalogenM st act slots msg m (Either AppError GroupOverview)
+patchGroup groupID patch = patchJson decodeJson
+  ("/groups/" <> show groupID)
+  (encodeJson patch)
 
 postRenderHtml
   :: forall st act slots msg m

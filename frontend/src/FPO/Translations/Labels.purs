@@ -13,6 +13,10 @@ import FPO.Translations.Page.Admin.GroupProjects
   ( deGroupProjectsPage
   , enGroupProjectsPage
   )
+import FPO.Translations.Page.Admin.GroupSettings
+  ( deGroupSettingsPage
+  , enGroupSettingsPage
+  )
 import FPO.Translations.Page.Admin.PageGroups (deAdminGroupPage, enAdminGroupPage)
 import FPO.Translations.Page.Admin.PageUsers (deAdminUserPage, enAdminUserPage)
 import FPO.Translations.Page.AdminPanel (deAdminPanel, enAdminPanel)
@@ -44,6 +48,7 @@ en = fromRecord
   $ merge (toRecord enPasswordReset)
   $ merge (toRecord enProfile)
   $ merge (toRecord enGroupProjectsPage)
+  $ merge (toRecord enGroupSettingsPage)
   $ merge (toRecord enUnauthorized)
   $
     toRecord enGroupMemberPage
@@ -66,6 +71,7 @@ de = fromRecord
   $ merge (toRecord dePasswordReset)
   $ merge (toRecord deProfile)
   $ merge (toRecord deGroupProjectsPage)
+  $ merge (toRecord deGroupSettingsPage)
   $ merge (toRecord deUnauthorized)
   $
     toRecord deGroupMemberPage
@@ -249,6 +255,15 @@ type Labels =
       ::: "gp_removeProject"
       ::: "gp_searchProjects"
       ::: "gp_successfullyCreatedDocument"
+
+      -- | Group Settings Page
+      ::: "gs_description"
+      ::: "gs_descriptionPlaceholder"
+      ::: "gs_groupName"
+      ::: "gs_groupNamePlaceholder"
+      ::: "gs_saveSettings"
+      ::: "gs_settings"
+      ::: "gs_settingsUpdated"
 
       -- | Home Page
       ::: "home_basicDescription"

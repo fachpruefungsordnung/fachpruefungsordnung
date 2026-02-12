@@ -19,6 +19,8 @@ module UserManagement.Statements
     , getGroupInfo
     , getAllGroupsOverview
     , deleteGroup
+    , updateGroupName
+    , updateGroupDescription
     , addRole
     , updateUserRoleInGroup
     , removeUserFromGroup
@@ -230,6 +232,22 @@ deleteGroup =
     [resultlessStatement|
       delete from groups
       where id = $1 :: int8
+    |]
+
+updateGroupName :: Statement (Text, Group.GroupID) ()
+updateGroupName =
+    [resultlessStatement|
+      update groups
+      set name = $1 :: text
+      where id = $2 :: int8
+    |]
+
+updateGroupDescription :: Statement (Maybe Text, Group.GroupID) ()
+updateGroupDescription =
+    [resultlessStatement|
+      update groups
+      set description = $1 :: text?
+      where id = $2 :: int8
     |]
 
 addRole :: Statement (User.UserID, Group.GroupID, Text) ()
