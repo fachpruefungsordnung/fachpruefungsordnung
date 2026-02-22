@@ -430,24 +430,13 @@ splitview = connect selectTranslator $ H.mkComponent
               \justify-content: center; \
               \position: relative;"
           ]
-          [ HH.button
-              [ HP.style
-                  "background:rgba(255, 255, 255, 0.8); \
-                  \border: 0.2px solid #aaa; \
-                  \padding: 0.1rem 0.1rem; \
-                  \font-size: 8px; \
-                  \font-weight: bold; \
-                  \line-height: 1; \
-                  \color:rgba(0, 0, 0, 0.7); \
-                  \border-radius: 3px; \
-                  \cursor: pointer; \
-                  \height: 40px; \
-                  \width: 8px;"
-              -- To prevent the resizer event under the button
-              , HE.handler' (EventType "mousedown") \ev ->
-                  unsafePerformEffect do
-                    stopPropagation ev
-                    pure Nothing -- Do not trigger the mouse down event under the button
+      [ HH.button
+          [ HP.classes [ H.ClassName "splitview-resizer-toggle-btn" ]
+            -- To prevent the resizer event under the button
+          , HE.handler' (EventType "mousedown") \ev ->
+              unsafePerformEffect do
+                stopPropagation ev
+                pure Nothing -- Do not trigger the mouse down event under the button
               , HE.onClick \_ -> ToggleSidebar
               ]
               [ HH.text if not state.resizeState.sidebarClosed then "⟨" else "⟩" ]
@@ -468,19 +457,8 @@ splitview = connect selectTranslator $ H.mkComponent
           \position: relative;"
       ]
       [ HH.button
-          [ HP.style
-              "background:rgba(255, 255, 255, 0.8); \
-              \border: 0.2px solid #aaa; \
-              \padding: 0.1rem 0.1rem; \
-              \font-size: 8px; \
-              \font-weight: bold; \
-              \line-height: 1; \
-              \color:rgba(0, 0, 0, 0.7); \
-              \border-radius: 3px; \
-              \cursor: pointer; \
-              \height: 40px; \
-              \width: 8px;"
-          -- To prevent the resizer event under the button
+          [ HP.classes [ H.ClassName "splitview-resizer-toggle-btn" ]
+            -- To prevent the resizer event under the button
           , HE.handler' (EventType "mousedown") \ev ->
               unsafePerformEffect do
                 stopPropagation ev
@@ -557,19 +535,12 @@ splitview = connect selectTranslator $ H.mkComponent
   closeButton :: Action -> H.ComponentHTML Action Slots m
   closeButton action =
     HH.button
-      [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
-      , HP.style
-          "position: absolute; \
-          \top: 0.5rem; \
-          \right: 0.5rem; \
-          \background-color: #fdecea; \
-          \color: #b71c1c; \
-          \padding: 0.2rem 0.4rem; \
-          \font-size: 0.75rem; \
-          \line-height: 1; \
-          \border: 1px solid #f5c6cb; \
-          \border-radius: 0.2rem; \
-          \z-index: 10;"
+      [ HP.classes
+          [ HB.btn
+          , HB.btnSm
+          , HB.btnOutlineSecondary
+          , H.ClassName "splitview-close-btn"
+          ]
       , HE.onClick \_ -> action
       ]
       [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]

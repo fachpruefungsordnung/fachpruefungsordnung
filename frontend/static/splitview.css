@@ -1,0 +1,27 @@
+.splitview-resizer-toggle-btn {
+  background: rgba(255, 255, 255, 0.8);
+  border: 0.2px solid #aaa;
+  padding: 0.1rem 0.1rem;
+  font-size: 8px;
+  font-weight: bold;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.7);
+  border-radius: 3px;
+  cursor: pointer;
+  height: 40px;
+  width: 8px;
+}
+
+.splitview-close-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background-color: #fdecea;
+  color: #b71c1c;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.75rem;
+  line-height: 1;
+  border: 1px solid #f5c6cb;
+  border-radius: 0.2rem;
+  z-index: 10;
+}
