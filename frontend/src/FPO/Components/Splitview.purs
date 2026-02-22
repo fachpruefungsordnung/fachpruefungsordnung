@@ -863,10 +863,11 @@ splitview = connect selectTranslator $ H.mkComponent
 
     -- Switch between CompareEditor, Preview and TogglePreview
     SwitchPreview -> do
-      state <- H.get
-      case state.mSelectedTocEntry of
-        Just _ -> clearSelectedEntry
-        Nothing -> handleAction TogglePreview
+      mSelectedTocEntry <- H.gets _.mSelectedTocEntry
+      -- Previously in case structure the close button would not close at the beginning
+      -- Now after clearSelectedEntry, also TogglePreview
+      when (isJust mSelectedTocEntry) clearSelectedEntry
+      handleAction TogglePreview
 
     -- Toggle the preview area
     TogglePreview -> do
