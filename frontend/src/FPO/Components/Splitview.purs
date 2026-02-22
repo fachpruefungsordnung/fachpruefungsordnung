@@ -431,15 +431,22 @@ splitview = connect selectTranslator $ H.mkComponent
               \position: relative;"
           ]
       [ HH.button
-          [ HP.classes [ H.ClassName "splitview-resizer-toggle-btn" ]
+          [ HP.classes $
+              [ H.ClassName "splitview-resizer-toggle-btn"
+              , H.ClassName "splitview-resizer-toggle-btn--left"
+              ] <>
+                if state.resizeState.sidebarClosed then
+                  [ H.ClassName "splitview-resizer-toggle-btn--closed" ]
+                else
+                  []
             -- To prevent the resizer event under the button
           , HE.handler' (EventType "mousedown") \ev ->
               unsafePerformEffect do
                 stopPropagation ev
                 pure Nothing -- Do not trigger the mouse down event under the button
-              , HE.onClick \_ -> ToggleSidebar
-              ]
-              [ HH.text if not state.resizeState.sidebarClosed then "⟨" else "⟩" ]
+          , HE.onClick \_ -> ToggleSidebar
+          ]
+          [ HH.text if not state.resizeState.sidebarClosed then "⟨" else "⟩" ]
           ]
       ]
 
@@ -457,7 +464,14 @@ splitview = connect selectTranslator $ H.mkComponent
           \position: relative;"
       ]
       [ HH.button
-          [ HP.classes [ H.ClassName "splitview-resizer-toggle-btn" ]
+          [ HP.classes $
+              [ H.ClassName "splitview-resizer-toggle-btn"
+              , H.ClassName "splitview-resizer-toggle-btn--right"
+              ] <>
+                if state.resizeState.previewClosed then
+                  [ H.ClassName "splitview-resizer-toggle-btn--closed" ]
+                else
+                  []
             -- To prevent the resizer event under the button
           , HE.handler' (EventType "mousedown") \ev ->
               unsafePerformEffect do
