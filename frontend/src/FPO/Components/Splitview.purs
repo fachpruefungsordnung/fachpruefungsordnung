@@ -421,28 +421,17 @@ splitview = connect selectTranslator $ H.mkComponent
       -- Left Resizer
       , HH.div
           [ HE.onMouseDown (StartResize LeftResizer)
-          , HP.style
-              "width: 8px; \
-              \cursor: col-resize; \
-              \background:rgba(0, 0, 0, 0.3); \
-              \display: flex; \
-              \align-items: center; \
-              \justify-content: center; \
-              \position: relative;"
+          , HP.classes [ H.ClassName "splitview-resizer" ]
           ]
           [ HH.button
-              [ HP.style
-                  "background:rgba(255, 255, 255, 0.8); \
-                  \border: 0.2px solid #aaa; \
-                  \padding: 0.1rem 0.1rem; \
-                  \font-size: 8px; \
-                  \font-weight: bold; \
-                  \line-height: 1; \
-                  \color:rgba(0, 0, 0, 0.7); \
-                  \border-radius: 3px; \
-                  \cursor: pointer; \
-                  \height: 40px; \
-                  \width: 8px;"
+              [ HP.classes $
+                  [ H.ClassName "splitview-resizer-toggle-btn"
+                  , H.ClassName "splitview-resizer-toggle-btn--left"
+                  ] <>
+                    if state.resizeState.sidebarClosed then
+                      [ H.ClassName "splitview-resizer-toggle-btn--closed" ]
+                    else
+                      []
               -- To prevent the resizer event under the button
               , HE.handler' (EventType "mousedown") \ev ->
                   unsafePerformEffect do
@@ -458,28 +447,17 @@ splitview = connect selectTranslator $ H.mkComponent
   rightResizer state =
     HH.div
       [ HE.onMouseDown (StartResize RightResizer)
-      , HP.style
-          "width: 8px; \
-          \cursor: col-resize; \
-          \background:rgba(0, 0, 0, 0.3); \
-          \display: flex; \
-          \align-items: center; \
-          \justify-content: center; \
-          \position: relative;"
+      , HP.classes [ H.ClassName "splitview-resizer" ]
       ]
       [ HH.button
-          [ HP.style
-              "background:rgba(255, 255, 255, 0.8); \
-              \border: 0.2px solid #aaa; \
-              \padding: 0.1rem 0.1rem; \
-              \font-size: 8px; \
-              \font-weight: bold; \
-              \line-height: 1; \
-              \color:rgba(0, 0, 0, 0.7); \
-              \border-radius: 3px; \
-              \cursor: pointer; \
-              \height: 40px; \
-              \width: 8px;"
+          [ HP.classes $
+              [ H.ClassName "splitview-resizer-toggle-btn"
+              , H.ClassName "splitview-resizer-toggle-btn--right"
+              ] <>
+                if state.resizeState.previewClosed then
+                  [ H.ClassName "splitview-resizer-toggle-btn--closed" ]
+                else
+                  []
           -- To prevent the resizer event under the button
           , HE.handler' (EventType "mousedown") \ev ->
               unsafePerformEffect do
@@ -557,19 +535,12 @@ splitview = connect selectTranslator $ H.mkComponent
   closeButton :: Action -> H.ComponentHTML Action Slots m
   closeButton action =
     HH.button
-      [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
-      , HP.style
-          "position: absolute; \
-          \top: 0.5rem; \
-          \right: 0.5rem; \
-          \background-color: #fdecea; \
-          \color: #b71c1c; \
-          \padding: 0.2rem 0.4rem; \
-          \font-size: 0.75rem; \
-          \line-height: 1; \
-          \border: 1px solid #f5c6cb; \
-          \border-radius: 0.2rem; \
-          \z-index: 10;"
+      [ HP.classes
+          [ HB.btn
+          , HB.btnSm
+          , HB.btnOutlineSecondary
+          , H.ClassName "splitview-close-btn"
+          ]
       , HE.onClick \_ -> action
       ]
       [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
@@ -863,10 +834,11 @@ splitview = connect selectTranslator $ H.mkComponent
 
     -- Switch between CompareEditor, Preview and TogglePreview
     SwitchPreview -> do
-      state <- H.get
-      case state.mSelectedTocEntry of
-        Just _ -> clearSelectedEntry
-        Nothing -> handleAction TogglePreview
+      mSelectedTocEntry <- H.gets _.mSelectedTocEntry
+      -- Previously in case structure the close button would not close at the beginning
+      -- Now after clearSelectedEntry, also TogglePreview
+      when (isJust mSelectedTocEntry) clearSelectedEntry
+      handleAction TogglePreview
 
     -- Toggle the preview area
     TogglePreview -> do
