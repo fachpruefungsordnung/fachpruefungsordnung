@@ -421,14 +421,7 @@ splitview = connect selectTranslator $ H.mkComponent
       -- Left Resizer
       , HH.div
           [ HE.onMouseDown (StartResize LeftResizer)
-          , HP.style
-              "width: 8px; \
-              \cursor: col-resize; \
-              \background:rgba(0, 0, 0, 0.3); \
-              \display: flex; \
-              \align-items: center; \
-              \justify-content: center; \
-              \position: relative;"
+          , HP.classes [ H.ClassName "splitview-resizer" ]
           ]
       [ HH.button
           [ HP.classes $
@@ -454,14 +447,7 @@ splitview = connect selectTranslator $ H.mkComponent
   rightResizer state =
     HH.div
       [ HE.onMouseDown (StartResize RightResizer)
-      , HP.style
-          "width: 8px; \
-          \cursor: col-resize; \
-          \background:rgba(0, 0, 0, 0.3); \
-          \display: flex; \
-          \align-items: center; \
-          \justify-content: center; \
-          \position: relative;"
+      , HP.classes [ H.ClassName "splitview-resizer" ]
       ]
       [ HH.button
           [ HP.classes $
