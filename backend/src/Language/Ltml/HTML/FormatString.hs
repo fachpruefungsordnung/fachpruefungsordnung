@@ -78,7 +78,7 @@ headingFormatId (HeadingFormat typography formatS) idHtml textHtml =
 -- | Returns (ID Html, ToC Key Html) for a Section;
 --   uses ID Html to build ToC Key Html
 sectionFormat :: SectionFormat -> Int -> (Html (), Html ())
-sectionFormat (SectionFormat idFormat (TocKeyFormat tocKeyFormat) _) = idKeyFormat idFormat tocKeyFormat
+sectionFormat (SectionFormat idFormat (TocKeyFormat tocKeyFormat)) = idKeyFormat idFormat tocKeyFormat
 
 -- | Returns (ID Html, ToC Key Html) for a Paragraph;
 --   uses ID Html to build Paragraph Key Html
