@@ -197,9 +197,11 @@ component =
                                       [ HP.id "usernameHelp"
                                       , HP.classes [ HB.textMuted ]
                                       ]
-                                      [ HH.text $ translate
-                                          (label :: _ "prof_usernameHelp")
-                                          state.translator
+                                      [ if state.isYourProfile then
+                                          HH.text $ translate
+                                            (label :: _ "prof_usernameHelp")
+                                            state.translator
+                                        else HH.text ""
                                       ]
                                   , if state.unsaved then
                                       HH.span
