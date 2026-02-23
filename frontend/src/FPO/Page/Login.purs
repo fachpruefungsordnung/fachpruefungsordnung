@@ -13,18 +13,18 @@ import Prelude
 import Data.Argonaut.Encode.Class (encodeJson)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
+import Effect (Effect)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Request (postString) as Request
-import FPO.Data.Route (Route(..))
+import FPO.Data.Request (postStringSilent) as Request
+import FPO.Data.Route (Route(..), urlToRoute)
 import FPO.Data.Store as Store
 import FPO.Dto.Login (LoginDto)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addColumn)
 import Halogen as H
 import Halogen.HTML as HH
-import Halogen.HTML.Events (onClick, onSubmit) as HE
+import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
@@ -33,7 +33,13 @@ import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
 import Web.Event.Internal.Types (Event)
 
-type Input = Unit
+foreign import selectElement :: forall a. a -> Effect Unit
+
+-- | The login page now receives an optional redirect URI from the route's
+-- | query parameters so that the user can be returned to the page they were
+-- | on before being logged out.  This survives page reloads (unlike the old
+-- | Store-based `loginRedirect`).
+type Input = { redirect :: Maybe String }
 
 data Action
   = Initialize
@@ -42,6 +48,7 @@ data Action
   | UpdatePassword String
   | DoLogin LoginDto Event
   | Receive (Connected FPOTranslator Input)
+  | ToggleShowPassword
 
 toLoginDto :: State -> LoginDto
 toLoginDto state = { loginEmail: state.email, loginPassword: state.password }
@@ -49,7 +56,13 @@ toLoginDto state = { loginEmail: state.email, loginPassword: state.password }
 type State = FPOState
   ( email :: String
   , password :: String
+  , loginFailed :: Boolean
+  , showPassword :: Boolean
+  , redirect :: Maybe String -- ^ URI to navigate to after successful login
   )
+
+passwordRef :: H.RefLabel
+passwordRef = H.RefLabel "password-input"
 
 -- | Login component.
 -- |
@@ -63,9 +76,12 @@ component
   => H.Component query Input output m
 component =
   connect selectTranslator $ H.mkComponent
-    { initialState: \{ context } ->
+    { initialState: \{ context, input } ->
         { email: ""
         , password: ""
+        , loginFailed: false
+        , showPassword: false
+        , redirect: input.redirect
         , translator: fromFpoTranslator context
         }
     , render
@@ -90,87 +106,173 @@ component =
       -- address from the store, provided that it exists (was
       -- previously set).
       store <- getStore
+      currentRedirect <- H.gets _.redirect
       let
         initialState =
           { email: store.inputMail
           , password: ""
+          , loginFailed: false
+          , showPassword: false
+          , redirect: currentRedirect
           , translator: fromFpoTranslator store.translator
           }
       H.put initialState
     UpdateEmail email -> do
-      H.modify_ \state -> state { email = email }
+      H.modify_ \state -> state { email = email, loginFailed = false }
       -- In this example, we are simply storing the user's email in our
       -- store, every time the user clicks on the button (either login or
       -- register).
       updateStore $ Store.SetMail email
     UpdatePassword password -> do
-      H.modify_ \state -> state { password = password }
+      state <- H.get
+      -- If the user edits the password after a failed login attempt,
+      -- select all text so they can easily retype.
+      when state.loginFailed $ selectPasswordField
+      H.modify_ \s -> s { password = password, loginFailed = false }
     NavigateToPasswordReset -> do
       navigate (PasswordReset { token: Nothing })
     DoLogin loginDto event -> do
       H.liftEffect $ preventDefault event
       -- trying to do a login by calling the api at /api/login
       -- we show the error response that comes back from the backend
-      loginResponse <- Request.postString "/login" (encodeJson loginDto)
+      loginResponse <-
+        Request.postStringSilent "/login" (encodeJson loginDto)
       case loginResponse of
-        Left _ -> pure unit
+        Left _ -> do
+          H.modify_ _ { loginFailed = true }
+          selectPasswordField
         Right _ -> handleLoginRedirect
       pure unit
-    Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
+    Receive { context, input } -> H.modify_ _
+      { translator = fromFpoTranslator context, redirect = input.redirect }
+    ToggleShowPassword -> do
+      H.modify_ \state -> state { showPassword = not state.showPassword }
 
-  -- After successful login, redirect to either a previously set redirect route
-  -- or to the profile page with a login success banner.
+  selectPasswordField :: H.HalogenM State Action () output m Unit
+  selectPasswordField = do
+    mEl <- H.getRef passwordRef
+    case mEl of
+      Nothing -> pure unit
+      Just el -> H.liftEffect $ selectElement el
+
+  -- After successful login, redirect to the route encoded in the URL's
+  -- ?redirect= query parameter, or fall back to Home.
   handleLoginRedirect :: H.HalogenM State Action () output m Unit
   handleLoginRedirect = do
-    redirect <- _.loginRedirect <$> getStore
-    case redirect of
-      Just r -> do
-        updateStore $ Store.SetLoginRedirect Nothing
-        navigate r
-      Nothing -> do
-        navigate (Profile { loginSuccessful: Just true, userId: Nothing })
+    mRedirectUri <- H.gets _.redirect
+    case mRedirectUri >>= urlToRoute of
+      Just r -> navigate r
+      Nothing -> navigate Home
 
   renderLoginForm :: forall w. State -> HH.HTML w Action
   renderLoginForm state =
-    HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-      [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
-          [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-              [ HH.text "Login" ]
-          , HH.form
-              [ HE.onSubmit \e -> DoLogin (toLoginDto state) e ]
-              [ addColumn
-                  state.email
-                  ( (translate (label :: _ "common_emailAddress") state.translator) <>
-                      ":"
-                  )
-                  (translate (label :: _ "common_email") state.translator)
-                  "bi-envelope-fill"
-                  HP.InputEmail
-                  UpdateEmail
-              , addColumn
-                  state.password
-                  ((translate (label :: _ "common_password") state.translator) <> ":")
-                  (translate (label :: _ "common_password") state.translator)
-                  "bi-lock-fill"
-                  HP.InputPassword
-                  UpdatePassword
-              , HH.div [ HP.classes [ HB.mb4, HB.textCenter ] ]
-                  [ HH.button
-                      [ HP.classes [ HB.btn, HB.btnPrimary ] ]
-                      [ HH.text "Login" ]
-                  ]
-              , HH.div [ HP.classes [ HB.textCenter ] ]
-                  [ HH.button
-                      [ HP.classes [ HB.btn, HB.btnLink ]
-                      , HP.type_ HP.ButtonButton
-                      , HE.onClick $ const NavigateToPasswordReset
-                      ]
-                      [ HH.text
-                          ( translate (label :: _ "login_passwordForgotten")
-                              state.translator
-                          )
-                      ]
-                  ]
-              ]
-          ]
-      ]
+    let
+      errorMsg = translate (label :: _ "error_invalidCredentials") state.translator
+      invalidClass = HH.ClassName "is-invalid"
+      emailClasses =
+        [ HB.formControl ]
+          <> if state.loginFailed then [ invalidClass ] else []
+      passwordClasses =
+        [ HB.formControl ]
+          <> if state.loginFailed then [ invalidClass ] else []
+      passwordType =
+        if state.showPassword then HP.InputText
+        else HP.InputPassword
+      eyeIcon =
+        if state.showPassword then "bi-eye-slash-fill"
+        else "bi-eye-fill"
+      loginFailedVisibility = HP.style
+        if state.loginFailed then ""
+        else "visibility: hidden;"
+    in
+      HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
+        [ HH.div [ HP.classes [ HB.colLg4, HB.colMd6, HB.colSm8 ] ]
+            [ HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
+                [ HH.text "Login" ]
+            , HH.form
+                [ HE.onSubmit \e -> DoLogin (toLoginDto state) e ]
+                [ HH.div [ HP.classes [ HB.mb2 ] ]
+                    [ HH.label [ HP.classes [ HB.formLabel ] ]
+                        [ HH.text $
+                            ( translate (label :: _ "common_emailAddress")
+                                state.translator
+                            ) <> ":"
+                        ]
+                    , HH.div [ HP.classes [ HB.inputGroup ] ]
+                        [ HH.span [ HP.classes [ HB.inputGroupText ] ]
+                            [ HH.i [ HP.class_ (HH.ClassName "bi-envelope-fill") ] []
+                            ]
+                        , HH.input
+                            [ HP.type_ HP.InputEmail
+                            , HP.classes emailClasses
+                            , HP.placeholder
+                                ( translate (label :: _ "common_email")
+                                    state.translator
+                                )
+                            , HP.value state.email
+                            , HE.onValueInput UpdateEmail
+                            ]
+                        ]
+                    , HH.div
+                        [ HP.classes
+                            [ HH.ClassName "invalid-feedback", HB.dBlock ]
+                        , loginFailedVisibility
+                        ]
+                        [ HH.text errorMsg ]
+                    ]
+                , HH.div [ HP.classes [ HB.mb2 ] ]
+                    [ HH.label [ HP.classes [ HB.formLabel ] ]
+                        [ HH.text $
+                            ( translate (label :: _ "common_password")
+                                state.translator
+                            ) <> ":"
+                        ]
+                    , HH.div [ HP.classes [ HB.inputGroup ] ]
+                        [ HH.span [ HP.classes [ HB.inputGroupText ] ]
+                            [ HH.i [ HP.class_ (HH.ClassName "bi-lock-fill") ] [] ]
+                        , HH.input
+                            [ HP.type_ passwordType
+                            , HP.classes passwordClasses
+                            , HP.placeholder
+                                ( translate (label :: _ "common_password")
+                                    state.translator
+                                )
+                            , HP.value state.password
+                            , HP.ref passwordRef
+                            , HE.onValueInput UpdatePassword
+                            ]
+                        , HH.button
+                            [ HP.type_ HP.ButtonButton
+                            , HP.classes [ HB.btn, HB.btnOutlineSecondary ]
+                            , HE.onClick $ const ToggleShowPassword
+                            , HP.tabIndex (-1)
+                            ]
+                            [ HH.i [ HP.class_ (HH.ClassName eyeIcon) ] [] ]
+                        ]
+                    , HH.div
+                        [ HP.classes
+                            [ HH.ClassName "invalid-feedback", HB.dBlock ]
+                        , loginFailedVisibility
+                        ]
+                        [ HH.text errorMsg ]
+                    ]
+                , HH.div [ HP.classes [ HB.mb4, HB.textCenter ] ]
+                    [ HH.button
+                        [ HP.classes [ HB.btn, HB.btnPrimary ] ]
+                        [ HH.text "Login" ]
+                    ]
+                , HH.div [ HP.classes [ HB.textCenter ] ]
+                    [ HH.button
+                        [ HP.classes [ HB.btn, HB.btnLink ]
+                        , HP.type_ HP.ButtonButton
+                        , HE.onClick $ const NavigateToPasswordReset
+                        ]
+                        [ HH.text
+                            ( translate (label :: _ "login_passwordForgotten")
+                                state.translator
+                            )
+                        ]
+                    ]
+                ]
+            ]
+        ]

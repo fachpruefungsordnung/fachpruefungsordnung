@@ -4,11 +4,11 @@ import Prelude
 
 import Data.Argonaut.Core (jsonEmptyObject)
 import Data.Argonaut.Encode (encodeJson)
-import Data.Array (filter, find, snoc)
+import Data.Array (filter, find, findIndex, modifyAt, snoc)
 import Data.Either (Either(..))
 import Data.Foldable (any)
 import Data.Formatter.DateTime (Formatter)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), maybe)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Components.UI.RenderComment (renderComment, renderFirstComment)
 import FPO.Data.Navigate (class Navigate)
@@ -43,7 +43,7 @@ data Output
   | ConfirmComment CommentSection
   | CommentOverview (Array FirstComment)
   | SendAbstractedComments (Array FirstComment) Boolean
-  | ToDeleteComment Boolean
+  | ToDeleteComment Int Boolean
   | UpdatedComments (Array FirstComment) Boolean
   | SetReAnchor (Maybe CommentSection)
 
@@ -67,12 +67,14 @@ data Query a
   | Overview a
   | UpdateComment (Array Int) a
   | ReaddedAnchor a
+  | UpdateCommentProblem Int a
 
 type State = FPOState
   ( docID :: Int
   , tocID :: Int
   , markerID :: Int
   , commentSections :: Array CommentSection
+  , commentSectionsLoaded :: Boolean
   , mCommentSection :: Maybe CommentSection
   , newComment :: Boolean
   , commentDraft :: String
@@ -98,6 +100,7 @@ commentview = connect selectTranslator $ H.mkComponent
       , tocID: -1
       , markerID: -1
       , commentSections: []
+      , commentSectionsLoaded: false
       , mCommentSection: Nothing
       , newComment: false
       , commentDraft: ""
@@ -182,7 +185,7 @@ commentview = connect selectTranslator $ H.mkComponent
               [ HP.classes [ HB.dFlex, HB.alignItemsCenter, HB.w100 ]
               , HP.style "gap: .5rem; padding-left: 0.5rem; padding-right: 0.5rem;"
               ]
-              [ -- Senden (links)
+              [ -- Send (left)
                 HH.button
                   [ HP.classes [ HB.btn, HB.btnPrimary, HB.px3, HB.py1, HB.m0 ]
                   , HP.style "white-space: nowrap;"
@@ -195,7 +198,7 @@ commentview = connect selectTranslator $ H.mkComponent
                   , HH.i [ HP.classes [ HB.bi, H.ClassName "bi-send" ] ] []
                   ]
 
-              -- Resolve (rechts)
+              -- Resolve (right)
               , if state.newComment then
                   HH.button
                     [ HP.classes
@@ -377,7 +380,7 @@ commentview = connect selectTranslator $ H.mkComponent
             , requestModal = Nothing
             }
           -- Delete it from Editor
-          H.raise (ToDeleteComment hasProblem)
+          H.raise (ToDeleteComment state.markerID hasProblem)
           H.raise (CommentOverview (map extractFirst newCSs))
 
     DeleteComment -> do
@@ -396,7 +399,7 @@ commentview = connect selectTranslator $ H.mkComponent
         , commentSections = updatedSections
         , mCommentSection = Nothing
         }
-      H.raise (ToDeleteComment hasProblem)
+      H.raise (ToDeleteComment state.markerID hasProblem)
 
     SelectingCommentSection markerID -> do
       if markerID == -360 then do
@@ -454,6 +457,7 @@ commentview = connect selectTranslator $ H.mkComponent
     RequestComments docID tocID markerIDs inLatest a -> do
       state <- H.get
       if (state.docID /= docID || tocID /= state.tocID) then do
+        H.modify_ _ { commentSectionsLoaded = false }
         fetchedCommentSections <- fetchCommentSections docID tocID
         let
           commentSections = map
@@ -466,6 +470,7 @@ commentview = connect selectTranslator $ H.mkComponent
           { docID = docID
           , tocID = tocID
           , commentSections = css
+          , commentSectionsLoaded = true
           , mCommentSection = Nothing
           , markerID = -1
           , inLatest = inLatest
@@ -481,6 +486,7 @@ commentview = connect selectTranslator $ H.mkComponent
           fs = map extractFirst css
         H.modify_ _
           { commentSections = css
+          , commentSectionsLoaded = true
           , mCommentSection = Nothing
           , markerID = -1
           , inLatest = inLatest
@@ -532,6 +538,29 @@ commentview = connect selectTranslator $ H.mkComponent
           H.raise (UpdatedComments (map extractFirst newCSs) hasProblem)
       pure (Just a)
 
+    UpdateCommentProblem markerID a -> do
+      state <- H.get
+      if state.commentSectionsLoaded then do
+        let
+          newCS = markProblemForMarker markerID state.commentSections
+          css = map updateFirstCommentProblem newCS
+          fs = map extractFirst css
+          hasProblem = hasProblems css
+          mUpdated = find (\sec -> sec.markerID == markerID) css
+          mCS = case (find (\sec -> sec.markerID == state.markerID) css) of
+            Just cs -> Just cs
+            Nothing -> state.mCommentSection
+        H.modify_ _ { commentSections = css, mCommentSection = mCS }
+        H.raise (UpdatedComments fs hasProblem)
+        when (markerID == state.markerID) do
+          case mUpdated of
+            Just cs ->
+              H.raise (SetReAnchor (if cs.hasProblem then Just cs else Nothing))
+            Nothing -> pure unit
+        pure $ Just a
+      else
+        pure (Just a)
+
   -- Retrieves the comment sections for a given document ID and TOC ID. If
   -- the request fails, an empty array is returned.
   fetchCommentSections
@@ -558,3 +587,11 @@ commentview = connect selectTranslator $ H.mkComponent
           (not (any (\id -> cs.markerID == id) markerIDs))
       }
 
+  markProblemForMarker :: Int -> Array CommentSection -> Array CommentSection
+  markProblemForMarker markerID css =
+    let
+      f cs = if cs.resolved then cs else cs { hasProblem = true }
+    in
+      case findIndex (\cs -> cs.markerID == markerID) css of
+        Nothing -> css
+        Just ix -> modifyAt ix f css # maybe css identity

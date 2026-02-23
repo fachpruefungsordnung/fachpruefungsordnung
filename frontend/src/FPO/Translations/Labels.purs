@@ -13,6 +13,10 @@ import FPO.Translations.Page.Admin.GroupProjects
   ( deGroupProjectsPage
   , enGroupProjectsPage
   )
+import FPO.Translations.Page.Admin.GroupSettings
+  ( deGroupSettingsPage
+  , enGroupSettingsPage
+  )
 import FPO.Translations.Page.Admin.PageGroups (deAdminGroupPage, enAdminGroupPage)
 import FPO.Translations.Page.Admin.PageUsers (deAdminUserPage, enAdminUserPage)
 import FPO.Translations.Page.AdminPanel (deAdminPanel, enAdminPanel)
@@ -21,6 +25,7 @@ import FPO.Translations.Page.Login (deLogin, enLogin)
 import FPO.Translations.Page.Page404 (dePage404, enPage404)
 import FPO.Translations.Page.Profile (deProfile, enProfile)
 import FPO.Translations.Page.ResetPassword (dePasswordReset, enPasswordReset)
+import FPO.Translations.Page.Unauthorized (deUnauthorized, enUnauthorized)
 import Record (merge)
 import Record.Extra (type (:::), SNil)
 import Simple.I18n.Translation (Translation, fromRecord, toRecord)
@@ -43,6 +48,8 @@ en = fromRecord
   $ merge (toRecord enPasswordReset)
   $ merge (toRecord enProfile)
   $ merge (toRecord enGroupProjectsPage)
+  $ merge (toRecord enGroupSettingsPage)
+  $ merge (toRecord enUnauthorized)
   $
     toRecord enGroupMemberPage
 
@@ -64,6 +71,8 @@ de = fromRecord
   $ merge (toRecord dePasswordReset)
   $ merge (toRecord deProfile)
   $ merge (toRecord deGroupProjectsPage)
+  $ merge (toRecord deGroupSettingsPage)
+  $ merge (toRecord deUnauthorized)
   $
     toRecord deGroupMemberPage
 
@@ -74,9 +83,15 @@ de = fromRecord
 -- | Because of this constraint, it's sensible to use
 -- | appropriate prefixes for strongly related labels.
 type Labels =
-  ( -- | Admin Groups Page
-    "admin_groups_createGroup"
+  ( -- | Admin Panel / Administration Page
+    "admin_administration"
+      ::: "admin_groups"
+
+      -- | Admin Groups Page
+      ::: "admin_groups_addMembers"
+      ::: "admin_groups_createGroup"
       ::: "admin_groups_createNewGroup"
+      ::: "admin_groups_deleteGroup"
       ::: "admin_groups_desc"
       ::: "admin_groups_enterGroupDesc"
       ::: "admin_groups_enterGroupName"
@@ -87,12 +102,16 @@ type Labels =
       ::: "admin_groups_failedDeletingGroup"
       ::: "admin_groups_groupName"
       ::: "admin_groups_listOfGroups"
+      ::: "admin_groups_noUsersFound"
       ::: "admin_groups_notEmpty"
       ::: "admin_groups_searchForGroups"
+      ::: "admin_groups_searchUsersToAdd"
       ::: "admin_groups_stillLoading"
+      ::: "admin_groups_successfullyCreatedGroup"
       ::: "admin_groups_viewDocumentsPage"
 
-      -- | Admin Users Page
+      -- | Admin Users Page (admin_users comes before admin_users_*)
+      ::: "admin_users"
       ::: "admin_users_create"
       ::: "admin_users_createNewUser"
       ::: "admin_users_deleteUser"
@@ -101,6 +120,7 @@ type Labels =
       ::: "admin_users_failedToLoadUsers"
       ::: "admin_users_goToProfilePage"
       ::: "admin_users_listOfUsers"
+      ::: "admin_users_searchUsers"
       ::: "admin_users_successfullyCreatedUser"
       ::: "admin_users_theUser"
 
@@ -123,8 +143,11 @@ type Labels =
       ::: "comment_send"
 
       -- | Common Phrases
+      ::: "common_add"
       ::: "common_by"
       ::: "common_cancel"
+      ::: "common_clear"
+      ::: "common_close"
       ::: "common_confirmDelete"
       ::: "common_confirmDiscard"
       ::: "common_create"
@@ -188,7 +211,7 @@ type Labels =
       ::: "editor_viewVersion"
       ::: "editor_wrapToggle"
 
-      -- | Errors 
+      -- | Errors
       ::: "error_accessDeniedError"
       ::: "error_authError"
       ::: "error_conflictError"
@@ -205,7 +228,9 @@ type Labels =
       -- | Group Members Page
       ::: "gm_addMember"
       ::: "gm_memberManagement"
+      ::: "gm_membersAddedSuccessfully"
       ::: "gm_membersOfGroup"
+      ::: "gm_noUsersFound"
       ::: "gm_removeMember"
       ::: "gm_role"
       ::: "gm_searchMembers"
@@ -221,6 +246,7 @@ type Labels =
 
       -- | Group Projects Page
       ::: "gp_createNewProject"
+      ::: "gp_docNameNotEmpty"
       ::: "gp_documentName"
       ::: "gp_enterDocumentName"
       ::: "gp_groupProjects"
@@ -228,6 +254,16 @@ type Labels =
       ::: "gp_projectManagement"
       ::: "gp_removeProject"
       ::: "gp_searchProjects"
+      ::: "gp_successfullyCreatedDocument"
+
+      -- | Group Settings Page
+      ::: "gs_description"
+      ::: "gs_descriptionPlaceholder"
+      ::: "gs_groupName"
+      ::: "gs_groupNamePlaceholder"
+      ::: "gs_saveSettings"
+      ::: "gs_settings"
+      ::: "gs_settingsUpdated"
 
       -- | Home Page
       ::: "home_basicDescription"
@@ -251,9 +287,25 @@ type Labels =
       -- | Login Page
       ::: "login_passwordForgotten"
 
-      -- | Navar
+      -- | Modal labels
+      ::: "modal_changesFound"
+      ::: "modal_content"
+      ::: "modal_currentVersion"
+      ::: "modal_documentHistory_title"
+      ::: "modal_historyBefore"
+      ::: "modal_noHistory"
+      ::: "modal_paragraph"
+      ::: "modal_paragraphHistory_title"
+      ::: "modal_structure"
+      ::: "modal_textRevision"
+      ::: "modal_treeRevision"
+      ::: "modal_versionsFound"
+
+      -- | Navbar
+      ::: "navbar_administration"
       ::: "navbar_documents"
       ::: "navbar_groups"
+      ::: "navbar_help"
       ::: "navbar_users"
 
       -- | 404 Page
@@ -306,6 +358,10 @@ type Labels =
       ::: "toc_full"
       ::: "toc_paragraph"
       ::: "toc_section"
+
+      -- | Unauthorized Page
+      ::: "unauthorized_message"
+      ::: "unauthorized_title"
 
       ::: SNil
   )
