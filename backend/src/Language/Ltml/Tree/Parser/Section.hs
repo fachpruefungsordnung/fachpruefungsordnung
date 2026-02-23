@@ -13,7 +13,7 @@ import Language.Lsd.AST.Type.Section
     ( FormattedSectionType
     , HeadingType
     , SectionBodyType (InnerSectionBodyType)
-    , SectionType (SectionType)
+    , SectionType (SectionType), SectionFormatted (SectionFormatted)
     )
 import Language.Ltml.AST.Node (Node)
 import Language.Ltml.AST.Section
@@ -31,6 +31,7 @@ import Language.Ltml.Tree.Parser
     , nFlaggedTreePF
     )
 import Text.Megaparsec (eof)
+import Data.List.NonEmpty (NonEmpty(..))
 
 {-# ANN sectionTP "HLint: ignore Avoid lambda using `infix`" #-}
 sectionTP
@@ -43,17 +44,35 @@ sectionTP = nFlaggedTreePF sectionTP'
         :: FormattedSectionType
         -> InputTree'
         -> FootnoteTreeParser FormattedSection
-    sectionTP' t' tree = traverseF (\t -> sectionTP'' t tree) t'
-      where
-        sectionTP''
-            :: SectionType
-            -> InputTree'
-            -> FootnoteTreeParser (Parsed (Node Section))
-        sectionTP'' t (Leaf x) = leafFootnoteParser (sectionP t eof) x
-        sectionTP'' (SectionType kw headingT bodyT) (Tree x children) = do
-            wHeading <- sequenceEither <$> headingTP kw headingT x
-            body <- sectionBodyTP bodyT children
-            return $ Right $ fmap (\heading -> Section heading body) wHeading
+    sectionTP' (t :| ts) tree = foldr (altSelector . singleSectionTP' tree) (singleSectionTP' tree t) ts
+
+    altSelector :: FootnoteTreeParser FormattedSection 
+                -> FootnoteTreeParser FormattedSection 
+                -> FootnoteTreeParser FormattedSection
+    altSelector l r = do
+        l' <- l
+        case l' of
+            SectionFormatted _ (Right _) -> return l'
+            _ -> r
+
+    -- baseSelection :: FootnoteTreeParser FormattedSection 
+    -- baseSelection = fail "no valid alternative found"
+
+    singleSectionTP'
+        :: InputTree'
+        -> SectionFormatted SectionType
+        -> FootnoteTreeParser FormattedSection
+    singleSectionTP' tree = traverseF (\t -> sectionTP'' t tree)
+
+    sectionTP''
+        :: SectionType
+        -> InputTree'
+        -> FootnoteTreeParser (Parsed (Node Section))
+    sectionTP'' t (Leaf x) = leafFootnoteParser (sectionP t eof) x
+    sectionTP'' (SectionType kw headingT bodyT) (Tree x children) = do
+        wHeading <- sequenceEither <$> headingTP kw headingT x
+        body <- sectionBodyTP bodyT children
+        return $ Right $ fmap (\heading -> Section heading body) wHeading
 
 headingTP
     :: Keyword

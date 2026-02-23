@@ -23,7 +23,7 @@ data TableType
 data RowType
     = RowType
         Keyword -- this defines the keyword that ends the row, e.g. "&"
-        -- together with the main table keyword, this defines the parsing of the row
+        -- together with the main table keyword this defines the parsing of the row
         -- e.g. if the main table keyword is "|" and the row ending keyword is "&",
         -- then the end of a row is marked with "|&"
         (Star (Disjunction CellType))
@@ -42,7 +42,7 @@ newtype DefaultCellType = DefaultCellType CellType
 data CellType
     = CellType
         Keyword -- this defines the keyword that specifies the cell. e.g. "*" or "-"
-        -- together with the main table keyword, this defines the parsing of the cell
+        -- together with the main table keyword this defines the parsing of the cell
         -- e.g. if the main table keyword is "|" and the cell keyword is "*",
         -- then the start of the cell is marked with "|*"
         CellFormat

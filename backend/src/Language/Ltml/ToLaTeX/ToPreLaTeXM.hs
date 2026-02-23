@@ -272,7 +272,7 @@ instance Labelable EnumItem where
     attachLabel mLabel (EnumItem tt) = do
         path <- GS.nextEnumPosition
         ident <- use (GS.formatState . GS.enumIdentifierFormat)
-        GS.insertRefLabel mLabel (getIdentifier ident (last path))
+        GS.insertRefLabel mLabel (getIdentifier ident (last path) 0)
         tt' <- GS.descendEnumTree $ toPreLaTeXM tt
         let anchor = maybe mempty (`hypertarget` mempty) mLabel
         pure $ anchor <> tt'
@@ -305,7 +305,7 @@ instance ToPreLaTeXM Paragraph where
 instance Labelable Paragraph where
     attachLabel mLabel (Paragraph (ParagraphFormat ident (ParagraphKeyFormat key)) content) = do
         n <- GS.nextParagraph
-        let identifier = getIdentifier ident n
+        let identifier = getIdentifier ident n 0
         GS.insertRefLabel mLabel identifier
         GS.enumPosition .= [0]
         content' <- toPreLaTeXM content
@@ -363,28 +363,28 @@ instance Labelable Section where
             -- \^ if the parsing of the heading failed, we throw an error, otherwise proceed
             Left e -> error (errorBundlePretty e)
             Right (Heading fmt tt) -> do
-                (SectionFormat ident (TocKeyFormat keyident)) <-
+                (SectionFormat ident (TocKeyFormat keyident) isInserted) <-
                     use (GS.formatState . GS.sectionFormat)
                 tt' <- toPreLaTeXM tt
                 -- \| helper functions to reduce redundance
                 let headingText = tt'
-                    buildHeading n = do
-                        createHeading fmt headingText (IText $ getIdentifier ident n)
+                    buildHeading n ni = do
+                        createHeading fmt headingText (IText $ getIdentifier ident n ni)
                     setLabel n = GS.insertRefLabel mLabel (T.pack (show n))
                     filterFN xs = [y | y <- xs, not (isFN y)]
-                      where
                         -- \^ when the heading is added to the toc, we want to get rid of footnotes. (luckily Styled is not allowed in HeadingTextTree)
-
+                      where
                         isFN (FootnoteRef _) = True
                         isFN _ = False
                 tocEntry <- toPreLaTeXM $ filterFN tt
                 case nodes of
                     LeafSectionBody paragraphs -> do
-                        n <- GS.nextSection
+                        n <- (if isInserted then use $ GS.counterState . GS.sectionCTR else GS.nextSection)
+                        ni <- (if isInserted then GS.nextInsertedSection else pure 0)
                         setLabel n
                         GS.flagState . GS.onlyOneParagraph .= (length paragraphs == 1)
-                        tocAnchor <- GS.addTOCEntry n keyident ident tocEntry
-                        headingDoc <- buildHeading n
+                        tocAnchor <- GS.addTOCEntry n ni keyident ident tocEntry
+                        headingDoc <- buildHeading n ni
                         content' <- toPreLaTeXM paragraphs
                         let refAnchor = maybe headingDoc (`hypertarget` headingDoc) mLabel
                         pure $ tocAnchor <> refAnchor <> content'
@@ -392,8 +392,8 @@ instance Labelable Section where
                         n <- GS.nextSupersection
                         setLabel n
                         GS.counterState . GS.supersectionCTR .= 0
-                        tocAnchor <- GS.addTOCEntry n keyident ident tocEntry
-                        headingDoc <- buildHeading n
+                        tocAnchor <- GS.addTOCEntry n 0 keyident ident tocEntry
+                        headingDoc <- buildHeading n 0
                         content' <- toPreLaTeXM subsections
                         GS.counterState . GS.supersectionCTR .= n
                         let refAnchor =
@@ -580,9 +580,9 @@ instance Labelable Document where
                         n <- GS.nextAppendix
                         AppendixElementFormat ident (TocKeyFormat key) fmt <-
                             use (GS.formatState . GS.appendixFormat)
-                        let iText = getIdentifier ident n
+                        let iText = getIdentifier ident n 0
                         GS.insertRefLabel mLabel iText
-                        tocAnchor <- GS.addTOCEntry n key ident tt'
+                        tocAnchor <- GS.addTOCEntry n 0 key ident tt'
                         -- \^ inserts a toc entry and returns a hypertarget, so that it is possible to jump here from the toc
                         GS.addAppendixHeaderEntry n key ident tt'
                         heading <- createHeading fmt tt' (IText iText)
