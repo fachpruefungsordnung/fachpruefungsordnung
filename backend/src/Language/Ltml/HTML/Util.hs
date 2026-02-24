@@ -27,6 +27,7 @@ module Language.Ltml.HTML.Util
       -- * ToHtmlM Helpers
     , getNextRawTextTree
     , isSuper
+    , isInserted
 
       -- * FilePaths
     , disjointRelative
@@ -40,6 +41,7 @@ import Data.Char (chr)
 import Data.Text (Text, pack)
 import Data.Text.Lazy (toStrict)
 import Data.Void (absurd)
+import Language.Lsd.AST.Type.Section (SectionFormat (..))
 import Language.Ltml.AST.Label (Label (..))
 import Language.Ltml.AST.Section (SectionBody (InnerSectionBody))
 import Language.Ltml.AST.Text (HeadingTextTree, TextTree (..))
@@ -175,6 +177,10 @@ getNextRawTextTree =
 isSuper :: SectionBody -> Bool
 isSuper (InnerSectionBody _) = True
 isSuper _ = False
+
+-- | Is given 'Section' an inserted 'Section'?
+isInserted :: SectionFormat -> Bool
+isInserted (SectionFormat _ _ insertedFlag) = insertedFlag
 
 -------------------------------------------------------------------------------
 
