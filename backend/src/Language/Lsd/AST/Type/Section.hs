@@ -15,6 +15,7 @@ module Language.Lsd.AST.Type.Section
 where
 
 import Control.Functor.Utils (TraversableF (traverseF))
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Void (Void)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.Format
@@ -34,7 +35,6 @@ import Language.Lsd.AST.Type
 import Language.Lsd.AST.Type.Paragraph (ParagraphType)
 import Language.Lsd.AST.Type.SimpleBlock (SimpleBlockType)
 import Language.Lsd.AST.Type.Text (TextType)
-import Data.List.NonEmpty (NonEmpty(..))
 
 data SectionFormat
     = SectionFormat
@@ -64,7 +64,7 @@ instance RawProperNodeKind FormattedSectionType where
 
     -- Note: The parser also permits super-sections as leafs in the input tree.
     --  - Ideally, this should also somehow be reflected here. (TODO)
-    treeSyntaxMapRaw f (SectionFormatted _ (SectionType _ _ bodyT) :|_ ) =
+    treeSyntaxMapRaw f (SectionFormatted _ (SectionType _ _ bodyT) :| _) =
         case sectionBodyChildrenOrderMap f bodyT of
             Just co -> TreeSyntax (HasEditableHeader True) co
             Nothing -> LeafSyntax

@@ -8,6 +8,7 @@ where
 import Control.Applicative ((<|>))
 import Control.Functor.Utils (traverseF)
 import Control.Monad (void)
+import Data.List.NonEmpty (NonEmpty (..))
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Star (Star))
 import Language.Lsd.AST.Type (unwrapNT)
@@ -37,8 +38,7 @@ import Language.Ltml.Parser.Keyword (keywordP)
 import Language.Ltml.Parser.Paragraph (paragraphP)
 import Language.Ltml.Parser.SimpleBlock (simpleBlockP)
 import Language.Ltml.Parser.Text (HangingTextP, hangingTextP')
-import Text.Megaparsec (many, choice, MonadParsec (try))
-import Data.List.NonEmpty (NonEmpty(..))
+import Text.Megaparsec (MonadParsec (try), choice, many)
 
 sectionP :: SectionType -> Parser () -> FootnoteParser (Node Section)
 sectionP (SectionType kw headingT bodyT) succStartP = do
@@ -46,7 +46,8 @@ sectionP (SectionType kw headingT bodyT) succStartP = do
     body <- sectionBodyP bodyT succStartP
     return $ Node mLabel $ Section (Right heading) body
 
-sectionP' :: FormattedSectionType -> Parser () -> FootnoteParser FormattedSection
+sectionP'
+    :: FormattedSectionType -> Parser () -> FootnoteParser FormattedSection
 sectionP' (t :| ts) succStartP = choice (map (try . singleSectionP' succStartP) (ts ++ [t]))
   where
     singleSectionP'
@@ -76,10 +77,9 @@ sectionBodyP t0 succStartP = bodyP t0
                 (simpleBlockP $ unwrapNT t)
                 succStartP
 
-
 toStartP :: FormattedSectionType -> Parser ()
 toStartP (t :| ts) = choice (map (try . toStartP') (ts ++ [t]))
-  where 
+  where
     toStartP' :: SectionFormatted SectionType -> Parser ()
     toStartP' (SectionFormatted _ (SectionType kw _ _)) = void $ keywordP kw
 

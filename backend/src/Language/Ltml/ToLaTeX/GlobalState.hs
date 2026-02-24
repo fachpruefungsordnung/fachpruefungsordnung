@@ -232,7 +232,12 @@ insertRefLabel mLabel ident =
 --   wrap it in a hyperlink, to make the final pdf interactive. returns the corresponding
 --   hypertarget.
 addTOCEntry
-    :: Int -> Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState PreLaTeX
+    :: Int
+    -> Int
+    -> KeyFormat
+    -> IdentifierFormat
+    -> PreLaTeX
+    -> State GlobalState PreLaTeX
 addTOCEntry n ni keyident ident headingText = do
     m <- nextTOCLabel
     let tocLabel = Label $ T.pack $ "/" ++ show m ++ "/"

@@ -372,14 +372,16 @@ instance Labelable Section where
                         createHeading fmt headingText (IText $ getIdentifier ident n ni)
                     setLabel n = GS.insertRefLabel mLabel (T.pack (show n))
                     filterFN xs = [y | y <- xs, not (isFN y)]
-                        -- \^ when the heading is added to the toc, we want to get rid of footnotes. (luckily Styled is not allowed in HeadingTextTree)
                       where
+                        -- \^ when the heading is added to the toc, we want to get rid of footnotes. (luckily Styled is not allowed in HeadingTextTree)
+
                         isFN (FootnoteRef _) = True
                         isFN _ = False
                 tocEntry <- toPreLaTeXM $ filterFN tt
                 case nodes of
                     LeafSectionBody paragraphs -> do
-                        n <- (if isInserted then use $ GS.counterState . GS.sectionCTR else GS.nextSection)
+                        n <-
+                            (if isInserted then use $ GS.counterState . GS.sectionCTR else GS.nextSection)
                         ni <- (if isInserted then GS.nextInsertedSection else pure 0)
                         setLabel n
                         GS.flagState . GS.onlyOneParagraph .= (length paragraphs == 1)

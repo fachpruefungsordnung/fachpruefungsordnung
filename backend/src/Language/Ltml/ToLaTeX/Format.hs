@@ -28,7 +28,7 @@ import Data.Typography
 import Data.Void (Void, absurd)
 import Language.Lsd.AST.Format
     ( EnumStyle (AlphabeticLower, AlphabeticUpper, Arabic)
-    , FormatAtom (PlaceholderAtom, StringAtom, InsertedPlaceholderAtom)
+    , FormatAtom (InsertedPlaceholderAtom, PlaceholderAtom, StringAtom)
     , FormatString (..)
     , HeadingFormat (..)
     , HeadingPlaceholderAtom (..)
@@ -172,18 +172,23 @@ staticDocumentFormat =
 
 getIdentifier :: IdentifierFormat -> Int -> Int -> T.Text
 getIdentifier (FormatString []) _ _ = mempty
-getIdentifier (FormatString (StringAtom s : rest)) i ii = -- i is the normal identifier while ii is the inserted one
+getIdentifier (FormatString (StringAtom s : rest)) i ii =
+    -- i is the normal identifier while ii is the inserted one
     T.pack s <> getIdentifier (FormatString rest) i ii
 getIdentifier (FormatString (PlaceholderAtom a : rest)) i ii =
     case a of
         Arabic -> T.pack (show i) <> getIdentifier (FormatString rest) i ii
-        AlphabeticLower -> T.pack [chr ((i - 1) `mod` 27 + 97)] <> getIdentifier (FormatString rest) i ii
-        AlphabeticUpper -> T.pack [chr ((i - 1) `mod` 27 + 65)] <> getIdentifier (FormatString rest) i ii
+        AlphabeticLower ->
+            T.pack [chr ((i - 1) `mod` 27 + 97)] <> getIdentifier (FormatString rest) i ii
+        AlphabeticUpper ->
+            T.pack [chr ((i - 1) `mod` 27 + 65)] <> getIdentifier (FormatString rest) i ii
 getIdentifier (FormatString (InsertedPlaceholderAtom a : rest)) i ii =
     case a of
         Arabic -> T.pack (show ii) <> getIdentifier (FormatString rest) i ii
-        AlphabeticLower -> T.pack [chr ((ii - 1) `mod` 27 + 97)] <> getIdentifier (FormatString rest) i ii
-        AlphabeticUpper -> T.pack [chr ((ii - 1) `mod` 27 + 65)] <> getIdentifier (FormatString rest) i ii
+        AlphabeticLower ->
+            T.pack [chr ((ii - 1) `mod` 27 + 97)] <> getIdentifier (FormatString rest) i ii
+        AlphabeticUpper ->
+            T.pack [chr ((ii - 1) `mod` 27 + 65)] <> getIdentifier (FormatString rest) i ii
 
 getEnumStyle :: IdentifierFormat -> KeyFormat -> T.Text
 getEnumStyle ident key = "label=" <> buildKey (getEnumIdentifier' ident) key
@@ -196,7 +201,7 @@ getEnumStyle ident key = "label=" <> buildKey (getEnumIdentifier' ident) key
         i
         ((FormatString (PlaceholderAtom KeyIdentifierPlaceholder : rest))) =
             i <> buildKey i (FormatString rest)
-    buildKey 
+    buildKey
         _
         ((FormatString (InsertedPlaceholderAtom KeyIdentifierPlaceholder : _))) = undefined
 
@@ -237,4 +242,3 @@ formatHeaderFooterItem superTitle title date (HeaderFooterItemFormat fontsize st
             HeaderFooterCurPageNumAtom -> IRaw "\\thepage" <> formatHeaderFooterFstring (FormatString rest)
             HeaderFooterLastPageNumAtom -> IRaw "\\pageref{LastPage}" <> formatHeaderFooterFstring (FormatString rest)
     formatHeaderFooterFstring (FormatString (InsertedPlaceholderAtom _ : _)) = undefined
-

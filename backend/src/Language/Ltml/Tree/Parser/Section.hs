@@ -5,6 +5,7 @@ module Language.Ltml.Tree.Parser.Section
 where
 
 import Control.Functor.Utils (sequenceEither, traverseF)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Text (Text)
 import Language.Lsd.AST.Common (Keyword)
 import Language.Lsd.AST.SimpleRegex (Star (Star))
@@ -13,7 +14,8 @@ import Language.Lsd.AST.Type.Section
     ( FormattedSectionType
     , HeadingType
     , SectionBodyType (InnerSectionBodyType)
-    , SectionType (SectionType), SectionFormatted (SectionFormatted)
+    , SectionFormatted (SectionFormatted)
+    , SectionType (SectionType)
     )
 import Language.Ltml.AST.Node (Node)
 import Language.Ltml.AST.Section
@@ -31,7 +33,6 @@ import Language.Ltml.Tree.Parser
     , nFlaggedTreePF
     )
 import Text.Megaparsec (eof)
-import Data.List.NonEmpty (NonEmpty(..))
 
 {-# ANN sectionTP "HLint: ignore Avoid lambda using `infix`" #-}
 sectionTP
@@ -46,16 +47,17 @@ sectionTP = nFlaggedTreePF sectionTP'
         -> FootnoteTreeParser FormattedSection
     sectionTP' (t :| ts) tree = foldr (altSelector . singleSectionTP' tree) (singleSectionTP' tree t) ts
 
-    altSelector :: FootnoteTreeParser FormattedSection 
-                -> FootnoteTreeParser FormattedSection 
-                -> FootnoteTreeParser FormattedSection
+    altSelector
+        :: FootnoteTreeParser FormattedSection
+        -> FootnoteTreeParser FormattedSection
+        -> FootnoteTreeParser FormattedSection
     altSelector l r = do
         l' <- l
         case l' of
             SectionFormatted _ (Right _) -> return l'
             _ -> r
 
-    -- baseSelection :: FootnoteTreeParser FormattedSection 
+    -- baseSelection :: FootnoteTreeParser FormattedSection
     -- baseSelection = fail "no valid alternative found"
 
     singleSectionTP'
