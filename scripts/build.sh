@@ -57,7 +57,7 @@ docker context create "${CONTEXT}" \
   --docker "host=ssh://${REMOTE_BUILD_HOST}"
 
 info "Building on '${REMOTE_BUILD_HOST}'..."
-DOCKER_BUILDKIT=0 docker --context "${CONTEXT}" compose build
+DOCKER_BUILDKIT=1 docker --context "${CONTEXT}" compose build
 
 info "Loading Images..."
 docker --context ${CONTEXT} compose images --quiet \
