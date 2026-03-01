@@ -46,7 +46,8 @@ info "Building on '${REMOTE_BUILD_HOST}'..."
 DOCKER_BUILDKIT=1 docker --context "${CONTEXT}" compose build
 
 info "Loading Images..."
-docker --context ${CONTEXT} compose images --quiet \
+docker --context ${CONTEXT} compose config --images \
+  | grep fpo \
   | xargs docker --context "${CONTEXT}" save \
   | docker load
 
