@@ -2,6 +2,7 @@ services:
   backend:
     container_name: fpo-backend
     hostname: api
+    image: fpo-backend:latest
     build: ./backend
     restart: unless-stopped
     environment:
@@ -25,6 +26,7 @@ services:
   backend-haddock:
     container_name: fpo-haddock
     hostname: haddock
+    image: fpo-backend-haddock:latest
     build:
       context: ./backend
       target: serve-haddock
@@ -34,6 +36,7 @@ services:
   docs:
     container_name: fpo-docs
     hostname: docs
+    image: fpo-docs:latet
     build:
       context: .
       args:
@@ -93,6 +96,7 @@ services:
 
   nginx:
     container_name: fpo-nginx
+    image: fpo-frontend:latest
     build: ./frontend
     ports:
       - "${PORT}:8080"
