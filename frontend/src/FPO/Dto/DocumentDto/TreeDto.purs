@@ -15,10 +15,7 @@ module FPO.Dto.DocumentDto.TreeDto
   , getContentOr
   , getEdgeTree
   , getFullTitle
-  , getFullTitleForDisplay
   , getHeading
-  , getShortTitle
-  , getShortTitleForDisplay
   , modifyNodeRootTree
   , replaceNodeRootTree
   , unspecifiedMeta
@@ -35,7 +32,7 @@ import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Array (uncons)
 import Data.Foldable (foldr)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.String (length, splitAt)
+import Data.String (Pattern(..), Replacement(..), length, replaceAll, splitAt)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
 import FPO.UI.HTML (decodeHtmlEntity)
@@ -96,21 +93,6 @@ getFullTitle (Meta { label, title }) =
     Just l -> removeHTMLTags l <> " " <> removeHTMLTags
       (getContentOr "(missing)" title)
     Nothing -> removeHTMLTags $ getContentOr "(missing)" title
-
--- | Returns the full title of the node for display, including the label if it exists.
--- | Decodes HTML entities.
-getFullTitleForDisplay :: Meta -> String
-getFullTitleForDisplay = getFullTitle
-
--- | Returns the short title of the node, i.e. the title without the label.
--- | Removes HTML tags.
-getShortTitle :: Meta -> String
-getShortTitle (Meta { title }) = removeHTMLTags $ getContentOr "(missing)" title
-
--- | Returns the short title of the node for display, i.e. the title without the label.
--- | Decodes HTML entities.
-getShortTitleForDisplay :: Meta -> String
-getShortTitleForDisplay = decodeHtmlEntity <<< getShortTitle
 
 -- | Drops the <span> and </span> tags from a string, if they exist.
 -- | Otherwise, the string is returned unchanged.

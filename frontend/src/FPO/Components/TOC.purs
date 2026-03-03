@@ -59,9 +59,7 @@ import FPO.Dto.DocumentDto.TreeDto
   , findRootTree
   , getContent
   , getFullTitle
-  , getFullTitleForDisplay
   , getHeading
-  , getShortTitleForDisplay
   , modifyNodeRootTree
   , unspecifiedMeta
   )
@@ -975,7 +973,7 @@ tocview = connect selectAll $ H.mkComponent
         Just entry -> do
           let
             leafId = entry.id
-            mTitle = getFullTitleForDisplay <$> findLeafMeta leafId state.tocEntries
+            mTitle = getFullTitle <$> findLeafMeta leafId state.tocEntries
           H.modify_ \st ->
             st
               { mSelectedTocEntry = Just (SelLeaf leafId)
@@ -992,7 +990,7 @@ tocview = connect selectAll $ H.mkComponent
           handleQuery (SelectFirstEntry a)
         Just _entry -> do
           let
-            mTitle = getFullTitleForDisplay <$> findLeafMeta targetId state.tocEntries
+            mTitle = getFullTitle <$> findLeafMeta targetId state.tocEntries
           H.modify_ \st ->
             st
               { mSelectedTocEntry = Just (SelLeaf targetId)
@@ -1121,7 +1119,7 @@ tocview = connect selectAll $ H.mkComponent
                 , HH.span
                     ( [ HP.classes titleClasses
                       , HP.style "align-self: stretch; flex-basis: 0;"
-                      , HP.title $ getFullTitleForDisplay meta
+                      , HP.title $ getFullTitle meta
                       , HP.ref (H.RefLabel ("toc_node_title_" <> show path))
                       ] <>
                         ( if canBeRenamed then
@@ -1196,7 +1194,6 @@ tocview = connect selectAll $ H.mkComponent
           else []
         containerProps =
           ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <> selectedClasses
-            , HP.title ("Jump to section " <> getShortTitleForDisplay meta)
             ] <> dragProps
           )
         innerDivBaseClasses =
