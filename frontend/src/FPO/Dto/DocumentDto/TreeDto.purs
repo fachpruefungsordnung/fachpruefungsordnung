@@ -32,7 +32,7 @@ import Data.Argonaut.Encode (class EncodeJson, encodeJson)
 import Data.Array (uncons)
 import Data.Foldable (foldr)
 import Data.Maybe (Maybe(..), fromMaybe)
-import Data.String (Pattern(..), Replacement(..), length, replaceAll, splitAt)
+import Data.String (length, splitAt)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
 
