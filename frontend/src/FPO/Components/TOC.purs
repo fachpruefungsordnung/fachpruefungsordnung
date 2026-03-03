@@ -31,11 +31,13 @@ import Data.Array
   )
 import Data.DateTime (Date, DateTime, adjust)
 import Data.Either (Either(..))
+import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Show (class Show)
 import Data.Time.Duration (Days(..), Minutes)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
+import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Now (getTimezoneOffset, nowDateTime)
@@ -108,6 +110,7 @@ import Prelude
   , (<>)
   , (==)
   , (>)
+  , (>>=)
   , (||)
   )
 import Simple.I18n.Translator (label, translate)
@@ -193,6 +196,7 @@ data Action
   | CloseDocumentHistoryModal
   | HandleParagraphHistoryOutput PHM.Output
   | HandleDocumentHistoryOutput DHM.Output
+  | UpdateTitles
 
 data EntityKind = Section | Paragraph
 
@@ -589,6 +593,42 @@ tocview = connect selectAll $ H.mkComponent
     DoNothing -> do
       pure unit
 
+    UpdateTitles -> do
+      state <- H.get
+      -- Update titles for all TOC entries using setInnerHtml
+      updateTitlesInTree state.tocEntries
+      where
+      updateTitlesInTree :: TOCTree -> H.HalogenM State Action Slots Output m Unit
+      updateTitlesInTree Empty = pure unit
+      updateTitlesInTree (RootTree { children }) =
+        traverse_ (\(Tuple ix edge) -> updateTitlesInEdgeWithPath ix edge)
+          (mapWithIndex Tuple children)
+
+      updateTitlesInEdgeWithPath
+        :: Int -> Edge TOCEntry -> H.HalogenM State Action Slots Output m Unit
+      updateTitlesInEdgeWithPath ix (Edge tree) = updateTitlesInTreeNodeWithPath
+        [ ix ]
+        tree
+
+      updateTitlesInTreeNodeWithPath
+        :: Path -> Tree TOCEntry -> H.HalogenM State Action Slots Output m Unit
+      updateTitlesInTreeNodeWithPath path (Node { meta, children }) = do
+        -- Update title for this node
+        H.getHTMLElementRef (H.RefLabel ("toc_node_title_" <> show path)) >>=
+          traverse_ \titleElement -> do
+            H.liftEffect $ HTMLP.setInnerHtml titleElement (getFullTitle meta)
+        -- Update children with extended paths
+        traverse_
+          ( \(Tuple ix (Edge child)) -> updateTitlesInTreeNodeWithPath
+              (path <> [ ix ])
+              child
+          )
+          (mapWithIndex Tuple children)
+      updateTitlesInTreeNodeWithPath _ (Leaf { meta, node }) = do
+        H.getHTMLElementRef (H.RefLabel ("toc_title_" <> show node.id)) >>= traverse_
+          \titleElement -> do
+            H.liftEffect $ HTMLP.setInnerHtml titleElement (getFullTitle meta)
+
     JumpToLeafSection id path title -> do
       handleAction (ToggleHistoryMenuOff path)
       mSelectedTocEntry <- H.gets _.mSelectedTocEntry
@@ -901,6 +941,10 @@ tocview = connect selectAll $ H.mkComponent
             pure unit
         _ -> do
           pure unit
+      -- Update all titles after receiving new TOC entries
+      _ <- H.fork do
+        H.liftAff $ delay (Milliseconds 10.0) -- Small delay to ensure DOM is rendered
+        handleAction UpdateTitles
       pure (Just a)
 
     RequestCurrentTocEntryTitle reply -> do
@@ -1078,6 +1122,7 @@ tocview = connect selectAll $ H.mkComponent
                     ( [ HP.classes titleClasses
                       , HP.style "align-self: stretch; flex-basis: 0;"
                       , HP.title $ getFullTitleForDisplay meta
+                      , HP.ref (H.RefLabel ("toc_node_title_" <> show path))
                       ] <>
                         ( if canBeRenamed then
                             [ HE.onClick \_ -> JumpToNodeSection path
@@ -1088,7 +1133,7 @@ tocview = connect selectAll $ H.mkComponent
                             []
                         )
                     )
-                    [ HH.text $ getFullTitleForDisplay meta ]
+                    []
                 , addItemInterface
                 ]
             ]
@@ -1178,8 +1223,9 @@ tocview = connect selectAll $ H.mkComponent
                     [ HP.classes
                         [ HB.textTruncate, HB.flexGrow1, HB.fwNormal, HB.fs6 ]
                     , HP.style "align-self: stretch; flex-basis: 0;"
+                    , HP.ref (H.RefLabel ("toc_title_" <> show id))
                     ]
-                    [ HH.text $ HTMLP.decodeHtmlEntity (getFullTitle meta) ]
+                    []
                 , renderParagraphButtonInterface
                     path
                     isDeletable
