@@ -100,7 +100,7 @@ getFullTitle (Meta { label, title }) =
 -- | Returns the full title of the node for display, including the label if it exists.
 -- | Decodes HTML entities.
 getFullTitleForDisplay :: Meta -> String
-getFullTitleForDisplay = decodeHtmlEntity <<< getFullTitle
+getFullTitleForDisplay = getFullTitle
 
 -- | Returns the short title of the node, i.e. the title without the label.
 -- | Removes HTML tags.

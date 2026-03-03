@@ -96,7 +96,7 @@ import FPO.Types
   , FirstComment
   , TOCEntry
   )
-import FPO.UI.HTML (decodeHtmlEntity)
+import FPO.UI.HTML (setInnerHtml)
 import FPO.UI.Modals.DiscardModal (discardModal)
 import FPO.UI.Modals.InfoModal (infoModal)
 import FPO.Util (prependIf)
@@ -546,12 +546,9 @@ editor = connect selectTranslator $ H.mkComponent
           [ HH.h2
               [ HP.classes [ HH.ClassName "text-truncate" ]
               , HP.style "font-size: 1rem; margin: 0;"
+              , HP.ref (H.RefLabel "section_title")
               ]
-              [ HH.text $
-                  case state.mTitle of
-                    Just title -> decodeHtmlEntity title
-                    Nothing -> translate (label :: _ "editor_no_title")
-                      state.translator
+              [ HH.text "" -- wird in den Actions hinzugefügt
               ]
           ]
       , case state.compareToElement of
@@ -879,7 +876,7 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit -- Nothing to do
                 Just path -> do
                   H.raise $ RenamedNode contentLines path
-                  H.modify_ _ { mTitle = Just contentLines }
+                  H.raise UpdateFullTitle
               freeSaveFlagsAndMaybeRerun
             Just entry ->
               case state.mContent of
@@ -1704,6 +1701,10 @@ editor = connect selectTranslator $ H.mkComponent
                 , html = html
                 , wasLoadedInMergeMode = loadInMergeMode
                 }
+              H.getHTMLElementRef (H.RefLabel "section_title") >>= traverse_
+                \sectionTitle -> do
+                  H.liftEffect $ setInnerHtml sectionTitle
+                    (fromMaybe "Kein Titel vorhanden!" mTitle)
               setIsOnMerge loadInMergeMode
 
               -- Only secondary Editor has ElementData
@@ -1843,6 +1844,10 @@ editor = connect selectTranslator $ H.mkComponent
         , mTitle = mTitle
         , isLoading = true
         }
+      H.getHTMLElementRef (H.RefLabel "section_title") >>= traverse_ \sectionTitle ->
+        do
+          H.liftEffect $ setInnerHtml sectionTitle
+            (fromMaybe "Kein Titel vorhanden!" mTitle)
       state <- H.get
       H.gets _.mEditor >>= traverse_ \ed -> do
         -- Set the content of the editor
@@ -1875,6 +1880,10 @@ editor = connect selectTranslator $ H.mkComponent
 
     ReceiveFullTitle mTitle a -> do
       H.modify_ _ { mTitle = mTitle }
+      H.getHTMLElementRef (H.RefLabel "section_title") >>= traverse_ \sectionTitle ->
+        do
+          H.liftEffect $ setInnerHtml sectionTitle
+            (fromMaybe "Kein Titel vorhanden!" mTitle)
       pure (Just a)
 
     SetDirtyFlag a -> do
