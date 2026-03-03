@@ -35,7 +35,6 @@ import Data.Maybe (Maybe(..), fromMaybe)
 import Data.String (Pattern(..), Replacement(..), length, replaceAll, splitAt)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..), fst, snd)
-import FPO.UI.HTML (decodeHtmlEntity)
 
 newtype TreeHeader = TreeHeader
   { headerKind :: String

@@ -20,7 +20,6 @@ import Halogen.Themes.Bootstrap5 as HB
 import Web.HTML.HTMLElement (HTMLElement)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
-foreign import decodeHtmlEntity :: String -> String
 foreign import setInnerHtml :: HTMLElement -> String -> Effect Unit
 
 -- Creates a new column with a optional label and an input field.
