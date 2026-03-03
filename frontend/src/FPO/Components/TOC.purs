@@ -1041,8 +1041,6 @@ tocview = connect selectAll $ H.mkComponent
                         , HB.btnSm
                         , HB.me2
                         ]
-                    , HP.title $ translate (label :: _ "modal_documentHistory_title")
-                        state.translator
                     , HE.onClick $ const OpenDocumentHistoryModal
                     ]
                     [ HH.i
@@ -1119,7 +1117,6 @@ tocview = connect selectAll $ H.mkComponent
                 , HH.span
                     ( [ HP.classes titleClasses
                       , HP.style "align-self: stretch; flex-basis: 0;"
-                      , HP.title $ getFullTitle meta
                       , HP.ref (H.RefLabel ("toc_node_title_" <> show path))
                       ] <>
                         ( if canBeRenamed then
