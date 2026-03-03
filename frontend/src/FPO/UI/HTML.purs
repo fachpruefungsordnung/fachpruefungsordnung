@@ -10,15 +10,17 @@ import DOM.HTML.Indexed.InputType (InputType)
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.String (null)
+import Effect (Effect)
 import FPO.Util (handleKeyDownEscape)
 import Halogen.HTML as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
+import Web.HTML.HTMLElement (HTMLElement)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
-foreign import decodeHtmlEntity :: String -> String
+foreign import setInnerHtml :: HTMLElement -> String -> Effect Unit
 
 -- Creates a new column with a optional label and an input field.
 addColumn
