@@ -306,242 +306,250 @@ component =
   renderNotLoggedIn :: State -> H.ComponentHTML Action Slots m
   renderNotLoggedIn state =
     HH.div_
-      [ -- Hero Section
+      [ -- ── Hero Section ──────────────────────────────────────────
         HH.section
-          [ HP.classes
-              [ HH.ClassName "hero-bg"
-              , HH.ClassName "slanted-bottom"
-              , HB.dFlex
-              , HB.alignItemsCenter
-              , HB.textWhite
-              ]
-          ]
-          [ HH.div
-              [ HP.classes [ HB.container ] ]
-              [ HH.div
-                  [ HP.classes [ HB.row, HB.alignItemsCenter ] ]
-                  [ HH.div
-                      [ HP.classes [ HB.colLg6 ] ]
-                      [ HH.h1
-                          [ HP.classes
-                              [ HB.display4
-                              , HB.fwBold
-                              , HB.mb4
-                              ]
-                          ]
-                          [ HH.text "FPO-Editor" ]
-                      , HH.p
-                          [ HP.classes [ HB.lead, HB.mb4 ] ]
-                          [ HH.text $ translate (label :: _ "home_basicDescription")
-                              state.translator
-                          ]
-                      , HH.button
-                          [ HP.classes
-                              [ HB.btn
-                              , HB.btnLight
-                              , HB.btnLg
-                              , HB.me3
-                              ]
-                          , HE.onClick $ const NavLogin
-                          ]
-                          [ HH.i
-                              [ HP.classes
-                                  [ HH.ClassName "bi-box-arrow-in-right"
-                                  , HB.me2
-                                  ]
-                              ]
-                              []
-                          , HH.text "Login"
-                          ]
-                      , HH.a
-                          [ HP.classes
-                              [ HB.btn
-                              , HB.btnOutlineLight
-                              , HB.btnLg
-                              ]
-                          , HE.onClick $ const ScrollToFeatures
-                          ]
-                          [ HH.i
-                              [ HP.classes
-                                  [ HH.ClassName "bi-info-circle"
-                                  , HB.me2
-                                  ]
-                              ]
-                              []
-                          , HH.text $ translate (label :: _ "home_learnMore")
-                              state.translator
-                          ]
-                      ]
-                  , HH.div
-                      [ HP.classes [ HB.colLg6, HB.textCenter, HB.mt3 ] ]
-                      [ HH.i
-                          [ HP.classes
-                              [ HH.ClassName "bi-file-pdf"
-                              , HB.display1
-                              ]
-                          , HP.style "font-size: 8rem; opacity: 0.8;"
-                          ]
-                          []
-                      ]
+          [ HP.classes [ HH.ClassName "landing-hero" ] ]
+          [ -- Decorative gradient orbs
+            HH.div
+              [ HP.classes
+                  [ HH.ClassName "landing-orb"
+                  , HH.ClassName "landing-orb--1"
                   ]
               ]
-          ]
-
-      -- Features Section
-      , HH.section
-          [ HP.classes [ HB.py5, HB.mt5 ]
-          ]
-          [ HH.div
-              [ HP.classes [ HB.container ] ]
-              [ HH.div
-                  [ HP.classes
-                      [ HB.row
-                      , HB.textCenter
-                      , HB.g4
-                      ]
+              []
+          , HH.div
+              [ HP.classes
+                  [ HH.ClassName "landing-orb"
+                  , HH.ClassName "landing-orb--2"
                   ]
-                  [ -- Team Collaboration
-                    HH.div
-                      [ HP.classes [ HB.colMd4 ] ]
-                      [ HH.div
-                          [ HP.classes [ HB.p4 ] ]
-                          [ HH.div
-                              [ HP.classes
-                                  [ HB.bgPrimary
-                                  , HB.roundedCircle
-                                  , HB.mxAuto
-                                  , HB.mb3
-                                  , HB.dFlex
-                                  , HB.alignItemsCenter
-                                  , HB.justifyContentCenter
-                                  ]
-                              , HP.style "width: 80px; height: 80px;"
-                              ]
-                              [ HH.i
-                                  [ HP.classes
-                                      [ HH.ClassName "bi"
-                                      , HH.ClassName "bi-people"
-                                      , HB.textWhite
-                                      , HB.fs2
-                                      ]
-                                  ]
-                                  []
-                              ]
-                          , HH.h4_
-                              [ HH.text $ translate
-                                  (label :: _ "home_teamCollaboration")
-                                  state.translator
-                              ]
-                          , HH.p
-                              [ HP.classes [ HB.textMuted ] ]
-                              [ HH.text $ translate
-                                  (label :: _ "home_teamCollaborationDescription")
-                                  state.translator
-                              ]
-                          ]
-                      ]
+              ]
+              []
+          , HH.div
+              [ HP.classes
+                  [ HH.ClassName "landing-orb"
+                  , HH.ClassName "landing-orb--3"
+                  ]
+              ]
+              []
 
-                  -- Version Control
-                  , HH.div
-                      [ HP.classes [ HB.colMd4 ] ]
-                      [ HH.div
-                          [ HP.classes [ HB.p4 ] ]
-                          [ HH.div
-                              [ HP.classes
-                                  [ HB.bgPrimary
-                                  , HB.roundedCircle
-                                  , HB.mxAuto
-                                  , HB.mb3
-                                  , HB.dFlex
-                                  , HB.alignItemsCenter
-                                  , HB.justifyContentCenter
-                                  ]
-                              , HP.id "features"
-                              , HP.style "width: 80px; height: 80px;"
-                              ]
-                              [ HH.i
-                                  [ HP.classes
-                                      [ HH.ClassName "bi-git"
-                                      , HB.textWhite
-                                      , HB.fs2
-                                      ]
-                                  ]
-                                  []
-                              ]
-                          , HH.h4_
-                              [ HH.text $ translate (label :: _ "home_versionControl")
-                                  state.translator
-                              ]
-                          , HH.p
-                              [ HP.classes [ HB.textMuted ] ]
-                              [ HH.text $ translate
-                                  (label :: _ "home_versionControlDescription")
-                                  state.translator
-                              ]
+          -- Centred hero content
+          , HH.div
+              [ HP.classes [ HH.ClassName "landing-hero__content" ] ]
+              [ -- Small badge / chip
+                HH.span
+                  [ HP.classes [ HH.ClassName "landing-badge" ] ]
+                  [ HH.i
+                      [ HP.classes
+                          [ HH.ClassName "bi-mortarboard"
+                          , HB.me1
                           ]
                       ]
-
-                  -- Advanced Editing
-                  , HH.div
-                      [ HP.classes [ HB.colMd4 ] ]
-                      [ HH.div
-                          [ HP.classes [ HB.p4 ] ]
-                          [ HH.div
-                              [ HP.classes
-                                  [ HB.bgPrimary
-                                  , HB.roundedCircle
-                                  , HB.mxAuto
-                                  , HB.mb3
-                                  , HB.dFlex
-                                  , HB.alignItemsCenter
-                                  , HB.justifyContentCenter
-                                  ]
-                              , HP.style "width: 80px; height: 80px;"
-                              ]
-                              [ HH.i
-                                  [ HP.classes
-                                      [ HH.ClassName "bi-journal-code"
-                                      , HB.textWhite
-                                      , HB.fs2
-                                      ]
-                                  ]
-                                  []
-                              ]
-                          , HH.h4_
-                              [ HH.text $ translate (label :: _ "home_editing")
-                                  state.translator
-                              ]
-                          , HH.p
-                              [ HP.classes [ HB.textMuted ] ]
-                              [ HH.text $ translate
-                                  (label :: _ "home_editingDescription")
-                                  state.translator
-                              ]
-                          ]
-                      ]
+                      []
+                  , HH.text "FPO-Editor"
                   ]
 
-              -- Get Started Button
+              -- Large title
+              , HH.h1
+                  [ HP.classes [ HH.ClassName "landing-hero__title" ] ]
+                  [ HH.text "FPO-Editor" ]
+
+              -- Description
+              , HH.p
+                  [ HP.classes [ HH.ClassName "landing-hero__subtitle" ] ]
+                  [ HH.text $ translate
+                      (label :: _ "home_basicDescription")
+                      state.translator
+                  ]
+
+              -- Action buttons
               , HH.div
-                  [ HP.classes [ HB.textCenter, HB.mt5 ] ]
+                  [ HP.classes [ HH.ClassName "landing-hero__actions" ] ]
                   [ HH.button
                       [ HP.classes
                           [ HB.btn
-                          , HB.btnPrimary
-                          , HB.btnLg
+                          , HH.ClassName "landing-btn-primary"
                           ]
                       , HE.onClick $ const NavLogin
                       ]
                       [ HH.i
                           [ HP.classes
-                              [ HH.ClassName "bi-rocket-takeoff"
+                              [ HH.ClassName "bi-box-arrow-in-right"
                               , HB.me2
                               ]
                           ]
                           []
-                      , HH.text $ translate (label :: _ "home_getStarted")
+                      , HH.text "Login"
+                      ]
+                  , HH.a
+                      [ HP.classes
+                          [ HB.btn
+                          , HH.ClassName "landing-btn-secondary"
+                          ]
+                      , HE.onClick $ const ScrollToFeatures
+                      ]
+                      [ HH.i
+                          [ HP.classes
+                              [ HH.ClassName "bi-info-circle"
+                              , HB.me2
+                              ]
+                          ]
+                          []
+                      , HH.text $ translate
+                          (label :: _ "home_learnMore")
                           state.translator
                       ]
+                  ]
+              ]
+
+          -- Scroll-down chevron
+          , HH.div
+              [ HP.classes [ HH.ClassName "landing-scroll-indicator" ]
+              , HE.onClick $ const ScrollToFeatures
+              ]
+              [ HH.i
+                  [ HP.classes [ HH.ClassName "bi-chevron-down" ] ]
+                  []
+              ]
+          ]
+
+      -- ── Features Section ────────────────────────────────────────
+      , HH.section
+          [ HP.classes [ HH.ClassName "landing-features" ]
+          , HP.id "features"
+          ]
+          [ HH.div
+              [ HP.classes [ HB.container ] ]
+              [ HH.div
+                  [ HP.classes [ HH.ClassName "landing-features__grid" ] ]
+                  [ -- Team Collaboration
+                    HH.div
+                      [ HP.classes [ HH.ClassName "landing-feature-card" ] ]
+                      [ HH.div
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__icon" ]
+                          ]
+                          [ HH.i
+                              [ HP.classes [ HH.ClassName "bi-people" ] ]
+                              []
+                          ]
+                      , HH.h3
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__title" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_teamCollaboration")
+                              state.translator
+                          ]
+                      , HH.p
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__desc" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_teamCollaborationDescription")
+                              state.translator
+                          ]
+                      ]
+
+                  -- Version Control
+                  , HH.div
+                      [ HP.classes [ HH.ClassName "landing-feature-card" ] ]
+                      [ HH.div
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__icon"
+                              , HH.ClassName "landing-feature-card__icon--success"
+                              ]
+                          ]
+                          [ HH.i
+                              [ HP.classes [ HH.ClassName "bi-git" ] ]
+                              []
+                          ]
+                      , HH.h3
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__title" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_versionControl")
+                              state.translator
+                          ]
+                      , HH.p
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__desc" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_versionControlDescription")
+                              state.translator
+                          ]
+                      ]
+
+                  -- Advanced Editing
+                  , HH.div
+                      [ HP.classes [ HH.ClassName "landing-feature-card" ] ]
+                      [ HH.div
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__icon"
+                              , HH.ClassName "landing-feature-card__icon--warning"
+                              ]
+                          ]
+                          [ HH.i
+                              [ HP.classes [ HH.ClassName "bi-journal-code" ] ]
+                              []
+                          ]
+                      , HH.h3
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__title" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_editing")
+                              state.translator
+                          ]
+                      , HH.p
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__desc" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_editingDescription")
+                              state.translator
+                          ]
+                      ]
+                  ]
+              ]
+          ]
+
+      -- ── CTA Section ─────────────────────────────────────────────
+      , HH.section
+          [ HP.classes [ HH.ClassName "landing-cta" ] ]
+          [ HH.div
+              [ HP.classes [ HH.ClassName "landing-cta__inner" ] ]
+              [ HH.h2
+                  [ HP.classes [ HH.ClassName "landing-cta__title" ] ]
+                  [ HH.text $ translate
+                      (label :: _ "home_getStarted")
+                      state.translator
+                  ]
+              , HH.p
+                  [ HP.classes [ HH.ClassName "landing-cta__subtitle" ] ]
+                  [ HH.text $ translate
+                      (label :: _ "home_basicDescription")
+                      state.translator
+                  ]
+              , HH.button
+                  [ HP.classes
+                      [ HB.btn
+                      , HH.ClassName "landing-btn-primary"
+                      , HB.btnLg
+                      ]
+                  , HE.onClick $ const NavLogin
+                  ]
+                  [ HH.i
+                      [ HP.classes
+                          [ HH.ClassName "bi-rocket-takeoff"
+                          , HB.me2
+                          ]
+                      ]
+                      []
+                  , HH.text $ translate
+                      (label :: _ "home_getStarted")
+                      state.translator
                   ]
               ]
           ]

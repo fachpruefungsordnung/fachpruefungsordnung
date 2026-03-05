@@ -5,54 +5,100 @@
 *,
 *::before,
 *::after {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 html {
-  scroll-behavior: smooth;
+    scroll-behavior: smooth;
 }
 
 body {
-  margin: 0;
-  font-family: var(--fpo-font-family);
-  font-size: var(--fpo-text-base);
-  color: var(--fpo-text-primary);
-  background: var(--fpo-bg-primary);
-  line-height: 1.5;
+    margin: 0;
+    font-family: var(--fpo-font-family);
+    font-size: var(--fpo-text-base);
+    color: var(--fpo-text-primary);
+    background: var(--fpo-bg-primary);
+    line-height: 1.5;
 }
 
-h1, h2, h3, h4, h5, h6,
-p, figure, blockquote, dl, dd {
-  margin: 0;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure,
+blockquote,
+dl,
+dd {
+    margin: 0;
 }
 
-ol, ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* Heading typography — explicit sizes so we never fall back to
+   the browser's tiny defaults (especially for h5/h6). */
+h1 {
+    font-size: var(--fpo-text-3xl);
+    font-weight: 700;
+    line-height: 1.25;
+}
+h2 {
+    font-size: var(--fpo-text-2xl);
+    font-weight: 700;
+    line-height: 1.3;
+}
+h3 {
+    font-size: var(--fpo-text-xl);
+    font-weight: 600;
+    line-height: 1.35;
+}
+h4 {
+    font-size: var(--fpo-text-lg);
+    font-weight: 600;
+    line-height: 1.4;
+}
+h5 {
+    font-size: var(--fpo-text-md);
+    font-weight: 600;
+    line-height: 1.45;
+}
+h6 {
+    font-size: var(--fpo-text-base);
+    font-weight: 600;
+    line-height: 1.5;
+}
+
+ol,
+ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
 }
 
 img {
-  max-width: 100%;
-  display: block;
+    max-width: 100%;
+    display: block;
 }
 
 a {
-  text-decoration: none;
-  color: inherit;
+    text-decoration: none;
+    color: inherit;
 }
 
-button, input, select, textarea {
-  font: inherit;
+button,
+input,
+select,
+textarea {
+    font: inherit;
 }
 
 fieldset {
-  margin: 0;
-  padding: 0;
-  border: none;
+    margin: 0;
+    padding: 0;
+    border: none;
 }
 
 legend {
-  margin: 0;
-  padding: 0;
+    margin: 0;
+    padding: 0;
 }
