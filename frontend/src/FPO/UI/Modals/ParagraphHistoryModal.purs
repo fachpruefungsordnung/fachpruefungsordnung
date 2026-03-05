@@ -36,7 +36,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectAll)
-import Halogen.Themes.Bootstrap5 as HB
+import FPO.UI.Css as HB
 import Parsing (runParserT)
 import Simple.I18n.Translator (Translator, label, translate)
 
@@ -140,8 +140,6 @@ render state =
     [ HH.div
         [ HP.classes [ HB.modal, HB.fade, HB.show ]
         , HP.id "paragraphHistoryModal"
-        , HP.attr (HH.AttrName "data-bs-backdrop") "static"
-        , HP.attr (HH.AttrName "data-bs-keyboard") "false"
         , HP.attr (HH.AttrName "tabindex") "-1"
         , HP.attr (HH.AttrName "aria-hidden") "false"
         , HP.attr (HH.AttrName "aria-labelledby") "paragraphHistoryModalLabel"

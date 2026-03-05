@@ -1,42 +1,42 @@
 :root {
   /* --- Comment sticky note --- */
-  --comment-bg-default:  #fff9c4; /* Post-it yellow */
-  --comment-bg-hover:    #fff3a6; /* a bit darker */
-  --comment-border:      #ffe08a; /* edge */
-  --comment-text:        #212529; /* standard text */
-  --comment-shadow:      0 0 0 1.5px #000;
-  --comment-radius:      10px;
+  --comment-bg-default: #fff9c4; /* Post-it yellow */
+  --comment-bg-hover: #fff3a6; /* a bit darker */
+  --comment-border: #ffe08a; /* edge */
+  --comment-text: #212529; /* standard text */
+  --comment-shadow: 0 0 0 1.5px #000;
+  --comment-radius: 10px;
 
   /* --- Comment status backgrounds --- */
-  --comment-bg-first:   #FFFF00E6;
+  --comment-bg-first: #ffff00e6;
   --comment-bg-resolved: #42fa00;
-  --comment-bg-problem:  #fd7e14;
+  --comment-bg-problem: #fd7e14;
   --comment-bg-outdated: #0099ff;
 
   /* --- Accent colors (for Icons/Badges/Left-border) --- */
   --accent-resolved: #198754;
-  --accent-problem:  #fd7e14;
+  --accent-problem: #fd7e14;
   --accent-outdated: #0099ff;
 
   /* --- Ace editor marker --- */
-  --marker-bg:      var(--comment-bg-first);
-  --active-line-bg: #FFFF0026;
-  --handle-bg:      #FFBB00;
+  --marker-bg: var(--comment-bg-first);
+  --active-line-bg: #ffff0026;
+  --handle-bg: #ffbb00;
 
   /* --- Buttons --- */
-  --btn-orange:       #fd7e14;
+  --btn-orange: #fd7e14;
   --btn-orange-hover: #e96b0c;
   --btn-orange-rgb: 253, 126, 20;
 
-  --btn-blue:         #0099ff;
-  --btn-blue-hover:   #0b5ed7;
+  --btn-blue: #0099ff;
+  --btn-blue-hover: #0b5ed7;
   --btn-blue-rgb: 0, 153, 255;
-  --toolbar-btn-bg: #f8f9fa;
-  --toolbar-btn-border: #dee2e6;
-  --toolbar-btn-color: #212529;
-  --toolbar-btn-hover-bg: #e9ecef;
-  --toolbar-btn-hover-border: #ced4da;
-  --toolbar-btn-hover-color: #212529;
-  --toolbar-btn-active-bg: #dee2e6;
-  --toolbar-btn-active-border: #adb5bd;
+  --toolbar-btn-bg: var(--fpo-bg-secondary);
+  --toolbar-btn-border: var(--fpo-border-default);
+  --toolbar-btn-color: var(--fpo-text-primary);
+  --toolbar-btn-hover-bg: var(--fpo-bg-tertiary);
+  --toolbar-btn-hover-border: var(--fpo-border-strong);
+  --toolbar-btn-hover-color: var(--fpo-text-primary);
+  --toolbar-btn-active-bg: var(--fpo-border-default);
+  --toolbar-btn-active-border: var(--fpo-border-strong);
 }

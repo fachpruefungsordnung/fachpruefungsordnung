@@ -1,0 +1,176 @@
+/* ==========================================================================
+   FPO Design System — Pure-CSS Dropdown
+   Replaces Bootstrap JS dropdown toggle with CSS :hover / :focus-within.
+
+   KEY DESIGN DECISION — visibility + transition-delay
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   We intentionally avoid `display: none` for hiding menus.
+   `display` is not transitionable, so toggling it gives the user zero
+   grace period to move the mouse from the toggle into the menu.
+
+   Instead we use:
+     hidden:  visibility: hidden  +  opacity: 0  +  pointer-events: none
+     shown:   visibility: visible +  opacity: 1  +  pointer-events: auto
+
+   The `visibility` transition uses a DELAY equal to the opacity duration
+   when *hiding*, so the menu stays interactive (visibility: visible) for
+   the full fade-out window.  If the mouse re-enters during that window,
+   the hide is cancelled and the menu snaps back to fully visible.
+   ========================================================================== */
+
+/* Container */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+/* Inside a navbar, extend the hover zone so the mouse can travel from
+   the toggle down to the menu without ever leaving the .dropdown box.
+   The negative margin compensates so sibling layout isn't affected. */
+.navbar .dropdown {
+    padding-bottom: 10px;
+    margin-bottom: -10px;
+}
+
+/* -----------------------------------------------------------------------
+   Menu – hidden state (default)
+   ----------------------------------------------------------------------- */
+.dropdown-menu {
+    /* Positioning */
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+
+    /* Box */
+    min-width: 10rem;
+    padding: var(--fpo-space-1) 0;
+    margin: 0;
+    list-style: none;
+
+    /* Appearance */
+    background: var(--fpo-bg-elevated);
+    border: 1px solid var(--fpo-border-default);
+    border-radius: var(--fpo-radius-lg);
+    box-shadow: var(--fpo-shadow-lg);
+
+    /* Hidden state */
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-4px);
+
+    /* Transitions – the visibility delay keeps the menu interactive
+       during the fade-out so the mouse can still "catch" it. */
+    transition:
+        opacity var(--fpo-transition-fast),
+        transform var(--fpo-transition-fast),
+        visibility 0s var(--fpo-transition-fast);
+    /* visibility changes to hidden AFTER the fade-out finishes */
+}
+
+/* Pull the menu back up inside a navbar to counteract the extra
+   padding-bottom on the .dropdown container. */
+.navbar .dropdown > .dropdown-menu {
+    top: calc(100% - 10px);
+}
+
+/* -----------------------------------------------------------------------
+   Menu – shown state (hover / focus-within / .show)
+   ----------------------------------------------------------------------- */
+.dropdown:hover > .dropdown-menu,
+.dropdown:focus-within > .dropdown-menu,
+.dropdown-menu.show {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+
+    /* On show, visibility flips immediately (0s, no delay). */
+    transition:
+        opacity var(--fpo-transition-fast),
+        transform var(--fpo-transition-fast),
+        visibility 0s;
+}
+
+/* Right-aligned variant */
+.dropdown-menu-end {
+    left: auto;
+    right: 0;
+}
+
+/* -----------------------------------------------------------------------
+   Toggle caret
+   ----------------------------------------------------------------------- */
+.dropdown-toggle {
+    cursor: pointer;
+}
+
+.dropdown-toggle::after {
+    content: "";
+    display: inline-block;
+    width: 0;
+    height: 0;
+    margin-left: 0.35em;
+    vertical-align: middle;
+    border-top: 0.3em solid;
+    border-right: 0.3em solid transparent;
+    border-left: 0.3em solid transparent;
+}
+
+/* -----------------------------------------------------------------------
+   Dropdown item
+   ----------------------------------------------------------------------- */
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: var(--fpo-space-2) var(--fpo-space-4);
+    font-size: var(--fpo-text-base);
+    font-weight: 400;
+    color: var(--fpo-text-primary);
+    text-decoration: none;
+    white-space: nowrap;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    transition:
+        background var(--fpo-transition-fast),
+        color var(--fpo-transition-fast);
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background: var(--fpo-bg-tertiary);
+    color: var(--fpo-text-primary);
+    outline: none;
+}
+
+.dropdown-item.active,
+.dropdown-item:active {
+    background: var(--fpo-accent-subtle);
+    color: var(--fpo-accent);
+}
+
+.dropdown-item.disabled,
+.dropdown-item:disabled {
+    color: var(--fpo-text-tertiary);
+    pointer-events: none;
+}
+
+/* -----------------------------------------------------------------------
+   Divider / Header
+   ----------------------------------------------------------------------- */
+.dropdown-divider {
+    height: 0;
+    margin: var(--fpo-space-2) 0;
+    overflow: hidden;
+    border-top: 1px solid var(--fpo-border-subtle);
+}
+
+.dropdown-header {
+    display: block;
+    padding: var(--fpo-space-2) var(--fpo-space-4);
+    font-size: var(--fpo-text-sm);
+    color: var(--fpo-text-tertiary);
+    white-space: nowrap;
+}

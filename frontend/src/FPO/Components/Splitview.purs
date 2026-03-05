@@ -85,7 +85,7 @@ import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
-import Halogen.Themes.Bootstrap5 as HB
+import FPO.UI.Css as HB
 import Routing.Duplex as RD
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))

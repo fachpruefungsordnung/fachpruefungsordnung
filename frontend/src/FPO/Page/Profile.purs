@@ -41,7 +41,7 @@ import Halogen.HTML.Properties as HP
 import Halogen.HTML.Properties.ARIA as HPA
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import Halogen.Themes.Bootstrap5 as HB
+import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 
 data Action
@@ -299,12 +299,8 @@ component =
                                             state.translator
                                         ]
                                     ]
-                                , -- Trigger modal via data attributes (Bootstrap handles visuals)
-                                  HH.button
+                                , HH.button
                                     [ HP.classes [ HB.btn, HB.btnOutlineDanger ]
-                                    , HP.attr (HH.AttrName "data-bs-toggle") "modal"
-                                    , HP.attr (HH.AttrName "data-bs-target")
-                                        "#resetModal"
                                     ]
                                     [ HH.text $ translate
                                         (label :: _ "prof_resetPassword")
@@ -595,7 +591,6 @@ modal state =
                     ]
                 , HH.button
                     [ HP.classes [ HB.btnClose ]
-                    , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
                     , HPA.label "Close"
                     ]
                     []
@@ -673,7 +668,6 @@ modal state =
             , HH.div [ HP.classes [ HB.modalFooter ] ]
                 [ HH.button
                     [ HP.classes [ HB.btn, HB.btnLight ]
-                    , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
                     ]
                     [ HH.text $ translate (label :: _ "prof_close") state.translator ]
                 , let

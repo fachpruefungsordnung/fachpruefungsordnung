@@ -1,7 +1,7 @@
 .splitview-resizer {
-  width: 8px;
+  width: 5px;
   cursor: col-resize;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--fpo-border-default);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -9,24 +9,28 @@
 }
 
 .splitview-resizer-toggle-btn {
-  background: rgba(255, 255, 255, 0.8);
-  border: 0.2px solid #aaa;
+  background: var(--fpo-bg-elevated);
+  border: 1px solid var(--fpo-border-default);
   padding: 0.1rem 0.1rem;
   font-size: 8px;
   font-weight: bold;
   line-height: 1;
-  color: rgba(0, 0, 0, 0.7);
+  color: var(--fpo-text-secondary);
   border-radius: 3px;
   cursor: pointer;
   height: 40px;
   width: 8px;
   position: relative;
   z-index: 1000;
-  transition: width 140ms ease, height 140ms ease, transform 140ms ease, font-size 140ms ease;
+  transition:
+    width 140ms ease,
+    height 140ms ease,
+    transform 140ms ease,
+    font-size 140ms ease;
 }
 
 .splitview-resizer-toggle-btn--closed {
-  width: 18px;
+  width: 16px;
   height: 56px;
   font-size: 11px;
   border-width: 1px;
@@ -45,12 +49,12 @@
   position: absolute;
   top: 0.5rem;
   right: 0.5rem;
-  background-color: #fdecea;
-  color: #b71c1c;
+  background-color: var(--fpo-danger-subtle);
+  color: var(--fpo-danger);
   padding: 0.2rem 0.4rem;
   font-size: 0.75rem;
   line-height: 1;
-  border: 1px solid #f5c6cb;
+  border: 1px solid var(--fpo-danger);
   border-radius: 0.2rem;
   z-index: 1100;
 }

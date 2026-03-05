@@ -50,7 +50,7 @@ import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import Halogen.Themes.Bootstrap5 as HB
+import FPO.UI.Css as HB
 import Halogen.VDom.Driver (runUI)
 import Prelude
   ( Unit

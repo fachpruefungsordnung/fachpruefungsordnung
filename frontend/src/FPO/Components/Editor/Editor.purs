@@ -107,7 +107,7 @@ import Halogen.HTML.Properties (classes, enabled, ref, style, title) as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
-import Halogen.Themes.Bootstrap5 as HB
+import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element (toEventTarget)

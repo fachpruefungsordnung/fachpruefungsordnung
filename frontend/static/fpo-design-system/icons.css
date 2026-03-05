@@ -1,0 +1,74 @@
+/* ==========================================================================
+   FPO Design System — Icons
+   Placeholder: keeps .bi working until Phase 5 (Lucide migration).
+   ========================================================================== */
+
+/*
+ * During the transition period Bootstrap Icons CDN is still loaded,
+ * so .bi will inherit its font from that stylesheet.
+ * This file reserves the namespace and adds any overrides we need.
+ */
+
+.bi {
+  display: inline-block;
+  vertical-align: -0.125em;
+  /* Font-face and glyph content come from the BI CDN for now */
+}
+
+/* --------------------------------------------------------------------------
+   Flag Icon Replacements
+   Bootstrap Icons doesn't have bi-flag-de / bi-flag-gb glyphs.
+   The CDN sets their ::before { content: none; font-family: bootstrap-icons }
+   which hides them.  We override with styled text badges showing the
+   country code.  The double-class selectors (.bi-flag-de.bi-flag-de) and
+   !important are needed to beat the CDN's specificity.
+   -------------------------------------------------------------------------- */
+
+i.bi-flag-de,
+i.bi-flag-gb,
+.bi-flag-de.flex-shrink-0,
+.bi-flag-gb.flex-shrink-0,
+.bi-flag-de,
+.bi-flag-gb {
+  /* Reset any inherited icon font so the pseudo-element text renders */
+  font-family: var(--fpo-font-family) !important;
+  font-style: normal !important;
+  font-weight: 700 !important;
+  font-size: 0.6875rem !important;
+  line-height: 1 !important;
+  letter-spacing: 0.02em;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75em;
+  height: 1.35em;
+  padding: 0 0.15em;
+  border-radius: 3px;
+  color: var(--fpo-text-secondary);
+  background: var(--fpo-bg-tertiary);
+  vertical-align: middle;
+  -webkit-font-smoothing: auto;
+}
+
+/* Override the CDN's ::before rules that set content: none */
+i.bi-flag-de::before,
+.bi-flag-de.flex-shrink-0::before,
+.bi-flag-de::before {
+  content: "DE" !important;
+  font-family: var(--fpo-font-family) !important;
+  font-weight: 700 !important;
+  font-size: 0.6875rem !important;
+  display: inline !important;
+  -webkit-font-smoothing: auto;
+}
+
+i.bi-flag-gb::before,
+.bi-flag-gb.flex-shrink-0::before,
+.bi-flag-gb::before {
+  content: "EN" !important;
+  font-family: var(--fpo-font-family) !important;
+  font-weight: 700 !important;
+  font-size: 0.6875rem !important;
+  display: inline !important;
+  -webkit-font-smoothing: auto;
+}

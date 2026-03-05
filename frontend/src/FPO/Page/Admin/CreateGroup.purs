@@ -52,7 +52,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import Halogen.Themes.Bootstrap5 as HB
+import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (Event, preventDefault)
 import Web.UIEvent.KeyboardEvent as KE

@@ -8,7 +8,7 @@ import FPO.Data.Request (LoadState(..))
 import Halogen as H
 import Halogen.HTML (iframe) as HH
 import Halogen.HTML.Properties as HP
-import Halogen.Themes.Bootstrap5 as HB
+import FPO.UI.Css as HB
 import Web.HTML.Common (AttrName(..))
 
 type Output = Unit

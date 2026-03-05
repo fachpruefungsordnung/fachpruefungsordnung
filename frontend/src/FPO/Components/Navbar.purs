@@ -35,7 +35,7 @@ import Halogen.HTML.Properties.ARIA as HPA
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Store.Select (selectAll)
-import Halogen.Themes.Bootstrap5 as HB
+import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 import Web.HTML (window)
 import Web.HTML.Window (open)
@@ -245,7 +245,6 @@ navbar = connect selectAll $ H.mkComponent
       [ HH.a
           [ HP.classes [ HB.navLink, HB.dropdownToggle ]
           , role "button"
-          , HP.attr (AttrName "data-bs-toggle") "dropdown"
           , HP.attr (AttrName "aria-expanded") "false"
           ]
           [ HH.i [ HP.classes [ ClassName "bi-translate", HB.me1 ] ] []

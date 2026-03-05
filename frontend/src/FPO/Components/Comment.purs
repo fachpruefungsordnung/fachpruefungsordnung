@@ -33,7 +33,7 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import Halogen.Themes.Bootstrap5 as HB
+import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 
 type Input = Unit
@@ -268,7 +268,6 @@ commentview = connect selectTranslator $ H.mkComponent
                   [ HH.button
                       [ HP.type_ HP.ButtonButton
                       , HP.classes [ HB.btn, HB.btnSecondary ]
-                      , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
                       , HE.onClick (const CancelModal)
                       ]
                       [ HH.text
@@ -280,7 +279,6 @@ commentview = connect selectTranslator $ H.mkComponent
                           [ HB.btn
                           , if mode == Delete then HB.btnDanger else HB.btnSuccess
                           ]
-                      , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
                       , HE.onClick (const action)
                       ]
                       [ HH.text confirmButton ]

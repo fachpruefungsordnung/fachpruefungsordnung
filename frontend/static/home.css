@@ -1,23 +1,42 @@
+/* =============================================
+   Home Page — Hero & Features
+   ============================================= */
+
+/* Hero section: rich accent gradient so .text-white is readable */
 .hero-bg {
   background: linear-gradient(
-    180deg, 
-    #f8f9fa 0%, 
-    #91b0e9 30%,
-    #91b0e9 60%,
-    #c8d2e2 90%
+    135deg,
+    #3730a3 0%,
+    var(--fpo-accent) 45%,
+    #6366f1 100%
   );
-  min-height: 100vh;
+  min-height: 80vh;
 }
 
 .slanted-bottom {
   clip-path: polygon(0 0, 100% 0, 100% 85%, 0 100%);
 }
 
+/* Feature cards on the landing page */
+.feature-card {
+  border: 1px solid var(--fpo-border-subtle);
+  border-radius: var(--fpo-radius-lg);
+  background: var(--fpo-bg-primary);
+  transition:
+    box-shadow var(--fpo-transition-fast),
+    transform var(--fpo-transition-fast);
+}
+
+.feature-card:hover {
+  box-shadow: var(--fpo-shadow-md);
+  transform: translateY(-2px);
+}
+
 /* Remove scroll indicator */
 .disable-scrollbar {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 .disable-scrollbar::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
+  display: none;
 }
