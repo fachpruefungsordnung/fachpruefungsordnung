@@ -45,6 +45,7 @@ import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
 import FPO.UI.HTML (addCard, addColumn, emptyTableRow, loadingSpinner)
+import FPO.UI.NavbarReveal (setupNavbarReveal, teardownNavbarReveal)
 import FPO.UI.SmoothScroll (smoothScrollToElement)
 import Halogen (liftEffect)
 import Halogen as H
@@ -76,6 +77,7 @@ data Sorting = TitleAsc | TitleDesc | LastUpdatedAsc | LastUpdatedDesc
 
 data Action
   = Initialize
+  | Finalize
   | NavLogin
   | ScrollToFeatures
   | ViewProject DocumentHeader
@@ -112,6 +114,7 @@ component =
     , render
     , eval: H.mkEval H.defaultEval
         { initialize = Just Initialize
+        , finalize = Just Finalize
         , handleAction = handleAction
         , receive = Just <<< Receive
         }
@@ -154,6 +157,9 @@ component =
             { user = Loaded Nothing
             , currentTime = Just now
             }
+          -- The user is not logged in → show landing hero.
+          -- Hide the navbar and reveal it only after scrolling.
+          H.liftEffect $ setupNavbarReveal 80
         Right user -> do
           H.modify_ _
             { projects = Loading
@@ -171,10 +177,13 @@ component =
                 { projects = Loaded docs
                 , currentTime = Just now
                 }
+    Finalize -> do
+      H.liftEffect teardownNavbarReveal
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
       navigate (editorRoute (DocumentHeader.getID project))
     NavLogin -> do
+      H.liftEffect teardownNavbarReveal
       navigate (loginRouteWithRedirect Home)
     ScrollToFeatures -> do
       H.liftEffect $ smoothScrollToElement "features"
