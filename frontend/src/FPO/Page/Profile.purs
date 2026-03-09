@@ -118,125 +118,164 @@ component =
     , groupMemberships: []
     , translator: fromFpoTranslator context
     , isYourProfile: userId == Nothing -- We only input the userId if it is the profile from another person
+
     }
 
   render :: State -> H.ComponentHTML Action () m
   render state =
     HH.div
-      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.vh100 ] ]
-      [ HH.div [ HP.classes [ HB.container, HB.py4 ] ]
+      [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
+      [ -- ── Profile Hero Banner ────────────────────────────────
+        HH.div [ HP.classes [ ClassName "profile-hero" ] ]
+          [ -- Decorative orbs
+            HH.div
+              [ HP.classes
+                  [ ClassName "profile-hero__orb"
+                  , ClassName "profile-hero__orb--1"
+                  ]
+              ]
+              []
+          , HH.div
+              [ HP.classes
+                  [ ClassName "profile-hero__orb"
+                  , ClassName "profile-hero__orb--2"
+                  ]
+              ]
+              []
+          , -- Hero content: avatar + name + email
+            HH.div [ HP.classes [ ClassName "profile-hero__content" ] ]
+              [ HH.div [ HP.classes [ ClassName "avatar" ] ]
+                  [ HH.text $ fromMaybe "" (initials state.username) ]
+              , HH.div [ HP.classes [ ClassName "profile-hero__info" ] ]
+                  [ HH.h1 [ HP.classes [ ClassName "profile-hero__name" ] ]
+                      [ HH.text $
+                          if state.username == "" then
+                            translate (label :: _ "prof_profile") state.translator
+                          else state.username
+                      , if state.isYourProfile then
+                          HH.span
+                            [ HP.classes [ HB.badge, HB.roundedPill, HB.ms2 ]
+                            , HP.style
+                                "background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.9); font-size: 0.5em; vertical-align: middle;"
+                            ]
+                            [ HH.text $ translate (label :: _ "prof_you")
+                                state.translator
+                            ]
+                        else HH.text ""
+                      ]
+                  , HH.p [ HP.classes [ ClassName "profile-hero__email" ] ]
+                      [ HH.text state.emailAddress ]
+                  ]
+              ]
+          ]
+
+      -- ── Profile Body (cards overlap hero) ────────────────────
+      , HH.div [ HP.classes [ ClassName "profile-body" ] ]
           [ HH.div [ HP.classes [ HB.row, HB.g4 ] ]
-              [ -- LEFT COLUMN
-                HH.div [ HP.classes [ HB.colLg8 ] ]
-                  [ HH.div [ HP.classes [ HB.card ] ]
-                      [ HH.div [ HP.classes [ HB.cardBody ] ]
-                          [ -- header
-                            HH.div
-                              [ HP.classes [ HB.dFlex, HB.alignItemsCenter, HB.mb3 ] ]
-                              [ HH.div [ HP.classes [ ClassName "avatar", HB.me3 ] ]
-                                  [ HH.text $ fromMaybe "" (initials state.username) ]
-                              , HH.div_
-                                  [ HH.h5_
-                                      [ HH.text $
-                                          ( translate (label :: _ "prof_profile")
-                                              state.translator
-                                          ) <>
-                                            if state.isYourProfile then
-                                              ( " ("
-                                                  <>
-                                                    ( translate
-                                                        (label :: _ "prof_you")
-                                                        state.translator
-                                                    )
-                                                  <> ")"
-                                              )
-                                            else ""
-                                      ]
+              [ -- LEFT COLUMN: Username + Password stacked
+                HH.div
+                  [ HP.classes
+                      [ HB.colLg7
+                      , HB.dFlex
+                      , HB.flexColumn
+                      , HB.gap3
+                      ]
+                  ]
+                  [ -- ── Username card ────────────────────────────
+                    HH.div [ HP.classes [ ClassName "profile-section" ] ]
+                      [ HH.div [ HP.classes [ ClassName "profile-section__header" ] ]
+                          [ HH.div
+                              [ HP.classes
+                                  [ ClassName "profile-section__icon"
+                                  , ClassName "profile-section__icon--accent"
                                   ]
                               ]
-                          , -- Username editable
-                            HH.div [ HP.classes [ HB.mb3 ] ]
-                              [ HH.label
-                                  [ HP.for "username", HP.classes [ HB.formLabel ] ]
-                                  [ HH.text
-                                      ( translate (label :: _ "common_userName")
-                                          state.translator
-                                      )
+                              [ HH.i [ HP.classes [ ClassName "bi-person" ] ] [] ]
+                          , HH.h2
+                              [ HP.classes [ ClassName "profile-section__title" ] ]
+                              [ HH.text $ translate (label :: _ "common_userName")
+                                  state.translator
+                              ]
+                          ]
+                      , HH.div [ HP.classes [ ClassName "profile-section__body" ] ]
+                          [ HH.div [ HP.classes [ HB.positionRelative ] ]
+                              [ HH.div [ HP.classes [ ClassName "input-icon" ] ]
+                                  [ HH.i
+                                      [ HP.classes
+                                          [ HB.bi, ClassName "bi-card-heading" ]
+                                      ]
+                                      []
                                   ]
-                              , HH.div [ HP.classes [ HB.positionRelative ] ]
-                                  [ HH.div [ HP.classes [ ClassName "input-icon" ] ]
-                                      [ HH.i
-                                          [ HP.classes
-                                              [ HB.bi, ClassName "bi-card-heading" ]
-                                          ]
-                                          []
+                              , HH.input
+                                  [ HP.id "username"
+                                  , HP.classes
+                                      [ HB.formControl
+                                      , ClassName "input-with-icon"
                                       ]
-                                  , HH.input
-                                      [ HP.id "username"
-                                      , HP.classes
-                                          [ HB.formControl
-                                          , ClassName "input-with-icon"
-                                          ]
-                                      , HP.type_ HP.InputText
-                                      , HP.value state.username
-                                      , HP.disabled (not state.isYourProfile)
-                                      , HE.onValueInput UsernameInput
-                                      , HP.autocomplete AutocompleteUsername
-                                      , HPA.describedBy "usernameHelp"
-                                      ]
+                                  , HP.type_ HP.InputText
+                                  , HP.value state.username
+                                  , HP.disabled (not state.isYourProfile)
+                                  , HE.onValueInput UsernameInput
+                                  , HP.autocomplete AutocompleteUsername
+                                  , HPA.describedBy "usernameHelp"
                                   ]
-                              , HH.div
-                                  [ HP.classes
-                                      [ HB.dFlex
-                                      , HB.alignItemsCenter
-                                      , HB.gap2
-                                      , HB.mt2
-                                      ]
+                              ]
+                          , HH.div
+                              [ HP.classes
+                                  [ HB.dFlex
+                                  , HB.alignItemsCenter
+                                  , HB.gap2
+                                  , HB.mt2
                                   ]
-                                  [ HH.small
-                                      [ HP.id "usernameHelp"
-                                      , HP.classes [ HB.textMuted ]
-                                      ]
-                                      [ if state.isYourProfile then
-                                          HH.text $ translate
-                                            (label :: _ "prof_usernameHelp")
-                                            state.translator
-                                        else HH.text ""
-                                      ]
-                                  , if state.unsaved then
-                                      HH.span
-                                        [ HP.id "unsavedBadge"
-                                        , HP.classes
-                                            [ HB.badge
-                                            , HB.roundedPill
-                                            , HB.textBgWarning
-                                            ]
-                                        ]
-                                        [ HH.span
-                                            [ HP.classes
-                                                [ HB.me1, ClassName "unsaved-dot" ]
-                                            ]
-                                            []
-                                        , HH.text $ translate
-                                            (label :: _ "prof_unsaved")
-                                            state.translator
-                                        ]
+                              ]
+                              [ HH.small
+                                  [ HP.id "usernameHelp"
+                                  , HP.classes [ HB.textMuted ]
+                                  ]
+                                  [ if state.isYourProfile then
+                                      HH.text $ translate
+                                        (label :: _ "prof_usernameHelp")
+                                        state.translator
                                     else HH.text ""
                                   ]
+                              , if state.unsaved then
+                                  HH.span
+                                    [ HP.id "unsavedBadge"
+                                    , HP.classes
+                                        [ HB.badge
+                                        , HB.roundedPill
+                                        , HB.textBgWarning
+                                        ]
+                                    ]
+                                    [ HH.span
+                                        [ HP.classes
+                                            [ HB.me1, ClassName "unsaved-dot" ]
+                                        ]
+                                        []
+                                    , HH.text $ translate
+                                        (label :: _ "prof_unsaved")
+                                        state.translator
+                                    ]
+                                else HH.text ""
                               ]
                           , -- Action bar
                             if state.unsaved then
                               HH.div
                                 [ HP.id "actionBar"
                                 , HP.classes
-                                    [ HB.dFlex, HB.gap2, HB.justifyContentEnd ]
+                                    [ HB.dFlex
+                                    , HB.gap2
+                                    , HB.justifyContentEnd
+                                    , HB.mt3
+                                    ]
                                 ]
                                 [ HH.button
                                     [ HP.id "cancelBtn"
                                     , HP.classes [ HB.btn, HB.btnLight ]
                                     , HE.onClick (const CancelEdit)
                                     ]
-                                    [ HH.text $ translate (label :: _ "common_cancel")
+                                    [ HH.text $ translate
+                                        (label :: _ "common_cancel")
                                         state.translator
                                     ]
                                 , let
@@ -277,10 +316,34 @@ component =
                                       [ HH.span_ labelChildren ]
                                 ]
                             else HH.text ""
-                          , HH.hr [ HP.classes [ HB.my4 ] ]
-                          , if (not state.isYourProfile) then HH.div_ []
-                            else
-                              HH.div
+                          ]
+                      ]
+
+                  -- ── Password / Security card ──────────────────
+                  , if (not state.isYourProfile) then HH.text ""
+                    else
+                      HH.div [ HP.classes [ ClassName "profile-section" ] ]
+                        [ HH.div
+                            [ HP.classes [ ClassName "profile-section__header" ] ]
+                            [ HH.div
+                                [ HP.classes
+                                    [ ClassName "profile-section__icon"
+                                    , ClassName "profile-section__icon--danger"
+                                    ]
+                                ]
+                                [ HH.i [ HP.classes [ ClassName "bi-shield-lock" ] ]
+                                    []
+                                ]
+                            , HH.h2
+                                [ HP.classes [ ClassName "profile-section__title" ] ]
+                                [ HH.text $ translate
+                                    (label :: _ "common_password")
+                                    state.translator
+                                ]
+                            ]
+                        , HH.div
+                            [ HP.classes [ ClassName "profile-section__body" ] ]
+                            [ HH.div
                                 [ HP.classes
                                     [ HB.dFlex
                                     , HB.alignItemsCenter
@@ -288,96 +351,75 @@ component =
                                     ]
                                 ]
                                 [ HH.div_
-                                    [ HH.h6_
-                                        [ HH.text $ translate
-                                            (label :: _ "common_password")
-                                            state.translator
-                                        ]
-                                    , HH.small [ HP.classes [ HB.textMuted ] ]
+                                    [ HH.p [ HP.classes [ HB.textMuted, HB.mb0 ] ]
                                         [ HH.text $ translate
                                             (label :: _ "prof_passwordSecurity")
                                             state.translator
                                         ]
                                     ]
                                 , HH.button
-                                    [ HP.classes [ HB.btn, HB.btnOutlineDanger ]
+                                    [ HP.classes
+                                        [ HB.btn, HB.btnOutlineDanger ]
                                     ]
-                                    [ HH.text $ translate
+                                    [ HH.i
+                                        [ HP.classes
+                                            [ ClassName "bi-key", HB.me2 ]
+                                        ]
+                                        []
+                                    , HH.text $ translate
                                         (label :: _ "prof_resetPassword")
                                         state.translator
                                     ]
                                 ]
-                          ]
-                      ]
+                            ]
+                        ]
                   ]
-              , -- RIGHT COLUMN (groups sidebar)
-                HH.div [ HP.classes [ HB.colLg4 ] ]
-                  [ HH.div [ HP.classes [ ClassName "sidebar-sticky" ] ]
-                      [ HH.div [ HP.classes [ HB.card, HB.mb4 ] ]
+
+              -- RIGHT COLUMN: Groups & Roles
+              , HH.div [ HP.classes [ HB.colLg4 ] ]
+                  [ HH.div [ HP.classes [ ClassName "profile-section" ] ]
+                      [ HH.div
+                          [ HP.classes [ ClassName "profile-section__header" ] ]
                           [ HH.div
                               [ HP.classes
-                                  [ HB.cardHeader
-                                  , HB.dFlex
-                                  , HB.alignItemsCenter
-                                  , HB.justifyContentBetween
+                                  [ ClassName "profile-section__icon"
+                                  , ClassName "profile-section__icon--success"
                                   ]
                               ]
-                              [ HH.h6_
-                                  [ HH.text $ translate
-                                      (label :: _ "prof_groupsAndRoles")
-                                      state.translator
-                                  ]
-                              , HH.span
-                                  [ HP.classes [ HB.badge, HB.textBgSecondary ] ]
-                                  [ HH.text $ show
-                                      (Array.length state.groupMemberships)
-                                  ]
+                              [ HH.i [ HP.classes [ ClassName "bi-people" ] ] [] ]
+                          , HH.h2
+                              [ HP.classes [ ClassName "profile-section__title" ] ]
+                              [ HH.text $ translate
+                                  (label :: _ "prof_groupsAndRoles")
+                                  state.translator
                               ]
-                          , HH.div [ HP.classes [ HB.listGroup, HB.listGroupFlush ] ]
-                              (map groupListItem state.groupMemberships)
-                          , HH.div [ HP.classes [ HB.cardFooter ] ]
-                              [ HH.small [ HP.classes [ HB.textMuted ] ]
-                                  [ HH.text $ translate (label :: _ "prof_rolesHelp")
-                                      state.translator
-                                  ]
+                          , HH.span
+                              [ HP.classes
+                                  [ HB.badge, HB.textBgSecondary, HB.msAuto ]
+                              ]
+                              [ HH.text $ show
+                                  (Array.length state.groupMemberships)
                               ]
                           ]
-                      , HH.div [ HP.classes [ HB.card ] ]
-                          [ HH.div [ HP.classes [ HB.cardBody ] ]
-                              [ HH.h6_
-                                  [ HH.text $ translate
-                                      (label :: _ "prof_accountEmail")
-                                      state.translator
-                                  ]
-                              , HH.div [ HP.classes [ HB.inputGroup ] ]
-                                  [ HH.span
-                                      [ HP.classes [ HB.inputGroupText ]
-                                      , HP.id "email-addon"
-                                      ]
-                                      [ HH.text "@" ]
-                                  , HH.input
-                                      [ HP.type_ HP.InputEmail
-                                      , HP.classes [ HB.formControl ]
-                                      , HP.value state.emailAddress
-                                      , HP.disabled true
-                                      , HPA.describedBy "email-addon"
-                                      ]
-                                  ]
-                              , HH.small [ HP.classes [ HB.textMuted ] ]
-                                  [ HH.text $ translate
-                                      (label :: _ "prof_accountEmailHelp")
-                                      state.translator
-                                  ]
+                      , HH.div
+                          [ HP.classes [ HB.listGroup, HB.listGroupFlush ] ]
+                          (map groupListItem state.groupMemberships)
+                      , HH.div [ HP.classes [ HB.cardFooter ] ]
+                          [ HH.small [ HP.classes [ HB.textMuted ] ]
+                              [ HH.text $ translate
+                                  (label :: _ "prof_rolesHelp")
+                                  state.translator
                               ]
                           ]
                       ]
                   ]
               ]
           ]
-      , -- Password reset modal markup (Bootstrap)
-        modal state
-      , -- Toasts (show/hide via state toggles)
-        toasts state
+
+      -- Password reset modal
+      , modal state
+      -- Toasts (show/hide via state toggles)
+      , toasts state
       ]
 
   handleAction :: Action -> H.HalogenM State Action () Output m Unit

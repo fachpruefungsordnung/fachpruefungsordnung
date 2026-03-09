@@ -1,59 +1,229 @@
-/* Profile-specific styles — card styling comes from the design system */
+/* =============================================
+   Profile Page — Modern Design
+   Inspired by the landing page aesthetic
+   ============================================= */
+
+/* --------------------------------------------------------------------------
+   Profile Hero Banner
+   -------------------------------------------------------------------------- */
+
+.profile-hero {
+  position: relative;
+  background: linear-gradient(
+    135deg,
+    #1e1b4b 0%,
+    var(--fpo-accent) 60%,
+    #818cf8 100%
+  );
+  padding: 1.5rem var(--fpo-space-4) 2.5rem;
+  overflow: hidden;
+}
+
+/* Decorative orb (reuses landing aesthetic) */
+.profile-hero__orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.profile-hero__orb--1 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, #a5b4fc 0%, transparent 70%);
+  top: -40%;
+  right: -5%;
+}
+
+.profile-hero__orb--2 {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, #c084fc 0%, transparent 70%);
+  bottom: -30%;
+  left: 10%;
+}
+
+.profile-hero__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--fpo-space-4);
+  max-width: 1140px;
+  margin: 0 auto;
+}
+
+/* --------------------------------------------------------------------------
+   Avatar
+   -------------------------------------------------------------------------- */
 
 .avatar {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
-  background: linear-gradient(
-    145deg,
-    var(--fpo-border-default),
-    var(--fpo-bg-secondary)
-  );
+  background: rgba(255, 255, 255, 0.18);
+  border: 2px solid rgba(255, 255, 255, 0.3);
   display: grid;
   place-items: center;
+  font-size: var(--fpo-text-xl);
   font-weight: 700;
-  color: var(--fpo-text-secondary);
+  color: #fff;
+  flex-shrink: 0;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-.unsaved-dot {
-  width: 0.6rem;
-  height: 0.6rem;
-  border-radius: 50%;
-  background: #4c3a03;
-  display: inline-block;
+.profile-hero__info {
+  display: flex;
+  align-items: center;
+  gap: var(--fpo-space-3);
+  flex-wrap: wrap;
+  min-width: 0;
 }
+
+.profile-hero__name {
+  font-size: var(--fpo-text-xl);
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.profile-hero__email {
+  font-size: var(--fpo-text-sm);
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
+  padding-left: var(--fpo-space-3);
+  border-left: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+/* --------------------------------------------------------------------------
+   Profile Content Body
+   -------------------------------------------------------------------------- */
+
+.profile-body {
+  max-width: 1140px;
+  margin: -1rem auto 0;
+  padding: 0 var(--fpo-space-4) var(--fpo-space-8);
+  position: relative;
+  z-index: 2;
+}
+
+/* --------------------------------------------------------------------------
+   Profile Section Cards
+   -------------------------------------------------------------------------- */
+
+.profile-section {
+  background: var(--fpo-bg-elevated);
+  border: 1px solid var(--fpo-border-subtle);
+  border-radius: var(--fpo-radius-xl);
+  box-shadow: var(--fpo-shadow-sm);
+  overflow: hidden;
+  transition:
+    box-shadow var(--fpo-transition-normal),
+    border-color var(--fpo-transition-normal);
+}
+
+/* When a column holds a single card (e.g. Groups sidebar),
+   let the card stretch to match the adjacent column's height. */
+.profile-body .row > [class*="col"] > .profile-section:only-child {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.profile-body .row > [class*="col"] > .profile-section:only-child > .list-group {
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.profile-section:hover {
+  box-shadow: var(--fpo-shadow-md);
+  border-color: var(--fpo-border-default);
+}
+
+.profile-section__header {
+  display: flex;
+  align-items: center;
+  gap: var(--fpo-space-3);
+  padding: var(--fpo-space-3) var(--fpo-space-4);
+  border-bottom: 1px solid var(--fpo-border-subtle);
+}
+
+.profile-section__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--fpo-radius-md);
+  font-size: 0.875rem;
+  flex-shrink: 0;
+}
+
+.profile-section__icon--accent {
+  background: var(--fpo-accent-subtle);
+  color: var(--fpo-accent);
+}
+
+.profile-section__icon--danger {
+  background: var(--fpo-danger-subtle);
+  color: var(--fpo-danger);
+}
+
+.profile-section__icon--info {
+  background: var(--fpo-info-subtle);
+  color: var(--fpo-info);
+}
+
+.profile-section__icon--success {
+  background: var(--fpo-success-subtle);
+  color: var(--fpo-success);
+}
+
+.profile-section__title {
+  font-size: var(--fpo-text-base);
+  font-weight: 600;
+  color: var(--fpo-text-primary);
+  margin: 0;
+}
+
+.profile-section__body {
+  padding: var(--fpo-space-4);
+}
+
+/* --------------------------------------------------------------------------
+   Form Overrides in Profile Context
+   -------------------------------------------------------------------------- */
 
 .input-icon {
   position: absolute;
   left: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .input-with-icon {
   padding-left: 2rem;
 }
 
-.fade-swap-enter {
-  opacity: 0;
-  transform: translateY(2px);
+/* --------------------------------------------------------------------------
+   Unsaved Badge
+   -------------------------------------------------------------------------- */
+
+.unsaved-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: #4c3a03;
+  display: inline-block;
 }
 
-.fade-swap-enter-active {
-  opacity: 1;
-  transform: translateY(0);
-  transition: all 0.2s ease;
-}
-
-.fade-swap-exit {
-  opacity: 1;
-}
-
-.fade-swap-exit-active {
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
+/* --------------------------------------------------------------------------
+   Strength Bar (password)
+   -------------------------------------------------------------------------- */
 
 .strength-bar {
   height: 0.4rem;
@@ -71,11 +241,44 @@
     background-color 0.25s ease;
 }
 
-.offcanvas-w {
-  width: 360px;
+/* --------------------------------------------------------------------------
+   Responsive
+   -------------------------------------------------------------------------- */
+
+@media (max-width: 767.98px) {
+  .profile-hero__content {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .profile-hero__info {
+    flex-direction: column;
+  }
+
+  .profile-hero__email {
+    border-left: none;
+    padding-left: 0;
+  }
+
+  .profile-hero {
+    padding: 1.5rem var(--fpo-space-4) 2rem;
+  }
+
+  .profile-body {
+    margin-top: -0.75rem;
+  }
+
+  .profile-section__body {
+    padding: var(--fpo-space-3);
+  }
+
+  .profile-section__header {
+    padding: var(--fpo-space-2) var(--fpo-space-3);
+  }
 }
 
-.sidebar-sticky {
-  position: sticky;
-  top: 1rem;
+@media (prefers-reduced-motion: reduce) {
+  .profile-section {
+    transition: none;
+  }
 }
