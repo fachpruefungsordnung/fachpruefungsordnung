@@ -1053,53 +1053,44 @@ tocview = connect selectAll $ H.mkComponent
                     ]
                 ]
             ]
-        , HH.div
-            [ HP.classes [ HH.ClassName "toc-list" ] ]
-            [ let
-                selectedClasses = case mSelectedTocEntry of
-                  Just (SelNode [] _) -> [ HH.ClassName "active" ]
-                  _ -> []
-                innerDivClasses =
-                  [ HB.dFlex, HB.alignItemsCenter, HB.py1, HB.positionRelative ]
-                titleClasses =
-                  [ HB.textTruncate, HB.flexGrow1, HB.fwBold, HB.fs5 ]
-              in        
-                HH.div
-                  ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <>
-                    selectedClasses
-                    ]
-                    <>
-                    [ HP.style "cursor: pointer;" ]
-                  )
-                  [ HH.div
+        , let
+            selectedClasses = case mSelectedTocEntry of
+              Just (SelNode [] _) -> [ HH.ClassName "active" ]
+              _ -> []
+            innerDivClasses =
+              [ HB.dFlex, HB.alignItemsCenter, HB.py1, HB.positionRelative ]
+            titleClasses =
+              [ HB.textTruncate, HB.flexGrow1, HB.fwBold, HB.fs5 ]
+            headerItem =
+              HH.div
+                ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <> selectedClasses ]
+                  <> [ HP.style "cursor: pointer;" ]
+                )
+                [ HH.div
                     [ HP.classes innerDivClasses ]
                     [ HH.span
-                      ( [ HP.classes titleClasses
-                        , HP.style "align-self: stretch; flex-basis: 0;"
-                        , HP.title "Header"
-                        , HE.onClick \_ -> JumpToNodeSection []
-                                (getHeading header)
-                                ("Header")
-                        ]
-                        
-                      )
-                      [ HH.text "Kopfzeile" ]
-                  --, addItemInterface
+                        ( [ HP.classes titleClasses
+                          , HP.style "align-self: stretch; flex-basis: 0;"
+                          , HP.title "Header"
+                          , HE.onClick \_ -> JumpToNodeSection [] (getHeading header) "Header"
+                          ]
+                        )
+                        [ HH.text "Kopfzeile" ]
                     ]
-                  ]
-                  
-                
-            <> ( concat $ mapWithIndex
-                ( \ix (Edge child) ->
-                    treeToHTML header state menuPath historyPath 1 mSelectedTocEntry
-                      [ ix ]
-                      now
-                      searchData
-                      child
-                )
-                children
+                ]
+            childItems = concat $ mapWithIndex
+              ( \ix (Edge child) ->
+                  treeToHTML header state menuPath historyPath 1 mSelectedTocEntry
+                    [ ix ]
+                    now
+                    searchData
+                    child
               )
-            ]     
+              children
+          in
+            HH.div
+              [ HP.classes [ HH.ClassName "toc-list" ] ]
+              ( [ headerItem ] <> childItems )     
         ]
     ]
 
