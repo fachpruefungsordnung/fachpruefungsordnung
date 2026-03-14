@@ -1063,8 +1063,10 @@ tocview = connect selectAll $ H.mkComponent
               [ HB.textTruncate, HB.flexGrow1, HB.fwBold, HB.fs5 ]
             headerItem =
               HH.div
-                ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <> selectedClasses ]
-                  <> [ HP.style "cursor: pointer;" ]
+                ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <>
+                      selectedClasses
+                  ]
+                    <> [ HP.style "cursor: pointer;" ]
                 )
                 [ HH.div
                     [ HP.classes innerDivClasses ]
@@ -1072,7 +1074,8 @@ tocview = connect selectAll $ H.mkComponent
                         ( [ HP.classes titleClasses
                           , HP.style "align-self: stretch; flex-basis: 0;"
                           , HP.title "Header"
-                          , HE.onClick \_ -> JumpToNodeSection [] (getHeading header) "Header"
+                          , HE.onClick \_ -> JumpToNodeSection [] (getHeading header)
+                              "Header"
                           ]
                         )
                         [ HH.text "Kopfzeile" ]
@@ -1090,7 +1093,7 @@ tocview = connect selectAll $ H.mkComponent
           in
             HH.div
               [ HP.classes [ HH.ClassName "toc-list" ] ]
-              ( [ headerItem ] <> childItems )     
+              ([ headerItem ] <> childItems)
         ]
     ]
 

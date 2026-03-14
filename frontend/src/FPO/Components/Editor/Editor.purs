@@ -876,7 +876,7 @@ editor = connect selectTranslator $ H.mkComponent
                   pure unit -- Nothing to do
                 Just [] -> do
                   H.raise $ RenamedNode contentLines [] --update Header without updating the title
-                Just path -> do 
+                Just path -> do
                   H.raise $ RenamedNode contentLines path
                   H.raise UpdateFullTitle
               freeSaveFlagsAndMaybeRerun

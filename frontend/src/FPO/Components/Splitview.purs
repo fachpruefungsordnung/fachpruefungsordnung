@@ -1662,12 +1662,12 @@ insertNodeIntoEdgeAtPosition path node (Edge (Node { meta, children, header })) 
 changeNodeHeading
   :: Path -> String -> TOCTree -> TOCTree
 changeNodeHeading _ _ Empty = Empty
-changeNodeHeading path newName (RootTree { children, header }) =  
+changeNodeHeading path newName (RootTree { children, header }) =
   if path == [] then
     let
       newHeader = updateHeading newName header
-    in 
-      RootTree{children, header: newHeader}
+    in
+      RootTree { children, header: newHeader }
   else
     let
       newChildren = mapWithIndex
