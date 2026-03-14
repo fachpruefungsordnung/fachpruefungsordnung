@@ -26,7 +26,7 @@ buildEnumItemRefHtml :: Int -> ReaderT ReaderState (State GlobalState) (Html ())
 buildEnumItemRefHtml enumItemID = do
     -- \| Get current item number and enumeration FormatString from state and build corresponding reference
     enumIDFormatString <- asks currentEnumIDFormatString
-    return $ identifierFormat enumIDFormatString enumItemID
+    return $ identifierFormat enumIDFormatString enumItemID 0
 
 -------------------------------------------------------------------------------
 

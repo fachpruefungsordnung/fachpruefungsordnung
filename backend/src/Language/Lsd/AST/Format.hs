@@ -28,6 +28,7 @@ newtype FormatString a = FormatString [FormatAtom a]
 data FormatAtom a
     = StringAtom String
     | PlaceholderAtom a
+    | InsertedPlaceholderAtom a
     deriving (Show, Eq)
 
 type IdentifierFormat = FormatString EnumStyle

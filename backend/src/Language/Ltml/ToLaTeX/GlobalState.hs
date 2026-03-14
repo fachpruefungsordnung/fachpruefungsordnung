@@ -11,6 +11,7 @@ module Language.Ltml.ToLaTeX.GlobalState
     {- functions to mutate counters -}
     , nextSupersection
     , nextSection
+    , nextInsertedSection
     , nextParagraph
     , nextSentence
     , nextFootnote
@@ -30,6 +31,7 @@ module Language.Ltml.ToLaTeX.GlobalState
     , formatState
     , supersectionCTR
     , sectionCTR
+    , insertedSectionCTR
     , paragraphCTR
     , sentenceCTR
     , footnoteCTR
@@ -114,6 +116,7 @@ data GlobalState = GlobalState
 data CounterState = CounterState
     { _supersectionCTR :: Int
     , _sectionCTR :: Int
+    , _insertedSectionCTR :: Int
     , _paragraphCTR :: Int
     , _sentenceCTR :: Int
     , _footnoteCTR :: Int
@@ -152,12 +155,18 @@ makeLenses ''FormatState
 
 nextSupersection :: State GlobalState Int
 nextSupersection = do
+    counterState . insertedSectionCTR .= 0
     counterState . supersectionCTR <+= 1
 
 nextSection :: State GlobalState Int
 nextSection = do
     counterState . paragraphCTR .= 0
     counterState . sectionCTR <+= 1
+
+nextInsertedSection :: State GlobalState Int
+nextInsertedSection = do
+    counterState . paragraphCTR .= 0
+    counterState . insertedSectionCTR <+= 1
 
 nextParagraph :: State GlobalState Int
 nextParagraph = do
@@ -184,6 +193,7 @@ resetCountersHard :: State GlobalState ()
 resetCountersHard = do
     counterState . supersectionCTR .= 0
     counterState . sectionCTR .= 0
+    counterState . insertedSectionCTR .= 0
     counterState . paragraphCTR .= 0
     counterState . footnoteCTR .= 0
     counterState . appendixCTR .= 0
@@ -192,6 +202,7 @@ resetCountersSoft :: State GlobalState ()
 resetCountersSoft = do
     counterState . supersectionCTR .= 0
     counterState . sectionCTR .= 0
+    counterState . insertedSectionCTR .= 0
     counterState . paragraphCTR .= 0
     counterState . footnoteCTR .= 0
 
@@ -221,8 +232,13 @@ insertRefLabel mLabel ident =
 --   wrap it in a hyperlink, to make the final pdf interactive. returns the corresponding
 --   hypertarget.
 addTOCEntry
-    :: Int -> KeyFormat -> IdentifierFormat -> PreLaTeX -> State GlobalState PreLaTeX
-addTOCEntry n keyident ident headingText = do
+    :: Int
+    -> Int
+    -> KeyFormat
+    -> IdentifierFormat
+    -> PreLaTeX
+    -> State GlobalState PreLaTeX
+addTOCEntry n ni keyident ident headingText = do
     m <- nextTOCLabel
     let tocLabel = Label $ T.pack $ "/" ++ show m ++ "/"
     toc
@@ -231,7 +247,7 @@ addTOCEntry n keyident ident headingText = do
                     [ hyperlink
                         tocLabel
                         ( ISequence
-                            [ formatKey keyident (IText $ getIdentifier ident n)
+                            [ formatKey keyident (IText $ getIdentifier ident n ni)
                             , IText " "
                             , headingText
                             ]
@@ -249,7 +265,7 @@ addAppendixHeaderEntry n keyident ident headingText =
     appendixHeaders
         %= ( <>
                 DList.fromList
-                    [ formatKey keyident (IText $ getIdentifier ident n)
+                    [ formatKey keyident (IText $ getIdentifier ident n 0)
                     , IText " "
                     , headingText
                     , linebreak
@@ -305,6 +321,7 @@ initialGlobalState =
 initialCounterState :: CounterState
 initialCounterState =
     CounterState
+        0
         0
         0
         0

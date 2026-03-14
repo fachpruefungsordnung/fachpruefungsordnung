@@ -261,36 +261,42 @@ instance ToHtmlM (Node Section) where
                         sectionBody
                     )
             ) = do
-            globalState <- get
             sectionFormatS <- asks localSectionFormat
             let (sectionIDGetter, incrementSectionID, sectionCssClass) =
                     -- \| Check if we are inside a section or a super-section
                     -- TODO: Is (SimpleLeafSectionBody [SimpleBlocks]) counted as super-section? (i think yes)
-                    if isSuper sectionBody
-                        then (currentSuperSectionID, incSuperSectionID, Class.SuperSection)
-                        else (currentSectionID, incSectionID, Class.Section)
-                (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (sectionIDGetter globalState)
-             in do
-                    addMaybeLabelToState mLabel sectionIDHtml
-                    -- \| Render parsed Heading, which also creates ToC Entry
-                    (headingHtml, tocId, rawTitle) <-
-                        buildHeadingHtml sectionIDHtml mLabel sectionTocKeyHtml parsedHeading
-                    childrenHtml <- toHtmlM sectionBody
-                    -- \| increment (super)SectionID for next section
-                    incrementSectionID
+                    case (isSuper sectionBody, isInserted sectionFormatS) of
+                        (True, _) -> (currentSuperSectionID, incSuperSectionID, Class.SuperSection)
+                        (False, True) -> (currentSectionID, incInsertedSectionID, Class.Section)
+                        (False, False) -> (currentSectionID, resetInsertedSectionID >> incSectionID, Class.Section)
 
-                    exportLinkFunc <- asks exportLinkWrapper
-                    let rawdTitleHtml = toHtml . (" " <>) <$> rawTitle
-                        exportLinkHtml =
-                            exportLinkFunc (Label tocId) <$> (pure sectionTocKeyHtml <> rawdTitleHtml)
+            -- \| increment (inserted / super) section id
+            incrementSectionID
+            globalState <- get
+            let (sectionIDHtml, sectionTocKeyHtml) =
+                    sectionFormat
+                        sectionFormatS
+                        (sectionIDGetter globalState)
+                        (currentInsertedSectionID globalState)
 
-                        sectionHtml =
-                            section_ [cssClass_ sectionCssClass]
-                                <$> (headingHtml <> childrenHtml <> exportLinkHtml)
-                    -- \| Collects all sections for possible export
-                    collectExportSection tocId rawTitle sectionHtml
+            addMaybeLabelToState mLabel sectionIDHtml
+            -- \| Render parsed Heading, which also creates ToC Entry
+            (headingHtml, tocId, rawTitle) <-
+                buildHeadingHtml sectionIDHtml mLabel sectionTocKeyHtml parsedHeading
+            childrenHtml <- toHtmlM sectionBody
 
-                    return sectionHtml
+            exportLinkFunc <- asks exportLinkWrapper
+            let rawdTitleHtml = toHtml . (" " <>) <$> rawTitle
+                exportLinkHtml =
+                    exportLinkFunc (Label tocId) <$> (pure sectionTocKeyHtml <> rawdTitleHtml)
+
+                sectionHtml =
+                    section_ [cssClass_ sectionCssClass]
+                        <$> (headingHtml <> childrenHtml <> exportLinkHtml)
+            -- \| Collects all sections for possible export
+            collectExportSection tocId rawTitle sectionHtml
+
+            return sectionHtml
           where
             -- \| Also adds table of contents entry for section
             buildHeadingHtml
@@ -364,7 +370,7 @@ instance ToHtmlM SectionBody where
 instance ToHtmlM (Node Paragraph) where
     toHtmlM (Node mLabel (Paragraph format textTrees)) = do
         globalState <- get
-        let (paragraphIDHtml, paragraphKeyHtml) = paragraphFormat format (currentParagraphID globalState)
+        let (paragraphIDHtml, paragraphKeyHtml) = paragraphFormat format (currentParagraphID globalState) 0
          in do
                 addMaybeLabelToState mLabel paragraphIDHtml
                 -- \| Group raw text (without enums) into <div> for flex layout spacing
@@ -693,10 +699,14 @@ instance (ToHtmlM a) => ToHtmlM (SectionFormatted (Parsed a)) where
             setHasErrors
             -- \| Count error as @Section@, to keep following
             --    @Section@s correctly numbered
+            if isInserted sectionFormatS
+                then incInsertedSectionID
+                else resetInsertedSectionID >> incSectionID
+
             sectionID <- gets currentSectionID
-            incSectionID
+            insertedSectionID <- gets currentInsertedSectionID
             -- \| Since we dont have a title we set the tocID as title
-            let (_, tocKeyHtml) = sectionFormat sectionFormatS sectionID
+            let (_, tocKeyHtml) = sectionFormat sectionFormatS sectionID insertedSectionID
             htmlID <- addTocEntry Nothing (Error $ Now tocKeyHtml) Nothing SomeSection
             returnNow $ parseErrorHtml (Just htmlID) parseErr
         Right a -> local (\s -> s {localSectionFormat = sectionFormatS}) $ toHtmlM a
