@@ -1,5 +1,24 @@
 -- | All DTOs and data representations related to groups.
-module FPO.Dto.GroupDto where
+module FPO.Dto.GroupDto
+  ( GroupID
+  , GroupOverview(..)
+  , getGroupOverviewID
+  , getGroupOverviewName
+  , GroupCreate(..)
+  , GroupDto(..)
+  , getGroupName
+  , getGroupDescription
+  , getGroupMembers
+  , lookupUser
+  , isUserInGroup
+  , GroupMemberDto(..)
+  , getUserInfoName
+  , getUserInfoRole
+  , getUserInfoID
+  , GroupPatch(..)
+  , class ToGroupOverview
+  , toGroupOverview
+  ) where
 
 import Prelude
 
@@ -16,7 +35,10 @@ type GroupID = Int
 
 -- | Represents a group overview entity, as returned by the `GET /groups` endpoint.
 newtype GroupOverview = GroupOverview
-  { groupOverviewName :: String, groupOverviewID :: GroupID }
+  { groupOverviewName :: String
+  , groupOverviewID :: GroupID
+  , groupOverviewDescription :: String
+  }
 
 getGroupOverviewID :: GroupOverview -> Int
 getGroupOverviewID (GroupOverview g) = g.groupOverviewID
@@ -32,8 +54,13 @@ instance showGroupOverview :: Show GroupOverview where
   show = genericShow
 
 -- | A group creation request DTO, as sent to the `POST /groups` endpoint.
+-- | The `groupCreateUsers` field is an optional array of user UUIDs to add
+-- | as members when the group is created.
 newtype GroupCreate = GroupCreate
-  { groupCreateName :: String, groupCreateDescription :: String }
+  { groupCreateName :: String
+  , groupCreateDescription :: String
+  , groupCreateUsers :: Array UserID
+  }
 
 derive instance newtypeGroupCreate :: Newtype GroupCreate _
 derive newtype instance encodeJsonGroupCreate :: EncodeJson GroupCreate
@@ -49,6 +76,9 @@ newtype GroupDto = GroupDto
 
 getGroupName :: GroupDto -> String
 getGroupName (GroupDto g) = g.groupName
+
+getGroupDescription :: GroupDto -> String
+getGroupDescription (GroupDto g) = g.groupDescription
 
 getGroupMembers :: GroupDto -> Array GroupMemberDto
 getGroupMembers (GroupDto g) = g.groupMembers
@@ -98,10 +128,27 @@ instance toGroupOverviewGroupDto :: ToGroupOverview GroupDto where
   toGroupOverview (GroupDto g) = GroupOverview
     { groupOverviewName: g.groupName
     , groupOverviewID: g.groupID
+    , groupOverviewDescription: g.groupDescription
     }
 
 instance toGroupOverviewGroupOverview :: ToGroupOverview UR.FullUserRoleDto where
   toGroupOverview r = GroupOverview
     { groupOverviewName: UR.getGroupName r
     , groupOverviewID: UR.getGroupID r
+    , groupOverviewDescription: ""
     }
+
+-- | A group patch request DTO, as sent to the `PATCH /groups/{groupID}` endpoint.
+-- | Both fields are optional, but at least one must be provided.
+-- | `patchDescription` is a Maybe (Maybe String) to allow:
+-- |   - Nothing: don't change description
+-- |   - Just Nothing: set description to null
+-- |   - Just (Just "...") : set description to new value
+newtype GroupPatch = GroupPatch
+  { patchName :: Maybe String
+  , patchDescription :: Maybe (Maybe String)
+  }
+
+derive instance newtypeGroupPatch :: Newtype GroupPatch _
+derive newtype instance encodeJsonGroupPatch :: EncodeJson GroupPatch
+derive newtype instance decodeJsonGroupPatch :: DecodeJson GroupPatch

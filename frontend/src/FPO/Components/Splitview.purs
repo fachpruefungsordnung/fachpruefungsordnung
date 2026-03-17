@@ -24,7 +24,7 @@ import Data.Either (Either(..))
 import Data.Foldable (traverse_)
 import Data.Formatter.DateTime (Formatter, parseFormatString)
 import Data.Int (toNumber)
-import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.String.Regex as Regex
 import Data.String.Regex.Flags as RegexFlags
 import Effect.Aff (Milliseconds(..), delay)
@@ -37,9 +37,10 @@ import FPO.Components.Editor.Types (ElementData)
 import FPO.Components.Preview as Preview
 import FPO.Components.TOC (Path, SelectedEntity(..), Version)
 import FPO.Components.TOC as TOC
-import FPO.Data.Navigate (class Navigate)
+import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request (LoadState(..))
 import FPO.Data.Request as Request
+import FPO.Data.Route (EditorParams, Route(..), currentPath, routeCodec)
 import FPO.Data.Store as Store
 import FPO.Data.Time (defaultFormatter, timeStampsVersions)
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
@@ -85,11 +86,12 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
 import Halogen.Themes.Bootstrap5 as HB
+import Routing.Duplex as RD
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
 import Web.DOM.Document as Document
 import Web.DOM.Element as Element
-import Web.Event.Event (EventType(..), stopPropagation)
+import Web.Event.Event (EventType(..), preventDefault, stopPropagation)
 import Web.File.Url (createObjectURL, revokeObjectURL)
 import Web.HTML (window)
 import Web.HTML as Web.HTML
@@ -99,19 +101,24 @@ import Web.HTML.Window (document)
 import Web.HTML.Window as Web.HTML.Window
 import Web.ResizeObserver (ResizeObserver, disconnect, observe, resizeObserver)
 import Web.UIEvent.MouseEvent (MouseEvent, clientX)
+import Web.UIEvent.MouseEvent as MouseEvent
 
 data DragTarget = LeftResizer | RightResizer
 
 derive instance eqDragTarget :: Eq DragTarget
 
 type Output = Unit
-type Input = DocumentID
+type Input =
+  { docID :: DocumentID
+  , params :: EditorParams
+  }
 
 data Query a = UnitQuery a
 
 data Action
   = Init
   | Receive (Connected FPOTranslator Input)
+  | SyncUrlParams
   -- Resizing Actions
   | StartResize DragTarget MouseEvent
   | StopResize MouseEvent
@@ -136,7 +143,6 @@ data Action
   -- inner maybe for how. Nothing for left Version means newest version, nothing
   -- for right version means no comparison
   | ModifyVersionMapping Int (Maybe (Maybe Int)) (Maybe (ElementData))
-  | UpdateMSelectedTocEntry
   | SetComparison Int (Maybe Int)
   | UpdateVersionMapping
   | UpdateDirtyVersion
@@ -218,7 +224,7 @@ splitview = connect selectTranslator $ H.mkComponent
   where
   initialState :: Connected FPOTranslator Input -> State
   initialState { context, input } =
-    { docID: input
+    { docID: input.docID
     , translator: fromFpoTranslator context
     , mDragTarget: Nothing
     , resizeState:
@@ -278,6 +284,12 @@ splitview = connect selectTranslator $ H.mkComponent
       contentWidth = state.resizeState.windowWidth - resizersTotalWidth
       ratioScaleFactor = contentWidth / state.resizeState.windowWidth
       absoluteEditorRatio = state.resizeState.editorRatio * ratioScaleFactor
+      isDragging = state.mDragTarget /= Nothing
+      dragStyle =
+        if isDragging then
+          "user-select: none; -webkit-user-select: none;"
+        else
+          ""
     -- toolbarHeight :: Int
     -- toolbarHeight = 31 -- px, height of the toolbar
     in
@@ -287,8 +299,9 @@ splitview = connect selectTranslator $ H.mkComponent
         , HE.onMouseLeave StopResize
         , HP.classes [ HB.dFlex, HB.overflowHidden ]
         , HP.style
-            ( "height: calc(100vh - " <> show navbarHeight <>
-                "px); max-height: 100%; min-height: 0;"
+            ( "height: calc(100vh - " <> show navbarHeight
+                <> "px); max-height: 100%; min-height: 0;"
+                <> dragStyle
             )
         , HP.ref (H.RefLabel "splitview")
         ]
@@ -408,28 +421,17 @@ splitview = connect selectTranslator $ H.mkComponent
       -- Left Resizer
       , HH.div
           [ HE.onMouseDown (StartResize LeftResizer)
-          , HP.style
-              "width: 8px; \
-              \cursor: col-resize; \
-              \background:rgba(0, 0, 0, 0.3); \
-              \display: flex; \
-              \align-items: center; \
-              \justify-content: center; \
-              \position: relative;"
+          , HP.classes [ H.ClassName "splitview-resizer" ]
           ]
           [ HH.button
-              [ HP.style
-                  "background:rgba(255, 255, 255, 0.8); \
-                  \border: 0.2px solid #aaa; \
-                  \padding: 0.1rem 0.1rem; \
-                  \font-size: 8px; \
-                  \font-weight: bold; \
-                  \line-height: 1; \
-                  \color:rgba(0, 0, 0, 0.7); \
-                  \border-radius: 3px; \
-                  \cursor: pointer; \
-                  \height: 40px; \
-                  \width: 8px;"
+              [ HP.classes $
+                  [ H.ClassName "splitview-resizer-toggle-btn"
+                  , H.ClassName "splitview-resizer-toggle-btn--left"
+                  ] <>
+                    if state.resizeState.sidebarClosed then
+                      [ H.ClassName "splitview-resizer-toggle-btn--closed" ]
+                    else
+                      []
               -- To prevent the resizer event under the button
               , HE.handler' (EventType "mousedown") \ev ->
                   unsafePerformEffect do
@@ -445,28 +447,17 @@ splitview = connect selectTranslator $ H.mkComponent
   rightResizer state =
     HH.div
       [ HE.onMouseDown (StartResize RightResizer)
-      , HP.style
-          "width: 8px; \
-          \cursor: col-resize; \
-          \background:rgba(0, 0, 0, 0.3); \
-          \display: flex; \
-          \align-items: center; \
-          \justify-content: center; \
-          \position: relative;"
+      , HP.classes [ H.ClassName "splitview-resizer" ]
       ]
       [ HH.button
-          [ HP.style
-              "background:rgba(255, 255, 255, 0.8); \
-              \border: 0.2px solid #aaa; \
-              \padding: 0.1rem 0.1rem; \
-              \font-size: 8px; \
-              \font-weight: bold; \
-              \line-height: 1; \
-              \color:rgba(0, 0, 0, 0.7); \
-              \border-radius: 3px; \
-              \cursor: pointer; \
-              \height: 40px; \
-              \width: 8px;"
+          [ HP.classes $
+              [ H.ClassName "splitview-resizer-toggle-btn"
+              , H.ClassName "splitview-resizer-toggle-btn--right"
+              ] <>
+                if state.resizeState.previewClosed then
+                  [ H.ClassName "splitview-resizer-toggle-btn--closed" ]
+                else
+                  []
           -- To prevent the resizer event under the button
           , HE.handler' (EventType "mousedown") \ev ->
               unsafePerformEffect do
@@ -544,19 +535,12 @@ splitview = connect selectTranslator $ H.mkComponent
   closeButton :: Action -> H.ComponentHTML Action Slots m
   closeButton action =
     HH.button
-      [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
-      , HP.style
-          "position: absolute; \
-          \top: 0.5rem; \
-          \right: 0.5rem; \
-          \background-color: #fdecea; \
-          \color: #b71c1c; \
-          \padding: 0.2rem 0.4rem; \
-          \font-size: 0.75rem; \
-          \line-height: 1; \
-          \border: 1px solid #f5c6cb; \
-          \border-radius: 0.2rem; \
-          \z-index: 10;"
+      [ HP.classes
+          [ HB.btn
+          , HB.btnSm
+          , HB.btnOutlineSecondary
+          , H.ClassName "splitview-close-btn"
+          ]
       , HE.onClick \_ -> action
       ]
       [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x" ] ] [] ]
@@ -586,8 +570,27 @@ splitview = connect selectTranslator $ H.mkComponent
       H.tell _toc unit (TOC.ReceiveTOCs Empty emptyMetaMap)
       -- Load the initial TOC entries into the editor
       handleAction GET
-      handleAction UpdateMSelectedTocEntry
-      H.tell _toc unit (TOC.SelectFirstEntry)
+
+      -- Read the URL params directly from the path so we don't depend on a
+      -- variable that is only available in initialState/Receive.
+      path <- H.liftEffect currentPath
+      let
+        mRoute = case RD.parse routeCodec path of
+          Left _ -> Nothing
+          Right r -> Just r
+        params = case mRoute of
+          Just (Editor _ p) -> p
+          _ -> { revision: Nothing, paragraph: Nothing, splitview: Nothing }
+      case params.paragraph of
+        Just paraId -> do
+          H.tell _toc unit (TOC.SelectEntry paraId)
+          -- If a specific revision is also requested, apply it
+          case params.revision of
+            Just revId ->
+              handleAction (ModifyVersionMapping paraId (Just (Just revId)) Nothing)
+            Nothing -> pure unit
+        Nothing ->
+          H.tell _toc unit (TOC.SelectFirstEntry)
 
       -- Subscribe to resize events and store subscription for cleanup
       { emitter, listener } <- H.liftEffect HS.create
@@ -612,6 +615,40 @@ splitview = connect selectTranslator $ H.mkComponent
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }
+
+    -- Compute the current editor state and push it into the URL.
+    -- This is called after paragraph / version / splitview changes so
+    -- that the address bar always reflects the current state.
+    -- We compare against the current path to avoid re-entrant navigation.
+    --
+    -- Reads `mSelectedTocEntry` from Splitview's own state, which is the
+    -- single source of truth.  That field is only ever written by
+    -- `syncSelectedEntry` (and `initialState`), so it is always correct.
+    SyncUrlParams -> do
+      state <- H.get
+      let
+        paraId = case state.mSelectedTocEntry of
+          Just (SelLeaf id) -> Just id
+          _ -> Nothing
+        revId = case paraId of
+          Nothing -> Nothing
+          Just pid ->
+            case findRootTree (\e -> e.elementID == pid) state.versionMapping of
+              Just entry -> entry.versionID
+              Nothing -> Nothing
+        svParam = case paraId of
+          Nothing -> Nothing
+          Just pid ->
+            case findRootTree (\e -> e.elementID == pid) state.versionMapping of
+              Just entry | isJust entry.comparisonData -> Just "comparison"
+              _ -> Nothing
+        newParams = { revision: revId, paragraph: paraId, splitview: svParam }
+        desiredPath = RD.print routeCodec (Editor state.docID newParams)
+      -- Only navigate when the path would actually change — this breaks
+      -- the navigate → popstate → Receive → SyncUrlParams feedback loop.
+      path <- H.liftEffect currentPath
+      when (path /= desiredPath) do
+        navigate (Editor state.docID newParams)
 
     UpdateDirtyVersion -> do
       isDirty <- H.request _editor 0 Editor.RequestDirtyVersion
@@ -679,6 +716,7 @@ splitview = connect selectTranslator $ H.mkComponent
     -- Resizing as long as mouse is hold down on window
     -- (Or until the browser detects the mouse is released)
     StartResize dragTarget mouseEvent -> do
+      H.liftEffect $ preventDefault (MouseEvent.toEvent mouseEvent)
       H.modify_ \st -> st
         { mDragTarget = Just dragTarget
         , mStartResizeState = Just st.resizeState
@@ -736,10 +774,6 @@ splitview = connect selectTranslator $ H.mkComponent
             (Editor.UpdateEditorSize (newResizeState.previewRatio * width))
 
         _, _ -> pure unit
-
-    UpdateMSelectedTocEntry -> do
-      cToc <- H.request _toc unit TOC.RequestCurrentTocEntry
-      H.modify_ _ { mSelectedTocEntry = join cToc }
 
     -- for when the tree updates.
     UpdateVersionMapping -> do
@@ -800,10 +834,11 @@ splitview = connect selectTranslator $ H.mkComponent
 
     -- Switch between CompareEditor, Preview and TogglePreview
     SwitchPreview -> do
-      state <- H.get
-      case state.mSelectedTocEntry of
-        Just _ -> H.modify_ _ { mSelectedTocEntry = Nothing }
-        Nothing -> handleAction TogglePreview
+      mSelectedTocEntry <- H.gets _.mSelectedTocEntry
+      -- Previously in case structure the close button would not close at the beginning
+      -- Now after clearSelectedEntry, also TogglePreview
+      when (isJust mSelectedTocEntry) clearSelectedEntry
+      handleAction TogglePreview
 
     -- Toggle the preview area
     TogglePreview -> do
@@ -829,7 +864,8 @@ splitview = connect selectTranslator $ H.mkComponent
               , previewClosed = false
               }
           }
-      handleAction UpdateMSelectedTocEntry
+      -- After the version mapping is updated below, sync URL so the
+      -- revision / splitview params stay current.
       let
         newVersionID = case vID of
           Just id -> const id
@@ -848,6 +884,7 @@ splitview = connect selectTranslator $ H.mkComponent
             )
             versionMapping
       H.modify_ _ { versionMapping = newVersionMapping }
+      handleAction SyncUrlParams
 
     SetComparison elementID mVID -> do
       state <- H.get
@@ -952,10 +989,9 @@ splitview = connect selectTranslator $ H.mkComponent
       Editor.PostPDF _ -> do
         state <- H.get
         upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
-        currentTocEntry <- H.request _toc unit TOC.RequestCurrentTocEntry
         let
           textElementId :: Int
-          textElementId = case join currentTocEntry of
+          textElementId = case state.mSelectedTocEntry of
             Just (SelLeaf id) -> id
             _ -> -1
 
@@ -1044,7 +1080,6 @@ splitview = connect selectTranslator $ H.mkComponent
         handleAction $ ToggleCommentOverview true
 
       Editor.RaiseDiscard -> do
-        handleAction UpdateMSelectedTocEntry
         state <- H.get
         -- Only the SelLeaf case should ever occur
         case state.mSelectedTocEntry of
@@ -1063,7 +1098,6 @@ splitview = connect selectTranslator $ H.mkComponent
             pure unit
 
       Editor.RaiseMergeMode draft -> do
-        handleAction UpdateMSelectedTocEntry
         state <- H.get
         upToDateVersion <- H.request _toc unit TOC.RequestUpToDateVersion
         case upToDateVersion of
@@ -1121,7 +1155,6 @@ splitview = connect selectTranslator $ H.mkComponent
           _ -> pure unit
 
       Editor.Merged -> do
-        handleAction UpdateMSelectedTocEntry
         state <- H.get
         case state.mSelectedTocEntry of
           Just (SelLeaf elementID) -> do
@@ -1151,7 +1184,6 @@ splitview = connect selectTranslator $ H.mkComponent
         H.tell _comment unit (Comment.UpdateCommentProblem markerID)
 
     DeleteDraft -> do
-      handleAction UpdateMSelectedTocEntry
       state <- H.get
       -- Only the SelLeaf case should ever occur
       case state.mSelectedTocEntry of
@@ -1203,7 +1235,14 @@ splitview = connect selectTranslator $ H.mkComponent
         else do
           H.modify_ _ { pendingUpdateElementID = currentElementID }
           H.tell _editor 0 Editor.SaveSection
-          handleAction UpdateMSelectedTocEntry
+          -- Atomically update Splitview state, notify the TOC, and sync the
+          -- URL.  This must happen before telling the editor to load the new
+          -- section, because the editor's save (triggered by SaveSection
+          -- above) may raise RaiseUpdateVersion whose handler eventually
+          -- calls ModifyVersionMapping → SyncUrlParams.  If
+          -- mSelectedTocEntry were still stale at that point the URL would
+          -- regress to the old paragraph.
+          syncSelectedEntry (SelLeaf selectedId) mTitle
           state <- H.get
           let
             entry = case (findTOCEntry selectedId state.tocEntries) of
@@ -1217,7 +1256,6 @@ splitview = connect selectTranslator $ H.mkComponent
                   { elementID: -1, versionID: Nothing, comparisonData: Nothing }
                 Just elem -> elem
           H.tell _editor 0 (Editor.ChangeSection entry ev.versionID mTitle)
-          H.tell _toc unit $ TOC.UpdateMSelectedTocEntry (SelLeaf selectedId) mTitle
           case ev.comparisonData of
             Nothing -> do
               -- this case should be covered by mSelectedTocEntry being set to Nothing
@@ -1234,8 +1272,7 @@ splitview = connect selectTranslator $ H.mkComponent
           H.tell _editor 0 Editor.PreventChangeSection
         else do
           H.tell _editor 0 (Editor.ChangeToNode heading path mTitle)
-          H.tell _toc unit $ TOC.UpdateMSelectedTocEntry (SelNode path heading)
-            (Just heading)
+          syncSelectedEntry (SelNode path heading) (Just heading)
 
       TOC.AddNode path node -> do
         s <- H.get
@@ -1266,6 +1303,24 @@ splitview = connect selectTranslator $ H.mkComponent
         Nothing -> pure unit
 
     where
+    -- | Atomically update the selected entry in Splitview, notify the TOC
+    -- | child component, and push the change into the browser URL.
+    -- |
+    -- | Together with `clearSelectedEntry`, these are the **only**
+    -- | functions that write `mSelectedTocEntry`.  By funnelling every
+    -- | mutation through these two helpers we guarantee that Splitview
+    -- | state, TOC state, and the browser URL can never drift apart.
+    syncSelectedEntry entry mTitle = do
+      H.modify_ _ { mSelectedTocEntry = Just entry }
+      H.tell _toc unit $ TOC.UpdateMSelectedTocEntry entry mTitle
+      handleAction SyncUrlParams
+
+    -- | Clear the selected entry (e.g. when leaving comparison mode).
+    -- | Counterpart to `syncSelectedEntry` — keeps the same invariant
+    -- | that `mSelectedTocEntry` is only written through controlled helpers.
+    clearSelectedEntry = do
+      H.modify_ _ { mSelectedTocEntry = Nothing }
+
     -- Communicates tree changes to the server and TOC component.
     updateTree newTree = do
       state <- H.get

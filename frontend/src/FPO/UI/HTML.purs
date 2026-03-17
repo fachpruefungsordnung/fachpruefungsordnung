@@ -10,15 +10,17 @@ import DOM.HTML.Indexed.InputType (InputType)
 import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.String (null)
+import Effect (Effect)
 import FPO.Util (handleKeyDownEscape)
 import Halogen.HTML as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Themes.Bootstrap5 as HB
+import Web.HTML.HTMLElement (HTMLElement)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
-foreign import decodeHtmlEntity :: String -> String
+foreign import setInnerHtml :: HTMLElement -> String -> Effect Unit
 
 -- Creates a new column with a optional label and an input field.
 addColumn
@@ -189,3 +191,43 @@ loadingSpinner =
   HH.div [ HP.classes [ HB.textCenter, HB.my5 ] ]
     [ HH.span [ HP.classes [ HB.spinnerBorder, HB.textPrimary ] ] []
     ]
+
+-- | Reusable search/filter input with a magnifying-glass icon.
+-- | Used by the administration and group-overview pages.
+filterInput
+  :: forall w i
+   . String -- ^ current filter value
+  -> String -- ^ placeholder text
+  -> (String -> i) -- ^ action on input
+  -> HH.HTML w i
+filterInput value placeholder action =
+  HH.div [ HP.classes [ HB.inputGroup, HB.mb3 ] ]
+    [ HH.span [ HP.classes [ HB.inputGroupText ] ]
+        [ HH.i [ HP.classes [ H.ClassName "bi-search" ] ] [] ]
+    , HH.input
+        [ HP.type_ HP.InputText
+        , HP.classes [ HB.formControl ]
+        , HP.placeholder placeholder
+        , HP.value value
+        , HE.onValueInput action
+        ]
+    ]
+
+-- | "Showing X–Y of Z" indicator for paginated lists.
+entryCount
+  :: forall w i
+   . Int -- ^ current page (0-based)
+  -> Int -- ^ items per page
+  -> Int -- ^ total item count
+  -> HH.HTML w i
+entryCount currentPage perPage totalItems =
+  if totalItems == 0 then HH.text ""
+  else
+    let
+      startItem = currentPage * perPage + 1
+      endItem = min ((currentPage + 1) * perPage) totalItems
+    in
+      HH.div [ HP.classes [ HB.textStart, HB.textMuted, HB.small ] ]
+        [ HH.text $
+            show startItem <> "–" <> show endItem <> " / " <> show totalItems
+        ]

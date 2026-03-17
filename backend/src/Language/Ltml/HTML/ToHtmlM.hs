@@ -193,16 +193,16 @@ instance ToHtmlM (Parsed DocumentHeading) where
     toHtmlM eErrDocumentHeading = do
         -- \| Title which is used if a parse error occurs
         fallbackTitle <- gets documentFallbackTitle
-        (resType, titleHtml) <- case eErrDocumentHeading of
+        (resType, tocTitleHtml, titleHtml) <- case eErrDocumentHeading of
             Left _ -> do
                 setHasErrors
                 failedHeadingTextHtml <- toHtmlM fallbackTitle
-                return (Error, failedHeadingTextHtml)
+                return (Error, failedHeadingTextHtml, failedHeadingTextHtml)
             Right (DocumentHeading headingTextTree) -> do
-                headingTextHtml <- toHtmlM headingTextTree
+                (tocHeadingTextHtml, headingTextHtml) <- tocHeadingHtml headingTextTree
                 -- \| Used for setting HTML title
                 modify (\s -> s {mainDocumentTitle = headingText headingTextTree})
-                return (Success, headingTextHtml)
+                return (Success, tocHeadingTextHtml, headingTextHtml)
         -- \| Get HeadingFormat from DocumentContainer or AppendixSection
         headingFormatS <- asks documentHeadingFormat
         -- \| Here we check if we are inside an appendix, since
@@ -210,7 +210,7 @@ instance ToHtmlM (Parsed DocumentHeading) where
         (mIdHtml, formattedTitle, mLabel) <- case headingFormatS of
             Left headFormat -> buildMainHeading titleHtml headFormat
             Right headFormatId -> buildAppendixHeading titleHtml headFormatId
-        htmlId <- addTocEntry mIdHtml (resType titleHtml) mLabel Other
+        htmlId <- addTocEntry mIdHtml (resType tocTitleHtml) mLabel Other
         -- \| In case of a parse error, output an error box
         return $
             either
@@ -261,36 +261,42 @@ instance ToHtmlM (Node Section) where
                         sectionBody
                     )
             ) = do
-            globalState <- get
             sectionFormatS <- asks localSectionFormat
             let (sectionIDGetter, incrementSectionID, sectionCssClass) =
                     -- \| Check if we are inside a section or a super-section
                     -- TODO: Is (SimpleLeafSectionBody [SimpleBlocks]) counted as super-section? (i think yes)
-                    if isSuper sectionBody
-                        then (currentSuperSectionID, incSuperSectionID, Class.SuperSection)
-                        else (currentSectionID, incSectionID, Class.Section)
-                (sectionIDHtml, sectionTocKeyHtml) = sectionFormat sectionFormatS (sectionIDGetter globalState)
-             in do
-                    addMaybeLabelToState mLabel sectionIDHtml
-                    -- \| Render parsed Heading, which also creates ToC Entry
-                    (headingHtml, tocId, rawTitle) <-
-                        buildHeadingHtml sectionIDHtml mLabel sectionTocKeyHtml parsedHeading
-                    childrenHtml <- toHtmlM sectionBody
-                    -- \| increment (super)SectionID for next section
-                    incrementSectionID
+                    case (isSuper sectionBody, isInserted sectionFormatS) of
+                        (True, _) -> (currentSuperSectionID, incSuperSectionID, Class.SuperSection)
+                        (False, True) -> (currentSectionID, incInsertedSectionID, Class.Section)
+                        (False, False) -> (currentSectionID, resetInsertedSectionID >> incSectionID, Class.Section)
 
-                    exportLinkFunc <- asks exportLinkWrapper
-                    let rawdTitleHtml = toHtml . (" " <>) <$> rawTitle
-                        exportLinkHtml =
-                            exportLinkFunc (Label tocId) <$> (pure sectionTocKeyHtml <> rawdTitleHtml)
+            -- \| increment (inserted / super) section id
+            incrementSectionID
+            globalState <- get
+            let (sectionIDHtml, sectionTocKeyHtml) =
+                    sectionFormat
+                        sectionFormatS
+                        (sectionIDGetter globalState)
+                        (currentInsertedSectionID globalState)
 
-                        sectionHtml =
-                            section_ [cssClass_ sectionCssClass]
-                                <$> (headingHtml <> childrenHtml <> exportLinkHtml)
-                    -- \| Collects all sections for possible export
-                    collectExportSection tocId rawTitle sectionHtml
+            addMaybeLabelToState mLabel sectionIDHtml
+            -- \| Render parsed Heading, which also creates ToC Entry
+            (headingHtml, tocId, rawTitle) <-
+                buildHeadingHtml sectionIDHtml mLabel sectionTocKeyHtml parsedHeading
+            childrenHtml <- toHtmlM sectionBody
 
-                    return sectionHtml
+            exportLinkFunc <- asks exportLinkWrapper
+            let rawdTitleHtml = toHtml . (" " <>) <$> rawTitle
+                exportLinkHtml =
+                    exportLinkFunc (Label tocId) <$> (pure sectionTocKeyHtml <> rawdTitleHtml)
+
+                sectionHtml =
+                    section_ [cssClass_ sectionCssClass]
+                        <$> (headingHtml <> childrenHtml <> exportLinkHtml)
+            -- \| Collects all sections for possible export
+            collectExportSection tocId rawTitle sectionHtml
+
+            return sectionHtml
           where
             -- \| Also adds table of contents entry for section
             buildHeadingHtml
@@ -317,12 +323,9 @@ instance ToHtmlM (Node Section) where
                             createTocEntryH Nothing (Error $ Now tocKeyHtml)
                         return (Now $ parseErrorHtml (Just htmlId) parseErr, htmlId, mempty)
                     Right (Heading headingFormatS title) -> do
-                        titleHtml <- toHtmlM title
+                        (tocTitleHtml, titleHtml) <- tocHeadingHtml title
                         let rawTitleText = headingText title
-                        -- TODO: Maybe: Toc entry for section has no footnotes (headingText skips them),
-                        --       since the could contain @<a>@. When the Toc entry is wrapped in another
-                        --       @<a>@ it creates invalid HTML
-                        htmlId <- createTocEntryH (Just tocKeyHtml) (Success $ toHtml <$> rawTitleText)
+                        htmlId <- createTocEntryH (Just tocKeyHtml) (Success tocTitleHtml)
                         return
                             ( h2_ [cssClass_ Class.Heading, cssClass_ Class.Anchor, id_ htmlId]
                                 . headingFormatId headingFormatS sectionIDHtml
@@ -367,7 +370,7 @@ instance ToHtmlM SectionBody where
 instance ToHtmlM (Node Paragraph) where
     toHtmlM (Node mLabel (Paragraph format textTrees)) = do
         globalState <- get
-        let (paragraphIDHtml, paragraphKeyHtml) = paragraphFormat format (currentParagraphID globalState)
+        let (paragraphIDHtml, paragraphKeyHtml) = paragraphFormat format (currentParagraphID globalState) 0
          in do
                 addMaybeLabelToState mLabel paragraphIDHtml
                 -- \| Group raw text (without enums) into <div> for flex layout spacing
@@ -696,10 +699,14 @@ instance (ToHtmlM a) => ToHtmlM (SectionFormatted (Parsed a)) where
             setHasErrors
             -- \| Count error as @Section@, to keep following
             --    @Section@s correctly numbered
+            if isInserted sectionFormatS
+                then incInsertedSectionID
+                else resetInsertedSectionID >> incSectionID
+
             sectionID <- gets currentSectionID
-            incSectionID
+            insertedSectionID <- gets currentInsertedSectionID
             -- \| Since we dont have a title we set the tocID as title
-            let (_, tocKeyHtml) = sectionFormat sectionFormatS sectionID
+            let (_, tocKeyHtml) = sectionFormat sectionFormatS sectionID insertedSectionID
             htmlID <- addTocEntry Nothing (Error $ Now tocKeyHtml) Nothing SomeSection
             returnNow $ parseErrorHtml (Just htmlID) parseErr
         Right a -> local (\s -> s {localSectionFormat = sectionFormatS}) $ toHtmlM a
@@ -828,6 +835,21 @@ renderGroupedTextTree textF_ enumF_ tts =
             followingHtml <- renderGroupedTextTree textF_ enumF_ tts'
             -- \| Wrap raw text without enums into textF_
             return $ (textF_ <$> rawTextHtml) <> followingHtml
+
+-------------------------------------------------------------------------------
+
+-- | Render 'HeadingTextTree' with and without 'FootnoteRef's for normal and ToC usage
+tocHeadingHtml
+    :: [HeadingTextTree] -> ReaderStateMonad (Delayed (Html ()), Delayed (Html ()))
+tocHeadingHtml [] = return (mempty, mempty)
+tocHeadingHtml (h : hs) = do
+    normalHtml <- toHtmlM h
+    let tocHtml = case h of
+            FootnoteRef _ -> mempty
+            _ -> normalHtml
+    (tocRest, normalRest) <- tocHeadingHtml hs
+
+    return (tocHtml <> tocRest, normalHtml <> normalRest)
 
 -------------------------------------------------------------------------------
 

@@ -16,6 +16,8 @@ module Language.Ltml.HTML.Common
 
       -- * SectionID Functions
     , incSectionID
+    , incInsertedSectionID
+    , resetInsertedSectionID
     , incSuperSectionID
 
       -- * Footnotes
@@ -103,6 +105,8 @@ data GlobalState = GlobalState
     -- ^ Tracks the current super-section number
     , currentSectionID :: Int
     -- ^ Tracks the current section number
+    , currentInsertedSectionID :: Int
+    -- ^ Tracks the current inserted section number
     , currentParagraphID :: Int
     -- ^ Tracks the current paragraph number in the current section
     , currentSentenceID :: Int
@@ -206,7 +210,8 @@ initGlobalState =
     GlobalState
         { hasFlagged = False
         , currentSuperSectionID = 1
-        , currentSectionID = 1
+        , currentSectionID = 0
+        , currentInsertedSectionID = 0
         , currentParagraphID = 1
         , currentSentenceID = 0
         , currentEnumItemID = 1
@@ -256,6 +261,16 @@ initReaderState =
 -- | Increments currentSectionID in GlobalState
 incSectionID :: ReaderT r (State GlobalState) ()
 incSectionID = modify (\s -> s {currentSectionID = currentSectionID s + 1})
+
+-- | Increments currentInsertedSectionID in GlobalState
+incInsertedSectionID :: ReaderT r (State GlobalState) ()
+incInsertedSectionID = modify (\s -> s {currentInsertedSectionID = currentInsertedSectionID s + 1})
+
+-- | Reset currentInsertedSectionID to initial value
+resetInsertedSectionID :: ReaderT r (State GlobalState) ()
+resetInsertedSectionID =
+    modify
+        (\s -> s {currentInsertedSectionID = currentInsertedSectionID initGlobalState})
 
 -- | Increments currentSuperSectionID in GlobalState
 incSuperSectionID :: ReaderT r (State GlobalState) ()
@@ -446,7 +461,7 @@ evalDelayed :: GlobalState -> Delayed a -> a
 evalDelayed _ (Now a) = a
 evalDelayed s (Later fa) = fa s
 
-returnNow :: Html () -> HtmlReaderState
+returnNow :: a -> ReaderStateMonad (Delayed a)
 returnNow = return . Now
 
 instance (Monoid a) => Monoid (Delayed a) where

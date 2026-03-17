@@ -19,6 +19,8 @@ module UserManagement.Statements
     , getGroupInfo
     , getAllGroupsOverview
     , deleteGroup
+    , updateGroupName
+    , updateGroupDescription
     , addRole
     , updateUserRoleInGroup
     , removeUserFromGroup
@@ -205,10 +207,9 @@ addGroup =
       returning id :: int8
     |]
 
-getGroupInfo :: Statement Group.GroupID Group.GroupCreate
+getGroupInfo :: Statement Group.GroupID (Text, Maybe Text)
 getGroupInfo =
-    uncurry Group.GroupCreate
-        <$> [singletonStatement|
+    [singletonStatement|
         select name :: text, description :: text?
         from groups
         where id = $1 :: int8
@@ -216,11 +217,13 @@ getGroupInfo =
 
 getAllGroupsOverview :: Statement () [Group.GroupOverview]
 getAllGroupsOverview =
-    fmap (\(id, name) -> Group.GroupOverview (id :: Group.GroupID) name)
+    fmap
+        ( \(id, name, mDescription) -> Group.GroupOverview (id :: Group.GroupID) name mDescription
+        )
         <$> rmap
             toList
             [vectorStatement|
-        select id :: int8, name :: text
+        select id :: int8, name :: text, description :: text?
         from groups
     |]
 
@@ -229,6 +232,22 @@ deleteGroup =
     [resultlessStatement|
       delete from groups
       where id = $1 :: int8
+    |]
+
+updateGroupName :: Statement (Text, Group.GroupID) ()
+updateGroupName =
+    [resultlessStatement|
+      update groups
+      set name = $1 :: text
+      where id = $2 :: int8
+    |]
+
+updateGroupDescription :: Statement (Maybe Text, Group.GroupID) ()
+updateGroupDescription =
+    [resultlessStatement|
+      update groups
+      set description = $1 :: text?
+      where id = $2 :: int8
     |]
 
 addRole :: Statement (User.UserID, Group.GroupID, Text) ()

@@ -1,6 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 
-module UserManagement.Group (Group (..), GroupCreate (..), GroupID, GroupOverview (..)) where
+module UserManagement.Group (Group (..), GroupCreate (..), GroupPatch (..), GroupID, GroupOverview (..)) where
 
 import Data.Aeson (FromJSON, ToJSON)
 import Data.OpenApi (ToSchema)
@@ -25,6 +25,7 @@ instance ToSchema Group
 data GroupOverview = GroupOverview
     { groupOverviewID :: GroupID
     , groupOverviewName :: Text
+    , groupOverviewDescription :: Maybe Text
     }
     deriving (Generic)
 
@@ -34,10 +35,21 @@ instance ToJSON GroupOverview
 data GroupCreate = GroupCreate
     { groupCreateName :: Text
     , groupCreateDescription :: Maybe Text
+    , groupCreateUsers :: Maybe [User.UserID]
     }
     deriving (Eq, Generic)
 
 instance FromJSON GroupCreate
 instance ToSchema GroupCreate
+
+-- | Represents a PATCH request for updating a group's name and/or description
+data GroupPatch = GroupPatch
+    { patchName :: Maybe Text
+    , patchDescription :: Maybe (Maybe Text)
+    }
+    deriving (Eq, Generic)
+
+instance FromJSON GroupPatch
+instance ToSchema GroupPatch
 
 type GroupID = Int64

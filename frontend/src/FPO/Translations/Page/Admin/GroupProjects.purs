@@ -5,6 +5,7 @@ import Simple.I18n.Translation (Translation, fromRecord)
 
 type GroupProjectsPageLabels =
   ( "gp_createNewProject"
+      ::: "gp_docNameNotEmpty"
       ::: "gp_documentName"
       ::: "gp_enterDocumentName"
       ::: "gp_groupProjects"
@@ -12,12 +13,14 @@ type GroupProjectsPageLabels =
       ::: "gp_projectManagement"
       ::: "gp_removeProject"
       ::: "gp_searchProjects"
+      ::: "gp_successfullyCreatedDocument"
       ::: SNil
   )
 
 enGroupProjectsPage :: Translation GroupProjectsPageLabels
 enGroupProjectsPage = fromRecord
   { gp_createNewProject: "Create New Project"
+  , gp_docNameNotEmpty: "Document name cannot be empty."
   , gp_documentName: "Document Name"
   , gp_enterDocumentName: "Enter Document Name"
   , gp_groupProjects: "Projects of Group"
@@ -25,11 +28,13 @@ enGroupProjectsPage = fromRecord
   , gp_projectManagement: "Project Management"
   , gp_removeProject: "Remove Project"
   , gp_searchProjects: "Search for Projects"
+  , gp_successfullyCreatedDocument: "Successfully created document"
   }
 
 deGroupProjectsPage :: Translation GroupProjectsPageLabels
 deGroupProjectsPage = fromRecord
   { gp_createNewProject: "Neues Projekt erstellen"
+  , gp_docNameNotEmpty: "Der Dokumentname darf nicht leer sein."
   , gp_documentName: "Dokumentname"
   , gp_enterDocumentName: "Dokumentname eingeben"
   , gp_groupProjects: "Projekte der Gruppe"
@@ -37,4 +42,5 @@ deGroupProjectsPage = fromRecord
   , gp_projectManagement: "Projektverwaltung"
   , gp_removeProject: "Projekt entfernen"
   , gp_searchProjects: "Suche nach Projekten"
+  , gp_successfullyCreatedDocument: "Dokument erfolgreich erstellt"
   }
