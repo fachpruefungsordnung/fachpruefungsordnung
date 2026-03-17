@@ -89,7 +89,7 @@ getGroupHandler
     :: AuthResult Auth.Token -> Group.GroupID -> Handler Group.Group
 getGroupHandler (Authenticated token) groupID = do
     conn <- tryGetDBConnection
-    ifSuperOrAdminDo conn token groupID $ do
+    ifSuperOrGroupMemberDo conn token groupID $ do
         Group.GroupOverview _ name mDesc <- runDB conn $ Sessions.getGroupInfo groupID
         members <- runDB conn $ Sessions.getMembersOfGroup groupID
         return $ Group.Group groupID name mDesc members
