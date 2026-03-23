@@ -42,6 +42,7 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
+import Web.Event.Event (Event, preventDefault)
 
 data Action
   = Initialize
@@ -49,7 +50,7 @@ data Action
   | ChangeUsername String
   | ChangeEmail String
   | ChangePassword String
-  | SubmitCreateUser
+  | SubmitCreateUser Event
   | Cancel
 
 type State = FPOState
@@ -110,7 +111,7 @@ component =
   renderForm :: State -> H.ComponentHTML Action () m
   renderForm state =
     HH.form
-      [ HE.onSubmit $ const SubmitCreateUser ]
+      [ HE.onSubmit SubmitCreateUser ]
       [ addColumn
           (getName state.createUserDto)
           (translate (label :: _ "common_userName") state.translator)
@@ -183,7 +184,8 @@ component =
       state <- H.get
       H.modify_ _ { createUserDto = withPassword password state.createUserDto }
 
-    SubmitCreateUser -> do
+    SubmitCreateUser event -> do
+      H.liftEffect $ preventDefault event
       state <- H.get
       H.modify_ _ { waiting = true }
 

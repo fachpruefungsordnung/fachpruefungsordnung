@@ -1,6 +1,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,7 +14,11 @@ module Server.Handlers.AuthHandlers
 
 import Control.Monad.IO.Class
 import Data.Password.Argon2
+import Docs (logMessage)
+import Docs.Hasql.Database (run)
 import qualified Hasql.Session as Session
+import Logging.Logs (Severity (Info))
+import Logging.Scope (Scope (Scope))
 import Servant
 import Servant.Auth.Server
 import qualified Server.Auth as Auth
@@ -65,6 +70,16 @@ loginHandler cookieSett jwtSett Auth.UserLoginData {..} = do
             case passwordCheck of
                 PasswordCheckFail -> throwError errWrongLoginCredentials
                 PasswordCheckSuccess -> do
+                    _ <-
+                        liftIO
+                            $ flip
+                                run
+                                conn
+                            $ logMessage
+                                Info
+                                (Just uid)
+                                (Scope "login")
+                                (loginEmail <> " logged in.")
                     eSuperadmin <- liftIO $ Session.run (Sessions.checkSuperadmin uid) conn
                     case eSuperadmin of
                         Left _ -> throwError errDatabaseAccessFailed

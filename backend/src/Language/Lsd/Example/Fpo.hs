@@ -13,6 +13,7 @@ module Language.Lsd.Example.Fpo
 where
 
 import Data.Char (toLower)
+import Data.List.NonEmpty (NonEmpty (..))
 import Data.Typography
 import Data.Void (Void)
 import Language.Lsd.AST.Common
@@ -281,6 +282,7 @@ superSectionT =
                         , PlaceholderAtom KeyIdentifierPlaceholder
                         ]
                 )
+                False
             )
             ( SectionType
                 (Keyword "=")
@@ -299,6 +301,7 @@ superSectionT =
                 )
                 (InnerSectionBodyType (Star sectionT))
             )
+            :| []
 
 sectionT :: NamedType FormattedSectionType
 sectionT =
@@ -312,6 +315,7 @@ sectionT =
                         , PlaceholderAtom KeyIdentifierPlaceholder
                         ]
                 )
+                False
             )
             ( SectionType
                 (Keyword "§")
@@ -330,6 +334,37 @@ sectionT =
                 )
                 (LeafSectionBodyType (Star paragraphT))
             )
+            :| [
+                 -- Alternative section format for inserted sections
+                 SectionFormatted
+                    ( SectionFormat
+                        (FormatString [PlaceholderAtom Arabic, InsertedPlaceholderAtom AlphabeticLower])
+                        ( TocKeyFormat $
+                            FormatString
+                                [ StringAtom "§ "
+                                , PlaceholderAtom KeyIdentifierPlaceholder
+                                ]
+                        )
+                        True
+                    )
+                    ( SectionType
+                        (Keyword "§*")
+                        ( HeadingType
+                            ( HeadingFormat
+                                (Typography Centered MediumFontSize [Bold])
+                                ( FormatString
+                                    [ StringAtom "§ "
+                                    , PlaceholderAtom IdentifierPlaceholder
+                                    , StringAtom "\n"
+                                    , PlaceholderAtom HeadingTextPlaceholder
+                                    ]
+                                )
+                            )
+                            plainTextT
+                        )
+                        (LeafSectionBodyType (Star paragraphT))
+                    )
+               ]
 
 paragraphT :: NamedType ParagraphType
 paragraphT =

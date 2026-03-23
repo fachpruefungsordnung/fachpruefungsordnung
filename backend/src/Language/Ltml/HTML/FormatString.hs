@@ -71,25 +71,27 @@ headingFormatId (HeadingFormat typography formatS) idHtml textHtml =
             StringAtom s -> convertNewLine s
             PlaceholderAtom IdentifierPlaceholder -> id
             PlaceholderAtom HeadingTextPlaceholder -> text
+            -- No InsertedPlaceholders allowed here
+            InsertedPlaceholderAtom _ -> mempty
             <> headingFormatString (FormatString as) id text
 
 -------------------------------------------------------------------------------
 
 -- | Returns (ID Html, ToC Key Html) for a Section;
 --   uses ID Html to build ToC Key Html
-sectionFormat :: SectionFormat -> Int -> (Html (), Html ())
-sectionFormat (SectionFormat idFormat (TocKeyFormat tocKeyFormat)) = idKeyFormat idFormat tocKeyFormat
+sectionFormat :: SectionFormat -> Int -> Int -> (Html (), Html ())
+sectionFormat (SectionFormat idFormat (TocKeyFormat tocKeyFormat) _) = idKeyFormat idFormat tocKeyFormat
 
 -- | Returns (ID Html, ToC Key Html) for a Paragraph;
 --   uses ID Html to build Paragraph Key Html
-paragraphFormat :: ParagraphFormat -> Int -> (Html (), Html ())
+paragraphFormat :: ParagraphFormat -> Int -> Int -> (Html (), Html ())
 paragraphFormat (ParagraphFormat idFormat (ParagraphKeyFormat paragraphKeyFormat)) = idKeyFormat idFormat paragraphKeyFormat
 
 -- | Builds key html based on identifier html and returns both
 --   as (ID Html, ToC Key Html)
-idKeyFormat :: IdentifierFormat -> KeyFormat -> Int -> (Html (), Html ())
-idKeyFormat idFormat keyFormatS i =
-    let idHtml = identifierFormat idFormat i
+idKeyFormat :: IdentifierFormat -> KeyFormat -> Int -> Int -> (Html (), Html ())
+idKeyFormat idFormat keyFormatS i insertedI =
+    let idHtml = identifierFormat idFormat i insertedI
         keyHtml = keyFormat keyFormatS idHtml
      in (idHtml, keyHtml)
 
@@ -97,18 +99,22 @@ idKeyFormat idFormat keyFormatS i =
 
 -- | Builds id Html based on given FormatString and id.
 identifierFormat
-    :: IdentifierFormat -> Int -> Html ()
-identifierFormat (FormatString []) _ = return mempty
-identifierFormat (FormatString (a : as)) id =
+    :: IdentifierFormat -> Int -> Int -> Html ()
+identifierFormat (FormatString []) _ _ = return mempty
+identifierFormat (FormatString (a : as)) id insertedId =
     let b = case a of
             -- \| replaces '\n' with <br>
             StringAtom s -> convertNewLine s
-            PlaceholderAtom Arabic -> toHtml $ show id
-            -- \| convert paragraphID to single letter string
-            PlaceholderAtom AlphabeticLower -> toHtml $ intToLower id
-            PlaceholderAtom AlphabeticUpper -> toHtml $ intToCapital id
-        bs = identifierFormat (FormatString as) id
+            PlaceholderAtom style -> htmlAs style id
+            InsertedPlaceholderAtom style -> htmlAs style insertedId
+        bs = identifierFormat (FormatString as) id insertedId
      in b <> bs
+  where
+    htmlAs :: EnumStyle -> Int -> Html ()
+    htmlAs style i = toHtml $ case style of
+        Arabic -> show i
+        AlphabeticLower -> intToLower i
+        AlphabeticUpper -> intToCapital i
 
 -- | Builds the desired key in Html based on the given FormatString and the identifier Html
 keyFormat :: KeyFormat -> Html () -> Html ()
@@ -117,6 +123,8 @@ keyFormat (FormatString (a : as)) idHtml =
     let b = case a of
             StringAtom s -> toHtml s
             PlaceholderAtom KeyIdentifierPlaceholder -> idHtml
+            -- \| InsertedIds are not supported here
+            InsertedPlaceholderAtom KeyIdentifierPlaceholder -> idHtml
         bs = keyFormat (FormatString as) idHtml
      in b <> bs
 
@@ -160,6 +168,9 @@ idFormatCounter (FormatString (a : as)) =
             PlaceholderAtom Arabic -> counterNum "item"
             PlaceholderAtom AlphabeticLower -> counterChar "item"
             PlaceholderAtom AlphabeticUpper -> counterCharCapital "item"
+            -- No InsertedPlaceholders allowed here
+            InsertedPlaceholderAtom _ -> mempty
+
         cs = idFormatCounter (FormatString as)
      in c <> cs
 
@@ -170,6 +181,8 @@ keyFormatCounter (FormatString (a : as)) idCounter =
     let c = case a of
             StringAtom s -> stringCounter $ pack s
             PlaceholderAtom KeyIdentifierPlaceholder -> idCounter
+            -- No InsertedPlaceholders allowed here
+            InsertedPlaceholderAtom _ -> mempty
         cs = keyFormatCounter (FormatString as) idCounter
      in c <> cs
 
@@ -193,7 +206,7 @@ appendixFormat
     -> Delayed (Html ())
     -> (Delayed (Html ()), Html ())
 appendixFormat idFormatS i (TocKeyFormat keyFormatS) headingFormatS titleHtml =
-    let idHtml = identifierFormat idFormatS i
+    let idHtml = identifierFormat idFormatS i 0
         tocKeyHtml = keyFormat keyFormatS idHtml
         headingHtml = headingFormatId headingFormatS idHtml <$> titleHtml
      in (headingHtml, tocKeyHtml)
