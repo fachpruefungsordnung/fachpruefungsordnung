@@ -70,6 +70,9 @@ import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
+import Web.Event.Event (stopPropagation)
+import Web.UIEvent.MouseEvent (MouseEvent)
+import Web.UIEvent.MouseEvent as MouseEvent
 import Type.Proxy (Proxy(..))
 
 _docPagination = Proxy :: Proxy "docPagination"
@@ -96,7 +99,7 @@ data Action
   | SetDocPage P.Output
   | FilterDocuments String
   | ViewDocument DH.DocumentID
-  | RequestDeleteDocument Int
+  | RequestDeleteDocument Int MouseEvent
   | ConfirmDeleteDocument Int
   | RequestCreateDocument
   | ConfirmCreateDocument
@@ -359,7 +362,18 @@ component =
                   ]
               ]
           ]
-      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__body" ] ] $ map (renderDocumentEntry state) docs
+      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
+          ( if null docs then
+              [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty" ] ]
+                  [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
+                      [ HH.i [ HP.classes [ H.ClassName "bi-folder2-open" ] ] [] ]
+                  , HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-text" ] ]
+                      [ HH.text $ translate (label :: _ "gp_noDocumentsFound") state.translator ]
+                  ]
+              ]
+            else
+              map (renderDocumentEntry state) docs
+          )
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _docPagination unit P.component docPaginationProps SetDocPage
           , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
@@ -377,7 +391,10 @@ component =
 
   renderDocumentEntry :: State -> DH.DocumentHeader -> H.ComponentHTML Action Slots m
   renderDocumentEntry state doc =
-    HH.div [ HP.classes [ H.ClassName "fpo-data-list__row" ] ]
+    HH.div
+      [ HP.classes [ H.ClassName "fpo-data-list__row", H.ClassName "fpo-data-list__row--clickable" ]
+      , HE.onClick $ const $ ViewDocument (DH.getID doc)
+      ]
       [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
           [ HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-primary" ] ]
               [ HH.text $ DH.getName doc ]
@@ -388,14 +405,8 @@ component =
           ]
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-actions" ] ]
           [ HH.button
-              [ HP.classes [ H.ClassName "fpo-data-list__action-btn", H.ClassName "fpo-data-list__action-btn--accent" ]
-              , HE.onClick $ const $ ViewDocument (DH.getID doc)
-              , Style.popover $ translate (label :: _ "home_editing") state.translator
-              ]
-              [ HH.i [ HP.classes [ H.ClassName "bi-pencil-fill" ] ] [] ]
-          , HH.button
               [ HP.classes [ H.ClassName "fpo-data-list__action-btn", H.ClassName "fpo-data-list__action-btn--danger" ]
-              , HE.onClick $ const $ RequestDeleteDocument (DH.getID doc)
+              , HE.onClick $ \e -> RequestDeleteDocument (DH.getID doc) e
               , Style.popover $ translate (label :: _ "gp_removeProject") state.translator
               ]
               [ HH.i [ HP.classes [ H.ClassName "bi-trash-fill" ] ] [] ]
@@ -442,7 +453,18 @@ component =
                   ]
               ]
           ]
-      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__body" ] ] $ map (renderMemberEntry state) members
+      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
+          ( if null members then
+              [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty" ] ]
+                  [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
+                      [ HH.i [ HP.classes [ H.ClassName "bi-people" ] ] [] ]
+                  , HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-text" ] ]
+                      [ HH.text $ translate (label :: _ "gm_noMembersFound") state.translator ]
+                  ]
+              ]
+            else
+              map (renderMemberEntry state) members
+          )
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _memberPagination unit P.component memberPaginationProps SetMemberPage
           , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
@@ -858,7 +880,8 @@ component =
         NoModal -> navigate (editorRoute docID)
         _ -> pure unit
 
-    RequestDeleteDocument docID -> do
+    RequestDeleteDocument docID event -> do
+      H.liftEffect $ stopPropagation (MouseEvent.toEvent event)
       H.modify_ _ { modalState = DeleteDocumentModal docID }
       focusRef modalDeleteDocRef
 

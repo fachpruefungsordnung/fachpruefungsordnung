@@ -318,14 +318,16 @@
 .fpo-data-list__footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: var(--fpo-space-4);
   padding: var(--fpo-space-3) var(--fpo-space-5);
   border-top: 1px solid var(--fpo-border-subtle);
-  background: var(--fpo-bg-secondary);
+  position: relative;
 }
 
 .fpo-data-list__entry-count {
+  position: absolute;
+  right: var(--fpo-space-5);
   font-size: var(--fpo-text-xs);
   color: var(--fpo-text-tertiary);
   white-space: nowrap;
@@ -445,16 +447,12 @@
   }
 
   .fpo-data-list__footer {
-    flex-wrap: wrap;
-    gap: var(--fpo-space-2);
-    justify-content: center;
     padding: var(--fpo-space-3) var(--fpo-space-4);
   }
 
   .fpo-data-list__entry-count {
-    order: 1;
-    flex-basis: 100%;
-    text-align: center;
+    position: static;
+    margin-top: var(--fpo-space-1);
   }
 
   .fpo-data-list__empty {
