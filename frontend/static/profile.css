@@ -9,12 +9,7 @@
 
 .profile-hero {
   position: relative;
-  background: linear-gradient(
-    135deg,
-    #1e1b4b 0%,
-    var(--fpo-accent) 60%,
-    #818cf8 100%
-  );
+  background: transparent;
   padding: 1.5rem var(--fpo-space-4) 2.5rem;
   overflow: hidden;
 }
@@ -62,13 +57,13 @@
   width: 56px;
   height: 56px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: var(--fpo-bg-elevated);
+  border: 2px solid var(--fpo-border-default);
   display: grid;
   place-items: center;
   font-size: var(--fpo-text-xl);
   font-weight: 700;
-  color: #fff;
+  color: var(--fpo-text-primary);
   flex-shrink: 0;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -85,17 +80,17 @@
 .profile-hero__name {
   font-size: var(--fpo-text-xl);
   font-weight: 700;
-  color: #fff;
+  color: var(--fpo-text-primary);
   margin: 0;
   line-height: 1.2;
 }
 
 .profile-hero__email {
   font-size: var(--fpo-text-sm);
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--fpo-text-secondary);
   margin: 0;
   padding-left: var(--fpo-space-3);
-  border-left: 1px solid rgba(255, 255, 255, 0.25);
+  border-left: 1px solid var(--fpo-border-default);
 }
 
 /* --------------------------------------------------------------------------

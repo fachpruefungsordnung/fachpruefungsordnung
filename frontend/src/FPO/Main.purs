@@ -140,7 +140,14 @@ component =
         , Style.disableScrollbar
         ]
     ]
-    [ HH.slot_ _navbar unit Navbar.navbar unit
+    [ HH.div [ HP.classes [ H.ClassName "fpo-global-bg" ] ]
+        [ HH.div [ HP.classes [ H.ClassName "fpo-global-bg__noise" ] ] []
+        , HH.div [ HP.classes [ H.ClassName "fpo-global-bg__orb", H.ClassName "fpo-global-bg__orb--1" ] ] []
+        , HH.div [ HP.classes [ H.ClassName "fpo-global-bg__orb", H.ClassName "fpo-global-bg__orb--2" ] ] []
+        , HH.div [ HP.classes [ H.ClassName "fpo-global-bg__orb", H.ClassName "fpo-global-bg__orb--3" ] ] []
+        , HH.div [ HP.classes [ H.ClassName "fpo-global-bg__orb", H.ClassName "fpo-global-bg__orb--4" ] ] []
+        ]
+    , HH.slot_ _navbar unit Navbar.navbar unit
     , HH.slot_ _appToasts unit AppToasts.component unit
     , case state.route of
         Nothing -> HH.div_ [] -- Loading: route not yet resolved

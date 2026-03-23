@@ -17,7 +17,7 @@ body {
     font-family: var(--fpo-font-family);
     font-size: var(--fpo-text-base);
     color: var(--fpo-text-primary);
-    background: var(--fpo-bg-primary);
+    background: transparent;
     line-height: 1.5;
 }
 

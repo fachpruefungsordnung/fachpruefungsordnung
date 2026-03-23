@@ -127,22 +127,7 @@ component =
       [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
       [ -- ── Profile Hero Banner ────────────────────────────────
         HH.div [ HP.classes [ ClassName "profile-hero" ] ]
-          [ -- Decorative orbs
-            HH.div
-              [ HP.classes
-                  [ ClassName "profile-hero__orb"
-                  , ClassName "profile-hero__orb--1"
-                  ]
-              ]
-              []
-          , HH.div
-              [ HP.classes
-                  [ ClassName "profile-hero__orb"
-                  , ClassName "profile-hero__orb--2"
-                  ]
-              ]
-              []
-          , -- Hero content: avatar + name + email
+          [ -- Hero content: avatar + name + email
             HH.div [ HP.classes [ ClassName "profile-hero__content" ] ]
               [ HH.div [ HP.classes [ ClassName "avatar" ] ]
                   [ HH.text $ fromMaybe "" (initials state.username) ]
@@ -156,7 +141,7 @@ component =
                           HH.span
                             [ HP.classes [ HB.badge, HB.roundedPill, HB.ms2 ]
                             , HP.style
-                                "background: rgba(255,255,255,0.18); color: rgba(255,255,255,0.9); font-size: 0.5em; vertical-align: middle;"
+                                "background: var(--fpo-bg-secondary); border: 1px solid var(--fpo-border-default); color: var(--fpo-text-secondary); font-size: 0.5em; vertical-align: middle;"
                             ]
                             [ HH.text $ translate (label :: _ "prof_you")
                                 state.translator

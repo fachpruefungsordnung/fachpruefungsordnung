@@ -27,7 +27,7 @@ COPY spago.yaml spago.yaml
 COPY spago.lock spago.lock
 
 RUN --mount=type=cache,target=/build/node_modules/ \
-    --mount=type=cache,target=/build/output/ \
+# --mount=type=cache,target=/build/output/ \
     npm install && \
     spago install
 
@@ -39,7 +39,7 @@ COPY module_desc.py module_desc.py
 RUN python3 module_desc.py README.md src/FPO/FPO.purs
 
 RUN --mount=type=cache,target=/build/node_modules/ \
-    --mount=type=cache,target=/build/output/ \
+#    --mount=type=cache,target=/build/output/ \
     spago build && \
     spago bundle --bundle-type app &&\
     spago docs
