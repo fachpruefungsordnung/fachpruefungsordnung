@@ -1084,7 +1084,7 @@
 .nav-tabs {
   display: flex;
   border-bottom: 2px solid var(--fpo-border-default);
-  gap: var(--fpo-space-2);
+  /* gap: var(--fpo-space-2); */
 }
 
 .nav-tabs .nav-link {
