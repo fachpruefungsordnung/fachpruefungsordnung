@@ -10,6 +10,7 @@
 @import url("./fpo-design-system/dropdown.css");
 @import url("./fpo-design-system/icons.css");
 @import url("./backgrounds.css");
+@import url("./data-list.css");
 
 /* App-specific styles */
 @import url("./editor-theme.css");

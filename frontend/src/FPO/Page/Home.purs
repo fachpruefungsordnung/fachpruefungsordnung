@@ -13,7 +13,7 @@ module FPO.Page.Home (component) where
 
 import Prelude
 
-import Data.Array (filter, length, null, replicate, slice)
+import Data.Array (filter, length, null, slice)
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -22,7 +22,6 @@ import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
-import FPO.Components.TableHead as TH
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request
   ( LoadState(..)
@@ -38,13 +37,12 @@ import FPO.Dto.DocumentDto.DocDate as DocDate
 import FPO.Dto.DocumentDto.DocumentHeader
   ( DocumentHeader
   , DocumentID
-  , getEditTimestamp
   )
 import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addCard, addColumn, emptyTableRow, loadingSpinner)
+import FPO.UI.HTML (loadingSpinner)
 import FPO.UI.NavbarReveal (setupNavbarReveal, teardownNavbarReveal)
 import FPO.UI.SmoothScroll (smoothScrollToElement)
 import Halogen (liftEffect)
@@ -68,12 +66,9 @@ import Web.HTML.Window (document)
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
 
-_tablehead = Proxy :: Proxy "tablehead"
 _pagination = Proxy :: Proxy "pagination"
 
 type Input = Unit
-
-data Sorting = TitleAsc | TitleDesc | LastUpdatedAsc | LastUpdatedDesc
 
 data Action
   = Initialize
@@ -83,7 +78,6 @@ data Action
   | ViewProject DocumentHeader
   | Receive (Connected FPOTranslator Input)
   | DoNothing
-  | ChangeSorting TH.Output
   | HandleSearchInput String
   | SetPage P.Output
   | DownloadPdf DocumentID String MouseEvent -- Id, Project Name, Event (used for prevent default)
@@ -98,8 +92,7 @@ type State = FPOState
   )
 
 type Slots =
-  ( tablehead :: forall q. H.Slot q TH.Output Unit
-  , pagination :: H.Slot P.Query P.Output Unit
+  ( pagination :: H.Slot P.Query P.Output Unit
   )
 
 component
@@ -189,35 +182,6 @@ component =
       H.liftEffect $ smoothScrollToElement "features"
     DoNothing ->
       pure unit
-    ChangeSorting (TH.Clicked title order) -> do
-      state <- H.get
-      case state.projects of
-        Loading -> pure unit
-        Loaded projects' -> do
-          -- Sorting logic based on the clicked column title:
-          let
-            title_title = translate (label :: _ "home_title") state.translator
-            title_lastUpdated = translate (label :: _ "home_lastUpdated")
-              state.translator
-          projects <- pure $
-            if title == title_title then
-              TH.sortByF
-                order
-                (comparing DocumentHeader.getName)
-                projects'
-            else if title == title_lastUpdated then
-              TH.sortByF
-                (TH.toggleSorting order) -- The newest project should be first.
-                (comparing getEditTimestamp)
-                projects'
-            else
-              projects' -- Ignore other columns.
-
-          H.modify_ _ { projects = Loaded projects }
-
-          -- After changing the sorting, tell the pagination component
-          -- to reset to the first page:
-          H.tell _pagination unit $ P.SetPageQ 0
     HandleSearchInput query -> do
       H.modify_ _ { searchQuery = query }
     SetPage (P.Clicked page) -> do
@@ -305,10 +269,7 @@ component =
     [ HH.h1 [ HP.classes [ HB.textCenter, HB.mt5 ] ]
         [ HH.text $ translate (label :: _ "common_home") state.translator ]
     , HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-        [ addCard
-            (translate (label :: _ "home_yourProjects") state.translator)
-            [ HP.classes [ HB.colSm11, HB.colMd9, HB.colLg7 ] ]
-            (renderProjectOverview state)
+        [ renderProjectOverview state
         ]
     ]
 
@@ -567,144 +528,111 @@ component =
   -- Search bar and list of projects.
   renderProjectOverview :: State -> H.ComponentHTML Action Slots m
   renderProjectOverview state =
-    HH.div [ HP.classes [ HB.container ] ]
-      [ HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-          [ HH.div [ HP.classes [ HB.col6 ] ]
-              [ addColumn
-                  state.searchQuery
-                  ""
-                  (translate (label :: _ "home_searchForProjects") state.translator)
-                  "bi-search"
-                  HP.InputText
-                  HandleSearchInput
+    HH.div
+      [ HP.classes [ HB.colSm11, HB.colMd9, HB.colLg7, HH.ClassName "fpo-data-list" ] ]
+      [ -- Header
+        HH.div [ HP.classes [ HH.ClassName "fpo-data-list__header" ] ]
+          [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__title" ] ]
+              [ HH.text $ translate (label :: _ "home_yourProjects") state.translator ]
+          ]
+      -- Search
+      , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__search" ] ]
+          [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__search-wrapper" ] ]
+              [ HH.i
+                  [ HP.classes
+                      [ HH.ClassName "bi-search"
+                      , HH.ClassName "fpo-data-list__search-icon"
+                      ]
+                  ]
+                  []
+              , HH.input
+                  [ HP.classes [ HH.ClassName "fpo-data-list__search-input" ]
+                  , HP.placeholder $ translate (label :: _ "home_searchForProjects") state.translator
+                  , HP.value state.searchQuery
+                  , HE.onValueInput HandleSearchInput
+                  ]
               ]
-          , if state.projects == Loading then loadingSpinner
-            else HH.div [ HP.classes [ HB.col12 ] ] [ renderProjectTable ps state ]
-          , HH.slot _pagination unit P.component paginationSettings SetPage
+          ]
+      -- Body
+      , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__body" ] ]
+          ( if state.projects == Loading then
+              [ loadingSpinner ]
+            else if null ps then
+              [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__empty" ] ]
+                  [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__empty-icon" ] ]
+                      [ HH.i [ HP.classes [ HH.ClassName "bi-folder2-open" ] ] [] ]
+                  , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__empty-text" ] ]
+                      [ HH.text $ translate (label :: _ "home_noProjectsFound") state.translator ]
+                  ]
+              ]
+            else
+              map (renderProjectRow state) ps
+          )
+      -- Footer
+      , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__footer" ] ]
+          [ HH.slot _pagination unit P.component paginationSettings SetPage
           , if length fps == 0 then HH.text ""
             else
               let
                 startItem = state.page * 5 + 1
                 endItem = min ((state.page + 1) * 5) (length fps)
               in
-                HH.div [ HP.classes [ HB.textCenter, HB.textMuted, HB.small ] ]
+                HH.span [ HP.classes [ HH.ClassName "fpo-data-list__entry-count" ] ]
                   [ HH.text $
-                      show startItem <> "–" <> show endItem <> " / " <> show
+                      show startItem <> "\x2013" <> show endItem <> " / " <> show
                         (length fps)
                   ]
           ]
       ]
     where
-    -- All projects filtered by the search query:
     fps = filterProjects state.searchQuery (fromLoading state.projects [])
-    -- Slice of the projects for the current page:
-    ps = slice (state.page * 5) ((state.page + 1) * 5) $ fps
+    ps = slice (state.page * 5) ((state.page + 1) * 5) fps
     paginationSettings =
       { pages: length fps `div` 5 +
           if length fps `mod` 5 > 0 then 1 else 0
       , style: P.Compact 2
-      , reaction: P.FirstPage -- After changing the search query, reset to first page.
+      , reaction: P.FirstPage
       }
 
-  -- Renders the list of projects.
-  renderProjectTable
-    :: Array DocumentHeader -> State -> H.ComponentHTML Action Slots m
-  renderProjectTable ps state =
-    HH.table
-      [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
-      [ HH.colgroup_
-          [ HH.col [ HP.style "width: 57%;" ] -- 'Title' column
-          , HH.col [ HP.style "width: 27%;" ] -- 'Last Updated' column
-          , HH.col [ HP.style "width: 8%;" ] -- 'PDF' column
-          , HH.col [ HP.style "width: 8%;" ] -- 'ZIP' column
-          ]
-      , HH.slot _tablehead unit TH.component
-          { columns: tableCols state.translator
-          , sortedBy: translate (label :: _ "home_lastUpdated") state.translator
-          }
-          ChangeSorting
-      , HH.tbody_ $
-          if null ps then
-            [ HH.tr []
-                [ HH.td
-                    [ HP.colSpan 4
-                    , HP.classes [ HB.textCenter ]
-                    ]
-                    [ HH.i_
-                        [ HH.text $ translate (label :: _ "home_noProjectsFound")
-                            state.translator
-                        ]
-                    ]
-                ]
-            ]
-          else
-            ( map (renderProjectRow state) ps
-                <> replicate (5 - length ps) (emptyTableRow 48 4)
-            ) -- Fill up to 5 rows
-      ]
-    where
-    tableCols translator = TH.createTableColumns
-      [ { title: translate (label :: _ "home_title") translator
-        , style: Just TH.Alpha
-        }
-      , { title: translate (label :: _ "home_lastUpdated") translator
-        , style: Just TH.Numeric
-        }
-      , { title: "PDF"
-        , style: Nothing
-        }
-      , { title: "ZIP"
-        , style: Nothing
-        }
-      ]
-
-  -- Renders a single project row in the table.
+  -- Renders a single project row.
   renderProjectRow :: forall w. State -> DocumentHeader -> HH.HTML w Action
   renderProjectRow state project =
-    HH.tr
-      [ HE.onClick $ const $ ViewProject project
-      , HP.style "cursor: pointer;"
-      ]
-      [ HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ DocumentHeader.getName project ]
-      , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ formatRelativeTime state.currentTime $ DocDate.docDateToDateTime
-              $
-                DocumentHeader.getLastEdited project
+    HH.div
+      [ HP.classes
+          [ HH.ClassName "fpo-data-list__row"
+          , HH.ClassName "fpo-data-list__row--clickable"
           ]
-      , HH.td
-          [ HP.classes [ HB.textCenter, HB.alignMiddle ] ]
+      , HE.onClick $ const $ ViewProject project
+      ]
+      [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-info" ] ]
+          [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-primary" ] ]
+              [ HH.text $ DocumentHeader.getName project ]
+          , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-secondary" ] ]
+              [ HH.text $ formatRelativeTime state.currentTime $ DocDate.docDateToDateTime $
+                  DocumentHeader.getLastEdited project
+              ]
+          ]
+      , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-actions" ] ]
           [ HH.button
-              [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+              [ HP.classes
+                  [ HH.ClassName "fpo-data-list__action-btn"
+                  , HH.ClassName "fpo-data-list__action-btn--accent"
+                  ]
               , HE.onClick $ \e -> DownloadPdf (DocumentHeader.getIdentifier project)
                   (DocumentHeader.getName project)
                   e
               ]
-              [ HH.i
-                  [ HP.classes
-                      [ HH.ClassName "bi-file-earmark-pdf"
-                      , HB.bi
-                      ]
+              [ HH.i [ HP.classes [ HH.ClassName "bi-file-earmark-pdf" ] ] [] ]
+          , HH.button
+              [ HP.classes
+                  [ HH.ClassName "fpo-data-list__action-btn"
+                  , HH.ClassName "fpo-data-list__action-btn--accent"
                   ]
-                  []
-              ]
-          ]
-      , HH.td
-          [ HP.classes [ HB.textCenter, HB.alignMiddle ] ]
-          [ HH.button
-              [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
               , HE.onClick $ \e -> DownloadZip (DocumentHeader.getIdentifier project)
                   (DocumentHeader.getName project)
                   e
               ]
-              [ HH.i
-                  [ HP.classes
-                      [ HH.ClassName "bi-file-zip"
-                      , HB.bi
-                      ]
-                  ]
-                  []
-              ]
+              [ HH.i [ HP.classes [ HH.ClassName "bi-file-zip" ] ] [] ]
           ]
       ]
 
