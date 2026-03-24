@@ -1053,18 +1053,53 @@ tocview = connect selectAll $ H.mkComponent
                     ]
                 ]
             ]
-        , HH.div
-            [ HP.classes [ HH.ClassName "toc-list" ] ]
-            ( concat $ mapWithIndex
-                ( \ix (Edge child) ->
-                    treeToHTML header state menuPath historyPath 1 mSelectedTocEntry
-                      [ ix ]
-                      now
-                      searchData
-                      child
+        , let
+            selectedClasses = case mSelectedTocEntry of
+              Just (SelNode [] _) -> [ HH.ClassName "active" ]
+              _ -> []
+            innerDivClasses =
+              [ HB.dFlex, HB.alignItemsCenter, HB.py1, HB.positionRelative ]
+            titleClasses =
+              [ HB.textTruncate, HB.flexGrow1, HB.fwBold, HB.fs5 ]
+            headerItem =
+              HH.div
+                ( [ HP.classes $ [ HH.ClassName "toc-item", HB.rounded ] <>
+                      selectedClasses
+                  ]
+                    <> [ HP.style "cursor: pointer;" ]
                 )
-                children
-            )
+                [ HH.div
+                    [ HP.classes innerDivClasses ]
+                    [ HH.span
+                        [ HP.classes
+                            [ HH.ClassName "toc-drag-handle", HB.textMuted, HB.me2 ]
+                        , HP.style ("margin-left: " <> "1" <> "rem;")
+                        ]
+                        (singletonIf (isJust Nothing) $ HH.text "⋮⋮")
+                    , HH.span
+                        ( [ HP.classes titleClasses
+                          , HP.style "align-self: stretch; flex-basis: 0;"
+                          , HP.title "Header"
+                          , HE.onClick \_ -> JumpToNodeSection [] (getHeading header)
+                              "Header"
+                          ]
+                        )
+                        [ HH.text "Kopfzeile" ]
+                    ]
+                ]
+            childItems = concat $ mapWithIndex
+              ( \ix (Edge child) ->
+                  treeToHTML header state menuPath historyPath 1 mSelectedTocEntry
+                    [ ix ]
+                    now
+                    searchData
+                    child
+              )
+              children
+          in
+            HH.div
+              [ HP.classes [ HH.ClassName "toc-list" ] ]
+              ([ headerItem ] <> childItems)
         ]
     ]
 
