@@ -1071,6 +1071,12 @@ tocview = connect selectAll $ H.mkComponent
                 [ HH.div
                     [ HP.classes innerDivClasses ]
                     [ HH.span
+                        [ HP.classes
+                            [ HH.ClassName "toc-drag-handle", HB.textMuted, HB.me2 ]
+                        , HP.style ("margin-left: " <> "1" <> "rem;")
+                        ]
+                        (singletonIf (isJust Nothing) $ HH.text "⋮⋮")
+                    , HH.span
                         ( [ HP.classes titleClasses
                           , HP.style "align-self: stretch; flex-basis: 0;"
                           , HP.title "Header"
