@@ -268,6 +268,7 @@ type Labels =
       ::: "gs_saveSettings"
       ::: "gs_settings"
       ::: "gs_settingsUpdated"
+      ::: "gs_unsavedChangesConfirm"
 
       -- | Home Page
       ::: "home_basicDescription"

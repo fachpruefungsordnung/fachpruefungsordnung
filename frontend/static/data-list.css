@@ -13,10 +13,6 @@
   border: 1px solid var(--fpo-border-subtle);
   border-radius: var(--fpo-radius-xl);
   box-shadow: var(--fpo-shadow-sm);
-  overflow: hidden;
-  transition:
-    box-shadow var(--fpo-transition-normal),
-    border-color var(--fpo-transition-normal);
 }
 
 .fpo-data-list:hover {
@@ -488,6 +484,43 @@
   .fpo-data-list__empty {
     padding: var(--fpo-space-8) var(--fpo-space-4);
   }
+}
+
+/* --------------------------------------------------------------------------
+   Back Button (subtle page-level navigation)
+   -------------------------------------------------------------------------- */
+
+.fpo-back-btn {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--fpo-border-subtle);
+  border-radius: var(--fpo-radius-full);
+  background: var(--fpo-bg-elevated);
+  color: var(--fpo-text-tertiary);
+  font-size: var(--fpo-text-md);
+  cursor: pointer;
+  box-shadow: var(--fpo-shadow-xs);
+  transition:
+    color var(--fpo-transition-fast),
+    border-color var(--fpo-transition-fast),
+    box-shadow var(--fpo-transition-fast);
+}
+
+.fpo-back-btn:hover {
+  color: var(--fpo-accent);
+  border-color: var(--fpo-accent-muted);
+  box-shadow: var(--fpo-shadow-sm);
+}
+
+.fpo-back-btn:active {
+  transform: translateY(-50%) scale(0.95);
 }
 
 /* --------------------------------------------------------------------------

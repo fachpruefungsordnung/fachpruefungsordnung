@@ -71,6 +71,8 @@ import Halogen.Store.Monad (class MonadStore, updateStore)
 import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (stopPropagation)
+import Web.HTML (window)
+import Web.HTML.Window (confirm)
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
 import Type.Proxy (Proxy(..))
@@ -93,6 +95,7 @@ data Action
   = Initialize
   | Receive (Connected FPOTranslator Input)
   | DoNothing
+  | GoBack
   -- Tab actions
   | SwitchTab Tab
   -- Document actions
@@ -284,10 +287,18 @@ component =
 
   renderHeader :: State -> H.ComponentHTML Action Slots m
   renderHeader state =
-    HH.h1 [ HP.classes [ HB.textCenter, HB.mb4 ] ]
-      [ HH.text $ fromMaybe
-          (translate (label :: _ "common_group") state.translator)
-          (getGroupName <$> state.group)
+    HH.div [ HP.classes [ HB.textCenter, HB.mb4, HB.positionRelative ] ]
+      [ HH.button
+          [ HP.classes [ H.ClassName "fpo-back-btn" ]
+          , HE.onClick $ const GoBack
+          ]
+          [ HH.i [ HP.classes [ H.ClassName "bi-arrow-left" ] ] []
+          ]
+      , HH.h1 [ HP.classes [ HB.m0 ] ]
+          [ HH.text $ fromMaybe
+              (translate (label :: _ "common_group") state.translator)
+              (getGroupName <$> state.group)
+          ]
       ]
 
   renderTabs :: State -> H.ComponentHTML Action Slots m
@@ -567,7 +578,7 @@ component =
                 [ HH.i [ HP.classes [ H.ClassName "bi-person-plus-fill", HB.me2 ] ] []
                 , HH.text $ translate (label :: _ "gm_addMember") state.translator
                 ]
-            , if hasSelection then HH.span [ HP.classes [ HB.badge, HB.bgPrimary ] ]
+            , if hasSelection then HH.span [ HP.classes [ HB.badge, HB.textBgPrimary ] ]
                 [ HH.text $ show (length state.selectedUsersToAdd) ]
               else HH.text ""
             ]
@@ -725,23 +736,12 @@ component =
 
   renderSettingsForm :: State -> H.ComponentHTML Action Slots m
   renderSettingsForm state =
-    HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-      [ HH.div [ HP.classes [ HB.col12, HB.colLg10 ] ]
-          [ HH.div [ HP.classes [ HB.card ] ]
-              [ HH.div
-                  [ HP.classes
-                      [ HB.cardHeader
-                      , HB.dFlex
-                      , HB.justifyContentBetween
-                      , HB.alignItemsCenter
-                      ]
-                  ]
-                  [ HH.h5 [ HP.classes [ HB.mb0 ] ]
-                      [ HH.text $ translate (label :: _ "gs_settings")
-                          state.translator
-                      ]
-                  ]
-              , HH.div [ HP.classes [ HB.cardBody ] ]
+    HH.div [ HP.classes [ H.ClassName "fpo-data-list" ] ]
+      [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__header" ] ]
+          [ HH.h5 [ HP.classes [ H.ClassName "fpo-data-list__title" ] ]
+              [ HH.text $ translate (label :: _ "gs_settings") state.translator ]
+          ]
+      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__body", HB.py4 ] ]
                   [ -- Group Name field
                     HH.div [ HP.classes [ HB.mb3 ] ]
                       [ HH.label
@@ -814,8 +814,6 @@ component =
                           ]
                       ]
                   ]
-              ]
-          ]
       ]
 
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
@@ -858,6 +856,20 @@ component =
         loadGroupData
 
     DoNothing -> pure unit
+
+    GoBack -> do
+      state <- H.get
+      let
+        currentName = fromMaybe "" $ getGroupName <$> state.group
+        currentDesc = fromMaybe "" $ state.group >>= \g -> pure (getGroupDescription g)
+        hasChanges = state.editedGroupName /= currentName || state.editedGroupDescription /= currentDesc
+      shouldGo <-
+        if hasChanges then do
+          win <- H.liftEffect window
+          H.liftEffect $ confirm (translate (label :: _ "gs_unsavedChangesConfirm") state.translator) win
+        else pure true
+      when shouldGo $ navigate AdminGroups
+
 
     -- Tab actions
     SwitchTab tab -> do
