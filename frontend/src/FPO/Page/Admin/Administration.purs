@@ -8,7 +8,7 @@ module FPO.Page.Admin.Administration
 
 import Prelude
 
-import Data.Array (filter, length, null, slice)
+import Data.Array (filter, length, null, replicate, slice)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), contains, toLower)
@@ -385,7 +385,8 @@ component =
                   ]
               ]
           ]
-      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
+      , HH.div
+          [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
           ( if null usrs then
               [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty" ] ]
                   [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
@@ -396,6 +397,7 @@ component =
               ]
             else
               map (renderUserEntry state) usrs
+                <> placeholderRows usersPerPage (length usrs) userPageCount
           )
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _userPagination unit P.component userPaginationProps SetUserPage
@@ -406,12 +408,13 @@ component =
     where
     usrs = slice (state.userPage * usersPerPage) ((state.userPage + 1) * usersPerPage)
       state.filteredUsers
+    usersPerPage = 10
+    userPageCount = P.calculatePageCount (length state.filteredUsers) usersPerPage
     userPaginationProps =
-      { pages: P.calculatePageCount (length state.filteredUsers) usersPerPage
+      { pages: userPageCount
       , style: P.Compact 1
       , reaction: P.PreservePage
       }
-    usersPerPage = 10
 
   renderUserEntry :: State -> UserOverviewDto -> H.ComponentHTML Action Slots m
   renderUserEntry state userDto =
@@ -473,7 +476,8 @@ component =
                   ]
               ]
           ]
-      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
+      , HH.div
+          [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
           ( if null grps then
               [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty" ] ]
                   [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
@@ -484,6 +488,7 @@ component =
               ]
             else
               map (renderGroupEntry state) grps
+                <> placeholderRows groupsPerPage (length grps) groupPageCount
           )
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _groupPagination unit P.component groupPaginationProps SetGroupPage
@@ -495,12 +500,13 @@ component =
     grps = slice (state.groupPage * groupsPerPage)
       ((state.groupPage + 1) * groupsPerPage)
       state.filteredGroups
+    groupsPerPage = 10
+    groupPageCount = P.calculatePageCount (length state.filteredGroups) groupsPerPage
     groupPaginationProps =
-      { pages: P.calculatePageCount (length state.filteredGroups) groupsPerPage
+      { pages: groupPageCount
       , style: P.Compact 1
       , reaction: P.PreservePage
       }
-    groupsPerPage = 10
 
   renderGroupEntry :: State -> GroupOverview -> H.ComponentHTML Action Slots m
   renderGroupEntry state groupOverview@(GroupOverview g) =
@@ -525,6 +531,23 @@ component =
           ]
       ]
 
+
+  placeholderRows :: forall w i. Int -> Int -> Int -> Array (HH.HTML w i)
+  placeholderRows perPage currentCount pages =
+    let needed = perPage - currentCount
+    in if pages <= 1 || needed <= 0 then []
+       else replicate needed $
+         HH.div
+           [ HP.classes [ H.ClassName "fpo-data-list__row" ]
+           , HP.style "visibility: hidden; pointer-events: none;"
+           ]
+           [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
+               [ HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-primary" ] ]
+                   [ HH.text "\x00a0" ]
+               , HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-secondary" ] ]
+                   [ HH.text "\x00a0" ]
+               ]
+           ]
 
   -- Delete modals
   renderDeleteUserModal :: State -> H.ComponentHTML Action Slots m

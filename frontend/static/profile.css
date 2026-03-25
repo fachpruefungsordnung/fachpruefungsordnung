@@ -10,7 +10,7 @@
 .profile-hero {
   position: relative;
   background: transparent;
-  padding: 1.5rem var(--fpo-space-4) 2.5rem;
+  padding: 1.5rem 0 2.5rem;
   overflow: hidden;
 }
 
@@ -45,8 +45,19 @@
   display: flex;
   align-items: center;
   gap: var(--fpo-space-4);
-  max-width: 1140px;
-  margin: 0 auto;
+}
+
+/* --------------------------------------------------------------------------
+   Back button — inline variant for flex layouts (e.g. profile hero)
+   -------------------------------------------------------------------------- */
+
+.fpo-back-btn--inline {
+  position: static;
+  transform: none;
+}
+
+.fpo-back-btn--inline:active {
+  transform: scale(0.95);
 }
 
 /* --------------------------------------------------------------------------
@@ -98,11 +109,29 @@
    -------------------------------------------------------------------------- */
 
 .profile-body {
-  max-width: 1140px;
-  margin: -1rem auto 0;
-  padding: 0 var(--fpo-space-4) var(--fpo-space-8);
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--fpo-space-4);
+  padding: 0 0 var(--fpo-space-8);
   position: relative;
   z-index: 2;
+}
+
+@media (min-width: 992px) {
+  .profile-body {
+    grid-template-columns: 2fr 1fr;
+  }
+}
+
+.profile-body__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--fpo-space-4);
+  min-width: 0;
+}
+
+.profile-body__sidebar {
+  min-width: 0;
 }
 
 /* --------------------------------------------------------------------------
@@ -120,15 +149,14 @@
     border-color var(--fpo-transition-normal);
 }
 
-/* When a column holds a single card (e.g. Groups sidebar),
-   let the card stretch to match the adjacent column's height. */
-.profile-body .row > [class*="col"] > .profile-section:only-child {
+/* When the sidebar holds a single card, let it stretch vertically. */
+.profile-body__sidebar > .profile-section:only-child {
   height: 100%;
   display: flex;
   flex-direction: column;
 }
 
-.profile-body .row > [class*="col"] > .profile-section:only-child > .list-group {
+.profile-body__sidebar > .profile-section:only-child > .list-group {
   flex: 1 1 auto;
   overflow-y: auto;
 }

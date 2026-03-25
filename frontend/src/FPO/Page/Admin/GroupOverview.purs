@@ -9,7 +9,7 @@ module FPO.Page.Admin.GroupOverview
 
 import Prelude
 
-import Data.Array (elem, filter, head, length, notElem, null, slice, (:))
+import Data.Array (elem, filter, head, length, notElem, null, replicate, slice, (:))
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..), fromMaybe, isNothing)
@@ -373,7 +373,8 @@ component =
                   ]
               ]
           ]
-      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
+      , HH.div
+          [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
           ( if null docs then
               [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty" ] ]
                   [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
@@ -384,6 +385,7 @@ component =
               ]
             else
               map (renderDocumentEntry state) docs
+                <> placeholderRows (length docs) docPageCount
           )
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _docPagination unit P.component docPaginationProps SetDocPage
@@ -394,8 +396,9 @@ component =
     where
     docs = slice (state.docPage * itemsPerPage) ((state.docPage + 1) * itemsPerPage)
       state.filteredDocuments
+    docPageCount = P.calculatePageCount (length state.filteredDocuments) itemsPerPage
     docPaginationProps =
-      { pages: P.calculatePageCount (length state.filteredDocuments) itemsPerPage
+      { pages: docPageCount
       , style: P.Compact 1
       , reaction: P.PreservePage
       }
@@ -464,7 +467,8 @@ component =
                   ]
               ]
           ]
-      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
+      , HH.div
+          [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
           ( if null members then
               [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty" ] ]
                   [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
@@ -475,6 +479,7 @@ component =
               ]
             else
               map (renderMemberEntry state) members
+                <> placeholderRows (length members) memberPageCount
           )
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _memberPagination unit P.component memberPaginationProps SetMemberPage
@@ -486,8 +491,9 @@ component =
     members = slice (state.memberPage * itemsPerPage)
       ((state.memberPage + 1) * itemsPerPage)
       state.filteredMembers
+    memberPageCount = P.calculatePageCount (length state.filteredMembers) itemsPerPage
     memberPaginationProps =
-      { pages: P.calculatePageCount (length state.filteredMembers) itemsPerPage
+      { pages: memberPageCount
       , style: P.Compact 1
       , reaction: P.PreservePage
       }
@@ -1187,6 +1193,23 @@ component =
           , editedGroupName = getGroupName grp
           , editedGroupDescription = getGroupDescription grp
           }
+
+  placeholderRows :: Int -> Int -> Array (H.ComponentHTML Action Slots m)
+  placeholderRows currentCount pages =
+    let needed = itemsPerPage - currentCount
+    in if pages <= 1 || needed <= 0 then []
+       else replicate needed $
+         HH.div
+           [ HP.classes [ H.ClassName "fpo-data-list__row" ]
+           , HP.style "visibility: hidden; pointer-events: none;"
+           ]
+           [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
+               [ HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-primary" ] ]
+                   [ HH.text "\x00a0" ]
+               , HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-secondary" ] ]
+                   [ HH.text "\x00a0" ]
+               ]
+           ]
 
   reloadGroupMembers :: H.HalogenM State Action Slots output m Unit
   reloadGroupMembers = do

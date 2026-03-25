@@ -13,7 +13,7 @@ module FPO.Page.Home (component) where
 
 import Prelude
 
-import Data.Array (filter, length, null, slice)
+import Data.Array (filter, length, null, replicate, slice)
 import Data.DateTime (DateTime)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
@@ -554,7 +554,8 @@ component =
               ]
           ]
       -- Body
-      , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__body" ] ]
+      , HH.div
+          [ HP.classes [ HH.ClassName "fpo-data-list__body" ] ]
           ( if state.projects == Loading then
               [ loadingSpinner ]
             else if null ps then
@@ -567,6 +568,7 @@ component =
               ]
             else
               map (renderProjectRow state) ps
+                <> placeholderRows 5 (length ps) pageCount
           )
       -- Footer
       , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__footer" ] ]
@@ -587,9 +589,10 @@ component =
     where
     fps = filterProjects state.searchQuery (fromLoading state.projects [])
     ps = slice (state.page * 5) ((state.page + 1) * 5) fps
+    pageCount = length fps `div` 5 +
+      if length fps `mod` 5 > 0 then 1 else 0
     paginationSettings =
-      { pages: length fps `div` 5 +
-          if length fps `mod` 5 > 0 then 1 else 0
+      { pages: pageCount
       , style: P.Compact 2
       , reaction: P.FirstPage
       }
@@ -635,6 +638,26 @@ component =
               [ HH.i [ HP.classes [ HH.ClassName "bi-file-zip" ] ] [] ]
           ]
       ]
+
+  -- Render invisible placeholder rows so the list body keeps a constant
+  -- height across pages (prevents pagination controls from jumping).
+  -- Only emits placeholders when there are multiple pages.
+  placeholderRows :: forall w. Int -> Int -> Int -> Array (HH.HTML w Action)
+  placeholderRows perPage currentCount pages =
+    let needed = perPage - currentCount
+    in if pages <= 1 || needed <= 0 then []
+       else replicate needed $
+         HH.div
+           [ HP.classes [ HH.ClassName "fpo-data-list__row" ]
+           , HP.style "visibility: hidden; pointer-events: none;"
+           ]
+           [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-info" ] ]
+               [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-primary" ] ]
+                   [ HH.text "\x00a0" ] -- non-breaking space for height
+               , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-secondary" ] ]
+                   [ HH.text "\x00a0" ]
+               ]
+           ]
 
   filterProjects :: String -> Array DocumentHeader -> Array DocumentHeader
   filterProjects query projects =

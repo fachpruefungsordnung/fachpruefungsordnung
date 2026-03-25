@@ -19,7 +19,8 @@ import Data.String.Regex (regex, split)
 import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.AppError (AppError)
-import FPO.Data.Navigate (class Navigate)
+import FPO.Data.Navigate (class Navigate, navigate)
+import FPO.Data.Route (Route(..))
 import FPO.Data.Request (getUser, getUserWithId, patchString, postIgnore)
 import FPO.Data.Store as Store
 import FPO.Dto.UserDto
@@ -58,6 +59,7 @@ data Action
   | UpdatePassword
   | HidePwToast
   | HideNotYetImplementedToast
+  | GoBack
 
 data Output = ChangedUsername
 
@@ -125,46 +127,48 @@ component =
   render state =
     HH.div
       [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
-      [ -- ── Profile Hero Banner ────────────────────────────────
-        HH.div [ HP.classes [ ClassName "profile-hero" ] ]
-          [ -- Hero content: avatar + name + email
-            HH.div [ HP.classes [ ClassName "profile-hero__content" ] ]
-              [ HH.div [ HP.classes [ ClassName "avatar" ] ]
-                  [ HH.text $ fromMaybe "" (initials state.username) ]
-              , HH.div [ HP.classes [ ClassName "profile-hero__info" ] ]
-                  [ HH.h1 [ HP.classes [ ClassName "profile-hero__name" ] ]
-                      [ HH.text $
-                          if state.username == "" then
-                            translate (label :: _ "prof_profile") state.translator
-                          else state.username
-                      , if state.isYourProfile then
-                          HH.span
-                            [ HP.classes [ HB.badge, HB.roundedPill, HB.ms2 ]
-                            , HP.style
-                                "background: var(--fpo-bg-secondary); border: 1px solid var(--fpo-border-default); color: var(--fpo-text-secondary); font-size: 0.5em; vertical-align: middle;"
-                            ]
-                            [ HH.text $ translate (label :: _ "prof_you")
-                                state.translator
-                            ]
-                        else HH.text ""
+      [ HH.div [ HP.classes [ HB.container, HB.my5 ] ]
+          [ -- ── Profile Hero Banner ────────────────────────────────
+            HH.div [ HP.classes [ ClassName "profile-hero" ] ]
+              [ -- Hero content: avatar + name + email
+                HH.div [ HP.classes [ ClassName "profile-hero__content" ] ]
+                  [ HH.button
+                      [ HP.classes [ ClassName "fpo-back-btn", ClassName "fpo-back-btn--inline" ]
+                      , HE.onClick $ const GoBack
                       ]
-                  , HH.p [ HP.classes [ ClassName "profile-hero__email" ] ]
-                      [ HH.text state.emailAddress ]
+                      [ HH.i [ HP.classes [ ClassName "bi-arrow-left" ] ] []
+                      ]
+                  , HH.div [ HP.classes [ ClassName "avatar" ] ]
+                      [ HH.text $ fromMaybe "" (initials state.username) ]
+                  , HH.div [ HP.classes [ ClassName "profile-hero__info" ] ]
+                      [ HH.h1 [ HP.classes [ ClassName "profile-hero__name" ] ]
+                          [ HH.text $
+                              if state.username == "" then
+                                translate (label :: _ "prof_profile") state.translator
+                              else state.username
+                          , if state.isYourProfile then
+                              HH.span
+                                [ HP.classes [ HB.badge, HB.roundedPill, HB.ms2 ]
+                                , HP.style
+                                    "background: var(--fpo-bg-secondary); border: 1px solid var(--fpo-border-default); color: var(--fpo-text-secondary); font-size: 0.5em; vertical-align: middle;"
+                                ]
+                                [ HH.text $ translate (label :: _ "prof_you")
+                                    state.translator
+                                ]
+                            else HH.text ""
+                          ]
+                      , HH.p [ HP.classes [ ClassName "profile-hero__email" ] ]
+                          [ HH.text state.emailAddress ]
+                      ]
                   ]
               ]
-          ]
 
-      -- ── Profile Body (cards overlap hero) ────────────────────
-      , HH.div [ HP.classes [ ClassName "profile-body" ] ]
-          [ HH.div [ HP.classes [ HB.row, HB.g4 ] ]
+          -- ── Profile Body (cards below hero) ────────────────────
+          , HH.div [ HP.classes [ ClassName "profile-body" ] ]
               [ -- LEFT COLUMN: Username + Password stacked
                 HH.div
                   [ HP.classes
-                      [ HB.colLg7
-                      , HB.dFlex
-                      , HB.flexColumn
-                      , HB.gap3
-                      ]
+                      [ ClassName "profile-body__main" ]
                   ]
                   [ -- ── Username card ────────────────────────────
                     HH.div [ HP.classes [ ClassName "profile-section" ] ]
@@ -361,7 +365,7 @@ component =
                   ]
 
               -- RIGHT COLUMN: Groups & Roles
-              , HH.div [ HP.classes [ HB.colLg4 ] ]
+              , HH.div [ HP.classes [ ClassName "profile-body__sidebar" ] ]
                   [ HH.div [ HP.classes [ ClassName "profile-section" ] ]
                       [ HH.div
                           [ HP.classes [ ClassName "profile-section__header" ] ]
@@ -481,6 +485,10 @@ component =
           pure unit
     HideSavedToast -> H.modify_ _ { showSavedToast = Nothing }
     HideNotYetImplementedToast -> H.modify_ _ { showNotYetImplementedToast = false }
+    GoBack -> do
+      state <- H.get
+      if state.isYourProfile then navigate Home
+      else navigate AdminUsers
     SendResetLink -> do
       maybeUser <- getUser
       case maybeUser of
