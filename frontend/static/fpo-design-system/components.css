@@ -243,6 +243,16 @@
   color: var(--fpo-text-primary);
 }
 
+.btn-outline-success {
+  background: transparent;
+  color: var(--fpo-success);
+  border-color: var(--fpo-success);
+}
+.btn-outline-success:hover {
+  background: var(--fpo-success);
+  color: var(--fpo-text-inverse);
+}
+
 .btn-outline-danger {
   background: transparent;
   color: var(--fpo-danger);

@@ -365,7 +365,7 @@ renderHistoryItem state index item =
           [ HH.span
               [ HP.classes
                   [ HB.badge
-                  , if isTreeItem then HB.bgInfo else HB.bgSuccess
+                  , if isTreeItem then HB.textBgInfo else HB.textBgSuccess
                   , HB.me2
                   ]
               ]

@@ -374,7 +374,7 @@ splitview = connect selectTranslator $ H.mkComponent
           , HP.style $
               "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
                 <>
-                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
+                  "%; box-sizing: border-box; min-width: 6ch; background: var(--fpo-bg-secondary); position: relative;"
                 <>
                   if
                     not state.resizeState.sidebarClosed && not
@@ -383,12 +383,21 @@ splitview = connect selectTranslator $ H.mkComponent
                   else
                     "display: none;"
           ]
-          [ closeButton CloseComment
-          , HH.h4
+          [ HH.div
               [ HP.style
-                  "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
+                  "display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0.25rem 0.75rem 0.25rem;"
               ]
-              [ HH.text (translate (label :: _ "comment_comment") state.translator) ]
+              [ HH.button
+                  [ HP.classes [ H.ClassName "fpo-back-btn", H.ClassName "fpo-back-btn--inline" ]
+                  , HE.onClick \_ -> CloseComment
+                  ]
+                  [ HH.i [ HP.classes [ H.ClassName "bi-arrow-left" ] ] [] ]
+              , HH.h4
+                  [ HP.style
+                      "margin: 0; font-weight: 600; color: var(--fpo-text-primary); font-size: var(--fpo-text-md);"
+                  ]
+                  [ HH.text (translate (label :: _ "comment_comment") state.translator) ]
+              ]
           , HH.slot _comment unit Comment.commentview unit HandleComment
           ]
       -- CommentOverview
@@ -397,7 +406,7 @@ splitview = connect selectTranslator $ H.mkComponent
           , HP.style $
               "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
                 <>
-                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
+                  "%; box-sizing: border-box; min-width: 6ch; background: var(--fpo-bg-secondary); position: relative;"
                 <>
                   if
                     not state.resizeState.sidebarClosed
@@ -407,13 +416,22 @@ splitview = connect selectTranslator $ H.mkComponent
                   else
                     "display: none;"
           ]
-          [ closeButton $ ToggleCommentOverview false
-          , HH.h4
+          [ HH.div
               [ HP.style
-                  "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
+                  "display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0.25rem 0.75rem 0.25rem;"
               ]
-              [ HH.text
-                  (translate (label :: _ "comment_allComments") state.translator)
+              [ HH.button
+                  [ HP.classes [ H.ClassName "fpo-back-btn", H.ClassName "fpo-back-btn--inline" ]
+                  , HE.onClick \_ -> ToggleCommentOverview false
+                  ]
+                  [ HH.i [ HP.classes [ H.ClassName "bi-arrow-left" ] ] [] ]
+              , HH.h4
+                  [ HP.style
+                      "margin: 0; font-weight: 600; color: var(--fpo-text-primary); font-size: var(--fpo-text-md);"
+                  ]
+                  [ HH.text
+                      (translate (label :: _ "comment_allComments") state.translator)
+                  ]
               ]
           , HH.slot _commentOverview unit CommentOverview.commentOverviewview unit
               HandleCommentOverview

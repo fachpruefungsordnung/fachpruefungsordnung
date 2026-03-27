@@ -135,13 +135,18 @@ type Labels =
       ::: "comment_comment"
       ::: "comment_delete"
       ::: "comment_delete_phrase"
+      ::: "comment_discard"
+      ::: "comment_discard_phrase"
+      ::: "comment_end_of_conversation"
       ::: "comment_modal_delete_titel"
       ::: "comment_modal_resolve_titel"
       ::: "comment_no_timestamp"
+      ::: "comment_placeholder"
       ::: "comment_predated"
       ::: "comment_reanchor"
       ::: "comment_resolve"
       ::: "comment_resolve_phrase"
+      ::: "comment_resolved_notice"
       ::: "comment_send"
 
       -- | Common Phrases

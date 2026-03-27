@@ -3,9 +3,12 @@ module FPO.Components.CommentOverview where
 import Prelude
 
 import Data.Array (partition)
+import Data.DateTime (DateTime)
 import Data.Formatter.DateTime (Formatter)
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
+import Effect.Class (liftEffect)
+import Effect.Now (nowDateTime)
 import FPO.Components.UI.RenderComment (renderFirstComment)
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Store as Store
@@ -35,6 +38,7 @@ data Query a
 type State = FPOState
   ( comments :: Array FirstComment
   , mTimeFormatter :: Maybe Formatter
+  , mCurrentTime :: Maybe DateTime
   , inLatest :: Boolean
   )
 
@@ -49,6 +53,7 @@ commentOverviewview = connect selectTranslator $ H.mkComponent
       { translator: fromFpoTranslator context
       , comments: []
       , mTimeFormatter: Nothing
+      , mCurrentTime: Nothing
       , inLatest: true
       }
   , render
@@ -72,6 +77,7 @@ commentOverviewview = connect selectTranslator $ H.mkComponent
           :: FirstComment -> forall slots. H.ComponentHTML Action slots m
         shortendRenderFirstComment first = renderFirstComment state.translator
           state.mTimeFormatter
+          state.mCurrentTime
           state.inLatest
           true
           (SelectCommentSection first.markerID)
@@ -89,7 +95,8 @@ commentOverviewview = connect selectTranslator $ H.mkComponent
   handleAction = case _ of
 
     Init -> do
-      pure unit
+      now <- liftEffect nowDateTime
+      H.modify_ _ { mCurrentTime = Just now }
 
     Receive { context } -> do
       H.modify_ _ { translator = fromFpoTranslator context }

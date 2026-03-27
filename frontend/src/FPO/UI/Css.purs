@@ -512,6 +512,9 @@ btnOutlineInfo = ClassName "btn-outline-info"
 btnOutlineLight :: ClassName
 btnOutlineLight = ClassName "btn-outline-light"
 
+btnOutlineSuccess :: ClassName
+btnOutlineSuccess = ClassName "btn-outline-success"
+
 btnOutlinePrimary :: ClassName
 btnOutlinePrimary = ClassName "btn-outline-primary"
 

@@ -1,42 +1,38 @@
 :root {
-  /* --- Comment sticky note --- */
-  --comment-bg-default: #fff9c4; /* Post-it yellow */
-  --comment-bg-hover: #fff3a6; /* a bit darker */
-  --comment-border: #ffe08a; /* edge */
-  --comment-text: #212529; /* standard text */
-  --comment-shadow: 0 0 0 1.5px #000;
-  --comment-radius: 10px;
+  /* --- Comment card --- */
+  --comment-bg-default: var(--fpo-bg-elevated);
+  --comment-bg-hover: var(--fpo-bg-secondary);
+  --comment-border: var(--fpo-border-subtle);
+  --comment-text: var(--fpo-text-primary);
+  --comment-shadow: var(--fpo-shadow-xs);
+  --comment-radius: var(--fpo-radius-lg);
 
-  /* --- Comment status backgrounds --- */
-  --comment-bg-first: #ffff00e6;
-  --comment-bg-resolved: #42fa00;
-  --comment-bg-problem: #fd7e14;
-  --comment-bg-outdated: #0099ff;
+  /* --- Comment status accent (left-border color) --- */
+  --comment-accent-default: var(--fpo-accent);
+  --comment-accent-resolved: var(--fpo-success);
+  --comment-accent-problem: var(--fpo-warning);
+  --comment-accent-outdated: var(--fpo-info);
 
-  /* --- Accent colors (for Icons/Badges/Left-border) --- */
-  --accent-resolved: #198754;
-  --accent-problem: #fd7e14;
-  --accent-outdated: #0099ff;
+  /* Legacy aliases used by other code */
+  --comment-bg-first: var(--fpo-bg-elevated);
+  --comment-bg-resolved: var(--fpo-bg-elevated);
+  --comment-bg-problem: var(--fpo-bg-elevated);
+  --comment-bg-outdated: var(--fpo-bg-elevated);
+  --accent-resolved: var(--fpo-success);
+  --accent-problem: var(--fpo-warning);
+  --accent-outdated: var(--fpo-info);
 
   /* --- Ace editor marker --- */
-  --marker-bg: var(--comment-bg-first);
-  --active-line-bg: #ffff0026;
-  --handle-bg: #ffbb00;
+  --marker-bg: var(--fpo-accent-subtle);
+  --active-line-bg: rgba(79, 70, 229, 0.06);
+  --handle-bg: var(--fpo-accent-muted);
 
-  /* --- Buttons --- */
-  --btn-orange: #fd7e14;
-  --btn-orange-hover: #e96b0c;
-  --btn-orange-rgb: 253, 126, 20;
+  /* --- Comment action buttons --- */
+  --btn-orange: var(--fpo-warning);
+  --btn-orange-hover: #c05e00;
+  --btn-orange-rgb: 217, 119, 6;
 
-  --btn-blue: #0099ff;
-  --btn-blue-hover: #0b5ed7;
-  --btn-blue-rgb: 0, 153, 255;
-  --toolbar-btn-bg: var(--fpo-bg-secondary);
-  --toolbar-btn-border: var(--fpo-border-default);
-  --toolbar-btn-color: var(--fpo-text-primary);
-  --toolbar-btn-hover-bg: var(--fpo-bg-tertiary);
-  --toolbar-btn-hover-border: var(--fpo-border-strong);
-  --toolbar-btn-hover-color: var(--fpo-text-primary);
-  --toolbar-btn-active-bg: var(--fpo-border-default);
-  --toolbar-btn-active-border: var(--fpo-border-strong);
+  --btn-blue: var(--fpo-info);
+  --btn-blue-hover: #0670a3;
+  --btn-blue-rgb: 8, 145, 178;
 }

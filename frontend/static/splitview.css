@@ -1,60 +1,115 @@
+/* --------------------------------------------------------------------------
+   Splitview Resizer — the vertical drag bar between panels
+   -------------------------------------------------------------------------- */
+
 .splitview-resizer {
-  width: 5px;
+  width: 4px;
   cursor: col-resize;
-  background: var(--fpo-border-default);
+  background: var(--fpo-border-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+  flex-shrink: 0;
+  transition: background var(--fpo-transition-fast);
 }
+
+.splitview-resizer:hover {
+  background: var(--fpo-accent-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Resizer Toggle Button — small pill to collapse/expand a panel
+   -------------------------------------------------------------------------- */
 
 .splitview-resizer-toggle-btn {
   background: var(--fpo-bg-elevated);
   border: 1px solid var(--fpo-border-default);
-  padding: 0.1rem 0.1rem;
-  font-size: 8px;
-  font-weight: bold;
+  padding: 0;
+  font-size: 0;
+  font-weight: 600;
   line-height: 1;
-  color: var(--fpo-text-secondary);
-  border-radius: 3px;
+  color: var(--fpo-text-tertiary);
+  border-radius: var(--fpo-radius-full);
   cursor: pointer;
-  height: 40px;
-  width: 8px;
+  height: 32px;
+  width: 6px;
   position: relative;
-  z-index: 1000;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--fpo-shadow-xs);
   transition:
-    width 140ms ease,
-    height 140ms ease,
-    transform 140ms ease,
-    font-size 140ms ease;
+    width var(--fpo-transition-fast),
+    height var(--fpo-transition-fast),
+    font-size var(--fpo-transition-fast),
+    transform var(--fpo-transition-fast),
+    color var(--fpo-transition-fast),
+    border-color var(--fpo-transition-fast),
+    box-shadow var(--fpo-transition-fast);
 }
 
+.splitview-resizer-toggle-btn:hover {
+  border-color: var(--fpo-accent-muted);
+  color: var(--fpo-accent);
+  box-shadow: var(--fpo-shadow-sm);
+}
+
+/* When panel is collapsed, the button grows to show the arrow */
 .splitview-resizer-toggle-btn--closed {
-  width: 16px;
-  height: 56px;
-  font-size: 11px;
-  border-width: 1px;
-  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.18);
+  width: 18px;
+  height: 48px;
+  font-size: var(--fpo-text-sm);
+  border-color: var(--fpo-border-default);
+  box-shadow: var(--fpo-shadow-sm);
+  color: var(--fpo-text-secondary);
+}
+
+.splitview-resizer-toggle-btn--closed:hover {
+  background: var(--fpo-accent-subtle);
+  border-color: var(--fpo-accent-muted);
+  color: var(--fpo-accent);
 }
 
 .splitview-resizer-toggle-btn--left.splitview-resizer-toggle-btn--closed {
-  transform: translateX(7px);
+  transform: translateX(8px);
 }
 
 .splitview-resizer-toggle-btn--right.splitview-resizer-toggle-btn--closed {
-  transform: translateX(-7px);
+  transform: translateX(-8px);
 }
+
+/* --------------------------------------------------------------------------
+   Panel Close Button — positioned in the preview header
+   -------------------------------------------------------------------------- */
 
 .splitview-close-btn {
   position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  background-color: var(--fpo-danger-subtle);
-  color: var(--fpo-danger);
-  padding: 0.2rem 0.4rem;
-  font-size: 0.75rem;
+  top: var(--fpo-space-2);
+  right: var(--fpo-space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: var(--fpo-bg-secondary);
+  color: var(--fpo-text-tertiary);
+  border: 1px solid var(--fpo-border-subtle);
+  border-radius: var(--fpo-radius-full);
+  font-size: var(--fpo-text-sm);
   line-height: 1;
-  border: 1px solid var(--fpo-danger);
-  border-radius: 0.2rem;
-  z-index: 1100;
+  cursor: pointer;
+  z-index: 10;
+  transition:
+    background var(--fpo-transition-fast),
+    color var(--fpo-transition-fast),
+    border-color var(--fpo-transition-fast);
+}
+
+.splitview-close-btn:hover {
+  background: var(--fpo-danger-subtle);
+  color: var(--fpo-danger);
+  border-color: var(--fpo-danger);
 }

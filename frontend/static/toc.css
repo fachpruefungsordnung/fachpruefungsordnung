@@ -2,12 +2,13 @@
 .toc-drag-handle,
 .toc-add-wrapper {
   opacity: 0;
-  transition: opacity 0.15s ease;
+  transition: opacity var(--fpo-transition-fast);
 }
 
 .toc-item {
   padding-top: 2px;
   padding-bottom: 2px;
+  border-left: 3px solid transparent;
 }
 
 /* Show drag handles and add buttons on hover */
@@ -18,12 +19,17 @@
 
 /* Hover effects for toc items */
 .toc-item:hover {
-  background-color: var(--fpo-bg-tertiary) !important;
+  background: var(--fpo-bg-secondary);
+  border-left-color: var(--fpo-accent-muted);
 }
 
 .toc-item.active {
   background-color: var(--fpo-accent-subtle) !important;
   color: var(--fpo-accent) !important;
+}
+
+.toc-item.text-primary {
+  border-left-color: var(--fpo-accent);
 }
 
 /* Always show add button in header */
@@ -75,11 +81,11 @@
 .toc-button {
   padding: 0.125rem 0.375rem;
   font-size: 1.1rem;
-  border-radius: 3px;
+  border-radius: var(--fpo-radius-sm);
   border: none;
   background: transparent;
   color: var(--fpo-text-tertiary);
-  transition: all 0.15s ease;
+  transition: all var(--fpo-transition-fast);
   aspect-ratio: 1 / 1;
   height: 1.3em;
   display: inline-flex;
@@ -93,13 +99,13 @@
 }
 
 .toc-button.btn-success:hover {
-  background: #d4edda;
-  color: #155724;
+  background: var(--fpo-success-subtle);
+  color: var(--fpo-success);
 }
 
 .toc-button.btn-danger:hover {
-  background: #f8d7da;
-  color: #721c24;
+  background: var(--fpo-danger-subtle);
+  color: var(--fpo-danger);
 }
 
 /* ********** Drag and drop ********** */
@@ -116,7 +122,7 @@
   margin: 0 0.75rem;
   background: transparent;
   border-radius: 1px;
-  transition: all 0.15s ease;
+  transition: all var(--fpo-transition-fast);
 }
 
 .drop-zone.active {
@@ -126,7 +132,7 @@
 }
 
 .drop-zone.blocked {
-  background: #aaaaaa;
+  background: var(--fpo-border-default);
   height: 2px;
   margin: 0.25rem 0.75rem;
 }
@@ -135,8 +141,8 @@
 
 .drop-zone-end {
   transition:
-    height 0.2s ease,
-    margin 0.2s ease;
+    height var(--fpo-transition-normal),
+    margin var(--fpo-transition-normal);
   position: relative;
   height: 0;
   overflow: hidden;
@@ -146,18 +152,18 @@
 
 .drop-zone-end.preview {
   height: 18px;
-  background-color: rgba(168, 214, 255, 0.1);
+  background-color: var(--fpo-accent-subtle);
   margin: 1px 0.75rem;
-  border: 1px dashed #c6e4ff;
-  border-radius: 3px;
+  border: 1px dashed var(--fpo-accent-muted);
+  border-radius: var(--fpo-radius-sm);
 }
 
 .drop-zone-end.active {
   height: 32px;
   background-color: rgba(37, 99, 235, 0.1);
   margin: 2px 0.75rem;
-  border: 1px dashed var(--fpo-accent);
-  border-radius: 3px;
+  border: 1px dashed var(--fpo-accent-muted);
+  border-radius: var(--fpo-radius-sm);
 }
 
 .drop-zone-end::after {
@@ -170,7 +176,7 @@
   color: var(--fpo-text-tertiary);
   white-space: nowrap;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--fpo-transition-normal);
   pointer-events: none;
 }
 
