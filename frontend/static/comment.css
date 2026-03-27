@@ -306,7 +306,7 @@
   gap: var(--fpo-space-2);
 }
 
-/* Discard popover */
+/* Popover — base (opens upward by default) */
 .fpo-discard-popover {
   position: absolute;
   bottom: calc(100% + 6px);
@@ -319,6 +319,24 @@
   z-index: 100;
   min-width: 180px;
   animation: fpo-popover-in 150ms ease;
+}
+
+/* Popover — opens downward (for header buttons) */
+.fpo-discard-popover--down {
+  bottom: auto;
+  top: calc(100% + 6px);
+  animation: fpo-popover-in-down 150ms ease;
+}
+
+@keyframes fpo-popover-in-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes fpo-popover-in {
@@ -363,6 +381,37 @@
     margin-left: var(--fpo-space-2);
   }
 }
+
+/* --------------------------------------------------------------------------
+   Sidebar button label — hidden via container query when panel is narrow
+   -------------------------------------------------------------------------- */
+
+.fpo-sidebar-panel {
+  container-type: inline-size;
+}
+
+.fpo-btn-label {
+  display: inline;
+}
+
+/* When the sidebar panel shrinks below 220px, hide all button text labels */
+@container (max-width: 320px) {
+  .fpo-btn-label {
+    display: none;
+  }
+}
+
+/* Resolve button in header */
+.fpo-resolve-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------------------------
+   Reduced motion
+   -------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
   .fpo-comment {

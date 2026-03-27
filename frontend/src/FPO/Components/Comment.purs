@@ -29,7 +29,6 @@ import FPO.Types
   , sectionDtoToCS
   , updateFirstCommentProblem
   )
-import FPO.UI.HTML (addModal)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -49,6 +48,7 @@ data Output
   | ToDeleteComment Int Boolean
   | UpdatedComments (Array FirstComment) Boolean
   | SetReAnchor (Maybe CommentSection)
+  | ShowResolveButton Boolean
 
 data Action
   = Init
@@ -73,6 +73,7 @@ data Query a
   | UpdateComment (Array Int) a
   | ReaddedAnchor a
   | UpdateCommentProblem Int a
+  | RequestResolve a
 
 type State = FPOState
   ( docID :: Int
@@ -137,24 +138,7 @@ commentview = connect selectTranslator $ H.mkComponent
         HH.text ""
     Just commentSection ->
       HH.div [ HP.style "padding: 0 0.25rem;" ]
-        ( -- Resolve button at top when in an unresolved existing thread
-          ( if (not commentSection.resolved) && (not state.newComment) then
-              [ HH.div [ HP.style "padding: 0.25rem 0.25rem 0.5rem;" ]
-                  [ HH.button
-                      [ HP.classes
-                          [ HB.btn, HB.btnSm, H.ClassName "btn-outline-success" ]
-                      , HP.style "width: 100%;"
-                      , HE.onClick \_ -> RequestModal Resolve
-                      ]
-                      [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ], HP.style "margin-right: 0.35rem;" ] []
-                      , HH.text
-                          (translate (label :: _ "comment_resolve") state.translator)
-                      ]
-                  ]
-              ]
-            else []
-          )
-            <> renderComments state commentSection
+        ( renderComments state commentSection
             <>
               -- "Resolved" notice when thread is resolved
               ( if commentSection.resolved then
@@ -224,28 +208,19 @@ commentview = connect selectTranslator $ H.mkComponent
               ]
           , HH.div
               [ HP.classes [ H.ClassName "fpo-comment-input__actions" ] ]
-              [ -- Send button
-                HH.button
-                  [ HP.classes [ HB.btn, HB.btnSm, HB.btnPrimary ]
-                  , HP.style "white-space: nowrap;"
-                  , HE.onClick \_ -> SendComment
-                  ]
-                  [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-send" ], HP.style "margin-right: 0.35rem;" ] []
-                  , HH.text
-                      (translate (label :: _ "comment_send") state.translator)
-                  ]
-
-              -- Discard button (new comment) — uses popover confirmation
-              , if state.newComment then
-                  HH.div [ HP.style "margin-left: auto; position: relative;" ]
+              [ -- Discard button (new comment, left side) — uses popover confirmation
+                if state.newComment then
+                  HH.div [ HP.style "position: relative;" ]
                     ( [ HH.button
                           [ HP.classes [ HB.btn, HB.btnSm, H.ClassName "btn-outline-danger" ]
                           , HP.style "white-space: nowrap;"
                           , HE.onClick \_ -> ShowDiscardPopover
                           ]
                           [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ], HP.style "margin-right: 0.35rem;" ] []
-                          , HH.text
-                              (translate (label :: _ "comment_discard") state.translator)
+                          , HH.span [ HP.classes [ H.ClassName "fpo-btn-label" ] ]
+                              [ HH.text
+                                  (translate (label :: _ "comment_discard") state.translator)
+                              ]
                           ]
                       ] <>
                         if state.showDiscardPopover then
@@ -276,44 +251,26 @@ commentview = connect selectTranslator $ H.mkComponent
                     )
                 else
                   HH.text ""
+
+              -- Send button (right side)
+              , HH.button
+                  [ HP.classes [ HB.btn, HB.btnSm, HB.btnPrimary ]
+                  , HP.style "white-space: nowrap; margin-left: auto;"
+                  , HE.onClick \_ -> SendComment
+                  ]
+                  [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-send" ], HP.style "margin-right: 0.35rem;" ] []
+                  , HH.span [ HP.classes [ H.ClassName "fpo-btn-label" ] ]
+                      [ HH.text
+                          (translate (label :: _ "comment_send") state.translator)
+                      ]
+                  ]
               ]
           ]
       )
     where
     renderModal = case state.requestModal of
       Nothing -> []
-      Just Resolve ->
-        let
-          titel = translate (label :: _ "comment_modal_resolve_titel") state.translator
-          phrase = translate (label :: _ "comment_resolve_phrase") state.translator
-          confirmButton = translate (label :: _ "common_resolve") state.translator
-        in
-          [ addModal
-              titel
-              CancelModal
-              DoNothing
-              [ HH.div
-                  [ HP.classes [ HB.modalBody ] ]
-                  [ HH.text phrase ]
-              , HH.div
-                  [ HP.classes [ HB.modalFooter ] ]
-                  [ HH.button
-                      [ HP.type_ HP.ButtonButton
-                      , HP.classes [ HB.btn, HB.btnSecondary ]
-                      , HE.onClick (const CancelModal)
-                      ]
-                      [ HH.text
-                          (translate (label :: _ "common_cancel") state.translator)
-                      ]
-                  , HH.button
-                      [ HP.type_ HP.ButtonButton
-                      , HP.classes [ HB.btn, HB.btnSuccess ]
-                      , HE.onClick (const ResolveComment)
-                      ]
-                      [ HH.text confirmButton ]
-                  ]
-              ]
-          ]
+      Just Resolve -> []
       Just Delete -> []  -- Delete no longer uses modal, uses popover instead
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
@@ -411,6 +368,7 @@ commentview = connect selectTranslator $ H.mkComponent
           -- Delete it from Editor
           H.raise (ToDeleteComment state.markerID hasProblem)
           H.raise (CommentOverview (map extractFirst newCSs))
+          H.raise (ShowResolveButton false)
 
     DeleteComment -> do
       state <- H.get
@@ -430,6 +388,7 @@ commentview = connect selectTranslator $ H.mkComponent
         , mCommentSection = Nothing
         }
       H.raise (ToDeleteComment state.markerID hasProblem)
+      H.raise (ShowResolveButton false)
 
     SelectingCommentSection markerID -> do
       if markerID == -360 then do
@@ -439,6 +398,7 @@ commentview = connect selectTranslator $ H.mkComponent
           , newComment = true
           }
         H.raise (SetReAnchor Nothing)
+        H.raise (ShowResolveButton false)
       else do
         state <- H.get
         let commentSections = state.commentSections
@@ -452,12 +412,17 @@ commentview = connect selectTranslator $ H.mkComponent
                 }
               let reAnchor = if section.hasProblem then Just section else Nothing
               H.raise (SetReAnchor reAnchor)
+              H.raise (ShowResolveButton (not section.resolved))
         else do
           let
             reAnchor =
               state.mCommentSection >>= \cs ->
                 if cs.hasProblem then Just cs else Nothing
+            showResolve = case state.mCommentSection of
+              Just cs -> not cs.resolved
+              Nothing -> false
           H.raise (SetReAnchor reAnchor)
+          H.raise (ShowResolveButton showResolve)
 
     RequestModal mode -> do
       H.modify_ _ { requestModal = Just mode }
@@ -485,6 +450,7 @@ commentview = connect selectTranslator $ H.mkComponent
         , mCommentSection = Nothing
         , newComment = true
         }
+      H.raise (ShowResolveButton false)
       pure (Just a)
 
     ReceiveTimeFormatter mTimeFormatter a -> do
@@ -513,6 +479,7 @@ commentview = connect selectTranslator $ H.mkComponent
           , inLatest = inLatest
           }
         H.raise (SendAbstractedComments fs hasProblem)
+        H.raise (ShowResolveButton false)
       else do
         let
           commentSections = map
@@ -529,6 +496,7 @@ commentview = connect selectTranslator $ H.mkComponent
           , inLatest = inLatest
           }
         H.raise (SendAbstractedComments fs hasProblem)
+        H.raise (ShowResolveButton false)
       pure (Just a)
 
     SelectedCommentSection markerID a -> do
@@ -597,6 +565,10 @@ commentview = connect selectTranslator $ H.mkComponent
         pure $ Just a
       else
         pure (Just a)
+
+    RequestResolve a -> do
+      handleAction ResolveComment
+      pure (Just a)
 
   -- Retrieves the comment sections for a given document ID and TOC ID. If
   -- the request fails, an empty array is returned.
