@@ -310,7 +310,7 @@
 .fpo-discard-popover {
   position: absolute;
   bottom: calc(100% + 6px);
-  right: 0;
+  left: 0;
   background: var(--fpo-bg-elevated);
   border: 1px solid var(--fpo-border-default);
   border-radius: var(--fpo-radius-lg);
@@ -361,7 +361,7 @@
   display: flex;
   align-items: center;
   gap: var(--fpo-space-2);
-  justify-content: flex-end;
+  justify-content: space-between;
 }
 
 /* --------------------------------------------------------------------------

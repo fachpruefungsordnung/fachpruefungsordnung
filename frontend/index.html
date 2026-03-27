@@ -3,8 +3,18 @@
   <head>
     <script>
       class RawHtmlElement extends HTMLElement {
+        static get observedAttributes() { return ['html']; }
         connectedCallback() {
-          this.innerHTML = this.getAttribute('html') || '';
+          this._render();
+        }
+        attributeChangedCallback() {
+          this._render();
+        }
+        _render() {
+          const html = this.getAttribute('html') || '';
+          if (this.innerHTML !== html) {
+            this.innerHTML = html;
+          }
         }
       }
       customElements.define('raw-html', RawHtmlElement);
