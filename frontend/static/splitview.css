@@ -1,7 +1,3 @@
-/* --------------------------------------------------------------------------
-   Splitview Resizer — the vertical drag bar between panels
-   -------------------------------------------------------------------------- */
-
 .splitview-resizer {
   width: 4px;
   cursor: col-resize;
@@ -17,10 +13,6 @@
 .splitview-resizer:hover {
   background: var(--fpo-accent-muted);
 }
-
-/* --------------------------------------------------------------------------
-   Resizer Toggle Button — small pill to collapse/expand a panel
-   -------------------------------------------------------------------------- */
 
 .splitview-resizer-toggle-btn {
   background: var(--fpo-bg-elevated);
@@ -79,10 +71,6 @@
 .splitview-resizer-toggle-btn--right.splitview-resizer-toggle-btn--closed {
   transform: translateX(-8px);
 }
-
-/* --------------------------------------------------------------------------
-   Panel Close Button — positioned in the preview header
-   -------------------------------------------------------------------------- */
 
 .splitview-close-btn {
   position: absolute;

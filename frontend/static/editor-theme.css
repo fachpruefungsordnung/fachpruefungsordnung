@@ -1,5 +1,4 @@
 :root {
-  /* --- Comment card --- */
   --comment-bg-default: var(--fpo-bg-elevated);
   --comment-bg-hover: var(--fpo-bg-secondary);
   --comment-border: var(--fpo-border-subtle);
@@ -7,13 +6,11 @@
   --comment-shadow: var(--fpo-shadow-xs);
   --comment-radius: var(--fpo-radius-lg);
 
-  /* --- Comment status accent (left-border color) --- */
   --comment-accent-default: var(--fpo-accent);
   --comment-accent-resolved: var(--fpo-success);
   --comment-accent-problem: var(--fpo-warning);
   --comment-accent-outdated: var(--fpo-info);
 
-  /* Legacy aliases used by other code */
   --comment-bg-first: var(--fpo-bg-elevated);
   --comment-bg-resolved: var(--fpo-bg-elevated);
   --comment-bg-problem: var(--fpo-bg-elevated);
@@ -27,7 +24,6 @@
   --active-line-bg: rgba(79, 70, 229, 0.06);
   --handle-bg: var(--fpo-accent-muted);
 
-  /* --- Comment action buttons --- */
   --btn-orange: var(--fpo-warning);
   --btn-orange-hover: #c05e00;
   --btn-orange-rgb: 217, 119, 6;

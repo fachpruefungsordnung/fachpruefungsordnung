@@ -1,27 +1,3 @@
-/* --------------------------------------------------------------------------
-   Global App Background
-   Brings the landing-page hero narrative to the entire application.
-
-   Design rationale
-   ────────────────
-   The landing hero uses a rich indigo→purple gradient with three animated
-   orbs (indigo #a5b4fc, purple #c084fc, cyan #67e8f9) plus a noise-grain
-   overlay.  For the inner pages we carry the same DNA but "quiet" it to
-   ~15-20 % intensity so content stays king.  Think of it as the hero
-   gradient settling into an ambient wash.
-
-   Key elements:
-     1. Angled gradient base that echoes the hero palette at very low opacity.
-     2. A top "horizon" gradient stripe where the hero's colour bleeds into
-        the page, creating a seamless visual bridge from navbar downward.
-     3. Four animated orbs — the original three (indigo, purple, cyan) plus
-        a warm rose/amber accent for asymmetric interest.
-     4. SVG noise texture for tactile depth (same as hero).
-     5. Slower, more ambient animation timing than the hero.
-   -------------------------------------------------------------------------- */
-
-/* ── Container ───────────────────────────────────────────────────────────── */
-
 .fpo-global-bg {
   position: fixed;
   inset: 0;
@@ -29,23 +5,15 @@
   overflow: hidden;
   pointer-events: none;
 
-  /* Subtle angled gradient base — echoes the hero direction (160deg)
-       but at barely-there tints so it feels like a whisper, not a shout. */
   background: linear-gradient(
     160deg,
     hsl(240 40% 97%) 0%,
-    /* very faint indigo-tinted white  */ hsl(245 30% 97.5%) 25%,
-    /* barely-there deep indigo hint  */ var(--fpo-bg-secondary) 50%,
-    /* neutral anchor in the middle   */ hsl(250 25% 97%) 75%,
-    /* faint violet-blue tint         */ hsl(255 20% 97.5%) 100%
-      /* ends with the slightest lilac  */
+    hsl(245 30% 97.5%) 25%,
+    var(--fpo-bg-secondary) 50%,
+    hsl(250 25% 97%) 75%,
+    hsl(255 20% 97.5%) 100%
   );
 }
-
-/* ── Top Horizon Gradient ────────────────────────────────────────────────
-   A soft colour bleed along the very top of the viewport, as if the hero's
-   deep indigo palette still lingers just beyond the navbar.
-   Uses ::before so it sits under the noise layer but above the base. */
 
 .fpo-global-bg::before {
   content: "";
@@ -57,16 +25,12 @@
   background: linear-gradient(
     180deg,
     hsla(243, 55%, 55%, 0.06) 0%,
-    /* faint indigo (hero mid-tone)  */ hsla(250, 50%, 60%, 0.03) 40%,
-    /* lighter transition            */ transparent 100%
+    hsla(250, 50%, 60%, 0.03) 40%,
+    transparent 100%
   );
   pointer-events: none;
   z-index: 0;
 }
-
-/* ── Noise Texture ───────────────────────────────────────────────────────
-   Identical grain to the hero section — gives the flat gradients a subtle
-   "printed-paper" feel.  Sits on top of everything via z-index. */
 
 .fpo-global-bg__noise {
   position: absolute;
@@ -75,11 +39,6 @@
   pointer-events: none;
   z-index: 2;
 }
-
-/* ── Orbs (shared base) ──────────────────────────────────────────────────
-   Slower float speed than the hero for a meditative, ambient quality.  The
-   orbs are large, heavily blurred, and low-opacity — a pastel glow rather
-   than a solid shape. */
 
 .fpo-global-bg__orb {
   position: absolute;
@@ -90,8 +49,6 @@
   will-change: transform;
   z-index: 0;
 }
-
-/* ── Orb 1 — Indigo  (hero: #a5b4fc)  ─ top-right ──────────────────── */
 
 .fpo-global-bg__orb--1 {
   width: 650px;
@@ -107,8 +64,6 @@
   animation: fpo-global-orb-1 26s ease-in-out infinite;
 }
 
-/* ── Orb 2 — Purple  (hero: #c084fc)  ─ bottom-left ────────────────── */
-
 .fpo-global-bg__orb--2 {
   width: 550px;
   height: 550px;
@@ -122,8 +77,6 @@
   left: -8%;
   animation: fpo-global-orb-2 30s ease-in-out infinite;
 }
-
-/* ── Orb 3 — Cyan  (hero: #67e8f9)  ─ centre ───────────────────────── */
 
 .fpo-global-bg__orb--3 {
   width: 420px;
@@ -140,27 +93,19 @@
   animation: fpo-global-orb-3 22s ease-in-out infinite;
 }
 
-/* ── Orb 4 — Rose / Amber accent  ─ right-centre ────────────────────
-   Warm complement that breaks the exclusively-cool palette and adds a
-   gentle sunrise-like glow to the right side of the viewport. */
-
 .fpo-global-bg__orb--4 {
   width: 380px;
   height: 380px;
   background: radial-gradient(
     circle,
     rgba(251, 146, 160, 0.35) 0%,
-    /* rose-300 */ rgba(251, 191, 146, 0.12) 45%,
-    /* amber-200 */ transparent 70%
+    rgba(251, 191, 146, 0.12) 45%,
+    transparent 70%
   );
   top: 20%;
   right: 15%;
   animation: fpo-global-orb-4 28s ease-in-out infinite;
 }
-
-/* ── Keyframes ──────────────────────────────────────────────────────────
-   Intentionally slower & with smaller travel distances than the hero
-   counterparts so they feel calm and ambient. */
 
 @keyframes fpo-global-orb-1 {
   0%,
@@ -217,10 +162,6 @@
   }
 }
 
-/* ── Responsive ─────────────────────────────────────────────────────────
-   On smaller screens: shrink orbs, reduce blur so they stay visible but
-   don't overwhelm narrow viewports. */
-
 @media (max-width: 767.98px) {
   .fpo-global-bg__orb {
     filter: blur(70px);
@@ -247,8 +188,6 @@
     height: 200px;
   }
 }
-
-/* ── Accessibility ──────────────────────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
   .fpo-global-bg__orb {

@@ -1,15 +1,7 @@
-/* --------------------------------------------------------------------------
-   Preview iframe — remove default browser border
-   -------------------------------------------------------------------------- */
-
 iframe {
   border: none;
   background: var(--fpo-bg-primary);
 }
-
-/* --------------------------------------------------------------------------
-   ACE Editor — visual refinements
-   -------------------------------------------------------------------------- */
 
 .ace_editor {
   font-family: var(--fpo-font-mono) !important;
@@ -43,10 +35,10 @@ iframe {
 .ace_marker-layer .fpo-handle-start,
 .ace_marker-layer .fpo-handle-end {
   position: absolute;
-  background: transparent; /* Text nicht überdecken */
-  cursor: grab !important; /* Hand-Cursor */
-  pointer-events: auto; /* Klickbar */
-  user-select: none; /* keine Textauswahl */
+  background: transparent;
+  cursor: grab !important;
+  pointer-events: auto;
+  user-select: none;
   z-index: 4;
 }
 
@@ -75,7 +67,6 @@ iframe {
   cursor: grabbing;
 }
 
-/* To make not mark the text underneath the dragged comment section */
 .ace_editor.fpo-dragging .ace_selection,
 .ace_editor.fpo-dragging .ace_marker-layer .ace_selected-word {
   background: transparent !important;
@@ -92,10 +83,6 @@ iframe {
   z-index: 1;
   background: var(--active-line-bg) !important;
 }
-
-/* --------------------------------------------------------------------------
-   Editor Toolbar Buttons
-   -------------------------------------------------------------------------- */
 
 .editor-toolbar-btn {
   border-radius: var(--fpo-radius-md);
@@ -145,14 +132,12 @@ iframe {
   font-weight: 600;
 }
 
-/* Default (non-active, non-colored) button */
 .editor-toolbar-btn--default {
   background: var(--fpo-bg-secondary);
   border-color: var(--fpo-border-subtle);
   color: var(--fpo-text-primary);
 }
 
-/* Hover for all non-active, non-colored toolbar buttons */
 .editor-toolbar-btn:not(.toolbar-btn--active):not(.btn-orange):not(.btn-blue):not(
     :disabled
   ):hover {
@@ -170,7 +155,6 @@ iframe {
   cursor: not-allowed;
 }
 
-/* Active (toggled-on) state */
 .toolbar-btn--active {
   background: var(--fpo-accent);
   border-color: var(--fpo-accent);
@@ -187,7 +171,6 @@ iframe {
   border-color: var(--fpo-accent-hover);
 }
 
-/* Orange icon accent */
 .editor-toolbar-btn.icon-orange i {
   color: var(--fpo-warning);
 }

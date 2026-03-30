@@ -1,47 +1,35 @@
-/* ==========================================================================
-   User Hover-Dropdown
-   Sits inside the navbar — opens on hover, profile link on click.
-   The generic padding-based hover zone in dropdown.css keeps the mouse
-   connected between toggle and menu; this file only adds appearance
-   tweaks and the profile-link styling.
-   ========================================================================== */
-
-/* --- Menu appearance ----------------------------------------------------- */
-
 .user-hover-dropdown .dropdown-menu {
-    min-width: 120px;
+  min-width: 120px;
 }
 
 .user-hover-dropdown .dropdown-item {
-    font-size: var(--fpo-text-base);
-    padding: var(--fpo-space-2) var(--fpo-space-4);
+  font-size: var(--fpo-text-base);
+  padding: var(--fpo-space-2) var(--fpo-space-4);
 }
 
-/* --- Profile link (the toggle) ------------------------------------------- */
-
 .user-profile-link {
-    position: relative;
-    cursor: pointer;
-    transition: color var(--fpo-transition-fast);
-    text-decoration: none;
+  position: relative;
+  cursor: pointer;
+  transition: color var(--fpo-transition-fast);
+  text-decoration: none;
 }
 
 .user-profile-link:hover {
-    color: var(--fpo-accent) !important;
+  color: var(--fpo-accent) !important;
 }
 
 /* Animated underline on hover */
 .user-profile-link::after {
-    content: "";
-    position: absolute;
-    bottom: 2px;
-    left: 0;
-    width: 0;
-    height: 2px;
-    background-color: var(--fpo-accent-muted);
-    transition: width 0.25s ease;
+  content: "";
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background-color: var(--fpo-accent-muted);
+  transition: width 0.25s ease;
 }
 
 .user-profile-link:hover::after {
-    width: 100%;
+  width: 100%;
 }

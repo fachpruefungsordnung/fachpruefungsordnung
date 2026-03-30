@@ -1,13 +1,3 @@
-/* ==========================================================================
-   FPO Design System — Data List
-   Unified component for all list / data views (projects, users, groups …).
-   Uses FPO design tokens exclusively — see tokens.css for values.
-   ========================================================================== */
-
-/* --------------------------------------------------------------------------
-   Container
-   -------------------------------------------------------------------------- */
-
 .fpo-data-list {
   background: var(--fpo-bg-elevated);
   border: 1px solid var(--fpo-border-subtle);
@@ -19,10 +9,6 @@
   box-shadow: var(--fpo-shadow-md);
   border-color: var(--fpo-border-default);
 }
-
-/* --------------------------------------------------------------------------
-   Header
-   -------------------------------------------------------------------------- */
 
 .fpo-data-list__header {
   display: flex;
@@ -63,10 +49,6 @@
   gap: var(--fpo-space-2);
   flex-shrink: 0;
 }
-
-/* --------------------------------------------------------------------------
-   Search
-   -------------------------------------------------------------------------- */
 
 .fpo-data-list__search {
   padding: var(--fpo-space-3) var(--fpo-space-5);
@@ -124,10 +106,6 @@
   color: var(--fpo-accent);
 }
 
-/* --------------------------------------------------------------------------
-   Body
-   -------------------------------------------------------------------------- */
-
 .fpo-data-list__body {
   padding: 0 var(--fpo-space-5);
 }
@@ -135,10 +113,6 @@
 .fpo-data-list__body:last-child {
   padding-bottom: var(--fpo-space-5);
 }
-
-/* --------------------------------------------------------------------------
-   Row
-   -------------------------------------------------------------------------- */
 
 .fpo-data-list__row {
   display: flex;
@@ -165,7 +139,6 @@
   border-left-color: var(--fpo-accent-muted);
 }
 
-/* Clickable modifier */
 .fpo-data-list__row--clickable {
   cursor: pointer;
 }
@@ -177,10 +150,6 @@
 .fpo-data-list__row--clickable:active {
   background: var(--fpo-bg-tertiary);
 }
-
-/* --------------------------------------------------------------------------
-   Row — Info (left side)
-   -------------------------------------------------------------------------- */
 
 .fpo-data-list__row-info {
   display: flex;
@@ -210,7 +179,6 @@
   white-space: nowrap;
 }
 
-/* Clickable rows: make primary text look interactive */
 .fpo-data-list__row--clickable .fpo-data-list__row-primary {
   transition: color var(--fpo-transition-fast);
 }
@@ -218,10 +186,6 @@
 .fpo-data-list__row--clickable:hover .fpo-data-list__row-primary {
   color: var(--fpo-accent);
 }
-
-/* --------------------------------------------------------------------------
-   Row — Meta (middle / right metadata)
-   -------------------------------------------------------------------------- */
 
 .fpo-data-list__row-meta {
   display: flex;
@@ -266,10 +230,6 @@
   color: var(--fpo-danger);
 }
 
-/* --------------------------------------------------------------------------
-   Row — Actions (right side)
-   -------------------------------------------------------------------------- */
-
 .fpo-data-list__row-actions {
   display: flex;
   align-items: center;
@@ -277,7 +237,6 @@
   flex-shrink: 0;
 }
 
-/* Small inline action button (icon-only) */
 .fpo-data-list__action-btn {
   display: inline-flex;
   align-items: center;
@@ -326,10 +285,6 @@
   pointer-events: none;
 }
 
-/* --------------------------------------------------------------------------
-   Footer
-   -------------------------------------------------------------------------- */
-
 .fpo-data-list__footer {
   display: flex;
   align-items: center;
@@ -362,11 +317,6 @@
   color: var(--fpo-text-tertiary);
   white-space: nowrap;
 }
-
-/* --------------------------------------------------------------------------
-   Footer — Pagination Override
-   Smaller, rounder pills with accent styling when nested in data-list.
-   -------------------------------------------------------------------------- */
 
 .fpo-data-list__footer .pagination {
   gap: var(--fpo-space-1);
@@ -403,10 +353,6 @@
   opacity: 0.4;
 }
 
-/* --------------------------------------------------------------------------
-   Empty State
-   -------------------------------------------------------------------------- */
-
 .fpo-data-list__empty {
   display: flex;
   flex-direction: column;
@@ -435,10 +381,6 @@
   margin: 0;
   font-style: italic;
 }
-
-/* --------------------------------------------------------------------------
-   Responsive
-   -------------------------------------------------------------------------- */
 
 @media (max-width: 767.98px) {
   .fpo-data-list__header {
@@ -490,10 +432,6 @@
   }
 }
 
-/* --------------------------------------------------------------------------
-   Back Button (subtle page-level navigation)
-   -------------------------------------------------------------------------- */
-
 .fpo-back-btn {
   position: absolute;
   left: 0;
@@ -526,10 +464,6 @@
 .fpo-back-btn:active {
   transform: translateY(-50%) scale(0.95);
 }
-
-/* --------------------------------------------------------------------------
-   Reduced Motion
-   -------------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
   .fpo-data-list,

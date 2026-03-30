@@ -2,13 +2,12 @@
    IMPORTANT: @import must be at the very top (before all other rules)!
    if you use CSS variables, it must come first */
 
-/* FPO Design System */
-@import url("./fpo-design-system/reset.css");
-@import url("./fpo-design-system/tokens.css");
-@import url("./fpo-design-system/utilities.css");
-@import url("./fpo-design-system/components.css");
-@import url("./fpo-design-system/dropdown.css");
-@import url("./fpo-design-system/icons.css");
+@import url("./page-design/reset.css");
+@import url("./page-design/tokens.css");
+@import url("./page-design/utilities.css");
+@import url("./page-design/components.css");
+@import url("./page-design/dropdown.css");
+@import url("./page-design/icons.css");
 @import url("./backgrounds.css");
 @import url("./data-list.css");
 
