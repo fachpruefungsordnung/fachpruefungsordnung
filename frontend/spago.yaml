@@ -18,7 +18,6 @@ package:
     - foreign
     - formatters
     - halogen
-    - halogen-bootstrap5
     - halogen-store
     - halogen-subscriptions
     - http-methods

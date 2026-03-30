@@ -11,10 +11,10 @@
   bottom: calc(100% + 10px);
   left: 50%;
   transform: translateX(-50%);
-  background: #333;
-  color: white;
+  background: var(--fpo-text-primary);
+  color: var(--fpo-text-inverse);
   padding: 6px 10px;
-  border-radius: 4px;
+  border-radius: var(--fpo-radius-sm);
   font-size: 13px;
   white-space: nowrap;
   z-index: 1000;
@@ -29,13 +29,13 @@
 }
 
 [data-tooltip]::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: calc(100%);
   left: 50%;
   transform: translateX(-50%);
   border: 5px solid transparent;
-  border-top: 5px solid #333;
+  border-top: 5px solid var(--fpo-text-primary);
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s ease-in-out;

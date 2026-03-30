@@ -12,13 +12,13 @@ import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.Css as HB
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 
 data Action

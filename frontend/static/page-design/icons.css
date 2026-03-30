@@ -1,0 +1,51 @@
+.bi {
+  display: inline-block;
+  vertical-align: -0.125em;
+}
+
+i.bi-flag-de,
+i.bi-flag-gb,
+.bi-flag-de.flex-shrink-0,
+.bi-flag-gb.flex-shrink-0,
+.bi-flag-de,
+.bi-flag-gb {
+  font-family: var(--fpo-font-family) !important;
+  font-style: normal !important;
+  font-weight: 700 !important;
+  font-size: 0.6875rem !important;
+  line-height: 1 !important;
+  letter-spacing: 0.02em;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75em;
+  height: 1.35em;
+  padding: 0 0.15em;
+  border-radius: 3px;
+  color: var(--fpo-text-secondary);
+  background: var(--fpo-bg-tertiary);
+  vertical-align: middle;
+  -webkit-font-smoothing: auto;
+}
+
+i.bi-flag-de::before,
+.bi-flag-de.flex-shrink-0::before,
+.bi-flag-de::before {
+  content: "DE" !important;
+  font-family: var(--fpo-font-family) !important;
+  font-weight: 700 !important;
+  font-size: 0.6875rem !important;
+  display: inline !important;
+  -webkit-font-smoothing: auto;
+}
+
+i.bi-flag-gb::before,
+.bi-flag-gb.flex-shrink-0::before,
+.bi-flag-gb::before {
+  content: "EN" !important;
+  font-family: var(--fpo-font-family) !important;
+  font-weight: 700 !important;
+  font-size: 0.6875rem !important;
+  display: inline !important;
+  -webkit-font-smoothing: auto;
+}

@@ -8,7 +8,7 @@ module FPO.Page.Admin.Administration
 
 import Prelude
 
-import Data.Array (filter, length, replicate, slice)
+import Data.Array (filter, length, null, replicate, slice)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Data.String (Pattern(..), contains, toLower)
@@ -39,7 +39,8 @@ import FPO.Dto.UserOverviewDto (UserOverviewDto)
 import FPO.Dto.UserOverviewDto as UOD
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (emptyEntryGen, entryCount, filterInput, loadingSpinner)
+import FPO.UI.Css as HB
+import FPO.UI.HTML (loadingSpinner)
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.UI.Style as Style
 import FPO.Util as Util
@@ -49,9 +50,11 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
+import Web.Event.Event (stopPropagation)
+import Web.UIEvent.MouseEvent (MouseEvent)
+import Web.UIEvent.MouseEvent as MouseEvent
 
 _userPagination = Proxy :: Proxy "userPagination"
 _groupPagination = Proxy :: Proxy "groupPagination"
@@ -74,7 +77,7 @@ data Action
   -- User actions
   | SetUserPage P.Output
   | ChangeUserFilter String
-  | RequestDeleteUser UserOverviewDto
+  | RequestDeleteUser UserOverviewDto MouseEvent
   | ConfirmDeleteUser String
   | CancelDeleteUser
   | NavigateToProfile String
@@ -82,7 +85,7 @@ data Action
   -- Group actions
   | SetGroupPage P.Output
   | ChangeGroupFilter String
-  | RequestDeleteGroup GroupOverview
+  | RequestDeleteGroup GroupOverview MouseEvent
   | ConfirmDeleteGroup GroupID
   | CancelDeleteGroup
   | NavigateToGroupDocuments GroupID
@@ -217,7 +220,8 @@ component =
       H.modify_ _ { userFilter = f }
       filterUsers
 
-    RequestDeleteUser userDto -> do
+    RequestDeleteUser userDto event -> do
+      H.liftEffect $ stopPropagation (MouseEvent.toEvent event)
       H.modify_ _ { requestDeleteUser = Just userDto }
       Util.focusRef modalDeleteUserRef
 
@@ -245,7 +249,8 @@ component =
       H.modify_ _ { groupFilter = f }
       filterGroups
 
-    RequestDeleteGroup groupOverview -> do
+    RequestDeleteGroup groupOverview event -> do
+      H.liftEffect $ stopPropagation (MouseEvent.toEvent event)
       H.modify_ _ { requestDeleteGroup = Just groupOverview }
       Util.focusRef modalDeleteGroupRef
 
@@ -353,105 +358,113 @@ component =
 
   renderUsersList :: State -> H.ComponentHTML Action Slots m
   renderUsersList state =
-    HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-      [ HH.div [ HP.classes [ HB.col12, HB.colLg10 ] ]
-          [ HH.div [ HP.classes [ HB.card ] ]
-              [ HH.div
+    HH.div [ HP.classes [ H.ClassName "fpo-data-list" ] ]
+      [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__header" ] ]
+          [ HH.h5 [ HP.classes [ H.ClassName "fpo-data-list__title" ] ]
+              [ HH.text $ translate (label :: _ "admin_users_listOfUsers")
+                  state.translator
+              ]
+          , HH.div [ HP.classes [ H.ClassName "fpo-data-list__header-actions" ] ]
+              [ HH.button
+                  [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
+                  , HE.onClick $ const NavigateToCreateUser
+                  , Style.popover $ translate (label :: _ "admin_users_createNewUser")
+                      state.translator
+                  ]
+                  [ HH.i [ HP.classes [ H.ClassName "bi-plus-lg", HB.me1 ] ] []
+                  , HH.text $ translate (label :: _ "common_add") state.translator
+                  ]
+              ]
+          ]
+      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__search" ] ]
+          [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__search-wrapper" ] ]
+              [ HH.i
                   [ HP.classes
-                      [ HB.cardHeader
-                      , HB.dFlex
-                      , HB.justifyContentBetween
-                      , HB.alignItemsCenter
+                      [ H.ClassName "bi-search"
+                      , H.ClassName "fpo-data-list__search-icon"
                       ]
                   ]
-                  [ HH.h5 [ HP.classes [ HB.mb0 ] ]
-                      [ HH.text $ translate (label :: _ "admin_users_listOfUsers")
+                  []
+              , HH.input
+                  [ HP.type_ HP.InputText
+                  , HP.classes [ H.ClassName "fpo-data-list__search-input" ]
+                  , HP.placeholder $ translate (label :: _ "admin_users_searchUsers")
+                      state.translator
+                  , HP.value state.userFilter
+                  , HE.onValueInput ChangeUserFilter
+                  ]
+              ]
+          ]
+      , HH.div
+          [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
+          ( if null usrs then
+              [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty" ] ]
+                  [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
+                      [ HH.i [ HP.classes [ H.ClassName "bi-people" ] ] [] ]
+                  , HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-text" ] ]
+                      [ HH.text $ translate (label :: _ "admin_users_noUsersFound")
                           state.translator
-                      ]
-                  , HH.button
-                      [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
-                      , HE.onClick $ const NavigateToCreateUser
-                      , Style.popover $ translate
-                          (label :: _ "admin_users_createNewUser")
-                          state.translator
-                      ]
-                      [ HH.i [ HP.classes [ H.ClassName "bi-plus-lg", HB.me1 ] ] []
-                      , HH.text $ translate (label :: _ "common_add") state.translator
                       ]
                   ]
-              , HH.div [ HP.classes [ HB.cardBody ] ]
-                  [ filterInput
-                      state.userFilter
-                      ( translate (label :: _ "admin_users_searchUsers")
-                          state.translator
+              ]
+            else
+              map (renderUserEntry state) usrs
+                <> placeholderRows usersPerPage (length usrs) userPageCount
+          )
+      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
+          [ HH.slot _userPagination unit P.component userPaginationProps SetUserPage
+          , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
+              [ HH.text $
+                  if length state.filteredUsers == 0 then ""
+                  else show (state.userPage * usersPerPage + 1) <> "–"
+                    <> show
+                      ( min ((state.userPage + 1) * usersPerPage)
+                          (length state.filteredUsers)
                       )
-                      ChangeUserFilter
-                  , HH.ul [ HP.classes [ HB.listGroup, HB.listGroupFlush ] ]
-                      $ map (renderUserEntry state) usrs
-                          <> replicate (usersPerPage - length usrs)
-                            (emptyEntryGen [ emptyUserButtons ])
-                  , HH.slot _userPagination unit P.component userPaginationProps
-                      SetUserPage
-                  , entryCount state.userPage usersPerPage
-                      (length state.filteredUsers)
-                  ]
+                    <> " / "
+                    <> show (length state.filteredUsers)
               ]
           ]
       ]
     where
     usrs = slice (state.userPage * usersPerPage) ((state.userPage + 1) * usersPerPage)
       state.filteredUsers
+    usersPerPage = 10
+    userPageCount = P.calculatePageCount (length state.filteredUsers) usersPerPage
     userPaginationProps =
-      { pages: P.calculatePageCount (length state.filteredUsers) usersPerPage
+      { pages: userPageCount
       , style: P.Compact 1
       , reaction: P.PreservePage
       }
-    usersPerPage = 10
 
   renderUserEntry :: State -> UserOverviewDto -> H.ComponentHTML Action Slots m
   renderUserEntry state userDto =
-    HH.li
+    HH.div
       [ HP.classes
-          [ HB.listGroupItem
-          , HB.dFlex
-          , HB.justifyContentBetween
-          , HB.alignItemsCenter
+          [ H.ClassName "fpo-data-list__row"
+          , H.ClassName "fpo-data-list__row--clickable"
           ]
+      , HE.onClick $ const $ NavigateToProfile $ UOD.getID userDto
       ]
-      [ HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
-          [ HH.span [ HP.classes [ HB.fwBold ] ]
+      [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
+          [ HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-primary" ] ]
               [ HH.text $ UOD.getName userDto ]
-          , HH.small [ HP.classes [ HB.textMuted ] ]
+          , HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-secondary" ] ]
               [ HH.text $ UOD.getEmail userDto ]
           ]
-      , HH.div [ HP.classes [ HB.dFlex, HB.gap2 ] ]
+      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-actions" ] ]
           [ HH.button
-              [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
-              , HE.onClick $ const $ NavigateToProfile $ UOD.getID userDto
-              , Style.popover $ translate (label :: _ "admin_users_goToProfilePage")
-                  state.translator
-              ]
-              [ HH.i [ HP.classes [ H.ClassName "bi-pencil-fill" ] ] [] ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm ]
-              , HE.onClick $ const $ RequestDeleteUser userDto
+              [ HP.classes
+                  [ H.ClassName "fpo-data-list__action-btn"
+                  , H.ClassName "fpo-data-list__action-btn--danger"
+                  ]
+              , HE.onClick $ \e -> RequestDeleteUser userDto e
               , HP.disabled $ state.currentUserID == Just (UOD.getID userDto)
               , Style.popover $ translate (label :: _ "admin_users_deleteUser")
                   state.translator
               ]
               [ HH.i [ HP.classes [ H.ClassName "bi-trash-fill" ] ] [] ]
           ]
-      ]
-
-  emptyUserButtons :: forall w. HH.HTML w Action
-  emptyUserButtons =
-    HH.div [ HP.classes [ HB.dFlex, HB.gap2 ] ]
-      [ HH.button
-          [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm, HB.invisible ] ]
-          [ HH.i [ HP.classes [ H.ClassName "bi-pencil-fill" ] ] [] ]
-      , HH.button
-          [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm, HB.invisible ] ]
-          [ HH.i [ HP.classes [ H.ClassName "bi-trash-fill" ] ] [] ]
       ]
 
   -- Groups Tab
@@ -463,48 +476,74 @@ component =
 
   renderGroupsList :: State -> H.ComponentHTML Action Slots m
   renderGroupsList state =
-    HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-      [ HH.div [ HP.classes [ HB.col12, HB.colLg10 ] ]
-          [ HH.div [ HP.classes [ HB.card ] ]
-              [ HH.div
+    HH.div [ HP.classes [ H.ClassName "fpo-data-list" ] ]
+      [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__header" ] ]
+          [ HH.h5 [ HP.classes [ H.ClassName "fpo-data-list__title" ] ]
+              [ HH.text $ translate (label :: _ "admin_groups_listOfGroups")
+                  state.translator
+              ]
+          , HH.div [ HP.classes [ H.ClassName "fpo-data-list__header-actions" ] ]
+              [ HH.button
+                  [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
+                  , HE.onClick $ const NavigateToCreateGroup
+                  , Style.popover $ translate
+                      (label :: _ "admin_groups_createNewGroup")
+                      state.translator
+                  ]
+                  [ HH.i [ HP.classes [ H.ClassName "bi-plus-lg", HB.me1 ] ] []
+                  , HH.text $ translate (label :: _ "common_add") state.translator
+                  ]
+              ]
+          ]
+      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__search" ] ]
+          [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__search-wrapper" ] ]
+              [ HH.i
                   [ HP.classes
-                      [ HB.cardHeader
-                      , HB.dFlex
-                      , HB.justifyContentBetween
-                      , HB.alignItemsCenter
+                      [ H.ClassName "bi-search"
+                      , H.ClassName "fpo-data-list__search-icon"
                       ]
                   ]
-                  [ HH.h5 [ HP.classes [ HB.mb0 ] ]
-                      [ HH.text $ translate (label :: _ "admin_groups_listOfGroups")
+                  []
+              , HH.input
+                  [ HP.type_ HP.InputText
+                  , HP.classes [ H.ClassName "fpo-data-list__search-input" ]
+                  , HP.placeholder $ translate
+                      (label :: _ "admin_groups_searchForGroups")
+                      state.translator
+                  , HP.value state.groupFilter
+                  , HE.onValueInput ChangeGroupFilter
+                  ]
+              ]
+          ]
+      , HH.div
+          [ HP.classes [ H.ClassName "fpo-data-list__body" ] ]
+          ( if null grps then
+              [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty" ] ]
+                  [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
+                      [ HH.i [ HP.classes [ H.ClassName "bi-collection" ] ] [] ]
+                  , HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-text" ] ]
+                      [ HH.text $ translate (label :: _ "admin_groups_noGroupsFound")
                           state.translator
-                      ]
-                  , HH.button
-                      [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
-                      , HE.onClick $ const NavigateToCreateGroup
-                      , Style.popover $ translate
-                          (label :: _ "admin_groups_createNewGroup")
-                          state.translator
-                      ]
-                      [ HH.i [ HP.classes [ H.ClassName "bi-plus-lg", HB.me1 ] ] []
-                      , HH.text $ translate (label :: _ "common_add") state.translator
                       ]
                   ]
-              , HH.div [ HP.classes [ HB.cardBody ] ]
-                  [ filterInput
-                      state.groupFilter
-                      ( translate (label :: _ "admin_groups_searchForGroups")
-                          state.translator
+              ]
+            else
+              map (renderGroupEntry state) grps
+                <> placeholderRows groupsPerPage (length grps) groupPageCount
+          )
+      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
+          [ HH.slot _groupPagination unit P.component groupPaginationProps
+              SetGroupPage
+          , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
+              [ HH.text $
+                  if length state.filteredGroups == 0 then ""
+                  else show (state.groupPage * groupsPerPage + 1) <> "-"
+                    <> show
+                      ( min ((state.groupPage + 1) * groupsPerPage)
+                          (length state.filteredGroups)
                       )
-                      ChangeGroupFilter
-                  , HH.ul [ HP.classes [ HB.listGroup, HB.listGroupFlush ] ]
-                      $ map (renderGroupEntry state) grps
-                          <> replicate (groupsPerPage - length grps)
-                            (emptyEntryGen [ emptyGroupButtons ])
-                  , HH.slot _groupPagination unit P.component groupPaginationProps
-                      SetGroupPage
-                  , entryCount state.groupPage groupsPerPage
-                      (length state.filteredGroups)
-                  ]
+                    <> " / "
+                    <> show (length state.filteredGroups)
               ]
           ]
       ]
@@ -512,41 +551,36 @@ component =
     grps = slice (state.groupPage * groupsPerPage)
       ((state.groupPage + 1) * groupsPerPage)
       state.filteredGroups
+    groupsPerPage = 10
+    groupPageCount = P.calculatePageCount (length state.filteredGroups) groupsPerPage
     groupPaginationProps =
-      { pages: P.calculatePageCount (length state.filteredGroups) groupsPerPage
+      { pages: groupPageCount
       , style: P.Compact 1
       , reaction: P.PreservePage
       }
-    groupsPerPage = 10
 
   renderGroupEntry :: State -> GroupOverview -> H.ComponentHTML Action Slots m
   renderGroupEntry state groupOverview@(GroupOverview g) =
-    HH.li
+    HH.div
       [ HP.classes
-          [ HB.listGroupItem
-          , HB.dFlex
-          , HB.justifyContentBetween
-          , HB.alignItemsCenter
+          [ H.ClassName "fpo-data-list__row"
+          , H.ClassName "fpo-data-list__row--clickable"
           ]
+      , HE.onClick $ const $ NavigateToGroupDocuments g.groupOverviewID
       ]
-      [ HH.div [ HP.classes [ HB.dFlex, HB.flexColumn, HB.flexGrow1 ] ]
-          [ HH.span [ HP.classes [ HB.fwBold ] ]
+      [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
+          [ HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-primary" ] ]
               [ HH.text g.groupOverviewName ]
-          , HH.small [ HP.classes [ HB.textMuted ] ]
+          , HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-secondary" ] ]
               [ HH.text g.groupOverviewDescription ]
           ]
-      , HH.div [ HP.classes [ HB.dFlex, HB.gap2 ] ]
+      , HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-actions" ] ]
           [ HH.button
-              [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm ]
-              , HE.onClick $ const $ NavigateToGroupDocuments g.groupOverviewID
-              , Style.popover $ translate
-                  (label :: _ "admin_groups_viewDocumentsPage")
-                  state.translator
-              ]
-              [ HH.i [ HP.classes [ H.ClassName "bi-pencil-fill" ] ] [] ]
-          , HH.button
-              [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm ]
-              , HE.onClick $ const $ RequestDeleteGroup groupOverview
+              [ HP.classes
+                  [ H.ClassName "fpo-data-list__action-btn"
+                  , H.ClassName "fpo-data-list__action-btn--danger"
+                  ]
+              , HE.onClick $ \e -> RequestDeleteGroup groupOverview e
               , HP.disabled state.waiting
               , Style.popover $ translate (label :: _ "admin_groups_deleteGroup")
                   state.translator
@@ -555,16 +589,24 @@ component =
           ]
       ]
 
-  emptyGroupButtons :: forall w. HH.HTML w Action
-  emptyGroupButtons =
-    HH.div [ HP.classes [ HB.dFlex, HB.gap2 ] ]
-      [ HH.button
-          [ HP.classes [ HB.btn, HB.btnOutlinePrimary, HB.btnSm, HB.invisible ] ]
-          [ HH.i [ HP.classes [ H.ClassName "bi-pencil-fill" ] ] [] ]
-      , HH.button
-          [ HP.classes [ HB.btn, HB.btnOutlineDanger, HB.btnSm, HB.invisible ] ]
-          [ HH.i [ HP.classes [ H.ClassName "bi-trash-fill" ] ] [] ]
-      ]
+  placeholderRows :: forall w i. Int -> Int -> Int -> Array (HH.HTML w i)
+  placeholderRows perPage currentCount pages =
+    let
+      needed = perPage - currentCount
+    in
+      if pages <= 1 || needed <= 0 then []
+      else replicate needed $
+        HH.div
+          [ HP.classes [ H.ClassName "fpo-data-list__row" ]
+          , HP.style "visibility: hidden; pointer-events: none;"
+          ]
+          [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
+              [ HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-primary" ] ]
+                  [ HH.text "\x00a0" ]
+              , HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-secondary" ] ]
+                  [ HH.text "\x00a0" ]
+              ]
+          ]
 
   -- Delete modals
   renderDeleteUserModal :: State -> H.ComponentHTML Action Slots m

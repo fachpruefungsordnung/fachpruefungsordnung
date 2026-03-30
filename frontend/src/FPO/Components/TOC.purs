@@ -31,13 +31,11 @@ import Data.Array
   )
 import Data.DateTime (Date, DateTime, adjust)
 import Data.Either (Either(..))
-import Data.Foldable (traverse_)
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Show (class Show)
 import Data.Time.Duration (Days(..), Minutes)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Now (getTimezoneOffset, nowDateTime)
@@ -68,7 +66,7 @@ import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
 import FPO.Types (TOCEntry, TOCTree, findTOCEntry, firstTOCEntry)
-import FPO.UI.HTML as HTMLP
+import FPO.UI.Css as HB
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.UI.Modals.DocumentHistoryModal as DHM
 import FPO.UI.Modals.ParagraphHistoryModal as PHM
@@ -81,7 +79,6 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectAll)
-import Halogen.Themes.Bootstrap5 as HB
 import Parsing (runParserT)
 import Prelude
   ( class Eq
@@ -108,7 +105,7 @@ import Prelude
   , (<>)
   , (==)
   , (>)
-  , (>>=)
+
   , (||)
   )
 import Simple.I18n.Translator (label, translate)
@@ -194,6 +191,8 @@ data Action
   | CloseDocumentHistoryModal
   | HandleParagraphHistoryOutput PHM.Output
   | HandleDocumentHistoryOutput DHM.Output
+  | OpenEditModal
+  | CloseEditModal
   | UpdateTitles
 
 data EntityKind = Section | Paragraph
@@ -245,6 +244,7 @@ type State = FPOState
   -- | Modal state
   , showParagraphHistoryModal :: Maybe { elementID :: Int, title :: String }
   , showDocumentHistoryModal :: Boolean
+  , showEditModal :: Boolean
   )
 
 -- | Slot types for child components
@@ -286,6 +286,7 @@ tocview = connect selectAll $ H.mkComponent
       , upToDateVersion: Nothing
       , showParagraphHistoryModal: Nothing
       , showDocumentHistoryModal: false
+      , showEditModal: false
       }
   , render
   , eval: H.mkEval $ H.defaultEval
@@ -305,9 +306,10 @@ tocview = connect selectAll $ H.mkComponent
     HH.div
       [ HP.classes [ HH.ClassName "leftscrollbar" ] ]
       [ HH.div_ $
-          renderDeleteModal
-            <> renderParagraphHistoryModal
+          renderParagraphHistoryModal
             <> renderDocumentHistoryModal
+            <> renderEditModal
+            <> renderDeleteModal
             <>
               ( rootTreeToHTML
                   state
@@ -361,6 +363,105 @@ tocview = connect selectAll $ H.mkComponent
     kindToString = case _ of
       Section -> translate (label :: _ "toc_section") state.translator
       Paragraph -> translate (label :: _ "toc_paragraph") state.translator
+
+    renderEditModal =
+      if not state.showEditModal then []
+      else
+        [ HH.div_
+            [ HH.div
+                [ HP.classes [ HB.modal, HB.fade, HB.show ]
+                , HP.style "display: block;"
+                , HP.attr (HH.AttrName "tabindex") "-1"
+                ]
+                [ HH.div
+                    [ HP.classes [ HB.modalDialog ]
+                    , HP.style "max-width: 600px;"
+                    ]
+                    [ HH.div
+                        [ HP.classes [ HB.modalContent ] ]
+                        [ -- Header
+                          HH.div
+                            [ HP.classes [ HB.modalHeader ] ]
+                            [ HH.h5
+                                [ HP.classes [ HB.modalTitle ] ]
+                                [ HH.i
+                                    [ HP.classes [ HB.bi, HH.ClassName "bi-pencil" ]
+                                    , HP.style "margin-right: 0.5rem;"
+                                    ]
+                                    []
+                                , HH.text $ translate
+                                    (label :: _ "toc_editModal_title")
+                                    state.translator
+                                ]
+                            , HH.button
+                                [ HP.classes [ HB.btnClose ]
+                                , HE.onClick $ const CloseEditModal
+                                ]
+                                []
+                            ]
+                        , -- Body: the tree with editing enabled
+                          HH.div
+                            [ HP.classes [ HB.modalBody ]
+                            , HP.style
+                                "max-height: 60vh; overflow-y: auto; padding: 0;"
+                            ]
+                            [ HH.div
+                                [ HP.classes [ HH.ClassName "toc-list" ]
+                                , HP.style "padding: var(--fpo-space-2) 0;"
+                                ]
+                                ( concat $ mapWithIndex
+                                    ( \ix (Edge child) ->
+                                        treeToHTML
+                                          (getRootHeader state.tocEntries)
+                                          true
+                                          state
+                                          state.showAddMenu
+                                          state.showHistoryMenu
+                                          1
+                                          state.mSelectedTocEntry
+                                          [ ix ]
+                                          state.now
+                                          state.searchData
+                                          child
+                                    )
+                                    (getRootChildren state.tocEntries)
+                                )
+                            ]
+                        , -- Footer with info text
+                          HH.div
+                            [ HP.classes [ HB.modalFooter ]
+                            , HP.style "justify-content: space-between;"
+                            ]
+                            [ HH.small
+                                [ HP.style "color: var(--fpo-text-tertiary);" ]
+                                [ HH.i
+                                    [ HP.classes
+                                        [ HB.bi, HH.ClassName "bi-info-circle" ]
+                                    , HP.style "margin-right: 0.35rem;"
+                                    ]
+                                    []
+                                , HH.text $ translate
+                                    (label :: _ "toc_editModal_hint")
+                                    state.translator
+                                ]
+                            , HH.button
+                                [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
+                                , HE.onClick $ const CloseEditModal
+                                ]
+                                [ HH.text $ translate (label :: _ "common_close")
+                                    state.translator
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            , HH.div
+                [ HP.classes [ HH.ClassName "modal-backdrop", HH.ClassName "show" ]
+                , HE.onClick $ const CloseEditModal
+                ]
+                []
+            ]
+        ]
 
   handleAction :: Action -> H.HalogenM State Action Slots Output m Unit
   handleAction = case _ of
@@ -591,41 +692,19 @@ tocview = connect selectAll $ H.mkComponent
     DoNothing -> do
       pure unit
 
+    OpenEditModal -> do
+      H.modify_ _ { showEditModal = true }
+
+    CloseEditModal -> do
+      H.modify_ _
+        { showEditModal = false
+        , showAddMenu = [ -1 ]
+        , requestDelete = Nothing
+        , dragState = Nothing
+        }
+
     UpdateTitles -> do
-      state <- H.get
-      -- Update titles for all TOC entries using setInnerHtml
-      updateTitlesInTree state.tocEntries
-      where
-      updateTitlesInTree :: TOCTree -> H.HalogenM State Action Slots Output m Unit
-      updateTitlesInTree Empty = pure unit
-      updateTitlesInTree (RootTree { children }) =
-        traverse_ (\(Tuple ix edge) -> updateTitlesInEdgeWithPath ix edge)
-          (mapWithIndex Tuple children)
-
-      updateTitlesInEdgeWithPath
-        :: Int -> Edge TOCEntry -> H.HalogenM State Action Slots Output m Unit
-      updateTitlesInEdgeWithPath ix (Edge tree) = updateTitlesInTreeNodeWithPath
-        [ ix ]
-        tree
-
-      updateTitlesInTreeNodeWithPath
-        :: Path -> Tree TOCEntry -> H.HalogenM State Action Slots Output m Unit
-      updateTitlesInTreeNodeWithPath path (Node { meta, children }) = do
-        -- Update title for this node
-        H.getHTMLElementRef (H.RefLabel ("toc_node_title_" <> show path)) >>=
-          traverse_ \titleElement -> do
-            H.liftEffect $ HTMLP.setInnerHtml titleElement (getFullTitle meta)
-        -- Update children with extended paths
-        traverse_
-          ( \(Tuple ix (Edge child)) -> updateTitlesInTreeNodeWithPath
-              (path <> [ ix ])
-              child
-          )
-          (mapWithIndex Tuple children)
-      updateTitlesInTreeNodeWithPath _ (Leaf { meta, node }) = do
-        H.getHTMLElementRef (H.RefLabel ("toc_title_" <> show node.id)) >>= traverse_
-          \titleElement -> do
-            H.liftEffect $ HTMLP.setInnerHtml titleElement (getFullTitle meta)
+      pure unit
 
     JumpToLeafSection id path title -> do
       handleAction (ToggleHistoryMenuOff path)
@@ -699,7 +778,6 @@ tocview = connect selectAll $ H.mkComponent
 
     RequestDeleteSection entity -> do
       H.modify_ _ { requestDelete = Just entity }
-
       Util.focusRef modalDeleteRef
 
     CancelDeleteSection -> do
@@ -939,10 +1017,6 @@ tocview = connect selectAll $ H.mkComponent
             pure unit
         _ -> do
           pure unit
-      -- Update all titles after receiving new TOC entries
-      _ <- H.fork do
-        H.liftAff $ delay (Milliseconds 10.0) -- Small delay to ensure DOM is rendered
-        handleAction UpdateTitles
       pure (Just a)
 
     RequestCurrentTocEntryTitle reply -> do
@@ -1024,32 +1098,57 @@ tocview = connect selectAll $ H.mkComponent
     searchData
     (RootTree { children, header }) =
     [ HH.div
-        [ HP.classes [ HB.bgWhite, HB.shadow ] ]
+        [ HP.style
+            "background: var(--fpo-bg-elevated); border: 1px solid var(--fpo-border-subtle); border-radius: var(--fpo-radius-lg); box-shadow: var(--fpo-shadow-sm);"
+        ]
         [ HH.div
-            [ HP.classes [ HB.borderBottom, HB.ms1, HB.me2 ] ]
+            [ HP.style
+                "border-bottom: 1px solid var(--fpo-border-subtle); padding: var(--fpo-space-2) var(--fpo-space-3);"
+            ]
             [ HH.div
                 [ HP.classes
                     [ HB.dFlex, HB.alignItemsCenter, HB.justifyContentBetween ]
                 ]
                 [ HH.span
-                    [ HP.classes [ HB.fwSemibold, HB.textTruncate, HB.fs4, HB.p2 ] ]
-                    [ HH.text docName ]
-                , HH.button
-                    [ HP.classes
-                        [ HB.btn
-                        , HB.btnOutlinePrimary
-                        , HB.btnSm
-                        , HB.me2
-                        ]
-                    , HE.onClick $ const OpenDocumentHistoryModal
+                    [ HP.style
+                        "font-weight: 600; font-size: var(--fpo-text-md); color: var(--fpo-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
                     ]
-                    [ HH.i
+                    [ HH.text docName ]
+                , HH.div
+                    [ HP.classes
+                        [ HB.dFlex, HB.alignItemsCenter, HH.ClassName "gap-1" ]
+                    ]
+                    [ HH.button
                         [ HP.classes
-                            [ HB.bi, HH.ClassName "bi-clock-history", HB.me1 ]
+                            [ HB.btn
+                            , HB.btnSm
+                            , HB.me1
+                            , HH.ClassName "btn-outline-secondary"
+                            ]
+                        , HE.onClick $ const OpenEditModal
+                        , HP.title $ translate (label :: _ "toc_editMode_on")
+                            state.translator
                         ]
-                        []
-                    , HH.text $ translate (label :: _ "modal_documentHistory_title")
-                        state.translator
+                        [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-pencil" ] ] [] ]
+                    , HH.button
+                        [ HP.classes
+                            [ HB.btn
+                            , HB.btnOutlinePrimary
+                            , HB.btnSm
+                            ]
+                        , HE.onClick $ const OpenDocumentHistoryModal
+                        ]
+                        [ HH.i
+                            [ HP.classes
+                                [ HB.bi, HH.ClassName "bi-clock-history" ]
+                            ]
+                            []
+                        , HH.span [ HP.classes [ HH.ClassName "fpo-btn-label" ] ]
+                            [ HH.text $ " " <> translate
+                                (label :: _ "modal_documentHistory_title")
+                                state.translator
+                            ]
+                        ]
                     ]
                 ]
             ]
@@ -1071,25 +1170,22 @@ tocview = connect selectAll $ H.mkComponent
                 [ HH.div
                     [ HP.classes innerDivClasses ]
                     [ HH.span
-                        [ HP.classes
-                            [ HH.ClassName "toc-drag-handle", HB.textMuted, HB.me2 ]
-                        , HP.style ("margin-left: " <> "1" <> "rem;")
-                        ]
-                        (singletonIf (isJust Nothing) $ HH.text "⋮⋮")
+                        [ HP.style "width: 1rem; flex-shrink: 0;" ]
+                        []
                     , HH.span
                         ( [ HP.classes titleClasses
                           , HP.style "align-self: stretch; flex-basis: 0;"
-                          , HP.title "Header"
                           , HE.onClick \_ -> JumpToNodeSection [] (getHeading header)
                               "Header"
                           ]
                         )
-                        [ HH.text "Kopfzeile" ]
+                        [ HH.text (getHeading header) ]
                     ]
                 ]
             childItems = concat $ mapWithIndex
               ( \ix (Edge child) ->
-                  treeToHTML header state menuPath historyPath 1 mSelectedTocEntry
+                  treeToHTML header false state menuPath historyPath 1
+                    mSelectedTocEntry
                     [ ix ]
                     now
                     searchData
@@ -1105,6 +1201,7 @@ tocview = connect selectAll $ H.mkComponent
 
   treeToHTML
     :: TreeHeader
+    -> Boolean
     -> State
     -> Path
     -> Path
@@ -1117,6 +1214,7 @@ tocview = connect selectAll $ H.mkComponent
     -> Array (H.ComponentHTML Action Slots m)
   treeToHTML
     parentHeader
+    isEditing
     state
     menuPath
     historyPath
@@ -1143,18 +1241,17 @@ tocview = connect selectAll $ H.mkComponent
                 <>
                   dragProps
                 <>
-                  [ HP.style "cursor: pointer;" ]
+                  [ HP.style $ if isEditing then "" else "cursor: pointer;" ]
             )
-            [ addDropZone state path
+            [ if isEditing then addDropZone state path else HH.text ""
             , HH.div
                 [ HP.classes innerDivClasses ]
                 [ dragHandle
                 , HH.span
                     ( [ HP.classes titleClasses
                       , HP.style "align-self: stretch; flex-basis: 0;"
-                      , HP.ref (H.RefLabel ("toc_node_title_" <> show path))
                       ] <>
-                        ( if canBeRenamed then
+                        ( if canBeRenamed && not isEditing then
                             [ HE.onClick \_ -> JumpToNodeSection path
                                 (getHeading header)
                                 (getFullTitle meta)
@@ -1163,7 +1260,10 @@ tocview = connect selectAll $ H.mkComponent
                             []
                         )
                     )
-                    []
+                    [ HH.element (HH.ElemName "raw-html")
+                        [ HP.attr (HH.AttrName "html") (getFullTitle meta) ]
+                        []
+                    ]
                 , addItemInterface
                 ]
             ]
@@ -1173,6 +1273,7 @@ tocview = connect selectAll $ H.mkComponent
                 ( \ix (Edge child) ->
                     treeToHTML
                       header
+                      isEditing
                       state
                       menuPath
                       historyPath
@@ -1190,7 +1291,8 @@ tocview = connect selectAll $ H.mkComponent
             -- It is handled like a normal element during drag and drop detection,
             -- i.e., it has its own path. Of course, this only happens if the parent
             -- allows for changes to the children structure (i.e., has `StarOrder` syntax).
-            ( case MM.getDisjunction header state.metaMap of
+            ( if not isEditing then []
+              else case MM.getDisjunction header state.metaMap of
                 Nothing ->
                   []
                 Just pd ->
@@ -1208,15 +1310,69 @@ tocview = connect selectAll $ H.mkComponent
       -- the section allows for (more) children and the "-" button, if
       -- allowed for deletion.
       addItemInterface =
-        renderSectionButtonInterface
-          items
-          menuPath
-          path
-          isDeletable
-          Section
-          (getFullTitle meta)
+        if not isEditing then HH.text ""
+        else
+          HH.div
+            [ HP.classes [ HB.positionRelative, HB.dInlineFlex, HB.alignItemsCenter ]
+            , HP.style "flex-shrink: 0;"
+            ] $
+            ( singletonIf (not $ null items) $
+                HH.button
+                  [ HP.classes
+                      [ HB.btn
+                      , HB.btnSuccess
+                      , HH.ClassName "toc-button"
+                      , HH.ClassName "toc-add-wrapper"
+                      ]
+                  , HE.onClick \_ -> ToggleAddMenu path
+                  ]
+                  [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-plus" ] ] [] ]
+            )
+              <>
+                [ if isDeletable then
+                    deleteSectionButton path Section (getFullTitle meta)
+                  else
+                    HH.button
+                      [ HP.classes
+                          [ HB.btn
+                          , HH.ClassName "toc-button"
+                          , HH.ClassName "toc-add-wrapper"
+                          ]
+                      , HP.disabled true
+                      , HP.title
+                          (translate (label :: _ "toc_cannotDelete") state.translator)
+                      , HP.style "opacity: 0.25; cursor: not-allowed;"
+                      ]
+                      [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-dash" ] ] [] ]
+                ]
+              <>
+                [ if menuPath == path then
+                    HH.div
+                      [ HP.classes
+                          [ H.ClassName "fpo-popover"
+                          , H.ClassName "fpo-popover--down"
+                          , H.ClassName "fpo-popover--right"
+                          ]
+                      , HP.style "padding: var(--fpo-space-1) 0; min-width: 140px;"
+                      ]
+                      (map createSectionButton items)
+                  else
+                    HH.text ""
+                ]
         where
         items = MM.findAllowedChildren header state.metaMap
+        createSectionButton (Tuple tyName meta2) =
+          HH.button
+            [ HP.classes [ H.ClassName "fpo-popover__item" ]
+            , HE.onClick \_ -> CreateNewMSection tyName meta2 path
+            ]
+            [ HH.i
+                [ HP.classes [ HB.bi, H.ClassName "bi-plus" ]
+                , HP.style "font-size: 0.75rem; opacity: 0.5;"
+                ]
+                []
+            , HH.text (" " <> MM.getDisplayNameAsString meta2)
+            ]
 
     Leaf { meta, node: { id, paraID: _, name: _ } } ->
       let
@@ -1232,10 +1388,10 @@ tocview = connect selectAll $ H.mkComponent
           [ HB.dFlex, HB.alignItemsCenter, HB.py1, HB.positionRelative ]
         innerDivProps =
           [ HP.classes innerDivBaseClasses
-          , HP.style "cursor: pointer;"
+          , HP.style $ if isEditing then "" else "cursor: pointer;"
           ] <>
             -- Stop to be able to click, if alredy selected (prevent spamming post requests)
-            ( if level > 0 && mSelectedTocEntry /= Just (SelLeaf id) then
+            ( if not isEditing && level > 0 && mSelectedTocEntry /= Just (SelLeaf id) then
                 [ HE.onClick \_ -> JumpToLeafSection id path (getFullTitle meta)
                 ]
               else
@@ -1244,7 +1400,7 @@ tocview = connect selectAll $ H.mkComponent
       in
         [ HH.div
             containerProps
-            [ addDropZone state path
+            [ if isEditing then addDropZone state path else HH.text ""
             , HH.div
                 innerDivProps
                 [ dragHandle
@@ -1252,14 +1408,43 @@ tocview = connect selectAll $ H.mkComponent
                     [ HP.classes
                         [ HB.textTruncate, HB.flexGrow1, HB.fwNormal, HB.fs6 ]
                     , HP.style "align-self: stretch; flex-basis: 0;"
-                    , HP.ref (H.RefLabel ("toc_title_" <> show id))
                     ]
-                    []
-                , renderParagraphButtonInterface
-                    path
-                    isDeletable
-                    (getFullTitle meta)
-                    id
+                    [ HH.element (HH.ElemName "raw-html")
+                        [ HP.attr (HH.AttrName "html") (getFullTitle meta) ]
+                        []
+                    ]
+                , if isEditing then
+                    HH.div
+                      [ HP.classes
+                          [ HB.positionRelative, HB.dInlineFlex, HB.alignItemsCenter ]
+                      , HP.style "flex-shrink: 0;"
+                      ] $
+                      [ if isDeletable then
+                          deleteSectionButton path Paragraph (getFullTitle meta)
+                        else
+                          HH.button
+                            [ HP.classes
+                                [ HB.btn
+                                , HH.ClassName "toc-button"
+                                , HH.ClassName "toc-add-wrapper"
+                                ]
+                            , HP.disabled true
+                            , HP.title
+                                ( translate (label :: _ "toc_cannotDelete")
+                                    state.translator
+                                )
+                            , HP.style "opacity: 0.25; cursor: not-allowed;"
+                            ]
+                            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-dash" ] ] []
+                            ]
+                      ]
+                  else
+                    HH.div
+                      [ HP.classes
+                          [ HB.positionRelative, HB.dInlineFlex, HB.alignItemsCenter ]
+                      , HP.style "flex-shrink: 0;"
+                      ]
+                      [ historyButton id (getFullTitle meta) ]
                 ]
             ]
         ]
@@ -1272,24 +1457,41 @@ tocview = connect selectAll $ H.mkComponent
     -- specified disjunction, meaning that we can drag and remove items.
     mParentDisjunction = MM.getDisjunction parentHeader state.metaMap
 
-    dragProps = case mParentDisjunction of
-      Nothing -> []
-      Just pk ->
-        [ HP.draggable true
-        , HE.onDragStart $ const $ StartDrag path pk
-        , HE.onDragOver $ HighlightDropZone path pk
-        , HE.onDrop $ const $ CompleteDrop path
-        , HE.onDragEnd $ const $ ClearDropZones
-        ]
+    dragProps =
+      if not isEditing then []
+      else
+        case mParentDisjunction of
+          Nothing -> []
+          Just pk ->
+            [ HP.draggable true
+            , HE.onDragStart $ const $ StartDrag path pk
+            , HE.onDragOver $ HighlightDropZone path pk
+            , HE.onDrop $ const $ CompleteDrop path
+            , HE.onDragEnd $ const $ ClearDropZones
+            ]
 
     -- Show the drag handle only if the parent allows changes to the children structure.
     dragHandle =
-      HH.span
-        [ HP.classes
-            [ HH.ClassName "toc-drag-handle", HB.textMuted, HB.me2 ]
-        , HP.style ("margin-left: " <> show level <> "rem;")
-        ]
-        (singletonIf (isJust mParentDisjunction) $ HH.text "⋮⋮")
+      if not isEditing then
+        -- Only indentation spacer, no handle
+        HH.span [ HP.style ("width: " <> show level <> "rem; flex-shrink: 0;") ] []
+      else
+        HH.span [ HP.classes [ HB.dFlex, HB.alignItemsCenter ] ]
+          [ HH.span
+              [ HP.classes [ HH.ClassName "toc-drag-handle", HB.textMuted ] ]
+              (singletonIf (isJust mParentDisjunction) $ HH.text "⋮⋮")
+          , HH.span [ HP.style ("width: " <> show level <> "rem; flex-shrink: 0;") ]
+              []
+          ]
+
+  getRootHeader :: RootTree TOCEntry -> TreeHeader
+  getRootHeader Empty = TreeHeader
+    { headerKind: "root", headerType: "root", heading: "" }
+  getRootHeader (RootTree { header }) = header
+
+  getRootChildren :: RootTree TOCEntry -> Array (Edge TOCEntry)
+  getRootChildren Empty = []
+  getRootChildren (RootTree { children }) = children
 
   -- Helper to check if the current path is the active dropzone.
   -- This is used to highlight the dropzone when dragging an item.
@@ -1428,111 +1630,14 @@ tocview = connect selectAll $ H.mkComponent
   historyButton elementID title = HH.button
     [ HP.classes
         [ HB.btn
-        , HB.btnSecondary
         , HH.ClassName "toc-button"
         , HH.ClassName "toc-add-wrapper"
-        , H.ClassName "bi bi-clock-history"
         ]
     , HE.onClick \e -> unsafePerformEffect do
         stopPropagation (MouseEvent.toEvent e)
         pure $ OpenParagraphHistoryModal elementID title
     ]
-    []
-
-  renderParagraphButtonInterface
-    :: Path
-    -> Boolean
-    -> String
-    -> Int
-    -> H.ComponentHTML Action Slots m
-  renderParagraphButtonInterface
-    path
-    renderDeleteBtn
-    title
-    elementID =
-    HH.div
-      [ HP.classes [ HB.positionRelative, HB.dInlineFlex ] ] $
-      [ historyButton elementID title
-      ]
-        <>
-          singletonIf renderDeleteBtn (deleteSectionButton path Paragraph title)
-
-  -- Helper to render add button with dropdown, and optional delete button.
-  renderSectionButtonInterface
-    :: Array (Tuple MM.FullTypeName MM.ProperTypeMeta)
-    -> Array Int
-    -> Array Int
-    -> Boolean
-    -> EntityKind
-    -> String
-    -> H.ComponentHTML Action Slots m
-  renderSectionButtonInterface
-    items
-    menuPath
-    currentPath
-    renderDeleteBtn
-    kind
-    title =
-    HH.div
-      [ HP.classes [ HB.positionRelative ] ] $
-      ( singletonIf (not $ null items) $
-          HH.button
-            [ HP.classes
-                [ HB.btn
-                , HB.btnSuccess
-                , HH.ClassName "toc-button"
-                , HH.ClassName "toc-add-wrapper"
-                ]
-            , HE.onClick \_ -> ToggleAddMenu currentPath
-            ]
-            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-plus" ] ] [] ]
-      )
-        <>
-          ( singletonIf renderDeleteBtn $ deleteSectionButton currentPath kind title
-          )
-        <>
-          [ if menuPath == currentPath then
-              HH.div
-                [ HP.classes
-                    [ HB.positionAbsolute
-                    , HB.bgWhite
-                    , HB.border
-                    , HB.rounded
-                    , HB.shadowSm
-                    , HB.py1
-                    ]
-                , HP.style "top: 100%; right: 0; z-index: 1000; min-width: 160px;"
-                ]
-                buttons
-            else
-              HH.text ""
-          ]
-    where
-    addSectionButton str act = HH.button
-      [ HP.classes
-          [ HB.btn
-          , HB.btnLink
-          , HB.textStart
-          , HB.textDecorationNone
-          , HB.w100
-          , HB.border0
-          , HB.textBody
-          , HB.dFlex
-          , HB.alignItemsCenter
-          ]
-      , HE.onClick \_ -> act currentPath
-      ]
-      [ HH.div [ HP.classes [ H.ClassName "bi bi-plus", HB.fs5, HB.me1 ] ] []
-      , HH.div [ HP.classes [ HB.fs6 ] ]
-          [ HH.text str ]
-      ]
-
-    -- Creates buttons for each allowed item type.
-    buttons = map createSectionButton items
-      where
-      createSectionButton (Tuple tyName meta) =
-        addSectionButton (MM.getDisplayNameAsString meta)
-          (CreateNewMSection tyName meta)
+    [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-clock-history" ] ] [] ]
 
 -- Helper function to extract the title from the current TOC entry
 getCurrentTocEntryTitle :: Maybe SelectedEntity -> RootTree TOCEntry -> Maybe String

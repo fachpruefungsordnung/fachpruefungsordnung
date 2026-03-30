@@ -11,12 +11,12 @@ import Data.Array as Array
 import Data.Maybe (Maybe(..))
 import Data.String (null)
 import Effect (Effect)
+import FPO.UI.Css as HB
 import FPO.Util (handleKeyDownEscape)
 import Halogen.HTML as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Themes.Bootstrap5 as HB
 import Web.HTML.HTMLElement (HTMLElement)
 import Web.UIEvent.MouseEvent (MouseEvent)
 
@@ -122,8 +122,6 @@ addModal title cancelAction doNothingAction content =
         [ HP.classes
             [ HB.modal, HB.fade, HB.show ]
         , HP.id "deleteModal"
-        , HP.attr (HH.AttrName "data-bs-backdrop") "static"
-        , HP.attr (HH.AttrName "data-bs-keyboard") "false"
         , HP.attr (HH.AttrName "tabindex") "-1"
         , HP.attr (HH.AttrName "aria-hidden") "false"
         , HP.style "display: block;"
@@ -144,7 +142,6 @@ addModal title cancelAction doNothingAction content =
                       , HH.button
                           [ HP.type_ HP.ButtonButton
                           , HP.classes [ HB.btnClose ]
-                          , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
                           , HP.attr (HH.AttrName "aria-label") "Close"
                           , HE.onClick $ const cancelAction
                           ]

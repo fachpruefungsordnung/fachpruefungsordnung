@@ -13,11 +13,11 @@ import FPO.Components.Splitview as Splitview
 import FPO.Data.Navigate (class Navigate)
 import FPO.Data.Store as Store
 import FPO.Dto.DocumentDto.DocumentHeader (DocumentID)
+import FPO.UI.Css as HB
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore)
-import Halogen.Themes.Bootstrap5 as HB
 import Type.Proxy (Proxy(..))
 
 -- | The input now carries both the document ID and optional query parameters

@@ -44,6 +44,7 @@ import FPO.Dto.UserOverviewDto as UOD
 import FPO.Dto.UserRoleDto (Role(..))
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.Css as HB
 import FPO.UI.HTML (addColumn)
 import FPO.UI.Style as Style
 import Halogen as H
@@ -52,7 +53,6 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (Event, preventDefault)
 import Web.UIEvent.KeyboardEvent as KE

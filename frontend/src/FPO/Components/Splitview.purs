@@ -68,6 +68,7 @@ import FPO.Types
   , findTitleTOCEntry
   , tocTreeToDocumentTree
   )
+import FPO.UI.Css as HB
 import FPO.UI.Modals.DirtyVersionModal (dirtyVersionModal)
 import FPO.UI.Resizing
   ( ResizeState
@@ -85,7 +86,6 @@ import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
-import Halogen.Themes.Bootstrap5 as HB
 import Routing.Duplex as RD
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
@@ -152,6 +152,9 @@ data Action
   | DeleteDraft
   | DoNothing
   | Finalize
+  | ShowResolvePopover
+  | HideResolvePopover
+  | ConfirmResolve
 
 type State = FPOState
   ( docID :: DocumentID
@@ -186,6 +189,8 @@ type State = FPOState
   , mListener :: Maybe (HS.Listener Action)
   , mResizeObserver :: Maybe ResizeObserver
   , mResizeSubscriptionId :: Maybe SubscriptionId
+  , showResolveButton :: Boolean
+  , showResolvePopover :: Boolean
   )
 
 type ElemVersion =
@@ -255,6 +260,8 @@ splitview = connect selectTranslator $ H.mkComponent
     , mListener: Nothing
     , mResizeObserver: Nothing
     , mResizeSubscriptionId: Nothing
+    , showResolveButton: false
+    , showResolvePopover: false
     }
 
   render :: State -> H.ComponentHTML Action Slots m
@@ -352,11 +359,11 @@ splitview = connect selectTranslator $ H.mkComponent
     in
       [ -- TOC
         HH.div
-          [ HP.classes [ HB.overflowAuto, HB.p1 ]
+          [ HP.classes [ HB.overflowAuto, HB.p1, H.ClassName "fpo-sidebar-panel" ]
           , HP.style $
               "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
                 <>
-                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(233, 233, 235); position: relative;"
+                  "%; box-sizing: border-box; min-width: 6ch; background: var(--fpo-bg-secondary); position: relative;"
                 <>
                   if
                     not state.resizeState.sidebarClosed
@@ -370,11 +377,11 @@ splitview = connect selectTranslator $ H.mkComponent
           [ HH.slot _toc unit TOC.tocview state.docID HandleTOC ]
       -- Comment
       , HH.div
-          [ HP.classes [ HB.overflowAuto, HB.p1 ]
+          [ HP.classes [ HB.overflowAuto, HB.p1, H.ClassName "fpo-sidebar-panel" ]
           , HP.style $
               "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
                 <>
-                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
+                  "%; box-sizing: border-box; min-width: 6ch; background: var(--fpo-bg-secondary); position: relative;"
                 <>
                   if
                     not state.resizeState.sidebarClosed && not
@@ -383,21 +390,102 @@ splitview = connect selectTranslator $ H.mkComponent
                   else
                     "display: none;"
           ]
-          [ closeButton CloseComment
-          , HH.h4
+          [ HH.div
               [ HP.style
-                  "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
+                  "display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0.25rem 0.75rem 0.25rem;"
               ]
-              [ HH.text (translate (label :: _ "comment_comment") state.translator) ]
+              [ HH.button
+                  [ HP.classes
+                      [ H.ClassName "fpo-back-btn"
+                      , H.ClassName "fpo-back-btn--inline"
+                      ]
+                  , HE.onClick \_ -> CloseComment
+                  ]
+                  [ HH.i [ HP.classes [ H.ClassName "bi-arrow-left" ] ] [] ]
+              , HH.h4
+                  [ HP.style
+                      "margin: 0; font-weight: 600; color: var(--fpo-text-primary); font-size: var(--fpo-text-md);"
+                  ]
+                  [ HH.text
+                      (translate (label :: _ "comment_comment") state.translator)
+                  ]
+              -- Resolve button, pushed to the right
+              , if state.showResolveButton then
+                  HH.div [ HP.style "margin-left: auto; position: relative;" ]
+                    ( [ HH.button
+                          [ HP.classes
+                              [ HB.btn
+                              , HB.btnSm
+                              , H.ClassName "btn-outline-success"
+                              , H.ClassName "fpo-resolve-btn"
+                              ]
+                          , HE.onClick \_ -> ShowResolvePopover
+                          ]
+                          [ HH.i
+                              [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ]
+                              []
+                          , HH.span [ HP.classes [ H.ClassName "fpo-btn-label" ] ]
+                              [ HH.text
+                                  ( " " <> translate (label :: _ "comment_resolve")
+                                      state.translator
+                                  )
+                              ]
+                          ]
+                      ] <>
+                        if state.showResolvePopover then
+                          [ HH.div
+                              [ HP.classes
+                                  [ H.ClassName "fpo-popover"
+                                  , H.ClassName "fpo-popover--down"
+                                  ]
+                              ]
+                              [ HH.div
+                                  [ HP.classes [ H.ClassName "fpo-popover__text" ] ]
+                                  [ HH.text
+                                      ( translate
+                                          (label :: _ "comment_resolve_phrase")
+                                          state.translator
+                                      )
+                                  ]
+                              , HH.div
+                                  [ HP.classes [ H.ClassName "fpo-popover__actions" ]
+                                  ]
+                                  [ HH.button
+                                      [ HP.classes
+                                          [ HB.btn, HB.btnSm, HB.btnSecondary ]
+                                      , HE.onClick \_ -> HideResolvePopover
+                                      ]
+                                      [ HH.text
+                                          ( translate (label :: _ "common_cancel")
+                                              state.translator
+                                          )
+                                      ]
+                                  , HH.button
+                                      [ HP.classes [ HB.btn, HB.btnSm, HB.btnSuccess ]
+                                      , HE.onClick \_ -> ConfirmResolve
+                                      ]
+                                      [ HH.text
+                                          ( translate (label :: _ "common_resolve")
+                                              state.translator
+                                          )
+                                      ]
+                                  ]
+                              ]
+                          ]
+                        else []
+                    )
+                else
+                  HH.text ""
+              ]
           , HH.slot _comment unit Comment.commentview unit HandleComment
           ]
       -- CommentOverview
       , HH.div
-          [ HP.classes [ HB.overflowAuto, HB.p1 ]
+          [ HP.classes [ HB.overflowAuto, HB.p1, H.ClassName "fpo-sidebar-panel" ]
           , HP.style $
               "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
                 <>
-                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(229, 241, 248); position: relative;"
+                  "%; box-sizing: border-box; min-width: 6ch; background: var(--fpo-bg-secondary); position: relative;"
                 <>
                   if
                     not state.resizeState.sidebarClosed
@@ -407,13 +495,25 @@ splitview = connect selectTranslator $ H.mkComponent
                   else
                     "display: none;"
           ]
-          [ closeButton $ ToggleCommentOverview false
-          , HH.h4
+          [ HH.div
               [ HP.style
-                  "margin-top: 0.5rem; margin-bottom: 1rem; margin-left: 0.5rem; font-weight: bold; color: black;"
+                  "display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0.25rem 0.75rem 0.25rem;"
               ]
-              [ HH.text
-                  (translate (label :: _ "comment_allComments") state.translator)
+              [ HH.button
+                  [ HP.classes
+                      [ H.ClassName "fpo-back-btn"
+                      , H.ClassName "fpo-back-btn--inline"
+                      ]
+                  , HE.onClick \_ -> ToggleCommentOverview false
+                  ]
+                  [ HH.i [ HP.classes [ H.ClassName "bi-arrow-left" ] ] [] ]
+              , HH.h4
+                  [ HP.style
+                      "margin: 0; font-weight: 600; color: var(--fpo-text-primary); font-size: var(--fpo-text-md);"
+                  ]
+                  [ HH.text
+                      (translate (label :: _ "comment_allComments") state.translator)
+                  ]
               ]
           , HH.slot _commentOverview unit CommentOverview.commentOverviewview unit
               HandleCommentOverview
@@ -793,7 +893,11 @@ splitview = connect selectTranslator $ H.mkComponent
       H.modify_ _ { versionMapping = newVersionMapping }
 
     CloseComment -> do
-      H.modify_ \st -> st { resizeState = st.resizeState { commentClosed = true } }
+      H.modify_ \st -> st
+        { resizeState = st.resizeState { commentClosed = true }
+        , showResolveButton = false
+        , showResolvePopover = false
+        }
       H.tell _editor 0 (Editor.UnselectCommentSection)
 
     ToggleCommentOverview shown -> do
@@ -831,6 +935,16 @@ splitview = connect selectTranslator $ H.mkComponent
 
     DoNothing -> do
       pure unit
+
+    ShowResolvePopover -> do
+      H.modify_ _ { showResolvePopover = true }
+
+    HideResolvePopover -> do
+      H.modify_ _ { showResolvePopover = false }
+
+    ConfirmResolve -> do
+      H.modify_ _ { showResolvePopover = false }
+      H.tell _comment unit Comment.RequestResolve
 
     -- Switch between CompareEditor, Preview and TogglePreview
     SwitchPreview -> do
@@ -933,6 +1047,9 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Comment.SetReAnchor reAnchor -> do
         H.tell _editor 0 (Editor.SetReAnchor reAnchor)
+
+      Comment.ShowResolveButton show -> do
+        H.modify_ _ { showResolveButton = show, showResolvePopover = false }
 
     HandleCommentOverview output -> case output of
 

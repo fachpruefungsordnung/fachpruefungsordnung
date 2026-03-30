@@ -22,7 +22,6 @@ import Effect.Aff (Milliseconds(..), delay)
 import Effect.Aff.Class (class MonadAff)
 import Effect.Now (nowDateTime)
 import FPO.Components.Pagination as P
-import FPO.Components.TableHead as TH
 import FPO.Data.Navigate (class Navigate, navigate)
 import FPO.Data.Request
   ( LoadState(..)
@@ -38,13 +37,14 @@ import FPO.Dto.DocumentDto.DocDate as DocDate
 import FPO.Dto.DocumentDto.DocumentHeader
   ( DocumentHeader
   , DocumentID
-  , getEditTimestamp
   )
 import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
-import FPO.UI.HTML (addCard, addColumn, emptyTableRow, loadingSpinner)
+import FPO.UI.Css as HB
+import FPO.UI.HTML (loadingSpinner)
+import FPO.UI.NavbarReveal (setupNavbarReveal, teardownNavbarReveal)
 import FPO.UI.SmoothScroll (smoothScrollToElement)
 import Halogen (liftEffect)
 import Halogen as H
@@ -53,7 +53,6 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
 import Web.DOM.Document as Document
@@ -67,21 +66,18 @@ import Web.HTML.Window (document)
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
 
-_tablehead = Proxy :: Proxy "tablehead"
 _pagination = Proxy :: Proxy "pagination"
 
 type Input = Unit
 
-data Sorting = TitleAsc | TitleDesc | LastUpdatedAsc | LastUpdatedDesc
-
 data Action
   = Initialize
+  | Finalize
   | NavLogin
   | ScrollToFeatures
   | ViewProject DocumentHeader
   | Receive (Connected FPOTranslator Input)
   | DoNothing
-  | ChangeSorting TH.Output
   | HandleSearchInput String
   | SetPage P.Output
   | DownloadPdf DocumentID String MouseEvent -- Id, Project Name, Event (used for prevent default)
@@ -96,8 +92,7 @@ type State = FPOState
   )
 
 type Slots =
-  ( tablehead :: forall q. H.Slot q TH.Output Unit
-  , pagination :: H.Slot P.Query P.Output Unit
+  ( pagination :: H.Slot P.Query P.Output Unit
   )
 
 component
@@ -112,6 +107,7 @@ component =
     , render
     , eval: H.mkEval H.defaultEval
         { initialize = Just Initialize
+        , finalize = Just Finalize
         , handleAction = handleAction
         , receive = Just <<< Receive
         }
@@ -154,6 +150,9 @@ component =
             { user = Loaded Nothing
             , currentTime = Just now
             }
+          -- The user is not logged in → show landing hero.
+          -- Hide the navbar and reveal it only after scrolling.
+          H.liftEffect $ setupNavbarReveal 80
         Right user -> do
           H.modify_ _
             { projects = Loading
@@ -171,44 +170,18 @@ component =
                 { projects = Loaded docs
                 , currentTime = Just now
                 }
+    Finalize -> do
+      H.liftEffect teardownNavbarReveal
     Receive { context } -> H.modify_ _ { translator = fromFpoTranslator context }
     ViewProject project -> do
       navigate (editorRoute (DocumentHeader.getID project))
     NavLogin -> do
+      H.liftEffect teardownNavbarReveal
       navigate (loginRouteWithRedirect Home)
     ScrollToFeatures -> do
       H.liftEffect $ smoothScrollToElement "features"
     DoNothing ->
       pure unit
-    ChangeSorting (TH.Clicked title order) -> do
-      state <- H.get
-      case state.projects of
-        Loading -> pure unit
-        Loaded projects' -> do
-          -- Sorting logic based on the clicked column title:
-          let
-            title_title = translate (label :: _ "home_title") state.translator
-            title_lastUpdated = translate (label :: _ "home_lastUpdated")
-              state.translator
-          projects <- pure $
-            if title == title_title then
-              TH.sortByF
-                order
-                (comparing DocumentHeader.getName)
-                projects'
-            else if title == title_lastUpdated then
-              TH.sortByF
-                (TH.toggleSorting order) -- The newest project should be first.
-                (comparing getEditTimestamp)
-                projects'
-            else
-              projects' -- Ignore other columns.
-
-          H.modify_ _ { projects = Loaded projects }
-
-          -- After changing the sorting, tell the pagination component
-          -- to reset to the first page:
-          H.tell _pagination unit $ P.SetPageQ 0
     HandleSearchInput query -> do
       H.modify_ _ { searchQuery = query }
     SetPage (P.Clicked page) -> do
@@ -296,252 +269,257 @@ component =
     [ HH.h1 [ HP.classes [ HB.textCenter, HB.mt5 ] ]
         [ HH.text $ translate (label :: _ "common_home") state.translator ]
     , HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-        [ addCard
-            (translate (label :: _ "home_yourProjects") state.translator)
-            [ HP.classes [ HB.colSm11, HB.colMd9, HB.colLg7 ] ]
-            (renderProjectOverview state)
+        [ renderProjectOverview state
         ]
     ]
 
   renderNotLoggedIn :: State -> H.ComponentHTML Action Slots m
   renderNotLoggedIn state =
     HH.div_
-      [ -- Hero Section
+      [ -- ── Hero Section ──────────────────────────────────────────
         HH.section
-          [ HP.classes
-              [ HH.ClassName "hero-bg"
-              , HH.ClassName "slanted-bottom"
-              , HB.dFlex
-              , HB.alignItemsCenter
-              , HB.textWhite
-              ]
-          ]
-          [ HH.div
-              [ HP.classes [ HB.container ] ]
-              [ HH.div
-                  [ HP.classes [ HB.row, HB.alignItemsCenter ] ]
-                  [ HH.div
-                      [ HP.classes [ HB.colLg6 ] ]
-                      [ HH.h1
-                          [ HP.classes
-                              [ HB.display4
-                              , HB.fwBold
-                              , HB.mb4
-                              ]
-                          ]
-                          [ HH.text "FPO-Editor" ]
-                      , HH.p
-                          [ HP.classes [ HB.lead, HB.mb4 ] ]
-                          [ HH.text $ translate (label :: _ "home_basicDescription")
-                              state.translator
-                          ]
-                      , HH.button
-                          [ HP.classes
-                              [ HB.btn
-                              , HB.btnLight
-                              , HB.btnLg
-                              , HB.me3
-                              ]
-                          , HE.onClick $ const NavLogin
-                          ]
-                          [ HH.i
-                              [ HP.classes
-                                  [ HH.ClassName "bi-box-arrow-in-right"
-                                  , HB.me2
-                                  ]
-                              ]
-                              []
-                          , HH.text "Login"
-                          ]
-                      , HH.a
-                          [ HP.classes
-                              [ HB.btn
-                              , HB.btnOutlineLight
-                              , HB.btnLg
-                              ]
-                          , HE.onClick $ const ScrollToFeatures
-                          ]
-                          [ HH.i
-                              [ HP.classes
-                                  [ HH.ClassName "bi-info-circle"
-                                  , HB.me2
-                                  ]
-                              ]
-                              []
-                          , HH.text $ translate (label :: _ "home_learnMore")
-                              state.translator
-                          ]
-                      ]
-                  , HH.div
-                      [ HP.classes [ HB.colLg6, HB.textCenter, HB.mt3 ] ]
-                      [ HH.i
-                          [ HP.classes
-                              [ HH.ClassName "bi-file-pdf"
-                              , HB.display1
-                              ]
-                          , HP.style "font-size: 8rem; opacity: 0.8;"
-                          ]
-                          []
-                      ]
+          [ HP.classes [ HH.ClassName "landing-hero" ] ]
+          [ -- Decorative gradient orbs
+            HH.div
+              [ HP.classes
+                  [ HH.ClassName "landing-orb"
+                  , HH.ClassName "landing-orb--1"
                   ]
               ]
-          ]
-
-      -- Features Section
-      , HH.section
-          [ HP.classes [ HB.py5, HB.mt5 ]
-          ]
-          [ HH.div
-              [ HP.classes [ HB.container ] ]
-              [ HH.div
-                  [ HP.classes
-                      [ HB.row
-                      , HB.textCenter
-                      , HB.g4
-                      ]
+              []
+          , HH.div
+              [ HP.classes
+                  [ HH.ClassName "landing-orb"
+                  , HH.ClassName "landing-orb--2"
                   ]
-                  [ -- Team Collaboration
-                    HH.div
-                      [ HP.classes [ HB.colMd4 ] ]
-                      [ HH.div
-                          [ HP.classes [ HB.p4 ] ]
-                          [ HH.div
-                              [ HP.classes
-                                  [ HB.bgPrimary
-                                  , HB.roundedCircle
-                                  , HB.mxAuto
-                                  , HB.mb3
-                                  , HB.dFlex
-                                  , HB.alignItemsCenter
-                                  , HB.justifyContentCenter
-                                  ]
-                              , HP.style "width: 80px; height: 80px;"
-                              ]
-                              [ HH.i
-                                  [ HP.classes
-                                      [ HH.ClassName "bi"
-                                      , HH.ClassName "bi-people"
-                                      , HB.textWhite
-                                      , HB.fs2
-                                      ]
-                                  ]
-                                  []
-                              ]
-                          , HH.h4_
-                              [ HH.text $ translate
-                                  (label :: _ "home_teamCollaboration")
-                                  state.translator
-                              ]
-                          , HH.p
-                              [ HP.classes [ HB.textMuted ] ]
-                              [ HH.text $ translate
-                                  (label :: _ "home_teamCollaborationDescription")
-                                  state.translator
-                              ]
-                          ]
-                      ]
+              ]
+              []
+          , HH.div
+              [ HP.classes
+                  [ HH.ClassName "landing-orb"
+                  , HH.ClassName "landing-orb--3"
+                  ]
+              ]
+              []
 
-                  -- Version Control
-                  , HH.div
-                      [ HP.classes [ HB.colMd4 ] ]
-                      [ HH.div
-                          [ HP.classes [ HB.p4 ] ]
-                          [ HH.div
-                              [ HP.classes
-                                  [ HB.bgPrimary
-                                  , HB.roundedCircle
-                                  , HB.mxAuto
-                                  , HB.mb3
-                                  , HB.dFlex
-                                  , HB.alignItemsCenter
-                                  , HB.justifyContentCenter
-                                  ]
-                              , HP.id "features"
-                              , HP.style "width: 80px; height: 80px;"
-                              ]
-                              [ HH.i
-                                  [ HP.classes
-                                      [ HH.ClassName "bi-git"
-                                      , HB.textWhite
-                                      , HB.fs2
-                                      ]
-                                  ]
-                                  []
-                              ]
-                          , HH.h4_
-                              [ HH.text $ translate (label :: _ "home_versionControl")
-                                  state.translator
-                              ]
-                          , HH.p
-                              [ HP.classes [ HB.textMuted ] ]
-                              [ HH.text $ translate
-                                  (label :: _ "home_versionControlDescription")
-                                  state.translator
-                              ]
+          -- Centred hero content
+          , HH.div
+              [ HP.classes [ HH.ClassName "landing-hero__content" ] ]
+              [ -- Small badge / chip
+                HH.span
+                  [ HP.classes [ HH.ClassName "landing-badge" ] ]
+                  [ HH.i
+                      [ HP.classes
+                          [ HH.ClassName "bi-mortarboard"
+                          , HB.me1
                           ]
                       ]
-
-                  -- Advanced Editing
-                  , HH.div
-                      [ HP.classes [ HB.colMd4 ] ]
-                      [ HH.div
-                          [ HP.classes [ HB.p4 ] ]
-                          [ HH.div
-                              [ HP.classes
-                                  [ HB.bgPrimary
-                                  , HB.roundedCircle
-                                  , HB.mxAuto
-                                  , HB.mb3
-                                  , HB.dFlex
-                                  , HB.alignItemsCenter
-                                  , HB.justifyContentCenter
-                                  ]
-                              , HP.style "width: 80px; height: 80px;"
-                              ]
-                              [ HH.i
-                                  [ HP.classes
-                                      [ HH.ClassName "bi-journal-code"
-                                      , HB.textWhite
-                                      , HB.fs2
-                                      ]
-                                  ]
-                                  []
-                              ]
-                          , HH.h4_
-                              [ HH.text $ translate (label :: _ "home_editing")
-                                  state.translator
-                              ]
-                          , HH.p
-                              [ HP.classes [ HB.textMuted ] ]
-                              [ HH.text $ translate
-                                  (label :: _ "home_editingDescription")
-                                  state.translator
-                              ]
-                          ]
-                      ]
+                      []
+                  , HH.text "FPO-Editor"
                   ]
 
-              -- Get Started Button
+              -- Large title
+              , HH.h1
+                  [ HP.classes [ HH.ClassName "landing-hero__title" ] ]
+                  [ HH.text "FPO-Editor" ]
+
+              -- Description
+              , HH.p
+                  [ HP.classes [ HH.ClassName "landing-hero__subtitle" ] ]
+                  [ HH.text $ translate
+                      (label :: _ "home_basicDescription")
+                      state.translator
+                  ]
+
+              -- Action buttons
               , HH.div
-                  [ HP.classes [ HB.textCenter, HB.mt5 ] ]
+                  [ HP.classes [ HH.ClassName "landing-hero__actions" ] ]
                   [ HH.button
                       [ HP.classes
                           [ HB.btn
-                          , HB.btnPrimary
-                          , HB.btnLg
+                          , HH.ClassName "landing-btn-primary"
                           ]
                       , HE.onClick $ const NavLogin
                       ]
                       [ HH.i
                           [ HP.classes
-                              [ HH.ClassName "bi-rocket-takeoff"
+                              [ HH.ClassName "bi-box-arrow-in-right"
                               , HB.me2
                               ]
                           ]
                           []
-                      , HH.text $ translate (label :: _ "home_getStarted")
+                      , HH.text "Login"
+                      ]
+                  , HH.a
+                      [ HP.classes
+                          [ HB.btn
+                          , HH.ClassName "landing-btn-secondary"
+                          ]
+                      , HE.onClick $ const ScrollToFeatures
+                      ]
+                      [ HH.i
+                          [ HP.classes
+                              [ HH.ClassName "bi-info-circle"
+                              , HB.me2
+                              ]
+                          ]
+                          []
+                      , HH.text $ translate
+                          (label :: _ "home_learnMore")
                           state.translator
                       ]
+                  ]
+              ]
+
+          -- Scroll-down chevron
+          , HH.div
+              [ HP.classes [ HH.ClassName "landing-scroll-indicator" ]
+              , HE.onClick $ const ScrollToFeatures
+              ]
+              [ HH.i
+                  [ HP.classes [ HH.ClassName "bi-chevron-down" ] ]
+                  []
+              ]
+          ]
+
+      -- ── Features Section ────────────────────────────────────────
+      , HH.section
+          [ HP.classes [ HH.ClassName "landing-features" ]
+          , HP.id "features"
+          ]
+          [ HH.div
+              [ HP.classes [ HB.container ] ]
+              [ HH.div
+                  [ HP.classes [ HH.ClassName "landing-features__grid" ] ]
+                  [ -- Team Collaboration
+                    HH.div
+                      [ HP.classes [ HH.ClassName "landing-feature-card" ] ]
+                      [ HH.div
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__icon" ]
+                          ]
+                          [ HH.i
+                              [ HP.classes [ HH.ClassName "bi-people" ] ]
+                              []
+                          ]
+                      , HH.h3
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__title" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_teamCollaboration")
+                              state.translator
+                          ]
+                      , HH.p
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__desc" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_teamCollaborationDescription")
+                              state.translator
+                          ]
+                      ]
+
+                  -- Version Control
+                  , HH.div
+                      [ HP.classes [ HH.ClassName "landing-feature-card" ] ]
+                      [ HH.div
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__icon"
+                              , HH.ClassName "landing-feature-card__icon--success"
+                              ]
+                          ]
+                          [ HH.i
+                              [ HP.classes [ HH.ClassName "bi-git" ] ]
+                              []
+                          ]
+                      , HH.h3
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__title" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_versionControl")
+                              state.translator
+                          ]
+                      , HH.p
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__desc" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_versionControlDescription")
+                              state.translator
+                          ]
+                      ]
+
+                  -- Advanced Editing
+                  , HH.div
+                      [ HP.classes [ HH.ClassName "landing-feature-card" ] ]
+                      [ HH.div
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__icon"
+                              , HH.ClassName "landing-feature-card__icon--warning"
+                              ]
+                          ]
+                          [ HH.i
+                              [ HP.classes [ HH.ClassName "bi-journal-code" ] ]
+                              []
+                          ]
+                      , HH.h3
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__title" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_editing")
+                              state.translator
+                          ]
+                      , HH.p
+                          [ HP.classes
+                              [ HH.ClassName "landing-feature-card__desc" ]
+                          ]
+                          [ HH.text $ translate
+                              (label :: _ "home_editingDescription")
+                              state.translator
+                          ]
+                      ]
+                  ]
+              ]
+          ]
+
+      -- ── CTA Section ─────────────────────────────────────────────
+      , HH.section
+          [ HP.classes [ HH.ClassName "landing-cta" ] ]
+          [ HH.div
+              [ HP.classes [ HH.ClassName "landing-cta__inner" ] ]
+              [ HH.h2
+                  [ HP.classes [ HH.ClassName "landing-cta__title" ] ]
+                  [ HH.text $ translate
+                      (label :: _ "home_getStarted")
+                      state.translator
+                  ]
+              , HH.p
+                  [ HP.classes [ HH.ClassName "landing-cta__subtitle" ] ]
+                  [ HH.text $ translate
+                      (label :: _ "home_basicDescription")
+                      state.translator
+                  ]
+              , HH.button
+                  [ HP.classes
+                      [ HB.btn
+                      , HH.ClassName "landing-btn-primary"
+                      , HB.btnLg
+                      ]
+                  , HE.onClick $ const NavLogin
+                  ]
+                  [ HH.i
+                      [ HP.classes
+                          [ HH.ClassName "bi-rocket-takeoff"
+                          , HB.me2
+                          ]
+                      ]
+                      []
+                  , HH.text $ translate
+                      (label :: _ "home_getStarted")
+                      state.translator
                   ]
               ]
           ]
@@ -550,146 +528,145 @@ component =
   -- Search bar and list of projects.
   renderProjectOverview :: State -> H.ComponentHTML Action Slots m
   renderProjectOverview state =
-    HH.div [ HP.classes [ HB.container ] ]
-      [ HH.div [ HP.classes [ HB.row, HB.justifyContentCenter ] ]
-          [ HH.div [ HP.classes [ HB.col6 ] ]
-              [ addColumn
-                  state.searchQuery
-                  ""
-                  (translate (label :: _ "home_searchForProjects") state.translator)
-                  "bi-search"
-                  HP.InputText
-                  HandleSearchInput
+    HH.div
+      [ HP.classes [ HB.colSm11, HB.colMd9, HB.colLg7, HH.ClassName "fpo-data-list" ]
+      ]
+      [ -- Header
+        HH.div [ HP.classes [ HH.ClassName "fpo-data-list__header" ] ]
+          [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__title" ] ]
+              [ HH.text $ translate (label :: _ "home_yourProjects") state.translator
               ]
-          , if state.projects == Loading then loadingSpinner
-            else HH.div [ HP.classes [ HB.col12 ] ] [ renderProjectTable ps state ]
-          , HH.slot _pagination unit P.component paginationSettings SetPage
+          ]
+      -- Search
+      , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__search" ] ]
+          [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__search-wrapper" ] ]
+              [ HH.i
+                  [ HP.classes
+                      [ HH.ClassName "bi-search"
+                      , HH.ClassName "fpo-data-list__search-icon"
+                      ]
+                  ]
+                  []
+              , HH.input
+                  [ HP.classes [ HH.ClassName "fpo-data-list__search-input" ]
+                  , HP.placeholder $ translate (label :: _ "home_searchForProjects")
+                      state.translator
+                  , HP.value state.searchQuery
+                  , HE.onValueInput HandleSearchInput
+                  ]
+              ]
+          ]
+      -- Body
+      , HH.div
+          [ HP.classes [ HH.ClassName "fpo-data-list__body" ] ]
+          ( if state.projects == Loading then
+              [ loadingSpinner ]
+            else if null ps then
+              [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__empty" ] ]
+                  [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__empty-icon" ] ]
+                      [ HH.i [ HP.classes [ HH.ClassName "bi-folder2-open" ] ] [] ]
+                  , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__empty-text" ] ]
+                      [ HH.text $ translate (label :: _ "home_noProjectsFound")
+                          state.translator
+                      ]
+                  ]
+              ]
+            else
+              map (renderProjectRow state) ps
+                <> placeholderRows 5 (length ps) pageCount
+          )
+      -- Footer
+      , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__footer" ] ]
+          [ HH.slot _pagination unit P.component paginationSettings SetPage
           , if length fps == 0 then HH.text ""
             else
               let
                 startItem = state.page * 5 + 1
                 endItem = min ((state.page + 1) * 5) (length fps)
               in
-                HH.div [ HP.classes [ HB.textCenter, HB.textMuted, HB.small ] ]
+                HH.span [ HP.classes [ HH.ClassName "fpo-data-list__entry-count" ] ]
                   [ HH.text $
-                      show startItem <> "–" <> show endItem <> " / " <> show
+                      show startItem <> "-" <> show endItem <> " / " <> show
                         (length fps)
                   ]
           ]
       ]
     where
-    -- All projects filtered by the search query:
     fps = filterProjects state.searchQuery (fromLoading state.projects [])
-    -- Slice of the projects for the current page:
-    ps = slice (state.page * 5) ((state.page + 1) * 5) $ fps
+    ps = slice (state.page * 5) ((state.page + 1) * 5) fps
+    pageCount = length fps `div` 5 +
+      if length fps `mod` 5 > 0 then 1 else 0
     paginationSettings =
-      { pages: length fps `div` 5 +
-          if length fps `mod` 5 > 0 then 1 else 0
+      { pages: pageCount
       , style: P.Compact 2
-      , reaction: P.FirstPage -- After changing the search query, reset to first page.
+      , reaction: P.FirstPage
       }
 
-  -- Renders the list of projects.
-  renderProjectTable
-    :: Array DocumentHeader -> State -> H.ComponentHTML Action Slots m
-  renderProjectTable ps state =
-    HH.table
-      [ HP.classes [ HB.table, HB.tableHover, HB.tableBordered ] ]
-      [ HH.colgroup_
-          [ HH.col [ HP.style "width: 57%;" ] -- 'Title' column
-          , HH.col [ HP.style "width: 27%;" ] -- 'Last Updated' column
-          , HH.col [ HP.style "width: 8%;" ] -- 'PDF' column
-          , HH.col [ HP.style "width: 8%;" ] -- 'ZIP' column
-          ]
-      , HH.slot _tablehead unit TH.component
-          { columns: tableCols state.translator
-          , sortedBy: translate (label :: _ "home_lastUpdated") state.translator
-          }
-          ChangeSorting
-      , HH.tbody_ $
-          if null ps then
-            [ HH.tr []
-                [ HH.td
-                    [ HP.colSpan 4
-                    , HP.classes [ HB.textCenter ]
-                    ]
-                    [ HH.i_
-                        [ HH.text $ translate (label :: _ "home_noProjectsFound")
-                            state.translator
-                        ]
-                    ]
-                ]
-            ]
-          else
-            ( map (renderProjectRow state) ps
-                <> replicate (5 - length ps) (emptyTableRow 48 4)
-            ) -- Fill up to 5 rows
-      ]
-    where
-    tableCols translator = TH.createTableColumns
-      [ { title: translate (label :: _ "home_title") translator
-        , style: Just TH.Alpha
-        }
-      , { title: translate (label :: _ "home_lastUpdated") translator
-        , style: Just TH.Numeric
-        }
-      , { title: "PDF"
-        , style: Nothing
-        }
-      , { title: "ZIP"
-        , style: Nothing
-        }
-      ]
-
-  -- Renders a single project row in the table.
+  -- Renders a single project row.
   renderProjectRow :: forall w. State -> DocumentHeader -> HH.HTML w Action
   renderProjectRow state project =
-    HH.tr
-      [ HE.onClick $ const $ ViewProject project
-      , HP.style "cursor: pointer;"
-      ]
-      [ HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ DocumentHeader.getName project ]
-      , HH.td [ HP.classes [ HB.textCenter ] ]
-          [ HH.text $ formatRelativeTime state.currentTime $ DocDate.docDateToDateTime
-              $
-                DocumentHeader.getLastEdited project
+    HH.div
+      [ HP.classes
+          [ HH.ClassName "fpo-data-list__row"
+          , HH.ClassName "fpo-data-list__row--clickable"
           ]
-      , HH.td
-          [ HP.classes [ HB.textCenter, HB.alignMiddle ] ]
+      , HE.onClick $ const $ ViewProject project
+      ]
+      [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-info" ] ]
+          [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-primary" ] ]
+              [ HH.text $ DocumentHeader.getName project ]
+          , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-secondary" ] ]
+              [ HH.text $ formatRelativeTime state.currentTime
+                  $ DocDate.docDateToDateTime
+                  $
+                    DocumentHeader.getLastEdited project
+              ]
+          ]
+      , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-actions" ] ]
           [ HH.button
-              [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
+              [ HP.classes
+                  [ HH.ClassName "fpo-data-list__action-btn"
+                  , HH.ClassName "fpo-data-list__action-btn--accent"
+                  ]
               , HE.onClick $ \e -> DownloadPdf (DocumentHeader.getIdentifier project)
                   (DocumentHeader.getName project)
                   e
               ]
-              [ HH.i
-                  [ HP.classes
-                      [ HH.ClassName "bi-file-earmark-pdf"
-                      , HB.bi
-                      ]
+              [ HH.i [ HP.classes [ HH.ClassName "bi-file-earmark-pdf" ] ] [] ]
+          , HH.button
+              [ HP.classes
+                  [ HH.ClassName "fpo-data-list__action-btn"
+                  , HH.ClassName "fpo-data-list__action-btn--accent"
                   ]
-                  []
-              ]
-          ]
-      , HH.td
-          [ HP.classes [ HB.textCenter, HB.alignMiddle ] ]
-          [ HH.button
-              [ HP.classes [ HB.btn, HB.btnSm, HB.btnOutlineSecondary ]
               , HE.onClick $ \e -> DownloadZip (DocumentHeader.getIdentifier project)
                   (DocumentHeader.getName project)
                   e
               ]
-              [ HH.i
-                  [ HP.classes
-                      [ HH.ClassName "bi-file-zip"
-                      , HB.bi
-                      ]
-                  ]
-                  []
-              ]
+              [ HH.i [ HP.classes [ HH.ClassName "bi-file-zip" ] ] [] ]
           ]
       ]
+
+  -- Render invisible placeholder rows so the list body keeps a constant
+  -- height across pages (prevents pagination controls from jumping).
+  -- Only emits placeholders when there are multiple pages.
+  placeholderRows :: forall w. Int -> Int -> Int -> Array (HH.HTML w Action)
+  placeholderRows perPage currentCount pages =
+    let
+      needed = perPage - currentCount
+    in
+      if pages <= 1 || needed <= 0 then []
+      else replicate needed $
+        HH.div
+          [ HP.classes [ HH.ClassName "fpo-data-list__row" ]
+          , HP.style "visibility: hidden; pointer-events: none;"
+          ]
+          [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-info" ] ]
+              [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-primary" ] ]
+                  [ HH.text "\x00a0" ] -- non-breaking space for height
+              , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-secondary" ] ]
+                  [ HH.text "\x00a0" ]
+              ]
+          ]
 
   filterProjects :: String -> Array DocumentHeader -> Array DocumentHeader
   filterProjects query projects =

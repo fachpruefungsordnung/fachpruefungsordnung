@@ -1,29 +1,40 @@
-/* Hide drag handles and add buttons by default, show on hover */
-.toc-drag-handle,
-.toc-add-wrapper {
-  opacity: 0;
-  transition: opacity 0.15s ease;
+.toc-list {
+  container-type: inline-size;
+  padding: var(--fpo-space-1) 0;
 }
 
 .toc-item {
   padding-top: 2px;
   padding-bottom: 2px;
+  border-left: 3px solid transparent;
+  transition:
+    background var(--fpo-transition-fast),
+    border-left-color var(--fpo-transition-fast);
 }
 
-/* Show drag handles and add buttons on hover */
-.toc-item:hover .toc-drag-handle,
-.toc-item:hover .toc-add-wrapper {
-  opacity: 1;
-}
-
-/* Hover effects for toc items */
 .toc-item:hover {
-  background-color: var(--bs-gray-100) !important;
+  background: var(--fpo-bg-secondary);
+  border-left-color: var(--fpo-accent-muted);
 }
 
 .toc-item.active {
-  background-color: rgb(230, 240, 255) !important;
-  color: rgb(13, 110, 253) !important;
+  background-color: var(--fpo-accent-subtle);
+  color: var(--fpo-accent);
+}
+
+.toc-item.active:hover {
+  background-color: var(--fpo-accent-subtle);
+}
+
+.toc-drag-handle,
+.toc-add-wrapper {
+  opacity: 0;
+  transition: opacity var(--fpo-transition-fast);
+}
+
+.toc-item:hover .toc-drag-handle,
+.toc-item:hover .toc-add-wrapper {
+  opacity: 1;
 }
 
 /* Always show add button in header */
@@ -31,56 +42,27 @@
   opacity: 1;
 }
 
-/* Drag handle cursor */
+/* Drag handle */
 .toc-drag-handle {
   cursor: grab;
   user-select: none;
   font-size: 0.8rem;
   width: 16px;
+  flex-shrink: 0;
 }
 
 .toc-drag-handle:active {
   cursor: grabbing;
 }
 
-/* Dropdown hover effects */
-.btn-link:hover {
-  background-color: var(--bs-gray-100) !important;
-  color: var(--bs-body-color) !important;
-}
-
-/* ********** Buttons for Version History ********** */
-
-.toc-item.btn-info {
-  background-color: rgb(255, 255, 255) !important;
-  color: rgb(0, 0, 0) !important
-}
-
-.toc-item.btn-info:hover {
-  background-color: var(--bs-gray-100) !important;
-}
-
-.toc-item.btn-info.active {
-  background-color: rgb(230, 240, 255) !important;
-  color: rgb(13, 110, 253) !important;
-}
-
-.toc-item.btn-info.active:hover {
-  background-color: rgb(230, 240, 255) !important;
-  color: rgb(13, 110, 253) !important;
-}
-
-
-/* ********** Small TOC buttons ********** */
-
 .toc-button {
   padding: 0.125rem 0.375rem;
   font-size: 1.1rem;
-  border-radius: 3px;
+  border-radius: var(--fpo-radius-sm);
   border: none;
   background: transparent;
-  color: #8995a1;
-  transition: all 0.15s ease;
+  color: var(--fpo-text-tertiary);
+  transition: all var(--fpo-transition-fast);
   aspect-ratio: 1 / 1;
   height: 1.3em;
   display: inline-flex;
@@ -89,27 +71,30 @@
 }
 
 .toc-button:hover {
-  background: #e9ecef;
-  color: #495057;
+  background: var(--fpo-bg-tertiary);
+  color: var(--fpo-text-secondary);
 }
 
 .toc-button.btn-success:hover {
-  background: #d4edda;
-  color: #155724;
+  background: var(--fpo-success-subtle);
+  color: var(--fpo-success);
 }
 
 .toc-button.btn-danger:hover {
-  background: #f8d7da;
-  color: #721c24;
+  background: var(--fpo-danger-subtle);
+  color: var(--fpo-danger);
 }
 
-/* ********** Drag and drop ********** */
+.btn-link:hover {
+  background-color: var(--fpo-bg-tertiary) !important;
+  color: var(--fpo-text-primary) !important;
+}
 
 .toc-item.dragging {
   opacity: 0.6;
   transform: scale(0.98);
   z-index: 1000;
-  background: #f8f9fa;
+  background: var(--fpo-bg-secondary);
 }
 
 .drop-zone {
@@ -117,17 +102,17 @@
   margin: 0 0.75rem;
   background: transparent;
   border-radius: 1px;
-  transition: all 0.15s ease;
+  transition: all var(--fpo-transition-fast);
 }
 
 .drop-zone.active {
-  background: #0d6efd;
+  background: var(--fpo-accent);
   height: 2px;
   margin: 0.25rem 0.75rem;
 }
 
 .drop-zone.blocked {
-  background: #aaaaaa;
+  background: var(--fpo-border-default);
   height: 2px;
   margin: 0.25rem 0.75rem;
 }
@@ -135,7 +120,9 @@
 /* Drop zone at the end of sections */
 
 .drop-zone-end {
-  transition: height 0.2s ease, margin 0.2s ease;
+  transition:
+    height var(--fpo-transition-normal),
+    margin var(--fpo-transition-normal);
   position: relative;
   height: 0;
   overflow: hidden;
@@ -145,18 +132,18 @@
 
 .drop-zone-end.preview {
   height: 18px;
-  background-color: rgba(168, 214, 255, 0.1);
+  background-color: var(--fpo-accent-subtle);
   margin: 1px 0.75rem;
-  border: 1px dashed #c6e4ff;
-  border-radius: 3px;
+  border: 1px dashed var(--fpo-accent-muted);
+  border-radius: var(--fpo-radius-sm);
 }
 
 .drop-zone-end.active {
   height: 32px;
-  background-color: rgba(0, 123, 255, 0.1);
+  background-color: rgba(37, 99, 235, 0.1);
   margin: 2px 0.75rem;
-  border: 1px dashed #007bff;
-  border-radius: 3px;
+  border: 1px dashed var(--fpo-accent-muted);
+  border-radius: var(--fpo-radius-sm);
 }
 
 .drop-zone-end::after {
@@ -166,38 +153,45 @@
   top: 50%;
   transform: translate(-50%, -50%);
   font-size: 10px;
-  color: #6c757d;
+  color: var(--fpo-text-tertiary);
   white-space: nowrap;
   opacity: 0;
-  transition: opacity 0.2s ease;
+  transition: opacity var(--fpo-transition-normal);
   pointer-events: none;
 }
 
 .drop-zone-end.preview::after {
   opacity: 1;
-  color: #4c94e0;
+  color: var(--fpo-accent-muted);
 }
 
 .drop-zone-end.active::after {
   opacity: 1;
-  color: #007bff;
+  color: var(--fpo-accent);
 }
 
-/* ********** Smaller margin ********** */
-
-.mx05 {
-  margin-left: 0.0625rem !important;
-  margin-right: 0.0625rem !important;
+@container (max-width: 220px) {
+  .fpo-btn-label {
+    display: none;
+  }
 }
-
-/* ********** Put scroll bar to the left ********** */
 
 .leftscrollbar {
-  height: 100%;      
-  overflow-y: auto;   
-  direction: rtl;     
+  height: 100%;
+  overflow-y: auto;
+  direction: rtl;
 }
 
 .leftscrollbar > div {
-  direction: ltr;     
-} 
+  direction: ltr;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toc-item,
+  .toc-drag-handle,
+  .toc-add-wrapper,
+  .drop-zone,
+  .drop-zone-end {
+    transition: none;
+  }
+}

@@ -5,10 +5,10 @@ import Prelude
 import Data.Maybe (Maybe(Just, Nothing))
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Request (LoadState(..))
+import FPO.UI.Css as HB
 import Halogen as H
 import Halogen.HTML (iframe) as HH
 import Halogen.HTML.Properties as HP
-import Halogen.Themes.Bootstrap5 as HB
 import Web.HTML.Common (AttrName(..))
 
 type Output = Unit

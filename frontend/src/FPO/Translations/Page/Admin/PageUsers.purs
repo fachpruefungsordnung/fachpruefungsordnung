@@ -12,6 +12,7 @@ type AdminUserPageLabels =
       ::: "admin_users_failedToLoadUsers"
       ::: "admin_users_goToProfilePage"
       ::: "admin_users_listOfUsers"
+      ::: "admin_users_noUsersFound"
       ::: "admin_users_successfullyCreatedUser"
       ::: "admin_users_theUser"
       ::: SNil
@@ -27,6 +28,7 @@ enAdminUserPage = fromRecord
   , admin_users_failedToLoadUsers: "Failed to load users"
   , admin_users_goToProfilePage: "Go to profile page"
   , admin_users_successfullyCreatedUser: "Successfully created user"
+  , admin_users_noUsersFound: "No users found"
   , admin_users_create: "Create"
   , admin_users_theUser: "user"
   }
@@ -41,7 +43,7 @@ deAdminUserPage = fromRecord
   , admin_users_failedToLoadUsers: "Fehler beim Laden der Nutzer"
   , admin_users_goToProfilePage: "Zum Profil gehen"
   , admin_users_successfullyCreatedUser: "Nutzer erfolgreich erstellt"
+  , admin_users_noUsersFound: "Keine Benutzer gefunden"
   , admin_users_create: "Erstellen"
   , admin_users_theUser: "den Nutzer"
   }
-

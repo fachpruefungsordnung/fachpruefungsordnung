@@ -7,13 +7,13 @@ import Prelude
 import Data.Array (singleton)
 import Data.Maybe (Maybe(..))
 import FPO.Translations.Labels (Labels)
+import FPO.UI.Css as HB
 import FPO.UI.HTML (addModal)
 import FPO.Util as Util
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (Translator, label, translate)
 
 -- | Modal for confirming the deletion of a group.
@@ -93,7 +93,6 @@ deleteConfirmationModal
             [ HP.type_ HP.ButtonButton
             , HP.classes
                 [ HB.btn, HB.btnSecondary ]
-            , HP.attr (HH.AttrName "data-bs-dismiss") "modal"
             , HE.onClick (const cancelAction)
             ]
             [ HH.text $ translate (label :: _ "common_cancel") translator ]

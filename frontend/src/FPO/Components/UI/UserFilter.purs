@@ -12,13 +12,13 @@ import Effect.Aff.Class (class MonadAff)
 import FPO.Data.Store as Store
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.Css as HB
 import FPO.UI.HTML (addButton, addCard, addColumn)
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Properties (InputType(..), classes) as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import Halogen.Themes.Bootstrap5 as HB
 import Simple.I18n.Translator (label, translate)
 
 type State = FPOState (username :: String, email :: String)
