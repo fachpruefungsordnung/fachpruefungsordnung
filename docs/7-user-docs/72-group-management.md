@@ -2,8 +2,8 @@
 
 ## Creating a new Group
 
-1. Go to the Groups menu by clicking on the respective element of the navigation bar in the top left corner.
-   ![](img/groupselection.png)
+1. Go to the Administration menu by clicking on the respective element of the navigation bar in the top left corner.
+   ![](img/navadmin.png)
 2. Next enter the desired group name in the name field of the **Create New Group** part and confirm with create.
    ![](img/creategroup.png)
 3. Then a popup will appear where a optional group description can be added. After confirming the creation with **Create**, the group is added.
