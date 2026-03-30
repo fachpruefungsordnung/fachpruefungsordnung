@@ -444,7 +444,6 @@
 }
 /* Zero interior-facing corners for every direct child in an input-group */
 .input-group > *:not(:first-child) {
-  border-left: 0;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
 }
@@ -468,6 +467,18 @@
   background: var(--fpo-bg-tertiary);
   border: 1px solid var(--fpo-border-default);
   border-radius: var(--fpo-radius-md);
+}
+
+.input-group > .input-group-text:first-child {
+  border-right: 0;
+}
+
+.input-group > .input-group-text:last-child {
+  border-left: 0;
+}
+
+.input-group > .btn {
+  border-left: 0;
 }
 
 /* --------------------------------------------------------------------------

@@ -1780,17 +1780,23 @@ changeNodeHeading
   :: Path -> String -> TOCTree -> TOCTree
 changeNodeHeading _ _ Empty = Empty
 changeNodeHeading path newName (RootTree { children, header }) =
-  let
-    newChildren = mapWithIndex
-      ( \ix (Edge child) ->
-          case uncons path of
-            Just { head, tail } | ix == head ->
-              Edge $ changeNodeHeading' tail newName child
-            _ -> Edge child
-      )
-      children
-  in
-    RootTree { children: newChildren, header }
+  if path == [] then
+    let
+      newHeader = updateHeading newName header
+    in
+      RootTree { children, header: newHeader }
+  else
+    let
+      newChildren = mapWithIndex
+        ( \ix (Edge child) ->
+            case uncons path of
+              Just { head, tail } | ix == head ->
+                Edge $ changeNodeHeading' tail newName child
+              _ -> Edge child
+        )
+        children
+    in
+      RootTree { children: newChildren, header }
 
 changeNodeHeading' :: Path -> String -> Tree TOCEntry -> Tree TOCEntry
 changeNodeHeading' path newName tree = case path of
