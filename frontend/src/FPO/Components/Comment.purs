@@ -224,12 +224,12 @@ commentview = connect selectTranslator $ H.mkComponent
                           ]
                       ] <>
                         if state.showDiscardPopover then
-                          [ HH.div [ HP.classes [ H.ClassName "fpo-discard-popover" ] ]
-                              [ HH.div [ HP.classes [ H.ClassName "fpo-discard-popover__text" ] ]
+                          [ HH.div [ HP.classes [ H.ClassName "fpo-popover" ] ]
+                              [ HH.div [ HP.classes [ H.ClassName "fpo-popover__text" ] ]
                                   [ HH.text
                                       (translate (label :: _ "comment_discard_phrase") state.translator)
                                   ]
-                              , HH.div [ HP.classes [ H.ClassName "fpo-discard-popover__actions" ] ]
+                              , HH.div [ HP.classes [ H.ClassName "fpo-popover__actions" ] ]
                                   [ HH.button
                                       [ HP.classes [ HB.btn, HB.btnSm, HB.btnSecondary ]
                                       , HE.onClick \_ -> HideDiscardPopover

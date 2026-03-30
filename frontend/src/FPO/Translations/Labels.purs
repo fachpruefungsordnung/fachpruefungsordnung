@@ -364,6 +364,11 @@ type Labels =
       ::: "rp_RequestCode"
 
       -- | Table of Contents (TOC)
+      ::: "toc_cannotDelete"
+      ::: "toc_editModal_hint"
+      ::: "toc_editModal_title"
+      ::: "toc_editMode_off"
+      ::: "toc_editMode_on"
       ::: "toc_end_dropzone"
       ::: "toc_full"
       ::: "toc_paragraph"

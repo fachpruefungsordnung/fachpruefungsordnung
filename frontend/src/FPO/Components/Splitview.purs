@@ -359,11 +359,11 @@ splitview = connect selectTranslator $ H.mkComponent
     in
       [ -- TOC
         HH.div
-          [ HP.classes [ HB.overflowAuto, HB.p1 ]
+          [ HP.classes [ HB.overflowAuto, HB.p1, H.ClassName "fpo-sidebar-panel" ]
           , HP.style $
               "flex: 0 0 " <> show (absoluteSidebarRatio * 100.0)
                 <>
-                  "%; box-sizing: border-box; min-width: 6ch; background:rgb(233, 233, 235); position: relative;"
+                  "%; box-sizing: border-box; min-width: 6ch; background: var(--fpo-bg-secondary); position: relative;"
                 <>
                   if
                     not state.resizeState.sidebarClosed
@@ -417,10 +417,10 @@ splitview = connect selectTranslator $ H.mkComponent
                           ]
                       ] <>
                         if state.showResolvePopover then
-                          [ HH.div [ HP.classes [ H.ClassName "fpo-discard-popover", H.ClassName "fpo-discard-popover--down" ] ]
-                              [ HH.div [ HP.classes [ H.ClassName "fpo-discard-popover__text" ] ]
+                          [ HH.div [ HP.classes [ H.ClassName "fpo-popover", H.ClassName "fpo-popover--down" ] ]
+                              [ HH.div [ HP.classes [ H.ClassName "fpo-popover__text" ] ]
                                   [ HH.text (translate (label :: _ "comment_resolve_phrase") state.translator) ]
-                              , HH.div [ HP.classes [ H.ClassName "fpo-discard-popover__actions" ] ]
+                              , HH.div [ HP.classes [ H.ClassName "fpo-popover__actions" ] ]
                                   [ HH.button
                                       [ HP.classes [ HB.btn, HB.btnSm, HB.btnSecondary ]
                                       , HE.onClick \_ -> HideResolvePopover
