@@ -353,15 +353,18 @@ type Labels =
       ::: "prof_you"
 
       -- | Reset Password Page
-      ::: "rp_ConfirmationCode"
       ::: "rp_Header"
-      ::: "rp_IfYouNeedANewCode"
-      ::: "rp_InputCode"
       ::: "rp_NoEmail"
       ::: "rp_NoMatch"
       ::: "rp_PasswordConfirm"
       ::: "rp_PasswordNew"
-      ::: "rp_RequestCode"
+      ::: "rp_linkSentBodyAfter"
+      ::: "rp_linkSentBodyBefore"
+      ::: "rp_linkSentTitle"
+      ::: "rp_newPasswordHint"
+      ::: "rp_requestLinkHint"
+      ::: "rp_sendResetLink"
+      ::: "rp_setNewPassword"
 
       -- | Table of Contents (TOC)
       ::: "toc_cannotDelete"

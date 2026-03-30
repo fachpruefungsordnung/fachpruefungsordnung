@@ -402,7 +402,7 @@ component =
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _userPagination unit P.component userPaginationProps SetUserPage
           , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
-              [ HH.text $ if length state.filteredUsers == 0 then "" else show (state.userPage * usersPerPage + 1) <> "\x2013" <> show (min ((state.userPage + 1) * usersPerPage) (length state.filteredUsers)) <> " / " <> show (length state.filteredUsers) ]
+              [ HH.text $ if length state.filteredUsers == 0 then "" else show (state.userPage * usersPerPage + 1) <> "–" <> show (min ((state.userPage + 1) * usersPerPage) (length state.filteredUsers)) <> " / " <> show (length state.filteredUsers) ]
           ]
       ]
     where
@@ -493,7 +493,7 @@ component =
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _groupPagination unit P.component groupPaginationProps SetGroupPage
           , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
-              [ HH.text $ if length state.filteredGroups == 0 then "" else show (state.groupPage * groupsPerPage + 1) <> "\x2013" <> show (min ((state.groupPage + 1) * groupsPerPage) (length state.filteredGroups)) <> " / " <> show (length state.filteredGroups) ]
+              [ HH.text $ if length state.filteredGroups == 0 then "" else show (state.groupPage * groupsPerPage + 1) <> "-" <> show (min ((state.groupPage + 1) * groupsPerPage) (length state.filteredGroups)) <> " / " <> show (length state.filteredGroups) ]
           ]
       ]
     where

@@ -581,7 +581,7 @@ component =
               in
                 HH.span [ HP.classes [ HH.ClassName "fpo-data-list__entry-count" ] ]
                   [ HH.text $
-                      show startItem <> "\x2013" <> show endItem <> " / " <> show
+                      show startItem <> "-" <> show endItem <> " / " <> show
                         (length fps)
                   ]
           ]

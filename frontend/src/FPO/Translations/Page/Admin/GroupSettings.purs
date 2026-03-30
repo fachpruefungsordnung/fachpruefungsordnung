@@ -35,6 +35,6 @@ deGroupSettingsPage = fromRecord
   , gs_groupNamePlaceholder: "Gruppenname eingeben"
   , gs_saveSettings: "Einstellungen speichern"
   , gs_settings: "Einstellungen"
-  , gs_unsavedChangesConfirm: "Es gibt ungespeicherte \xC4nderungen. M\xF6chten Sie die Seite verlassen, ohne zu speichern?"
+  , gs_unsavedChangesConfirm: "Es gibt ungespeicherte Änderungen. Möchten Sie die Seite verlassen, ohne zu speichern?"
   , gs_settingsUpdated: "Gruppeneinstellungen erfolgreich aktualisiert"
   }

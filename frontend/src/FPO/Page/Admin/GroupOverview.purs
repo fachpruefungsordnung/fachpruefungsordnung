@@ -390,7 +390,7 @@ component =
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _docPagination unit P.component docPaginationProps SetDocPage
           , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
-              [ HH.text $ if length state.filteredDocuments == 0 then "" else show (state.docPage * itemsPerPage + 1) <> "\x2013" <> show (min ((state.docPage + 1) * itemsPerPage) (length state.filteredDocuments)) <> " / " <> show (length state.filteredDocuments) ]
+              [ HH.text $ if length state.filteredDocuments == 0 then "" else show (state.docPage * itemsPerPage + 1) <> "-" <> show (min ((state.docPage + 1) * itemsPerPage) (length state.filteredDocuments)) <> " / " <> show (length state.filteredDocuments) ]
           ]
       ]
     where
@@ -484,7 +484,7 @@ component =
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _memberPagination unit P.component memberPaginationProps SetMemberPage
           , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
-              [ HH.text $ if length state.filteredMembers == 0 then "" else show (state.memberPage * itemsPerPage + 1) <> "\x2013" <> show (min ((state.memberPage + 1) * itemsPerPage) (length state.filteredMembers)) <> " / " <> show (length state.filteredMembers) ]
+              [ HH.text $ if length state.filteredMembers == 0 then "" else show (state.memberPage * itemsPerPage + 1) <> "-" <> show (min ((state.memberPage + 1) * itemsPerPage) (length state.filteredMembers)) <> " / " <> show (length state.filteredMembers) ]
           ]
       ]
     where

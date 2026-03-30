@@ -19,7 +19,7 @@ type TocLabels =
 enTOC :: Translation TocLabels
 enTOC = fromRecord
   { toc_cannotDelete: "This element cannot be removed"
-  , toc_editModal_hint: "Drag entries to reorder. Use + to add and \x2212 to remove elements."
+  , toc_editModal_hint: "Drag entries to reorder. Use + to add and - to remove elements."
   , toc_editModal_title: "Edit Document Structure"
   , toc_editMode_off: "Stop editing"
   , toc_editMode_on: "Edit structure"
@@ -33,7 +33,7 @@ enTOC = fromRecord
 deTOC :: Translation TocLabels
 deTOC = fromRecord
   { toc_cannotDelete: "Dieses Element kann nicht entfernt werden"
-  , toc_editModal_hint: "Eintr\x00E4ge ziehen zum Neuordnen. Mit + hinzuf\x00FCgen und \x2212 entfernen."
+  , toc_editModal_hint: "Einträge ziehen zum Neuordnen. Mit + hinzufügen und - entfernen."
   , toc_editModal_title: "Dokumentstruktur bearbeiten"
   , toc_editMode_off: "Bearbeitung beenden"
   , toc_editMode_on: "Struktur bearbeiten"

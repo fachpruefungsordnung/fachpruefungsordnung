@@ -39,11 +39,11 @@ enComment = fromRecord
   , comment_modal_delete_titel: "Confirm Delete"
   , comment_modal_resolve_titel: "Confirm Resolve"
   , comment_no_timestamp: "No timestamp found."
-  , comment_placeholder: "Write a comment\x2026"
+  , comment_placeholder: "Write a comment..."
   , comment_predated:
       "Note: This comment was created after the currently displayed version."
   , comment_reanchor:
-      "Note: This comment no longer has an anchor. Select a new range and click the \x201CComment\x201D button to re-anchor it."
+      "Note: This comment no longer has an anchor. Select a new range and click the \"Comment\" button to re-anchor it."
   , comment_resolve: "Resolve"
   , comment_resolve_phrase: "Are you sure you want to resolve this comment?"
   , comment_resolved_notice: "This conversation has been resolved."
@@ -63,11 +63,11 @@ deComment = fromRecord
   , comment_modal_delete_titel: "Löschen bestätigen"
   , comment_modal_resolve_titel: "Auflösen bestätigen"
   , comment_no_timestamp: "Keinen timestamp gefunden."
-  , comment_placeholder: "Kommentar schreiben\x2026"
+  , comment_placeholder: "Kommentar schreiben..."
   , comment_predated:
       "Hinweis: Dieser Kommentar wurde erst nach der aktuell angezeigten Version erstellt."
   , comment_reanchor:
-      "Hinweis: Dieser Kommentar hat keinen Anker mehr. Markiere neuen Bereich und klicke auf \x201EKommentar\x201C-Button, um ihn neu zu verankern."
+      "Hinweis: Dieser Kommentar hat keinen Anker mehr. Markiere neuen Bereich und klicke auf \"Kommentar\"-Button, um ihn neu zu verankern."
   , comment_resolve: "Auflösen"
   , comment_resolve_phrase:
       "Sind sie sicher, dass sie diesen Kommentar auflösen möchten?"
