@@ -68,6 +68,7 @@ import FPO.Types
   , findTitleTOCEntry
   , tocTreeToDocumentTree
   )
+import FPO.UI.Css as HB
 import FPO.UI.Modals.DirtyVersionModal (dirtyVersionModal)
 import FPO.UI.Resizing
   ( ResizeState
@@ -85,7 +86,6 @@ import Halogen.Query.HalogenM (SubscriptionId)
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
-import FPO.UI.Css as HB
 import Routing.Duplex as RD
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(Proxy))
@@ -395,7 +395,10 @@ splitview = connect selectTranslator $ H.mkComponent
                   "display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0.25rem 0.75rem 0.25rem;"
               ]
               [ HH.button
-                  [ HP.classes [ H.ClassName "fpo-back-btn", H.ClassName "fpo-back-btn--inline" ]
+                  [ HP.classes
+                      [ H.ClassName "fpo-back-btn"
+                      , H.ClassName "fpo-back-btn--inline"
+                      ]
                   , HE.onClick \_ -> CloseComment
                   ]
                   [ HH.i [ HP.classes [ H.ClassName "bi-arrow-left" ] ] [] ]
@@ -403,34 +406,69 @@ splitview = connect selectTranslator $ H.mkComponent
                   [ HP.style
                       "margin: 0; font-weight: 600; color: var(--fpo-text-primary); font-size: var(--fpo-text-md);"
                   ]
-                  [ HH.text (translate (label :: _ "comment_comment") state.translator) ]
+                  [ HH.text
+                      (translate (label :: _ "comment_comment") state.translator)
+                  ]
               -- Resolve button, pushed to the right
               , if state.showResolveButton then
                   HH.div [ HP.style "margin-left: auto; position: relative;" ]
                     ( [ HH.button
-                          [ HP.classes [ HB.btn, HB.btnSm, H.ClassName "btn-outline-success", H.ClassName "fpo-resolve-btn" ]
+                          [ HP.classes
+                              [ HB.btn
+                              , HB.btnSm
+                              , H.ClassName "btn-outline-success"
+                              , H.ClassName "fpo-resolve-btn"
+                              ]
                           , HE.onClick \_ -> ShowResolvePopover
                           ]
-                          [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ] []
+                          [ HH.i
+                              [ HP.classes [ HB.bi, H.ClassName "bi-check2-circle" ] ]
+                              []
                           , HH.span [ HP.classes [ H.ClassName "fpo-btn-label" ] ]
-                              [ HH.text (" " <> translate (label :: _ "comment_resolve") state.translator) ]
+                              [ HH.text
+                                  ( " " <> translate (label :: _ "comment_resolve")
+                                      state.translator
+                                  )
+                              ]
                           ]
                       ] <>
                         if state.showResolvePopover then
-                          [ HH.div [ HP.classes [ H.ClassName "fpo-popover", H.ClassName "fpo-popover--down" ] ]
-                              [ HH.div [ HP.classes [ H.ClassName "fpo-popover__text" ] ]
-                                  [ HH.text (translate (label :: _ "comment_resolve_phrase") state.translator) ]
-                              , HH.div [ HP.classes [ H.ClassName "fpo-popover__actions" ] ]
+                          [ HH.div
+                              [ HP.classes
+                                  [ H.ClassName "fpo-popover"
+                                  , H.ClassName "fpo-popover--down"
+                                  ]
+                              ]
+                              [ HH.div
+                                  [ HP.classes [ H.ClassName "fpo-popover__text" ] ]
+                                  [ HH.text
+                                      ( translate
+                                          (label :: _ "comment_resolve_phrase")
+                                          state.translator
+                                      )
+                                  ]
+                              , HH.div
+                                  [ HP.classes [ H.ClassName "fpo-popover__actions" ]
+                                  ]
                                   [ HH.button
-                                      [ HP.classes [ HB.btn, HB.btnSm, HB.btnSecondary ]
+                                      [ HP.classes
+                                          [ HB.btn, HB.btnSm, HB.btnSecondary ]
                                       , HE.onClick \_ -> HideResolvePopover
                                       ]
-                                      [ HH.text (translate (label :: _ "common_cancel") state.translator) ]
+                                      [ HH.text
+                                          ( translate (label :: _ "common_cancel")
+                                              state.translator
+                                          )
+                                      ]
                                   , HH.button
                                       [ HP.classes [ HB.btn, HB.btnSm, HB.btnSuccess ]
                                       , HE.onClick \_ -> ConfirmResolve
                                       ]
-                                      [ HH.text (translate (label :: _ "common_resolve") state.translator) ]
+                                      [ HH.text
+                                          ( translate (label :: _ "common_resolve")
+                                              state.translator
+                                          )
+                                      ]
                                   ]
                               ]
                           ]
@@ -462,7 +500,10 @@ splitview = connect selectTranslator $ H.mkComponent
                   "display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0.25rem 0.75rem 0.25rem;"
               ]
               [ HH.button
-                  [ HP.classes [ H.ClassName "fpo-back-btn", H.ClassName "fpo-back-btn--inline" ]
+                  [ HP.classes
+                      [ H.ClassName "fpo-back-btn"
+                      , H.ClassName "fpo-back-btn--inline"
+                      ]
                   , HE.onClick \_ -> ToggleCommentOverview false
                   ]
                   [ HH.i [ HP.classes [ H.ClassName "bi-arrow-left" ] ] [] ]

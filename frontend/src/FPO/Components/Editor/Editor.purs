@@ -96,6 +96,7 @@ import FPO.Types
   , FirstComment
   , TOCEntry
   )
+import FPO.UI.Css as HB
 import FPO.UI.HTML (setInnerHtml)
 import FPO.UI.Modals.DiscardModal (discardModal)
 import FPO.UI.Modals.InfoModal (infoModal)
@@ -107,7 +108,6 @@ import Halogen.HTML.Properties (classes, enabled, ref, style, title) as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Subscription as HS
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 import Unsafe.Coerce (unsafeCoerce)
 import Web.DOM.Element (toEventTarget)

@@ -25,6 +25,7 @@ import FPO.Translations.Translator
   , getTranslatorForLanguage
   )
 import FPO.Translations.Util (FPOState)
+import FPO.UI.Css as HB
 import Halogen (AttrName(..), ClassName(..))
 import Halogen as H
 import Halogen.HTML as HH
@@ -35,7 +36,6 @@ import Halogen.HTML.Properties.ARIA as HPA
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Store.Select (selectAll)
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 import Web.HTML (window)
 import Web.HTML.Window (open)

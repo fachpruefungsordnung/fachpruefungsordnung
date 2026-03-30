@@ -39,6 +39,7 @@ import FPO.Dto.UserOverviewDto (UserOverviewDto)
 import FPO.Dto.UserOverviewDto as UOD
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.Css as HB
 import FPO.UI.HTML (loadingSpinner)
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.UI.Style as Style
@@ -49,12 +50,11 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
+import Type.Proxy (Proxy(..))
 import Web.Event.Event (stopPropagation)
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
-import Type.Proxy (Proxy(..))
 
 _userPagination = Proxy :: Proxy "userPagination"
 _groupPagination = Proxy :: Proxy "groupPagination"
@@ -361,12 +361,15 @@ component =
     HH.div [ HP.classes [ H.ClassName "fpo-data-list" ] ]
       [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__header" ] ]
           [ HH.h5 [ HP.classes [ H.ClassName "fpo-data-list__title" ] ]
-              [ HH.text $ translate (label :: _ "admin_users_listOfUsers") state.translator ]
+              [ HH.text $ translate (label :: _ "admin_users_listOfUsers")
+                  state.translator
+              ]
           , HH.div [ HP.classes [ H.ClassName "fpo-data-list__header-actions" ] ]
               [ HH.button
                   [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
                   , HE.onClick $ const NavigateToCreateUser
-                  , Style.popover $ translate (label :: _ "admin_users_createNewUser") state.translator
+                  , Style.popover $ translate (label :: _ "admin_users_createNewUser")
+                      state.translator
                   ]
                   [ HH.i [ HP.classes [ H.ClassName "bi-plus-lg", HB.me1 ] ] []
                   , HH.text $ translate (label :: _ "common_add") state.translator
@@ -375,11 +378,18 @@ component =
           ]
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__search" ] ]
           [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__search-wrapper" ] ]
-              [ HH.i [ HP.classes [ H.ClassName "bi-search", H.ClassName "fpo-data-list__search-icon" ] ] []
+              [ HH.i
+                  [ HP.classes
+                      [ H.ClassName "bi-search"
+                      , H.ClassName "fpo-data-list__search-icon"
+                      ]
+                  ]
+                  []
               , HH.input
                   [ HP.type_ HP.InputText
                   , HP.classes [ H.ClassName "fpo-data-list__search-input" ]
-                  , HP.placeholder $ translate (label :: _ "admin_users_searchUsers") state.translator
+                  , HP.placeholder $ translate (label :: _ "admin_users_searchUsers")
+                      state.translator
                   , HP.value state.userFilter
                   , HE.onValueInput ChangeUserFilter
                   ]
@@ -392,7 +402,9 @@ component =
                   [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
                       [ HH.i [ HP.classes [ H.ClassName "bi-people" ] ] [] ]
                   , HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-text" ] ]
-                      [ HH.text $ translate (label :: _ "admin_users_noUsersFound") state.translator ]
+                      [ HH.text $ translate (label :: _ "admin_users_noUsersFound")
+                          state.translator
+                      ]
                   ]
               ]
             else
@@ -402,7 +414,16 @@ component =
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _userPagination unit P.component userPaginationProps SetUserPage
           , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
-              [ HH.text $ if length state.filteredUsers == 0 then "" else show (state.userPage * usersPerPage + 1) <> "–" <> show (min ((state.userPage + 1) * usersPerPage) (length state.filteredUsers)) <> " / " <> show (length state.filteredUsers) ]
+              [ HH.text $
+                  if length state.filteredUsers == 0 then ""
+                  else show (state.userPage * usersPerPage + 1) <> "–"
+                    <> show
+                      ( min ((state.userPage + 1) * usersPerPage)
+                          (length state.filteredUsers)
+                      )
+                    <> " / "
+                    <> show (length state.filteredUsers)
+              ]
           ]
       ]
     where
@@ -419,7 +440,10 @@ component =
   renderUserEntry :: State -> UserOverviewDto -> H.ComponentHTML Action Slots m
   renderUserEntry state userDto =
     HH.div
-      [ HP.classes [ H.ClassName "fpo-data-list__row", H.ClassName "fpo-data-list__row--clickable" ]
+      [ HP.classes
+          [ H.ClassName "fpo-data-list__row"
+          , H.ClassName "fpo-data-list__row--clickable"
+          ]
       , HE.onClick $ const $ NavigateToProfile $ UOD.getID userDto
       ]
       [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
@@ -430,15 +454,18 @@ component =
           ]
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-actions" ] ]
           [ HH.button
-              [ HP.classes [ H.ClassName "fpo-data-list__action-btn", H.ClassName "fpo-data-list__action-btn--danger" ]
+              [ HP.classes
+                  [ H.ClassName "fpo-data-list__action-btn"
+                  , H.ClassName "fpo-data-list__action-btn--danger"
+                  ]
               , HE.onClick $ \e -> RequestDeleteUser userDto e
               , HP.disabled $ state.currentUserID == Just (UOD.getID userDto)
-              , Style.popover $ translate (label :: _ "admin_users_deleteUser") state.translator
+              , Style.popover $ translate (label :: _ "admin_users_deleteUser")
+                  state.translator
               ]
               [ HH.i [ HP.classes [ H.ClassName "bi-trash-fill" ] ] [] ]
           ]
       ]
-
 
   -- Groups Tab
   renderGroupsTab :: State -> H.ComponentHTML Action Slots m
@@ -452,12 +479,16 @@ component =
     HH.div [ HP.classes [ H.ClassName "fpo-data-list" ] ]
       [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__header" ] ]
           [ HH.h5 [ HP.classes [ H.ClassName "fpo-data-list__title" ] ]
-              [ HH.text $ translate (label :: _ "admin_groups_listOfGroups") state.translator ]
+              [ HH.text $ translate (label :: _ "admin_groups_listOfGroups")
+                  state.translator
+              ]
           , HH.div [ HP.classes [ H.ClassName "fpo-data-list__header-actions" ] ]
               [ HH.button
                   [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
                   , HE.onClick $ const NavigateToCreateGroup
-                  , Style.popover $ translate (label :: _ "admin_groups_createNewGroup") state.translator
+                  , Style.popover $ translate
+                      (label :: _ "admin_groups_createNewGroup")
+                      state.translator
                   ]
                   [ HH.i [ HP.classes [ H.ClassName "bi-plus-lg", HB.me1 ] ] []
                   , HH.text $ translate (label :: _ "common_add") state.translator
@@ -466,11 +497,19 @@ component =
           ]
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__search" ] ]
           [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__search-wrapper" ] ]
-              [ HH.i [ HP.classes [ H.ClassName "bi-search", H.ClassName "fpo-data-list__search-icon" ] ] []
+              [ HH.i
+                  [ HP.classes
+                      [ H.ClassName "bi-search"
+                      , H.ClassName "fpo-data-list__search-icon"
+                      ]
+                  ]
+                  []
               , HH.input
                   [ HP.type_ HP.InputText
                   , HP.classes [ H.ClassName "fpo-data-list__search-input" ]
-                  , HP.placeholder $ translate (label :: _ "admin_groups_searchForGroups") state.translator
+                  , HP.placeholder $ translate
+                      (label :: _ "admin_groups_searchForGroups")
+                      state.translator
                   , HP.value state.groupFilter
                   , HE.onValueInput ChangeGroupFilter
                   ]
@@ -483,7 +522,9 @@ component =
                   [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
                       [ HH.i [ HP.classes [ H.ClassName "bi-collection" ] ] [] ]
                   , HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-text" ] ]
-                      [ HH.text $ translate (label :: _ "admin_groups_noGroupsFound") state.translator ]
+                      [ HH.text $ translate (label :: _ "admin_groups_noGroupsFound")
+                          state.translator
+                      ]
                   ]
               ]
             else
@@ -491,9 +532,19 @@ component =
                 <> placeholderRows groupsPerPage (length grps) groupPageCount
           )
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
-          [ HH.slot _groupPagination unit P.component groupPaginationProps SetGroupPage
+          [ HH.slot _groupPagination unit P.component groupPaginationProps
+              SetGroupPage
           , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
-              [ HH.text $ if length state.filteredGroups == 0 then "" else show (state.groupPage * groupsPerPage + 1) <> "-" <> show (min ((state.groupPage + 1) * groupsPerPage) (length state.filteredGroups)) <> " / " <> show (length state.filteredGroups) ]
+              [ HH.text $
+                  if length state.filteredGroups == 0 then ""
+                  else show (state.groupPage * groupsPerPage + 1) <> "-"
+                    <> show
+                      ( min ((state.groupPage + 1) * groupsPerPage)
+                          (length state.filteredGroups)
+                      )
+                    <> " / "
+                    <> show (length state.filteredGroups)
+              ]
           ]
       ]
     where
@@ -511,7 +562,10 @@ component =
   renderGroupEntry :: State -> GroupOverview -> H.ComponentHTML Action Slots m
   renderGroupEntry state groupOverview@(GroupOverview g) =
     HH.div
-      [ HP.classes [ H.ClassName "fpo-data-list__row", H.ClassName "fpo-data-list__row--clickable" ]
+      [ HP.classes
+          [ H.ClassName "fpo-data-list__row"
+          , H.ClassName "fpo-data-list__row--clickable"
+          ]
       , HE.onClick $ const $ NavigateToGroupDocuments g.groupOverviewID
       ]
       [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
@@ -522,32 +576,37 @@ component =
           ]
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-actions" ] ]
           [ HH.button
-              [ HP.classes [ H.ClassName "fpo-data-list__action-btn", H.ClassName "fpo-data-list__action-btn--danger" ]
+              [ HP.classes
+                  [ H.ClassName "fpo-data-list__action-btn"
+                  , H.ClassName "fpo-data-list__action-btn--danger"
+                  ]
               , HE.onClick $ \e -> RequestDeleteGroup groupOverview e
               , HP.disabled state.waiting
-              , Style.popover $ translate (label :: _ "admin_groups_deleteGroup") state.translator
+              , Style.popover $ translate (label :: _ "admin_groups_deleteGroup")
+                  state.translator
               ]
               [ HH.i [ HP.classes [ H.ClassName "bi-trash-fill" ] ] [] ]
           ]
       ]
 
-
   placeholderRows :: forall w i. Int -> Int -> Int -> Array (HH.HTML w i)
   placeholderRows perPage currentCount pages =
-    let needed = perPage - currentCount
-    in if pages <= 1 || needed <= 0 then []
-       else replicate needed $
-         HH.div
-           [ HP.classes [ H.ClassName "fpo-data-list__row" ]
-           , HP.style "visibility: hidden; pointer-events: none;"
-           ]
-           [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
-               [ HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-primary" ] ]
-                   [ HH.text "\x00a0" ]
-               , HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-secondary" ] ]
-                   [ HH.text "\x00a0" ]
-               ]
-           ]
+    let
+      needed = perPage - currentCount
+    in
+      if pages <= 1 || needed <= 0 then []
+      else replicate needed $
+        HH.div
+          [ HP.classes [ H.ClassName "fpo-data-list__row" ]
+          , HP.style "visibility: hidden; pointer-events: none;"
+          ]
+          [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
+              [ HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-primary" ] ]
+                  [ HH.text "\x00a0" ]
+              , HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-secondary" ] ]
+                  [ HH.text "\x00a0" ]
+              ]
+          ]
 
   -- Delete modals
   renderDeleteUserModal :: State -> H.ComponentHTML Action Slots m

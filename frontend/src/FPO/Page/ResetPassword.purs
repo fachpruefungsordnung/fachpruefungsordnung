@@ -22,13 +22,13 @@ import FPO.Data.Route (loginRoute)
 import FPO.Data.Store as Store
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.Css as HB
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, getStore, updateStore)
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (preventDefault)
 import Web.Event.Internal.Types (Event)
@@ -44,9 +44,9 @@ data Action
   | ToggleShowPassword
 
 data Phase
-  = RequestLinkForm   -- no token, user enters email
-  | RequestLinkSent   -- email sent, show success
-  | NewPasswordForm   -- token present, user enters passwords
+  = RequestLinkForm -- no token, user enters email
+  | RequestLinkSent -- email sent, show success
+  | NewPasswordForm -- token present, user enters passwords
 
 type State = FPOState
   ( email :: String
@@ -90,7 +90,9 @@ component =
   render :: State -> H.ComponentHTML Action () m
   render state =
     HH.div
-      [ HP.style "min-height: 60vh; display: flex; align-items: center; justify-content: center;" ]
+      [ HP.style
+          "min-height: 60vh; display: flex; align-items: center; justify-content: center;"
+      ]
       [ HH.div
           [ HP.style "width: 100%; max-width: 420px; padding: 0 var(--fpo-space-4);" ]
           [ case state.phase of
@@ -104,12 +106,18 @@ component =
   renderRequestLinkForm :: State -> H.ComponentHTML Action () m
   renderRequestLinkForm state =
     HH.div
-      [ HP.style "background: var(--fpo-bg-elevated); border: 1px solid var(--fpo-border-subtle); border-radius: var(--fpo-radius-xl); box-shadow: var(--fpo-shadow-sm); padding: var(--fpo-space-6);" ]
+      [ HP.style
+          "background: var(--fpo-bg-elevated); border: 1px solid var(--fpo-border-subtle); border-radius: var(--fpo-radius-xl); box-shadow: var(--fpo-shadow-sm); padding: var(--fpo-space-6);"
+      ]
       [ HH.h2
-          [ HP.style "font-size: var(--fpo-text-xl); font-weight: 700; color: var(--fpo-text-primary); margin: 0 0 var(--fpo-space-1) 0;" ]
+          [ HP.style
+              "font-size: var(--fpo-text-xl); font-weight: 700; color: var(--fpo-text-primary); margin: 0 0 var(--fpo-space-1) 0;"
+          ]
           [ HH.text $ translate (label :: _ "rp_Header") state.translator ]
       , HH.p
-          [ HP.style "font-size: var(--fpo-text-sm); color: var(--fpo-text-tertiary); margin: 0 0 var(--fpo-space-5) 0;" ]
+          [ HP.style
+              "font-size: var(--fpo-text-sm); color: var(--fpo-text-tertiary); margin: 0 0 var(--fpo-space-5) 0;"
+          ]
           [ HH.text $ translate (label :: _ "rp_requestLinkHint") state.translator ]
       , HH.form
           [ HE.onSubmit SubmitRequestLink ]
@@ -117,7 +125,9 @@ component =
               [ HP.classes [ HB.formLabel ]
               , HP.style "font-size: var(--fpo-text-sm); font-weight: 500;"
               ]
-              [ HH.text $ translate (label :: _ "common_emailAddress") state.translator ]
+              [ HH.text $ translate (label :: _ "common_emailAddress")
+                  state.translator
+              ]
           , HH.div
               [ HP.classes [ HB.inputGroup, HB.mb4 ] ]
               [ HH.span [ HP.classes [ HB.inputGroupText ] ]
@@ -125,7 +135,8 @@ component =
               , HH.input
                   [ HP.type_ HP.InputEmail
                   , HP.classes [ HB.formControl ]
-                  , HP.placeholder (translate (label :: _ "common_email") state.translator)
+                  , HP.placeholder
+                      (translate (label :: _ "common_email") state.translator)
                   , HP.value state.email
                   , HE.onValueInput UpdateEmail
                   , HP.required true
@@ -148,17 +159,26 @@ component =
   renderRequestLinkSent :: State -> H.ComponentHTML Action () m
   renderRequestLinkSent state =
     HH.div
-      [ HP.style "background: var(--fpo-bg-elevated); border: 1px solid var(--fpo-border-subtle); border-radius: var(--fpo-radius-xl); box-shadow: var(--fpo-shadow-sm); padding: var(--fpo-space-6); text-align: center;" ]
+      [ HP.style
+          "background: var(--fpo-bg-elevated); border: 1px solid var(--fpo-border-subtle); border-radius: var(--fpo-radius-xl); box-shadow: var(--fpo-shadow-sm); padding: var(--fpo-space-6); text-align: center;"
+      ]
       [ HH.div
-          [ HP.style "width: 48px; height: 48px; border-radius: 50%; background: var(--fpo-success-subtle); color: var(--fpo-success); display: inline-flex; align-items: center; justify-content: center; font-size: var(--fpo-text-xl); margin-bottom: var(--fpo-space-4);" ]
+          [ HP.style
+              "width: 48px; height: 48px; border-radius: 50%; background: var(--fpo-success-subtle); color: var(--fpo-success); display: inline-flex; align-items: center; justify-content: center; font-size: var(--fpo-text-xl); margin-bottom: var(--fpo-space-4);"
+          ]
           [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check-lg" ] ] [] ]
       , HH.h2
-          [ HP.style "font-size: var(--fpo-text-lg); font-weight: 700; color: var(--fpo-text-primary); margin: 0 0 var(--fpo-space-2) 0;" ]
+          [ HP.style
+              "font-size: var(--fpo-text-lg); font-weight: 700; color: var(--fpo-text-primary); margin: 0 0 var(--fpo-space-2) 0;"
+          ]
           [ HH.text $ translate (label :: _ "rp_linkSentTitle") state.translator ]
       , HH.p
-          [ HP.style "font-size: var(--fpo-text-sm); color: var(--fpo-text-secondary); margin: 0; line-height: 1.5;" ]
+          [ HP.style
+              "font-size: var(--fpo-text-sm); color: var(--fpo-text-secondary); margin: 0; line-height: 1.5;"
+          ]
           [ HH.text $ translate (label :: _ "rp_linkSentBodyBefore") state.translator
-          , HH.span [ HP.style "font-weight: 600; color: var(--fpo-text-primary);" ] [ HH.text $ " " <> state.email <> " " ]
+          , HH.span [ HP.style "font-weight: 600; color: var(--fpo-text-primary);" ]
+              [ HH.text $ " " <> state.email <> " " ]
           , HH.text $ translate (label :: _ "rp_linkSentBodyAfter") state.translator
           ]
       ]
@@ -168,18 +188,25 @@ component =
   renderNewPasswordForm state =
     let
       passwordsMatch = state.passwordPrimary == state.passwordSecondary
-      formReady = state.passwordPrimary /= "" && passwordsMatch && not state.submitting
+      formReady = state.passwordPrimary /= "" && passwordsMatch && not
+        state.submitting
       showMismatch = state.passwordSecondary /= "" && not passwordsMatch
       passwordType = if state.showPassword then HP.InputText else HP.InputPassword
       eyeIcon = if state.showPassword then "bi-eye-slash-fill" else "bi-eye-fill"
     in
       HH.div
-        [ HP.style "background: var(--fpo-bg-elevated); border: 1px solid var(--fpo-border-subtle); border-radius: var(--fpo-radius-xl); box-shadow: var(--fpo-shadow-sm); padding: var(--fpo-space-6);" ]
+        [ HP.style
+            "background: var(--fpo-bg-elevated); border: 1px solid var(--fpo-border-subtle); border-radius: var(--fpo-radius-xl); box-shadow: var(--fpo-shadow-sm); padding: var(--fpo-space-6);"
+        ]
         [ HH.h2
-            [ HP.style "font-size: var(--fpo-text-xl); font-weight: 700; color: var(--fpo-text-primary); margin: 0 0 var(--fpo-space-1) 0;" ]
+            [ HP.style
+                "font-size: var(--fpo-text-xl); font-weight: 700; color: var(--fpo-text-primary); margin: 0 0 var(--fpo-space-1) 0;"
+            ]
             [ HH.text $ translate (label :: _ "rp_Header") state.translator ]
         , HH.p
-            [ HP.style "font-size: var(--fpo-text-sm); color: var(--fpo-text-tertiary); margin: 0 0 var(--fpo-space-5) 0;" ]
+            [ HP.style
+                "font-size: var(--fpo-text-sm); color: var(--fpo-text-tertiary); margin: 0 0 var(--fpo-space-5) 0;"
+            ]
             [ HH.text $ translate (label :: _ "rp_newPasswordHint") state.translator ]
         , HH.form
             [ HE.onSubmit SubmitNewPassword ]
@@ -195,7 +222,8 @@ component =
                 , HH.input
                     [ HP.type_ passwordType
                     , HP.classes [ HB.formControl ]
-                    , HP.placeholder (translate (label :: _ "common_password") state.translator)
+                    , HP.placeholder
+                        (translate (label :: _ "common_password") state.translator)
                     , HP.value state.passwordPrimary
                     , HE.onValueInput UpdatePasswordPrimary
                     , HP.required true
@@ -213,7 +241,9 @@ component =
                 [ HP.classes [ HB.formLabel ]
                 , HP.style "font-size: var(--fpo-text-sm); font-weight: 500;"
                 ]
-                [ HH.text $ translate (label :: _ "rp_PasswordConfirm") state.translator ]
+                [ HH.text $ translate (label :: _ "rp_PasswordConfirm")
+                    state.translator
+                ]
             , HH.div [ HP.classes [ HB.inputGroup, HB.mb1 ] ]
                 [ HH.span [ HP.classes [ HB.inputGroupText ] ]
                     [ HH.i [ HP.class_ (H.ClassName "bi-lock") ] [] ]
@@ -222,7 +252,8 @@ component =
                     , HP.classes $
                         [ HB.formControl ] <>
                           if showMismatch then [ H.ClassName "is-invalid" ] else []
-                    , HP.placeholder (translate (label :: _ "rp_PasswordConfirm") state.translator)
+                    , HP.placeholder
+                        (translate (label :: _ "rp_PasswordConfirm") state.translator)
                     , HP.value state.passwordSecondary
                     , HE.onValueInput UpdatePasswordSecondary
                     , HP.required true
@@ -238,7 +269,9 @@ component =
             , -- Mismatch feedback
               if showMismatch then
                 HH.div
-                  [ HP.style "font-size: var(--fpo-text-xs); color: var(--fpo-danger); margin-bottom: var(--fpo-space-3);" ]
+                  [ HP.style
+                      "font-size: var(--fpo-text-xs); color: var(--fpo-danger); margin-bottom: var(--fpo-space-3);"
+                  ]
                   [ HH.text $ translate (label :: _ "rp_NoMatch") state.translator ]
               else
                 HH.div [ HP.style "margin-bottom: var(--fpo-space-4);" ] []
@@ -248,17 +281,21 @@ component =
                   ] <>
                     if not formReady then [ HP.disabled true ] else []
                 )
-                [ HH.text $ translate (label :: _ "rp_setNewPassword") state.translator ]
+                [ HH.text $ translate (label :: _ "rp_setNewPassword")
+                    state.translator
+                ]
             ]
         ]
 
   -- ─── Helpers ─────────────────────────────────────────────────────
   isValidEmail :: String -> Boolean
   isValidEmail email =
-    let pattern = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
-    in case regex pattern noFlags of
-      Right r -> test r email
-      Left _ -> false
+    let
+      pattern = "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+    in
+      case regex pattern noFlags of
+        Right r -> test r email
+        Left _ -> false
 
   -- ─── Action handlers ─────────────────────────────────────────────
   handleAction :: MonadAff m => Action -> H.HalogenM State Action () output m Unit

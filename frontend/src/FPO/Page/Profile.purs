@@ -20,8 +20,8 @@ import Data.String.Regex.Flags (noFlags)
 import Effect.Aff.Class (class MonadAff)
 import FPO.Data.AppError (AppError)
 import FPO.Data.Navigate (class Navigate, navigate)
-import FPO.Data.Route (Route(..))
 import FPO.Data.Request (getUser, getUserWithId, patchString, postIgnore)
+import FPO.Data.Route (Route(..))
 import FPO.Data.Store as Store
 import FPO.Dto.UserDto
   ( PatchUserDto(..)
@@ -33,6 +33,7 @@ import FPO.Dto.UserDto
 import FPO.Dto.UserRoleDto (FullUserRoleDto, Role(..), getGroupName, getUserRole)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.Css as HB
 import Halogen (ClassName(..))
 import Halogen as H
 import Halogen.HTML as HH
@@ -42,7 +43,6 @@ import Halogen.HTML.Properties as HP
 import Halogen.HTML.Properties.ARIA as HPA
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 
 data Action
@@ -133,7 +133,10 @@ component =
               [ -- Hero content: avatar + name + email
                 HH.div [ HP.classes [ ClassName "profile-hero__content" ] ]
                   [ HH.button
-                      [ HP.classes [ ClassName "fpo-back-btn", ClassName "fpo-back-btn--inline" ]
+                      [ HP.classes
+                          [ ClassName "fpo-back-btn"
+                          , ClassName "fpo-back-btn--inline"
+                          ]
                       , HE.onClick $ const GoBack
                       ]
                       [ HH.i [ HP.classes [ ClassName "bi-arrow-left" ] ] []

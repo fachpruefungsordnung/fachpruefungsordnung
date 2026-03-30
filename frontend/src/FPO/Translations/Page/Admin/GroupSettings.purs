@@ -23,7 +23,8 @@ enGroupSettingsPage = fromRecord
   , gs_groupNamePlaceholder: "Enter group name"
   , gs_saveSettings: "Save Settings"
   , gs_settings: "Settings"
-  , gs_unsavedChangesConfirm: "You have unsaved changes. Do you want to leave without saving?"
+  , gs_unsavedChangesConfirm:
+      "You have unsaved changes. Do you want to leave without saving?"
   , gs_settingsUpdated: "Group settings updated successfully"
   }
 
@@ -35,6 +36,7 @@ deGroupSettingsPage = fromRecord
   , gs_groupNamePlaceholder: "Gruppenname eingeben"
   , gs_saveSettings: "Einstellungen speichern"
   , gs_settings: "Einstellungen"
-  , gs_unsavedChangesConfirm: "Es gibt ungespeicherte Änderungen. Möchten Sie die Seite verlassen, ohne zu speichern?"
+  , gs_unsavedChangesConfirm:
+      "Es gibt ungespeicherte Änderungen. Möchten Sie die Seite verlassen, ohne zu speichern?"
   , gs_settingsUpdated: "Gruppeneinstellungen erfolgreich aktualisiert"
   }

@@ -28,6 +28,7 @@ import FPO.Dto.DocumentDto.DocumentHeader as DH
 import FPO.Dto.DocumentDto.TextElement as TE
 import FPO.Translations.Labels (Labels)
 import FPO.Translations.Translator (fromFpoTranslator)
+import FPO.UI.Css as HB
 import FPO.Util (handleKeyDownEscape)
 import Halogen as H
 import Halogen.HTML as HH
@@ -36,7 +37,6 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectAll)
-import FPO.UI.Css as HB
 import Parsing (runParserT)
 import Simple.I18n.Translator (Translator, label, translate)
 

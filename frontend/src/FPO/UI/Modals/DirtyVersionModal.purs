@@ -6,11 +6,11 @@ import Prelude
 
 import Data.Maybe (Maybe)
 import FPO.Translations.Labels (Labels)
+import FPO.UI.Css as HB
 import FPO.UI.HTML (addModal)
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (Translator, label, translate)
 
 -- | Modal for notifying the user of potentially lost changes.

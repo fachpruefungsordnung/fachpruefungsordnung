@@ -12,11 +12,11 @@ import Data.String (take, toUpper)
 import FPO.Data.Time (formatRelativeTime)
 import FPO.Translations.Labels (Labels)
 import FPO.Types (Comment, FirstComment)
+import FPO.UI.Css as HB
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (Translator, label, translate)
 
 -- | Renders a "first comment" (the root of a comment thread) as a modern card
@@ -51,7 +51,11 @@ renderFirstComment
               [ HP.style
                   ( "border-left-color:"
                       <>
-                        ( case firstComment.resolved, firstComment.hasProblem, inLatest of
+                        ( case
+                            firstComment.resolved,
+                            firstComment.hasProblem,
+                            inLatest
+                            of
                             true, _, _ -> "var(--comment-accent-resolved);"
                             _, true, true -> "var(--comment-accent-problem);"
                             _, true, false -> "var(--comment-accent-outdated);"
@@ -71,19 +75,39 @@ renderFirstComment
             [ HH.span [ HP.classes [ H.ClassName "fpo-comment__author" ] ]
                 [ HH.text firstComment.comment.author ]
             , HH.span [ HP.classes [ H.ClassName "fpo-comment__time" ] ]
-                [ HH.text $ formatCommentTime translator mTimeFormatter mCurrentTime firstComment.comment.timestamp
+                [ HH.text $ formatCommentTime translator mTimeFormatter mCurrentTime
+                    firstComment.comment.timestamp
                 ]
             ]
         , -- Status icon (top-right)
           case firstComment.resolved, firstComment.hasProblem, inLatest of
             true, _, _ ->
-              HH.div [ HP.classes [ H.ClassName "fpo-comment__status", H.ClassName "fpo-comment__status--resolved" ] ]
-                [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check-circle-fill" ] ] [] ]
+              HH.div
+                [ HP.classes
+                    [ H.ClassName "fpo-comment__status"
+                    , H.ClassName "fpo-comment__status--resolved"
+                    ]
+                ]
+                [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check-circle-fill" ] ] []
+                ]
             _, true, true ->
-              HH.div [ HP.classes [ H.ClassName "fpo-comment__status", H.ClassName "fpo-comment__status--problem" ] ]
-                [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-exclamation-circle-fill" ] ] [] ]
+              HH.div
+                [ HP.classes
+                    [ H.ClassName "fpo-comment__status"
+                    , H.ClassName "fpo-comment__status--problem"
+                    ]
+                ]
+                [ HH.i
+                    [ HP.classes [ HB.bi, H.ClassName "bi-exclamation-circle-fill" ] ]
+                    []
+                ]
             _, true, false ->
-              HH.div [ HP.classes [ H.ClassName "fpo-comment__status", H.ClassName "fpo-comment__status--outdated" ] ]
+              HH.div
+                [ HP.classes
+                    [ H.ClassName "fpo-comment__status"
+                    , H.ClassName "fpo-comment__status--outdated"
+                    ]
+                ]
                 [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-clock-history" ] ] [] ]
             _, _, _ ->
               HH.text ""
@@ -106,13 +130,19 @@ renderComment translator mTimeFormatter mCurrentTime c =
     [ HP.classes [ H.ClassName "fpo-comment", H.ClassName "fpo-comment--reply" ] ]
     [ -- Header row: avatar + author + time
       HH.div [ HP.classes [ H.ClassName "fpo-comment__header" ] ]
-        [ HH.div [ HP.classes [ H.ClassName "fpo-comment__avatar", H.ClassName "fpo-comment__avatar--sm" ] ]
+        [ HH.div
+            [ HP.classes
+                [ H.ClassName "fpo-comment__avatar"
+                , H.ClassName "fpo-comment__avatar--sm"
+                ]
+            ]
             [ HH.text $ toUpper $ take 1 c.author ]
         , HH.div [ HP.classes [ H.ClassName "fpo-comment__meta" ] ]
             [ HH.span [ HP.classes [ H.ClassName "fpo-comment__author" ] ]
                 [ HH.text c.author ]
             , HH.span [ HP.classes [ H.ClassName "fpo-comment__time" ] ]
-                [ HH.text $ formatCommentTime translator mTimeFormatter mCurrentTime c.timestamp
+                [ HH.text $ formatCommentTime translator mTimeFormatter mCurrentTime
+                    c.timestamp
                 ]
             ]
         ]

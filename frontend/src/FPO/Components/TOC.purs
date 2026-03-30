@@ -31,13 +31,11 @@ import Data.Array
   )
 import Data.DateTime (Date, DateTime, adjust)
 import Data.Either (Either(..))
-
 import Data.Maybe (Maybe(..), fromMaybe, isJust)
 import Data.Show (class Show)
 import Data.Time.Duration (Days(..), Minutes)
 import Data.Traversable (traverse)
 import Data.Tuple (Tuple(..))
-
 import Effect.Aff.Class (class MonadAff)
 import Effect.Class (liftEffect)
 import Effect.Now (getTimezoneOffset, nowDateTime)
@@ -68,7 +66,7 @@ import FPO.Dto.PostTextDto as PostTextDto
 import FPO.Translations.Translator (fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
 import FPO.Types (TOCEntry, TOCTree, findTOCEntry, firstTOCEntry)
-
+import FPO.UI.Css as HB
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.UI.Modals.DocumentHistoryModal as DHM
 import FPO.UI.Modals.ParagraphHistoryModal as PHM
@@ -81,7 +79,6 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectAll)
-import FPO.UI.Css as HB
 import Parsing (runParserT)
 import Prelude
   ( class Eq
@@ -387,8 +384,14 @@ tocview = connect selectAll $ H.mkComponent
                             [ HP.classes [ HB.modalHeader ] ]
                             [ HH.h5
                                 [ HP.classes [ HB.modalTitle ] ]
-                                [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-pencil" ], HP.style "margin-right: 0.5rem;" ] []
-                                , HH.text $ translate (label :: _ "toc_editModal_title") state.translator
+                                [ HH.i
+                                    [ HP.classes [ HB.bi, HH.ClassName "bi-pencil" ]
+                                    , HP.style "margin-right: 0.5rem;"
+                                    ]
+                                    []
+                                , HH.text $ translate
+                                    (label :: _ "toc_editModal_title")
+                                    state.translator
                                 ]
                             , HH.button
                                 [ HP.classes [ HB.btnClose ]
@@ -399,7 +402,8 @@ tocview = connect selectAll $ H.mkComponent
                         , -- Body: the tree with editing enabled
                           HH.div
                             [ HP.classes [ HB.modalBody ]
-                            , HP.style "max-height: 60vh; overflow-y: auto; padding: 0;"
+                            , HP.style
+                                "max-height: 60vh; overflow-y: auto; padding: 0;"
                             ]
                             [ HH.div
                                 [ HP.classes [ HH.ClassName "toc-list" ]
@@ -430,14 +434,23 @@ tocview = connect selectAll $ H.mkComponent
                             ]
                             [ HH.small
                                 [ HP.style "color: var(--fpo-text-tertiary);" ]
-                                [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-info-circle" ], HP.style "margin-right: 0.35rem;" ] []
-                                , HH.text $ translate (label :: _ "toc_editModal_hint") state.translator
+                                [ HH.i
+                                    [ HP.classes
+                                        [ HB.bi, HH.ClassName "bi-info-circle" ]
+                                    , HP.style "margin-right: 0.35rem;"
+                                    ]
+                                    []
+                                , HH.text $ translate
+                                    (label :: _ "toc_editModal_hint")
+                                    state.translator
                                 ]
                             , HH.button
                                 [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
                                 , HE.onClick $ const CloseEditModal
                                 ]
-                                [ HH.text $ translate (label :: _ "common_close") state.translator ]
+                                [ HH.text $ translate (label :: _ "common_close")
+                                    state.translator
+                                ]
                             ]
                         ]
                     ]
@@ -683,7 +696,12 @@ tocview = connect selectAll $ H.mkComponent
       H.modify_ _ { showEditModal = true }
 
     CloseEditModal -> do
-      H.modify_ _ { showEditModal = false, showAddMenu = [ -1 ], requestDelete = Nothing, dragState = Nothing }
+      H.modify_ _
+        { showEditModal = false
+        , showAddMenu = [ -1 ]
+        , requestDelete = Nothing
+        , dragState = Nothing
+        }
 
     UpdateTitles -> do
       pure unit
@@ -1080,18 +1098,26 @@ tocview = connect selectAll $ H.mkComponent
     searchData
     (RootTree { children, header }) =
     [ HH.div
-        [ HP.style "background: var(--fpo-bg-elevated); border: 1px solid var(--fpo-border-subtle); border-radius: var(--fpo-radius-lg); box-shadow: var(--fpo-shadow-sm);" ]
+        [ HP.style
+            "background: var(--fpo-bg-elevated); border: 1px solid var(--fpo-border-subtle); border-radius: var(--fpo-radius-lg); box-shadow: var(--fpo-shadow-sm);"
+        ]
         [ HH.div
-            [ HP.style "border-bottom: 1px solid var(--fpo-border-subtle); padding: var(--fpo-space-2) var(--fpo-space-3);" ]
+            [ HP.style
+                "border-bottom: 1px solid var(--fpo-border-subtle); padding: var(--fpo-space-2) var(--fpo-space-3);"
+            ]
             [ HH.div
                 [ HP.classes
                     [ HB.dFlex, HB.alignItemsCenter, HB.justifyContentBetween ]
                 ]
                 [ HH.span
-                    [ HP.style "font-weight: 600; font-size: var(--fpo-text-md); color: var(--fpo-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" ]
+                    [ HP.style
+                        "font-weight: 600; font-size: var(--fpo-text-md); color: var(--fpo-text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"
+                    ]
                     [ HH.text docName ]
                 , HH.div
-                    [ HP.classes [ HB.dFlex, HB.alignItemsCenter, HH.ClassName "gap-1" ] ]
+                    [ HP.classes
+                        [ HB.dFlex, HB.alignItemsCenter, HH.ClassName "gap-1" ]
+                    ]
                     [ HH.button
                         [ HP.classes
                             [ HB.btn
@@ -1100,7 +1126,8 @@ tocview = connect selectAll $ H.mkComponent
                             , HH.ClassName "btn-outline-secondary"
                             ]
                         , HE.onClick $ const OpenEditModal
-                        , HP.title $ translate (label :: _ "toc_editMode_on") state.translator
+                        , HP.title $ translate (label :: _ "toc_editMode_on")
+                            state.translator
                         ]
                         [ HH.i [ HP.classes [ HB.bi, HH.ClassName "bi-pencil" ] ] [] ]
                     , HH.button
@@ -1117,7 +1144,8 @@ tocview = connect selectAll $ H.mkComponent
                             ]
                             []
                         , HH.span [ HP.classes [ HH.ClassName "fpo-btn-label" ] ]
-                            [ HH.text $ " " <> translate (label :: _ "modal_documentHistory_title")
+                            [ HH.text $ " " <> translate
+                                (label :: _ "modal_documentHistory_title")
                                 state.translator
                             ]
                         ]
@@ -1128,7 +1156,8 @@ tocview = connect selectAll $ H.mkComponent
             [ HP.classes [ HH.ClassName "toc-list" ] ]
             ( concat $ mapWithIndex
                 ( \ix (Edge child) ->
-                    treeToHTML header false state menuPath historyPath 1 mSelectedTocEntry
+                    treeToHTML header false state menuPath historyPath 1
+                      mSelectedTocEntry
                       [ ix ]
                       now
                       searchData
@@ -1259,7 +1288,11 @@ tocview = connect selectAll $ H.mkComponent
             ( singletonIf (not $ null items) $
                 HH.button
                   [ HP.classes
-                      [ HB.btn, HB.btnSuccess, HH.ClassName "toc-button", HH.ClassName "toc-add-wrapper" ]
+                      [ HB.btn
+                      , HB.btnSuccess
+                      , HH.ClassName "toc-button"
+                      , HH.ClassName "toc-add-wrapper"
+                      ]
                   , HE.onClick \_ -> ToggleAddMenu path
                   ]
                   [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-plus" ] ] [] ]
@@ -1270,9 +1303,13 @@ tocview = connect selectAll $ H.mkComponent
                   else
                     HH.button
                       [ HP.classes
-                          [ HB.btn, HH.ClassName "toc-button", HH.ClassName "toc-add-wrapper" ]
+                          [ HB.btn
+                          , HH.ClassName "toc-button"
+                          , HH.ClassName "toc-add-wrapper"
+                          ]
                       , HP.disabled true
-                      , HP.title (translate (label :: _ "toc_cannotDelete") state.translator)
+                      , HP.title
+                          (translate (label :: _ "toc_cannotDelete") state.translator)
                       , HP.style "opacity: 0.25; cursor: not-allowed;"
                       ]
                       [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-dash" ] ] [] ]
@@ -1280,7 +1317,11 @@ tocview = connect selectAll $ H.mkComponent
               <>
                 [ if menuPath == path then
                     HH.div
-                      [ HP.classes [ H.ClassName "fpo-popover", H.ClassName "fpo-popover--down", H.ClassName "fpo-popover--right" ]
+                      [ HP.classes
+                          [ H.ClassName "fpo-popover"
+                          , H.ClassName "fpo-popover--down"
+                          , H.ClassName "fpo-popover--right"
+                          ]
                       , HP.style "padding: var(--fpo-space-1) 0; min-width: 140px;"
                       ]
                       (map createSectionButton items)
@@ -1294,7 +1335,11 @@ tocview = connect selectAll $ H.mkComponent
             [ HP.classes [ H.ClassName "fpo-popover__item" ]
             , HE.onClick \_ -> CreateNewMSection tyName meta2 path
             ]
-            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-plus" ], HP.style "font-size: 0.75rem; opacity: 0.5;" ] []
+            [ HH.i
+                [ HP.classes [ HB.bi, H.ClassName "bi-plus" ]
+                , HP.style "font-size: 0.75rem; opacity: 0.5;"
+                ]
+                []
             , HH.text (" " <> MM.getDisplayNameAsString meta2)
             ]
 
@@ -1338,25 +1383,36 @@ tocview = connect selectAll $ H.mkComponent
                         []
                     ]
                 , if isEditing then
-                    HH.div [ HP.classes [ HB.positionRelative, HB.dInlineFlex, HB.alignItemsCenter ]
-                           , HP.style "flex-shrink: 0;"
-                           ] $
+                    HH.div
+                      [ HP.classes
+                          [ HB.positionRelative, HB.dInlineFlex, HB.alignItemsCenter ]
+                      , HP.style "flex-shrink: 0;"
+                      ] $
                       [ if isDeletable then
                           deleteSectionButton path Paragraph (getFullTitle meta)
-                            else
-                              HH.button
-                                [ HP.classes
-                                    [ HB.btn, HH.ClassName "toc-button", HH.ClassName "toc-add-wrapper" ]
-                                , HP.disabled true
-                                , HP.title (translate (label :: _ "toc_cannotDelete") state.translator)
-                                , HP.style "opacity: 0.25; cursor: not-allowed;"
+                        else
+                          HH.button
+                            [ HP.classes
+                                [ HB.btn
+                                , HH.ClassName "toc-button"
+                                , HH.ClassName "toc-add-wrapper"
                                 ]
-                                [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-dash" ] ] [] ]
-                          ]
+                            , HP.disabled true
+                            , HP.title
+                                ( translate (label :: _ "toc_cannotDelete")
+                                    state.translator
+                                )
+                            , HP.style "opacity: 0.25; cursor: not-allowed;"
+                            ]
+                            [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-dash" ] ] []
+                            ]
+                      ]
                   else
-                    HH.div [ HP.classes [ HB.positionRelative, HB.dInlineFlex, HB.alignItemsCenter ]
-                           , HP.style "flex-shrink: 0;"
-                           ]
+                    HH.div
+                      [ HP.classes
+                          [ HB.positionRelative, HB.dInlineFlex, HB.alignItemsCenter ]
+                      , HP.style "flex-shrink: 0;"
+                      ]
                       [ historyButton id (getFullTitle meta) ]
                 ]
             ]
@@ -1370,16 +1426,18 @@ tocview = connect selectAll $ H.mkComponent
     -- specified disjunction, meaning that we can drag and remove items.
     mParentDisjunction = MM.getDisjunction parentHeader state.metaMap
 
-    dragProps = if not isEditing then [] else
-      case mParentDisjunction of
-        Nothing -> []
-        Just pk ->
-          [ HP.draggable true
-          , HE.onDragStart $ const $ StartDrag path pk
-          , HE.onDragOver $ HighlightDropZone path pk
-          , HE.onDrop $ const $ CompleteDrop path
-          , HE.onDragEnd $ const $ ClearDropZones
-          ]
+    dragProps =
+      if not isEditing then []
+      else
+        case mParentDisjunction of
+          Nothing -> []
+          Just pk ->
+            [ HP.draggable true
+            , HE.onDragStart $ const $ StartDrag path pk
+            , HE.onDragOver $ HighlightDropZone path pk
+            , HE.onDrop $ const $ CompleteDrop path
+            , HE.onDragEnd $ const $ ClearDropZones
+            ]
 
     -- Show the drag handle only if the parent allows changes to the children structure.
     dragHandle =
@@ -1391,11 +1449,13 @@ tocview = connect selectAll $ H.mkComponent
           [ HH.span
               [ HP.classes [ HH.ClassName "toc-drag-handle", HB.textMuted ] ]
               (singletonIf (isJust mParentDisjunction) $ HH.text "⋮⋮")
-          , HH.span [ HP.style ("width: " <> show level <> "rem; flex-shrink: 0;") ] []
+          , HH.span [ HP.style ("width: " <> show level <> "rem; flex-shrink: 0;") ]
+              []
           ]
 
   getRootHeader :: RootTree TOCEntry -> TreeHeader
-  getRootHeader Empty = TreeHeader { headerKind: "root", headerType: "root", heading: "" }
+  getRootHeader Empty = TreeHeader
+    { headerKind: "root", headerType: "root", heading: "" }
   getRootHeader (RootTree { header }) = header
 
   getRootChildren :: RootTree TOCEntry -> Array (Edge TOCEntry)
@@ -1547,8 +1607,6 @@ tocview = connect selectAll $ H.mkComponent
         pure $ OpenParagraphHistoryModal elementID title
     ]
     [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-clock-history" ] ] [] ]
-
-
 
 -- Helper function to extract the title from the current TOC entry
 getCurrentTocEntryTitle :: Maybe SelectedEntity -> RootTree TOCEntry -> Maybe String

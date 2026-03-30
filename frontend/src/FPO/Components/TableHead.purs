@@ -17,11 +17,11 @@ import Prelude
 import Data.Array (findIndex, sortBy, updateAt, (!!))
 import Data.Maybe (Maybe(..))
 import Data.Tuple (Tuple(..))
+import FPO.UI.Css as HB
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import FPO.UI.Css as HB
 
 data SortingStyle = Alpha | Numeric
 data Order = Asc | Desc

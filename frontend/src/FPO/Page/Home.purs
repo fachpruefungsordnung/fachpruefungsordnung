@@ -42,6 +42,7 @@ import FPO.Dto.DocumentDto.DocumentHeader as DocumentHeader
 import FPO.Dto.UserDto (FullUserDto, getUserID)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.Css as HB
 import FPO.UI.HTML (loadingSpinner)
 import FPO.UI.NavbarReveal (setupNavbarReveal, teardownNavbarReveal)
 import FPO.UI.SmoothScroll (smoothScrollToElement)
@@ -52,7 +53,6 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
 import Web.DOM.Document as Document
@@ -529,11 +529,13 @@ component =
   renderProjectOverview :: State -> H.ComponentHTML Action Slots m
   renderProjectOverview state =
     HH.div
-      [ HP.classes [ HB.colSm11, HB.colMd9, HB.colLg7, HH.ClassName "fpo-data-list" ] ]
+      [ HP.classes [ HB.colSm11, HB.colMd9, HB.colLg7, HH.ClassName "fpo-data-list" ]
+      ]
       [ -- Header
         HH.div [ HP.classes [ HH.ClassName "fpo-data-list__header" ] ]
           [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__title" ] ]
-              [ HH.text $ translate (label :: _ "home_yourProjects") state.translator ]
+              [ HH.text $ translate (label :: _ "home_yourProjects") state.translator
+              ]
           ]
       -- Search
       , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__search" ] ]
@@ -547,7 +549,8 @@ component =
                   []
               , HH.input
                   [ HP.classes [ HH.ClassName "fpo-data-list__search-input" ]
-                  , HP.placeholder $ translate (label :: _ "home_searchForProjects") state.translator
+                  , HP.placeholder $ translate (label :: _ "home_searchForProjects")
+                      state.translator
                   , HP.value state.searchQuery
                   , HE.onValueInput HandleSearchInput
                   ]
@@ -563,7 +566,9 @@ component =
                   [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__empty-icon" ] ]
                       [ HH.i [ HP.classes [ HH.ClassName "bi-folder2-open" ] ] [] ]
                   , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__empty-text" ] ]
-                      [ HH.text $ translate (label :: _ "home_noProjectsFound") state.translator ]
+                      [ HH.text $ translate (label :: _ "home_noProjectsFound")
+                          state.translator
+                      ]
                   ]
               ]
             else
@@ -611,8 +616,10 @@ component =
           [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-primary" ] ]
               [ HH.text $ DocumentHeader.getName project ]
           , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-secondary" ] ]
-              [ HH.text $ formatRelativeTime state.currentTime $ DocDate.docDateToDateTime $
-                  DocumentHeader.getLastEdited project
+              [ HH.text $ formatRelativeTime state.currentTime
+                  $ DocDate.docDateToDateTime
+                  $
+                    DocumentHeader.getLastEdited project
               ]
           ]
       , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-actions" ] ]
@@ -644,20 +651,22 @@ component =
   -- Only emits placeholders when there are multiple pages.
   placeholderRows :: forall w. Int -> Int -> Int -> Array (HH.HTML w Action)
   placeholderRows perPage currentCount pages =
-    let needed = perPage - currentCount
-    in if pages <= 1 || needed <= 0 then []
-       else replicate needed $
-         HH.div
-           [ HP.classes [ HH.ClassName "fpo-data-list__row" ]
-           , HP.style "visibility: hidden; pointer-events: none;"
-           ]
-           [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-info" ] ]
-               [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-primary" ] ]
-                   [ HH.text "\x00a0" ] -- non-breaking space for height
-               , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-secondary" ] ]
-                   [ HH.text "\x00a0" ]
-               ]
-           ]
+    let
+      needed = perPage - currentCount
+    in
+      if pages <= 1 || needed <= 0 then []
+      else replicate needed $
+        HH.div
+          [ HP.classes [ HH.ClassName "fpo-data-list__row" ]
+          , HP.style "visibility: hidden; pointer-events: none;"
+          ]
+          [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-info" ] ]
+              [ HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-primary" ] ]
+                  [ HH.text "\x00a0" ] -- non-breaking space for height
+              , HH.div [ HP.classes [ HH.ClassName "fpo-data-list__row-secondary" ] ]
+                  [ HH.text "\x00a0" ]
+              ]
+          ]
 
   filterProjects :: String -> Array DocumentHeader -> Array DocumentHeader
   filterProjects query projects =

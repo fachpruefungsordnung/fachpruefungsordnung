@@ -17,6 +17,7 @@ import FPO.Data.Store as Store
 import FPO.Translations.Labels (Labels)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState)
+import FPO.UI.Css as HB
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
@@ -24,7 +25,6 @@ import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
 import Halogen.Store.Select (Selector, selectEq)
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (Translator)
 
 type State = FPOState

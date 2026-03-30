@@ -23,6 +23,7 @@ import FPO.Dto.UserOverviewDto (UserOverviewDto)
 import FPO.Dto.UserOverviewDto as UserOverviewDto
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.Css as HB
 import FPO.UI.HTML (addCard, emptyEntryGen)
 import FPO.UI.Style as Style
 import FPO.Util (prependIf, singletonIf)
@@ -32,7 +33,6 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 import Type.Proxy (Proxy(..))
 

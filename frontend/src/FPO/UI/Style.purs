@@ -4,9 +4,9 @@
 
 module FPO.UI.Style where
 
+import FPO.UI.Css as HB
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
-import FPO.UI.Css as HB
 
 -- | Popover attribute for tooltips. Can be used just like any other HTML
 -- | attribute, and adds a tooltip to the element when hovered.

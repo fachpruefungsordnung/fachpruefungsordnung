@@ -23,11 +23,11 @@ import Prelude
 
 import Data.Array ((..))
 import Data.Maybe (Maybe(..))
+import FPO.UI.Css as HB
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import FPO.UI.Css as HB
 
 -- | Calculates the number of pages based on the total number of items
 -- | and the number of items per page.

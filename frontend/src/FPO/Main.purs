@@ -42,6 +42,7 @@ import FPO.Translations.Translator
   , detectBrowserLanguage
   , getTranslatorForLanguage
   )
+import FPO.UI.Css as HB
 import FPO.UI.Style as Style
 import FPO.UI.Truncated (setupTruncationListener)
 import Halogen (liftEffect)
@@ -50,7 +51,6 @@ import Halogen.Aff as HA
 import Halogen.HTML as HH
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import FPO.UI.Css as HB
 import Halogen.VDom.Driver (runUI)
 import Prelude
   ( Unit
@@ -142,10 +142,34 @@ component =
     ]
     [ HH.div [ HP.classes [ H.ClassName "fpo-global-bg" ] ]
         [ HH.div [ HP.classes [ H.ClassName "fpo-global-bg__noise" ] ] []
-        , HH.div [ HP.classes [ H.ClassName "fpo-global-bg__orb", H.ClassName "fpo-global-bg__orb--1" ] ] []
-        , HH.div [ HP.classes [ H.ClassName "fpo-global-bg__orb", H.ClassName "fpo-global-bg__orb--2" ] ] []
-        , HH.div [ HP.classes [ H.ClassName "fpo-global-bg__orb", H.ClassName "fpo-global-bg__orb--3" ] ] []
-        , HH.div [ HP.classes [ H.ClassName "fpo-global-bg__orb", H.ClassName "fpo-global-bg__orb--4" ] ] []
+        , HH.div
+            [ HP.classes
+                [ H.ClassName "fpo-global-bg__orb"
+                , H.ClassName "fpo-global-bg__orb--1"
+                ]
+            ]
+            []
+        , HH.div
+            [ HP.classes
+                [ H.ClassName "fpo-global-bg__orb"
+                , H.ClassName "fpo-global-bg__orb--2"
+                ]
+            ]
+            []
+        , HH.div
+            [ HP.classes
+                [ H.ClassName "fpo-global-bg__orb"
+                , H.ClassName "fpo-global-bg__orb--3"
+                ]
+            ]
+            []
+        , HH.div
+            [ HP.classes
+                [ H.ClassName "fpo-global-bg__orb"
+                , H.ClassName "fpo-global-bg__orb--4"
+                ]
+            ]
+            []
         ]
     , HH.slot_ _navbar unit Navbar.navbar unit
     , HH.slot_ _appToasts unit AppToasts.component unit

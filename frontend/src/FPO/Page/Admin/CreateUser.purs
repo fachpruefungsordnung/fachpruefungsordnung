@@ -32,6 +32,7 @@ import FPO.Dto.CreateUserDto as CreateUserDto
 import FPO.Dto.UserDto (isUserSuperadmin)
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.Css as HB
 import FPO.UI.HTML (addColumn)
 import FPO.Util (isValidEmailStrict)
 import Halogen as H
@@ -40,7 +41,6 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 import Web.Event.Event (Event, preventDefault)
 

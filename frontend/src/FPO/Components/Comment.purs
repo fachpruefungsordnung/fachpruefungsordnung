@@ -29,13 +29,13 @@ import FPO.Types
   , sectionDtoToCS
   , updateFirstCommentProblem
   )
+import FPO.UI.Css as HB
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
 
 type Input = Unit
@@ -142,10 +142,17 @@ commentview = connect selectTranslator $ H.mkComponent
             <>
               -- "Resolved" notice when thread is resolved
               ( if commentSection.resolved then
-                  [ HH.div [ HP.classes [ H.ClassName "fpo-comment-resolved-notice" ] ]
-                      [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-check-circle-fill" ] ] []
-                      , HH.span_ [ HH.text
-                          (translate (label :: _ "comment_resolved_notice") state.translator) ]
+                  [ HH.div
+                      [ HP.classes [ H.ClassName "fpo-comment-resolved-notice" ] ]
+                      [ HH.i
+                          [ HP.classes [ HB.bi, H.ClassName "bi-check-circle-fill" ] ]
+                          []
+                      , HH.span_
+                          [ HH.text
+                              ( translate (label :: _ "comment_resolved_notice")
+                                  state.translator
+                              )
+                          ]
                       ]
                   ]
                 else
@@ -156,7 +163,9 @@ commentview = connect selectTranslator $ H.mkComponent
               [ HH.div [ HP.classes [ H.ClassName "fpo-comment-end" ] ]
                   [ HH.span [ HP.classes [ H.ClassName "fpo-comment-end__text" ] ]
                       [ HH.text
-                          (translate (label :: _ "comment_end_of_conversation") state.translator)
+                          ( translate (label :: _ "comment_end_of_conversation")
+                              state.translator
+                          )
                       ]
                   ]
               ]
@@ -186,11 +195,14 @@ commentview = connect selectTranslator $ H.mkComponent
                       ""
               )
           ]
-      , renderFirstComment state.translator state.mTimeFormatter state.mCurrentTime state.inLatest false
+      , renderFirstComment state.translator state.mTimeFormatter state.mCurrentTime
+          state.inLatest
+          false
           DoNothing
           first
       ]
-        <> map (renderComment state.translator state.mTimeFormatter state.mCurrentTime)
+        <> map
+          (renderComment state.translator state.mTimeFormatter state.mCurrentTime)
           commentSection.replies
 
   renderInput :: State -> forall slots. H.ComponentHTML Action slots m
@@ -212,37 +224,55 @@ commentview = connect selectTranslator $ H.mkComponent
                 if state.newComment then
                   HH.div [ HP.style "position: relative;" ]
                     ( [ HH.button
-                          [ HP.classes [ HB.btn, HB.btnSm, H.ClassName "btn-outline-danger" ]
+                          [ HP.classes
+                              [ HB.btn, HB.btnSm, H.ClassName "btn-outline-danger" ]
                           , HP.style "white-space: nowrap;"
                           , HE.onClick \_ -> ShowDiscardPopover
                           ]
-                          [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ], HP.style "margin-right: 0.35rem;" ] []
+                          [ HH.i
+                              [ HP.classes [ HB.bi, H.ClassName "bi-x-lg" ]
+                              , HP.style "margin-right: 0.35rem;"
+                              ]
+                              []
                           , HH.span [ HP.classes [ H.ClassName "fpo-btn-label" ] ]
                               [ HH.text
-                                  (translate (label :: _ "comment_discard") state.translator)
+                                  ( translate (label :: _ "comment_discard")
+                                      state.translator
+                                  )
                               ]
                           ]
                       ] <>
                         if state.showDiscardPopover then
                           [ HH.div [ HP.classes [ H.ClassName "fpo-popover" ] ]
-                              [ HH.div [ HP.classes [ H.ClassName "fpo-popover__text" ] ]
+                              [ HH.div
+                                  [ HP.classes [ H.ClassName "fpo-popover__text" ] ]
                                   [ HH.text
-                                      (translate (label :: _ "comment_discard_phrase") state.translator)
+                                      ( translate
+                                          (label :: _ "comment_discard_phrase")
+                                          state.translator
+                                      )
                                   ]
-                              , HH.div [ HP.classes [ H.ClassName "fpo-popover__actions" ] ]
+                              , HH.div
+                                  [ HP.classes [ H.ClassName "fpo-popover__actions" ]
+                                  ]
                                   [ HH.button
-                                      [ HP.classes [ HB.btn, HB.btnSm, HB.btnSecondary ]
+                                      [ HP.classes
+                                          [ HB.btn, HB.btnSm, HB.btnSecondary ]
                                       , HE.onClick \_ -> HideDiscardPopover
                                       ]
                                       [ HH.text
-                                          (translate (label :: _ "common_cancel") state.translator)
+                                          ( translate (label :: _ "common_cancel")
+                                              state.translator
+                                          )
                                       ]
                                   , HH.button
                                       [ HP.classes [ HB.btn, HB.btnSm, HB.btnDanger ]
                                       , HE.onClick \_ -> DeleteComment
                                       ]
                                       [ HH.text
-                                          (translate (label :: _ "comment_discard") state.translator)
+                                          ( translate (label :: _ "comment_discard")
+                                              state.translator
+                                          )
                                       ]
                                   ]
                               ]
@@ -258,7 +288,11 @@ commentview = connect selectTranslator $ H.mkComponent
                   , HP.style "white-space: nowrap; margin-left: auto;"
                   , HE.onClick \_ -> SendComment
                   ]
-                  [ HH.i [ HP.classes [ HB.bi, H.ClassName "bi-send" ], HP.style "margin-right: 0.35rem;" ] []
+                  [ HH.i
+                      [ HP.classes [ HB.bi, H.ClassName "bi-send" ]
+                      , HP.style "margin-right: 0.35rem;"
+                      ]
+                      []
                   , HH.span [ HP.classes [ H.ClassName "fpo-btn-label" ] ]
                       [ HH.text
                           (translate (label :: _ "comment_send") state.translator)
@@ -271,7 +305,7 @@ commentview = connect selectTranslator $ H.mkComponent
     renderModal = case state.requestModal of
       Nothing -> []
       Just Resolve -> []
-      Just Delete -> []  -- Delete no longer uses modal, uses popover instead
+      Just Delete -> [] -- Delete no longer uses modal, uses popover instead
 
   handleAction :: Action -> forall slots. H.HalogenM State Action slots Output m Unit
   handleAction = case _ of
@@ -435,7 +469,6 @@ commentview = connect selectTranslator $ H.mkComponent
 
     HideDiscardPopover -> do
       H.modify_ _ { showDiscardPopover = false }
-
 
   handleQuery
     :: forall slots a

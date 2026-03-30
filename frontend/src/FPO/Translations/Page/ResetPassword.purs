@@ -26,11 +26,13 @@ enPasswordReset = fromRecord
   , rp_NoMatch: "The passwords do not match."
   , rp_PasswordConfirm: "Repeat new password"
   , rp_PasswordNew: "New password"
-  , rp_linkSentBodyAfter: "you will receive an email with instructions to reset your password."
+  , rp_linkSentBodyAfter:
+      "you will receive an email with instructions to reset your password."
   , rp_linkSentBodyBefore: "If an account exists for"
   , rp_linkSentTitle: "Check your inbox"
   , rp_newPasswordHint: "Choose a new password for your account."
-  , rp_requestLinkHint: "Enter your email address and we will send you a link to reset your password."
+  , rp_requestLinkHint:
+      "Enter your email address and we will send you a link to reset your password."
   , rp_sendResetLink: "Send reset link"
   , rp_setNewPassword: "Set new password"
   }
@@ -42,11 +44,13 @@ dePasswordReset = fromRecord
   , rp_NoMatch: "Die Passwörter stimmen nicht überein."
   , rp_PasswordConfirm: "Neues Passwort wiederholen"
   , rp_PasswordNew: "Neues Passwort"
-  , rp_linkSentBodyAfter: "existiert, erhalten Sie eine E-Mail mit Anweisungen zum Zurücksetzen Ihres Passworts."
+  , rp_linkSentBodyAfter:
+      "existiert, erhalten Sie eine E-Mail mit Anweisungen zum Zurücksetzen Ihres Passworts."
   , rp_linkSentBodyBefore: "Falls ein Konto für"
   , rp_linkSentTitle: "Posteingang prüfen"
   , rp_newPasswordHint: "Wählen Sie ein neues Passwort für Ihr Konto."
-  , rp_requestLinkHint: "Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link zum Zurücksetzen Ihres Passworts."
+  , rp_requestLinkHint:
+      "Geben Sie Ihre E-Mail-Adresse ein und wir senden Ihnen einen Link zum Zurücksetzen Ihres Passworts."
   , rp_sendResetLink: "Link senden"
   , rp_setNewPassword: "Neues Passwort setzen"
   }

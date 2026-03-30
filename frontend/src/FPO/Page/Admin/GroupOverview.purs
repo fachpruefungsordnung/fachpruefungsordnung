@@ -58,6 +58,7 @@ import FPO.Dto.UserOverviewDto as UOD
 import FPO.Dto.UserRoleDto (Role(..))
 import FPO.Translations.Translator (FPOTranslator, fromFpoTranslator)
 import FPO.Translations.Util (FPOState, selectTranslator)
+import FPO.UI.Css as HB
 import FPO.UI.HTML (addModal, loadingSpinner)
 import FPO.UI.Modals.DeleteModal (deleteConfirmationModal)
 import FPO.UI.Style as Style
@@ -68,14 +69,13 @@ import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore, updateStore)
-import FPO.UI.Css as HB
 import Simple.I18n.Translator (label, translate)
+import Type.Proxy (Proxy(..))
 import Web.Event.Event (stopPropagation)
 import Web.HTML (window)
 import Web.HTML.Window (confirm)
 import Web.UIEvent.MouseEvent (MouseEvent)
 import Web.UIEvent.MouseEvent as MouseEvent
-import Type.Proxy (Proxy(..))
 
 _docPagination = Proxy :: Proxy "docPagination"
 _memberPagination = Proxy :: Proxy "memberPagination"
@@ -354,7 +354,8 @@ component =
               [ HH.button
                   [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
                   , HE.onClick $ const RequestCreateDocument
-                  , Style.popover $ translate (label :: _ "gp_createNewProject") state.translator
+                  , Style.popover $ translate (label :: _ "gp_createNewProject")
+                      state.translator
                   ]
                   [ HH.i [ HP.classes [ H.ClassName "bi-plus-lg", HB.me1 ] ] []
                   , HH.text $ translate (label :: _ "common_add") state.translator
@@ -363,11 +364,18 @@ component =
           ]
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__search" ] ]
           [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__search-wrapper" ] ]
-              [ HH.i [ HP.classes [ H.ClassName "bi-search", H.ClassName "fpo-data-list__search-icon" ] ] []
+              [ HH.i
+                  [ HP.classes
+                      [ H.ClassName "bi-search"
+                      , H.ClassName "fpo-data-list__search-icon"
+                      ]
+                  ]
+                  []
               , HH.input
                   [ HP.type_ HP.InputText
                   , HP.classes [ H.ClassName "fpo-data-list__search-input" ]
-                  , HP.placeholder $ translate (label :: _ "gp_searchProjects") state.translator
+                  , HP.placeholder $ translate (label :: _ "gp_searchProjects")
+                      state.translator
                   , HP.value state.documentFilter
                   , HE.onValueInput FilterDocuments
                   ]
@@ -380,7 +388,9 @@ component =
                   [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
                       [ HH.i [ HP.classes [ H.ClassName "bi-folder2-open" ] ] [] ]
                   , HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-text" ] ]
-                      [ HH.text $ translate (label :: _ "gp_noDocumentsFound") state.translator ]
+                      [ HH.text $ translate (label :: _ "gp_noDocumentsFound")
+                          state.translator
+                      ]
                   ]
               ]
             else
@@ -390,7 +400,16 @@ component =
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
           [ HH.slot _docPagination unit P.component docPaginationProps SetDocPage
           , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
-              [ HH.text $ if length state.filteredDocuments == 0 then "" else show (state.docPage * itemsPerPage + 1) <> "-" <> show (min ((state.docPage + 1) * itemsPerPage) (length state.filteredDocuments)) <> " / " <> show (length state.filteredDocuments) ]
+              [ HH.text $
+                  if length state.filteredDocuments == 0 then ""
+                  else show (state.docPage * itemsPerPage + 1) <> "-"
+                    <> show
+                      ( min ((state.docPage + 1) * itemsPerPage)
+                          (length state.filteredDocuments)
+                      )
+                    <> " / "
+                    <> show (length state.filteredDocuments)
+              ]
           ]
       ]
     where
@@ -406,7 +425,10 @@ component =
   renderDocumentEntry :: State -> DH.DocumentHeader -> H.ComponentHTML Action Slots m
   renderDocumentEntry state doc =
     HH.div
-      [ HP.classes [ H.ClassName "fpo-data-list__row", H.ClassName "fpo-data-list__row--clickable" ]
+      [ HP.classes
+          [ H.ClassName "fpo-data-list__row"
+          , H.ClassName "fpo-data-list__row--clickable"
+          ]
       , HE.onClick $ const $ ViewDocument (DH.getID doc)
       ]
       [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
@@ -419,14 +441,17 @@ component =
           ]
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-actions" ] ]
           [ HH.button
-              [ HP.classes [ H.ClassName "fpo-data-list__action-btn", H.ClassName "fpo-data-list__action-btn--danger" ]
+              [ HP.classes
+                  [ H.ClassName "fpo-data-list__action-btn"
+                  , H.ClassName "fpo-data-list__action-btn--danger"
+                  ]
               , HE.onClick $ \e -> RequestDeleteDocument (DH.getID doc) e
-              , Style.popover $ translate (label :: _ "gp_removeProject") state.translator
+              , Style.popover $ translate (label :: _ "gp_removeProject")
+                  state.translator
               ]
               [ HH.i [ HP.classes [ H.ClassName "bi-trash-fill" ] ] [] ]
           ]
       ]
-
 
   renderMembersTab :: State -> H.ComponentHTML Action Slots m
   renderMembersTab state =
@@ -445,7 +470,8 @@ component =
                   [ HH.button
                       [ HP.classes [ HB.btn, HB.btnPrimary, HB.btnSm ]
                       , HE.onClick $ const OpenAddMemberPopover
-                      , Style.popover $ translate (label :: _ "gm_addMember") state.translator
+                      , Style.popover $ translate (label :: _ "gm_addMember")
+                          state.translator
                       ]
                       [ HH.i [ HP.classes [ H.ClassName "bi-plus-lg", HB.me1 ] ] []
                       , HH.text $ translate (label :: _ "common_add") state.translator
@@ -457,11 +483,18 @@ component =
           ]
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__search" ] ]
           [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__search-wrapper" ] ]
-              [ HH.i [ HP.classes [ H.ClassName "bi-search", H.ClassName "fpo-data-list__search-icon" ] ] []
+              [ HH.i
+                  [ HP.classes
+                      [ H.ClassName "bi-search"
+                      , H.ClassName "fpo-data-list__search-icon"
+                      ]
+                  ]
+                  []
               , HH.input
                   [ HP.type_ HP.InputText
                   , HP.classes [ H.ClassName "fpo-data-list__search-input" ]
-                  , HP.placeholder $ translate (label :: _ "gm_searchMembers") state.translator
+                  , HP.placeholder $ translate (label :: _ "gm_searchMembers")
+                      state.translator
                   , HP.value state.memberFilter
                   , HE.onValueInput FilterMembers
                   ]
@@ -474,7 +507,9 @@ component =
                   [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-icon" ] ]
                       [ HH.i [ HP.classes [ H.ClassName "bi-people" ] ] [] ]
                   , HH.div [ HP.classes [ H.ClassName "fpo-data-list__empty-text" ] ]
-                      [ HH.text $ translate (label :: _ "gm_noMembersFound") state.translator ]
+                      [ HH.text $ translate (label :: _ "gm_noMembersFound")
+                          state.translator
+                      ]
                   ]
               ]
             else
@@ -482,9 +517,19 @@ component =
                 <> placeholderRows (length members) memberPageCount
           )
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__footer" ] ]
-          [ HH.slot _memberPagination unit P.component memberPaginationProps SetMemberPage
+          [ HH.slot _memberPagination unit P.component memberPaginationProps
+              SetMemberPage
           , HH.span [ HP.classes [ H.ClassName "fpo-data-list__entry-count" ] ]
-              [ HH.text $ if length state.filteredMembers == 0 then "" else show (state.memberPage * itemsPerPage + 1) <> "-" <> show (min ((state.memberPage + 1) * itemsPerPage) (length state.filteredMembers)) <> " / " <> show (length state.filteredMembers) ]
+              [ HH.text $
+                  if length state.filteredMembers == 0 then ""
+                  else show (state.memberPage * itemsPerPage + 1) <> "-"
+                    <> show
+                      ( min ((state.memberPage + 1) * itemsPerPage)
+                          (length state.filteredMembers)
+                      )
+                    <> " / "
+                    <> show (length state.filteredMembers)
+              ]
           ]
       ]
     where
@@ -513,17 +558,25 @@ component =
                 [ HH.text $ roleToString state (getUserInfoRole member) ]
           , if state.isSuperAdmin then
               HH.button
-                [ HP.classes [ H.ClassName "fpo-data-list__action-btn", H.ClassName "fpo-data-list__action-btn--accent" ]
+                [ HP.classes
+                    [ H.ClassName "fpo-data-list__action-btn"
+                    , H.ClassName "fpo-data-list__action-btn--accent"
+                    ]
                 , HE.onClick $ const $ NavigateToUserProfile (getUserInfoID member)
-                , Style.popover $ translate (label :: _ "admin_users_goToProfilePage") state.translator
+                , Style.popover $ translate (label :: _ "admin_users_goToProfilePage")
+                    state.translator
                 ]
                 [ HH.i [ HP.classes [ H.ClassName "bi-person-fill" ] ] [] ]
             else
               HH.text ""
           , HH.button
-              [ HP.classes [ H.ClassName "fpo-data-list__action-btn", H.ClassName "fpo-data-list__action-btn--danger" ]
+              [ HP.classes
+                  [ H.ClassName "fpo-data-list__action-btn"
+                  , H.ClassName "fpo-data-list__action-btn--danger"
+                  ]
               , HE.onClick $ const $ RequestRemoveMember (getUserInfoID member)
-              , Style.popover $ translate (label :: _ "gm_removeMember") state.translator
+              , Style.popover $ translate (label :: _ "gm_removeMember")
+                  state.translator
               ]
               [ HH.i [ HP.classes [ H.ClassName "bi-box-arrow-right" ] ] [] ]
           ]
@@ -554,7 +607,6 @@ component =
     where
     currentRole = getUserInfoRole member
 
-
   roleToString :: State -> Role -> String
   roleToString state = case _ of
     Admin -> "Admin"
@@ -584,7 +636,8 @@ component =
                 [ HH.i [ HP.classes [ H.ClassName "bi-person-plus-fill", HB.me2 ] ] []
                 , HH.text $ translate (label :: _ "gm_addMember") state.translator
                 ]
-            , if hasSelection then HH.span [ HP.classes [ HB.badge, HB.textBgPrimary ] ]
+            , if hasSelection then HH.span
+                [ HP.classes [ HB.badge, HB.textBgPrimary ] ]
                 [ HH.text $ show (length state.selectedUsersToAdd) ]
               else HH.text ""
             ]
@@ -748,78 +801,78 @@ component =
               [ HH.text $ translate (label :: _ "gs_settings") state.translator ]
           ]
       , HH.div [ HP.classes [ H.ClassName "fpo-data-list__body", HB.py4 ] ]
-                  [ -- Group Name field
-                    HH.div [ HP.classes [ HB.mb3 ] ]
-                      [ HH.label
-                          [ HP.for "groupName"
-                          , HP.classes [ HB.formLabel ]
-                          ]
-                          [ HH.text $ translate (label :: _ "gs_groupName")
-                              state.translator
-                          ]
-                      , HH.input
-                          [ HP.type_ HP.InputText
-                          , HP.classes [ HB.formControl ]
-                          , HP.id "groupName"
-                          , HP.placeholder $ translate
-                              (label :: _ "gs_groupNamePlaceholder")
-                              state.translator
-                          , HP.value state.editedGroupName
-                          , HP.required true
-                          , HE.onValueInput ChangeGroupName
-                          , HP.disabled state.settingsSaving
-                          ]
-                      ]
-                  , -- Group Description field
-                    HH.div [ HP.classes [ HB.mb3 ] ]
-                      [ HH.label
-                          [ HP.for "groupDescription"
-                          , HP.classes [ HB.formLabel ]
-                          ]
-                          [ HH.text $ translate (label :: _ "gs_description")
-                              state.translator
-                          ]
-                      , HH.textarea
-                          [ HP.classes [ HB.formControl ]
-                          , HP.id "groupDescription"
-                          , HP.placeholder $ translate
-                              (label :: _ "gs_descriptionPlaceholder")
-                              state.translator
-                          , HP.value state.editedGroupDescription
-                          , HP.rows 3
-                          , HE.onValueInput ChangeGroupDescription
-                          , HP.disabled state.settingsSaving
-                          ]
-                      ]
-                  , -- Save button
-                    HH.div [ HP.classes [ HB.dFlex, HB.justifyContentEnd ] ]
-                      [ HH.button
-                          [ HP.classes [ HB.btn, HB.btnPrimary ]
-                          , HE.onClick $ const SaveGroupSettings
-                          , HP.disabled
-                              ( state.settingsSaving
-                                  || state.editedGroupName == ""
-                              )
-                          ]
-                          [ if state.settingsSaving then
-                              HH.span
-                                [ HP.classes
-                                    [ HB.spinnerBorder
-                                    , HB.spinnerBorderSm
-                                    , HB.me2
-                                    ]
-                                ]
-                                []
-                            else
-                              HH.i
-                                [ HP.classes [ H.ClassName "bi-check-lg", HB.me2 ]
-                                ]
-                                []
-                          , HH.text $ translate (label :: _ "gs_saveSettings")
-                              state.translator
-                          ]
-                      ]
+          [ -- Group Name field
+            HH.div [ HP.classes [ HB.mb3 ] ]
+              [ HH.label
+                  [ HP.for "groupName"
+                  , HP.classes [ HB.formLabel ]
                   ]
+                  [ HH.text $ translate (label :: _ "gs_groupName")
+                      state.translator
+                  ]
+              , HH.input
+                  [ HP.type_ HP.InputText
+                  , HP.classes [ HB.formControl ]
+                  , HP.id "groupName"
+                  , HP.placeholder $ translate
+                      (label :: _ "gs_groupNamePlaceholder")
+                      state.translator
+                  , HP.value state.editedGroupName
+                  , HP.required true
+                  , HE.onValueInput ChangeGroupName
+                  , HP.disabled state.settingsSaving
+                  ]
+              ]
+          , -- Group Description field
+            HH.div [ HP.classes [ HB.mb3 ] ]
+              [ HH.label
+                  [ HP.for "groupDescription"
+                  , HP.classes [ HB.formLabel ]
+                  ]
+                  [ HH.text $ translate (label :: _ "gs_description")
+                      state.translator
+                  ]
+              , HH.textarea
+                  [ HP.classes [ HB.formControl ]
+                  , HP.id "groupDescription"
+                  , HP.placeholder $ translate
+                      (label :: _ "gs_descriptionPlaceholder")
+                      state.translator
+                  , HP.value state.editedGroupDescription
+                  , HP.rows 3
+                  , HE.onValueInput ChangeGroupDescription
+                  , HP.disabled state.settingsSaving
+                  ]
+              ]
+          , -- Save button
+            HH.div [ HP.classes [ HB.dFlex, HB.justifyContentEnd ] ]
+              [ HH.button
+                  [ HP.classes [ HB.btn, HB.btnPrimary ]
+                  , HE.onClick $ const SaveGroupSettings
+                  , HP.disabled
+                      ( state.settingsSaving
+                          || state.editedGroupName == ""
+                      )
+                  ]
+                  [ if state.settingsSaving then
+                      HH.span
+                        [ HP.classes
+                            [ HB.spinnerBorder
+                            , HB.spinnerBorderSm
+                            , HB.me2
+                            ]
+                        ]
+                        []
+                    else
+                      HH.i
+                        [ HP.classes [ H.ClassName "bi-check-lg", HB.me2 ]
+                        ]
+                        []
+                  , HH.text $ translate (label :: _ "gs_saveSettings")
+                      state.translator
+                  ]
+              ]
+          ]
       ]
 
   handleAction :: Action -> H.HalogenM State Action Slots output m Unit
@@ -867,15 +920,18 @@ component =
       state <- H.get
       let
         currentName = fromMaybe "" $ getGroupName <$> state.group
-        currentDesc = fromMaybe "" $ state.group >>= \g -> pure (getGroupDescription g)
-        hasChanges = state.editedGroupName /= currentName || state.editedGroupDescription /= currentDesc
+        currentDesc = fromMaybe "" $ state.group >>= \g -> pure
+          (getGroupDescription g)
+        hasChanges = state.editedGroupName /= currentName ||
+          state.editedGroupDescription /= currentDesc
       shouldGo <-
         if hasChanges then do
           win <- H.liftEffect window
-          H.liftEffect $ confirm (translate (label :: _ "gs_unsavedChangesConfirm") state.translator) win
+          H.liftEffect $ confirm
+            (translate (label :: _ "gs_unsavedChangesConfirm") state.translator)
+            win
         else pure true
       when shouldGo $ navigate AdminGroups
-
 
     -- Tab actions
     SwitchTab tab -> do
@@ -1196,20 +1252,22 @@ component =
 
   placeholderRows :: Int -> Int -> Array (H.ComponentHTML Action Slots m)
   placeholderRows currentCount pages =
-    let needed = itemsPerPage - currentCount
-    in if pages <= 1 || needed <= 0 then []
-       else replicate needed $
-         HH.div
-           [ HP.classes [ H.ClassName "fpo-data-list__row" ]
-           , HP.style "visibility: hidden; pointer-events: none;"
-           ]
-           [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
-               [ HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-primary" ] ]
-                   [ HH.text "\x00a0" ]
-               , HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-secondary" ] ]
-                   [ HH.text "\x00a0" ]
-               ]
-           ]
+    let
+      needed = itemsPerPage - currentCount
+    in
+      if pages <= 1 || needed <= 0 then []
+      else replicate needed $
+        HH.div
+          [ HP.classes [ H.ClassName "fpo-data-list__row" ]
+          , HP.style "visibility: hidden; pointer-events: none;"
+          ]
+          [ HH.div [ HP.classes [ H.ClassName "fpo-data-list__row-info" ] ]
+              [ HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-primary" ] ]
+                  [ HH.text "\x00a0" ]
+              , HH.span [ HP.classes [ H.ClassName "fpo-data-list__row-secondary" ] ]
+                  [ HH.text "\x00a0" ]
+              ]
+          ]
 
   reloadGroupMembers :: H.HalogenM State Action Slots output m Unit
   reloadGroupMembers = do
