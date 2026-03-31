@@ -1179,7 +1179,7 @@ tocview = connect selectAll $ H.mkComponent
                               "Header"
                           ]
                         )
-                        [ HH.text (getHeading header) ]
+                        [ HH.text "Kopfzeile" ]
                     ]
                 ]
             childItems = concat $ mapWithIndex
