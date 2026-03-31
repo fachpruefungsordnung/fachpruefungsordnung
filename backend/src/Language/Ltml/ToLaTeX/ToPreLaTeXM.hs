@@ -424,10 +424,7 @@ instance ToPreLaTeXM Table where
                  in "|p{" <> marginS <> "\\textwidth}"
             option = T.pack (concatMap applyMargin props) <> "|"
         rows' <- mapM toPreLaTeXM rows
-        pure $
-            IRaw
-                "\\textcolor{orange}{Attention: Tables are currently not fully supported!}\n\n"
-                <> tabular option (ISequence rows' <> hline)
+        pure $ tabular option (ISequence rows' <> hline)
 
 instance ToPreLaTeXM Row where
     toPreLaTeXM (Row cells) = do
