@@ -1002,6 +1002,8 @@ splitview = connect selectTranslator $ H.mkComponent
 
     SetComparison elementID mVID -> do
       state <- H.get
+      when state.resizeState.previewClosed $
+        handleAction TogglePreview
       let
         tocEntry = fromMaybe
           emptyTOCEntry
@@ -1078,6 +1080,8 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Editor.ClickedQuery html -> do
         state <- H.get
+        when state.resizeState.previewClosed $
+          handleAction TogglePreview
         case state.mSelectedTocEntry of
           Just (SelLeaf tocID) -> do
             -- Only reset comparison data if we're not currently in comparison mode
