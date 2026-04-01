@@ -1002,18 +1002,22 @@ splitview = connect selectTranslator $ H.mkComponent
 
     SetComparison elementID mVID -> do
       state <- H.get
+      when state.resizeState.previewClosed $
+        handleAction TogglePreview
       let
         tocEntry = fromMaybe
           emptyTOCEntry
           (findTOCEntry elementID state.tocEntries)
-        title = fromMaybe
-          ""
-          (findTitleTOCEntry elementID state.tocEntries)
+        mTitle = findTitleTOCEntry elementID state.tocEntries
+        title = fromMaybe "" mTitle
+      syncSelectedEntry (SelLeaf elementID) mTitle
       handleAction
         ( ModifyVersionMapping elementID Nothing
             (Just (Just { tocEntry: tocEntry, revID: mVID, title: title }))
         )
       mmTitle <- H.request _toc unit TOC.RequestFullTitle
+      H.tell _editor 0
+        (Editor.ChangeSection tocEntry Nothing (join mmTitle))
       H.tell _editor 1
         (Editor.ChangeSection tocEntry mVID (join mmTitle))
 
@@ -1078,6 +1082,8 @@ splitview = connect selectTranslator $ H.mkComponent
 
       Editor.ClickedQuery html -> do
         state <- H.get
+        when state.resizeState.previewClosed $
+          handleAction TogglePreview
         case state.mSelectedTocEntry of
           Just (SelLeaf tocID) -> do
             -- Only reset comparison data if we're not currently in comparison mode
@@ -1091,17 +1097,7 @@ splitview = connect selectTranslator $ H.mkComponent
               Just _ -> pure unit -- Don't reset comparison data when in comparison mode
           _ -> pure unit
         -- Always set renderedHtml
-        H.modify_ _
-          { renderedHtml = Just (Loaded html)
-          }
-        -- Only update previewRatio and previewClosed if preview is not already shown
-        when state.resizeState.previewClosed do
-          H.modify_ \st -> st
-            { resizeState = st.resizeState
-                { previewRatio = state.resizeState.lastExpandedPreviewRatio
-                , previewClosed = false
-                }
-            }
+        H.modify_ _ { renderedHtml = Just (Loaded html) }
 
       Editor.PostPDF _ -> do
         state <- H.get

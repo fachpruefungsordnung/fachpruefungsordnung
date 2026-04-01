@@ -698,6 +698,7 @@ editor = connect selectTranslator $ H.mkComponent
 
       H.getHTMLElementRef (H.RefLabel "container") >>= traverse_ \el -> do
         editor_ <- H.liftEffect $ Ace.editNode el Ace.ace
+        H.modify_ _ { mEditor = Just editor_ }
         fontSize <- H.gets _.fontSize
 
         -- setting for both instances and later add more specific settings
